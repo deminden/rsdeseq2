@@ -12,10 +12,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-r@v2
       - name: Install test dependencies
-        run: Rscript -e 'install.packages("testthat", repos = "https://cloud.r-project.org")'
+        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("testthat", quietly = TRUE)) install.packages("testthat")'
       - name: Source-tree testthat suite
-        run: Rscript -e 'for (f in list.files("r-pkg/rsdeseq2/R", pattern="[.]R$", full.names=TRUE)) source(f); testthat::test_dir("r-pkg/rsdeseq2/tests/testthat", reporter="summary")'
+        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("testthat", quietly = TRUE)) install.packages("testthat"); for (f in list.files("r-pkg/rsdeseq2/R", pattern="[.]R$", full.names=TRUE)) source(f); testthat::test_dir("r-pkg/rsdeseq2/tests/testthat", reporter="summary")'
       - name: Build package
         run: R CMD build r-pkg/rsdeseq2
       - name: Package check
-        run: R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
+        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("testthat", quietly = TRUE)) install.packages("testthat")' && R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
