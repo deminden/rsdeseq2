@@ -1,0 +1,5 @@
+gene	sample1	sample2	sample3	sample4
+replace_gene1	0	9	1	0.5
+replace_gene2	8	0	0	0
+replace_gene3	0	0	7	0
+replace_gene4	0	0	0	0

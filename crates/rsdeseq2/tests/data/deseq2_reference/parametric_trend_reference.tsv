@@ -1,0 +1,7 @@
+gene	baseMean	dispGeneEst	dispFit	useForFit	asymptDisp	extraPois
+trend_gene1	10	0.25	0.25	TRUE	0.05	2
+trend_gene2	20	0.15	0.15	TRUE	0.05	2
+trend_gene3	40	0.1	0.1	TRUE	0.05	2
+trend_gene4	80	0.075	0.075	TRUE	0.05	2
+trend_gene5	160	0.0625	0.0625	TRUE	0.05	2
+trend_gene6	320	0.05625	0.05625	TRUE	0.05	2

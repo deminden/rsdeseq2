@@ -1,0 +1,9 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rsdeseq2"
+version = "0.0.1"
+description = "Future Python bindings for rsdeseq2"
+requires-python = ">=3.9"

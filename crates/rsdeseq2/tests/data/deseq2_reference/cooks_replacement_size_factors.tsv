@@ -1,0 +1,5 @@
+sample	size_factor	replaceable
+sample1	1	FALSE
+sample2	2	TRUE
+sample3	1	TRUE
+sample4	2	FALSE

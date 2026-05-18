@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+echo "rsdeseq2 configure: using the C .Call bridge for implemented primitive helpers."
+echo "rsdeseq2 configure: the Rust static-library bridge is not enabled yet."

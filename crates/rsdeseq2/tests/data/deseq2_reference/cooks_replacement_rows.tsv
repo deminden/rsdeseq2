@@ -1,0 +1,5 @@
+gene	replace	allZero	baseMean	baseVar	newAllZero	refitReplace	postRefitMaxCooks
+replace_gene1	TRUE	FALSE	18.125	39.0625	FALSE	TRUE	0.5
+replace_gene2	TRUE	TRUE	0	0	TRUE	FALSE	8
+replace_gene3	TRUE	FALSE	6.75	5.58333333333333	FALSE	TRUE	0
+replace_gene4	FALSE	FALSE	47.5	91.6666666666667	FALSE	FALSE	0

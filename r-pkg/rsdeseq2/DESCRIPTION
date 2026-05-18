@@ -1,0 +1,17 @@
+Package: rsdeseq2
+Title: Rust Backend Scaffold for DESeq2-Like Workflows
+Version: 0.0.1
+Authors@R:
+    person(given = "rsdeseq2", family = "contributors",
+           role = c("aut", "cre"), email = "maintainers@example.com")
+Author: rsdeseq2 contributors
+Maintainer: rsdeseq2 contributors <maintainers@example.com>
+Description: Minimal R package scaffold for a future Rust implementation of
+    DESeq2-compatible differential expression workflow stages.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.0
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

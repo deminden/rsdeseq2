@@ -1,0 +1,3 @@
+# The implemented primitive .Call bridge is compiled from entrypoint.c by R's
+# default package build rules. A future Rust static-library bridge can extend
+# this file when the R-facing Rust ABI is ready.

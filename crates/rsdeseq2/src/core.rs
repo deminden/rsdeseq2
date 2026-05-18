@@ -1,0 +1,2613 @@
+use crate::contrasts::{
+    contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_contrast, ContrastSpec,
+    FactorLevelContrast,
+};
+use crate::cooks::{
+    calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
+    CooksReplacementOptions,
+};
+use crate::design::DesignMatrix;
+use crate::dispersion::{
+    estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_glm_mu,
+    estimate_gene_wise_dispersions_linear_mu, estimate_map_dispersions, fit_mean_dispersion_trend,
+    fit_parametric_dispersion_trend, GeneWiseDispersionInput, GeneWiseDispersionOptions,
+    MapDispersionInput, MapDispersionOptions, MeanDispersionTrendOptions,
+    ParametricDispersionTrendOptions,
+};
+use crate::errors::{invalid_dimensions, DeseqError};
+use crate::glm::{
+    fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
+    fit_fixed_dispersion_irls_with_weights,
+    fit_intercept_only_fixed_dispersion_with_normalization_factors,
+    fit_intercept_only_fixed_dispersion_with_weights, lrt_test,
+    preprocess_observation_weights_with_options, wald_test_coefficient_with_options,
+    wald_test_contrast_with_options, IrlsOptions, LrtOutput, NbinomGlmFit,
+    ObservationWeightOptions, WaldAlternative, WaldContrastOutput, WaldOutput, WaldTestOptions,
+};
+use crate::independent_filtering::{apply_independent_filtering, IndependentFilteringOptions};
+use crate::matrix::RowMajorMatrix;
+use crate::normalization::{
+    base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
+    estimate_size_factors_with_options, normalized_counts, normalized_counts_with_factors,
+    validate_normalization_factors,
+};
+use crate::options::{
+    ControlGenes, CooksCutoff, ExecutionMode, FitType, SizeFactorMethod, SizeFactorOptions,
+    TestType,
+};
+use crate::results::{
+    apply_cooks_cutoff, build_lrt_results, build_wald_contrast_results,
+    build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
+};
+
+/// Row-major genes x samples count matrix.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CountMatrix {
+    n_genes: usize,
+    n_samples: usize,
+    counts: Vec<u32>,
+    gene_names: Option<Vec<String>>,
+    sample_names: Option<Vec<String>>,
+}
+
+impl CountMatrix {
+    /// Build a count matrix from row-major `u32` values.
+    pub fn from_row_major_u32(
+        n_genes: usize,
+        n_samples: usize,
+        counts: Vec<u32>,
+    ) -> Result<Self, DeseqError> {
+        Self::from_row_major_u32_with_names(n_genes, n_samples, counts, None, None)
+    }
+
+    /// Build a count matrix from row-major `u64` values.
+    ///
+    /// The initial storage type is `u32`; values larger than `u32::MAX` are
+    /// rejected instead of silently truncating.
+    pub fn from_row_major_u64(
+        n_genes: usize,
+        n_samples: usize,
+        counts: Vec<u64>,
+    ) -> Result<Self, DeseqError> {
+        let converted = counts
+            .into_iter()
+            .enumerate()
+            .map(|(idx, value)| {
+                u32::try_from(value).map_err(|_| DeseqError::InvalidCounts {
+                    reason: format!("count at index {idx} exceeds u32::MAX"),
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Self::from_row_major_u32(n_genes, n_samples, converted)
+    }
+
+    /// Build a count matrix with optional row and column names.
+    pub fn from_row_major_u32_with_names(
+        n_genes: usize,
+        n_samples: usize,
+        counts: Vec<u32>,
+        gene_names: Option<Vec<String>>,
+        sample_names: Option<Vec<String>>,
+    ) -> Result<Self, DeseqError> {
+        if n_genes == 0 {
+            return Err(DeseqError::InvalidCounts {
+                reason: "count matrix must contain at least one gene".to_string(),
+            });
+        }
+        if n_samples == 0 {
+            return Err(DeseqError::InvalidCounts {
+                reason: "count matrix must contain at least one sample".to_string(),
+            });
+        }
+        let expected =
+            n_genes
+                .checked_mul(n_samples)
+                .ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "count matrix shape overflow".to_string(),
+                    expected: usize::MAX,
+                    actual: counts.len(),
+                })?;
+        if counts.len() != expected {
+            return Err(invalid_dimensions(
+                "count matrix values",
+                expected,
+                counts.len(),
+            ));
+        }
+        if let Some(names) = &gene_names {
+            if names.len() != n_genes {
+                return Err(invalid_dimensions("gene names", n_genes, names.len()));
+            }
+        }
+        if let Some(names) = &sample_names {
+            if names.len() != n_samples {
+                return Err(invalid_dimensions("sample names", n_samples, names.len()));
+            }
+        }
+        Ok(Self {
+            n_genes,
+            n_samples,
+            counts,
+            gene_names,
+            sample_names,
+        })
+    }
+
+    /// Number of genes.
+    pub fn n_genes(&self) -> usize {
+        self.n_genes
+    }
+
+    /// Number of samples.
+    pub fn n_samples(&self) -> usize {
+        self.n_samples
+    }
+
+    /// Count values in row-major order.
+    pub fn as_slice(&self) -> &[u32] {
+        &self.counts
+    }
+
+    /// Return a gene row.
+    pub fn row(&self, gene: usize) -> Result<&[u32], DeseqError> {
+        if gene >= self.n_genes {
+            return Err(DeseqError::InvalidDimensions {
+                context: "gene index".to_string(),
+                expected: self.n_genes.saturating_sub(1),
+                actual: gene,
+            });
+        }
+        Ok(self.row_values(gene))
+    }
+
+    pub(crate) fn row_values(&self, gene: usize) -> &[u32] {
+        let start = gene * self.n_samples;
+        &self.counts[start..start + self.n_samples]
+    }
+
+    /// Whether all samples are zero for a gene.
+    pub fn is_all_zero_gene(&self, gene: usize) -> Result<bool, DeseqError> {
+        Ok(self.row(gene)?.iter().all(|count| *count == 0))
+    }
+
+    /// Per-gene all-zero flags.
+    pub fn all_zero_flags(&self) -> Vec<bool> {
+        (0..self.n_genes)
+            .map(|gene| self.row_values(gene).iter().all(|count| *count == 0))
+            .collect()
+    }
+
+    /// Optional gene names.
+    pub fn gene_names(&self) -> Option<&[String]> {
+        self.gene_names.as_deref()
+    }
+
+    /// Optional sample names.
+    pub fn sample_names(&self) -> Option<&[String]> {
+        self.sample_names.as_deref()
+    }
+
+    /// Return a basic summary used by fit-state output.
+    pub fn summary(&self) -> CountsSummary {
+        let all_zero_genes = (0..self.n_genes)
+            .filter(|gene| self.row_values(*gene).iter().all(|count| *count == 0))
+            .count();
+        CountsSummary {
+            n_genes: self.n_genes,
+            n_samples: self.n_samples,
+            all_zero_genes,
+        }
+    }
+}
+
+/// Basic count matrix summary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountsSummary {
+    /// Number of genes.
+    pub n_genes: usize,
+    /// Number of samples.
+    pub n_samples: usize,
+    /// Number of all-zero genes.
+    pub all_zero_genes: usize,
+}
+
+/// Inspectable fit state for all implemented and future DESeq2 stages.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqFit {
+    /// Count matrix summary.
+    pub counts_summary: CountsSummary,
+    /// Optional design matrix information.
+    pub design: Option<DesignMatrix>,
+    /// Optional reduced design matrix information for likelihood-ratio tests.
+    pub reduced_design: Option<DesignMatrix>,
+    /// Estimated or supplied size factors.
+    pub size_factors: Vec<f64>,
+    /// Optional gene/sample normalization factors.
+    pub normalization_factors: Option<RowMajorMatrix<f64>>,
+    /// Optional DESeq2-style observation weights used by builder stages.
+    ///
+    /// When a design is available these are row-normalized weights from
+    /// `getAndCheckWeights`-style preprocessing. `baseMean` and `baseVar` still
+    /// use the raw caller-supplied weights first, matching DESeq2's
+    /// `getBaseMeansAndVariances` ordering.
+    pub observation_weights: Option<RowMajorMatrix<f64>>,
+    /// Rows that failed DESeq2-style observation-weight design checks.
+    pub weights_fail: Option<Vec<bool>>,
+    /// Rank of the unweighted design during observation-weight preprocessing.
+    pub weights_design_rank: Option<usize>,
+    /// Per-gene base means.
+    pub base_mean: Vec<f64>,
+    /// Per-gene sample variance of normalized counts, matching DESeq2 `baseVar`.
+    pub base_var: Vec<f64>,
+    /// Per-gene all-zero flags, matching DESeq2 `allZero`.
+    ///
+    /// For design-aware observation-weight stages, rows with `weightsFail` are
+    /// also marked true, matching DESeq2's downstream skip behavior.
+    pub all_zero: Vec<bool>,
+    /// Gene-wise dispersion estimates.
+    pub disp_gene_est: Option<Vec<f64>>,
+    /// Fitted dispersion trend values.
+    pub disp_fit: Option<Vec<f64>>,
+    /// MAP dispersion estimates before outlier replacement.
+    pub disp_map: Option<Vec<f64>>,
+    /// Final dispersion estimates.
+    pub dispersion: Option<Vec<f64>>,
+    /// MAP dispersion iteration counts.
+    pub disp_iter: Option<Vec<usize>>,
+    /// MAP dispersion outlier flags.
+    pub disp_outlier: Option<Vec<bool>>,
+    /// Dispersion prior variance.
+    pub disp_prior_var: Option<f64>,
+    /// Dispersion convergence flags.
+    pub dispersion_converged: Option<Vec<bool>>,
+    /// GLM beta estimates.
+    pub beta: Option<RowMajorMatrix<f64>>,
+    /// GLM beta standard errors.
+    pub beta_se: Option<RowMajorMatrix<f64>>,
+    /// Per-gene GLM beta covariance matrices on log2 scale.
+    ///
+    /// Stored as genes x `(n_coefficients * n_coefficients)`, with each gene
+    /// row containing a row-major coefficient covariance matrix.
+    pub beta_covariance: Option<RowMajorMatrix<f64>>,
+    /// GLM beta convergence flags.
+    pub beta_converged: Option<Vec<bool>>,
+    /// GLM beta iteration counts.
+    pub beta_iter: Option<Vec<usize>>,
+    /// Per-gene fitted-model log likelihoods from the full GLM.
+    pub log_like: Option<Vec<f64>>,
+    /// Per-gene full-model deviance, matching DESeq2's `-2 * logLike` field.
+    pub full_deviance: Option<Vec<f64>>,
+    /// Per-gene reduced-model log likelihoods for LRT pipelines.
+    pub reduced_log_like: Option<Vec<f64>>,
+    /// Per-gene reduced-model beta convergence flags for LRT pipelines.
+    pub reduced_beta_converged: Option<Vec<bool>>,
+    /// Per-gene reduced-model beta iteration counts for LRT pipelines.
+    pub reduced_beta_iter: Option<Vec<usize>>,
+    /// Fitted mean matrix.
+    pub mu: Option<RowMajorMatrix<f64>>,
+    /// Cook's distance matrix.
+    pub cooks: Option<RowMajorMatrix<f64>>,
+    /// Per-gene maximum Cook's distance over eligible samples.
+    pub max_cooks: Option<Vec<Option<f64>>>,
+    /// Hat diagonal matrix.
+    pub hat_diagonal: Option<RowMajorMatrix<f64>>,
+    /// Wald output.
+    pub wald: Option<WaldOutput>,
+    /// LRT output.
+    pub lrt: Option<LrtOutput>,
+}
+
+/// Builder for implemented and future DESeq2 workflow stages.
+#[derive(Clone, Debug)]
+pub struct DeseqBuilder {
+    fit_type: FitType,
+    test: TestType,
+    size_factor_options: SizeFactorOptions,
+    normalization_factors: Option<RowMajorMatrix<f64>>,
+    observation_weights: Option<RowMajorMatrix<f64>>,
+    observation_weight_options: ObservationWeightOptions,
+    execution_mode: ExecutionMode,
+    threads: Option<usize>,
+    irls_options: IrlsOptions,
+    gene_wise_dispersion_options: GeneWiseDispersionOptions,
+    wald_test_options: WaldTestOptions,
+    cooks_cutoff: CooksCutoff,
+    independent_filtering_options: IndependentFilteringOptions,
+}
+
+struct NormalizationStages {
+    size_factors: Vec<f64>,
+    base_mean: Vec<f64>,
+    base_var: Vec<f64>,
+    all_zero: Vec<bool>,
+    normalized: RowMajorMatrix<f64>,
+    normalization_factors: Option<RowMajorMatrix<f64>>,
+    observation_weights: Option<RowMajorMatrix<f64>>,
+    weights_fail: Option<Vec<bool>>,
+    weights_design_rank: Option<usize>,
+}
+
+impl NormalizationStages {
+    fn into_base_fit_input(self) -> BaseFitInput {
+        BaseFitInput {
+            size_factors: self.size_factors,
+            normalization_factors: self.normalization_factors,
+            observation_weights: self.observation_weights,
+            weights_fail: self.weights_fail,
+            weights_design_rank: self.weights_design_rank,
+            base_mean: self.base_mean,
+            base_var: self.base_var,
+            all_zero: self.all_zero,
+        }
+    }
+}
+
+struct BaseFitInput {
+    size_factors: Vec<f64>,
+    normalization_factors: Option<RowMajorMatrix<f64>>,
+    observation_weights: Option<RowMajorMatrix<f64>>,
+    weights_fail: Option<Vec<bool>>,
+    weights_design_rank: Option<usize>,
+    base_mean: Vec<f64>,
+    base_var: Vec<f64>,
+    all_zero: Vec<bool>,
+}
+
+struct WeightedBaseMetadata {
+    base_mean: Vec<f64>,
+    base_var: Vec<f64>,
+    observation_weights: Option<RowMajorMatrix<f64>>,
+    weights_fail: Option<Vec<bool>>,
+    weights_design_rank: Option<usize>,
+}
+
+struct WaldPipelineInput<'a> {
+    counts: &'a CountMatrix,
+    design: &'a DesignMatrix,
+    size_factors: &'a [f64],
+    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    normalized: &'a RowMajorMatrix<f64>,
+    base_mean: &'a [f64],
+    all_zero: &'a [bool],
+    dispersions: &'a [f64],
+    coefficient: usize,
+}
+
+struct LrtPipelineInput<'a> {
+    counts: &'a CountMatrix,
+    full_design: &'a DesignMatrix,
+    reduced_design: &'a DesignMatrix,
+    size_factors: &'a [f64],
+    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    normalized: &'a RowMajorMatrix<f64>,
+    base_mean: &'a [f64],
+    all_zero: &'a [bool],
+    dispersions: &'a [f64],
+    coefficient: usize,
+}
+
+#[derive(Clone, Copy)]
+struct FixedDispersionGlmInput<'a> {
+    counts: &'a CountMatrix,
+    design: &'a DesignMatrix,
+    size_factors: &'a [f64],
+    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    all_zero: &'a [bool],
+    dispersions: &'a [f64],
+}
+
+struct FixedDispersionGlmOutput {
+    glm_fit: NbinomGlmFit,
+    expanded_dispersions: Vec<f64>,
+}
+
+struct WaldPipelineOutput {
+    glm_fit: NbinomGlmFit,
+    wald: WaldOutput,
+    cooks: CooksOutput,
+    results: DeseqResults,
+    expanded_dispersions: Vec<f64>,
+}
+
+struct WaldContrastPipelineOutput {
+    glm_fit: NbinomGlmFit,
+    wald_contrast: WaldContrastOutput,
+    cooks: CooksOutput,
+    results: DeseqResults,
+    expanded_dispersions: Vec<f64>,
+}
+
+struct LrtPipelineOutput {
+    full_fit: NbinomGlmFit,
+    reduced_fit: NbinomGlmFit,
+    lrt: LrtOutput,
+    cooks: CooksOutput,
+    results: DeseqResults,
+    expanded_dispersions: Vec<f64>,
+}
+
+/// Output from the limited native Wald replacement-refit path.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CooksReplacementWaldOutput {
+    /// Original fit on the caller-supplied counts, before replacement.
+    pub original_fit: DeseqFit,
+    /// Original result rows before replacement/refit.
+    pub original_results: DeseqResults,
+    /// Replacement/refit planning metadata.
+    pub refit_plan: CooksRefitPlan,
+    /// Refit on replacement counts, when any non-all-zero replacement row exists.
+    pub refit_fit: Option<DeseqFit>,
+    /// Result rows from the replacement-count refit, before merge.
+    pub refit_results: Option<DeseqResults>,
+    /// Final merged result rows after replacing only `refitRows`.
+    pub results: DeseqResults,
+}
+
+/// Output from the limited native LRT replacement-refit path.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CooksReplacementLrtOutput {
+    /// Original fit on the caller-supplied counts, before replacement.
+    pub original_fit: DeseqFit,
+    /// Original result rows before replacement/refit.
+    pub original_results: DeseqResults,
+    /// Replacement/refit planning metadata.
+    pub refit_plan: CooksRefitPlan,
+    /// Refit on replacement counts, when any non-all-zero replacement row exists.
+    pub refit_fit: Option<DeseqFit>,
+    /// Result rows from the replacement-count refit, before merge.
+    pub refit_results: Option<DeseqResults>,
+    /// Final merged result rows after replacing only `refitRows`.
+    pub results: DeseqResults,
+}
+
+impl Default for DeseqBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DeseqBuilder {
+    /// Construct a builder with conservative DESeq2-like defaults.
+    pub fn new() -> Self {
+        Self {
+            fit_type: FitType::default(),
+            test: TestType::default(),
+            size_factor_options: SizeFactorOptions::default(),
+            normalization_factors: None,
+            observation_weights: None,
+            observation_weight_options: ObservationWeightOptions::default(),
+            execution_mode: ExecutionMode::default(),
+            threads: None,
+            irls_options: IrlsOptions::default(),
+            gene_wise_dispersion_options: GeneWiseDispersionOptions::default(),
+            wald_test_options: WaldTestOptions::default(),
+            cooks_cutoff: CooksCutoff::default(),
+            independent_filtering_options: IndependentFilteringOptions::default(),
+        }
+    }
+
+    /// Set future dispersion fit type.
+    pub fn fit_type(mut self, fit_type: FitType) -> Self {
+        self.fit_type = fit_type;
+        self
+    }
+
+    /// Set future test type.
+    pub fn test(mut self, test: TestType) -> Self {
+        self.test = test;
+        self
+    }
+
+    /// Set size-factor method.
+    pub fn size_factor_method(mut self, method: SizeFactorMethod) -> Self {
+        self.size_factor_options.method = method;
+        self
+    }
+
+    /// Set all size-factor options.
+    pub fn size_factor_options(mut self, options: SizeFactorOptions) -> Self {
+        self.size_factor_options = options;
+        self
+    }
+
+    /// Set supplied geometric means for frozen size-factor estimation.
+    pub fn geometric_means(mut self, geo_means: Vec<f64>) -> Self {
+        self.size_factor_options.geo_means = Some(geo_means);
+        self
+    }
+
+    /// Set caller-supplied size factors, bypassing size-factor estimation.
+    pub fn size_factors(mut self, size_factors: Vec<f64>) -> Self {
+        self.size_factor_options.supplied_size_factors = Some(size_factors);
+        self
+    }
+
+    /// Set caller-supplied gene/sample normalization factors.
+    ///
+    /// As in DESeq2, these count-scale factors preempt size factors for
+    /// normalized counts and fixed-dispersion GLM offsets.
+    pub fn normalization_factors(mut self, normalization_factors: RowMajorMatrix<f64>) -> Self {
+        self.normalization_factors = Some(normalization_factors);
+        self
+    }
+
+    /// Set caller-supplied gene/sample observation weights.
+    ///
+    /// Initial no-design stages use these weights directly for DESeq2-style
+    /// weighted base metadata. Design-aware stages first row-normalize and
+    /// check them with `getAndCheckWeights`-style preprocessing.
+    pub fn observation_weights(mut self, observation_weights: RowMajorMatrix<f64>) -> Self {
+        self.observation_weights = Some(observation_weights);
+        self
+    }
+
+    /// Set DESeq2-style observation-weight preprocessing options.
+    pub fn observation_weight_options(mut self, options: ObservationWeightOptions) -> Self {
+        self.observation_weight_options = options;
+        self
+    }
+
+    /// Set zero-based control-gene row indices.
+    pub fn control_genes(mut self, control_genes: Vec<usize>) -> Self {
+        self.size_factor_options.control_genes = Some(ControlGenes::Indices(control_genes));
+        self
+    }
+
+    /// Set a logical control-gene mask with one value per gene.
+    pub fn control_gene_mask(mut self, control_gene_mask: Vec<bool>) -> Self {
+        self.size_factor_options.control_genes = Some(ControlGenes::Mask(control_gene_mask));
+        self
+    }
+
+    /// Set execution mode.
+    pub fn execution_mode(mut self, mode: ExecutionMode) -> Self {
+        self.execution_mode = mode;
+        self
+    }
+
+    /// Set the desired worker thread count for future parallel stages.
+    pub fn threads(mut self, threads: usize) -> Self {
+        self.threads = Some(threads);
+        self
+    }
+
+    /// Set IRLS options for fixed-dispersion GLM fitting.
+    pub fn irls_options(mut self, options: IrlsOptions) -> Self {
+        self.irls_options = options;
+        self
+    }
+
+    /// Set options for the current linear-mu gene-wise dispersion estimator.
+    pub fn gene_wise_dispersion_options(mut self, options: GeneWiseDispersionOptions) -> Self {
+        self.gene_wise_dispersion_options = options;
+        self
+    }
+
+    /// Set Wald p-value options.
+    pub fn wald_test_options(mut self, options: WaldTestOptions) -> Self {
+        self.wald_test_options = options;
+        self
+    }
+
+    /// Set DESeq2-style selected-coefficient LFC threshold testing.
+    pub fn wald_lfc_threshold(mut self, threshold: f64, alternative: WaldAlternative) -> Self {
+        self.wald_test_options.lfc_threshold = threshold;
+        self.wald_test_options.alternative = alternative;
+        self
+    }
+
+    /// Use DESeq2 `useT=TRUE` with residual degrees of freedom.
+    pub fn wald_t_residual_degrees_of_freedom(mut self) -> Self {
+        self.wald_test_options.pvalue_type =
+            WaldTestOptions::t_residual_degrees_of_freedom().pvalue_type;
+        self
+    }
+
+    /// Use DESeq2 `useT=TRUE` with one supplied degrees-of-freedom value.
+    pub fn wald_t_degrees_of_freedom(mut self, degrees_of_freedom: f64) -> Self {
+        self.wald_test_options.pvalue_type =
+            WaldTestOptions::t_degrees_of_freedom(degrees_of_freedom).pvalue_type;
+        self
+    }
+
+    /// Use DESeq2 `useT=TRUE` with one degrees-of-freedom value per gene.
+    pub fn wald_t_per_gene_degrees_of_freedom(mut self, degrees_of_freedom: Vec<f64>) -> Self {
+        self.wald_test_options.pvalue_type =
+            WaldTestOptions::t_per_gene_degrees_of_freedom(degrees_of_freedom).pvalue_type;
+        self
+    }
+
+    /// Set Cook's distance p-value filtering behavior for result rows.
+    pub fn cooks_cutoff(mut self, cutoff: CooksCutoff) -> Self {
+        self.cooks_cutoff = cutoff;
+        self
+    }
+
+    /// Disable Cook's distance p-value filtering.
+    pub fn disable_cooks_cutoff(mut self) -> Self {
+        self.cooks_cutoff = CooksCutoff::Disabled;
+        self
+    }
+
+    /// Use an explicit Cook's distance cutoff.
+    pub fn cooks_cutoff_threshold(mut self, cutoff: f64) -> Self {
+        self.cooks_cutoff = CooksCutoff::Threshold(cutoff);
+        self
+    }
+
+    /// Set independent-filtering options for result-row assembly.
+    pub fn independent_filtering_options(mut self, options: IndependentFilteringOptions) -> Self {
+        self.independent_filtering_options = options;
+        self
+    }
+
+    /// Disable independent filtering and use regular BH adjustment.
+    pub fn disable_independent_filtering(mut self) -> Self {
+        self.independent_filtering_options.enabled = false;
+        self
+    }
+
+    /// Set the alpha used to select the independent-filtering threshold.
+    pub fn independent_filtering_alpha(mut self, alpha: f64) -> Self {
+        self.independent_filtering_options.alpha = alpha;
+        self
+    }
+
+    /// Set an explicit independent-filtering theta grid.
+    pub fn independent_filtering_theta(mut self, theta: Vec<f64>) -> Self {
+        self.independent_filtering_options.theta = Some(theta);
+        self
+    }
+
+    /// Current fit type option.
+    pub fn current_fit_type(&self) -> FitType {
+        self.fit_type
+    }
+
+    /// Current test option.
+    pub fn current_test(&self) -> TestType {
+        self.test
+    }
+
+    /// Current execution mode.
+    pub fn current_execution_mode(&self) -> ExecutionMode {
+        self.execution_mode
+    }
+
+    /// Requested thread count.
+    pub fn requested_threads(&self) -> Option<usize> {
+        self.threads
+    }
+
+    /// Current IRLS options.
+    pub fn current_irls_options(&self) -> IrlsOptions {
+        self.irls_options.clone()
+    }
+
+    /// Current gene-wise dispersion options.
+    pub fn current_gene_wise_dispersion_options(&self) -> GeneWiseDispersionOptions {
+        self.gene_wise_dispersion_options
+    }
+
+    /// Current Wald p-value options.
+    pub fn current_wald_test_options(&self) -> &WaldTestOptions {
+        &self.wald_test_options
+    }
+
+    /// Current Cook's cutoff option.
+    pub fn current_cooks_cutoff(&self) -> CooksCutoff {
+        self.cooks_cutoff
+    }
+
+    /// Current independent-filtering options.
+    pub fn current_independent_filtering_options(&self) -> &IndependentFilteringOptions {
+        &self.independent_filtering_options
+    }
+
+    /// Current size-factor options.
+    pub fn current_size_factor_options(&self) -> &SizeFactorOptions {
+        &self.size_factor_options
+    }
+
+    /// Current caller-supplied normalization factors, if any.
+    pub fn current_normalization_factors(&self) -> Option<&RowMajorMatrix<f64>> {
+        self.normalization_factors.as_ref()
+    }
+
+    /// Current caller-supplied observation weights, if any.
+    pub fn current_observation_weights(&self) -> Option<&RowMajorMatrix<f64>> {
+        self.observation_weights.as_ref()
+    }
+
+    /// Current observation-weight preprocessing options.
+    pub fn current_observation_weight_options(&self) -> ObservationWeightOptions {
+        self.observation_weight_options
+    }
+
+    /// Run only the implemented initial normalization stages.
+    pub fn fit_size_factors_and_base_means(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let stages = self.normalization_stages(counts)?;
+        Ok(Self::base_fit(counts, None, stages.into_base_fit_input()))
+    }
+
+    /// Run initial normalization stages with design-aware observation-weight checks.
+    ///
+    /// This is useful for parity checks against DESeq2's early metadata when a
+    /// `weights` assay is present: raw weights are used for `baseMean` and
+    /// `baseVar`, weights are row-normalized for fitting checks, design/rank
+    /// failures are recorded in `weights_fail`, and failed rows are marked in
+    /// `all_zero` for downstream skipping.
+    pub fn fit_size_factors_and_base_means_with_design(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        Ok(Self::base_fit(
+            counts,
+            Some(design.clone()),
+            stages.into_base_fit_input(),
+        ))
+    }
+
+    /// Run the current linear-mu gene-wise dispersion estimator.
+    ///
+    /// This is a narrow Phase 3 stage for designs where DESeq2's
+    /// `linearMu=TRUE` branch is appropriate. It estimates size factors,
+    /// normalized counts, base row metadata, linear fitted means, and
+    /// fixed-mean gene-wise dispersions. Cox-Reid correction, iterative GLM
+    /// mean refits, trend fitting, and MAP shrinkage remain future stages.
+    pub fn fit_gene_wise_dispersions_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.ensure_no_observation_weights("native linear-mu dispersion estimation")?;
+        design.validate_full_rank("linear-mu dispersion")?;
+        let stages = self.normalization_stages(counts)?;
+        let dispersion = estimate_gene_wise_dispersions_linear_mu(
+            GeneWiseDispersionInput {
+                counts,
+                design,
+                size_factors: &stages.size_factors,
+                normalization_factors: stages.normalization_factors.as_ref(),
+                normalized_counts: &stages.normalized,
+                base_mean: &stages.base_mean,
+                base_var: &stages.base_var,
+                all_zero: &stages.all_zero,
+                observation_weights: None,
+            },
+            self.gene_wise_dispersion_options,
+        )?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
+        fit.dispersion_converged = Some(dispersion.converged);
+        fit.mu = Some(dispersion.mu);
+        Ok(fit)
+    }
+
+    /// Run the current GLM-mu gene-wise dispersion estimator.
+    ///
+    /// This is the first non-`linearMu` foundation for
+    /// `estimateDispersionsGeneEst`: rough/moments starts are followed by
+    /// fixed-dispersion NB GLM mean fitting and fixed-mean dispersion
+    /// optimization. Builder-supplied observation weights are preprocessed in
+    /// the same design-aware stage used by fixed-dispersion Wald/LRT paths and
+    /// then passed into both the fixed-dispersion mean fit and fixed-mean
+    /// dispersion objective.
+    pub fn fit_gene_wise_dispersions_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        design.validate_full_rank("GLM-mu dispersion")?;
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let dispersion = estimate_gene_wise_dispersions_glm_mu(
+            GeneWiseDispersionInput {
+                counts,
+                design,
+                size_factors: &stages.size_factors,
+                normalization_factors: stages.normalization_factors.as_ref(),
+                normalized_counts: &stages.normalized,
+                base_mean: &stages.base_mean,
+                base_var: &stages.base_var,
+                all_zero: &stages.all_zero,
+                observation_weights: stages.observation_weights.as_ref(),
+            },
+            self.gene_wise_dispersion_options,
+            self.irls_options.clone(),
+        )?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
+        fit.dispersion_converged = Some(dispersion.converged);
+        fit.mu = Some(dispersion.mu);
+        Ok(fit)
+    }
+
+    /// Run linear-mu gene-wise dispersion estimation and fit the parametric trend.
+    ///
+    /// This mirrors the implemented subset of `estimateDispersionsGeneEst`
+    /// followed by `estimateDispersionsFit(fitType="parametric")`. It fills
+    /// `dispGeneEst`, `dispFit`, and the linear fitted mean matrix, but it does
+    /// not yet estimate prior variance or MAP dispersions.
+    pub fn fit_parametric_dispersion_trend_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
+        self.attach_parametric_dispersion_trend(fit)
+    }
+
+    /// Run linear-mu gene-wise dispersion estimation and fit the mean trend.
+    ///
+    /// This mirrors the implemented subset of `estimateDispersionsGeneEst`
+    /// followed by `estimateDispersionsFit(fitType="mean")`. It fills
+    /// `dispGeneEst`, a constant `dispFit` for non-all-zero rows, and the
+    /// linear fitted mean matrix, but it does not yet estimate prior variance
+    /// or MAP dispersions for mean-trend fits.
+    pub fn fit_mean_dispersion_trend_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
+        self.attach_mean_dispersion_trend(fit)
+    }
+
+    /// Run GLM-mu gene-wise dispersion estimation and fit the parametric trend.
+    ///
+    /// This mirrors the current non-`linearMu` gene-wise branch
+    /// followed by `estimateDispersionsFit(fitType="parametric")`.
+    pub fn fit_parametric_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
+        self.attach_parametric_dispersion_trend(fit)
+    }
+
+    /// Run GLM-mu gene-wise dispersion estimation and fit the mean trend.
+    pub fn fit_mean_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
+        self.attach_mean_dispersion_trend(fit)
+    }
+
+    fn attach_parametric_dispersion_trend(
+        &self,
+        mut fit: DeseqFit,
+    ) -> Result<DeseqFit, DeseqError> {
+        let disp_gene_est =
+            fit.disp_gene_est
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
+                })?;
+        let trend_fit = fit_parametric_dispersion_trend(
+            &fit.base_mean,
+            disp_gene_est,
+            ParametricDispersionTrendOptions {
+                min_disp: self.gene_wise_dispersion_options.min_disp,
+                ..ParametricDispersionTrendOptions::default()
+            },
+        )?;
+        fit.disp_fit = Some(trend_fit.disp_fit);
+        Ok(fit)
+    }
+
+    fn attach_mean_dispersion_trend(&self, mut fit: DeseqFit) -> Result<DeseqFit, DeseqError> {
+        let disp_gene_est =
+            fit.disp_gene_est
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
+                })?;
+        let trend_fit = fit_mean_dispersion_trend(
+            &fit.base_mean,
+            disp_gene_est,
+            MeanDispersionTrendOptions {
+                min_disp: self.gene_wise_dispersion_options.min_disp,
+                ..MeanDispersionTrendOptions::default()
+            },
+        )?;
+        fit.disp_fit = Some(trend_fit.disp_fit);
+        Ok(fit)
+    }
+
+    /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
+    ///
+    /// `Parametric` and `Mean` are currently implemented. `Local` and
+    /// `GlmGamPoi` return `UnsupportedFeature` until parity implementations
+    /// are added.
+    pub fn fit_dispersion_trend_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        match self.fit_type {
+            FitType::Parametric => self.fit_parametric_dispersion_trend_linear_mu(counts, design),
+            FitType::Mean => self.fit_mean_dispersion_trend_linear_mu(counts, design),
+            FitType::Local => Err(DeseqError::UnsupportedFeature {
+                feature: "linear-mu local dispersion trend fitting".to_string(),
+            }),
+            FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
+                feature: "linear-mu glmGamPoi dispersion trend fitting".to_string(),
+            }),
+        }
+    }
+
+    /// Run the implemented GLM-mu dispersion trend path selected by `fit_type`.
+    ///
+    /// `Parametric` and `Mean` are currently implemented. `Local` and
+    /// `GlmGamPoi` return `UnsupportedFeature` until parity implementations
+    /// are added.
+    pub fn fit_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        match self.fit_type {
+            FitType::Parametric => self.fit_parametric_dispersion_trend_glm_mu(counts, design),
+            FitType::Mean => self.fit_mean_dispersion_trend_glm_mu(counts, design),
+            FitType::Local => Err(DeseqError::UnsupportedFeature {
+                feature: "GLM-mu local dispersion trend fitting".to_string(),
+            }),
+            FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
+                feature: "GLM-mu glmGamPoi dispersion trend fitting".to_string(),
+            }),
+        }
+    }
+
+    /// Run linear-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
+    ///
+    /// This fills final `dispersion` values using the builder's `fit_type`.
+    /// Parametric and mean trends are implemented. It follows the implemented
+    /// subset of DESeq2's
+    /// `estimateDispersionsMAP(type="DESeq2")`: no observation weights and
+    /// deterministic prior-variance estimation, including the low-df
+    /// histogram/KL branch.
+    pub fn fit_map_dispersions_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_dispersion_trend_linear_mu(counts, design)?;
+        self.attach_map_dispersions(counts, design, fit)
+    }
+
+    /// Run linear-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
+    ///
+    /// This compatibility-named entry point keeps the original parametric-only
+    /// behavior even if the builder's `fit_type` is set to another value.
+    pub fn fit_map_dispersions_linear_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_parametric_dispersion_trend_linear_mu(counts, design)?;
+        self.attach_map_dispersions(counts, design, fit)
+    }
+
+    /// Run GLM-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
+    ///
+    /// This fills final `dispersion` values using the builder's `fit_type`.
+    /// Parametric and mean trends are implemented. Builder-supplied
+    /// observation weights flow through the GLM-mu gene-wise, MAP, and native
+    /// Wald stages after DESeq2-style preprocessing.
+    pub fn fit_map_dispersions_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
+        self.attach_map_dispersions(counts, design, fit)
+    }
+
+    /// Run GLM-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_map_dispersions_glm_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_parametric_dispersion_trend_glm_mu(counts, design)?;
+        self.attach_map_dispersions(counts, design, fit)
+    }
+
+    fn attach_map_dispersions(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        mut fit: DeseqFit,
+    ) -> Result<DeseqFit, DeseqError> {
+        let disp_gene_est =
+            fit.disp_gene_est
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "gene-wise dispersions are required before MAP fitting".to_string(),
+                })?;
+        let disp_fit = fit
+            .disp_fit
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "fitted dispersion trend is required before MAP fitting".to_string(),
+            })?;
+        let mu = fit
+            .mu
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "fitted means are required before MAP fitting".to_string(),
+            })?;
+        let prior_variance = estimate_dispersion_prior_variance(
+            disp_gene_est,
+            disp_fit,
+            self.gene_wise_dispersion_options.min_disp,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        let map = estimate_map_dispersions(
+            MapDispersionInput {
+                counts,
+                design,
+                mu,
+                disp_gene_est,
+                disp_fit,
+                all_zero: &fit.all_zero,
+                observation_weights: fit.observation_weights.as_ref(),
+                disp_prior_var: prior_variance.disp_prior_var,
+                var_log_disp_estimates: prior_variance.var_log_disp_estimates,
+            },
+            MapDispersionOptions::from(self.gene_wise_dispersion_options),
+        )?;
+        fit.disp_prior_var = Some(prior_variance.disp_prior_var);
+        fit.disp_map = Some(map.disp_map);
+        fit.disp_iter = Some(map.disp_iter);
+        fit.disp_outlier = Some(map.disp_outlier);
+        fit.dispersion_converged = Some(map.converged);
+        fit.dispersion = Some(map.dispersion);
+        Ok(fit)
+    }
+
+    /// Run the implemented native dispersion path and then a Wald test.
+    ///
+    /// This is an early, explicitly scoped analogue of `DESeq(..., test="Wald")`:
+    /// size factors, base means, linear-mu gene-wise dispersions, selected
+    /// trend, deterministic prior variance, MAP dispersions, fixed-dispersion
+    /// GLM fitting, Cook's distances, and selected-coefficient Wald results.
+    /// Parametric and mean trends are currently implemented. It does not yet
+    /// implement DESeq2's general mean/dispersion iteration, beta priors,
+    /// contrasts, local trends, or observation weights.
+    pub fn fit_wald_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_pipeline_wald_coefficient(design, coefficient)?;
+        let fit = self.fit_map_dispersions_linear_mu(counts, design)?;
+        self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    /// Run the parametric native dispersion path and then a Wald test.
+    ///
+    /// This compatibility-named entry point keeps the original parametric-only
+    /// behavior even if the builder's `fit_type` is set to another value.
+    pub fn fit_wald_linear_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_pipeline_wald_coefficient(design, coefficient)?;
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, design)?;
+        self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    /// Run the GLM-mu native dispersion path and then a Wald test.
+    ///
+    /// This mirrors `fit_wald_linear_mu` but uses the GLM-mu mean/dispersion
+    /// alternation before trend, MAP, fixed-dispersion GLM, Cook's distances,
+    /// and selected-coefficient Wald results. Builder-supplied observation
+    /// weights are supported for this branch.
+    pub fn fit_wald_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_pipeline_wald_coefficient(design, coefficient)?;
+        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    /// Run the implemented linear-mu native dispersion path and then an LRT.
+    ///
+    /// This is a limited native analogue of `nbinomLRT`: the full design is
+    /// used for the currently implemented linear-mu dispersion/MAP stages, then
+    /// full and reduced fixed-dispersion GLMs are fit using those final
+    /// dispersions.
+    pub fn fit_lrt_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu(counts, full_design)?;
+        self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the parametric linear-mu native dispersion path and then an LRT.
+    ///
+    /// This compatibility-named entry point keeps the original parametric-only
+    /// behavior even if the builder's `fit_type` is set to another value.
+    pub fn fit_lrt_linear_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
+        self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the implemented GLM-mu native dispersion path and then an LRT.
+    ///
+    /// Builder-supplied observation weights are supported for the GLM-mu branch
+    /// through the same preprocessing used by native Wald.
+    pub fn fit_lrt_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
+        self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the parametric GLM-mu native dispersion path and then an LRT.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_lrt_glm_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
+        self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the current GLM-mu native Wald path with limited Cook's replacement refit.
+    ///
+    /// This is an explicitly scoped analogue of the `replaceOutliers` /
+    /// `refitWithoutOutliers` part of DESeq2 for the currently implemented
+    /// native GLM-mu Wald branch. It preserves the original size factors,
+    /// builds replacement counts from original Cook's distances, reruns the
+    /// implemented GLM-mu dispersion/MAP/Wald path on replacement counts, and
+    /// merges only rows marked for refit. It does not yet implement
+    /// contrast-aware replacement, beta priors, or Bioconductor object slots.
+    pub fn fit_wald_glm_mu_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        validate_pipeline_wald_coefficient(design, coefficient)?;
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_wald_glm_mu(counts, design, coefficient)?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        let normalized = match original_fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &original_fit.size_factors)?,
+        };
+        let refit_plan = prepare_cooks_replacement_refit(
+            counts,
+            &normalized,
+            &original_fit.size_factors,
+            original_fit.normalization_factors.as_ref(),
+            original_cooks,
+            design,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_wald_glm_mu(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                coefficient,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run the current GLM-mu native LRT path with limited Cook's replacement refit.
+    ///
+    /// This mirrors the scoped Wald replacement-refit path for the implemented
+    /// native GLM-mu LRT branch: first fit on original counts with Cook's
+    /// filtering disabled, replace eligible Cook's outlier counts, rerun the
+    /// native GLM-mu dispersion/MAP/LRT path on replacement counts with the
+    /// original size factors, and merge only rows marked by the refit plan.
+    /// Broader DESeq2 behavior for contrasts, beta priors, and Bioconductor
+    /// object metadata remains future work.
+    pub fn fit_lrt_glm_mu_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        let normalized = match original_fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &original_fit.size_factors)?,
+        };
+        let refit_plan = prepare_cooks_replacement_refit(
+            counts,
+            &normalized,
+            &original_fit.size_factors,
+            original_fit.normalization_factors.as_ref(),
+            original_cooks,
+            full_design,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_lrt_glm_mu(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                coefficient,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run the parametric GLM-mu native dispersion path and then a Wald test.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_wald_glm_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_pipeline_wald_coefficient(design, coefficient)?;
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    fn attach_native_wald(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient: usize,
+        mut fit: DeseqFit,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let dispersions = fit
+            .dispersion
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "MAP dispersions are required before Wald fitting".to_string(),
+            })?;
+        let normalized = match fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &fit.size_factors)?,
+        };
+        let wald_output = self.fixed_dispersion_wald_components(WaldPipelineInput {
+            counts,
+            design,
+            size_factors: &fit.size_factors,
+            normalization_factors: fit.normalization_factors.as_ref(),
+            observation_weights: fit.observation_weights.as_ref(),
+            normalized: &normalized,
+            base_mean: &fit.base_mean,
+            all_zero: &fit.all_zero,
+            dispersions,
+            coefficient,
+        })?;
+
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald);
+        Ok((fit, wald_output.results))
+    }
+
+    fn attach_native_lrt(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient: usize,
+        mut fit: DeseqFit,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let dispersions = fit
+            .dispersion
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "MAP dispersions are required before LRT fitting".to_string(),
+            })?;
+        let normalized = match fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &fit.size_factors)?,
+        };
+        let lrt_output = self.fixed_dispersion_lrt_components(LrtPipelineInput {
+            counts,
+            full_design,
+            reduced_design,
+            size_factors: &fit.size_factors,
+            normalization_factors: fit.normalization_factors.as_ref(),
+            observation_weights: fit.observation_weights.as_ref(),
+            normalized: &normalized,
+            base_mean: &fit.base_mean,
+            all_zero: &fit.all_zero,
+            dispersions,
+            coefficient,
+        })?;
+
+        fit.reduced_design = Some(reduced_design.clone());
+        fit.dispersion = Some(lrt_output.expanded_dispersions);
+        fit.cooks = Some(lrt_output.cooks.cooks);
+        fit.max_cooks = Some(lrt_output.cooks.max_cooks);
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        attach_glm_fit(&mut fit, lrt_output.full_fit);
+        fit.lrt = Some(lrt_output.lrt);
+        Ok((fit, lrt_output.results))
+    }
+
+    /// Run a supplied-dispersion Wald pipeline for one coefficient.
+    ///
+    /// This is the current closest analogue to the core `nbinomWaldTest` path,
+    /// but it requires caller-supplied dispersions and does not yet implement
+    /// contrasts or beta priors.
+    /// All-zero rows are skipped during GLM fitting and expanded back as
+    /// missing numeric values, matching DESeq2's `buildMatrixWithNARows`
+    /// pattern.
+    pub fn fit_fixed_dispersion_wald(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let wald_output = self.fixed_dispersion_wald_components(WaldPipelineInput {
+            counts,
+            design,
+            size_factors: &stages.size_factors,
+            normalization_factors: stages.normalization_factors.as_ref(),
+            observation_weights: stages.observation_weights.as_ref(),
+            normalized: &stages.normalized,
+            base_mean: &stages.base_mean,
+            all_zero: &stages.all_zero,
+            dispersions,
+            coefficient,
+        })?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald);
+        Ok((fit, wald_output.results))
+    }
+
+    /// Run a supplied-dispersion Wald pipeline for a primitive numeric contrast.
+    ///
+    /// The contrast vector must contain one finite value per design
+    /// coefficient. This is the Rust primitive analogue of DESeq2's numeric
+    /// contrast path after R has resolved formula terms and coefficient names.
+    pub fn fit_fixed_dispersion_wald_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let wald_output = self.fixed_dispersion_wald_contrast_components(
+            FixedDispersionGlmInput {
+                counts,
+                design,
+                size_factors: &stages.size_factors,
+                normalization_factors: stages.normalization_factors.as_ref(),
+                observation_weights: stages.observation_weights.as_ref(),
+                all_zero: &stages.all_zero,
+                dispersions,
+            },
+            &stages.normalized,
+            &stages.base_mean,
+            contrast,
+            None,
+        )?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald_contrast.wald);
+        Ok((fit, wald_output.results))
+    }
+
+    /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.
+    ///
+    /// This resolves coefficient names and DESeq2-style positive/negative
+    /// coefficient-name lists to a numeric contrast before calling
+    /// `fit_fixed_dispersion_wald_contrast`.
+    pub fn fit_fixed_dispersion_wald_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        self.fit_fixed_dispersion_wald_contrast(counts, design, dispersions, &numeric_contrast)
+    }
+
+    /// Run a supplied-dispersion Wald pipeline for a factor-level contrast.
+    ///
+    /// This resolves DESeq2-shaped coefficient names from the design matrix and
+    /// applies DESeq2-style character contrast all-zero handling using
+    /// caller-supplied sample levels. R formula parsing and colData ownership
+    /// remain outside the Rust core.
+    pub fn fit_fixed_dispersion_wald_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let wald_output = self.fixed_dispersion_wald_contrast_components(
+            FixedDispersionGlmInput {
+                counts,
+                design,
+                size_factors: &stages.size_factors,
+                normalization_factors: stages.normalization_factors.as_ref(),
+                observation_weights: stages.observation_weights.as_ref(),
+                all_zero: &stages.all_zero,
+                dispersions,
+            },
+            &stages.normalized,
+            &stages.base_mean,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+        )?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald_contrast.wald);
+        Ok((fit, wald_output.results))
+    }
+
+    /// Run a supplied-dispersion likelihood-ratio test pipeline.
+    ///
+    /// This mirrors the DESeq2 `nbinomLRT` shape for primitive matrices when
+    /// dispersions are already available. The full-model beta fields are
+    /// exposed in result rows alongside the model-level LRT statistic and
+    /// p-value.
+    pub fn fit_fixed_dispersion_lrt(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        coefficient: usize,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let stages = self.normalization_stages_for_design(counts, full_design)?;
+        let lrt_output = self.fixed_dispersion_lrt_components(LrtPipelineInput {
+            counts,
+            full_design,
+            reduced_design,
+            size_factors: &stages.size_factors,
+            normalization_factors: stages.normalization_factors.as_ref(),
+            observation_weights: stages.observation_weights.as_ref(),
+            normalized: &stages.normalized,
+            base_mean: &stages.base_mean,
+            all_zero: &stages.all_zero,
+            dispersions,
+            coefficient,
+        })?;
+
+        let mut fit = Self::base_fit(
+            counts,
+            Some(full_design.clone()),
+            stages.into_base_fit_input(),
+        );
+        fit.reduced_design = Some(reduced_design.clone());
+        fit.dispersion = Some(lrt_output.expanded_dispersions);
+        fit.cooks = Some(lrt_output.cooks.cooks);
+        fit.max_cooks = Some(lrt_output.cooks.max_cooks);
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        attach_glm_fit(&mut fit, lrt_output.full_fit);
+        fit.lrt = Some(lrt_output.lrt);
+        Ok((fit, lrt_output.results))
+    }
+
+    fn normalization_stages(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<NormalizationStages, DeseqError> {
+        self.normalization_stages_inner(counts, None)
+    }
+
+    fn normalization_stages_for_design(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<NormalizationStages, DeseqError> {
+        self.normalization_stages_inner(counts, Some(design))
+    }
+
+    fn normalization_stages_inner(
+        &self,
+        counts: &CountMatrix,
+        design: Option<&DesignMatrix>,
+    ) -> Result<NormalizationStages, DeseqError> {
+        let (size_factors, normalization_factors, normalized) = match &self.normalization_factors {
+            Some(factors) => {
+                validate_normalization_factors(counts, factors)?;
+                let size_factors = match &self.size_factor_options.supplied_size_factors {
+                    Some(size_factors) => {
+                        normalized_counts(counts, size_factors)?;
+                        size_factors.clone()
+                    }
+                    None => vec![1.0; counts.n_samples()],
+                };
+                let factors = factors.clone();
+                let normalized = normalized_counts_with_factors(counts, &factors)?;
+                (size_factors, Some(factors), normalized)
+            }
+            None => {
+                let control_gene_indices = self
+                    .size_factor_options
+                    .control_genes
+                    .as_ref()
+                    .map(|control_genes| control_genes.to_indices(counts.n_genes()))
+                    .transpose()?;
+                let size_factors = match &self.size_factor_options.supplied_size_factors {
+                    Some(size_factors) => size_factors.clone(),
+                    None => estimate_size_factors_with_options(
+                        counts,
+                        self.size_factor_options.method,
+                        self.size_factor_options.geo_means.as_deref(),
+                        control_gene_indices.as_deref(),
+                    )?,
+                };
+                let normalized = normalized_counts(counts, &size_factors)?;
+                (size_factors, None, normalized)
+            }
+        };
+        let weighted_metadata = self.weighted_base_metadata(counts, design, &normalized)?;
+        let raw_all_zero = counts.all_zero_flags();
+        let all_zero = match &weighted_metadata.weights_fail {
+            Some(weights_fail) => raw_all_zero
+                .iter()
+                .copied()
+                .zip(weights_fail.iter().copied())
+                .map(|(all_zero, weights_fail)| all_zero || weights_fail)
+                .collect(),
+            None => raw_all_zero,
+        };
+        Ok(NormalizationStages {
+            size_factors,
+            base_mean: weighted_metadata.base_mean,
+            base_var: weighted_metadata.base_var,
+            all_zero,
+            normalized,
+            normalization_factors,
+            observation_weights: weighted_metadata.observation_weights,
+            weights_fail: weighted_metadata.weights_fail,
+            weights_design_rank: weighted_metadata.weights_design_rank,
+        })
+    }
+
+    fn weighted_base_metadata(
+        &self,
+        counts: &CountMatrix,
+        design: Option<&DesignMatrix>,
+        normalized: &RowMajorMatrix<f64>,
+    ) -> Result<WeightedBaseMetadata, DeseqError> {
+        let Some(weights) = &self.observation_weights else {
+            return Ok(WeightedBaseMetadata {
+                base_mean: base_mean(normalized)?,
+                base_var: base_variance(normalized)?,
+                observation_weights: None,
+                weights_fail: None,
+                weights_design_rank: None,
+            });
+        };
+        validate_observation_weights_for_counts(counts, weights)?;
+        match design {
+            Some(design) => {
+                let checked = preprocess_observation_weights_with_options(
+                    weights,
+                    design,
+                    self.observation_weight_options,
+                )?;
+                let base_mean = base_mean_with_weights(normalized, weights)?;
+                let base_var = base_variance_with_weights(normalized, weights)?;
+                Ok(WeightedBaseMetadata {
+                    base_mean,
+                    base_var,
+                    observation_weights: Some(checked.weights),
+                    weights_fail: Some(checked.weights_fail),
+                    weights_design_rank: Some(checked.design_rank),
+                })
+            }
+            None => Ok(WeightedBaseMetadata {
+                base_mean: base_mean_with_weights(normalized, weights)?,
+                base_var: base_variance_with_weights(normalized, weights)?,
+                observation_weights: Some(weights.clone()),
+                weights_fail: None,
+                weights_design_rank: None,
+            }),
+        }
+    }
+
+    fn ensure_no_observation_weights(&self, feature: &str) -> Result<(), DeseqError> {
+        if self.observation_weights.is_some() {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: format!("{feature} with observation weights"),
+            });
+        }
+        Ok(())
+    }
+
+    fn fixed_dispersion_wald_components(
+        &self,
+        input: WaldPipelineInput<'_>,
+    ) -> Result<WaldPipelineOutput, DeseqError> {
+        if input.coefficient >= input.design.n_coefficients() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "pipeline Wald coefficient index".to_string(),
+                expected: input.design.n_coefficients().saturating_sub(1),
+                actual: input.coefficient,
+            });
+        }
+        let FixedDispersionGlmOutput {
+            glm_fit,
+            expanded_dispersions,
+        } = self.fixed_dispersion_glm_components(FixedDispersionGlmInput {
+            counts: input.counts,
+            design: input.design,
+            size_factors: input.size_factors,
+            normalization_factors: input.normalization_factors,
+            observation_weights: input.observation_weights,
+            all_zero: input.all_zero,
+            dispersions: input.dispersions,
+        })?;
+        let mut wald = wald_test_coefficient_with_options(
+            &glm_fit,
+            input.coefficient,
+            &self.wald_test_options,
+        )?;
+        mask_wald_degrees_of_freedom_for_all_zero_rows(&mut wald, input.all_zero)?;
+        let cooks = calculate_cooks_distance(
+            input.counts,
+            input.normalized,
+            &glm_fit.mu,
+            &glm_fit.hat_diagonal,
+            input.design,
+        )?;
+        let mut results = build_wald_results_from_wald(
+            input.base_mean,
+            &glm_fit,
+            input.coefficient,
+            input.counts.gene_names(),
+            Some(&expanded_dispersions),
+            &wald,
+        )?;
+        for (gene, all_zero) in input.all_zero.iter().copied().enumerate() {
+            results.rows[gene].max_cooks = cooks.max_cooks[gene];
+            if all_zero {
+                results.rows[gene].converged = None;
+                results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            input.design.n_samples(),
+            input.design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(WaldPipelineOutput {
+            glm_fit,
+            wald,
+            cooks,
+            results,
+            expanded_dispersions,
+        })
+    }
+
+    fn fixed_dispersion_wald_contrast_components(
+        &self,
+        input: FixedDispersionGlmInput<'_>,
+        normalized: &RowMajorMatrix<f64>,
+        base_mean: &[f64],
+        contrast: &[f64],
+        contrast_all_zero_override: Option<&[bool]>,
+    ) -> Result<WaldContrastPipelineOutput, DeseqError> {
+        let FixedDispersionGlmOutput {
+            glm_fit,
+            expanded_dispersions,
+        } = self.fixed_dispersion_glm_components(input)?;
+        let mut wald_contrast =
+            wald_test_contrast_with_options(&glm_fit, contrast, &self.wald_test_options)?;
+        mask_wald_degrees_of_freedom_for_all_zero_rows(&mut wald_contrast.wald, input.all_zero)?;
+        let contrast_all_zero = match contrast_all_zero_override {
+            Some(flags) => {
+                if flags.len() != input.counts.n_genes() {
+                    return Err(invalid_dimensions(
+                        "contrastAllZero rows",
+                        input.counts.n_genes(),
+                        flags.len(),
+                    ));
+                }
+                flags.to_vec()
+            }
+            None => contrast_all_zero_numeric(input.counts, input.design, contrast)?,
+        };
+        apply_contrast_all_zero_to_wald_contrast(
+            &mut wald_contrast,
+            &contrast_all_zero,
+            input.all_zero,
+        )?;
+        let cooks = calculate_cooks_distance(
+            input.counts,
+            normalized,
+            &glm_fit.mu,
+            &glm_fit.hat_diagonal,
+            input.design,
+        )?;
+        let mut results = build_wald_contrast_results(
+            base_mean,
+            &glm_fit,
+            &wald_contrast,
+            input.counts.gene_names(),
+            Some(&expanded_dispersions),
+        )?;
+        for (gene, all_zero) in input.all_zero.iter().copied().enumerate() {
+            results.rows[gene].max_cooks = cooks.max_cooks[gene];
+            if all_zero {
+                results.rows[gene].converged = None;
+                results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            input.design.n_samples(),
+            input.design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(WaldContrastPipelineOutput {
+            glm_fit,
+            wald_contrast,
+            cooks,
+            results,
+            expanded_dispersions,
+        })
+    }
+
+    fn fixed_dispersion_lrt_components(
+        &self,
+        input: LrtPipelineInput<'_>,
+    ) -> Result<LrtPipelineOutput, DeseqError> {
+        validate_lrt_pipeline_input(&input)?;
+        let nonzero_gene_indices = nonzero_gene_indices(input.all_zero);
+        let (full_fit, reduced_fit) = if nonzero_gene_indices.is_empty() {
+            (
+                all_zero_glm_fit(input.counts, input.full_design)?,
+                all_zero_glm_fit(input.counts, input.reduced_design)?,
+            )
+        } else {
+            let compact_counts = compact_counts(input.counts, &nonzero_gene_indices)?;
+            let compact_dispersions = nonzero_gene_indices
+                .iter()
+                .map(|gene| input.dispersions[*gene])
+                .collect::<Vec<_>>();
+            let compact_normalization_factors = input
+                .normalization_factors
+                .map(|factors| compact_matrix_rows(factors, &nonzero_gene_indices))
+                .transpose()?;
+            let compact_weights = input
+                .observation_weights
+                .map(|weights| compact_matrix_rows(weights, &nonzero_gene_indices))
+                .transpose()?;
+            let compact_full_fit = fit_fixed_dispersion_model(
+                &compact_counts,
+                input.full_design,
+                input.size_factors,
+                compact_normalization_factors.as_ref(),
+                compact_weights.as_ref(),
+                &compact_dispersions,
+                self.irls_options.clone(),
+            )?;
+            let compact_reduced_fit = fit_fixed_dispersion_model(
+                &compact_counts,
+                input.reduced_design,
+                input.size_factors,
+                compact_normalization_factors.as_ref(),
+                compact_weights.as_ref(),
+                &compact_dispersions,
+                self.irls_options.clone(),
+            )?;
+            (
+                expand_glm_fit(compact_full_fit, input.all_zero)?,
+                expand_glm_fit(compact_reduced_fit, input.all_zero)?,
+            )
+        };
+
+        let expanded_dispersions =
+            mask_all_zero_values_with_nan_rows(input.dispersions, input.all_zero)?;
+        let lrt = lrt_test(&full_fit, &reduced_fit)?;
+        let cooks = calculate_cooks_distance(
+            input.counts,
+            input.normalized,
+            &full_fit.mu,
+            &full_fit.hat_diagonal,
+            input.full_design,
+        )?;
+        let mut results = build_lrt_results(
+            input.base_mean,
+            &full_fit,
+            &lrt,
+            input.coefficient,
+            input.counts.gene_names(),
+            Some(&expanded_dispersions),
+        )?;
+        for (gene, all_zero) in input.all_zero.iter().copied().enumerate() {
+            results.rows[gene].max_cooks = cooks.max_cooks[gene];
+            if all_zero {
+                results.rows[gene].converged = None;
+                results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            input.full_design.n_samples(),
+            input.full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(LrtPipelineOutput {
+            full_fit,
+            reduced_fit,
+            lrt,
+            cooks,
+            results,
+            expanded_dispersions,
+        })
+    }
+
+    fn fixed_dispersion_glm_components(
+        &self,
+        input: FixedDispersionGlmInput<'_>,
+    ) -> Result<FixedDispersionGlmOutput, DeseqError> {
+        input.design.validate_full_rank("GLM")?;
+        if input.dispersions.len() != input.counts.n_genes() {
+            return Err(invalid_dimensions(
+                "pipeline dispersions",
+                input.counts.n_genes(),
+                input.dispersions.len(),
+            ));
+        }
+
+        let nonzero_gene_indices = nonzero_gene_indices(input.all_zero);
+        let glm_fit = if nonzero_gene_indices.is_empty() {
+            all_zero_glm_fit(input.counts, input.design)?
+        } else {
+            let compact_counts = compact_counts(input.counts, &nonzero_gene_indices)?;
+            let compact_dispersions = nonzero_gene_indices
+                .iter()
+                .map(|gene| input.dispersions[*gene])
+                .collect::<Vec<_>>();
+            let compact_normalization_factors = input
+                .normalization_factors
+                .map(|factors| compact_matrix_rows(factors, &nonzero_gene_indices))
+                .transpose()?;
+            let compact_weights = input
+                .observation_weights
+                .map(|weights| compact_matrix_rows(weights, &nonzero_gene_indices))
+                .transpose()?;
+            let compact_fit = fit_fixed_dispersion_model(
+                &compact_counts,
+                input.design,
+                input.size_factors,
+                compact_normalization_factors.as_ref(),
+                compact_weights.as_ref(),
+                &compact_dispersions,
+                self.irls_options.clone(),
+            )?;
+            expand_glm_fit(compact_fit, input.all_zero)?
+        };
+        let expanded_dispersions =
+            mask_all_zero_values_with_nan_rows(input.dispersions, input.all_zero)?;
+        Ok(FixedDispersionGlmOutput {
+            glm_fit,
+            expanded_dispersions,
+        })
+    }
+
+    fn base_fit(
+        counts: &CountMatrix,
+        design: Option<DesignMatrix>,
+        input: BaseFitInput,
+    ) -> DeseqFit {
+        DeseqFit {
+            counts_summary: counts.summary(),
+            design,
+            reduced_design: None,
+            size_factors: input.size_factors,
+            normalization_factors: input.normalization_factors,
+            observation_weights: input.observation_weights,
+            weights_fail: input.weights_fail,
+            weights_design_rank: input.weights_design_rank,
+            base_mean: input.base_mean,
+            base_var: input.base_var,
+            all_zero: input.all_zero,
+            disp_gene_est: None,
+            disp_fit: None,
+            disp_map: None,
+            dispersion: None,
+            disp_iter: None,
+            disp_outlier: None,
+            disp_prior_var: None,
+            dispersion_converged: None,
+            beta: None,
+            beta_se: None,
+            beta_covariance: None,
+            beta_converged: None,
+            beta_iter: None,
+            log_like: None,
+            full_deviance: None,
+            reduced_log_like: None,
+            reduced_beta_converged: None,
+            reduced_beta_iter: None,
+            mu: None,
+            cooks: None,
+            max_cooks: None,
+            hat_diagonal: None,
+            wald: None,
+            lrt: None,
+        }
+    }
+
+    /// Placeholder for the future full DESeq-like workflow.
+    pub fn fit(
+        &self,
+        _counts: &CountMatrix,
+        _design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        Err(DeseqError::UnsupportedFeature {
+            feature: "full DESeq workflow with dispersion and GLM fitting".to_string(),
+        })
+    }
+}
+
+fn validate_observation_weights_for_counts(
+    counts: &CountMatrix,
+    weights: &RowMajorMatrix<f64>,
+) -> Result<(), DeseqError> {
+    if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "observation weights".to_string(),
+            expected: counts.n_genes() * counts.n_samples(),
+            actual: weights.len(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), DeseqError> {
+    if input.dispersions.len() != input.counts.n_genes() {
+        return Err(invalid_dimensions(
+            "pipeline dispersions",
+            input.counts.n_genes(),
+            input.dispersions.len(),
+        ));
+    }
+    if input.full_design.n_samples() != input.reduced_design.n_samples() {
+        return Err(invalid_dimensions(
+            "LRT reduced design samples",
+            input.full_design.n_samples(),
+            input.reduced_design.n_samples(),
+        ));
+    }
+    if input.full_design.n_coefficients() <= input.reduced_design.n_coefficients() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "LRT full/reduced coefficients".to_string(),
+            expected: input.reduced_design.n_coefficients() + 1,
+            actual: input.full_design.n_coefficients(),
+        });
+    }
+    if input.coefficient >= input.full_design.n_coefficients() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "LRT result coefficient index".to_string(),
+            expected: input.full_design.n_coefficients().saturating_sub(1),
+            actual: input.coefficient,
+        });
+    }
+    if input.all_zero.len() != input.counts.n_genes() {
+        return Err(invalid_dimensions(
+            "LRT all-zero rows",
+            input.counts.n_genes(),
+            input.all_zero.len(),
+        ));
+    }
+    if input.base_mean.len() != input.counts.n_genes() {
+        return Err(invalid_dimensions(
+            "LRT baseMean rows",
+            input.counts.n_genes(),
+            input.base_mean.len(),
+        ));
+    }
+    if input.normalized.n_rows() != input.counts.n_genes()
+        || input.normalized.n_cols() != input.counts.n_samples()
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: "LRT normalized counts".to_string(),
+            expected: input.counts.n_genes() * input.counts.n_samples(),
+            actual: input.normalized.len(),
+        });
+    }
+    input.full_design.validate_full_rank("LRT full")?;
+    input.reduced_design.validate_full_rank("LRT reduced")?;
+    Ok(())
+}
+
+fn is_intercept_only_design(design: &DesignMatrix) -> bool {
+    design.n_coefficients() == 1
+        && design
+            .matrix()
+            .as_slice()
+            .iter()
+            .all(|value| (*value - 1.0).abs() <= f64::EPSILON)
+}
+
+fn fit_fixed_dispersion_model(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    normalization_factors: Option<&RowMajorMatrix<f64>>,
+    weights: Option<&RowMajorMatrix<f64>>,
+    dispersions: &[f64],
+    irls_options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    if is_intercept_only_design(design)
+        && irls_options.uses_intercept_shortcut_for_coefficients(design.n_coefficients())?
+    {
+        match normalization_factors {
+            Some(factors) => fit_intercept_only_fixed_dispersion_with_normalization_factors(
+                counts,
+                factors,
+                dispersions,
+                weights,
+            ),
+            None => fit_intercept_only_fixed_dispersion_with_weights(
+                counts,
+                size_factors,
+                dispersions,
+                weights,
+            ),
+        }
+    } else {
+        match normalization_factors {
+            Some(factors) => fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+                counts,
+                design,
+                factors,
+                dispersions,
+                weights,
+                irls_options,
+            ),
+            None => fit_fixed_dispersion_irls_with_weights(
+                counts,
+                design,
+                size_factors,
+                dispersions,
+                weights,
+                irls_options,
+            ),
+        }
+    }
+}
+
+fn merge_replacement_refit_results(
+    original_results: &DeseqResults,
+    refit_results: Option<&DeseqResults>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<DeseqResults, DeseqError> {
+    if original_results.rows.len() != refit_plan.replacement.replace.len() {
+        return Err(invalid_dimensions(
+            "replacement-refit result rows",
+            refit_plan.replacement.replace.len(),
+            original_results.rows.len(),
+        ));
+    }
+    if let Some(refit_results) = refit_results {
+        if refit_results.rows.len() != original_results.rows.len() {
+            return Err(invalid_dimensions(
+                "replacement-refit refit result rows",
+                original_results.rows.len(),
+                refit_results.rows.len(),
+            ));
+        }
+    }
+    if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
+        return Err(invalid_dimensions(
+            "replacement-refit baseMean rows",
+            original_results.rows.len(),
+            refit_plan.replaced_base_mean.len(),
+        ));
+    }
+    if refit_plan.post_refit_max_cooks.len() != original_results.rows.len() {
+        return Err(invalid_dimensions(
+            "replacement-refit maxCooks rows",
+            original_results.rows.len(),
+            refit_plan.post_refit_max_cooks.len(),
+        ));
+    }
+
+    let mut merged = original_results.clone();
+    for (gene, row) in merged.rows.iter_mut().enumerate() {
+        row.base_mean = refit_plan.replaced_base_mean[gene];
+        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+            row.max_cooks = refit_plan.post_refit_max_cooks[gene];
+            row.cooks_outlier = None;
+            row.filtered = None;
+        }
+    }
+
+    if let Some(refit_results) = refit_results {
+        for gene in refit_plan.refit_rows.iter().copied() {
+            merged.rows[gene] = refit_results.rows[gene].clone();
+            merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
+            merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
+            merged.rows[gene].cooks_outlier = None;
+            merged.rows[gene].filtered = None;
+        }
+    }
+
+    for gene in refit_plan.new_all_zero_rows.iter().copied() {
+        clear_replacement_all_zero_result(&mut merged.rows[gene]);
+        merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
+        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+            merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
+        }
+    }
+
+    merged.independent_filtering = None;
+    Ok(merged)
+}
+
+fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
+    row.log2_fold_change = None;
+    row.lfc_se = None;
+    row.stat = None;
+    row.pvalue = None;
+    row.padj = None;
+    row.dispersion = None;
+    row.converged = None;
+    row.cooks_outlier = None;
+    row.filtered = None;
+}
+
+fn nonzero_gene_indices(all_zero: &[bool]) -> Vec<usize> {
+    all_zero
+        .iter()
+        .copied()
+        .enumerate()
+        .filter_map(|(gene, is_zero)| (!is_zero).then_some(gene))
+        .collect()
+}
+
+fn compact_counts(counts: &CountMatrix, gene_indices: &[usize]) -> Result<CountMatrix, DeseqError> {
+    let mut values = Vec::with_capacity(gene_indices.len() * counts.n_samples());
+    for gene in gene_indices {
+        values.extend_from_slice(counts.row(*gene)?);
+    }
+    let gene_names = counts.gene_names().map(|names| {
+        gene_indices
+            .iter()
+            .map(|gene| names[*gene].clone())
+            .collect::<Vec<_>>()
+    });
+    let sample_names = counts.sample_names().map(<[String]>::to_vec);
+    CountMatrix::from_row_major_u32_with_names(
+        gene_indices.len(),
+        counts.n_samples(),
+        values,
+        gene_names,
+        sample_names,
+    )
+}
+
+fn compact_matrix_rows(
+    matrix: &RowMajorMatrix<f64>,
+    row_indices: &[usize],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let mut values = Vec::with_capacity(row_indices.len() * matrix.n_cols());
+    for row in row_indices {
+        values.extend_from_slice(matrix.row(*row)?);
+    }
+    RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
+}
+
+fn all_zero_glm_fit(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+) -> Result<NbinomGlmFit, DeseqError> {
+    Ok(NbinomGlmFit {
+        log_like: vec![f64::NAN; counts.n_genes()],
+        beta_converged: vec![false; counts.n_genes()],
+        beta: RowMajorMatrix::from_elem(counts.n_genes(), design.n_coefficients(), f64::NAN)?,
+        beta_se: RowMajorMatrix::from_elem(counts.n_genes(), design.n_coefficients(), f64::NAN)?,
+        beta_covariance: Some(RowMajorMatrix::from_elem(
+            counts.n_genes(),
+            design.n_coefficients() * design.n_coefficients(),
+            f64::NAN,
+        )?),
+        mu: RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), f64::NAN)?,
+        beta_iter: vec![0; counts.n_genes()],
+        model_matrix: design.clone(),
+        n_terms: design.n_coefficients(),
+        hat_diagonal: RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), f64::NAN)?,
+    })
+}
+
+fn expand_glm_fit(
+    compact_fit: NbinomGlmFit,
+    all_zero: &[bool],
+) -> Result<NbinomGlmFit, DeseqError> {
+    Ok(NbinomGlmFit {
+        log_like: expand_gene_values_with_nan_rows(&compact_fit.log_like, all_zero)?,
+        beta_converged: expand_gene_values_with_fill_rows(
+            &compact_fit.beta_converged,
+            all_zero,
+            false,
+        )?,
+        beta: expand_matrix_with_nan_rows(&compact_fit.beta, all_zero)?,
+        beta_se: expand_matrix_with_nan_rows(&compact_fit.beta_se, all_zero)?,
+        beta_covariance: compact_fit
+            .beta_covariance
+            .as_ref()
+            .map(|matrix| expand_matrix_with_nan_rows(matrix, all_zero))
+            .transpose()?,
+        mu: expand_matrix_with_nan_rows(&compact_fit.mu, all_zero)?,
+        beta_iter: expand_gene_values_with_fill_rows(&compact_fit.beta_iter, all_zero, 0)?,
+        model_matrix: compact_fit.model_matrix,
+        n_terms: compact_fit.n_terms,
+        hat_diagonal: expand_matrix_with_nan_rows(&compact_fit.hat_diagonal, all_zero)?,
+    })
+}
+
+fn expand_matrix_with_nan_rows(
+    matrix: &RowMajorMatrix<f64>,
+    all_zero: &[bool],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let n_cols = matrix.n_cols();
+    let mut values = vec![f64::NAN; all_zero.len() * n_cols];
+    let mut compact_row = 0_usize;
+    for (row, is_zero) in all_zero.iter().copied().enumerate() {
+        if is_zero {
+            continue;
+        }
+        let src = matrix.row(compact_row)?;
+        let start = row * n_cols;
+        values[start..start + n_cols].copy_from_slice(src);
+        compact_row += 1;
+    }
+    if compact_row != matrix.n_rows() {
+        return Err(invalid_dimensions(
+            "expanded matrix non-zero rows",
+            compact_row,
+            matrix.n_rows(),
+        ));
+    }
+    RowMajorMatrix::from_row_major(all_zero.len(), n_cols, values)
+}
+
+fn expand_gene_values_with_nan_rows(
+    values: &[f64],
+    all_zero: &[bool],
+) -> Result<Vec<f64>, DeseqError> {
+    expand_gene_values_with_fill_rows(values, all_zero, f64::NAN)
+}
+
+fn mask_all_zero_values_with_nan_rows(
+    values: &[f64],
+    all_zero: &[bool],
+) -> Result<Vec<f64>, DeseqError> {
+    if values.len() != all_zero.len() {
+        return Err(invalid_dimensions(
+            "all-zero masked vector rows",
+            all_zero.len(),
+            values.len(),
+        ));
+    }
+    Ok(values
+        .iter()
+        .copied()
+        .zip(all_zero.iter().copied())
+        .map(|(value, is_zero)| if is_zero { f64::NAN } else { value })
+        .collect())
+}
+
+fn mask_wald_degrees_of_freedom_for_all_zero_rows(
+    wald: &mut WaldOutput,
+    all_zero: &[bool],
+) -> Result<(), DeseqError> {
+    let Some(degrees_of_freedom) = &mut wald.degrees_of_freedom else {
+        return Ok(());
+    };
+    if degrees_of_freedom.len() != all_zero.len() {
+        return Err(invalid_dimensions(
+            "Wald degrees of freedom all-zero mask",
+            all_zero.len(),
+            degrees_of_freedom.len(),
+        ));
+    }
+    for (df, is_all_zero) in degrees_of_freedom.iter_mut().zip(all_zero.iter().copied()) {
+        if is_all_zero {
+            *df = None;
+        }
+    }
+    Ok(())
+}
+
+fn apply_contrast_all_zero_to_wald_contrast(
+    contrast: &mut WaldContrastOutput,
+    contrast_all_zero: &[bool],
+    all_zero: &[bool],
+) -> Result<(), DeseqError> {
+    let n_genes = contrast.log2_fold_change.len();
+    if contrast_all_zero.len() != n_genes {
+        return Err(invalid_dimensions(
+            "contrastAllZero rows",
+            n_genes,
+            contrast_all_zero.len(),
+        ));
+    }
+    if all_zero.len() != n_genes {
+        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
+    }
+    for gene in 0..n_genes {
+        if contrast_all_zero[gene] && !all_zero[gene] {
+            contrast.log2_fold_change[gene] = Some(0.0);
+            contrast.wald.stat[gene] = Some(0.0);
+            contrast.wald.pvalue[gene] = Some(1.0);
+        }
+    }
+    Ok(())
+}
+
+fn expand_gene_values_with_fill_rows<T: Copy>(
+    values: &[T],
+    all_zero: &[bool],
+    fill: T,
+) -> Result<Vec<T>, DeseqError> {
+    let mut expanded = vec![fill; all_zero.len()];
+    let mut compact_row = 0_usize;
+    for (row, is_zero) in all_zero.iter().copied().enumerate() {
+        if is_zero {
+            continue;
+        }
+        let Some(value) = values.get(compact_row) else {
+            return Err(invalid_dimensions(
+                "expanded vector non-zero rows",
+                compact_row + 1,
+                values.len(),
+            ));
+        };
+        expanded[row] = *value;
+        compact_row += 1;
+    }
+    if compact_row != values.len() {
+        return Err(invalid_dimensions(
+            "expanded vector non-zero rows",
+            compact_row,
+            values.len(),
+        ));
+    }
+    Ok(expanded)
+}
+
+fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
+    let full_deviance = glm_fit
+        .log_like
+        .iter()
+        .map(|log_like| -2.0 * *log_like)
+        .collect();
+    fit.beta = Some(glm_fit.beta);
+    fit.beta_se = Some(glm_fit.beta_se);
+    fit.beta_covariance = glm_fit.beta_covariance;
+    fit.beta_converged = Some(glm_fit.beta_converged);
+    fit.beta_iter = Some(glm_fit.beta_iter);
+    fit.log_like = Some(glm_fit.log_like);
+    fit.full_deviance = Some(full_deviance);
+    fit.mu = Some(glm_fit.mu);
+    fit.hat_diagonal = Some(glm_fit.hat_diagonal);
+}
+
+fn validate_pipeline_wald_coefficient(
+    design: &DesignMatrix,
+    coefficient: usize,
+) -> Result<(), DeseqError> {
+    if coefficient >= design.n_coefficients() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "pipeline Wald coefficient index".to_string(),
+            expected: design.n_coefficients().saturating_sub(1),
+            actual: coefficient,
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CountMatrix;
+
+    #[test]
+    fn count_matrix_rejects_bad_length() {
+        let err = CountMatrix::from_row_major_u32(2, 3, vec![1, 2]).unwrap_err();
+        assert!(err.to_string().contains("invalid dimensions"));
+    }
+
+    #[test]
+    fn count_matrix_row_access() {
+        let counts = CountMatrix::from_row_major_u32(2, 3, vec![1, 2, 3, 4, 5, 6]).unwrap();
+        assert_eq!(counts.row(1).unwrap(), &[4, 5, 6]);
+    }
+
+    #[test]
+    fn count_matrix_accepts_u64_when_values_fit() {
+        let counts = CountMatrix::from_row_major_u64(1, 3, vec![1, 2, 3]).unwrap();
+        assert_eq!(counts.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn all_zero_gene_detection() {
+        let counts = CountMatrix::from_row_major_u32(2, 3, vec![0, 0, 0, 4, 5, 6]).unwrap();
+        assert!(counts.is_all_zero_gene(0).unwrap());
+        assert!(!counts.is_all_zero_gene(1).unwrap());
+    }
+}

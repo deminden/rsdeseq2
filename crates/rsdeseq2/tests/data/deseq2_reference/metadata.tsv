@@ -1,0 +1,11 @@
+key	value
+DESeq2_version	1.46.0
+Bioconductor_version	3.20
+R_version	4.4.3
+platform	x86_64-conda-linux-gnu
+reference_fixture	tiny_two_group_four_gene
+fixed_glm_reference_mode	DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=FALSE
+normalization_factors_reference_mode	counts(dds, normalized=TRUE) with normalizationFactors(dds), which preempt sizeFactors(dds)
+native_nf_dispersion_reference_mode	DESeq2 roughDispEstimate, momentsDispEstimate, and linearModelMuNormalized with normalizationFactors(dds)
+weighted_reference_mode	getBaseMeansAndVariances with raw weights, getAndCheckWeights row-normalized weights, and fitNbinomGLMs with supplied dispersions
+native_weighted_glm_mu_reference_mode	estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights

@@ -1,0 +1,13 @@
+[package]
+name = "rsdeseq2-r"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[dependencies]
+
+[workspace]

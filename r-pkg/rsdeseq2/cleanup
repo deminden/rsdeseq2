@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+echo "rsdeseq2 cleanup: no generated Rust bridge artifacts to remove."

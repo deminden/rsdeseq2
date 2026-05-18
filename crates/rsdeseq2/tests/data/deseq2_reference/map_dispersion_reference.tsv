@@ -1,0 +1,2 @@
+gene	dispGeneEst	dispFit	dispInit	dispPriorVar	varLogDispEsts	dispMAP	dispersion	dispIter	dispOutlier	converged	useCR
+map_gene1	0.5	0.02	0.5	0.05	100	0.0216194483538132	0.0216194483538132	11	FALSE	TRUE	FALSE

@@ -1,0 +1,21 @@
+name: R
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+      - name: Install test dependencies
+        run: Rscript -e 'install.packages("testthat", repos = "https://cloud.r-project.org")'
+      - name: Source-tree testthat suite
+        run: Rscript -e 'for (f in list.files("r-pkg/rsdeseq2/R", pattern="[.]R$", full.names=TRUE)) source(f); testthat::test_dir("r-pkg/rsdeseq2/tests/testthat", reporter="summary")'
+      - name: Build package
+        run: R CMD build r-pkg/rsdeseq2
+      - name: Package check
+        run: R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
