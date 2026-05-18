@@ -6,14 +6,9 @@
 > normalization, dispersion, GLM, Cook's, and result-table primitives.
 
 `rsdeseq2` is an early Rust implementation of the core DESeq2 workflow. The
-goal is DESeq2-like intermediate and final results with a fast, inspectable
-Rust numerical core and R-first compatibility.
-
-This repository follows the same broad structure as `rsfgsea`: a Rust
-workspace, a core crate, R package scaffolding, scripts, docs, benchmarks, and
-reference/parity outputs. The statistical reference is the official
-Bioconductor DESeq2 package. This project is a clean-room reimplementation:
-DESeq2 behavior is documented and validated against, not copied line by line.
+goal is DESeq2-like intermediate and final results with a fast
+Rust numerical core. The statistical reference is the official
+Bioconductor DESeq2 package. DESeq2 behavior is documented and validated against, not copied line by line.
 
 ## Current Status
 
