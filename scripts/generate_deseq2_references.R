@@ -7,7 +7,6 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(FALSE)
-include_known_gaps <- any(args == "--include-known-gaps")
 file_arg <- grep("^--file=", args, value = TRUE)
 script_path <- if (length(file_arg) > 0) {
   normalizePath(sub("^--file=", "", file_arg[[1]]), mustWork = FALSE)
@@ -107,6 +106,7 @@ metadata <- data.frame(
     "normalization_factors_reference_mode",
     "native_nf_dispersion_reference_mode",
     "weighted_reference_mode",
+    "native_weighted_glm_mu_cr_reference_mode",
     "native_weighted_glm_mu_reference_mode"
   ),
   value = c(
@@ -117,8 +117,9 @@ metadata <- data.frame(
     "tiny_two_group_four_gene",
     "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=FALSE",
     "counts(dds, normalized=TRUE) with normalizationFactors(dds), which preempt sizeFactors(dds)",
-    "DESeq2 roughDispEstimate, momentsDispEstimate, and linearModelMuNormalized with normalizationFactors(dds)",
+    "DESeq2 roughDispEstimate, momentsDispEstimate, and estimateDispersionsGeneEst stored mu with normalizationFactors(dds)",
     "getBaseMeansAndVariances with raw weights, getAndCheckWeights row-normalized weights, and fitNbinomGLMs with supplied dispersions",
+    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) with observation weights for weighted Cox-Reid gene-wise dispersion anchors",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights"
   )
 )
@@ -438,7 +439,6 @@ if (!is.null(cooks_replacement_reference)) {
   )
 }
 
-if (include_known_gaps) {
 native_nf_reference <- tryCatch({
   dds_nf_meta <- DESeq2:::getBaseMeansAndVariances(dds_norm_factors)
   row_meta <- S4Vectors::mcols(dds_nf_meta)
@@ -452,10 +452,6 @@ native_nf_reference <- tryCatch({
   min_disp <- 1e-8
   max_disp <- max(10, ncol(dds_nf_meta))
   disp_init <- pmin(pmax(min_disp, pmin(rough_disp, moments_disp)), max_disp)
-  mu_nz <- DESeq2:::linearModelMuNormalized(dds_nf_nz, full_design)
-  mu_all <- matrix(NA_real_, nrow = nrow(counts), ncol = ncol(counts), dimnames = dimnames(counts))
-  mu_all[nonzero_rows, ] <- mu_nz
-
   dds_nf_gene <- DESeq2:::estimateDispersionsGeneEst(
     dds_norm_factors,
     modelMatrix = full_design,
@@ -465,6 +461,7 @@ native_nf_reference <- tryCatch({
     quiet = TRUE
   )
   gene_meta <- S4Vectors::mcols(dds_nf_gene)
+  gene_mu <- SummarizedExperiment::assays(dds_nf_gene)[["mu"]]
 
   list(
     row_meta = row_meta,
@@ -472,7 +469,7 @@ native_nf_reference <- tryCatch({
     rough_disp = rough_disp,
     moments_disp = moments_disp,
     disp_init = disp_init,
-    mu = mu_all,
+    mu = gene_mu,
     disp_gene_est = gene_meta$dispGeneEst,
     disp_gene_iter = gene_meta$dispGeneIter
   )
@@ -515,6 +512,53 @@ if (!is.null(native_nf_reference)) {
     native_nf_reference$mu,
     "gene",
     file.path(data_dir, "native_nf_mu.tsv")
+  )
+}
+
+native_weighted_glm_mu_cr_reference <- tryCatch({
+  dds_weighted_cr_gene <- DESeq2:::estimateDispersionsGeneEst(
+    dds_weighted,
+    modelMatrix = full_design,
+    linearMu = FALSE,
+    niter = 2,
+    useCR = TRUE,
+    quiet = TRUE
+  )
+  row_meta <- S4Vectors::mcols(dds_weighted_cr_gene)
+  weights_fail <- if ("weightsFail" %in% names(row_meta)) {
+    row_meta$weightsFail
+  } else {
+    rep(FALSE, nrow(counts))
+  }
+  list(
+    row_meta = row_meta,
+    weights_fail = weights_fail,
+    dispersion_mu = SummarizedExperiment::assays(dds_weighted_cr_gene)[["mu"]]
+  )
+}, error = function(error) {
+  writeLines(conditionMessage(error), file.path(data_dir, "native_weighted_glm_mu_cr_reference_error.txt"))
+  NULL
+})
+
+if (!is.null(native_weighted_glm_mu_cr_reference)) {
+  native_weighted_cr_rows <- data.frame(
+    gene = rownames(counts),
+    baseMean = native_weighted_glm_mu_cr_reference$row_meta$baseMean,
+    baseVar = native_weighted_glm_mu_cr_reference$row_meta$baseVar,
+    allZero = native_weighted_glm_mu_cr_reference$row_meta$allZero,
+    weightsFail = native_weighted_glm_mu_cr_reference$weights_fail,
+    dispGeneEst = native_weighted_glm_mu_cr_reference$row_meta$dispGeneEst,
+    dispGeneIter = native_weighted_glm_mu_cr_reference$row_meta$dispGeneIter,
+    check.names = FALSE
+  )
+  write_tsv(
+    native_weighted_cr_rows,
+    file.path(data_dir, "native_weighted_glm_mu_cr_reference.tsv")
+  )
+  write_matrix_tsv(
+    native_weighted_glm_mu_cr_reference$dispersion_mu,
+    "gene",
+    file.path(data_dir, "native_weighted_glm_mu_cr_dispersion_mu.tsv")
   )
 }
 
@@ -665,6 +709,7 @@ if (!is.null(native_weighted_glm_mu_reference)) {
     allZero = native_weighted_glm_mu_reference$row_meta$allZero,
     weightsFail = native_weighted_glm_mu_reference$weights_fail,
     dispGeneEst = native_weighted_glm_mu_reference$row_meta$dispGeneEst,
+    dispGeneIter = native_weighted_glm_mu_reference$row_meta$dispGeneIter,
     dispFit = native_weighted_glm_mu_reference$row_meta$dispFit,
     dispMAP = native_weighted_glm_mu_reference$row_meta$dispMAP,
     dispersion = native_weighted_glm_mu_reference$row_meta$dispersion,
@@ -703,8 +748,6 @@ if (!is.null(native_weighted_glm_mu_reference)) {
     file.path(data_dir, "native_weighted_glm_mu_wald_hat.tsv")
   )
 }
-}
-
 trend_means <- c(10, 20, 40, 80, 160, 320)
 trend_disps <- 0.05 + 2 / trend_means
 trend_fit <- DESeq2:::parametricDispersionFit(trend_means, trend_disps)
@@ -939,16 +982,21 @@ if (!is.null(fixed_reference)) {
   write_matrix_tsv(fixed_reference$cooks, "gene", file.path(data_dir, "fixed_cooks_full.tsv"))
 }
 
-if (include_known_gaps) {
 weighted_fixed_reference <- tryCatch({
   dds_weighted_fixed <- DESeq2:::getBaseMeansAndVariances(dds_weighted)
   dds_weighted_fixed <- DESeq2::`dispersions<-`(dds_weighted_fixed, value = fixed_dispersions)
   mcols_weighted_fixed <- S4Vectors::mcols(dds_weighted_fixed)
   mcols_weighted_fixed$dispersion <- fixed_dispersions
   dds_weighted_fixed <- S4Vectors::`mcols<-`(dds_weighted_fixed, value = mcols_weighted_fixed)
+  checked_weighted_fixed <- suppressWarnings(DESeq2:::getAndCheckWeights(
+    dds_weighted_fixed,
+    full_design
+  )$object)
+  fixed_all_zero <- S4Vectors::mcols(checked_weighted_fixed)$allZero
+  object_nz <- checked_weighted_fixed[!fixed_all_zero, , drop = FALSE]
 
   full_fit <- suppressWarnings(DESeq2:::fitNbinomGLMs(
-    dds_weighted_fixed,
+    object_nz,
     modelMatrix = full_design,
     renameCols = FALSE,
     betaTol = 1e-8,
@@ -959,7 +1007,7 @@ weighted_fixed_reference <- tryCatch({
     minmu = 0.5
   ))
   reduced_fit <- suppressWarnings(DESeq2:::fitNbinomGLMs(
-    dds_weighted_fixed,
+    object_nz,
     modelMatrix = reduced_design,
     renameCols = FALSE,
     betaTol = 1e-8,
@@ -977,11 +1025,23 @@ weighted_fixed_reference <- tryCatch({
   lrt_df <- ncol(full_design) - ncol(reduced_design)
   lrt_pvalue <- stats::pchisq(lrt_stat, df = lrt_df, lower.tail = FALSE)
 
-  weighted_meta <- if (!is.null(weighted_metadata_reference)) {
-    weighted_metadata_reference$row_meta
-  } else {
-    S4Vectors::mcols(DESeq2:::getAndCheckWeights(dds_weighted_fixed, full_design)$object)
+  expand_numeric <- function(value) {
+    expanded <- rep(NA_real_, length(fixed_all_zero))
+    expanded[!fixed_all_zero] <- value
+    expanded
   }
+  expand_integer <- function(value) {
+    expanded <- integer(length(fixed_all_zero))
+    expanded[!fixed_all_zero] <- value
+    expanded
+  }
+  expand_logical <- function(value) {
+    expanded <- rep(FALSE, length(fixed_all_zero))
+    expanded[!fixed_all_zero] <- value
+    expanded
+  }
+
+  weighted_meta <- S4Vectors::mcols(checked_weighted_fixed)
   weights_fail <- if ("weightsFail" %in% names(weighted_meta)) {
     weighted_meta$weightsFail
   } else {
@@ -991,13 +1051,23 @@ weighted_fixed_reference <- tryCatch({
   list(
     full_fit = full_fit,
     reduced_fit = reduced_fit,
-    wald_stat = wald_stat,
-    wald_pvalue = wald_pvalue,
-    lrt_stat = lrt_stat,
+    wald_stat = expand_numeric(wald_stat),
+    wald_pvalue = expand_numeric(wald_pvalue),
+    lrt_stat = expand_numeric(lrt_stat),
     lrt_df = lrt_df,
-    lrt_pvalue = lrt_pvalue,
+    lrt_pvalue = expand_numeric(lrt_pvalue),
     row_meta = weighted_meta,
-    weights_fail = weights_fail
+    weights_fail = weights_fail,
+    beta_intercept = expand_numeric(full_fit$betaMatrix[, 1]),
+    beta_conditionB = expand_numeric(full_fit$betaMatrix[, 2]),
+    beta_se_intercept = expand_numeric(full_fit$betaSE[, 1]),
+    beta_se_conditionB = expand_numeric(full_fit$betaSE[, 2]),
+    log_like = expand_numeric(full_fit$logLike),
+    converged = expand_logical(full_fit$betaConv),
+    iterations = expand_integer(full_fit$betaIter),
+    reduced_log_like = expand_numeric(reduced_fit$logLike),
+    reduced_converged = expand_logical(reduced_fit$betaConv),
+    reduced_iterations = expand_integer(reduced_fit$betaIter)
   )
 }, error = function(error) {
   writeLines(conditionMessage(error), file.path(data_dir, "fixed_weighted_glm_reference_error.txt"))
@@ -1005,9 +1075,6 @@ weighted_fixed_reference <- tryCatch({
 })
 
 if (!is.null(weighted_fixed_reference)) {
-  weighted_full_fit <- weighted_fixed_reference$full_fit
-  weighted_reduced_fit <- weighted_fixed_reference$reduced_fit
-
   write_tsv(
     data.frame(
       gene = rownames(counts),
@@ -1015,15 +1082,15 @@ if (!is.null(weighted_fixed_reference)) {
       baseMean = weighted_fixed_reference$row_meta$baseMean,
       allZero = weighted_fixed_reference$row_meta$allZero,
       weightsFail = weighted_fixed_reference$weights_fail,
-      beta_intercept = weighted_full_fit$betaMatrix[, 1],
-      beta_conditionB = weighted_full_fit$betaMatrix[, 2],
-      beta_se_intercept = weighted_full_fit$betaSE[, 1],
-      beta_se_conditionB = weighted_full_fit$betaSE[, 2],
+      beta_intercept = weighted_fixed_reference$beta_intercept,
+      beta_conditionB = weighted_fixed_reference$beta_conditionB,
+      beta_se_intercept = weighted_fixed_reference$beta_se_intercept,
+      beta_se_conditionB = weighted_fixed_reference$beta_se_conditionB,
       stat_conditionB = weighted_fixed_reference$wald_stat,
       pvalue_conditionB = weighted_fixed_reference$wald_pvalue,
-      log_like = weighted_full_fit$logLike,
-      converged = weighted_full_fit$betaConv,
-      iterations = weighted_full_fit$betaIter,
+      log_like = weighted_fixed_reference$log_like,
+      converged = weighted_fixed_reference$converged,
+      iterations = weighted_fixed_reference$iterations,
       check.names = FALSE
     ),
     file.path(data_dir, "fixed_wald_weighted_reference.tsv")
@@ -1036,24 +1103,24 @@ if (!is.null(weighted_fixed_reference)) {
       baseMean = weighted_fixed_reference$row_meta$baseMean,
       allZero = weighted_fixed_reference$row_meta$allZero,
       weightsFail = weighted_fixed_reference$weights_fail,
-      beta_intercept = weighted_full_fit$betaMatrix[, 1],
-      beta_conditionB = weighted_full_fit$betaMatrix[, 2],
-      beta_se_intercept = weighted_full_fit$betaSE[, 1],
-      beta_se_conditionB = weighted_full_fit$betaSE[, 2],
-      log_like_full = weighted_full_fit$logLike,
-      log_like_reduced = weighted_reduced_fit$logLike,
+      beta_intercept = weighted_fixed_reference$beta_intercept,
+      beta_conditionB = weighted_fixed_reference$beta_conditionB,
+      beta_se_intercept = weighted_fixed_reference$beta_se_intercept,
+      beta_se_conditionB = weighted_fixed_reference$beta_se_conditionB,
+      log_like_full = weighted_fixed_reference$log_like,
+      log_like_reduced = weighted_fixed_reference$reduced_log_like,
       lrt_stat = weighted_fixed_reference$lrt_stat,
       pvalue = weighted_fixed_reference$lrt_pvalue,
       df = weighted_fixed_reference$lrt_df,
-      full_converged = weighted_full_fit$betaConv,
-      reduced_converged = weighted_reduced_fit$betaConv,
+      full_converged = weighted_fixed_reference$converged,
+      reduced_converged = weighted_fixed_reference$reduced_converged,
+      full_iterations = weighted_fixed_reference$iterations,
+      reduced_iterations = weighted_fixed_reference$reduced_iterations,
       check.names = FALSE
     ),
     file.path(data_dir, "fixed_lrt_weighted_reference.tsv")
   )
 }
-}
-
 session_info <- sub("[[:blank:]]+$", "", capture.output(sessionInfo()))
 writeLines(session_info, file.path(data_dir, "sessionInfo.txt"))
 invisible(file.copy(file.path(data_dir, "metadata.tsv"), file.path(out_dir, "metadata.tsv"), overwrite = TRUE))

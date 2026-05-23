@@ -282,12 +282,18 @@ fn native_weighted_glm_mu_lrt_matches_optional_deseq2_reference() {
     let reduced_beta_iter = fit.reduced_beta_iter.as_ref().unwrap();
     let dispersion = fit.dispersion.as_ref().unwrap();
     let lrt = fit.lrt.as_ref().unwrap();
+    let diagnostics = fit.deseq2_mcols_diagnostics();
+    let disp_gene_iter = diagnostics.disp_gene_iter.as_ref().unwrap();
 
     assert_eq!(lrt.degrees_of_freedom, 1);
     assert_eq!(rows.len(), results.rows.len());
     assert_eq!(rows.len(), beta.n_rows());
     assert_eq!(reduced_beta_converged, &lrt.reduced_converged);
     assert_eq!(reduced_beta_iter.len(), rows.len());
+    assert_eq!(
+        diagnostics.disp_gene_iter.as_ref(),
+        fit.disp_gene_iter.as_ref()
+    );
     for (gene, row) in rows.iter().enumerate() {
         let all_zero = parse_required_bool(row, "allZero");
         let weights_fail = parse_required_bool(row, "weightsFail");
@@ -376,9 +382,18 @@ fn native_weighted_glm_mu_lrt_matches_optional_deseq2_reference() {
         );
 
         if skipped {
+            assert_eq!(disp_gene_iter[gene], 0);
             assert_eq!(beta_iter[gene], 0);
             assert_eq!(reduced_beta_iter[gene], 0);
         } else {
+            assert!(
+                disp_gene_iter[gene] > 0,
+                "native weighted GLM-mu LRT gene-wise iterations gene {gene}"
+            );
+            assert!(
+                parse_required_f64(row, "dispGeneIter") > 0.0,
+                "DESeq2 native weighted GLM-mu LRT gene-wise iterations gene {gene}"
+            );
             assert_eq!(
                 beta_converged[gene],
                 parse_required_bool(row, "full_converged"),

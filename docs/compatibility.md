@@ -1,5 +1,8 @@
 # Compatibility
 
+For a higher-level comparison against original DESeq2, see
+[`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).
+
 ## Implemented
 
 - Non-negative integer count matrix represented as genes x samples.
@@ -37,9 +40,6 @@
   checks, and `weights_fail` flags.
 - DESeq2-style full-rank design matrix checks for supplied-dispersion Wald/LRT
   pipelines and the current native linear-mu dispersion path.
-- R package primitive matrix helpers for size factors, normalized counts, and
-  baseMean. These currently use an R fallback matching the implemented Rust
-  normalization semantics until the native Rust bridge is connected.
 - Initial linear-mu gene-wise dispersion estimator with rough and moments
   dispersion starts.
 - Initial GLM-mu gene-wise dispersion estimator with rough/moments
@@ -47,7 +47,8 @@
   optimization, `niter`, DESeq2's `.05` log-dispersion `fitidx` update rule,
   and optional builder observation weights.
 - Fixed-mean Cox-Reid dispersion objective plus first and second derivatives,
-  including observation-weighted low-level variants.
+  including DESeq2-style observation-weighted variants where weights multiply
+  likelihood terms and threshold the Cox-Reid design subset.
 - DESeq2-style log-dispersion prior objective plus first and second derivative
   terms for MAP dispersion fitting.
 - DESeq2-shaped Armijo line-search optimizer for fixed-mean gene-wise
@@ -208,24 +209,21 @@ caller-supplied dispersions, default `1e-6` beta ridge, `useQR=FALSE`, and
 Rust fixed-dispersion Wald/LRT implementation. That default reference set now
 includes fixed-dispersion beta, SE, Wald/LRT statistics, log likelihoods,
 fitted means, hat diagonals, and Cook's distances. It also writes weighted base
-metadata using `getBaseMeansAndVariances` and `getAndCheckWeights`.
-Passing `--include-known-gaps` additionally writes exploratory weighted direct
-`fitNbinomGLMs` and weighted GLM-mu dispersion/MAP/Wald intermediate
-references. The weighted direct fixed-GLM fixtures are not part of the default
-passing set because DESeq2 can return ridge-stabilized coefficients for rows it
-also marks as `weightsFail`, while the current Rust high-level fixed pipelines
-treat those rows as skipped.
+metadata using `getBaseMeansAndVariances` and `getAndCheckWeights`, weighted
+fixed-dispersion Wald/LRT references with `weightsFail` rows expanded as
+missing, and weighted GLM-mu mean-trend dispersion/MAP/Wald/LRT intermediate
+references for the current native branch.
 
 ## Missing
 
-- DESeqDataSet input/output integration.
+- Mature Rust-backed R package wrapper around the Rust core. It must not
+  fall back to R/Bioconductor DESeq2 for runtime computation.
 - R formula parsing in Rust.
-- Native R-to-Rust bridge for the R package primitive helpers.
 - Full DESeq2 dispersion estimation, including complete weighted dispersion
   parity, local/glmGamPoi trend types, and production-ready end-to-end
   dispersion parity.
 - High-level propagation of observation-weight `weights_fail` flags through
-  complete DESeq2-like builder and R-wrapper workflows.
+  complete DESeq2-like builder and future wrapper workflows.
 - Direct weighted low-level `fitNbinomGLMs` parity for rows that DESeq2 marks
   `weightsFail` but still returns ridge-stabilized coefficients for when that
   internal function is called directly.
@@ -234,7 +232,7 @@ treat those rows as skipped.
   semantics, complete coefficient-name cleanup, and contrast-aware Cook's/refit
   edge cases.
 - Automatic formula-aware application of the two-group low-count Cook's
-  heuristic from high-level R wrappers.
+  heuristic from high-level wrappers.
 - Full Cook's outlier replacement behavior for contrasts, beta priors,
   Bioconductor assay preservation, and all DESeq2 edge cases.
 - General Wald and LRT tests with native dispersion estimation beyond the
@@ -242,16 +240,17 @@ treat those rows as skipped.
   references for all native LRT intermediates.
 - General all-zero row expansion for dispersion and full Bioconductor
   result-table metadata. A lightweight `DeseqFit` diagnostic alias view exists
-  for implemented Wald/LRT metadata names.
+  for implemented dispersion and Wald/LRT metadata names.
 - High-level R-style contrast handling beyond primitive coefficient-name
   resolution.
 - VST, rlog, and lfcShrink-compatible hooks.
 
 ## Known Deviations
 
-The Rust core accepts primitive matrices and explicit options. R formula
-semantics, S4 behavior, and model-matrix generation are expected to stay in R
-until the numerical core is validated.
+The Rust core accepts primitive matrices and explicit options. Formula
+semantics and model-matrix generation can be handled by a future wrapper, but
+runtime statistical computation must call Rust. There should be no fallback to
+R/Bioconductor DESeq2 for unsupported computations.
 
 Gene/sample normalization factors are supported for normalized-count metadata,
 supplied-dispersion fixed Wald/LRT pipelines, and the current native linear-mu
@@ -277,8 +276,9 @@ interpolation shortcut skips fitted points. The implementation is tested
 against R-generated fixtures for both cases.
 
 The current gene-wise dispersion estimators have the Cox-Reid objective and
-Armijo line-search shape. The linear-mu branch is wired through trend, MAP, and
-the limited native Wald path. The newer GLM-mu branch performs
+Armijo line-search shape, including DESeq2's weighted Cox-Reid
+`weightThreshold` subset rule. The linear-mu branch is wired through trend,
+MAP, and the limited native Wald path. The newer GLM-mu branch performs
 mean/dispersion alternation using fixed-dispersion IRLS, can consume
 preprocessed builder observation weights, and is wired through parametric/mean
 trend fitting, MAP shrinkage, and the limited native Wald path.
@@ -305,6 +305,8 @@ size factors, normalized counts, base means, and BH adjusted p-values.
 Future GLM and dispersion parity should compare intermediate fields first:
 
 - `dispGeneEst`
+- `dispGeneIter` presence and skipped-row shape; exact counts are diagnostic
+  because equivalent Armijo paths can take different numbers of steps.
 - `dispFit`
 - final dispersion
 - beta estimates

@@ -143,6 +143,7 @@ fn native_linear_mu_parametric_wald_preserves_dispersion_intermediates() {
     );
 
     let disp_gene_est = fit.disp_gene_est.as_ref().unwrap();
+    let disp_gene_iter = fit.disp_gene_iter.as_ref().unwrap();
     let disp_fit = fit.disp_fit.as_ref().unwrap();
     let disp_map = fit.disp_map.as_ref().unwrap();
     let dispersion = fit.dispersion.as_ref().unwrap();
@@ -151,6 +152,7 @@ fn native_linear_mu_parametric_wald_preserves_dispersion_intermediates() {
     let disp_converged = fit.dispersion_converged.as_ref().unwrap();
 
     assert_eq!(disp_gene_est.len(), counts.n_genes());
+    assert_eq!(disp_gene_iter.len(), counts.n_genes());
     assert_eq!(disp_fit.len(), counts.n_genes());
     assert_eq!(disp_map.len(), counts.n_genes());
     assert_eq!(dispersion.len(), counts.n_genes());
@@ -160,6 +162,7 @@ fn native_linear_mu_parametric_wald_preserves_dispersion_intermediates() {
     assert!(fit.disp_prior_var.unwrap().is_finite());
 
     assert!(disp_gene_est[0].is_nan());
+    assert_eq!(disp_gene_iter[0], 0);
     assert!(disp_fit[0].is_nan());
     assert!(disp_map[0].is_nan());
     assert!(dispersion[0].is_nan());
@@ -169,6 +172,7 @@ fn native_linear_mu_parametric_wald_preserves_dispersion_intermediates() {
 
     for gene in 1..counts.n_genes() {
         assert!(disp_gene_est[gene].is_finite());
+        assert!(disp_gene_iter[gene] > 0);
         assert!(disp_fit[gene].is_finite());
         assert!(disp_map[gene].is_finite());
         assert!(dispersion[gene].is_finite());
@@ -351,12 +355,14 @@ fn native_glm_mu_parametric_map_preserves_dispersion_intermediates() {
     );
 
     let disp_gene_est = fit.disp_gene_est.as_ref().unwrap();
+    let disp_gene_iter = fit.disp_gene_iter.as_ref().unwrap();
     let disp_fit = fit.disp_fit.as_ref().unwrap();
     let disp_map = fit.disp_map.as_ref().unwrap();
     let dispersion = fit.dispersion.as_ref().unwrap();
     let disp_iter = fit.disp_iter.as_ref().unwrap();
 
     assert_eq!(disp_gene_est.len(), counts.n_genes());
+    assert_eq!(disp_gene_iter.len(), counts.n_genes());
     assert_eq!(disp_fit.len(), counts.n_genes());
     assert_eq!(disp_map.len(), counts.n_genes());
     assert_eq!(dispersion.len(), counts.n_genes());
@@ -366,12 +372,14 @@ fn native_glm_mu_parametric_map_preserves_dispersion_intermediates() {
     assert!(fit.wald.is_none());
 
     assert!(disp_gene_est[0].is_nan());
+    assert_eq!(disp_gene_iter[0], 0);
     assert!(disp_fit[0].is_nan());
     assert!(disp_map[0].is_nan());
     assert!(dispersion[0].is_nan());
 
     for gene in 1..counts.n_genes() {
         assert!(disp_gene_est[gene].is_finite());
+        assert!(disp_gene_iter[gene] > 0);
         assert!(disp_fit[gene].is_finite());
         assert!(disp_map[gene].is_finite());
         assert!(dispersion[gene].is_finite());

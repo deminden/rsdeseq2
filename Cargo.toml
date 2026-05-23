@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rsdeseq2", "crates/rsdeseq2py"]
+members = ["crates/rsdeseq2"]
 resolver = "2"
 
 [workspace.package]

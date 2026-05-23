@@ -91,5 +91,7 @@ pub use crate::options::{
 pub use crate::results::{
     apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_results,
     build_wald_contrast_results, build_wald_results, build_wald_results_from_wald,
-    default_cooks_cutoff, recompute_padj, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
+    default_cooks_cutoff, deseq2_result_core_column_names, recompute_padj, resolve_cooks_cutoff,
+    rsdeseq2_result_diagnostic_column_names, DeseqResultRow, DeseqResults,
+    DESEQ2_RESULT_CORE_COLUMNS, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
 };

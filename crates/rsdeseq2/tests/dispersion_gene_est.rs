@@ -270,8 +270,25 @@ fn weighted_cox_reid_adjustment_matches_intercept_hand_formula() {
     let expected_weight_sum = mu
         .iter()
         .copied()
-        .zip(weights.iter().copied())
-        .map(|(mu, weight)| weight * (1.0 / mu + alpha).recip())
+        .map(|mu| (1.0 / mu + alpha).recip())
+        .sum::<f64>();
+
+    let adjustment =
+        cox_reid_adjustment_weighted(&design, &mu, alpha.ln(), Some(&weights)).unwrap();
+
+    assert_relative_eq!(adjustment, -0.5 * expected_weight_sum.ln(), epsilon = 1e-12);
+}
+
+#[test]
+fn weighted_cox_reid_adjustment_uses_thresholded_design_subset() {
+    let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
+    let mu = [10.0, 10.0, 20.0, 20.0];
+    let weights = [1.0, 0.005, 1.0, 0.0];
+    let alpha = 0.1_f64;
+    let expected_weight_sum = [mu[0], mu[2]]
+        .iter()
+        .copied()
+        .map(|mu| (1.0 / mu + alpha).recip())
         .sum::<f64>();
 
     let adjustment =
@@ -767,10 +784,14 @@ fn builder_attaches_linear_mu_gene_wise_dispersion_state() {
         .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
+    let gene_iterations = fit.disp_gene_iter.as_ref().unwrap();
     assert_eq!(dispersions.len(), 2);
+    assert_eq!(gene_iterations.len(), 2);
     assert_relative_eq!(dispersions[0], 1e-8, epsilon = 1e-15);
     assert!(dispersions[1] > 0.01);
+    assert!(gene_iterations.iter().all(|iterations| *iterations > 0));
     assert_eq!(fit.dispersion, None);
+    assert_eq!(fit.disp_iter, None);
     assert_eq!(
         fit.dispersion_converged.as_ref().unwrap(),
         &vec![true, true]
@@ -795,9 +816,13 @@ fn builder_attaches_glm_mu_gene_wise_dispersion_state() {
         .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
+    let gene_iterations = fit.disp_gene_iter.as_ref().unwrap();
     assert_eq!(dispersions.len(), 2);
+    assert_eq!(gene_iterations.len(), 2);
     assert_relative_eq!(dispersions[0], 1e-8, epsilon = 1e-15);
+    assert!(gene_iterations.iter().all(|iterations| *iterations > 0));
     assert_eq!(fit.dispersion, None);
+    assert_eq!(fit.disp_iter, None);
     assert_eq!(fit.mu.as_ref().unwrap().n_cols(), 4);
     assert_relative_eq!(
         fit.mu.as_ref().unwrap().row(0).unwrap()[0],
@@ -805,6 +830,111 @@ fn builder_attaches_glm_mu_gene_wise_dispersion_state() {
         epsilon = 1e-4
     );
     assert_eq!(fit.dispersion_converged.as_ref().unwrap().len(), 2);
+}
+
+#[test]
+fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_fitidx_weight_rows() {
+    let counts = CountMatrix::from_row_major_u32(
+        4,
+        4,
+        vec![
+            10, 12, 20, 24, //
+            0, 0, 5, 7, //
+            100, 80, 90, 120, //
+            3, 6, 9, 12,
+        ],
+    )
+    .unwrap();
+    let observation_weights = RowMajorMatrix::from_row_major(
+        4,
+        4,
+        vec![
+            1.0, 2.0, 1.0, 2.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            2.0, 1.0, 2.0, 1.0, //
+            1.0, 0.5, 1.0, 0.5,
+        ],
+    )
+    .unwrap();
+
+    let fit = DeseqBuilder::new()
+        .size_factors(vec![
+            0.645497224367903,
+            0.829777303051304,
+            1.29099444873581,
+            1.54919333848297,
+        ])
+        .observation_weights(observation_weights)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design())
+        .unwrap();
+
+    assert_eq!(
+        fit.weights_fail.as_ref().unwrap(),
+        &vec![false, true, false, false]
+    );
+    assert_eq!(fit.all_zero, vec![false, true, false, false]);
+    let dispersions = fit.disp_gene_est.as_ref().unwrap();
+    assert_relative_eq!(dispersions[0], 1.0e-8, epsilon = 1e-14);
+    assert!(dispersions[1].is_nan());
+    assert_relative_eq!(dispersions[2], 0.0279348053798306, epsilon = 1e-12);
+    assert_relative_eq!(dispersions[3], 1.0e-8, epsilon = 1e-14);
+}
+
+#[test]
+fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_weighted_cox_reid() {
+    let counts = CountMatrix::from_row_major_u32(
+        4,
+        4,
+        vec![
+            10, 12, 20, 24, //
+            0, 0, 5, 7, //
+            100, 80, 90, 120, //
+            3, 6, 9, 12,
+        ],
+    )
+    .unwrap();
+    let observation_weights = RowMajorMatrix::from_row_major(
+        4,
+        4,
+        vec![
+            1.0, 2.0, 1.0, 2.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            2.0, 1.0, 2.0, 1.0, //
+            1.0, 0.5, 1.0, 0.5,
+        ],
+    )
+    .unwrap();
+
+    let fit = DeseqBuilder::new()
+        .size_factors(vec![
+            0.645497224367903,
+            0.829777303051304,
+            1.29099444873581,
+            1.54919333848297,
+        ])
+        .observation_weights(observation_weights)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design())
+        .unwrap();
+
+    assert_eq!(
+        fit.weights_fail.as_ref().unwrap(),
+        &vec![false, true, false, false]
+    );
+    assert_eq!(fit.all_zero, vec![false, true, false, false]);
+    let dispersions = fit.disp_gene_est.as_ref().unwrap();
+    assert_relative_eq!(dispersions[0], 1.00000006870857e-8, epsilon = 1e-14);
+    assert!(dispersions[1].is_nan());
+    assert_relative_eq!(dispersions[2], 0.101575541631976, epsilon = 1e-12);
+    assert_relative_eq!(dispersions[3], 1.0e-8, epsilon = 1e-14);
 }
 
 #[test]

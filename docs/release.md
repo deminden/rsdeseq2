@@ -12,11 +12,10 @@ the tested primitive stages.
 Before the first commit:
 
 - Keep the local DESeq2 inspection clone under ignored `external/`.
-- Keep Rust `target/`, R check directories, package tarballs, native objects,
+- Keep Rust `target/`, generated archives/native objects,
   and generated parity/benchmark outputs out of git.
 - Keep the README warning that the package is not production-ready.
 - Run Rust formatting, linting, and tests.
-- Run the R source-tree tests and `R CMD check` for the scaffold package.
 - Review staged files for accidental large artifacts or generated references.
 
 Before any release:
@@ -25,9 +24,7 @@ Before any release:
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-Rscript -e 'for (f in list.files("r-pkg/rsdeseq2/R", pattern="[.]R$", full.names=TRUE)) source(f); testthat::test_dir("r-pkg/rsdeseq2/tests/testthat", reporter="summary")'
-R CMD build r-pkg/rsdeseq2
-R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
+scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
 Rscript scripts/generate_deseq2_references.R
 ```
 

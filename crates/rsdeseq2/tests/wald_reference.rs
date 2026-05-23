@@ -343,6 +343,13 @@ fn native_weighted_glm_mu_wald_matches_optional_deseq2_reference() {
     let hat = fit.hat_diagonal.as_ref().unwrap();
     let wald = fit.wald.as_ref().unwrap();
     let samples = reference_sample_names();
+    let diagnostics = fit.deseq2_mcols_diagnostics();
+    let disp_gene_iter = diagnostics.disp_gene_iter.as_ref().unwrap();
+
+    assert_eq!(
+        diagnostics.disp_gene_iter.as_ref(),
+        fit.disp_gene_iter.as_ref()
+    );
 
     assert_eq!(rows.len(), results.rows.len());
     for (gene, row) in rows.iter().enumerate() {
@@ -412,6 +419,14 @@ fn native_weighted_glm_mu_wald_matches_optional_deseq2_reference() {
             );
         }
         if !fit.all_zero[gene] {
+            assert!(
+                disp_gene_iter[gene] > 0,
+                "native weighted GLM-mu gene-wise iterations gene {gene}"
+            );
+            assert!(
+                parse_required_f64(row, "dispGeneIter") > 0.0,
+                "DESeq2 native weighted GLM-mu gene-wise iterations gene {gene}"
+            );
             assert_eq!(
                 beta_converged[gene],
                 parse_required_bool(row, "beta_converged"),

@@ -82,9 +82,14 @@ fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
     );
     assert!(fit.disp_prior_var.unwrap().is_finite());
     assert_eq!(fit.disp_gene_est.as_ref().unwrap().len(), counts.n_genes());
+    assert_eq!(fit.disp_gene_iter.as_ref().unwrap().len(), counts.n_genes());
     assert_eq!(fit.disp_fit.as_ref().unwrap().len(), counts.n_genes());
     assert_eq!(fit.disp_map.as_ref().unwrap().len(), counts.n_genes());
     assert_eq!(fit.dispersion.as_ref().unwrap().len(), counts.n_genes());
+    assert_eq!(fit.disp_gene_iter.as_ref().unwrap()[0], 0);
+    assert!(fit.disp_gene_iter.as_ref().unwrap()[1..]
+        .iter()
+        .all(|iterations| *iterations > 0));
 
     assert_eq!(fit.beta.as_ref().unwrap().n_cols(), full.n_coefficients());
     assert_eq!(

@@ -13,17 +13,21 @@ Reference files should record:
   `base_metadata_ratio.tsv`.
 - `results_wald_ratio.tsv` for future full-pipeline parity.
 - `fixed_dispersions.tsv`, `fixed_wald_reference.tsv`,
-  `fixed_wald_t_reference.tsv`,
+  `fixed_wald_t_reference.tsv`, `fixed_wald_weighted_reference.tsv`,
   `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`, and
-  `fixed_cooks_full.tsv` for the current supplied-dispersion GLM parity checks.
+  `fixed_cooks_full.tsv` for the current supplied-dispersion GLM parity checks,
+  plus `fixed_lrt_weighted_reference.tsv` for weighted LRT parity.
 - `observation_weights.tsv`, `observation_weights_normalized.tsv`,
   `base_metadata_weighted.tsv` for weighted metadata checks.
 - `native_weighted_glm_mu_reference.tsv`,
   `native_weighted_glm_mu_lrt_reference.tsv`,
   `native_weighted_glm_mu_dispersion_mu.tsv`,
+  `native_weighted_glm_mu_cr_reference.tsv`,
+  `native_weighted_glm_mu_cr_dispersion_mu.tsv`,
   `native_weighted_glm_mu_wald_mu.tsv`, and
-  `native_weighted_glm_mu_wald_hat.tsv` for optional weighted GLM-mu
-  dispersion/MAP/Wald/LRT intermediate checks.
+  `native_weighted_glm_mu_wald_hat.tsv` for weighted GLM-mu
+  dispersion/MAP/Wald/LRT intermediate checks, including gene-wise iteration
+  diagnostics and the default weighted Cox-Reid gene-wise branch.
 - `cooks_replacement_counts.tsv`, `cooks_replacement_design.tsv`,
   `cooks_replacement_cooks.tsv`, `cooks_replacement_size_factors.tsv`,
   `cooks_replacement_options.tsv`, `cooks_replacement_candidate_counts.tsv`,
@@ -36,7 +40,5 @@ files are generated locally, they compare the implemented stages against the R
 references.
 
 By default, `scripts/generate_deseq2_references.R` writes fixtures expected to
-pass today. Passing `--include-known-gaps` also writes exploratory references
-for currently divergent low-level paths, such as direct weighted
-`fitNbinomGLMs` calls where DESeq2 returns coefficients for rows it also marks
-as `weightsFail`.
+pass today, including weighted fixed-dispersion Wald/LRT and the current
+weighted GLM-mu mean-trend MAP/Wald/LRT branch.

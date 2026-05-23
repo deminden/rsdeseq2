@@ -3,14 +3,17 @@
 ## Repository Structure
 
 - `crates/rsdeseq2`: Rust numerical core and minimal CLI.
-- `r-pkg/rsdeseq2`: R package scaffold.
+- `r-pkg/rsdeseq2`: experimental R package scaffold and R CI surface.
 - `scripts`: reference generation and future benchmark scripts.
 - `docs`: algorithms, compatibility, reproducibility, and release notes.
 - `results/parity`: generated DESeq2 reference outputs.
 - `results/benchmarks`: benchmark outputs.
 
-The structure follows the broad organization of `rsfgsea`: Rust-first core,
-language wrappers, scripts, docs, CI, and validation outputs.
+The current implementation is Rust-first: a Rust core, minimal Rust CLI,
+scripts for parity fixtures, docs, CI, validation outputs, and an experimental
+R package scaffold. Mature R wrapper paths must call the Rust core and must not
+fall back to R/Bioconductor DESeq2 for runtime computation. R/DESeq2 is used
+only as an external reference generator for tests.
 
 ## Commands
 
@@ -18,19 +21,6 @@ language wrappers, scripts, docs, CI, and validation outputs.
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-```
-
-Run the R wrapper tests from the source tree:
-
-```bash
-Rscript -e 'for (f in list.files("r-pkg/rsdeseq2/R", pattern="[.]R$", full.names=TRUE)) source(f); testthat::test_dir("r-pkg/rsdeseq2/tests/testthat", reporter="summary")'
-```
-
-Run the R package check, including the registered C `.Call` bridge:
-
-```bash
-R CMD build r-pkg/rsdeseq2
-R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
 ```
 
 Generate R references:
@@ -49,20 +39,22 @@ R script is run, they compare the implemented Rust stages against the generated
 DESeq2 fixture files. Full DESeq2 result references are written for future
 dispersion parity, while the current Wald/LRT golden checks use supplied
 dispersions and `DESeq2:::fitNbinomGLMs` to match the Rust fixed-dispersion
-scope. The script's default output is intended to be green; use
-`Rscript scripts/generate_deseq2_references.R --include-known-gaps` only when
-you intentionally want exploratory fixtures for currently divergent internal
-weighted paths.
+scope. The default generated set is intended to be green and includes weighted
+fixed-dispersion Wald/LRT, weighted GLM-mu Cox-Reid gene-wise anchors, and the
+current weighted GLM-mu mean-trend MAP/Wald/LRT anchors.
 
 Run benchmarks:
 
 ```bash
 cargo bench -p rsdeseq2
+scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
 ```
 
 ## Coding Conventions
 
-- Keep the numerical core independent from R and Python bindings.
+- Keep statistical computation in Rust. Future language wrappers must call the
+  Rust core and fail clearly for unsupported paths instead of delegating to
+  DESeq2 or another implementation.
 - Prefer explicit structs and enums over string options.
 - Return `DeseqError::UnsupportedFeature` for unimplemented stages.
 - Avoid panics in library code.

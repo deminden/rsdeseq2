@@ -130,3 +130,34 @@ fn observation_weights_validate_inputs() {
     )
     .is_err());
 }
+
+#[test]
+fn builder_keeps_weight_threshold_shared_with_dispersion_options() {
+    let observation_options = ObservationWeightOptions {
+        weight_threshold: 0.25,
+        ..ObservationWeightOptions::default()
+    };
+    let builder = DeseqBuilder::new().observation_weight_options(observation_options);
+
+    assert_relative_eq!(
+        builder
+            .current_gene_wise_dispersion_options()
+            .weight_threshold,
+        0.25,
+        epsilon = 1e-12
+    );
+
+    let dispersion_options = GeneWiseDispersionOptions {
+        weight_threshold: 0.125,
+        ..GeneWiseDispersionOptions::default()
+    };
+    let builder = builder.gene_wise_dispersion_options(dispersion_options);
+
+    assert_relative_eq!(
+        builder
+            .current_observation_weight_options()
+            .weight_threshold,
+        0.125,
+        epsilon = 1e-12
+    );
+}

@@ -7,6 +7,25 @@ use crate::multiple_testing::bh_adjust;
 use crate::options::CooksCutoff;
 use statrs::distribution::{ContinuousCDF, FisherSnedecor};
 
+/// Core DESeq2 `results()` column names emitted by the current Rust result rows.
+pub const DESEQ2_RESULT_CORE_COLUMNS: [&str; 6] = [
+    "baseMean",
+    "log2FoldChange",
+    "lfcSE",
+    "stat",
+    "pvalue",
+    "padj",
+];
+
+/// Optional diagnostic columns carried by [`DeseqResultRow`] when present.
+pub const RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS: [&str; 5] = [
+    "dispersion",
+    "converged",
+    "maxCooks",
+    "cooksOutlier",
+    "filtered",
+];
+
 /// One row of a future DESeq2-like results table.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeseqResultRow {
@@ -55,6 +74,42 @@ impl DeseqResults {
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
+
+    /// Column names represented by this result table.
+    ///
+    /// The six core names match the simple DESeq2 `results()` table. Optional
+    /// Rust diagnostics are included only when at least one row carries that
+    /// field. Gene identifiers are represented as row names by R-style
+    /// frontends, not as a result column.
+    pub fn column_names(&self) -> Vec<&'static str> {
+        let mut columns = deseq2_result_core_column_names().to_vec();
+        if self.rows.iter().any(|row| row.dispersion.is_some()) {
+            columns.push("dispersion");
+        }
+        if self.rows.iter().any(|row| row.converged.is_some()) {
+            columns.push("converged");
+        }
+        if self.rows.iter().any(|row| row.max_cooks.is_some()) {
+            columns.push("maxCooks");
+        }
+        if self.rows.iter().any(|row| row.cooks_outlier.is_some()) {
+            columns.push("cooksOutlier");
+        }
+        if self.rows.iter().any(|row| row.filtered.is_some()) {
+            columns.push("filtered");
+        }
+        columns
+    }
+}
+
+/// Return the core DESeq2 `results()` column names currently emitted by Rust.
+pub fn deseq2_result_core_column_names() -> &'static [&'static str] {
+    &DESEQ2_RESULT_CORE_COLUMNS
+}
+
+/// Return optional diagnostic result-column names used by Rust result rows.
+pub fn rsdeseq2_result_diagnostic_column_names() -> &'static [&'static str] {
+    &RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS
 }
 
 /// Build DESeq2-shaped Wald result rows for one coefficient.

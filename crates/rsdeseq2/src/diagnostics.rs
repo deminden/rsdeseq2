@@ -19,6 +19,8 @@ use crate::core::DeseqFit;
 /// duplicating data in the core structs.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Deseq2McolsDiagnostics {
+    /// DESeq2 `dispGeneIter` column from gene-wise dispersion fitting.
+    pub disp_gene_iter: Option<Vec<usize>>,
     /// Wald-style `betaConv` column.
     pub beta_conv: Option<Vec<bool>>,
     /// LRT-style `fullBetaConv` column.
@@ -44,6 +46,7 @@ impl DeseqFit {
     pub fn deseq2_mcols_diagnostics(&self) -> Deseq2McolsDiagnostics {
         let is_lrt = self.lrt.is_some();
         Deseq2McolsDiagnostics {
+            disp_gene_iter: self.disp_gene_iter.clone(),
             beta_conv: (!is_lrt).then(|| self.beta_converged.clone()).flatten(),
             full_beta_conv: is_lrt.then(|| self.beta_converged.clone()).flatten(),
             reduced_beta_conv: self

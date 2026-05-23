@@ -246,6 +246,8 @@ pub struct DeseqFit {
     pub all_zero: Vec<bool>,
     /// Gene-wise dispersion estimates.
     pub disp_gene_est: Option<Vec<f64>>,
+    /// Gene-wise dispersion iteration counts, matching DESeq2 `dispGeneIter`.
+    pub disp_gene_iter: Option<Vec<usize>>,
     /// Fitted dispersion trend values.
     pub disp_fit: Option<Vec<f64>>,
     /// MAP dispersion estimates before outlier replacement.
@@ -545,7 +547,11 @@ impl DeseqBuilder {
     }
 
     /// Set DESeq2-style observation-weight preprocessing options.
+    ///
+    /// The `weight_threshold` is also used by weighted Cox-Reid dispersion
+    /// fitting, matching DESeq2's single `weightThreshold` argument.
     pub fn observation_weight_options(mut self, options: ObservationWeightOptions) -> Self {
+        self.gene_wise_dispersion_options.weight_threshold = options.weight_threshold;
         self.observation_weight_options = options;
         self
     }
@@ -581,7 +587,11 @@ impl DeseqBuilder {
     }
 
     /// Set options for the current linear-mu gene-wise dispersion estimator.
+    ///
+    /// The `weight_threshold` is also used for observation-weight
+    /// preprocessing, matching DESeq2's single `weightThreshold` argument.
     pub fn gene_wise_dispersion_options(mut self, options: GeneWiseDispersionOptions) -> Self {
+        self.observation_weight_options.weight_threshold = options.weight_threshold;
         self.gene_wise_dispersion_options = options;
         self
     }
@@ -787,6 +797,7 @@ impl DeseqBuilder {
         )?;
         let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
+        fit.disp_gene_iter = Some(dispersion.disp_iter);
         fit.dispersion_converged = Some(dispersion.converged);
         fit.mu = Some(dispersion.mu);
         Ok(fit)
@@ -825,6 +836,7 @@ impl DeseqBuilder {
         )?;
         let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
+        fit.disp_gene_iter = Some(dispersion.disp_iter);
         fit.dispersion_converged = Some(dispersion.converged);
         fit.mu = Some(dispersion.mu);
         Ok(fit)
@@ -2085,6 +2097,7 @@ impl DeseqBuilder {
             base_var: input.base_var,
             all_zero: input.all_zero,
             disp_gene_est: None,
+            disp_gene_iter: None,
             disp_fit: None,
             disp_map: None,
             dispersion: None,

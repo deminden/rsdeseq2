@@ -49,6 +49,8 @@ Generated files should include:
 - `native_weighted_glm_mu_reference.tsv`, when DESeq2 internals are available
 - `native_weighted_glm_mu_lrt_reference.tsv`, when DESeq2 internals are available
 - `native_weighted_glm_mu_dispersion_mu.tsv`, when DESeq2 internals are available
+- `native_weighted_glm_mu_cr_reference.tsv`, when DESeq2 internals are available
+- `native_weighted_glm_mu_cr_dispersion_mu.tsv`, when DESeq2 internals are available
 - `native_weighted_glm_mu_wald_mu.tsv`, when DESeq2 internals are available
 - `native_weighted_glm_mu_wald_hat.tsv`, when DESeq2 internals are available
 - `cooks_replacement_counts.tsv`
@@ -65,31 +67,32 @@ dispersions, default `1e-6` beta ridge, `useQR=FALSE`, and `useOptim=FALSE`.
 They exist to validate the current Rust fixed-dispersion GLM path. They are
 not a substitute for full DESeq2 dispersion-estimation parity. The default
 reference set includes the unweighted fixed Wald/LRT, fitted `mu`, hat
-diagonal, and Cook's distance files because these are numerically reproduced.
-Passing `--include-known-gaps` additionally writes exploratory weighted direct
-`fitNbinomGLMs` fixtures for rows DESeq2 marks as `weightsFail`; those are not
-part of the default passing set yet. The weighted GLM-mu native files use
-DESeq2 internals for the current narrow path:
+diagonal, Cook's distance files, and weighted fixed Wald/LRT files because
+these are numerically reproduced. The weighted GLM-mu native files include the
+default weighted Cox-Reid gene-wise branch,
+`estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE)`, plus the
+current narrow mean-trend MAP/Wald/LRT path:
 `estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE)`, mean trend
-fitting, `estimateDispersionsMAP(useCR=FALSE)`, and final
-full/reduced `fitNbinomGLMs(useQR=FALSE,useOptim=FALSE)`.
+fitting, `estimateDispersionsMAP(useCR=FALSE)`, and final full/reduced
+`fitNbinomGLMs(useQR=FALSE,useOptim=FALSE)`.
 
 Rust golden tests skip automatically when these files are absent. After running
 the R script, those same tests compare size factors, normalized counts,
 normalization-factor normalized counts, baseMean/baseVar/allZero,
 fixed-dispersion Wald/LRT fields, fitted means, hat diagonals, Cook's
 distances, and Cook's replacement/refit bookkeeping against the generated
-references. Optional known-gap fixtures are skip-safe when not generated.
+references.
 
 The current native Wald pipeline is covered by Rust self-consistency tests:
 it preserves dispersion intermediates, expands all-zero rows, and produces the
 same GLM/result fields as the supplied-dispersion Wald path when fed its own
 final MAP dispersions. The reference generator now emits normalization-factor
 native dispersion anchors for `roughDispEstimate`, `momentsDispEstimate`,
-bounded starts, and `linearModelMuNormalized`, plus weighted GLM-mu anchors
-for the current mean-trend MAP/Wald/LRT branch. Future R references should extend
-this path to broader DESeq2 stage-by-stage comparisons once the remaining
-dispersion branches are implemented.
+bounded starts, and post-`minmu` fitted means from
+`estimateDispersionsGeneEst`, plus weighted GLM-mu anchors for the current
+mean-trend MAP/Wald/LRT branch. Future R references should extend this path to
+broader DESeq2 stage-by-stage comparisons once the remaining dispersion
+branches are implemented.
 Thresholded selected-coefficient Wald alternatives are currently covered by
 hand/R-formula tests; future references should add `results(lfcThreshold=...)`
 tables for the supported alternatives.

@@ -163,11 +163,14 @@ sum_j [
 Terms independent of `alpha` are omitted because they do not affect the
 optimizer. When observation weights are supplied to the low-level dispersion
 objective, they multiply the per-sample likelihood terms. With Cox-Reid
-correction, the objective adds:
+correction, DESeq2 uses those weights to choose the `weightThreshold`
+sample subset, then computes the determinant on the unweighted NB working
+variance diagonal:
 
 ```text
 -0.5 * log(det(X' W X))
-W_jj = obs_weight_j * (1 / mu_j + alpha)^-1
+selected = { j | obs_weight_j > weightThreshold }
+W_jj = (1 / mu_j + alpha)^-1 for j in selected
 ```
 
 The Rust objective can also add DESeq2's normal prior kernel on the
@@ -392,8 +395,7 @@ For rank-deficient designs, it follows DESeq2's fallback shape and checks that
 no design column is entirely zero after weighting. Rows that fail are returned
 as `weights_fail`; higher-level pipelines can treat them like DESeq2 marks
 `mcols(dds)$allZero = TRUE` for failed-weight rows. The current helper is
-deterministic and primitive-matrix based; it is not yet wired into a
-DESeqDataSet wrapper.
+deterministic and primitive-matrix based.
 
 Builder stages expose this preprocessing in the fit state. With a supplied
 design, raw observation weights are first used for `baseMean` and `baseVar`,
@@ -555,11 +557,13 @@ padj = p.adjust(pvalue, method = "BH")
 
 Optional diagnostic fields include dispersion, beta convergence, Cook's
 distances, `maxCooks`, Cook's outlier flags, and independent-filtering flags
-when those stages are run. `DeseqFit::deseq2_mcols_diagnostics()` provides a
-DESeq2-name-shaped view for implemented Wald/LRT diagnostics such as
-`betaConv`, `fullBetaConv`, `reducedBetaConv`, `betaIter`, `deviance`, and
-`maxCooks`. Contrast handling, Cook's outlier replacement, and metadata-rich
-Bioconductor result objects are future work.
+when those stages are run. `DeseqResults::column_names()` reports the core
+DESeq2 result columns plus whichever optional diagnostic columns are present in
+the table. `DeseqFit::deseq2_mcols_diagnostics()` provides a DESeq2-name-shaped
+view for implemented diagnostics such as `dispGeneIter`, `betaConv`,
+`fullBetaConv`, `reducedBetaConv`, `betaIter`, `deviance`, and `maxCooks`.
+Contrast handling, Cook's outlier replacement, and metadata-rich Bioconductor
+result objects are future work.
 
 ## Cook's Distances
 
@@ -815,14 +819,15 @@ observation weights. It feeds the same parametric/mean trend, prior-variance,
 MAP shrinkage, and native Wald stages as the linear-mu branch.
 
 Then each non-all-zero gene is optimized on the log-alpha scale. By default,
-the score includes DESeq2's Cox-Reid adjustment, with observation weights
-included when supplied:
+the score includes DESeq2's Cox-Reid adjustment. Observation weights multiply
+the likelihood terms; for the Cox-Reid determinant they define the
+`weightThreshold` sample subset, matching `fitDisp`:
 
 ```text
 score(alpha) = ll_alpha_dependent(counts_i, mu_i, alpha)
-               - 0.5 * log(det(X' W_i X))
-W_ij = obs_weight_ij * (1 / mu_ij + alpha)^-1
-W_ij = (1 / mu_ij + alpha)^-1
+               - 0.5 * log(det(X_i' W_i X_i))
+X_i = X[obs_weight_i > weightThreshold, nonzero_columns]
+W_ij = (1 / mu_ij + alpha)^-1 for selected samples
 ```
 
 The alpha-dependent likelihood kernel follows DESeq2's `log_posterior`
@@ -874,8 +879,11 @@ optimizer support. The GLM-mu builder path can pass normalized observation
 weights through gene-wise dispersion, MAP, and native Wald stages; the current
 native linear-mu branch is still no-weight. The line-search diagnostics now
 record the final first and second derivatives (`last_dlp` and `last_d2lp`) for
-DESeq2-style curvature checks. Full parity still requires R golden references
-for the weighted GLM-mu branch plus local/glmGamPoi trend types.
+DESeq2-style curvature checks, and high-level fit states retain the gene-wise
+iteration counts as `dispGeneIter`-compatible diagnostics. The current weighted
+GLM-mu mean-trend MAP/Wald/LRT branch has DESeq2 golden references; broader
+full parity still requires local/glmGamPoi trend types and remaining edge-case
+coverage.
 
 The full-model beta and standard error for a selected coefficient are reported
 alongside the model-level LRT statistic and p-value, matching the shape of

@@ -13,7 +13,9 @@ skips all-zero rows for GLM fitting, expands them back as missing outputs, and r
 plus `maxCooks`. Result rows can apply DESeq2-style Cook's cutoff p-value
 masking, including the explicit two-group low-count Cook's heuristic helper,
 and base-mean independent filtering before BH adjustment, including an R
-`stats::lowess`-shaped smoother for the default DESeq2 threshold grid. A
+`stats::lowess`-shaped smoother for the default DESeq2 threshold grid.
+`DeseqResults::column_names()` exposes the current core and diagnostic result
+column contract. A
 primitive Cook's outlier replacement-count transform and replacement-refit
 planning helper are available, along with a limited replacement-refit path for
 the GLM-mu native Wald and LRT branches. The current

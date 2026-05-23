@@ -14,17 +14,18 @@ early normalization stages:
 - `deseq2McolsDiagnosticsRust(nGenes, test = c("none", "Wald", "LRT"), ...)`
 
 These helpers validate ordinary R matrices with genes in rows and samples in
-columns. They use an R fallback implementation that mirrors the Rust-supported
-size-factor, normalized-count, normalization-factor, baseMean, and early
-base-metadata algorithms while the native Rust bridge is still being wired.
+columns. They include an R-level helper implementation that mirrors the
+Rust-supported size-factor, normalized-count, normalization-factor, baseMean,
+and early base-metadata algorithms while the native Rust bridge is still being
+wired.
 When `normalizationFactors` are supplied to `normalizedCountsRust()`,
 `baseMeanRust()`, or `baseMetadataRust()`, they preempt `sizeFactors`, matching
 DESeq2's normalized-count behavior.
 
 `estimateSizeFactorsRust(native = TRUE)`, `normalizedCountsRust(native = TRUE)`,
 and `baseMeanRust(native = TRUE)` first try registered `.Call` bridges for
-primitive normalization summaries and fall back to the R implementation if the
-package shared library is not loaded.
+primitive normalization summaries. If the package shared library is not loaded,
+the helper uses the R-level implementation.
 
 `baseMetadataRust()` returns primitive row metadata columns `baseMean`,
 `baseVar`, and `allZero`. When `weights` are supplied, they must be a finite
@@ -32,8 +33,8 @@ non-negative matrix with the same dimensions as `counts`; the helper multiplies
 normalized counts by those raw observation weights before calculating row means
 and sample variances. This mirrors the early DESeq2 weighted metadata shape but
 does not modify DESeqDataSet `mcols()`. With `native = TRUE`, the helper first
-tries the registered `.Call` bridge for this primitive and falls back to the R
-implementation if the package shared library is not loaded.
+tries the registered `.Call` bridge for this primitive. If the package shared
+library is not loaded, the helper uses the R-level implementation.
 
 `applyCooksCutoffRust()` is a primitive result-table helper. It masks p-values
 where `maxCooks > cooksCutoff`, recomputes BH-adjusted p-values, and can apply

@@ -39,11 +39,7 @@ pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, Dese
         }
         gene_names.push(record.get(0).unwrap_or_default().to_string());
         for field in record.iter().skip(1) {
-            let parsed = field.parse::<u32>().map_err(|_| DeseqError::ParseInt {
-                context: path_ref.display().to_string(),
-                value: field.to_string(),
-            })?;
-            values.push(parsed);
+            values.push(parse_count_field(field, path_ref)?);
         }
     }
     CountMatrix::from_row_major_u32_with_names(
@@ -53,6 +49,30 @@ pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, Dese
         Some(gene_names),
         Some(sample_names),
     )
+}
+
+fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
+    if let Ok(value) = field.parse::<u32>() {
+        return Ok(value);
+    }
+
+    let value = field.parse::<f64>().map_err(|_| DeseqError::ParseInt {
+        context: path.display().to_string(),
+        value: field.to_string(),
+    })?;
+    if !value.is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: path.display().to_string(),
+            index: None,
+            value,
+        });
+    }
+    if value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
+        return Err(DeseqError::InvalidCounts {
+            reason: format!("count value '{field}' must be a non-negative integer"),
+        });
+    }
+    Ok(value as u32)
 }
 
 /// Write sample-level size factors to a tab-delimited file.
@@ -91,4 +111,29 @@ pub fn write_base_mean_tsv(
     }
     writer.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_count_field_accepts_integer_scientific_notation() {
+        let path = Path::new("counts.tsv");
+        assert_eq!(parse_count_field("1e+05", path).unwrap(), 100_000);
+        assert_eq!(parse_count_field("42.0", path).unwrap(), 42);
+    }
+
+    #[test]
+    fn parse_count_field_rejects_non_integer_numeric_values() {
+        let path = Path::new("counts.tsv");
+        assert!(matches!(
+            parse_count_field("1.5", path),
+            Err(DeseqError::InvalidCounts { .. })
+        ));
+        assert!(matches!(
+            parse_count_field("-1", path),
+            Err(DeseqError::InvalidCounts { .. })
+        ));
+    }
 }

@@ -14,13 +14,13 @@ Currently implemented primitive matrix helpers:
 - `rsdeseq2DiagnosticSchemaRust()`
 - `deseq2McolsDiagnosticsRust()`
 
-These helpers use an R fallback implementation that mirrors the Rust-supported
-normalization algorithms, including gene/sample normalization factors,
-weighted base metadata, Cook's cutoff result masking, and diagnostic metadata
-shape while the native Rust bridge is still being wired.
+These helpers include an R-level implementation that mirrors the
+Rust-supported normalization algorithms, including gene/sample normalization
+factors, weighted base metadata, Cook's cutoff result masking, and diagnostic
+metadata shape while the native Rust bridge is still being wired.
 `baseMetadataRust(native = TRUE)` can use the registered package `.Call` bridge
-for that primitive and falls back to the R implementation when the shared
-library is unavailable. `estimateSizeFactorsRust(native = TRUE)`,
+for that primitive and uses the R-level implementation when the shared library
+is unavailable. `estimateSizeFactorsRust(native = TRUE)`,
 `normalizedCountsRust(native = TRUE)`, and `baseMeanRust(native = TRUE)` follow
 the same pattern for primitive normalization summaries.
 `applyCooksCutoffRust(native = TRUE)` can use the registered native bridge for

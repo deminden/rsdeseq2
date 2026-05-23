@@ -7,8 +7,8 @@ use crate::errors::{invalid_dimensions, DeseqError};
 /// Primitive contrast specification for already-built design matrices.
 ///
 /// This intentionally covers only the parts of DESeq2 contrast handling that
-/// can be resolved from coefficient names alone. R formula parsing and factor
-/// level lookup remain wrapper-level work.
+/// can be resolved from coefficient names alone. Formula parsing and factor
+/// level lookup remain caller or future-wrapper work.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ContrastSpec {
     /// Explicit numeric contrast with one value per coefficient.
@@ -48,7 +48,7 @@ pub enum ContrastSpec {
 /// `contrastAllZero` handling.
 ///
 /// The Rust core does not parse R formulas or own colData. This request keeps
-/// the necessary primitive values together after an R wrapper or caller has
+/// the necessary primitive values together after a caller or future wrapper has
 /// already built the model matrix and extracted sample levels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FactorLevelContrast<'a> {
@@ -253,7 +253,8 @@ pub fn contrast_all_zero_numeric(
 /// This is the primitive-matrix analogue of DESeq2's
 /// `contrastAllZeroCharacter`: select samples whose supplied level is either
 /// `numerator` or `denominator`, then flag genes for which all selected raw
-/// counts are zero. Full factor validation still belongs in the R wrapper.
+/// counts are zero. Full factor validation remains caller or future-wrapper
+/// responsibility.
 pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
     counts: &CountMatrix,
     sample_levels: &[S],

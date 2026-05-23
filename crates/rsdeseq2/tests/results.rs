@@ -25,6 +25,31 @@ fn toy_fit(beta: Vec<f64>, beta_se: Vec<f64>, beta_converged: Vec<bool>) -> Nbin
 }
 
 #[test]
+fn result_column_schema_matches_current_deseq2_shape() {
+    assert_eq!(
+        deseq2_result_core_column_names(),
+        &[
+            "baseMean",
+            "log2FoldChange",
+            "lfcSE",
+            "stat",
+            "pvalue",
+            "padj"
+        ]
+    );
+    assert_eq!(
+        rsdeseq2_result_diagnostic_column_names(),
+        &[
+            "dispersion",
+            "converged",
+            "maxCooks",
+            "cooksOutlier",
+            "filtered"
+        ]
+    );
+}
+
+#[test]
 fn build_wald_results_populates_deseq2_shaped_columns() {
     let fit = toy_fit(vec![2.0, 1.0], vec![0.5, 1.0], vec![true, false]);
     let names = vec!["gene_a".to_string(), "gene_b".to_string()];
@@ -47,6 +72,19 @@ fn build_wald_results_populates_deseq2_shaped_columns() {
     assert!(results.rows[0].padj.unwrap() <= results.rows[1].padj.unwrap());
     assert_eq!(results.rows[0].dispersion, Some(0.1));
     assert_eq!(results.rows[1].converged, Some(false));
+    assert_eq!(
+        results.column_names(),
+        vec![
+            "baseMean",
+            "log2FoldChange",
+            "lfcSE",
+            "stat",
+            "pvalue",
+            "padj",
+            "dispersion",
+            "converged"
+        ]
+    );
 }
 
 #[test]
@@ -212,6 +250,7 @@ fn apply_cooks_cutoff_masks_outlier_pvalues_and_recomputes_padj() {
 
     apply_cooks_cutoff(&mut results, Some(5.0)).unwrap();
 
+    assert!(results.column_names().contains(&"cooksOutlier"));
     assert_eq!(results.rows[0].cooks_outlier, Some(false));
     assert!(results.rows[0].pvalue.is_some());
     assert!(results.rows[0].padj.is_some());

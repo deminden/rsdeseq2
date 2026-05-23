@@ -7,6 +7,6 @@ rsdeseq2 size-factors --counts counts.tsv --method ratio --output size_factors.t
 rsdeseq2 base-mean --counts counts.tsv --method poscounts --output base_mean.tsv
 ```
 
-The CLI should not grow ahead of the validated Rust and R APIs. Full
+The CLI should not grow ahead of the validated Rust API. Full
 differential-expression commands should wait until dispersion and GLM parity
 exist.

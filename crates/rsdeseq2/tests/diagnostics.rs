@@ -14,6 +14,39 @@ fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
 }
 
 #[test]
+fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 10, 20, 20, 10, 30, 10, 30]).unwrap();
+    let design =
+        DesignMatrix::from_row_major(4, 2, vec![1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0], None)
+            .unwrap();
+
+    let fit = DeseqBuilder::new()
+        .size_factors(vec![1.0, 1.0, 1.0, 1.0])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            use_cox_reid: false,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_gene_wise_dispersions_linear_mu(&counts, &design)
+        .unwrap();
+
+    let diagnostics = fit.deseq2_mcols_diagnostics();
+    assert_eq!(
+        diagnostics.disp_gene_iter.as_ref(),
+        fit.disp_gene_iter.as_ref()
+    );
+    assert!(diagnostics
+        .disp_gene_iter
+        .as_ref()
+        .unwrap()
+        .iter()
+        .all(|iterations| *iterations > 0));
+    assert_eq!(diagnostics.beta_conv, None);
+    assert_eq!(diagnostics.deviance, None);
+}
+
+#[test]
 fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let design =

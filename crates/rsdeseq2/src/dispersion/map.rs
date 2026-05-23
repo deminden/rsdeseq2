@@ -21,6 +21,8 @@ pub struct MapDispersionOptions {
     pub outlier_sd: f64,
     /// Apply Cox-Reid correction during the line-search MAP fit.
     pub use_cox_reid: bool,
+    /// Threshold used by DESeq2 to choose samples for weighted Cox-Reid terms.
+    pub weight_threshold: f64,
     /// DESeq2 Armijo line-search initial step size.
     pub kappa_0: f64,
     /// DESeq2 dispersion log-posterior convergence tolerance.
@@ -38,6 +40,7 @@ impl Default for MapDispersionOptions {
             max_disp: None,
             outlier_sd: 2.0,
             use_cox_reid: true,
+            weight_threshold: 1e-2,
             kappa_0: 1.0,
             disp_tol: 1e-6,
             maxit: 100,
@@ -53,6 +56,7 @@ impl From<GeneWiseDispersionOptions> for MapDispersionOptions {
             max_disp: options.max_disp,
             outlier_sd: 2.0,
             use_cox_reid: options.use_cox_reid,
+            weight_threshold: options.weight_threshold,
             kappa_0: options.kappa_0,
             disp_tol: options.disp_tol,
             maxit: options.maxit,
@@ -284,6 +288,7 @@ fn optimizer_options(options: MapDispersionOptions) -> GeneWiseDispersionOptions
         min_mu: 0.5,
         grid_points: options.grid_points,
         use_cox_reid: options.use_cox_reid,
+        weight_threshold: options.weight_threshold,
         fit_method: GeneWiseDispersionFitMethod::LineSearch,
         kappa_0: options.kappa_0,
         disp_tol: options.disp_tol,
@@ -394,6 +399,11 @@ fn validate_map_options(options: MapDispersionOptions, n_samples: usize) -> Resu
         });
     }
     validate_positive_scalar(options.outlier_sd, "MAP outlier_sd")?;
+    if !options.weight_threshold.is_finite() || options.weight_threshold < 0.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "MAP weight_threshold must be finite and non-negative".to_string(),
+        });
+    }
     validate_positive_scalar(options.kappa_0, "MAP kappa_0")?;
     validate_positive_scalar(options.disp_tol, "MAP disp_tol")?;
     if options.maxit == 0 {

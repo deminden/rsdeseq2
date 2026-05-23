@@ -6,8 +6,7 @@ reference; no DESeq2 source is vendored or translated line by line.
 
 ## Active TODOs
 
-- [x] Create Rust workspace, core crate, R scaffold, Python placeholder, docs,
-  scripts, and CI skeleton.
+- [x] Create Rust workspace, core crate, docs, scripts, and CI skeleton.
 - [x] Implement row-major count and numeric matrix types.
 - [x] Implement DESeq2-shaped `ratio` and `poscounts` size-factor estimation.
 - [x] Implement normalized counts, `baseMean`, and BH adjusted p-values.
@@ -19,7 +18,7 @@ reference; no DESeq2 source is vendored or translated line by line.
   fit-state metadata, and supplied-dispersion Wald/LRT weighted GLM wiring.
 - [x] Add builder-owned `geoMeans` and `controlGenes` options.
 - [x] Add builder-owned caller-supplied size factors for fixed-size-factor
-  parity tests and external R wrapper integration.
+  parity tests and external caller integration.
 - [x] Add hand tests for DESeq2 size-factor error cases.
 - [x] Add skip-safe DESeq2 golden-reference tests for generated normalization,
   supplied-dispersion Wald/LRT, and Cook's diagnostic files.
@@ -37,32 +36,16 @@ reference; no DESeq2 source is vendored or translated line by line.
   weighted Wald/LRT outputs.
 - [x] Extend generated references and skip-safe Rust tests for the current
   native weighted GLM-mu mean-trend LRT branch.
-- [x] Add R package primitive matrix helpers for size factors, normalized
-  counts, gene/sample normalization factors, baseMean, and weighted base
-  metadata using an explicit R fallback while the native bridge is pending.
-- [x] Add an opt-in registered `.Call` bridge for primitive size-factor
-  estimation with fallback to the R implementation when the shared library is
-  unavailable.
-- [x] Add an opt-in registered `.Call` bridge for primitive base metadata with
-  fallback to the R implementation when the shared library is unavailable.
-- [x] Add an opt-in registered `.Call` bridge for primitive normalized counts
-  with the same fallback behavior.
-- [x] Add an opt-in registered `.Call` bridge for primitive baseMean with the
-  same fallback behavior.
-- [x] Add R package primitive result helper for Cook's cutoff masking and the
-  explicit two-group low-count heuristic.
-- [x] Add an opt-in registered `.Call` bridge for primitive Cook's cutoff
-  masking with fallback to the R implementation when the shared library is
-  unavailable.
-- [x] Add R package primitive result-table assembly helper with DESeq2-shaped
-  columns and BH-adjusted p-value calculation.
-- [x] Add R package primitive independent-filtering helper for baseMean-driven
-  filtered BH adjustment and threshold metadata.
-- [x] Port selected DESeq2 size-factor validation cases into the R wrapper
-  tests, citing the original test file as the behavioral source.
-- [x] Add standard R package testthat entrypoint and CI coverage for source-tree
-  wrapper tests plus `R CMD check`.
-- [ ] Generate and commit small DESeq2 reference outputs when the R environment
+- [x] Promote generated DESeq2 1.46.0 references for normalization-factor
+  native dispersion, weighted fixed-dispersion Wald/LRT, and weighted GLM-mu
+  mean-trend MAP/Wald/LRT into the default passing fixture set.
+- [x] Add primitive result-table column schema helpers for Rust APIs.
+- [x] Remove current Python wrapper scaffold from the active workspace.
+- [x] Restore the experimental R package scaffold and R CI surface.
+- [ ] Mature the R package wrapper after core parity improves. Mature wrapper
+  paths must call the Rust implementation and must not fall back to
+  R/Bioconductor DESeq2 for runtime computation.
+- [x] Generate and commit small DESeq2 reference outputs when the R environment
   has Bioconductor DESeq2 installed.
 
 ## DESeq2 Reference Anchors
@@ -87,7 +70,7 @@ reference; no DESeq2 source is vendored or translated line by line.
 
 - [x] Count matrix validation.
 - [x] Row-major numeric matrix storage.
-- [x] Design matrix wrapper for R-generated model matrices.
+- [x] Design matrix wrapper for caller-supplied model matrices.
 - [x] Deterministic design matrix rank helpers and DESeq2-style full-rank
   guards for GLM-facing builder paths.
 - [x] Execution modes and statistical option enums.
@@ -144,7 +127,7 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Log2-scale beta covariance storage and primitive numeric Wald contrast
   helper using `c' beta` and `sqrt(c' Sigma c)`.
 - [ ] Full DESeq2 beta-prior variance estimation, expanded model-matrix
-  handling, and R-style contrast numerator/denominator construction.
+  handling, and DESeq2-style contrast numerator/denominator construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.
@@ -175,12 +158,12 @@ reference; no DESeq2 source is vendored or translated line by line.
   and Cook's distances.
 - [x] Lightweight DESeq2 `mcols(dds)`-style diagnostic alias view for
   implemented Wald/LRT fit-state fields.
-- [x] Pure-R diagnostic metadata shape helper for future R wrapper bindings.
-- [x] Minimal native diagnostic schema contract for the R bridge scaffold.
+- [x] Expose gene-wise dispersion iteration diagnostics (`dispGeneIter`) in
+  high-level fit state and the `mcols(dds)`-style alias view.
 - [x] Add initial linear-mu gene-wise dispersion foundation:
   `linearModelMu`, `roughDispEstimate`, `momentsDispEstimate`, bounded starts,
   Cox-Reid objective scoring, Armijo line search, and grid fallback.
-- [ ] Full result-table assembly with Bioconductor-style metadata.
+- [ ] Full result-table assembly with DESeq2-style metadata.
 - [ ] General all-zero row expansion helpers for future dispersion and full
   result-table outputs.
 - [ ] Optim fallback for non-converged or unstable rows.
@@ -231,18 +214,25 @@ reference; no DESeq2 source is vendored or translated line by line.
   of the GLM-mu gene-wise dispersion branch.
 - [x] Native Wald wiring on top of the GLM-mu MAP dispersion branch.
 - [x] Second derivative of the Cox-Reid-adjusted profile likelihood.
-- [x] Observation weights in the Cox-Reid objective, first derivative, and
-  second derivative.
+- [x] DESeq2-style weighted Cox-Reid threshold-subset objective, first
+  derivative, and second derivative.
 - [ ] Local and glmGamPoi dispersion trend types.
 - [x] DESeq2-shaped prior variance branch for residual df 1 through 3.
 - [x] Low-level observation-weighted MAP dispersion fitting.
 - [x] Builder-level observation weights through the GLM-mu gene-wise
   dispersion, MAP, and native Wald path.
-- [x] Optional R reference generation and skip-safe Rust checks for weighted
+- [x] Default R reference generation and skip-safe Rust checks for weighted
   GLM-mu dispersion/MAP/Wald intermediates.
-- [ ] Complete weighted dispersion parity for DESeq2's non-linear-mu GLM mean
-  fitting path, including generated-reference validation and remaining edge
-  cases.
+- [x] Match DESeq2's weighted `fitDisp` row-indexing behavior during GLM-mu
+  `fitidx` mean/dispersion alternation.
+- [x] Match DESeq2's weighted Cox-Reid behavior for the non-linear-mu
+  gene-wise path: observation weights multiply likelihood terms, while the
+  Cox-Reid determinant uses the `weightThreshold` sample subset without
+  multiplying by the weights.
+- [x] Add default DESeq2-internal weighted GLM-mu `useCR=TRUE` gene-wise
+  reference checks for weighted Cox-Reid dispersion parity.
+- [ ] Complete broader weighted dispersion parity for DESeq2's non-linear-mu
+  GLM mean fitting path beyond the current deterministic mean-trend fixture.
 - [ ] glmGamPoi MAP dispersion path.
 
 ## Phase 4: Full Wald Pipeline
@@ -258,10 +248,8 @@ reference; no DESeq2 source is vendored or translated line by line.
   dispersion branch, including builder-level observation weights.
 - [ ] Generalize the native Wald pipeline to DESeq2's full dispersion and GLM
   fitting behavior.
-- [x] Add R wrapper around primitive matrices for implemented normalization
-  and early base-metadata helpers.
-- [ ] Add R wrapper around DESeqDataSet inputs without faking unsupported S4
-  behavior.
+- [ ] Keep mature R wrapper workflow exposure deferred until the Rust pipeline
+  is complete enough to expose without DESeq2 runtime fallback.
 
 ## Phase 5: Results Compatibility
 
@@ -282,8 +270,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Initial Cook's distance and `maxCooks` diagnostics.
 - [x] Cook's outlier p-value filtering.
 - [x] Explicit primitive helper for DESeq2's two-group low-count Cook's
-  heuristic, to be called only when R-side formula/colData semantics establish
-  the one-factor two-level condition.
+  heuristic, to be called only when caller or future-wrapper formula metadata
+  establishes the one-factor two-level condition.
 - [x] Primitive Cook's outlier count replacement transform: trimmed normalized
   means, size-factor/normalization-factor rescaling, integer truncation,
   replaceable-sample mask, and `replace` flags.
@@ -294,8 +282,9 @@ reference; no DESeq2 source is vendored or translated line by line.
   factors, `refitReplace` merge, `newAllZero` result clearing, and final
   filtering.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
-  refit for contrasts, beta priors, and Bioconductor object metadata.
-- [ ] Full formula-aware outlier handling and R wrapper integration.
+  refit for contrasts, beta priors, and wrapper object metadata.
+- [ ] Full formula-aware outlier handling and future wrapper integration
+  without DESeq2 runtime fallback.
 - [x] Initial independent filtering.
 - [x] R `stats::lowess`-shaped independent-filter threshold selection for the
   DESeq2 default theta grid, including fitted-curve metadata.
@@ -304,8 +293,10 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Initial fixed-dispersion LRT.
 - [x] Limited native-dispersion LRT for current linear-mu and GLM-mu MAP
   dispersion branches.
-- [x] Optional DESeq2-internal native weighted GLM-mu LRT reference hook for
+- [x] DESeq2-internal native weighted GLM-mu LRT reference hook for
   the current mean-trend branch.
+- [x] Default DESeq2-internal native weighted GLM-mu Wald/LRT reference checks
+  for the current mean-trend branch.
 - [ ] Full LRT parity with native dispersion reference outputs, local/glmGamPoi
   trends, optim fallback, and remaining edge cases.
 
@@ -316,7 +307,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [ ] glmGamPoi-like mode if feasible.
 - [ ] VST.
 - [ ] rlog.
-- [ ] Python package.
+- [ ] Mature R package wrapper backed only by Rust, with no fallback to
+  R/Bioconductor DESeq2.
 - [ ] Mature CLI.
 
 ## Engineering Rules
@@ -325,4 +317,6 @@ reference; no DESeq2 source is vendored or translated line by line.
 - Prefer strict, deterministic behavior before adding fast paths.
 - Preserve row-major gene-contiguous storage in Rust.
 - Add hand-computable tests before golden-reference tests.
+- Keep runtime statistical computation in Rust. Future wrappers may prepare
+  inputs and present outputs, but must not call DESeq2 as a fallback.
 - Document every intentional deviation from DESeq2 semantics.

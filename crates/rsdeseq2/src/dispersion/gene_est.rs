@@ -24,6 +24,8 @@ pub struct GeneWiseDispersionOptions {
     pub grid_points: usize,
     /// Apply DESeq2's Cox-Reid log determinant adjustment.
     pub use_cox_reid: bool,
+    /// Threshold used by DESeq2 to choose samples for weighted Cox-Reid terms.
+    pub weight_threshold: f64,
     /// Dispersion optimizer to use after rough/moments initialization.
     pub fit_method: GeneWiseDispersionFitMethod,
     /// DESeq2 Armijo line-search initial step size.
@@ -44,6 +46,7 @@ impl Default for GeneWiseDispersionOptions {
             min_mu: 0.5,
             grid_points: 20,
             use_cox_reid: true,
+            weight_threshold: 1e-2,
             fit_method: GeneWiseDispersionFitMethod::LineSearch,
             kappa_0: 1.0,
             disp_tol: 1e-6,
@@ -270,8 +273,9 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
 /// `alpha_hat`, non-all-zero rows alternate between fixed-dispersion NB GLM
 /// mean fitting and fixed-mean dispersion optimization, and rows stop
 /// refitting when the log-dispersion move is at most `0.05`. When
-/// row-normalized observation weights are supplied, they are used in both the
-/// fixed-dispersion IRLS mean fit and the fixed-mean dispersion objective.
+/// row-normalized observation weights are supplied, they are used in the
+/// fixed-dispersion IRLS mean fit and the fixed-mean likelihood objective;
+/// Cox-Reid terms use DESeq2's thresholded weighted sample subset.
 /// glmGamPoi fitting remains a future high-level branch.
 pub fn estimate_gene_wise_dispersions_glm_mu(
     input: GeneWiseDispersionInput<'_>,
@@ -296,6 +300,13 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
     let mut alpha_hat = initial_disp.clone();
     let mut alpha_hat_new = initial_disp.clone();
     let alpha_init = initial_disp.clone();
+    let fitting_gene_order = input
+        .all_zero
+        .iter()
+        .copied()
+        .enumerate()
+        .filter_map(|(gene, all_zero)| (!all_zero).then_some(gene))
+        .collect::<Vec<_>>();
     let mut fitidx = input
         .all_zero
         .iter()
@@ -352,9 +363,12 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
             let fit_mu = fit.mu.row(compact_row)?;
             let start = gene * input.counts.n_samples();
             mu_values[start..start + input.counts.n_samples()].copy_from_slice(fit_mu);
+            // DESeq2 passes the full non-all-zero weight matrix into fitDisp
+            // even when counts/mu are subset by fitidx; the C++ then indexes
+            // weights by compact row position.
             let weight_row = input
                 .observation_weights
-                .map(|weights| weights.row(gene))
+                .map(|weights| weights.row(fitting_gene_order[compact_row]))
                 .transpose()?;
             let diagnostics = fit_dispersion_for_gene_detailed_with_weights(
                 input.counts.row(gene)?,
@@ -763,14 +777,17 @@ fn fit_dispersion_for_gene_detailed_with_weights(
                 prior: None,
                 weights,
             })?;
-            let last_lp = dispersion_log_posterior_with_prior_and_weights(
-                counts,
-                mu,
-                Some(design),
+            let last_lp = dispersion_log_posterior_objective(
+                DispersionObjectiveInput {
+                    counts,
+                    mu,
+                    design: Some(design),
+                    use_cox_reid: options.use_cox_reid,
+                    prior: None,
+                    weights,
+                    weight_threshold: options.weight_threshold,
+                },
                 dispersion.ln(),
-                options.use_cox_reid,
-                None,
-                weights,
             )?;
             Ok(GeneDispersionFitDiagnostics {
                 estimate: dispersion,
@@ -950,6 +967,17 @@ struct DispersionOptimizerInput<'a> {
     weights: Option<&'a [f64]>,
 }
 
+#[derive(Clone, Copy)]
+struct DispersionObjectiveInput<'a> {
+    counts: &'a [u32],
+    mu: &'a [f64],
+    design: Option<&'a DesignMatrix>,
+    use_cox_reid: bool,
+    prior: Option<DispersionPrior>,
+    weights: Option<&'a [f64]>,
+    weight_threshold: f64,
+}
+
 fn fit_dispersion_line_search_inner(
     input: DispersionOptimizerInput<'_>,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
@@ -983,24 +1011,17 @@ fn fit_dispersion_line_search_inner(
 
     let min_log_alpha = (options.min_disp / 10.0).ln();
     let mut log_alpha = initial_dispersion.clamp(options.min_disp, max_disp).ln();
-    let mut lp = dispersion_log_posterior_with_prior_and_weights(
+    let objective = DispersionObjectiveInput {
         counts,
         mu,
         design,
-        log_alpha,
-        options.use_cox_reid,
+        use_cox_reid: options.use_cox_reid,
         prior,
         weights,
-    )?;
-    let mut dlp = dispersion_log_posterior_derivative_with_prior_and_weights(
-        counts,
-        mu,
-        design,
-        log_alpha,
-        options.use_cox_reid,
-        prior,
-        weights,
-    )?;
+        weight_threshold: options.weight_threshold,
+    };
+    let mut lp = dispersion_log_posterior_objective(objective, log_alpha)?;
+    let mut dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
     let initial_lp = lp;
     let initial_dlp = dlp;
     let mut kappa = options.kappa_0;
@@ -1027,28 +1048,12 @@ fn fit_dispersion_line_search_inner(
         }
 
         let proposed_log_alpha = log_alpha + kappa * dlp;
-        let theta_kappa = -dispersion_log_posterior_with_prior_and_weights(
-            counts,
-            mu,
-            design,
-            proposed_log_alpha,
-            options.use_cox_reid,
-            prior,
-            weights,
-        )?;
+        let theta_kappa = -dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
         let theta_hat_kappa = -lp - kappa * epsilon * dlp.powi(2);
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            let lp_new = dispersion_log_posterior_with_prior_and_weights(
-                counts,
-                mu,
-                design,
-                log_alpha,
-                options.use_cox_reid,
-                prior,
-                weights,
-            )?;
+            let lp_new = dispersion_log_posterior_objective(objective, log_alpha)?;
             last_change = lp_new - lp;
             lp = lp_new;
             if last_change < options.disp_tol {
@@ -1057,15 +1062,7 @@ fn fit_dispersion_line_search_inner(
             if log_alpha < min_log_alpha {
                 break;
             }
-            dlp = dispersion_log_posterior_derivative_with_prior_and_weights(
-                counts,
-                mu,
-                design,
-                log_alpha,
-                options.use_cox_reid,
-                prior,
-                weights,
-            )?;
+            dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
             kappa = (kappa * 1.1).min(options.kappa_0);
             if iter_accept % 5 == 0 {
                 kappa /= 2.0;
@@ -1076,24 +1073,8 @@ fn fit_dispersion_line_search_inner(
     }
 
     let dispersion = log_alpha.exp().clamp(options.min_disp, max_disp);
-    let last_dlp = dispersion_log_posterior_derivative_with_prior_and_weights(
-        counts,
-        mu,
-        design,
-        log_alpha,
-        options.use_cox_reid,
-        prior,
-        weights,
-    )?;
-    let last_d2lp = dispersion_log_posterior_second_derivative_with_prior_and_weights(
-        counts,
-        mu,
-        design,
-        log_alpha,
-        options.use_cox_reid,
-        prior,
-        weights,
-    )?;
+    let last_dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
+    let last_d2lp = dispersion_log_posterior_second_derivative_objective(objective, log_alpha)?;
     Ok(DispersionLineSearchOutput {
         dispersion,
         log_alpha,
@@ -1261,41 +1242,26 @@ fn fit_dispersion_grid_inner(
     }
     let max_disp = max_dispersion(options, n_samples);
     validate_dispersion_bounds(options.min_disp, max_disp)?;
-    let min_log = options.min_disp.ln();
-    let max_log = max_disp.ln();
-    let coarse = linspace(min_log, max_log, options.grid_points);
-    let (best_log, _) = best_log_alpha(
+    let objective = DispersionObjectiveInput {
         counts,
         mu,
         design,
-        options.use_cox_reid,
-        &coarse,
+        use_cox_reid: options.use_cox_reid,
         prior,
         weights,
-    )?;
+        weight_threshold: options.weight_threshold,
+    };
+    let min_log = options.min_disp.ln();
+    let max_log = max_disp.ln();
+    let coarse = linspace(min_log, max_log, options.grid_points);
+    let (best_log, _) = best_log_alpha(objective, &coarse)?;
     let delta = coarse[1] - coarse[0];
     let center = if initial_dispersion.is_finite() && initial_dispersion > 0.0 {
         let initial = initial_dispersion
             .ln()
             .clamp(best_log - delta, best_log + delta);
-        let initial_score = dispersion_log_posterior_with_prior_and_weights(
-            counts,
-            mu,
-            design,
-            initial,
-            options.use_cox_reid,
-            prior,
-            weights,
-        )?;
-        let best_score = dispersion_log_posterior_with_prior_and_weights(
-            counts,
-            mu,
-            design,
-            best_log,
-            options.use_cox_reid,
-            prior,
-            weights,
-        )?;
+        let initial_score = dispersion_log_posterior_objective(objective, initial)?;
+        let best_score = dispersion_log_posterior_objective(objective, best_log)?;
         if initial_score > best_score {
             initial
         } else {
@@ -1305,15 +1271,7 @@ fn fit_dispersion_grid_inner(
         best_log
     };
     let fine = linspace(center - delta, center + delta, options.grid_points);
-    let (best_fine_log, _) = best_log_alpha(
-        counts,
-        mu,
-        design,
-        options.use_cox_reid,
-        &fine,
-        prior,
-        weights,
-    )?;
+    let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((
         best_fine_log.exp().clamp(options.min_disp, max_disp),
         options.grid_points * 2,
@@ -1506,12 +1464,28 @@ pub fn cox_reid_adjustment(
     cox_reid_adjustment_weighted(design, mu, log_alpha, None)
 }
 
-/// Cox-Reid adjustment term with optional observation weights.
+/// Cox-Reid adjustment term with optional DESeq2-style weighted sample subset.
 pub fn cox_reid_adjustment_weighted(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
     weights: Option<&[f64]>,
+) -> Result<f64, DeseqError> {
+    cox_reid_adjustment_weighted_with_threshold(
+        design,
+        mu,
+        log_alpha,
+        weights,
+        GeneWiseDispersionOptions::default().weight_threshold,
+    )
+}
+
+fn cox_reid_adjustment_weighted_with_threshold(
+    design: &DesignMatrix,
+    mu: &[f64],
+    log_alpha: f64,
+    weights: Option<&[f64]>,
+    weight_threshold: f64,
 ) -> Result<f64, DeseqError> {
     if design.n_samples() != mu.len() {
         return Err(invalid_dimensions(
@@ -1532,7 +1506,13 @@ pub fn cox_reid_adjustment_weighted(
             reason: "dispersion must be finite and positive".to_string(),
         });
     }
-    let matrices = cox_reid_weighted_design_matrices(design, mu, alpha, weights)?;
+    let matrices = cox_reid_weighted_design_matrices_with_threshold(
+        design,
+        mu,
+        alpha,
+        weights,
+        weight_threshold,
+    )?;
     let determinant = matrices.xtwx.determinant();
     if !determinant.is_finite() || determinant <= 0.0 {
         return Err(DeseqError::InvalidDimensions {
@@ -1550,11 +1530,12 @@ struct CoxReidDesignMatrices {
     d2_xtwx: DMatrix<f64>,
 }
 
-fn cox_reid_weighted_design_matrices(
+fn cox_reid_weighted_design_matrices_with_threshold(
     design: &DesignMatrix,
     mu: &[f64],
     alpha: f64,
     weights: Option<&[f64]>,
+    weight_threshold: f64,
 ) -> Result<CoxReidDesignMatrices, DeseqError> {
     if design.n_samples() != mu.len() {
         return Err(invalid_dimensions(
@@ -1569,24 +1550,37 @@ fn cox_reid_weighted_design_matrices(
         });
     }
     validate_observation_weight_slice(weights, mu.len(), "Cox-Reid weights")?;
-    let p = design.n_coefficients();
+    validate_weight_threshold(weight_threshold, "Cox-Reid weight threshold")?;
+    let selected_samples = cox_reid_sample_indices(weights, mu.len(), weight_threshold);
+    let selected_columns = match weights {
+        Some(_) => cox_reid_column_indices(design, &selected_samples)?,
+        None => (0..design.n_coefficients()).collect(),
+    };
+    if selected_samples.is_empty() || selected_columns.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "Cox-Reid weighted design subset".to_string(),
+            expected: design.n_coefficients(),
+            actual: 0,
+        });
+    }
+    let p = selected_columns.len();
     let mut xtwx = DMatrix::<f64>::zeros(p, p);
     let mut d_xtwx = DMatrix::<f64>::zeros(p, p);
     let mut d2_xtwx = DMatrix::<f64>::zeros(p, p);
-    for (sample, mu) in mu.iter().copied().enumerate() {
+    for sample in selected_samples {
+        let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
-        let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let inverse_variance = mu.recip() + alpha;
-        let weight = observation_weight * inverse_variance.recip();
-        let d_weight = -observation_weight * inverse_variance.powi(-2);
-        let d2_weight = 2.0 * observation_weight * inverse_variance.powi(-3);
+        let weight = inverse_variance.recip();
+        let d_weight = -inverse_variance.powi(-2);
+        let d2_weight = 2.0 * inverse_variance.powi(-3);
         let row = design.matrix().row(sample)?;
-        for left in 0..p {
-            for right in 0..p {
-                let x_product = row[left] * row[right];
-                xtwx[(left, right)] += x_product * weight;
-                d_xtwx[(left, right)] += x_product * d_weight;
-                d2_xtwx[(left, right)] += x_product * d2_weight;
+        for (left_idx, left_col) in selected_columns.iter().copied().enumerate() {
+            for (right_idx, right_col) in selected_columns.iter().copied().enumerate() {
+                let x_product = row[left_col] * row[right_col];
+                xtwx[(left_idx, right_idx)] += x_product * weight;
+                d_xtwx[(left_idx, right_idx)] += x_product * d_weight;
+                d2_xtwx[(left_idx, right_idx)] += x_product * d2_weight;
             }
         }
     }
@@ -1595,6 +1589,39 @@ fn cox_reid_weighted_design_matrices(
         d_xtwx,
         d2_xtwx,
     })
+}
+
+fn cox_reid_sample_indices(
+    weights: Option<&[f64]>,
+    n_samples: usize,
+    weight_threshold: f64,
+) -> Vec<usize> {
+    match weights {
+        Some(weights) => weights
+            .iter()
+            .copied()
+            .enumerate()
+            .filter_map(|(sample, weight)| (weight > weight_threshold).then_some(sample))
+            .collect(),
+        None => (0..n_samples).collect(),
+    }
+}
+
+fn cox_reid_column_indices(
+    design: &DesignMatrix,
+    selected_samples: &[usize],
+) -> Result<Vec<usize>, DeseqError> {
+    let mut selected = Vec::with_capacity(design.n_coefficients());
+    for column in 0..design.n_coefficients() {
+        let mut sum_abs = 0.0;
+        for sample in selected_samples {
+            sum_abs += design.matrix().row(*sample)?[column].abs();
+        }
+        if sum_abs > 0.0 {
+            selected.push(column);
+        }
+    }
+    Ok(selected)
 }
 
 fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> f64 {
@@ -1612,14 +1639,39 @@ pub fn cox_reid_adjustment_derivative(
 }
 
 /// Derivative of the weighted Cox-Reid adjustment with respect to log alpha.
+///
+/// Observation weights define the DESeq2 `weightThreshold` sample subset for
+/// the determinant; they do not multiply the Cox-Reid working weights.
 pub fn cox_reid_adjustment_derivative_weighted(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
+    cox_reid_adjustment_derivative_weighted_with_threshold(
+        design,
+        mu,
+        log_alpha,
+        weights,
+        GeneWiseDispersionOptions::default().weight_threshold,
+    )
+}
+
+fn cox_reid_adjustment_derivative_weighted_with_threshold(
+    design: &DesignMatrix,
+    mu: &[f64],
+    log_alpha: f64,
+    weights: Option<&[f64]>,
+    weight_threshold: f64,
+) -> Result<f64, DeseqError> {
     let alpha = log_alpha.exp();
-    let matrices = cox_reid_weighted_design_matrices(design, mu, alpha, weights)?;
+    let matrices = cox_reid_weighted_design_matrices_with_threshold(
+        design,
+        mu,
+        alpha,
+        weights,
+        weight_threshold,
+    )?;
     let Some(inverse) = matrices.xtwx.try_inverse() else {
         return Err(DeseqError::InvalidDimensions {
             context: "Cox-Reid weighted design inverse".to_string(),
@@ -1640,14 +1692,39 @@ pub fn cox_reid_adjustment_second_derivative(
 }
 
 /// Second derivative of the weighted Cox-Reid adjustment with respect to log alpha.
+///
+/// Observation weights define the DESeq2 `weightThreshold` sample subset for
+/// the determinant; they do not multiply the Cox-Reid working weights.
 pub fn cox_reid_adjustment_second_derivative_weighted(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
+    cox_reid_adjustment_second_derivative_weighted_with_threshold(
+        design,
+        mu,
+        log_alpha,
+        weights,
+        GeneWiseDispersionOptions::default().weight_threshold,
+    )
+}
+
+fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
+    design: &DesignMatrix,
+    mu: &[f64],
+    log_alpha: f64,
+    weights: Option<&[f64]>,
+    weight_threshold: f64,
+) -> Result<f64, DeseqError> {
     let alpha = log_alpha.exp();
-    let matrices = cox_reid_weighted_design_matrices(design, mu, alpha, weights)?;
+    let matrices = cox_reid_weighted_design_matrices_with_threshold(
+        design,
+        mu,
+        alpha,
+        weights,
+        weight_threshold,
+    )?;
     let Some(inverse) = matrices.xtwx.try_inverse() else {
         return Err(DeseqError::InvalidDimensions {
             context: "Cox-Reid weighted design inverse".to_string(),
@@ -1663,7 +1740,13 @@ pub fn cox_reid_adjustment_second_derivative_weighted(
     let trace_bi_d2b = trace_product(&inverse, &matrices.d2_xtwx);
     let second_alpha =
         0.5 * trace_bi_db.powi(2) - 0.5 * (trace_bi_db.powi(2) - second_trace + trace_bi_d2b);
-    let first_log_alpha = cox_reid_adjustment_derivative_weighted(design, mu, log_alpha, weights)?;
+    let first_log_alpha = cox_reid_adjustment_derivative_weighted_with_threshold(
+        design,
+        mu,
+        log_alpha,
+        weights,
+        weight_threshold,
+    )?;
     Ok(second_alpha * alpha.powi(2) + first_log_alpha)
 }
 
@@ -1750,18 +1833,48 @@ pub fn dispersion_log_posterior_with_prior_and_weights(
     prior: Option<DispersionPrior>,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
-    let likelihood = dispersion_nb_log_likelihood_kernel_weighted(counts, mu, log_alpha, weights)?;
-    let posterior = if use_cox_reid {
-        let Some(design) = design else {
+    dispersion_log_posterior_objective(
+        DispersionObjectiveInput {
+            counts,
+            mu,
+            design,
+            use_cox_reid,
+            prior,
+            weights,
+            weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+        },
+        log_alpha,
+    )
+}
+
+fn dispersion_log_posterior_objective(
+    input: DispersionObjectiveInput<'_>,
+    log_alpha: f64,
+) -> Result<f64, DeseqError> {
+    let likelihood = dispersion_nb_log_likelihood_kernel_weighted(
+        input.counts,
+        input.mu,
+        log_alpha,
+        input.weights,
+    )?;
+    let posterior = if input.use_cox_reid {
+        let Some(design) = input.design else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "Cox-Reid dispersion objective requires a design matrix".to_string(),
             });
         };
-        likelihood + cox_reid_adjustment_weighted(design, mu, log_alpha, weights)?
+        likelihood
+            + cox_reid_adjustment_weighted_with_threshold(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+            )?
     } else {
         likelihood
     };
-    if let Some(prior) = prior {
+    if let Some(prior) = input.prior {
         Ok(posterior + dispersion_prior_log_density(log_alpha, prior)?)
     } else {
         Ok(posterior)
@@ -1816,19 +1929,48 @@ pub fn dispersion_log_posterior_derivative_with_prior_and_weights(
     prior: Option<DispersionPrior>,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
-    let likelihood =
-        dispersion_nb_log_likelihood_kernel_derivative_weighted(counts, mu, log_alpha, weights)?;
-    let derivative = if use_cox_reid {
-        let Some(design) = design else {
+    dispersion_log_posterior_derivative_objective(
+        DispersionObjectiveInput {
+            counts,
+            mu,
+            design,
+            use_cox_reid,
+            prior,
+            weights,
+            weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+        },
+        log_alpha,
+    )
+}
+
+fn dispersion_log_posterior_derivative_objective(
+    input: DispersionObjectiveInput<'_>,
+    log_alpha: f64,
+) -> Result<f64, DeseqError> {
+    let likelihood = dispersion_nb_log_likelihood_kernel_derivative_weighted(
+        input.counts,
+        input.mu,
+        log_alpha,
+        input.weights,
+    )?;
+    let derivative = if input.use_cox_reid {
+        let Some(design) = input.design else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "Cox-Reid dispersion derivative requires a design matrix".to_string(),
             });
         };
-        likelihood + cox_reid_adjustment_derivative_weighted(design, mu, log_alpha, weights)?
+        likelihood
+            + cox_reid_adjustment_derivative_weighted_with_threshold(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+            )?
     } else {
         likelihood
     };
-    if let Some(prior) = prior {
+    if let Some(prior) = input.prior {
         Ok(derivative + dispersion_prior_derivative(log_alpha, prior)?)
     } else {
         Ok(derivative)
@@ -1883,21 +2025,49 @@ pub fn dispersion_log_posterior_second_derivative_with_prior_and_weights(
     prior: Option<DispersionPrior>,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
+    dispersion_log_posterior_second_derivative_objective(
+        DispersionObjectiveInput {
+            counts,
+            mu,
+            design,
+            use_cox_reid,
+            prior,
+            weights,
+            weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+        },
+        log_alpha,
+    )
+}
+
+fn dispersion_log_posterior_second_derivative_objective(
+    input: DispersionObjectiveInput<'_>,
+    log_alpha: f64,
+) -> Result<f64, DeseqError> {
     let likelihood = dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
-        counts, mu, log_alpha, weights,
+        input.counts,
+        input.mu,
+        log_alpha,
+        input.weights,
     )?;
-    let second_derivative = if use_cox_reid {
-        let Some(design) = design else {
+    let second_derivative = if input.use_cox_reid {
+        let Some(design) = input.design else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "Cox-Reid dispersion second derivative requires a design matrix"
                     .to_string(),
             });
         };
-        likelihood + cox_reid_adjustment_second_derivative_weighted(design, mu, log_alpha, weights)?
+        likelihood
+            + cox_reid_adjustment_second_derivative_weighted_with_threshold(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+            )?
     } else {
         likelihood
     };
-    if let Some(prior) = prior {
+    if let Some(prior) = input.prior {
         Ok(second_derivative + dispersion_prior_second_derivative(log_alpha, prior)?)
     } else {
         Ok(second_derivative)
@@ -1905,34 +2075,13 @@ pub fn dispersion_log_posterior_second_derivative_with_prior_and_weights(
 }
 
 fn best_log_alpha(
-    counts: &[u32],
-    mu: &[f64],
-    design: Option<&DesignMatrix>,
-    use_cox_reid: bool,
+    objective: DispersionObjectiveInput<'_>,
     grid: &[f64],
-    prior: Option<DispersionPrior>,
-    weights: Option<&[f64]>,
 ) -> Result<(f64, f64), DeseqError> {
     let mut best_log = grid[0];
-    let mut best_score = dispersion_log_posterior_with_prior_and_weights(
-        counts,
-        mu,
-        design,
-        best_log,
-        use_cox_reid,
-        prior,
-        weights,
-    )?;
+    let mut best_score = dispersion_log_posterior_objective(objective, best_log)?;
     for log_alpha in grid.iter().copied().skip(1) {
-        let score = dispersion_log_posterior_with_prior_and_weights(
-            counts,
-            mu,
-            design,
-            log_alpha,
-            use_cox_reid,
-            prior,
-            weights,
-        )?;
+        let score = dispersion_log_posterior_objective(objective, log_alpha)?;
         if score > best_score {
             best_log = log_alpha;
             best_score = score;
@@ -2127,6 +2276,16 @@ fn validate_gene_est_options(options: GeneWiseDispersionOptions) -> Result<(), D
             context: "dispersion niter".to_string(),
             expected: 1,
             actual: 0,
+        });
+    }
+    validate_weight_threshold(options.weight_threshold, "dispersion weight_threshold")?;
+    Ok(())
+}
+
+fn validate_weight_threshold(value: f64, context: &str) -> Result<(), DeseqError> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must be finite and non-negative"),
         });
     }
     Ok(())
