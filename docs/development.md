@@ -39,8 +39,13 @@ DESeq2 fixture files. Full DESeq2 result references are written for future
 dispersion parity, while the current Wald/LRT golden checks use supplied
 dispersions and `DESeq2:::fitNbinomGLMs` to match the Rust fixed-dispersion
 scope. The default generated set is intended to be green and includes weighted
-fixed-dispersion Wald/LRT, weighted GLM-mu Cox-Reid gene-wise anchors, and the
-current weighted GLM-mu mean-trend MAP/Wald/LRT anchors.
+fixed-dispersion Wald/LRT, unweighted GLM-mu mean-trend MAP/Wald/LRT anchors
+with and without Cox-Reid, weighted GLM-mu Cox-Reid gene-wise anchors, and the
+current weighted GLM-mu mean and local-trend MAP/Wald/LRT anchors, including
+result-row BH-adjusted p-value and compact result-table checks for those
+matched Wald/LRT branches, plus the current unweighted GLM-mu local-trend
+MAP/Wald/LRT result-table fixture and the unweighted GLM-mu Cox-Reid
+local-trend MAP anchor.
 
 Run benchmarks:
 

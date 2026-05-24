@@ -38,16 +38,16 @@ and selected result/filtering/Cook's primitives.
 | Base metadata | `baseMean`, `baseVar`, `allZero`, weighted base metadata. |
 | Observation weights | Row-max normalization, design checks, `weights_fail`, and implemented weighted fixed/native paths. |
 | Fixed-dispersion GLM | Intercept shortcut, IRLS, QR option, log likelihood, deviance, SEs, hats, beta-prior variance/refit primitives, Wald/LRT. |
-| Wald tests | Selected coefficients, primitive contrasts, threshold alternatives, normal and t p-values. |
+| Wald tests | Selected coefficients, fixed-dispersion primitive contrasts, native linear-mu/GLM-mu primitive contrasts, threshold alternatives, normal and t p-values. |
 | LRT | Fixed-dispersion full vs reduced and limited native-dispersion branches. |
-| Cook's diagnostics | Cook's matrix, `maxCooks`, p-value masking, low-count heuristic primitive, replacement planning, limited refit. |
+| Cook's diagnostics | Cook's matrix, `maxCooks`, p-value masking, low-count heuristic primitive, replacement planning, limited Wald/LRT/contrast refit. |
 | Independent filtering | BaseMean-driven filtered BH and DESeq2-shaped lowess threshold selection. |
 | Dispersion gene estimates | Linear-mu and GLM-mu foundations, rough/moments starts, Cox-Reid, Armijo, grid fallback. |
 | Dispersion trends | Parametric, mean, and initial pure-Rust local trends. |
 | Transformations | `normTransform` plus mean-fit, parametric, and local VST primitives for normalized counts; VST dispatch from fitted dispersion trends. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
-| Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including weighted GLM-mu anchors. |
+| Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including unweighted and weighted GLM-mu mean/local MAP/Wald/LRT anchors plus unweighted local Cox-Reid MAP. |
 
 ## Major Missing Pieces
 
@@ -67,7 +67,7 @@ Still missing:
 - exact seeded Monte Carlo/loess numerical identity for low-df dispersion prior
   variance,
 - complete weighted dispersion parity beyond the current deterministic
-  weighted GLM-mu fixtures,
+  weighted GLM-mu mean/local fixtures,
 - broader stage-by-stage native LRT references,
 - more edge cases around convergence, skipped rows, and replacement refits.
 
@@ -88,7 +88,7 @@ Still missing:
 - full `results(contrast=...)` semantics,
 - formula/metadata-aware factor-level handling,
 - complete coefficient-name cleanup,
-- complete contrast-aware Cook's/refit behavior,
+- complete formula-aware contrast Cook's/refit behavior,
 - full Bioconductor result-object metadata and formula-aware result metadata
   beyond the typed primitive table view.
 
@@ -96,7 +96,7 @@ Still missing:
 
 Still missing:
 
-- full Cook's replacement-triggered refit for all Wald/LRT/contrast paths,
+- full Cook's replacement-triggered refit for beta-prior and wrapper-object paths,
 - all beta-prior interactions,
 - full metadata preservation around replacement counts and final result tables,
 - automatic formula-aware low-count Cook's heuristic selection.

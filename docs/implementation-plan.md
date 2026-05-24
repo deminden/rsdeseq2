@@ -40,6 +40,14 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Promote generated DESeq2 1.46.0 references for normalization-factor
   native dispersion, weighted fixed-dispersion Wald/LRT, and weighted GLM-mu
   mean-trend MAP/Wald/LRT into the default passing fixture set.
+- [x] Add DESeq2-generated BH-adjusted p-value columns and result-row padj
+  parity checks for the matched GLM-mu Wald/LRT fixture branches.
+- [x] Add compact DESeq2-shaped result-table fixtures for the matched GLM-mu
+  Wald/LRT branches and compare public Rust result rows against them.
+- [x] Add unweighted GLM-mu local-trend MAP/Wald/LRT/result-table fixtures and
+  handle the single-usable-row local fit edge case as a constant local trend.
+- [x] Add weighted GLM-mu local-trend MAP/Wald/LRT/result-table fixtures with
+  `weightsFail` row expansion.
 - [x] Add primitive result-table column schema helpers for Rust APIs.
 - [x] Remove current Python wrapper scaffold from the active workspace.
 - [x] Restore the experimental R package scaffold and R CI surface.
@@ -282,18 +290,45 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Low-level observation-weighted MAP dispersion fitting.
 - [x] Builder-level observation weights through the GLM-mu gene-wise
   dispersion, MAP, and native Wald path.
+- [x] Default R reference generation and skip-safe Rust checks for unweighted
+  GLM-mu mean-trend MAP/Wald/LRT intermediates.
 - [x] Default R reference generation and skip-safe Rust checks for weighted
   GLM-mu dispersion/MAP/Wald intermediates.
+- [x] Match DESeq2's `minmu`-floored stored means in the GLM-mu dispersion
+  estimation intermediate.
 - [x] Match DESeq2's weighted `fitDisp` row-indexing behavior during GLM-mu
   `fitidx` mean/dispersion alternation.
 - [x] Match DESeq2's weighted Cox-Reid behavior for the non-linear-mu
   gene-wise path: observation weights multiply likelihood terms, while the
   Cox-Reid determinant uses the `weightThreshold` sample subset without
   multiplying by the weights.
+- [x] Add default DESeq2-internal unweighted GLM-mu `useCR=TRUE` gene-wise
+  reference checks for Cox-Reid dispersion and stored-mean parity.
+- [x] Add default DESeq2-internal unweighted GLM-mu mean-trend MAP/Wald/LRT
+  reference checks with Cox-Reid enabled through gene-wise and MAP dispersion
+  fitting.
 - [x] Add default DESeq2-internal weighted GLM-mu `useCR=TRUE` gene-wise
   reference checks for weighted Cox-Reid dispersion parity.
+- [x] Add default DESeq2-internal weighted GLM-mu mean-trend MAP/Wald/LRT
+  reference checks with Cox-Reid enabled through gene-wise and MAP dispersion
+  fitting.
+- [x] Assert result-table BH-adjusted p-values against DESeq2 for the matched
+  unweighted and weighted GLM-mu mean-trend Wald/LRT branches.
+- [x] Assert compact public result-row parity for matched GLM-mu Wald/LRT
+  branches, covering LFC, SE, statistic, p-value, adjusted p-value,
+  dispersion, and convergence.
+- [x] Assert MAP, Wald, LRT, and compact public result-row parity for the
+  current unweighted GLM-mu local-trend fixture.
+- [x] Assert MAP, Wald, LRT, and compact public result-row parity for the
+  current weighted GLM-mu local-trend fixture.
+- [x] Assert MAP dispersion intermediate parity for the current unweighted
+  GLM-mu Cox-Reid local-trend fixture.
+- [x] Add native GLM-mu Wald contrast entry points that reuse MAP dispersions,
+  including numeric, coefficient-name/list, and primitive factor-level
+  contrast metadata paths.
 - [ ] Complete broader weighted dispersion parity for DESeq2's non-linear-mu
-  GLM mean fitting path beyond the current deterministic mean-trend fixture.
+  GLM mean fitting path beyond the current deterministic mean/local-trend
+  fixtures.
 - [ ] glmGamPoi MAP dispersion path.
 
 ## Phase 4: Full Wald Pipeline
@@ -333,6 +368,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Character/factor-level `contrastAllZero` behavior for primitive
   factor-level Wald contrasts with caller-supplied sample levels, matching
   DESeq2's `contrastAllZeroCharacter` selected-sample rule.
+- [x] Native linear-mu and GLM-mu Wald contrast wrappers for primitive numeric,
+  coefficient-name/list, and caller-supplied factor-level requests.
 - [ ] Full DESeq2 contrast handling for `results(contrast=...)`, including
   colData/formula-aware factor-level semantics, complete coefficient-name
   cleanup, and contrast-aware Cook's/refit edge cases.
@@ -350,8 +387,12 @@ reference; no DESeq2 source is vendored or translated line by line.
   original fit, replacement counts, replacement-count refit with original size
   factors, `refitReplace` merge, `newAllZero` result clearing, and final
   filtering.
+- [x] Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
+  including primitive numeric, named/list, and caller-supplied factor-level
+  contrast routes.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
-  refit for contrasts, beta priors, and wrapper object metadata.
+  refit for beta priors, wrapper object metadata, and remaining contrast edge
+  cases.
 - [ ] Full formula-aware outlier handling and future wrapper integration
   without DESeq2 runtime fallback.
 - [x] Initial independent filtering.

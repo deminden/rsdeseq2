@@ -17,8 +17,8 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles and log2-to-natural ridge conversion. | Source-matched formula tests; expanded-model averaging and high-level plumbing still need fixture coverage. |
-| Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures, prior variance, MAP shrinkage, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/weighted GLM-mu fixtures and finite-difference objective tests. |
-| Results, Cook's, filtering | Matches implemented result-table assembly, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's and independent-filtering fixtures. |
+| Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
+| Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, and implemented local numerical-integration helpers. | Formula tests and stage-level dispatch tests; full Bioconductor object workflow remains future work. |
 
 ## Implemented
@@ -162,6 +162,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Primitive coefficient-name, positive/negative coefficient-list, and common
   factor-level contrast resolution against design coefficient names, with
   stable result-table names and comparison labels for named contrast specs.
+- Native linear-mu and GLM-mu Wald contrast entry points reuse the implemented
+  MAP dispersion paths, then run numeric, named/list, or caller-supplied
+  factor-level contrast result assembly.
 - Numeric/expanded DESeq2-style `contrastAllZero` handling for primitive Wald
   contrasts: selected samples are inferred from `modelMatrix %*%
   contrastBinary`, and eligible rows are assigned LFC/stat zero and p-value
@@ -210,6 +213,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Limited Cook's replacement-refit path for the implemented GLM-mu native Wald
   and LRT branches, merging only `refitReplace` rows and preserving original
   size factors.
+- Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
+  including primitive numeric, named/list, and caller-supplied factor-level
+  contrast routes.
 - Base-mean independent filtering with filtered BH adjustment metadata and an
   R `stats::lowess`-shaped rejection-curve smoother for DESeq2's default
   threshold-selection grid, plus a paired `filterNumRej`-shaped
@@ -273,9 +279,10 @@ The current gene-wise dispersion foundation follows the early
 `estimateDispersionsGeneEst` anchors in `R/core.R`: `roughDispEstimate`,
 `momentsDispEstimate`, `linearModelMu`, and the two-pass fallback grid shape in
 `fitDispGridWrapper`. It implements the Cox-Reid log determinant objective term
-for unweighted fits, has low-level weighted objective/derivative/curvature
-variants, and follows the Armijo line-search control flow from `fitDisp` for
-no-prior estimates. The MAP prior term follows
+for unweighted fits, matches the unweighted GLM-mu Cox-Reid gene-wise fixture,
+has low-level weighted objective/derivative/curvature variants, and follows the
+Armijo line-search control flow from `fitDisp` for no-prior estimates. The MAP
+prior term follows
 `fitDisp`/`fitDispGridWrapper`: a normal prior kernel on `log(alpha)` with
 mean `log(dispFit)` and variance `dispPriorVar`, plus the corresponding
 first and second derivatives. Parametric dispersion trends follow
@@ -304,8 +311,21 @@ includes fixed-dispersion beta, SE, Wald/LRT statistics, log likelihoods,
 fitted means, hat diagonals, and Cook's distances. It also writes weighted base
 metadata using `getBaseMeansAndVariances` and `getAndCheckWeights`, weighted
 fixed-dispersion Wald/LRT references with `weightsFail` rows expanded as
-missing, and weighted GLM-mu mean-trend dispersion/MAP/Wald/LRT intermediate
-references for the current native branch.
+missing, unweighted GLM-mu Cox-Reid mean-trend MAP/Wald/LRT and mean-trend
+MAP/Wald/LRT intermediates, plus weighted GLM-mu Cox-Reid mean-trend MAP and
+mean-trend and local-trend dispersion/MAP/Wald/LRT intermediate references for
+the current native branch. The matched GLM-mu Wald/LRT branches also write compact
+DESeq2-shaped result-table fixtures and assert result-row beta, SE, statistic,
+p-value, adjusted p-value, dispersion, and convergence parity.
+The unweighted GLM-mu local-trend fixture covers MAP, Wald, LRT, and compact
+Wald/LRT result rows for the tiny-data edge case where only one row is usable
+for local fitting; Rust now follows the corresponding constant local fit shape
+instead of failing the trend evaluation.
+The weighted GLM-mu local-trend fixture covers the same MAP/Wald/LRT/result-row
+surface with DESeq2's `weightsFail` expansion semantics.
+The unweighted GLM-mu Cox-Reid local-trend fixture currently covers the MAP
+dispersion intermediate; Wald/LRT result-row coverage for that exact
+combination remains future work.
 
 The fixed-dispersion IRLS path now includes a bounded pure-Rust optim fallback
 for routed rows. The current checked reference fixtures still use
@@ -317,8 +337,8 @@ bounded fallback where DESeq2 is installed locally.
 
 - Mature wrapper-facing interface around the Rust core.
 - R formula parsing in Rust.
-- Full DESeq2 dispersion estimation, including complete weighted dispersion
-  parity, exact `locfit` local-trend numerical identity, glmGamPoi trend type,
+- Full DESeq2 dispersion estimation, including broader weighted dispersion
+  edge-case parity, exact `locfit` local-trend numerical identity, glmGamPoi trend type,
   and production-ready end-to-end dispersion parity.
 - High-level propagation of observation-weight `weights_fail` flags through
   complete DESeq2-like builder and future wrapper workflows.
@@ -332,8 +352,8 @@ bounded fallback where DESeq2 is installed locally.
   edge cases.
 - Automatic formula-aware application of the two-group low-count Cook's
   heuristic from high-level wrappers.
-- Full Cook's outlier replacement behavior for contrasts, beta priors,
-  Bioconductor assay preservation, and all DESeq2 edge cases.
+- Full Cook's outlier replacement behavior for beta priors, Bioconductor assay
+  preservation, and all remaining DESeq2 edge cases.
 - General Wald and LRT tests with native dispersion estimation beyond the
   current limited linear-mu/GLM-mu branches and without generated DESeq2
   references for all native LRT intermediates.

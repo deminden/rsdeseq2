@@ -360,9 +360,14 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
         };
 
         for (compact_row, gene) in fit_genes.iter().copied().enumerate() {
-            let fit_mu = fit.mu.row(compact_row)?;
+            let fit_mu_raw = fit.mu.row(compact_row)?;
+            let fit_mu = fit_mu_raw
+                .iter()
+                .copied()
+                .map(|value| value.max(options.min_mu))
+                .collect::<Vec<_>>();
             let start = gene * input.counts.n_samples();
-            mu_values[start..start + input.counts.n_samples()].copy_from_slice(fit_mu);
+            mu_values[start..start + input.counts.n_samples()].copy_from_slice(&fit_mu);
             // DESeq2 passes the full non-all-zero weight matrix into fitDisp
             // even when counts/mu are subset by fitidx; the C++ then indexes
             // weights by compact row position.
@@ -372,7 +377,7 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
                 .transpose()?;
             let diagnostics = fit_dispersion_for_gene_detailed_with_weights(
                 input.counts.row(gene)?,
-                fit_mu,
+                &fit_mu,
                 input.design,
                 alpha_hat[gene],
                 options,
@@ -1218,7 +1223,6 @@ fn fit_dispersion_grid_inner(
     let counts = input.counts;
     let mu = input.mu;
     let design = input.design;
-    let initial_dispersion = input.initial_dispersion;
     let mut options = input.options;
     let n_samples = input.n_samples;
     let prior = input.prior;
@@ -1256,21 +1260,7 @@ fn fit_dispersion_grid_inner(
     let coarse = linspace(min_log, max_log, options.grid_points);
     let (best_log, _) = best_log_alpha(objective, &coarse)?;
     let delta = coarse[1] - coarse[0];
-    let center = if initial_dispersion.is_finite() && initial_dispersion > 0.0 {
-        let initial = initial_dispersion
-            .ln()
-            .clamp(best_log - delta, best_log + delta);
-        let initial_score = dispersion_log_posterior_objective(objective, initial)?;
-        let best_score = dispersion_log_posterior_objective(objective, best_log)?;
-        if initial_score > best_score {
-            initial
-        } else {
-            best_log
-        }
-    } else {
-        best_log
-    };
-    let fine = linspace(center - delta, center + delta, options.grid_points);
+    let fine = linspace(best_log - delta, best_log + delta, options.grid_points);
     let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((
         best_fine_log.exp().clamp(options.min_disp, max_disp),

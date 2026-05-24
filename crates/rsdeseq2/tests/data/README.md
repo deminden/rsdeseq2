@@ -25,15 +25,62 @@ Reference files should record:
   for the forced bounded-optimizer GLM fallback reference path.
 - `observation_weights.tsv`, `observation_weights_normalized.tsv`,
   `base_metadata_weighted.tsv` for weighted metadata checks.
+- `native_glm_mu_cr_reference.tsv`, `native_glm_mu_cr_dispersion_mu.tsv`,
+  `native_glm_mu_mean_reference.tsv`, `native_glm_mu_mean_lrt_reference.tsv`,
+  `native_glm_mu_mean_dispersion_mu.tsv`, `native_glm_mu_mean_wald_mu.tsv`,
+  `native_glm_mu_mean_wald_hat.tsv`, `native_glm_mu_mean_cr_map_reference.tsv`,
+  `native_glm_mu_mean_cr_lrt_reference.tsv`,
+  `native_glm_mu_mean_cr_map_dispersion_mu.tsv`,
+  `native_glm_mu_mean_cr_wald_mu.tsv`, and
+  `native_glm_mu_mean_cr_wald_hat.tsv`, plus
+  `native_glm_mu_mean_results_wald.tsv`,
+  `native_glm_mu_mean_results_lrt.tsv`,
+  `native_glm_mu_mean_cr_results_wald.tsv`, and
+  `native_glm_mu_mean_cr_results_lrt.tsv` for unweighted GLM-mu Cox-Reid and
+  mean-trend MAP/Wald/LRT intermediate and result-table checks, including
+  result-row p-value and BH-adjusted p-value parity for the matched Wald/LRT
+  branches.
+- `native_glm_mu_local_reference.tsv`,
+  `native_glm_mu_local_lrt_reference.tsv`,
+  `native_glm_mu_local_dispersion_mu.tsv`,
+  `native_glm_mu_local_wald_mu.tsv`,
+  `native_glm_mu_local_wald_hat.tsv`,
+  `native_glm_mu_local_results_wald.tsv`, and
+  `native_glm_mu_local_results_lrt.tsv` for the current unweighted GLM-mu
+  local-trend MAP/Wald/LRT intermediate and result-table branch, including
+  the single-usable-row local fit edge case.
+- `native_glm_mu_local_cr_map_reference.tsv` and
+  `native_glm_mu_local_cr_map_dispersion_mu.tsv` for the current unweighted
+  GLM-mu Cox-Reid local-trend MAP intermediate.
 - `native_weighted_glm_mu_reference.tsv`,
   `native_weighted_glm_mu_lrt_reference.tsv`,
   `native_weighted_glm_mu_dispersion_mu.tsv`,
   `native_weighted_glm_mu_cr_reference.tsv`,
   `native_weighted_glm_mu_cr_dispersion_mu.tsv`,
-  `native_weighted_glm_mu_wald_mu.tsv`, and
-  `native_weighted_glm_mu_wald_hat.tsv` for weighted GLM-mu
-  dispersion/MAP/Wald/LRT intermediate checks, including gene-wise iteration
-  diagnostics and the default weighted Cox-Reid gene-wise branch.
+  `native_weighted_glm_mu_mean_cr_map_reference.tsv`,
+  `native_weighted_glm_mu_mean_cr_map_dispersion_mu.tsv`,
+  `native_weighted_glm_mu_mean_cr_lrt_reference.tsv`,
+  `native_weighted_glm_mu_mean_cr_wald_mu.tsv`,
+  `native_weighted_glm_mu_mean_cr_wald_hat.tsv`,
+  `native_weighted_glm_mu_wald_mu.tsv`,
+  `native_weighted_glm_mu_wald_hat.tsv`,
+  `native_weighted_glm_mu_results_wald.tsv`,
+  `native_weighted_glm_mu_results_lrt.tsv`,
+  `native_weighted_glm_mu_mean_cr_results_wald.tsv`, and
+  `native_weighted_glm_mu_mean_cr_results_lrt.tsv` for weighted GLM-mu
+  dispersion/MAP/Wald/LRT intermediate and result-table checks, including
+  gene-wise iteration diagnostics, result-row p-value and BH-adjusted p-value
+  parity, and the default weighted Cox-Reid gene-wise and mean-trend
+  MAP/Wald/LRT branches.
+- `native_weighted_glm_mu_local_reference.tsv`,
+  `native_weighted_glm_mu_local_lrt_reference.tsv`,
+  `native_weighted_glm_mu_local_dispersion_mu.tsv`,
+  `native_weighted_glm_mu_local_wald_mu.tsv`,
+  `native_weighted_glm_mu_local_wald_hat.tsv`,
+  `native_weighted_glm_mu_local_results_wald.tsv`, and
+  `native_weighted_glm_mu_local_results_lrt.tsv` for weighted GLM-mu
+  local-trend MAP/Wald/LRT intermediate and result-table checks, including
+  `weightsFail` row expansion.
 - `parametric_trend_reference.tsv`,
   `parametric_trend_prediction_reference.tsv`, `mean_trend_reference.tsv`,
   `local_trend_reference.tsv`, `local_trend_prediction_reference.tsv`,
@@ -59,5 +106,6 @@ files are generated locally, they compare the implemented stages against the R
 references.
 
 By default, `scripts/generate_deseq2_references.R` writes fixtures expected to
-pass today, including weighted fixed-dispersion Wald/LRT and the current
-weighted GLM-mu mean-trend MAP/Wald/LRT branch.
+pass today, including weighted fixed-dispersion Wald/LRT, the current weighted
+GLM-mu mean and local-trend MAP/Wald/LRT branches with matched result-row
+adjusted p-values, and the unweighted GLM-mu Cox-Reid local-trend MAP anchor.

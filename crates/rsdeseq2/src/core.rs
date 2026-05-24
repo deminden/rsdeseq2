@@ -1708,6 +1708,82 @@ impl DeseqBuilder {
         self.attach_native_wald(counts, design, coefficient, fit)
     }
 
+    /// Run the linear-mu native dispersion path and then a Wald test for a numeric contrast.
+    ///
+    /// This is the primitive contrast companion to [`Self::fit_wald_linear_mu`].
+    /// It reuses the implemented linear-mu dispersion/MAP path, then reports
+    /// the requested contrast from the final fixed-dispersion GLM fit.
+    pub fn fit_wald_linear_mu_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu(counts, design)?;
+        self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+    }
+
+    /// Run the linear-mu native Wald path for a named primitive contrast specification.
+    pub fn fit_wald_linear_mu_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let (fit, mut results) =
+            self.fit_wald_linear_mu_contrast(counts, design, &numeric_contrast)?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the linear-mu native Wald path for a caller-supplied factor-level contrast.
+    pub fn fit_wald_linear_mu_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_linear_mu(counts, design)?;
+        let (fit, mut results) = self.attach_native_wald_contrast(
+            counts,
+            design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
+    }
+
     /// Run the parametric native dispersion path and then a Wald test.
     ///
     /// This compatibility-named entry point keeps the original parametric-only
@@ -1738,6 +1814,91 @@ impl DeseqBuilder {
         validate_pipeline_wald_coefficient(design, coefficient)?;
         let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
         self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    /// Run the GLM-mu native dispersion path and then a Wald test for a numeric contrast.
+    ///
+    /// This follows the same native dispersion/MAP and final GLM fitting path
+    /// as [`Self::fit_wald_glm_mu`], then reports a primitive numeric
+    /// contrast over the fitted coefficient vector. Higher-level formula and
+    /// factor handling remains caller or wrapper responsibility.
+    pub fn fit_wald_glm_mu_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+    }
+
+    /// Run the GLM-mu native Wald path for a named primitive contrast specification.
+    ///
+    /// This resolves coefficient names, coefficient-name lists, or supported
+    /// factor-level coefficient shapes to a numeric contrast before running
+    /// the implemented native GLM-mu Wald contrast path.
+    pub fn fit_wald_glm_mu_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let (fit, mut results) =
+            self.fit_wald_glm_mu_contrast(counts, design, &numeric_contrast)?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the GLM-mu native Wald path for a factor-level contrast.
+    ///
+    /// In addition to resolving the coefficient contrast, this applies
+    /// DESeq2-style character `contrastAllZero` handling using the supplied
+    /// per-sample factor levels.
+    pub fn fit_wald_glm_mu_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        let (fit, mut results) = self.attach_native_wald_contrast(
+            counts,
+            design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
     }
 
     /// Run the implemented linear-mu native dispersion path and then an LRT.
@@ -1809,8 +1970,8 @@ impl DeseqBuilder {
     /// native GLM-mu Wald branch. It preserves the original size factors,
     /// builds replacement counts from original Cook's distances, reruns the
     /// implemented GLM-mu dispersion/MAP/Wald path on replacement counts, and
-    /// merges only rows marked for refit. It does not yet implement
-    /// contrast-aware replacement, beta priors, or Bioconductor object slots.
+    /// merges only rows marked for refit. It does not yet implement beta
+    /// priors or Bioconductor object slots.
     pub fn fit_wald_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -1856,6 +2017,150 @@ impl DeseqBuilder {
                 &refit_plan.replacement.replaced_counts,
                 design,
                 coefficient,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run the current GLM-mu native Wald contrast path with limited Cook's replacement refit.
+    ///
+    /// This mirrors [`Self::fit_wald_glm_mu_with_cooks_replacement`] for
+    /// primitive numeric contrasts: original and replacement-count refits both
+    /// use the native GLM-mu contrast path, then only rows marked by the
+    /// replacement plan are merged into the final result table.
+    pub fn fit_wald_glm_mu_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_wald_glm_mu_contrast(counts, design, contrast)?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_wald_glm_mu_contrast(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run native GLM-mu Wald replacement refit for a named primitive contrast specification.
+    pub fn fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let mut output = self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+            counts,
+            design,
+            &numeric_contrast,
+            replacement_options,
+        )?;
+        apply_contrast_metadata_to_replacement_output(
+            &mut output,
+            contrast.result_name(),
+            contrast.comparison(),
+        );
+        Ok(output)
+    }
+
+    /// Run native GLM-mu Wald replacement refit for a caller-supplied factor-level contrast.
+    pub fn fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast)?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_wald_glm_mu_factor_level_contrast(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                contrast,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -2021,6 +2326,50 @@ impl DeseqBuilder {
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
         attach_glm_fit(&mut fit, wald_output.glm_fit);
         fit.wald = Some(wald_output.wald);
+        Ok((fit, wald_output.results))
+    }
+
+    fn attach_native_wald_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        contrast_all_zero_override: Option<&[bool]>,
+        mut fit: DeseqFit,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let dispersions = fit
+            .dispersion
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "MAP dispersions are required before Wald fitting".to_string(),
+            })?;
+        let normalized = match fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &fit.size_factors)?,
+        };
+        let wald_output = self.fixed_dispersion_wald_contrast_components(
+            FixedDispersionGlmInput {
+                counts,
+                design,
+                size_factors: &fit.size_factors,
+                normalization_factors: fit.normalization_factors.as_ref(),
+                observation_weights: fit.observation_weights.as_ref(),
+                all_zero: &fit.all_zero,
+                dispersions,
+            },
+            &normalized,
+            &fit.base_mean,
+            contrast,
+            contrast_all_zero_override,
+        )?;
+
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald_contrast.wald);
         Ok((fit, wald_output.results))
     }
 
@@ -2999,6 +3348,50 @@ fn merge_replacement_refit_results(
 
     merged.independent_filtering = None;
     Ok(merged)
+}
+
+fn replacement_refit_plan_from_original(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    original_fit: &DeseqFit,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<CooksRefitPlan, DeseqError> {
+    let original_cooks = original_fit
+        .cooks
+        .as_ref()
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "Cook's distances are required before replacement refit".to_string(),
+        })?;
+    let normalized = match original_fit.normalization_factors.as_ref() {
+        Some(normalization_factors) => {
+            normalized_counts_with_factors(counts, normalization_factors)?
+        }
+        None => normalized_counts(counts, &original_fit.size_factors)?,
+    };
+    prepare_cooks_replacement_refit(
+        counts,
+        &normalized,
+        &original_fit.size_factors,
+        original_fit.normalization_factors.as_ref(),
+        original_cooks,
+        design,
+        replacement_options,
+    )
+}
+
+fn apply_contrast_metadata_to_replacement_output(
+    output: &mut CooksReplacementWaldOutput,
+    result_name: String,
+    comparison: String,
+) {
+    output.original_results.metadata.result_name = Some(result_name.clone());
+    output.original_results.metadata.comparison = Some(comparison.clone());
+    if let Some(refit_results) = &mut output.refit_results {
+        refit_results.metadata.result_name = Some(result_name.clone());
+        refit_results.metadata.comparison = Some(comparison.clone());
+    }
+    output.results.metadata.result_name = Some(result_name);
+    output.results.metadata.comparison = Some(comparison);
 }
 
 fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {

@@ -262,6 +262,22 @@ fn fit_local_dispersion_trend_returns_nan_for_missing_fitted_rows() {
 }
 
 #[test]
+fn fit_local_dispersion_trend_uses_constant_fit_for_single_usable_row() {
+    let fit = fit_local_dispersion_trend(
+        &[10.0, 20.0, 40.0],
+        &[1e-8, 0.2, 1e-8],
+        LocalDispersionTrendOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(fit.genes_used, 1);
+    assert_eq!(fit.use_for_fit, vec![false, true, false]);
+    for value in fit.disp_fit {
+        assert_relative_eq!(value, 0.2, epsilon = 1e-12);
+    }
+}
+
+#[test]
 fn fit_local_dispersion_trend_validates_inputs() {
     assert!(fit_local_dispersion_trend(
         &[10.0, 20.0],

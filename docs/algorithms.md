@@ -670,9 +670,10 @@ contrastStat     = contrastEstimate / contrastSE
 
 This mirrors the numeric core of DESeq2's `getContrast` path after R has
 resolved a contrast into numeric coefficients. The precomputed numeric contrast
-output can be assembled into DESeq2-shaped result rows with BH adjustment, and
-the supplied-dispersion Wald builder can run a primitive numeric contrast
-through GLM fitting, Cook's cutoff masking, and independent filtering.
+output can be assembled into DESeq2-shaped result rows with BH adjustment. The
+supplied-dispersion Wald builder and the native linear-mu/GLM-mu Wald builders
+can run a primitive numeric contrast through GLM fitting, Cook's cutoff
+masking, and independent filtering.
 
 The primitive contrast resolver also supports named forms when a
 `DesignMatrix` has coefficient names:
@@ -691,9 +692,10 @@ factor-level helper covers common DESeq2 coefficient-name shapes:
 two non-reference levels when an explicit reference level is supplied, and
 expanded no-intercept coefficients such as `conditionB - conditionA`. It also
 uses a minimal R-like `make.names` pass for common non-syntactic level names.
-When named contrast specifications are run through the supplied-dispersion
-Wald builder, the result-table metadata preserves a stable result name and
-comparison label for coefficient, list, and factor-level contrast requests.
+When named contrast specifications are run through the supplied-dispersion or
+native linear-mu/GLM-mu Wald builders, the result-table metadata preserves a
+stable result name and comparison label for coefficient, list, and factor-level
+contrast requests.
 
 This is still a coefficient-name resolver over an already-built design matrix.
 Full DESeq2 `results(contrast=...)` compatibility still needs colData/formula
@@ -701,10 +703,11 @@ ownership, all coefficient cleanup rules, and contrast-aware Cook's/refit
 edge-case handling.
 
 For primitive numeric contrasts with both positive and negative coefficients,
-the supplied-dispersion Wald contrast pipeline mirrors DESeq2's
-`contrastAllZeroNumeric` behavior. Non-zero contrast coefficients are converted
-to one, samples are selected by non-zero `modelMatrix %*% contrastBinary`, and
-genes with zero raw counts across those selected samples get
+the supplied-dispersion and native linear-mu/GLM-mu Wald contrast pipelines
+mirror DESeq2's `contrastAllZeroNumeric` behavior. Non-zero contrast
+coefficients are converted to one, samples are selected by non-zero
+`modelMatrix %*% contrastBinary`, and genes with zero raw counts across those
+selected samples get
 `log2FoldChange = 0`, `stat = 0`, and `pvalue = 1`, unless the gene is already
 an all-zero row. One-sided numeric contrasts leave rows unchanged, matching
 DESeq2.
@@ -863,16 +866,17 @@ recording the maximum. If every sample is replaceable, post-refit `maxCooks` is
 missing for every gene.
 
 The first end-to-end replacement-refit paths are implemented for the current
-GLM-mu native Wald and LRT branches. They run the original fit with Cook's
-filtering and independent filtering disabled, prepare replacement counts from
-the original Cook's distances, refit the implemented GLM-mu dispersion/MAP
-path on the replacement counts while preserving the original size factors,
-then rerun the relevant Wald or LRT test, merge only `refitReplace` rows into
-the result table, clear result fields for `newAllZero` rows, and finally apply
-the caller's Cook's cutoff and independent filtering to the merged result rows.
+GLM-mu native Wald, Wald contrast, and LRT branches. They run the original fit
+with Cook's filtering and independent filtering disabled, prepare replacement
+counts from the original Cook's distances, refit the implemented GLM-mu
+dispersion/MAP path on the replacement counts while preserving the original
+size factors, then rerun the relevant Wald, Wald contrast, or LRT test, merge
+only `refitReplace` rows into the result table, clear result fields for
+`newAllZero` rows, and finally apply the caller's Cook's cutoff and independent
+filtering to the merged result rows.
 
 Automatic R formula/colData dispatch for the two-group low-count heuristic,
-contrast-aware replacement, beta-prior behavior, and Bioconductor
+remaining contrast edge cases, beta-prior behavior, and Bioconductor
 assay/metadata preservation are not implemented yet.
 
 ## Independent Filtering
@@ -1120,14 +1124,19 @@ All-zero genes are expanded with missing numeric values (`NaN` internally),
 following DESeq2's missing-row expansion convention. The implemented MAP path
 adds the log-dispersion prior, deterministic prior variance, and weighted
 optimizer support. The GLM-mu builder path can pass normalized observation
-weights through gene-wise dispersion, MAP, and native Wald stages; the current
+weights through gene-wise dispersion, MAP, and native Wald/LRT stages; the current
 native linear-mu branch is still no-weight. The line-search diagnostics now
 record the final first and second derivatives (`last_dlp` and `last_d2lp`) for
 DESeq2-style curvature checks, and high-level fit states retain the gene-wise
 iteration counts as `dispGeneIter`-compatible diagnostics. The current weighted
-GLM-mu mean-trend MAP/Wald/LRT branch has DESeq2 golden references; broader
-full parity still requires exact local trend edge-case coverage, glmGamPoi
-trend support, and remaining edge-case coverage.
+GLM-mu mean and local-trend MAP/Wald/LRT branches have DESeq2 golden
+references, including compact result-table and BH-adjusted p-value checks for
+the matched result rows. The unweighted GLM-mu Cox-Reid local-trend branch has
+a MAP dispersion anchor. Broader full parity still requires exact local
+`locfit` identity, glmGamPoi trend support, and remaining edge-case coverage.
+The local smoother now treats a single usable local-fit row as a constant
+log-dispersion trend, matching the generated tiny GLM-mu local fixture instead
+of failing on zero tricube neighborhood weight.
 
 The full-model beta and standard error for a selected coefficient are reported
 alongside the model-level LRT statistic and p-value, matching the shape of

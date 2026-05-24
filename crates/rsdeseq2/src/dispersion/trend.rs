@@ -799,6 +799,15 @@ fn local_polynomial_predict(
             reason: "no local dispersion fit rows are available".to_string(),
         });
     }
+    if xs.len() == 1 {
+        return ys
+            .first()
+            .copied()
+            .filter(|value| value.is_finite())
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "single-row local dispersion trend value must be finite".to_string(),
+            });
+    }
 
     validate_sorted_local_means(xs)?;
     let degree = degree.min(2).min(xs.len().saturating_sub(1));
@@ -825,12 +834,17 @@ fn local_polynomial_predict(
         }
     }
     if denominator > 0.0 {
-        Ok(numerator / denominator)
-    } else {
-        Err(DeseqError::InvalidDispersion {
+        return Ok(numerator / denominator);
+    }
+    xs.iter()
+        .copied()
+        .zip(ys.iter().copied())
+        .min_by(|(left_x, _), (right_x, _)| (left_x - x0).abs().total_cmp(&(right_x - x0).abs()))
+        .map(|(_, y)| y)
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| DeseqError::InvalidDispersion {
             reason: "local dispersion trend has zero usable neighborhood weight".to_string(),
         })
-    }
 }
 
 fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {

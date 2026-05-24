@@ -336,6 +336,105 @@ fn native_linear_mu_parametric_wald_matches_fixed_pipeline_when_reusing_final_di
 }
 
 #[test]
+fn native_linear_mu_wald_contrast_matches_fixed_pipeline_when_reusing_final_dispersions() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = native_wald_builder().fit_type(FitType::Mean);
+    let contrast = [0.0, 1.0];
+
+    let (native_fit, native_results) = builder
+        .fit_wald_linear_mu_contrast(&counts, &design, &contrast)
+        .unwrap();
+    let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
+    let (fixed_fit, fixed_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &final_dispersions, &contrast)
+        .unwrap();
+
+    assert!(native_fit.disp_prior_var.unwrap().is_finite());
+    assert_eq!(
+        native_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        native_results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+    assert_eq!(native_fit.wald, fixed_fit.wald);
+
+    for gene in 0..counts.n_genes() {
+        let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
+        let fixed_disp = fixed_fit.dispersion.as_ref().unwrap()[gene];
+        if native_disp.is_nan() {
+            assert!(fixed_disp.is_nan());
+        } else {
+            assert_relative_eq!(native_disp, fixed_disp, epsilon = 1e-12);
+        }
+        assert_eq!(
+            native_results.rows[gene].pvalue,
+            fixed_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            native_results.rows[gene].padj,
+            fixed_results.rows[gene].padj
+        );
+        assert_eq!(
+            native_results.rows[gene].log2_fold_change,
+            fixed_results.rows[gene].log2_fold_change
+        );
+    }
+}
+
+#[test]
+fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = native_wald_builder().fit_type(FitType::Mean);
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (_named_fit, named_results) = builder
+        .fit_wald_linear_mu_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+    let (_factor_fit, factor_results) = builder
+        .fit_wald_linear_mu_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+
+    assert_eq!(
+        named_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        named_results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+    for (named, factor) in named_results.rows.iter().zip(factor_results.rows.iter()) {
+        assert_eq!(named.log2_fold_change, factor.log2_fold_change);
+        assert_eq!(named.lfc_se, factor.lfc_se);
+        assert_eq!(named.stat, factor.stat);
+        assert_eq!(named.pvalue, factor.pvalue);
+        assert_eq!(named.padj, factor.padj);
+    }
+}
+
+#[test]
 fn native_linear_mu_generic_mean_wald_runs_through_map_and_glm() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
@@ -509,6 +608,105 @@ fn native_glm_mu_parametric_wald_matches_fixed_pipeline_when_reusing_final_dispe
             native_results.rows[gene].log2_fold_change,
             fixed_results.rows[gene].log2_fold_change
         );
+    }
+}
+
+#[test]
+fn native_glm_mu_wald_contrast_matches_fixed_pipeline_when_reusing_final_dispersions() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+    let contrast = [0.0, 1.0];
+
+    let (native_fit, native_results) = builder
+        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
+        .unwrap();
+    let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
+    let (fixed_fit, fixed_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &final_dispersions, &contrast)
+        .unwrap();
+
+    assert!(native_fit.disp_prior_var.unwrap().is_finite());
+    assert_eq!(
+        native_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        native_results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+    assert_eq!(native_fit.wald, fixed_fit.wald);
+
+    for gene in 0..counts.n_genes() {
+        let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
+        let fixed_disp = fixed_fit.dispersion.as_ref().unwrap()[gene];
+        if native_disp.is_nan() {
+            assert!(fixed_disp.is_nan());
+        } else {
+            assert_relative_eq!(native_disp, fixed_disp, epsilon = 1e-12);
+        }
+        assert_eq!(
+            native_results.rows[gene].pvalue,
+            fixed_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            native_results.rows[gene].padj,
+            fixed_results.rows[gene].padj
+        );
+        assert_eq!(
+            native_results.rows[gene].log2_fold_change,
+            fixed_results.rows[gene].log2_fold_change
+        );
+    }
+}
+
+#[test]
+fn native_glm_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (_named_fit, named_results) = builder
+        .fit_wald_glm_mu_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+    let (_factor_fit, factor_results) = builder
+        .fit_wald_glm_mu_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+
+    assert_eq!(
+        named_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        named_results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+    for (named, factor) in named_results.rows.iter().zip(factor_results.rows.iter()) {
+        assert_eq!(named.log2_fold_change, factor.log2_fold_change);
+        assert_eq!(named.lfc_se, factor.lfc_se);
+        assert_eq!(named.stat, factor.stat);
+        assert_eq!(named.pvalue, factor.pvalue);
+        assert_eq!(named.padj, factor.padj);
     }
 }
 
@@ -765,6 +963,149 @@ fn native_glm_mu_cooks_replacement_refit_merges_refit_rows() {
         assert_eq!(output.results.rows[gene].log2_fold_change, None);
         assert_eq!(output.results.rows[gene].dispersion, None);
     }
+}
+
+#[test]
+fn native_glm_mu_contrast_cooks_replacement_refit_merges_refit_rows() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let contrast = [0.0, 1.0];
+
+    let output = builder
+        .fit_wald_glm_mu_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: 0.0,
+                min_replicates: 3,
+                which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+            },
+        )
+        .unwrap();
+
+    assert!(output.refit_plan.n_refit > 0);
+    assert!(output.refit_plan.should_refit);
+    assert!(output.refit_fit.is_some());
+    assert!(output.refit_results.is_some());
+    assert_ne!(
+        output.refit_plan.replacement.replaced_counts.as_slice(),
+        counts.as_slice()
+    );
+    assert_eq!(
+        output.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        output.results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+
+    let refit_results = output.refit_results.as_ref().unwrap();
+    for gene in output.refit_plan.refit_rows.iter().copied() {
+        assert_eq!(
+            output.results.rows[gene].log2_fold_change,
+            refit_results.rows[gene].log2_fold_change
+        );
+        assert_eq!(
+            output.results.rows[gene].pvalue,
+            refit_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            output.results.rows[gene].max_cooks,
+            output.refit_plan.post_refit_max_cooks[gene]
+        );
+        assert_relative_eq!(
+            output.results.rows[gene].base_mean,
+            output.refit_plan.replaced_base_mean[gene],
+            epsilon = 1e-12
+        );
+    }
+    for gene in output.refit_plan.new_all_zero_rows.iter().copied() {
+        assert_eq!(output.results.rows[gene].pvalue, None);
+        assert_eq!(output.results.rows[gene].log2_fold_change, None);
+        assert_eq!(output.results.rows[gene].dispersion, None);
+    }
+}
+
+#[test]
+fn native_glm_mu_contrast_spec_cooks_replacement_preserves_metadata() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+
+    let output = builder
+        .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: f64::MAX,
+                min_replicates: 3,
+                which_samples: None,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(output.refit_plan.n_refit, 0);
+    assert!(output.refit_fit.is_none());
+    assert!(output.refit_results.is_none());
+    assert_eq!(
+        output.original_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+}
+
+#[test]
+fn native_glm_mu_factor_level_contrast_cooks_replacement_preserves_metadata() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let output = builder
+        .fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: f64::MAX,
+                min_replicates: 3,
+                which_samples: None,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(output.refit_plan.n_refit, 0);
+    assert!(output.refit_fit.is_none());
+    assert!(output.refit_results.is_none());
+    assert_eq!(
+        output.original_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
 }
 
 #[test]
