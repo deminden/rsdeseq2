@@ -150,9 +150,16 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] DESeq2-style beta-prior variance estimation for primitive MLE beta
   matrices, including quantile and weighted quantile methods, finite-beta
   filtering, and wide intercept priors.
+- [x] DESeq2 `estimateBetaPriorVar` fixture checks for primitive beta-prior
+  variance estimation on supplied-dispersion MLE beta matrices.
+- [x] DESeq2 beta-prior ridge refit fixture checks for supplied-dispersion GLM
+  betas, SEs, log-likelihoods, fitted means, and hat diagonals.
+- [x] Combined estimated-prior beta refit fixture check that runs MLE fitting,
+  estimates beta-prior variance, and compares the refit against DESeq2 anchors.
 - [x] Primitive beta-prior GLM refit using supplied or estimated log2-scale
   beta-prior variances, with DESeq2's `1 / betaPriorVar / log(2)^2`
-  natural-log ridge conversion.
+  natural-log ridge conversion, including size-factor, normalization-factor,
+  and observation-weight fixed-dispersion GLM inputs.
 - [ ] Expanded model-matrix beta-prior averaging, high-level beta-prior
   workflow plumbing, and DESeq2-style contrast numerator/denominator
   construction.
@@ -173,7 +180,7 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] DESeq2-style full-model deviance diagnostic (`-2 * logLike`) in
   `DeseqFit` for GLM-backed pipelines.
 - [x] LRT fit-state diagnostics for reduced-model log likelihood, beta
-  convergence, and beta iteration counts.
+  convergence, beta iteration counts, fitted means, and hat diagonals.
 - [x] Gene/sample normalization factors as GLM offsets for supplied-dispersion
   fixed Wald/LRT pipelines.
 - [x] All-zero row expansion for the supplied-dispersion Wald/LRT pipelines, using
@@ -204,6 +211,9 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add typed data-frame assembly for present `mcols(dds)`-style diagnostic
   aliases.
 - [x] Add TSV export for present `mcols(dds)`-style diagnostic aliases.
+- [x] Keep matrix-valued GLM diagnostics (`mu`, hats, and reduced-model
+  matrices) as explicit `DeseqFit` fields rather than `mcols(dds)` row
+  metadata columns.
 - [x] Add primitive result-table metadata carrier for test type, reported
   coefficient/contrast, column descriptions, p-value adjustment method, and
   independent-filtering metadata.
@@ -323,6 +333,12 @@ reference; no DESeq2 source is vendored or translated line by line.
   current weighted GLM-mu local-trend fixture.
 - [x] Assert MAP dispersion intermediate parity for the current unweighted
   GLM-mu Cox-Reid local-trend fixture.
+- [x] Assert MAP dispersion intermediate parity for the current weighted
+  GLM-mu Cox-Reid local-trend fixture.
+- [x] Assert compact Wald/LRT result-row parity for the current unweighted and
+  weighted GLM-mu Cox-Reid local-trend fixtures.
+- [x] Assert detailed Wald/LRT intermediate parity for GLM-mu Cox-Reid
+  local-trend fixtures beyond the compact public result rows.
 - [x] Add native GLM-mu Wald contrast entry points that reuse MAP dispersions,
   including numeric, coefficient-name/list, and primitive factor-level
   contrast metadata paths.
@@ -346,6 +362,10 @@ reference; no DESeq2 source is vendored or translated line by line.
   workflow, using the last design coefficient by default.
 - [x] Add top-level Wald result-table workflow via
   `DeseqBuilder::fit_with_results()`.
+- [x] Add top-level GLM-mu Wald result-table workflow for primitive numeric,
+  named/list, and caller-supplied factor-level contrasts.
+- [x] Add fit-only top-level GLM-mu Wald contrast helpers mirroring the
+  result-table contrast routes.
 - [ ] Generalize the native Wald pipeline to DESeq2's full dispersion and GLM
   fitting behavior.
 - [ ] Keep mature R wrapper workflow exposure deferred until the Rust pipeline
@@ -390,6 +410,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
   including primitive numeric, named/list, and caller-supplied factor-level
   contrast routes.
+- [x] Top-level GLM-mu Wald/LRT result helpers for limited Cook's replacement
+  refit, including default coefficient and primitive contrast result routes.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
   refit for beta priors, wrapper object metadata, and remaining contrast edge
   cases.
@@ -472,10 +494,9 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Automatic VST trend-source metadata recording fast-subset vs full-data
   trend fitting, requested `nsub`, and eligible-row count.
 - [x] Accessor helpers for automatic VST trend-source metadata.
-- [x] Automatic VST weighted-input guard that selects the full-data Rust trend
-  path while weighted fast-subset trend fitting remains unsupported.
-- [x] Full-data automatic VST reason metadata for insufficient eligible rows
-  versus observation-weighted input.
+- [x] Automatic VST fast-subset trend fitting with observation weights carried
+  through the deterministic row subset.
+- [x] Full-data automatic VST reason metadata for insufficient eligible rows.
 - [x] Stable string labels for automatic VST trend-source and full-data reason
   metadata.
 - [x] Automatic VST output metadata view with source labels, subset sizing,

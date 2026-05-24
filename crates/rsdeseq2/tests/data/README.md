@@ -18,17 +18,27 @@ Reference files should record:
 - `results_wald_ratio.tsv` for future full-pipeline parity.
 - `fixed_dispersions.tsv`, `fixed_wald_reference.tsv`,
   `fixed_wald_t_reference.tsv`, `fixed_wald_weighted_reference.tsv`,
-  `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`, and
-  `fixed_cooks_full.tsv` for the current supplied-dispersion GLM parity checks,
-  plus `fixed_lrt_weighted_reference.tsv` for weighted LRT parity.
-- `fixed_force_optim_wald_reference.tsv` and `fixed_force_optim_mu_full.tsv`
-  for the forced bounded-optimizer GLM fallback reference path.
+  `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`,
+  `fixed_mu_reduced.tsv`, `fixed_hat_reduced.tsv`, and `fixed_cooks_full.tsv`
+  for the current supplied-dispersion GLM parity checks, plus
+  `fixed_lrt_weighted_reference.tsv`, `fixed_weighted_mu_reduced.tsv`, and
+  `fixed_weighted_hat_reduced.tsv` for weighted LRT parity.
+- `beta_prior_variance_reference.tsv` for DESeq2 `estimateBetaPriorVar`
+  weighted and quantile beta-prior variance anchors from the supplied-dispersion
+  MLE beta matrix.
+- `beta_prior_refit_reference.tsv`, `beta_prior_refit_mu.tsv`, and
+  `beta_prior_refit_hat.tsv` for supplied-dispersion GLM refits with
+  DESeq2-style beta-prior ridge values.
+- `fixed_force_optim_wald_reference.tsv`, `fixed_force_optim_mu_full.tsv`,
+  and `fixed_force_optim_hat_full.tsv` for the forced bounded-optimizer GLM
+  fallback reference path.
 - `observation_weights.tsv`, `observation_weights_normalized.tsv`,
   `base_metadata_weighted.tsv` for weighted metadata checks.
 - `native_glm_mu_cr_reference.tsv`, `native_glm_mu_cr_dispersion_mu.tsv`,
   `native_glm_mu_mean_reference.tsv`, `native_glm_mu_mean_lrt_reference.tsv`,
   `native_glm_mu_mean_dispersion_mu.tsv`, `native_glm_mu_mean_wald_mu.tsv`,
-  `native_glm_mu_mean_wald_hat.tsv`, `native_glm_mu_mean_cr_map_reference.tsv`,
+  `native_glm_mu_mean_wald_hat.tsv`,
+  `native_glm_mu_mean_cr_map_reference.tsv`,
   `native_glm_mu_mean_cr_lrt_reference.tsv`,
   `native_glm_mu_mean_cr_map_dispersion_mu.tsv`,
   `native_glm_mu_mean_cr_wald_mu.tsv`, and
@@ -49,9 +59,14 @@ Reference files should record:
   `native_glm_mu_local_results_lrt.tsv` for the current unweighted GLM-mu
   local-trend MAP/Wald/LRT intermediate and result-table branch, including
   the single-usable-row local fit edge case.
-- `native_glm_mu_local_cr_map_reference.tsv` and
-  `native_glm_mu_local_cr_map_dispersion_mu.tsv` for the current unweighted
-  GLM-mu Cox-Reid local-trend MAP intermediate.
+- `native_glm_mu_local_cr_map_reference.tsv`,
+  `native_glm_mu_local_cr_lrt_reference.tsv`,
+  `native_glm_mu_local_cr_map_dispersion_mu.tsv`,
+  `native_glm_mu_local_cr_wald_mu.tsv`,
+  `native_glm_mu_local_cr_wald_hat.tsv`,
+  `native_glm_mu_local_cr_results_wald.tsv`, and
+  `native_glm_mu_local_cr_results_lrt.tsv` for the current unweighted GLM-mu
+  Cox-Reid local-trend MAP/Wald/LRT intermediates and compact result rows.
 - `native_weighted_glm_mu_reference.tsv`,
   `native_weighted_glm_mu_lrt_reference.tsv`,
   `native_weighted_glm_mu_dispersion_mu.tsv`,
@@ -81,6 +96,15 @@ Reference files should record:
   `native_weighted_glm_mu_local_results_lrt.tsv` for weighted GLM-mu
   local-trend MAP/Wald/LRT intermediate and result-table checks, including
   `weightsFail` row expansion.
+- `native_weighted_glm_mu_local_cr_map_reference.tsv`,
+  `native_weighted_glm_mu_local_cr_lrt_reference.tsv`,
+  `native_weighted_glm_mu_local_cr_map_dispersion_mu.tsv`,
+  `native_weighted_glm_mu_local_cr_wald_mu.tsv`,
+  `native_weighted_glm_mu_local_cr_wald_hat.tsv`,
+  `native_weighted_glm_mu_local_cr_results_wald.tsv`, and
+  `native_weighted_glm_mu_local_cr_results_lrt.tsv` for the current weighted
+  GLM-mu Cox-Reid local-trend MAP/Wald/LRT intermediates and compact result
+  rows, including `weightsFail` row expansion.
 - `parametric_trend_reference.tsv`,
   `parametric_trend_prediction_reference.tsv`, `mean_trend_reference.tsv`,
   `local_trend_reference.tsv`, `local_trend_prediction_reference.tsv`,
@@ -108,4 +132,5 @@ references.
 By default, `scripts/generate_deseq2_references.R` writes fixtures expected to
 pass today, including weighted fixed-dispersion Wald/LRT, the current weighted
 GLM-mu mean and local-trend MAP/Wald/LRT branches with matched result-row
-adjusted p-values, and the unweighted GLM-mu Cox-Reid local-trend MAP anchor.
+adjusted p-values, and unweighted/weighted GLM-mu Cox-Reid local-trend
+MAP/Wald/LRT anchors.

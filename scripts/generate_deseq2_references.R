@@ -163,7 +163,6 @@ build_glm_mu_reference <- function(dds_input, fit_type, use_cr) {
   lrt_df <- ncol(full_design) - ncol(reduced_design)
   lrt_pvalue_nz <- stats::pchisq(lrt_stat_nz, df = lrt_df, lower.tail = FALSE)
   lrt_padj_nz <- stats::p.adjust(lrt_pvalue_nz, method = "BH")
-
   list(
     row_meta = row_meta,
     weights_fail = weights_fail,
@@ -246,6 +245,7 @@ metadata <- data.frame(
     "platform",
     "reference_fixture",
     "fixed_glm_reference_mode",
+    "beta_prior_reference_mode",
     "normalization_factors_reference_mode",
     "native_nf_dispersion_reference_mode",
     "fixed_glm_force_optim_reference_mode",
@@ -259,6 +259,7 @@ metadata <- data.frame(
     "native_glm_mu_local_reference_mode",
     "native_glm_mu_local_cr_map_reference_mode",
     "native_weighted_glm_mu_local_reference_mode",
+    "native_weighted_glm_mu_local_cr_map_reference_mode",
     "dispersion_trend_reference_mode",
     "dispersion_prior_reference_mode",
     "map_dispersion_reference_mode"
@@ -270,6 +271,7 @@ metadata <- data.frame(
     R.version$platform,
     "tiny_two_group_four_gene",
     "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=FALSE",
+    "DESeq2:::estimateBetaPriorVar from supplied-dispersion MLE betas with weighted and quantile methods",
     "counts(dds, normalized=TRUE) with normalizationFactors(dds), which preempt sizeFactors(dds)",
     "DESeq2 roughDispEstimate, momentsDispEstimate, and estimateDispersionsGeneEst stored mu with normalizationFactors(dds)",
     "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=TRUE, forceOptim=TRUE",
@@ -283,6 +285,7 @@ metadata <- data.frame(
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='local'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) without observation weights",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE), estimateDispersionsFit(fitType='local'), and estimateDispersionsMAP(useCR=TRUE) without observation weights",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='local'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights",
+    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE), estimateDispersionsFit(fitType='local'), and estimateDispersionsMAP(useCR=TRUE) with observation weights",
     "parametricDispersionFit, estimateDispersionsFit(fitType='mean'), and localDispersionFit fixtures including prediction and threshold edge cases",
     "estimateDispersionsPriorVar high-df and low-df fixtures; low-df uses DESeq2's seeded Monte Carlo/R loess branch",
     "DESeq2:::fitDisp MAP dispersion fixture with explicit prior and Cox-Reid settings"
@@ -1500,10 +1503,60 @@ if (!is.null(native_glm_mu_local_cr_map_reference)) {
     native_glm_mu_local_cr_map_rows,
     file.path(data_dir, "native_glm_mu_local_cr_map_reference.tsv")
   )
+  write_result_reference(
+    native_glm_mu_local_cr_map_reference,
+    "native_glm_mu_local_cr_results_wald.tsv",
+    "Wald"
+  )
+  native_glm_mu_local_cr_lrt_rows <- data.frame(
+    gene = rownames(counts),
+    baseMean = native_glm_mu_local_cr_map_reference$row_meta$baseMean,
+    baseVar = native_glm_mu_local_cr_map_reference$row_meta$baseVar,
+    allZero = native_glm_mu_local_cr_map_reference$row_meta$allZero,
+    dispGeneEst = native_glm_mu_local_cr_map_reference$row_meta$dispGeneEst,
+    dispGeneIter = native_glm_mu_local_cr_map_reference$row_meta$dispGeneIter,
+    dispFit = native_glm_mu_local_cr_map_reference$row_meta$dispFit,
+    dispMAP = native_glm_mu_local_cr_map_reference$row_meta$dispMAP,
+    dispersion = native_glm_mu_local_cr_map_reference$row_meta$dispersion,
+    beta_intercept = native_glm_mu_local_cr_map_reference$beta_intercept,
+    beta_conditionB = native_glm_mu_local_cr_map_reference$beta_conditionB,
+    beta_se_intercept = native_glm_mu_local_cr_map_reference$beta_se_intercept,
+    beta_se_conditionB = native_glm_mu_local_cr_map_reference$beta_se_conditionB,
+    log_like_full = native_glm_mu_local_cr_map_reference$log_like,
+    log_like_reduced = native_glm_mu_local_cr_map_reference$reduced_log_like,
+    lrt_stat = native_glm_mu_local_cr_map_reference$lrt_stat,
+    pvalue = native_glm_mu_local_cr_map_reference$lrt_pvalue,
+    padj = native_glm_mu_local_cr_map_reference$lrt_padj,
+    df = native_glm_mu_local_cr_map_reference$lrt_df,
+    full_converged = native_glm_mu_local_cr_map_reference$beta_converged,
+    reduced_converged = native_glm_mu_local_cr_map_reference$reduced_beta_converged,
+    full_iterations = native_glm_mu_local_cr_map_reference$beta_iterations,
+    reduced_iterations = native_glm_mu_local_cr_map_reference$reduced_beta_iterations,
+    check.names = FALSE
+  )
+  write_tsv(
+    native_glm_mu_local_cr_lrt_rows,
+    file.path(data_dir, "native_glm_mu_local_cr_lrt_reference.tsv")
+  )
+  write_result_reference(
+    native_glm_mu_local_cr_map_reference,
+    "native_glm_mu_local_cr_results_lrt.tsv",
+    "LRT"
+  )
   write_matrix_tsv(
     native_glm_mu_local_cr_map_reference$dispersion_mu,
     "gene",
     file.path(data_dir, "native_glm_mu_local_cr_map_dispersion_mu.tsv")
+  )
+  write_matrix_tsv(
+    native_glm_mu_local_cr_map_reference$wald_mu,
+    "gene",
+    file.path(data_dir, "native_glm_mu_local_cr_wald_mu.tsv")
+  )
+  write_matrix_tsv(
+    native_glm_mu_local_cr_map_reference$wald_hat,
+    "gene",
+    file.path(data_dir, "native_glm_mu_local_cr_wald_hat.tsv")
   )
 }
 
@@ -1601,6 +1654,103 @@ if (!is.null(native_weighted_glm_mu_local_reference)) {
     native_weighted_glm_mu_local_reference$wald_hat,
     "gene",
     file.path(data_dir, "native_weighted_glm_mu_local_wald_hat.tsv")
+  )
+}
+
+native_weighted_glm_mu_local_cr_map_reference <- tryCatch({
+  build_glm_mu_reference(dds_weighted, "local", TRUE)
+}, error = function(error) {
+  writeLines(conditionMessage(error), file.path(data_dir, "native_weighted_glm_mu_local_cr_map_reference_error.txt"))
+  NULL
+})
+
+if (!is.null(native_weighted_glm_mu_local_cr_map_reference)) {
+  native_weighted_glm_mu_local_cr_map_rows <- data.frame(
+    gene = rownames(counts),
+    baseMean = native_weighted_glm_mu_local_cr_map_reference$row_meta$baseMean,
+    baseVar = native_weighted_glm_mu_local_cr_map_reference$row_meta$baseVar,
+    allZero = native_weighted_glm_mu_local_cr_map_reference$row_meta$allZero,
+    weightsFail = native_weighted_glm_mu_local_cr_map_reference$weights_fail,
+    dispGeneEst = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispGeneEst,
+    dispGeneIter = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispGeneIter,
+    dispFit = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispFit,
+    dispPriorVar = native_weighted_glm_mu_local_cr_map_reference$disp_prior_var,
+    varLogDispEsts = native_weighted_glm_mu_local_cr_map_reference$var_log_disp_estimates,
+    dispMAP = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispMAP,
+    dispersion = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispersion,
+    dispIter = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispIter,
+    dispOutlier = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispOutlier,
+    beta_intercept = native_weighted_glm_mu_local_cr_map_reference$beta_intercept,
+    beta_conditionB = native_weighted_glm_mu_local_cr_map_reference$beta_conditionB,
+    beta_se_intercept = native_weighted_glm_mu_local_cr_map_reference$beta_se_intercept,
+    beta_se_conditionB = native_weighted_glm_mu_local_cr_map_reference$beta_se_conditionB,
+    stat_conditionB = native_weighted_glm_mu_local_cr_map_reference$stat_conditionB,
+    pvalue_conditionB = native_weighted_glm_mu_local_cr_map_reference$pvalue_conditionB,
+    padj_conditionB = native_weighted_glm_mu_local_cr_map_reference$padj_conditionB,
+    log_like = native_weighted_glm_mu_local_cr_map_reference$log_like,
+    beta_converged = native_weighted_glm_mu_local_cr_map_reference$beta_converged,
+    beta_iterations = native_weighted_glm_mu_local_cr_map_reference$beta_iterations,
+    check.names = FALSE
+  )
+  write_tsv(
+    native_weighted_glm_mu_local_cr_map_rows,
+    file.path(data_dir, "native_weighted_glm_mu_local_cr_map_reference.tsv")
+  )
+  write_result_reference(
+    native_weighted_glm_mu_local_cr_map_reference,
+    "native_weighted_glm_mu_local_cr_results_wald.tsv",
+    "Wald"
+  )
+  native_weighted_glm_mu_local_cr_lrt_rows <- data.frame(
+    gene = rownames(counts),
+    baseMean = native_weighted_glm_mu_local_cr_map_reference$row_meta$baseMean,
+    baseVar = native_weighted_glm_mu_local_cr_map_reference$row_meta$baseVar,
+    allZero = native_weighted_glm_mu_local_cr_map_reference$row_meta$allZero,
+    weightsFail = native_weighted_glm_mu_local_cr_map_reference$weights_fail,
+    dispGeneEst = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispGeneEst,
+    dispGeneIter = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispGeneIter,
+    dispFit = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispFit,
+    dispMAP = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispMAP,
+    dispersion = native_weighted_glm_mu_local_cr_map_reference$row_meta$dispersion,
+    beta_intercept = native_weighted_glm_mu_local_cr_map_reference$beta_intercept,
+    beta_conditionB = native_weighted_glm_mu_local_cr_map_reference$beta_conditionB,
+    beta_se_intercept = native_weighted_glm_mu_local_cr_map_reference$beta_se_intercept,
+    beta_se_conditionB = native_weighted_glm_mu_local_cr_map_reference$beta_se_conditionB,
+    log_like_full = native_weighted_glm_mu_local_cr_map_reference$log_like,
+    log_like_reduced = native_weighted_glm_mu_local_cr_map_reference$reduced_log_like,
+    lrt_stat = native_weighted_glm_mu_local_cr_map_reference$lrt_stat,
+    pvalue = native_weighted_glm_mu_local_cr_map_reference$lrt_pvalue,
+    padj = native_weighted_glm_mu_local_cr_map_reference$lrt_padj,
+    df = native_weighted_glm_mu_local_cr_map_reference$lrt_df,
+    full_converged = native_weighted_glm_mu_local_cr_map_reference$beta_converged,
+    reduced_converged = native_weighted_glm_mu_local_cr_map_reference$reduced_beta_converged,
+    full_iterations = native_weighted_glm_mu_local_cr_map_reference$beta_iterations,
+    reduced_iterations = native_weighted_glm_mu_local_cr_map_reference$reduced_beta_iterations,
+    check.names = FALSE
+  )
+  write_tsv(
+    native_weighted_glm_mu_local_cr_lrt_rows,
+    file.path(data_dir, "native_weighted_glm_mu_local_cr_lrt_reference.tsv")
+  )
+  write_result_reference(
+    native_weighted_glm_mu_local_cr_map_reference,
+    "native_weighted_glm_mu_local_cr_results_lrt.tsv",
+    "LRT"
+  )
+  write_matrix_tsv(
+    native_weighted_glm_mu_local_cr_map_reference$dispersion_mu,
+    "gene",
+    file.path(data_dir, "native_weighted_glm_mu_local_cr_map_dispersion_mu.tsv")
+  )
+  write_matrix_tsv(
+    native_weighted_glm_mu_local_cr_map_reference$wald_mu,
+    "gene",
+    file.path(data_dir, "native_weighted_glm_mu_local_cr_wald_mu.tsv")
+  )
+  write_matrix_tsv(
+    native_weighted_glm_mu_local_cr_map_reference$wald_hat,
+    "gene",
+    file.path(data_dir, "native_weighted_glm_mu_local_cr_wald_hat.tsv")
   )
 }
 
@@ -2128,6 +2278,79 @@ fixed_reference <- tryCatch({
 if (!is.null(fixed_reference)) {
   full_fit <- fixed_reference$full_fit
   reduced_fit <- fixed_reference$reduced_fit
+  dds_beta_prior <- dds_ratio
+  dds_beta_prior <- DESeq2::`dispersions<-`(dds_beta_prior, value = fixed_dispersions)
+  attr(dds_beta_prior, "modelMatrixType") <- "standard"
+  beta_prior_mcols <- S4Vectors::mcols(dds_beta_prior)
+  beta_prior_mcols$dispersion <- fixed_dispersions
+  beta_prior_mcols$allZero <- rowSums(counts) == 0
+  beta_prior_mcols$baseMean <- base_mean
+  beta_prior_mcols$dispFit <- fixed_dispersions
+  for (coefficient in seq_len(ncol(full_fit$betaMatrix))) {
+    beta_prior_mcols[[paste0("MLE_", colnames(full_fit$betaMatrix)[coefficient])]] <-
+      full_fit$betaMatrix[, coefficient]
+  }
+  dds_beta_prior <- S4Vectors::`mcols<-`(dds_beta_prior, value = beta_prior_mcols)
+  beta_prior_weighted <- DESeq2:::estimateBetaPriorVar(
+    dds_beta_prior,
+    betaPriorMethod = "weighted",
+    upperQuantile = 0.05,
+    modelMatrix = full_design
+  )
+  beta_prior_quantile <- DESeq2:::estimateBetaPriorVar(
+    dds_beta_prior,
+    betaPriorMethod = "quantile",
+    upperQuantile = 0.05,
+    modelMatrix = full_design
+  )
+  beta_prior_refit <- DESeq2:::fitNbinomGLMs(
+    dds_beta_prior,
+    modelMatrix = full_design,
+    lambda = 1 / beta_prior_weighted,
+    renameCols = FALSE,
+    betaTol = 1e-8,
+    maxit = 100,
+    useOptim = FALSE,
+    useQR = FALSE,
+    warnNonposVar = FALSE,
+    minmu = 0.5
+  )
+
+  write_tsv(
+    data.frame(
+      coefficient = names(beta_prior_weighted),
+      weighted = as.numeric(beta_prior_weighted),
+      quantile = as.numeric(beta_prior_quantile),
+      check.names = FALSE
+    ),
+    file.path(data_dir, "beta_prior_variance_reference.tsv")
+  )
+  write_tsv(
+    data.frame(
+      gene = rownames(counts),
+      beta_intercept = beta_prior_refit$betaMatrix[, 1],
+      beta_conditionB = beta_prior_refit$betaMatrix[, 2],
+      beta_se_intercept = beta_prior_refit$betaSE[, 1],
+      beta_se_conditionB = beta_prior_refit$betaSE[, 2],
+      log_like = beta_prior_refit$logLike,
+      converged = beta_prior_refit$betaConv,
+      iterations = beta_prior_refit$betaIter,
+      check.names = FALSE
+    ),
+    file.path(data_dir, "beta_prior_refit_reference.tsv")
+  )
+  dimnames(beta_prior_refit$mu) <- dimnames(counts)
+  dimnames(beta_prior_refit$hat_diagonals) <- dimnames(counts)
+  write_matrix_tsv(
+    beta_prior_refit$mu,
+    "gene",
+    file.path(data_dir, "beta_prior_refit_mu.tsv")
+  )
+  write_matrix_tsv(
+    beta_prior_refit$hat_diagonals,
+    "gene",
+    file.path(data_dir, "beta_prior_refit_hat.tsv")
+  )
 
   write_tsv(
     data.frame(
@@ -2181,6 +2404,18 @@ if (!is.null(fixed_reference)) {
 
   write_matrix_tsv(full_fit$mu, "gene", file.path(data_dir, "fixed_mu_full.tsv"))
   write_matrix_tsv(full_fit$hat_diagonals, "gene", file.path(data_dir, "fixed_hat_full.tsv"))
+  dimnames(reduced_fit$mu) <- dimnames(counts)
+  dimnames(reduced_fit$hat_diagonals) <- dimnames(counts)
+  write_matrix_tsv(
+    reduced_fit$mu,
+    "gene",
+    file.path(data_dir, "fixed_mu_reduced.tsv")
+  )
+  write_matrix_tsv(
+    reduced_fit$hat_diagonals,
+    "gene",
+    file.path(data_dir, "fixed_hat_reduced.tsv")
+  )
   write_matrix_tsv(fixed_reference$cooks, "gene", file.path(data_dir, "fixed_cooks_full.tsv"))
 }
 
@@ -2239,6 +2474,12 @@ if (!is.null(fixed_force_optim_reference)) {
     file.path(data_dir, "fixed_force_optim_wald_reference.tsv")
   )
   write_matrix_tsv(full_fit$mu, "gene", file.path(data_dir, "fixed_force_optim_mu_full.tsv"))
+  dimnames(full_fit$hat_diagonals) <- dimnames(counts)
+  write_matrix_tsv(
+    full_fit$hat_diagonals,
+    "gene",
+    file.path(data_dir, "fixed_force_optim_hat_full.tsv")
+  )
 }
 
 weighted_fixed_reference <- tryCatch({
@@ -2299,6 +2540,11 @@ weighted_fixed_reference <- tryCatch({
     expanded[!fixed_all_zero] <- value
     expanded
   }
+  expand_matrix <- function(value) {
+    expanded <- DESeq2:::buildMatrixWithNARows(value, fixed_all_zero)
+    dimnames(expanded) <- dimnames(counts)
+    expanded
+  }
 
   weighted_meta <- S4Vectors::mcols(checked_weighted_fixed)
   weights_fail <- if ("weightsFail" %in% names(weighted_meta)) {
@@ -2326,7 +2572,9 @@ weighted_fixed_reference <- tryCatch({
     iterations = expand_integer(full_fit$betaIter),
     reduced_log_like = expand_numeric(reduced_fit$logLike),
     reduced_converged = expand_logical(reduced_fit$betaConv),
-    reduced_iterations = expand_integer(reduced_fit$betaIter)
+    reduced_iterations = expand_integer(reduced_fit$betaIter),
+    reduced_mu = expand_matrix(reduced_fit$mu),
+    reduced_hat = expand_matrix(reduced_fit$hat_diagonals)
   )
 }, error = function(error) {
   writeLines(conditionMessage(error), file.path(data_dir, "fixed_weighted_glm_reference_error.txt"))
@@ -2378,6 +2626,16 @@ if (!is.null(weighted_fixed_reference)) {
       check.names = FALSE
     ),
     file.path(data_dir, "fixed_lrt_weighted_reference.tsv")
+  )
+  write_matrix_tsv(
+    weighted_fixed_reference$reduced_mu,
+    "gene",
+    file.path(data_dir, "fixed_weighted_mu_reduced.tsv")
+  )
+  write_matrix_tsv(
+    weighted_fixed_reference$reduced_hat,
+    "gene",
+    file.path(data_dir, "fixed_weighted_hat_reduced.tsv")
   )
 }
 session_info <- sub("[[:blank:]]+$", "", capture.output(sessionInfo()))

@@ -77,12 +77,13 @@ pub struct IrlsOptions {
 
 impl Default for IrlsOptions {
     fn default() -> Self {
+        let inv_ln2 = std::f64::consts::LOG2_E;
         Self {
             beta_tol: 1e-8,
             maxit: 100,
             min_mu: 0.5,
             max_beta_abs: 30.0,
-            ridge_lambda: 1e-6 / std::f64::consts::LN_2.powi(2),
+            ridge_lambda: 1e-6 * inv_ln2 * inv_ln2,
             ridge_lambda_by_coefficient: None,
             solver: IrlsSolver::NormalEquations,
             use_optim: false,
@@ -124,7 +125,8 @@ impl IrlsOptions {
         &self,
         p: usize,
     ) -> Result<bool, DeseqError> {
-        let default_nat_log_lambda = 1e-6 / std::f64::consts::LN_2.powi(2);
+        let inv_ln2 = std::f64::consts::LOG2_E;
+        let default_nat_log_lambda = 1e-6 * inv_ln2 * inv_ln2;
         Ok(self
             .ridge_lambdas_for_coefficients(p)?
             .into_iter()
@@ -147,7 +149,8 @@ fn is_intercept_only_design(design: &DesignMatrix) -> bool {
 /// loop. The weighted least-squares update can use either the direct normal
 /// equations branch or DESeq2's augmented QR branch. Observation weights are
 /// supported, and fallback rows can be refit with bounded pure-Rust
-/// optimization. Contrast output remains future work.
+/// optimization. Explicit contrast testing is layered on top of the stored
+/// beta covariance matrices.
 pub fn fit_fixed_dispersion_irls(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -310,10 +313,12 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             let value = beta_covariance[diagonal * p + diagonal];
             beta_var_values.push(std::f64::consts::LOG2_E * value.max(0.0).sqrt());
         }
+        let log2_e = std::f64::consts::LOG2_E;
+        let log2_e_squared = log2_e * log2_e;
         beta_covariance_values.extend(
             beta_covariance
                 .into_iter()
-                .map(|value| std::f64::consts::LOG2_E.powi(2) * value),
+                .map(|value| log2_e_squared * value),
         );
         let output_mu = fitted_mu_unfloored(&x, &beta, nf)?;
         mu_values.extend(output_mu.iter().copied());
@@ -342,6 +347,7 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             &mut beta_var_values,
             &mut beta_covariance_values,
             &mut mu_values,
+            &mut hat_values,
             &mut beta_converged,
             &mut optim_log_like,
             OptimFallbackInput {
@@ -400,6 +406,7 @@ fn refit_optim_fallback_rows(
     beta_var_values: &mut [f64],
     beta_covariance_values: &mut [f64],
     mu_values: &mut [f64],
+    hat_values: &mut [f64],
     beta_converged: &mut [bool],
     optim_log_like: &mut [Option<f64>],
     input: OptimFallbackInput<'_>,
@@ -435,7 +442,7 @@ fn refit_optim_fallback_rows(
             .map(|value| value.max(input.options.min_mu))
             .collect::<Vec<_>>();
         let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
-        let Some((beta_covariance, _hat_diag)) =
+        let Some((beta_covariance, hat_diag)) =
             covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
         else {
             return Err(DeseqError::UnsupportedFeature {
@@ -449,11 +456,16 @@ fn refit_optim_fallback_rows(
             beta_var_values[gene * p + col] =
                 std::f64::consts::LOG2_E * covariance_value.max(0.0).sqrt();
         }
+        let log2_e = std::f64::consts::LOG2_E;
+        let log2_e_squared = log2_e * log2_e;
         for (idx, value) in beta_covariance.into_iter().enumerate() {
-            beta_covariance_values[gene * p * p + idx] = std::f64::consts::LOG2_E.powi(2) * value;
+            beta_covariance_values[gene * p * p + idx] = log2_e_squared * value;
         }
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;
+        }
+        for (sample, value) in hat_diag.into_iter().enumerate() {
+            hat_values[gene * n + sample] = value;
         }
         beta_converged[gene] = output.converged;
         optim_log_like[gene] = Some(nbinom_log_likelihood_weighted(
@@ -547,16 +559,8 @@ fn minimize_beta_log2_newton(
             });
         }
 
-        let Some(direction) = newton_direction(&hessian, &gradient)
-            .or_else(|| Some(gradient.iter().map(|value| -value).collect()))
-        else {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: false,
-                iterations: iter,
-            });
-        };
+        let direction =
+            bounded_beta_descent_direction(&parameters, &hessian, &gradient, lower, upper);
         let directional_derivative = gradient
             .iter()
             .copied()
@@ -590,9 +594,15 @@ fn minimize_beta_log2_newton(
                     iterations: iter + 1,
                 });
             }
+            let actual_directional_derivative =
+                actual_directional_derivative(&parameters, &candidate, &gradient);
+            if !actual_directional_derivative.is_finite() || actual_directional_derivative >= 0.0 {
+                step *= 0.5;
+                continue;
+            }
             let (candidate_value, candidate_gradient, candidate_hessian) =
                 beta_log2_objective_gradient_hessian(&input, &candidate)?;
-            if candidate_value <= value + options.armijo * step * directional_derivative {
+            if candidate_value <= value + options.armijo * actual_directional_derivative {
                 accepted = Some((
                     candidate,
                     candidate_value,
@@ -663,6 +673,8 @@ fn beta_log2_objective_gradient_hessian(
     let mut log_like = 0.0;
     let mut gradient = vec![0.0; p];
     let mut hessian = DMatrix::zeros(p, p);
+    let ln2 = std::f64::consts::LN_2;
+    let ln2_squared = ln2 * ln2;
     for sample in 0..input.x.nrows() {
         validate_positive_finite(input.nf[sample], "normalization factor", sample)?;
         let weight = input.weights.map_or(1.0, |weights| weights[sample]);
@@ -676,16 +688,19 @@ fn beta_log2_objective_gradient_hessian(
             return Ok((1.0e300, vec![0.0; p], DMatrix::identity(p, p)));
         }
         log_like += weight * nbinom_log_pmf(input.counts[sample], mu, input.dispersion)?;
-        let sample_score = weight * std::f64::consts::LN_2 * (f64::from(input.counts[sample]) - mu)
-            / (1.0 + input.dispersion * mu);
+        let one_plus_disp_mu = 1.0 + input.dispersion * mu;
+        let inv_one_plus_disp_mu = one_plus_disp_mu.recip();
+        let sample_score =
+            weight * ln2 * (f64::from(input.counts[sample]) - mu) * inv_one_plus_disp_mu;
         for (col, gradient_value) in gradient.iter_mut().enumerate().take(p) {
             *gradient_value -= input.x[(sample, col)] * sample_score;
         }
         let sample_hessian_weight = weight
-            * std::f64::consts::LN_2.powi(2)
+            * ln2_squared
             * mu
             * (1.0 + input.dispersion * f64::from(input.counts[sample]))
-            / (1.0 + input.dispersion * mu).powi(2);
+            * inv_one_plus_disp_mu
+            * inv_one_plus_disp_mu;
         for row in 0..p {
             for col in 0..p {
                 hessian[(row, col)] +=
@@ -697,7 +712,7 @@ fn beta_log2_objective_gradient_hessian(
     let mut objective = -log_like;
     for col in 0..p {
         validate_nonnegative_finite(input.ridge_lambda[col], "ridge lambda", col)?;
-        let ridge_log2 = input.ridge_lambda[col] * std::f64::consts::LN_2.powi(2);
+        let ridge_log2 = input.ridge_lambda[col] * ln2_squared;
         objective += 0.5 * ridge_log2 * beta[col] * beta[col];
         gradient[col] += ridge_log2 * beta[col];
         hessian[(col, col)] += ridge_log2;
@@ -712,6 +727,50 @@ fn newton_direction(hessian: &DMatrix<f64>, gradient: &[f64]) -> Option<Vec<f64>
         .lu()
         .solve(&rhs)
         .map(|values| values.iter().copied().collect())
+}
+
+fn bounded_beta_descent_direction(
+    parameters: &[f64],
+    hessian: &DMatrix<f64>,
+    gradient: &[f64],
+    lower: f64,
+    upper: f64,
+) -> Vec<f64> {
+    if let Some(direction) = newton_direction(hessian, gradient) {
+        let directional_derivative = gradient
+            .iter()
+            .copied()
+            .zip(direction.iter().copied())
+            .map(|(gradient, direction)| gradient * direction)
+            .sum::<f64>();
+        if directional_derivative.is_finite()
+            && directional_derivative < 0.0
+            && direction.iter().all(|value| value.is_finite())
+        {
+            return direction;
+        }
+    }
+    projected_beta_descent_direction(parameters, gradient, lower, upper)
+}
+
+fn projected_beta_descent_direction(
+    parameters: &[f64],
+    gradient: &[f64],
+    lower: f64,
+    upper: f64,
+) -> Vec<f64> {
+    parameters
+        .iter()
+        .copied()
+        .zip(gradient.iter().copied())
+        .map(|(parameter, gradient)| {
+            if (parameter <= lower && gradient > 0.0) || (parameter >= upper && gradient < 0.0) {
+                0.0
+            } else {
+                -gradient
+            }
+        })
+        .collect()
 }
 
 fn projected_gradient_norm(parameters: &[f64], gradient: &[f64], lower: f64, upper: f64) -> f64 {
@@ -737,6 +796,21 @@ fn max_abs_difference(left: &[f64], right: &[f64]) -> f64 {
         .zip(right.iter().copied())
         .map(|(left, right)| (left - right).abs())
         .fold(0.0, f64::max)
+}
+
+fn actual_directional_derivative(parameters: &[f64], candidate: &[f64], gradient: &[f64]) -> f64 {
+    gradient
+        .iter()
+        .copied()
+        .zip(
+            candidate
+                .iter()
+                .copied()
+                .zip(parameters.iter().copied())
+                .map(|(candidate, parameter)| candidate - parameter),
+        )
+        .map(|(gradient, direction)| gradient * direction)
+        .sum()
 }
 
 fn initial_beta(x: &DMatrix<f64>, y: &[f64], nf: &[f64]) -> Result<DVector<f64>, DeseqError> {
@@ -1101,4 +1175,41 @@ fn validate_nonnegative_finite(value: f64, context: &str, index: usize) -> Resul
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn bounded_beta_descent_direction_uses_newton_when_it_descends() {
+        let hessian = DMatrix::from_row_slice(1, 1, &[2.0]);
+        let direction = bounded_beta_descent_direction(&[0.0], &hessian, &[4.0], -30.0, 30.0);
+
+        assert_relative_eq!(direction[0], -2.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn bounded_beta_descent_direction_falls_back_when_newton_is_not_descent() {
+        let hessian = DMatrix::from_row_slice(1, 1, &[-2.0]);
+        let direction = bounded_beta_descent_direction(&[0.0], &hessian, &[4.0], -30.0, 30.0);
+
+        assert_relative_eq!(direction[0], -4.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn bounded_beta_descent_direction_projects_active_bounds() {
+        let hessian = DMatrix::from_row_slice(1, 1, &[-2.0]);
+        let direction = bounded_beta_descent_direction(&[-30.0], &hessian, &[4.0], -30.0, 30.0);
+
+        assert_relative_eq!(direction[0], 0.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn actual_directional_derivative_uses_clamped_candidate_movement() {
+        let derivative = actual_directional_derivative(&[29.0], &[30.0], &[-4.0]);
+
+        assert_relative_eq!(derivative, -4.0, epsilon = 1e-12);
+    }
 }

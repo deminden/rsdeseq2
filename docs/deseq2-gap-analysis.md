@@ -47,7 +47,7 @@ and selected result/filtering/Cook's primitives.
 | Transformations | `normTransform` plus mean-fit, parametric, and local VST primitives for normalized counts; VST dispatch from fitted dispersion trends. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
-| Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including unweighted and weighted GLM-mu mean/local MAP/Wald/LRT anchors plus unweighted local Cox-Reid MAP. |
+| Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including unweighted and weighted GLM-mu mean/local MAP/Wald/LRT anchors plus local Cox-Reid MAP/Wald/LRT anchors and compact result-row checks. |
 
 ## Major Missing Pieces
 

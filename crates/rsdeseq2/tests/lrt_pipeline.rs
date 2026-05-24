@@ -1,6 +1,37 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
+fn assert_lrt_likelihood_state(fit: &DeseqFit, counts: &CountMatrix) {
+    let log_like = fit.log_like.as_ref().unwrap();
+    let full_deviance = fit.full_deviance.as_ref().unwrap();
+    let reduced_log_like = fit.reduced_log_like.as_ref().unwrap();
+    let lrt = fit.lrt.as_ref().unwrap();
+    assert_eq!(log_like.len(), counts.n_genes());
+    assert_eq!(full_deviance.len(), counts.n_genes());
+    assert_eq!(reduced_log_like.len(), counts.n_genes());
+    assert_eq!(lrt.deviance.len(), counts.n_genes());
+    for gene in 0..counts.n_genes() {
+        if log_like[gene].is_nan() {
+            assert!(
+                full_deviance[gene].is_nan(),
+                "full deviance for gene {gene} should be NaN when log_like is NaN"
+            );
+            assert_eq!(lrt.deviance[gene], None);
+            continue;
+        }
+        assert_relative_eq!(full_deviance[gene], -2.0 * log_like[gene], epsilon = 1e-12);
+        if reduced_log_like[gene].is_nan() {
+            assert_eq!(lrt.deviance[gene], None);
+        } else {
+            assert_relative_eq!(
+                lrt.deviance[gene].unwrap(),
+                2.0 * (log_like[gene] - reduced_log_like[gene]),
+                epsilon = 1e-12
+            );
+        }
+    }
+}
+
 #[test]
 fn fixed_dispersion_lrt_pipeline_fits_full_and_reduced_models() {
     let counts = CountMatrix::from_row_major_u32_with_names(
@@ -38,13 +69,31 @@ fn fixed_dispersion_lrt_pipeline_fits_full_and_reduced_models() {
     assert_eq!(fit.reduced_beta_converged.as_deref(), Some(&[true][..]));
     assert_eq!(fit.reduced_beta_iter.as_ref().unwrap().len(), 1);
     assert!(fit.reduced_beta_iter.as_ref().unwrap()[0] > 0);
-    assert_eq!(fit.full_deviance.as_ref().unwrap().len(), 1);
-    assert_relative_eq!(
-        fit.full_deviance.as_ref().unwrap()[0],
-        -2.0 * fit.log_like.as_ref().unwrap()[0],
-        epsilon = 1e-12
+    assert_eq!(fit.reduced_mu.as_ref().unwrap().n_rows(), 1);
+    assert_eq!(
+        fit.reduced_mu.as_ref().unwrap().n_cols(),
+        counts.n_samples()
     );
-    assert_eq!(fit.reduced_log_like.as_ref().unwrap().len(), 1);
+    assert_eq!(fit.reduced_hat_diagonal.as_ref().unwrap().n_rows(), 1);
+    assert_eq!(
+        fit.reduced_hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert!(fit
+        .reduced_mu
+        .as_ref()
+        .unwrap()
+        .as_slice()
+        .iter()
+        .all(|value| value.is_finite()));
+    assert!(fit
+        .reduced_hat_diagonal
+        .as_ref()
+        .unwrap()
+        .as_slice()
+        .iter()
+        .all(|value| value.is_finite()));
+    assert_lrt_likelihood_state(&fit, &counts);
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
         2.0_f64.log2(),
@@ -101,6 +150,7 @@ fn fixed_dispersion_lrt_pipeline_uses_normalization_factors_for_offsets() {
         2.0_f64.log2(),
         epsilon = 1e-8
     );
+    assert_lrt_likelihood_state(&fit, &counts);
     assert_eq!(results.rows[0].pvalue, fit.lrt.as_ref().unwrap().pvalue[0]);
 }
 
@@ -138,12 +188,26 @@ fn fixed_dispersion_lrt_pipeline_expands_all_zero_rows() {
     );
     assert_eq!(fit.reduced_beta_iter.as_ref().unwrap()[0], 0);
     assert!(fit.reduced_beta_iter.as_ref().unwrap()[1] > 0);
+    assert!(fit.reduced_mu.as_ref().unwrap().row(0).unwrap()[0].is_nan());
+    assert!(fit.reduced_hat_diagonal.as_ref().unwrap().row(0).unwrap()[0].is_nan());
+    assert!(fit
+        .reduced_mu
+        .as_ref()
+        .unwrap()
+        .row(1)
+        .unwrap()
+        .iter()
+        .all(|value| value.is_finite()));
+    assert!(fit
+        .reduced_hat_diagonal
+        .as_ref()
+        .unwrap()
+        .row(1)
+        .unwrap()
+        .iter()
+        .all(|value| value.is_finite()));
     assert!(fit.full_deviance.as_ref().unwrap()[0].is_nan());
-    assert_relative_eq!(
-        fit.full_deviance.as_ref().unwrap()[1],
-        -2.0 * fit.log_like.as_ref().unwrap()[1],
-        epsilon = 1e-12
-    );
+    assert_lrt_likelihood_state(&fit, &counts);
     assert!(fit.reduced_log_like.as_ref().unwrap()[0].is_nan());
     assert!(fit.reduced_log_like.as_ref().unwrap()[1].is_finite());
     assert_eq!(fit.lrt.as_ref().unwrap().deviance[0], None);

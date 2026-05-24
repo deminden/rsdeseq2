@@ -373,8 +373,10 @@ pub fn fit_parametric_dispersion_trend(
                 reason: "parametric dispersion fit failed".to_string(),
             });
         }
-        let coefficient_change = (trend.asympt_disp / old.asympt_disp).ln().powi(2)
-            + (trend.extra_pois / old.extra_pois).ln().powi(2);
+        let asympt_change = (trend.asympt_disp / old.asympt_disp).ln();
+        let extra_pois_change = (trend.extra_pois / old.extra_pois).ln();
+        let coefficient_change =
+            asympt_change * asympt_change + extra_pois_change * extra_pois_change;
         if coefficient_change < options.coefficient_tol && fit.converged {
             return Ok(ParametricDispersionTrendFit {
                 trend,
@@ -689,7 +691,8 @@ fn weighted_gamma_identity_least_squares(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate(mean)?;
-        let weight = fitted.powi(-2);
+        let inv_fitted = fitted.recip();
+        let weight = inv_fitted * inv_fitted;
         let x = mean.recip();
         s00 += weight;
         s01 += weight * x;
@@ -774,7 +777,8 @@ fn gamma_deviance(
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate(mean)?;
         let ratio = disp / fitted;
-        deviance += 2.0 * ((disp - fitted) / fitted - ratio.ln());
+        let relative_delta = ratio - 1.0;
+        deviance += 2.0 * (relative_delta - relative_delta.ln_1p());
     }
     Ok(deviance)
 }
@@ -904,7 +908,9 @@ fn tricube_weight(distance: f64, bandwidth: f64) -> f64 {
         }
     } else if distance <= bandwidth {
         let scaled = distance / bandwidth;
-        (1.0 - scaled.powi(3)).powi(3)
+        let scaled_cubed = scaled * scaled * scaled;
+        let one_minus_scaled_cubed = 1.0 - scaled_cubed;
+        one_minus_scaled_cubed * one_minus_scaled_cubed * one_minus_scaled_cubed
     } else {
         0.0
     }
@@ -1167,4 +1173,32 @@ fn validate_positive_dispersion(dispersion: f64, index: Option<usize>) -> Result
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn gamma_deviance_keeps_near_perfect_fit_precision() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: 0.05,
+            extra_pois: 2.0,
+        };
+        let means = [20.0, 40.0, 80.0, 160.0];
+        let relative_delta = 1.0e-8;
+        let disps = means
+            .iter()
+            .map(|mean| trend.evaluate(*mean).unwrap() * (1.0 + relative_delta))
+            .collect::<Vec<_>>();
+        let good = [true; 4];
+
+        let deviance = gamma_deviance(&means, &disps, &good, trend).unwrap();
+        let expected = means.len() as f64 * 2.0 * (relative_delta - relative_delta.ln_1p());
+
+        assert!(deviance.is_finite());
+        assert!(deviance > 0.0);
+        assert_relative_eq!(deviance, expected, max_relative = 1e-12);
+    }
 }

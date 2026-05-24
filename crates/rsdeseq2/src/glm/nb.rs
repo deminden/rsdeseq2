@@ -12,9 +12,11 @@ pub fn nbinom_log_pmf(count: u32, mu: f64, dispersion: f64) -> Result<f64, Deseq
     validate_dispersion(dispersion, Some(0))?;
     let y = f64::from(count);
     let size = dispersion.recip();
-    Ok(ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0)
-        + size * (size / (size + mu)).ln()
-        + y * (mu / (size + mu)).ln())
+    let mu_dispersion = mu * dispersion;
+    Ok(
+        ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0) - size * mu_dispersion.ln_1p()
+            + count_log_term(y, mu_dispersion),
+    )
 }
 
 /// Row log likelihood for one gene.
@@ -124,9 +126,17 @@ pub fn nbinom_log_likelihood_matrix(
 fn nbinom_log_pmf_unchecked(count: u32, mu: f64, dispersion: f64) -> f64 {
     let y = f64::from(count);
     let size = dispersion.recip();
-    ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0)
-        + size * (size / (size + mu)).ln()
-        + y * (mu / (size + mu)).ln()
+    let mu_dispersion = mu * dispersion;
+    ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0) - size * mu_dispersion.ln_1p()
+        + count_log_term(y, mu_dispersion)
+}
+
+fn count_log_term(y: f64, mu_dispersion: f64) -> f64 {
+    if y == 0.0 {
+        0.0
+    } else {
+        y * (mu_dispersion.ln() - mu_dispersion.ln_1p())
+    }
 }
 
 fn validate_mu(mu: f64, index: Option<usize>) -> Result<(), DeseqError> {

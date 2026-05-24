@@ -18,6 +18,28 @@ fn assert_optional_float_vec_eq_with_nan(actual: Option<&Vec<f64>>, expected: Op
     }
 }
 
+fn assert_diagnostics_frame_excludes_matrix_state(frame: &Deseq2McolsDiagnosticsDataFrame) {
+    let names = frame
+        .columns
+        .iter()
+        .map(|column| column.name)
+        .collect::<Vec<_>>();
+    for matrix_name in [
+        "mu",
+        "hatDiagonal",
+        "reducedMu",
+        "reducedHatDiagonal",
+        "beta",
+        "betaSE",
+        "betaCovariance",
+    ] {
+        assert!(
+            !names.contains(&matrix_name),
+            "mcols diagnostics unexpectedly exposed matrix column {matrix_name}"
+        );
+    }
+}
+
 #[test]
 fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 12, 14, 20, 22, 24]).unwrap();
@@ -71,6 +93,7 @@ fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
         vec!["dispGeneEst", "dispGeneIter"]
     );
     let frame = diagnostics.data_frame();
+    assert_diagnostics_frame_excludes_matrix_state(&frame);
     assert_eq!(frame.columns.len(), 2);
     assert_eq!(frame.columns[0].name, "dispGeneEst");
     assert!(matches!(
@@ -210,6 +233,7 @@ fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
         ]
     );
     let frame = diagnostics.data_frame();
+    assert_diagnostics_frame_excludes_matrix_state(&frame);
     assert_eq!(
         frame
             .columns
@@ -256,11 +280,22 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
     assert_eq!(diagnostics.reduced_beta_iter, None);
     assert_eq!(diagnostics.deviance.as_ref(), fit.full_deviance.as_ref());
     assert_eq!(diagnostics.max_cooks.as_ref(), fit.max_cooks.as_ref());
+    assert_eq!(fit.mu.as_ref().unwrap().n_rows(), counts.n_genes());
+    assert_eq!(fit.mu.as_ref().unwrap().n_cols(), counts.n_samples());
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
     assert_eq!(
         diagnostics.present_column_names(),
         vec!["dispersion", "betaConv", "betaIter", "deviance", "maxCooks",]
     );
     let frame = diagnostics.data_frame();
+    assert_diagnostics_frame_excludes_matrix_state(&frame);
     assert_eq!(
         frame
             .columns
@@ -331,6 +366,29 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
     assert_eq!(diagnostics.beta_iter.as_ref().unwrap()[0], 0);
     assert_eq!(diagnostics.reduced_beta_iter.as_ref().unwrap()[0], 0);
     assert!(diagnostics_deviance[0].is_nan());
+    assert_eq!(fit.mu.as_ref().unwrap().n_rows(), counts.n_genes());
+    assert_eq!(fit.mu.as_ref().unwrap().n_cols(), counts.n_samples());
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert_eq!(fit.reduced_mu.as_ref().unwrap().n_rows(), counts.n_genes());
+    assert_eq!(
+        fit.reduced_mu.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert_eq!(
+        fit.reduced_hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.reduced_hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
     assert_eq!(
         diagnostics.present_column_names(),
         vec![
@@ -347,5 +405,15 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
         diagnostics_deviance[1],
         -2.0 * fit.log_like.as_ref().unwrap()[1],
         epsilon = 1e-12
+    );
+    let frame = diagnostics.data_frame();
+    assert_diagnostics_frame_excludes_matrix_state(&frame);
+    assert_eq!(
+        frame
+            .columns
+            .iter()
+            .map(|column| column.name)
+            .collect::<Vec<_>>(),
+        diagnostics.present_column_names()
     );
 }

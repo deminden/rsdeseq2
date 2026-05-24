@@ -330,13 +330,29 @@ pub struct DeseqFit {
     pub reduced_beta_converged: Option<Vec<bool>>,
     /// Per-gene reduced-model beta iteration counts for LRT pipelines.
     pub reduced_beta_iter: Option<Vec<usize>>,
+    /// Reduced-model fitted mean matrix for LRT pipelines.
+    ///
+    /// Kept as matrix-valued fit state rather than `mcols(dds)`-style row
+    /// metadata.
+    pub reduced_mu: Option<RowMajorMatrix<f64>>,
+    /// Reduced-model hat diagonal matrix for LRT pipelines.
+    ///
+    /// Kept as matrix-valued fit state rather than `mcols(dds)`-style row
+    /// metadata.
+    pub reduced_hat_diagonal: Option<RowMajorMatrix<f64>>,
     /// Fitted mean matrix.
+    ///
+    /// Kept as matrix-valued fit state rather than `mcols(dds)`-style row
+    /// metadata.
     pub mu: Option<RowMajorMatrix<f64>>,
     /// Cook's distance matrix.
     pub cooks: Option<RowMajorMatrix<f64>>,
     /// Per-gene maximum Cook's distance over eligible samples.
     pub max_cooks: Option<Vec<Option<f64>>>,
     /// Hat diagonal matrix.
+    ///
+    /// Kept as matrix-valued fit state rather than `mcols(dds)`-style row
+    /// metadata.
     pub hat_diagonal: Option<RowMajorMatrix<f64>>,
     /// Wald output.
     pub wald: Option<WaldOutput>,
@@ -727,8 +743,6 @@ pub enum VstTrendSource {
 pub enum VstFullDataReason {
     /// Fewer than `nsub` rows passed the fast-VST eligibility rule.
     InsufficientEligibleRows,
-    /// Observation weights are present and weighted fast-subset fitting is not implemented yet.
-    ObservationWeightsPresent,
 }
 
 impl FastVstGlmMuOutput {
@@ -828,7 +842,6 @@ impl VstFullDataReason {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::InsufficientEligibleRows => "insufficientEligibleRows",
-            Self::ObservationWeightsPresent => "observationWeightsPresent",
         }
     }
 }
@@ -1407,24 +1420,19 @@ impl DeseqBuilder {
             });
         }
         design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
-        let stages = self.normalization_stages(counts)?;
-        if self.observation_weights.is_some() {
-            return Err(DeseqError::UnsupportedFeature {
-                feature: "fast VST trend fitting with observation weights".to_string(),
-            });
-        }
+        let stages = self.normalization_stages_for_design(counts, design)?;
         let subset = build_fast_vst_subset(
             counts,
             &stages.normalized,
             &stages.base_mean,
             nsub,
             stages.normalization_factors.as_ref(),
-            None,
+            stages.observation_weights.as_ref(),
         )?;
         let mut subset_builder = self.clone();
         subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
         subset_builder.normalization_factors = subset.normalization_factors.clone();
-        subset_builder.observation_weights = None;
+        subset_builder.observation_weights = subset.observation_weights.clone();
         let fit = subset_builder.fit_dispersion_trend_glm_mu(&subset.counts, design)?;
         Ok((fit, subset))
     }
@@ -1494,11 +1502,10 @@ impl DeseqBuilder {
 
     /// Apply the implemented GLM-mu VST path with DESeq2-like fast-path selection.
     ///
-    /// When at least `nsub` rows have `baseMean > 5` and observation weights
-    /// are absent, the dispersion trend is fit on the deterministic fast-VST
-    /// subset and applied to the full count matrix. Otherwise, the selected
-    /// GLM-mu dispersion trend is fit on the full count matrix before
-    /// transforming the full matrix.
+    /// When at least `nsub` rows have `baseMean > 5`, the dispersion trend is
+    /// fit on the deterministic fast-VST subset and applied to the full count
+    /// matrix. Otherwise, the selected GLM-mu dispersion trend is fit on the
+    /// full count matrix before transforming the full matrix.
     pub fn vst_glm_mu_auto(
         &self,
         counts: &CountMatrix,
@@ -1512,7 +1519,7 @@ impl DeseqBuilder {
         }
         let base_fit = self.fit_size_factors_and_base_means_with_design(counts, design)?;
         let eligible_rows = base_fit.fast_vst_eligible_count()?;
-        if eligible_rows >= nsub && self.observation_weights.is_none() {
+        if eligible_rows >= nsub {
             let output = self.fast_vst_glm_mu(counts, design, nsub)?;
             return Ok(VstGlmMuOutput {
                 transformed: output.transformed,
@@ -1527,18 +1534,13 @@ impl DeseqBuilder {
 
         let trend_fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
         let transformed = trend_fit.variance_stabilizing_transform(counts)?;
-        let reason = if self.observation_weights.is_some() {
-            VstFullDataReason::ObservationWeightsPresent
-        } else {
-            VstFullDataReason::InsufficientEligibleRows
-        };
         Ok(VstGlmMuOutput {
             transformed,
             trend_fit,
             trend_source: VstTrendSource::FullData {
                 nsub,
                 eligible_rows,
-                reason,
+                reason: VstFullDataReason::InsufficientEligibleRows,
             },
             fast_subset: None,
         })
@@ -2414,6 +2416,8 @@ impl DeseqBuilder {
         fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
         fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
         fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
@@ -2624,6 +2628,8 @@ impl DeseqBuilder {
         fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
         fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
         fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
@@ -3078,6 +3084,8 @@ impl DeseqBuilder {
             reduced_log_like: None,
             reduced_beta_converged: None,
             reduced_beta_iter: None,
+            reduced_mu: None,
+            reduced_hat_diagonal: None,
             mu: None,
             cooks: None,
             max_cooks: None,
@@ -3117,6 +3125,177 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level Wald workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = default_results_coefficient(design)?;
+                self.fit_wald_glm_mu_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient,
+                    replacement_options,
+                )
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit without a reduced design".to_string(),
+            }),
+        }
+    }
+
+    /// Run the currently implemented top-level Wald workflow for a numeric contrast.
+    ///
+    /// This is the primitive contrast companion to [`Self::fit_with_results`].
+    /// It follows the implemented GLM-mu native Wald path when `test=Wald`.
+    /// Top-level LRT remains explicit because a contrast is not an LRT reduced
+    /// model.
+    pub fn fit_with_results_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast(counts, design, contrast),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit for a Wald contrast".to_string(),
+            }),
+        }
+    }
+
+    /// Run the currently implemented top-level Wald workflow for a numeric contrast.
+    pub fn fit_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_contrast(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald contrast".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level Wald workflow for a named primitive contrast specification.
+    pub fn fit_with_results_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_spec(counts, design, contrast),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit for a Wald contrast specification".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level Wald workflow for a named primitive contrast specification.
+    pub fn fit_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_contrast_spec(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level named Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald contrast specification"
+                    .to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    pub fn fit_with_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit for a Wald factor-level contrast".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    pub fn fit_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_factor_level_contrast(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level factor-level Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald factor-level contrast"
+                    .to_string(),
+            }),
+        }
+    }
+
     /// Run the currently implemented top-level LRT workflow with a reduced design.
     ///
     /// This follows the implemented GLM-mu native LRT path and reports the last
@@ -3140,6 +3319,24 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let coefficient = default_results_coefficient(full_design)?;
         self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+    }
+
+    /// Run the currently implemented top-level LRT workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let coefficient = default_results_coefficient(full_design)?;
+        self.fit_lrt_glm_mu_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            coefficient,
+            replacement_options,
+        )
     }
 }
 

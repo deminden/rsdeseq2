@@ -92,7 +92,7 @@ pub fn mad_squared(values: &[f64]) -> Result<f64, DeseqError> {
     let mad = median_finite(&deviations).ok_or_else(|| DeseqError::InvalidDispersion {
         reason: "cannot compute MAD of an empty or non-finite slice".to_string(),
     })? * 1.4826;
-    Ok(mad.powi(2))
+    Ok(mad * mad)
 }
 
 /// Log-dispersion residuals for rows used by DESeq2's prior variance estimate.
@@ -126,7 +126,7 @@ pub fn log_dispersion_residuals_above_min(
             let above_min = gene_est >= min_disp * 100.0;
             above_min_disp.push(above_min);
             if above_min {
-                residuals.push(gene_est.ln() - fit.ln());
+                residuals.push((gene_est / fit).ln());
             }
         } else if gene_est.is_nan() || fit.is_nan() {
             above_min_disp.push(false);
@@ -307,7 +307,7 @@ fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError>
         .iter()
         .copied()
         .zip(simulated.iter().copied())
-        .map(|(obs, sim)| obs * ((obs + small).ln() - (sim + small).ln()))
+        .map(|(obs, sim)| obs * ((obs + small) / (sim + small)).ln())
         .sum())
 }
 
@@ -388,7 +388,9 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         let mut sxy = 0.0;
         for (_, idx) in distances.iter().copied().take(span_points) {
             let scaled = ((x[idx] - target).abs() / max_distance).min(1.0);
-            let weight = (1.0 - scaled.powi(3)).powi(3);
+            let scaled_cubed = scaled * scaled * scaled;
+            let one_minus_scaled_cubed = 1.0 - scaled_cubed;
+            let weight = one_minus_scaled_cubed * one_minus_scaled_cubed * one_minus_scaled_cubed;
             sw += weight;
             sx += weight * x[idx];
             sy += weight * y[idx];

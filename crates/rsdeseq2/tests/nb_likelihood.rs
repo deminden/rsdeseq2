@@ -125,6 +125,14 @@ fn nb_log_pmf_approaches_poisson_for_small_dispersion() {
 }
 
 #[test]
+fn nb_log_pmf_zero_count_stays_finite_for_tiny_mu_dispersion() {
+    let actual = nbinom_log_pmf(0, 1.0e-200, 1.0e-200).unwrap();
+
+    assert!(actual.is_finite());
+    assert_relative_eq!(actual, 0.0, epsilon = 1e-12);
+}
+
+#[test]
 fn nb_likelihood_validates_inputs() {
     assert!(nbinom_log_pmf(1, 0.0, 0.1).is_err());
     assert!(nbinom_log_pmf(1, 1.0, 0.0).is_err());

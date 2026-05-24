@@ -64,6 +64,102 @@ fn native_lrt_builder() -> DeseqBuilder {
         .disable_independent_filtering()
 }
 
+fn assert_matrix_close_or_nan(
+    actual: &RowMajorMatrix<f64>,
+    expected: &RowMajorMatrix<f64>,
+    label: &str,
+) {
+    assert_eq!(actual.n_rows(), expected.n_rows(), "{label}: row mismatch");
+    assert_eq!(
+        actual.n_cols(),
+        expected.n_cols(),
+        "{label}: column mismatch"
+    );
+    for (index, (actual, expected)) in actual
+        .as_slice()
+        .iter()
+        .zip(expected.as_slice().iter())
+        .enumerate()
+    {
+        if expected.is_nan() {
+            assert!(
+                actual.is_nan(),
+                "{label}[{index}]: expected NaN, got {actual}"
+            );
+        } else {
+            assert_relative_eq!(*actual, *expected, epsilon = 1e-12);
+        }
+    }
+}
+
+fn assert_float_close_or_nan(actual: f64, expected: f64, label: &str) {
+    if expected.is_nan() {
+        assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
+        return;
+    }
+    assert_relative_eq!(actual, expected, epsilon = 1e-12);
+}
+
+fn assert_slice_close_or_nan(actual: &[f64], expected: &[f64], label: &str) {
+    assert_eq!(actual.len(), expected.len(), "{label}: length mismatch");
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert_float_close_or_nan(*actual, *expected, &format!("{label}[{index}]"));
+    }
+}
+
+fn assert_lrt_fit_state_matches(actual: &DeseqFit, expected: &DeseqFit, label: &str) {
+    assert_matrix_close_or_nan(
+        actual.beta.as_ref().unwrap(),
+        expected.beta.as_ref().unwrap(),
+        &format!("{label} beta"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_se.as_ref().unwrap(),
+        expected.beta_se.as_ref().unwrap(),
+        &format!("{label} beta_se"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_covariance.as_ref().unwrap(),
+        expected.beta_covariance.as_ref().unwrap(),
+        &format!("{label} beta_covariance"),
+    );
+    assert_slice_close_or_nan(
+        actual.log_like.as_ref().unwrap(),
+        expected.log_like.as_ref().unwrap(),
+        &format!("{label} full log_like"),
+    );
+    assert_slice_close_or_nan(
+        actual.full_deviance.as_ref().unwrap(),
+        expected.full_deviance.as_ref().unwrap(),
+        &format!("{label} full_deviance"),
+    );
+    assert_slice_close_or_nan(
+        actual.reduced_log_like.as_ref().unwrap(),
+        expected.reduced_log_like.as_ref().unwrap(),
+        &format!("{label} reduced log_like"),
+    );
+    assert_matrix_close_or_nan(
+        actual.mu.as_ref().unwrap(),
+        expected.mu.as_ref().unwrap(),
+        &format!("{label} full mu"),
+    );
+    assert_matrix_close_or_nan(
+        actual.hat_diagonal.as_ref().unwrap(),
+        expected.hat_diagonal.as_ref().unwrap(),
+        &format!("{label} full hat"),
+    );
+    assert_matrix_close_or_nan(
+        actual.reduced_mu.as_ref().unwrap(),
+        expected.reduced_mu.as_ref().unwrap(),
+        &format!("{label} reduced mu"),
+    );
+    assert_matrix_close_or_nan(
+        actual.reduced_hat_diagonal.as_ref().unwrap(),
+        expected.reduced_hat_diagonal.as_ref().unwrap(),
+        &format!("{label} reduced hat"),
+    );
+}
+
 #[test]
 fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
     let counts = counts_with_zero_row();
@@ -96,6 +192,23 @@ fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
         fit.reduced_log_like.as_ref().unwrap().len(),
         counts.n_genes()
     );
+    assert_eq!(fit.reduced_mu.as_ref().unwrap().n_rows(), counts.n_genes());
+    assert_eq!(
+        fit.reduced_mu.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert_eq!(
+        fit.reduced_hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.reduced_hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert!(fit.reduced_mu.as_ref().unwrap().row(0).unwrap()[0].is_nan());
+    assert!(fit.reduced_hat_diagonal.as_ref().unwrap().row(0).unwrap()[0].is_nan());
+    assert!(fit.reduced_mu.as_ref().unwrap().row(1).unwrap()[0].is_finite());
+    assert!(fit.reduced_hat_diagonal.as_ref().unwrap().row(1).unwrap()[0].is_finite());
     assert_eq!(
         fit.reduced_beta_converged.as_deref(),
         Some(&[false, true, true, true, true, true, true, true][..])
@@ -152,6 +265,32 @@ fn native_glm_mu_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() {
             native_results.rows[gene].log2_fold_change,
             fixed_results.rows[gene].log2_fold_change
         );
+        for sample in 0..counts.n_samples() {
+            let native_mu = native_fit.reduced_mu.as_ref().unwrap().row(gene).unwrap()[sample];
+            let fixed_mu = fixed_fit.reduced_mu.as_ref().unwrap().row(gene).unwrap()[sample];
+            if native_mu.is_nan() {
+                assert!(fixed_mu.is_nan());
+            } else {
+                assert_relative_eq!(native_mu, fixed_mu, epsilon = 1e-12);
+            }
+            let native_hat = native_fit
+                .reduced_hat_diagonal
+                .as_ref()
+                .unwrap()
+                .row(gene)
+                .unwrap()[sample];
+            let fixed_hat = fixed_fit
+                .reduced_hat_diagonal
+                .as_ref()
+                .unwrap()
+                .row(gene)
+                .unwrap()[sample];
+            if native_hat.is_nan() {
+                assert!(fixed_hat.is_nan());
+            } else {
+                assert_relative_eq!(native_hat, fixed_hat, epsilon = 1e-12);
+            }
+        }
     }
 }
 
@@ -242,6 +381,7 @@ fn top_level_fit_lrt_runs_default_glm_mu_lrt_for_last_coefficient() {
         top_level_fit.reduced_beta_converged,
         lrt_fit.reduced_beta_converged
     );
+    assert_lrt_fit_state_matches(&top_level_fit, &lrt_fit, "top-level LRT");
     assert_eq!(top_level_fit.lrt, lrt_fit.lrt);
     assert!(top_level_fit.dispersion.is_some());
     assert!(matches!(
@@ -276,6 +416,7 @@ fn top_level_fit_lrt_with_results_returns_default_lrt_results() {
     let (lrt_fit, lrt_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
 
     assert_eq!(top_level_fit.lrt, lrt_fit.lrt);
+    assert_lrt_fit_state_matches(&top_level_fit, &lrt_fit, "top-level LRT results");
     assert_eq!(top_level_results, lrt_results);
     assert_eq!(top_level_results.metadata.test_type, Some(TestType::Lrt));
     assert_eq!(
@@ -285,12 +426,82 @@ fn top_level_fit_lrt_with_results_returns_default_lrt_results() {
 }
 
 #[test]
+fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_glm_mu_lrt() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder();
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+    };
+
+    let top_level_output = builder
+        .fit_lrt_with_results_with_cooks_replacement(&counts, &full, &reduced, &replacement_options)
+        .unwrap();
+    let lrt_output = builder
+        .fit_lrt_glm_mu_with_cooks_replacement(&counts, &full, &reduced, 1, &replacement_options)
+        .unwrap();
+
+    assert_eq!(top_level_output.refit_plan, lrt_output.refit_plan);
+    assert_eq!(
+        top_level_output.original_results,
+        lrt_output.original_results
+    );
+    assert_lrt_fit_state_matches(
+        &top_level_output.original_fit,
+        &lrt_output.original_fit,
+        "top-level LRT replacement original",
+    );
+    assert_eq!(top_level_output.refit_results, lrt_output.refit_results);
+    assert_lrt_fit_state_matches(
+        top_level_output.refit_fit.as_ref().unwrap(),
+        lrt_output.refit_fit.as_ref().unwrap(),
+        "top-level LRT replacement refit",
+    );
+    assert_eq!(top_level_output.results, lrt_output.results);
+    assert!(top_level_output.refit_plan.should_refit);
+    assert!(top_level_output.refit_fit.as_ref().unwrap().lrt.is_some());
+    assert_eq!(
+        top_level_output.results.metadata.test_type,
+        Some(TestType::Lrt)
+    );
+    assert_eq!(
+        top_level_output.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+}
+
+#[test]
+fn top_level_fit_lrt_with_results_cooks_replacement_validates_reduced_design() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let invalid_reduced = full_design();
+    let err = native_lrt_builder()
+        .fit_lrt_with_results_with_cooks_replacement(
+            &counts,
+            &full,
+            &invalid_reduced,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap_err();
+
+    assert!(matches!(err, DeseqError::InvalidDimensions { .. }));
+}
+
+#[test]
 fn native_glm_mu_lrt_cooks_replacement_refit_skips_when_no_rows_are_marked() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
     let builder = native_lrt_builder();
 
+    let (expected_fit, expected_results) = builder
+        .clone()
+        .fit_lrt_glm_mu(&counts, &full, &reduced, 1)
+        .unwrap();
     let output = builder
         .fit_lrt_glm_mu_with_cooks_replacement(
             &counts,
@@ -310,6 +521,13 @@ fn native_glm_mu_lrt_cooks_replacement_refit_skips_when_no_rows_are_marked() {
     assert!(!output.refit_plan.should_refit);
     assert!(output.refit_fit.is_none());
     assert!(output.refit_results.is_none());
+    assert_lrt_fit_state_matches(
+        &output.original_fit,
+        &expected_fit,
+        "native GLM-mu LRT no-refit original",
+    );
+    assert_eq!(output.original_results, expected_results);
+    assert_eq!(output.results, expected_results);
     assert_eq!(output.results, output.original_results);
     assert_eq!(
         output.refit_plan.replacement.replaced_counts.as_slice(),

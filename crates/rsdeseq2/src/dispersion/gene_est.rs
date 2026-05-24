@@ -399,7 +399,7 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
                 if all_zero {
                     return false;
                 }
-                let move_size = (alpha_hat_new[gene].ln() - alpha_hat[gene].ln()).abs();
+                let move_size = (alpha_hat_new[gene] / alpha_hat[gene]).ln().abs();
                 move_size.is_finite() && move_size > 0.05
             })
             .collect();
@@ -537,7 +537,9 @@ pub fn rough_dispersion_estimates(
             .zip(mu.iter().copied())
             .map(|(count, fitted)| {
                 let fitted = fitted.max(1.0);
-                ((count - fitted).powi(2) - fitted) / fitted.powi(2)
+                let residual = count - fitted;
+                let inv_fitted = fitted.recip();
+                (residual * residual - fitted) * inv_fitted * inv_fitted
             })
             .sum::<f64>();
         estimates.push((sum / residual_df).max(0.0));
@@ -567,7 +569,8 @@ pub fn moments_dispersion_estimates(
         .zip(base_var.iter().copied())
         .map(|(mean, variance)| {
             if mean > 0.0 {
-                (variance - xim * mean) / mean.powi(2)
+                let inv_mean = mean.recip();
+                (variance - xim * mean) * inv_mean * inv_mean
             } else {
                 f64::NAN
             }
@@ -638,7 +641,8 @@ fn moments_dispersion_estimates_with_xim(
         .zip(base_var.iter().copied())
         .map(|(mean, variance)| {
             if mean > 0.0 {
-                (variance - xim * mean) / mean.powi(2)
+                let inv_mean = mean.recip();
+                (variance - xim * mean) * inv_mean * inv_mean
             } else {
                 f64::NAN
             }
@@ -1041,24 +1045,18 @@ fn fit_dispersion_line_search_inner(
             break;
         }
 
-        let proposal = log_alpha + kappa * dlp;
-        if proposal < -30.0 {
-            kappa = (-30.0 - log_alpha) / dlp;
-        }
-        if proposal > 10.0 {
-            kappa = (10.0 - log_alpha) / dlp;
-        }
-        if !kappa.is_finite() || kappa <= 0.0 {
+        let Some((proposed_log_alpha, effective_kappa)) =
+            bounded_log_alpha_proposal(log_alpha, dlp, kappa, -30.0, 10.0)
+        else {
             break;
-        }
+        };
 
-        let proposed_log_alpha = log_alpha + kappa * dlp;
         let theta_kappa = -dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
-        let theta_hat_kappa = -lp - kappa * epsilon * dlp.powi(2);
+        let theta_hat_kappa = -lp - effective_kappa * epsilon * dlp * dlp;
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            let lp_new = dispersion_log_posterior_objective(objective, log_alpha)?;
+            let lp_new = -theta_kappa;
             last_change = lp_new - lp;
             lp = lp_new;
             if last_change < options.disp_tol {
@@ -1068,12 +1066,12 @@ fn fit_dispersion_line_search_inner(
                 break;
             }
             dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
-            kappa = (kappa * 1.1).min(options.kappa_0);
+            kappa = (effective_kappa * 1.1).min(options.kappa_0);
             if iter_accept % 5 == 0 {
                 kappa /= 2.0;
             }
         } else {
-            kappa /= 2.0;
+            kappa = effective_kappa / 2.0;
         }
     }
 
@@ -1093,6 +1091,34 @@ fn fit_dispersion_line_search_inner(
         last_change,
         converged: iter < options.maxit && iter != 1,
     })
+}
+
+fn bounded_log_alpha_proposal(
+    log_alpha: f64,
+    direction: f64,
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<(f64, f64)> {
+    if !log_alpha.is_finite()
+        || !direction.is_finite()
+        || !step.is_finite()
+        || !lower.is_finite()
+        || !upper.is_finite()
+        || direction == 0.0
+        || step <= 0.0
+        || lower >= upper
+    {
+        return None;
+    }
+    let unclamped = log_alpha + step * direction;
+    let clamped = unclamped.clamp(lower, upper);
+    let effective_step = (clamped - log_alpha) / direction;
+    if effective_step.is_finite() && effective_step > 0.0 {
+        Some((clamped, effective_step))
+    } else {
+        None
+    }
 }
 
 /// Fit a dispersion for one gene by DESeq2-style two-pass log-alpha grid search.
@@ -1316,11 +1342,10 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
+        let mu_alpha = mu * alpha;
         total += observation_weight
-            * (ln_gamma(y + inv_alpha)
-                - ln_gamma(inv_alpha)
-                - y * (mu + inv_alpha).ln()
-                - inv_alpha * (1.0 + mu * alpha).ln());
+            * (ln_gamma(y + inv_alpha) - ln_gamma(inv_alpha) + y * log_alpha
+                - (y + inv_alpha) * mu_alpha.ln_1p());
     }
     Ok(total)
 }
@@ -1365,17 +1390,19 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         });
     }
     let inv_alpha = alpha.recip();
-    let inv_alpha_squared = inv_alpha.powi(2);
+    let inv_alpha_squared = inv_alpha * inv_alpha;
     let mut derivative_alpha = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
+        let mu_alpha = mu * alpha;
+        let one_plus_mu_alpha = 1.0 + mu_alpha;
         derivative_alpha += observation_weight
-            * (digamma(inv_alpha) + (1.0 + mu * alpha).ln()
-                - mu * alpha / (1.0 + mu * alpha)
+            * (digamma(inv_alpha) + mu_alpha.ln_1p()
+                - mu_alpha / one_plus_mu_alpha
                 - digamma(y + inv_alpha)
-                + y / (mu + inv_alpha));
+                + y * alpha / one_plus_mu_alpha);
     }
     Ok(inv_alpha_squared * derivative_alpha * alpha)
 }
@@ -1420,29 +1447,30 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         });
     }
     let inv_alpha = alpha.recip();
-    let inv_alpha_squared = inv_alpha.powi(2);
+    let inv_alpha_squared = inv_alpha * inv_alpha;
     let mut first_alpha_sum = 0.0;
     let mut second_alpha_sum = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
-        let first_term = digamma(inv_alpha) + (1.0 + mu * alpha).ln()
-            - mu * alpha / (1.0 + mu * alpha)
+        let mu_alpha = mu * alpha;
+        let one_plus_mu_alpha = 1.0 + mu_alpha;
+        let inv_one_plus_mu_alpha = one_plus_mu_alpha.recip();
+        let first_term = digamma(inv_alpha) + mu_alpha.ln_1p()
+            - mu_alpha * inv_one_plus_mu_alpha
             - digamma(y + inv_alpha)
-            + y / (mu + inv_alpha);
+            + y * alpha * inv_one_plus_mu_alpha;
         let second_term = -inv_alpha_squared * trigamma(inv_alpha)?
-            + mu.powi(2) * alpha * (1.0 + mu * alpha).powi(-2)
+            + mu * mu * alpha * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha
             + inv_alpha_squared * trigamma(y + inv_alpha)?
-            + inv_alpha_squared * y * (mu + inv_alpha).powi(-2);
+            + y * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha;
         first_alpha_sum += observation_weight * first_term;
         second_alpha_sum += observation_weight * second_term;
     }
-    let second_alpha =
-        -2.0 * inv_alpha.powi(3) * first_alpha_sum + inv_alpha_squared * second_alpha_sum;
     let first_log_alpha =
         dispersion_nb_log_likelihood_kernel_derivative_weighted(counts, mu, log_alpha, weights)?;
-    Ok(second_alpha * alpha.powi(2) + first_log_alpha)
+    Ok(second_alpha_sum - 2.0 * inv_alpha * first_alpha_sum + first_log_alpha)
 }
 
 /// Cox-Reid adjustment term for one gene and design matrix.
@@ -1560,10 +1588,10 @@ fn cox_reid_weighted_design_matrices_with_threshold(
     for sample in selected_samples {
         let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
-        let inverse_variance = mu.recip() + alpha;
-        let weight = inverse_variance.recip();
-        let d_weight = -inverse_variance.powi(-2);
-        let d2_weight = 2.0 * inverse_variance.powi(-3);
+        let mu_alpha = mu * alpha;
+        let weight = mu / (1.0 + mu_alpha);
+        let d_weight = -weight * weight;
+        let d2_weight = 2.0 * weight * weight * weight;
         let row = design.matrix().row(sample)?;
         for (left_idx, left_col) in selected_columns.iter().copied().enumerate() {
             for (right_idx, right_col) in selected_columns.iter().copied().enumerate() {
@@ -1722,14 +1750,12 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    let trace_bi_db = trace_product(&inverse, &matrices.d_xtwx);
     let second_trace = (&inverse * &matrices.d_xtwx * &inverse * &matrices.d_xtwx)
         .diagonal()
         .iter()
         .sum::<f64>();
     let trace_bi_d2b = trace_product(&inverse, &matrices.d2_xtwx);
-    let second_alpha =
-        0.5 * trace_bi_db.powi(2) - 0.5 * (trace_bi_db.powi(2) - second_trace + trace_bi_d2b);
+    let second_alpha = 0.5 * (second_trace - trace_bi_d2b);
     let first_log_alpha = cox_reid_adjustment_derivative_weighted_with_threshold(
         design,
         mu,
@@ -1737,7 +1763,7 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
         weights,
         weight_threshold,
     )?;
-    Ok(second_alpha * alpha.powi(2) + first_log_alpha)
+    Ok(second_alpha * alpha * alpha + first_log_alpha)
 }
 
 /// DESeq2's log-dispersion prior kernel, omitting additive constants.
@@ -1751,7 +1777,8 @@ pub fn dispersion_prior_log_density(
         });
     }
     validate_dispersion_prior(Some(prior))?;
-    Ok(-0.5 * (log_alpha - prior.log_mean).powi(2) / prior.variance)
+    let residual = log_alpha - prior.log_mean;
+    Ok(-0.5 * residual * residual / prior.variance)
 }
 
 /// Derivative of the log-dispersion prior kernel with respect to log alpha.
@@ -2382,4 +2409,50 @@ fn max_dispersion(options: GeneWiseDispersionOptions, n_samples: usize) -> f64 {
     options
         .max_disp
         .unwrap_or_else(|| 10.0_f64.max(n_samples as f64))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn bounded_log_alpha_proposal_keeps_unclamped_step() {
+        let (proposal, effective_step) =
+            bounded_log_alpha_proposal(0.0, 2.0, 0.5, -30.0, 10.0).unwrap();
+
+        assert_relative_eq!(proposal, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(effective_step, 0.5, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn bounded_log_alpha_proposal_reports_clamped_step() {
+        let (proposal, effective_step) =
+            bounded_log_alpha_proposal(9.5, 2.0, 1.0, -30.0, 10.0).unwrap();
+
+        assert_relative_eq!(proposal, 10.0, epsilon = 1e-12);
+        assert_relative_eq!(effective_step, 0.25, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn bounded_log_alpha_proposal_rejects_no_movement_at_bound() {
+        assert!(bounded_log_alpha_proposal(10.0, 2.0, 1.0, -30.0, 10.0).is_none());
+    }
+
+    #[test]
+    fn dispersion_kernel_keeps_small_mu_alpha_terms_stable() {
+        let counts = [0, 1, 2];
+        let mu = [1.0e-6, 2.0e-6, 3.0e-6];
+        let log_alpha = 1.0e-8_f64.ln();
+
+        let kernel = dispersion_nb_log_likelihood_kernel(&counts, &mu, log_alpha).unwrap();
+        let derivative =
+            dispersion_nb_log_likelihood_kernel_derivative(&counts, &mu, log_alpha).unwrap();
+        let second_derivative =
+            dispersion_nb_log_likelihood_kernel_second_derivative(&counts, &mu, log_alpha).unwrap();
+
+        assert!(kernel.is_finite());
+        assert!(derivative.is_finite());
+        assert!(second_derivative.is_finite());
+    }
 }

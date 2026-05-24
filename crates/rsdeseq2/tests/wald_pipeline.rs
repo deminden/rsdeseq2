@@ -1,6 +1,92 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
+fn assert_wald_likelihood_state(fit: &DeseqFit, counts: &CountMatrix) {
+    let log_like = fit.log_like.as_ref().unwrap();
+    let full_deviance = fit.full_deviance.as_ref().unwrap();
+    assert_eq!(log_like.len(), counts.n_genes());
+    assert_eq!(full_deviance.len(), counts.n_genes());
+    for (gene, (log_like, deviance)) in log_like.iter().zip(full_deviance).enumerate() {
+        if log_like.is_nan() {
+            assert!(
+                deviance.is_nan(),
+                "full deviance for gene {gene} should be NaN when log_like is NaN"
+            );
+        } else {
+            assert_relative_eq!(*deviance, -2.0 * *log_like, epsilon = 1e-12);
+        }
+    }
+}
+
+fn assert_float_close_or_nan(actual: f64, expected: f64, label: &str) {
+    if expected.is_nan() {
+        assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
+    } else {
+        assert_relative_eq!(actual, expected, epsilon = 1e-12);
+    }
+}
+
+fn assert_slice_close_or_nan(actual: &[f64], expected: &[f64], label: &str) {
+    assert_eq!(actual.len(), expected.len(), "{label}: length mismatch");
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert_float_close_or_nan(*actual, *expected, &format!("{label}[{index}]"));
+    }
+}
+
+fn assert_matrix_close_or_nan(
+    actual: &RowMajorMatrix<f64>,
+    expected: &RowMajorMatrix<f64>,
+    label: &str,
+) {
+    assert_eq!(actual.n_rows(), expected.n_rows(), "{label}: row mismatch");
+    assert_eq!(
+        actual.n_cols(),
+        expected.n_cols(),
+        "{label}: column mismatch"
+    );
+    assert_slice_close_or_nan(actual.as_slice(), expected.as_slice(), label);
+}
+
+fn assert_wald_fit_intermediates_match(actual: &DeseqFit, expected: &DeseqFit, label: &str) {
+    assert_eq!(actual.beta_converged, expected.beta_converged);
+    assert_eq!(actual.beta_iter, expected.beta_iter);
+    assert_matrix_close_or_nan(
+        actual.beta.as_ref().unwrap(),
+        expected.beta.as_ref().unwrap(),
+        &format!("{label} beta"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_se.as_ref().unwrap(),
+        expected.beta_se.as_ref().unwrap(),
+        &format!("{label} beta_se"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_covariance.as_ref().unwrap(),
+        expected.beta_covariance.as_ref().unwrap(),
+        &format!("{label} beta_covariance"),
+    );
+    assert_matrix_close_or_nan(
+        actual.mu.as_ref().unwrap(),
+        expected.mu.as_ref().unwrap(),
+        &format!("{label} mu"),
+    );
+    assert_matrix_close_or_nan(
+        actual.hat_diagonal.as_ref().unwrap(),
+        expected.hat_diagonal.as_ref().unwrap(),
+        &format!("{label} hat_diagonal"),
+    );
+    assert_slice_close_or_nan(
+        actual.log_like.as_ref().unwrap(),
+        expected.log_like.as_ref().unwrap(),
+        &format!("{label} log_like"),
+    );
+    assert_slice_close_or_nan(
+        actual.full_deviance.as_ref().unwrap(),
+        expected.full_deviance.as_ref().unwrap(),
+        &format!("{label} full_deviance"),
+    );
+}
+
 #[test]
 fn fixed_dispersion_wald_pipeline_uses_intercept_shortcut() {
     let counts = CountMatrix::from_row_major_u32_with_names(
@@ -40,7 +126,10 @@ fn fixed_dispersion_wald_pipeline_uses_intercept_shortcut() {
         epsilon = 1e-12
     );
     assert_eq!(fit.mu.as_ref().unwrap().n_rows(), 2);
+    assert_eq!(fit.mu.as_ref().unwrap().n_cols(), counts.n_samples());
+    assert_eq!(fit.hat_diagonal.as_ref().unwrap().n_rows(), 2);
     assert_eq!(fit.hat_diagonal.as_ref().unwrap().n_cols(), 3);
+    assert_wald_likelihood_state(&fit, &counts);
     let beta_covariance = fit.beta_covariance.as_ref().unwrap();
     assert_eq!(beta_covariance.n_rows(), 2);
     assert_eq!(beta_covariance.n_cols(), 1);
@@ -95,6 +184,15 @@ fn fixed_dispersion_wald_pipeline_uses_normalization_factors_for_offsets() {
     {
         assert_relative_eq!(*actual, expected, epsilon = 1e-12);
     }
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert_wald_likelihood_state(&fit, &counts);
     assert_relative_eq!(results.rows[0].base_mean, 10.0, epsilon = 1e-12);
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
@@ -145,6 +243,17 @@ fn fixed_dispersion_wald_pipeline_uses_irls_for_two_group_design() {
         2.0_f64.log2(),
         epsilon = 1e-8
     );
+    assert_eq!(fit.mu.as_ref().unwrap().n_rows(), counts.n_genes());
+    assert_eq!(fit.mu.as_ref().unwrap().n_cols(), counts.n_samples());
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_rows(),
+        counts.n_genes()
+    );
+    assert_eq!(
+        fit.hat_diagonal.as_ref().unwrap().n_cols(),
+        counts.n_samples()
+    );
+    assert_wald_likelihood_state(&fit, &counts);
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
         2.0_f64.log2(),
@@ -190,6 +299,11 @@ fn fixed_dispersion_wald_contrast_matches_selected_coefficient_for_two_group_des
         .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.05], &[0.0, 1.0])
         .unwrap();
 
+    assert_wald_fit_intermediates_match(
+        &contrast_fit,
+        &coefficient_fit,
+        "coefficient-equivalent contrast",
+    );
     assert_relative_eq!(
         contrast_results.rows[0].log2_fold_change.unwrap(),
         coefficient_results.rows[0].log2_fold_change.unwrap(),
@@ -230,14 +344,17 @@ fn fixed_dispersion_wald_contrast_spec_resolves_coefficient_name() {
     )
     .unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
+    let builder = DeseqBuilder::new()
         .size_factors(vec![1.0, 1.0, 1.0, 1.0])
         .disable_cooks_cutoff()
         .disable_independent_filtering()
         .irls_options(IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
-        })
+        });
+
+    let (fit, results) = builder
+        .clone()
         .fit_fixed_dispersion_wald_contrast_spec(
             &counts,
             &design,
@@ -245,7 +362,11 @@ fn fixed_dispersion_wald_contrast_spec_resolves_coefficient_name() {
             &ContrastSpec::coefficient_name("condition_B_vs_A"),
         )
         .unwrap();
+    let (primitive_fit, _primitive_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.05], &[0.0, 1.0])
+        .unwrap();
 
+    assert_wald_fit_intermediates_match(&fit, &primitive_fit, "coefficient-name contrast spec");
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
         2.0_f64.log2(),
@@ -279,14 +400,17 @@ fn fixed_dispersion_wald_contrast_spec_resolves_factor_level_shape() {
     )
     .unwrap();
 
-    let (_fit, results) = DeseqBuilder::new()
+    let builder = DeseqBuilder::new()
         .size_factors(vec![1.0, 1.0, 1.0, 1.0])
         .disable_cooks_cutoff()
         .disable_independent_filtering()
         .irls_options(IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
-        })
+        });
+
+    let (fit, results) = builder
+        .clone()
         .fit_fixed_dispersion_wald_contrast_spec(
             &counts,
             &design,
@@ -294,7 +418,11 @@ fn fixed_dispersion_wald_contrast_spec_resolves_factor_level_shape() {
             &ContrastSpec::factor_level("condition", "B", "A"),
         )
         .unwrap();
+    let (primitive_fit, _primitive_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.05], &[0.0, 1.0])
+        .unwrap();
 
+    assert_wald_fit_intermediates_match(&fit, &primitive_fit, "factor-level contrast spec");
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
         2.0_f64.log2(),
@@ -337,14 +465,17 @@ fn fixed_dispersion_wald_contrast_spec_resolves_name_lists() {
     )
     .unwrap();
 
-    let (fit, results) = DeseqBuilder::new()
+    let builder = DeseqBuilder::new()
         .size_factors(vec![1.0, 1.0, 1.0, 1.0])
         .disable_cooks_cutoff()
         .disable_independent_filtering()
         .irls_options(IrlsOptions {
             ridge_lambda: 0.0,
             ..IrlsOptions::default()
-        })
+        });
+
+    let (fit, results) = builder
+        .clone()
         .fit_fixed_dispersion_wald_contrast_spec(
             &counts,
             &design,
@@ -352,9 +483,13 @@ fn fixed_dispersion_wald_contrast_spec_resolves_name_lists() {
             &ContrastSpec::list(vec!["condition_B_vs_A".into()], vec!["batch_Y_vs_X".into()]),
         )
         .unwrap();
+    let (primitive_fit, _primitive_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.05], &[0.0, 1.0, -1.0])
+        .unwrap();
 
     let beta = fit.beta.as_ref().unwrap();
     let expected = beta.row(0).unwrap()[1] - beta.row(0).unwrap()[2];
+    assert_wald_fit_intermediates_match(&fit, &primitive_fit, "list contrast spec");
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
         expected,
@@ -470,10 +605,13 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_character_contrast_all_ze
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (fit, results) = DeseqBuilder::new()
+    let builder = DeseqBuilder::new()
         .size_factors(vec![1.0; 6])
         .disable_cooks_cutoff()
-        .disable_independent_filtering()
+        .disable_independent_filtering();
+
+    let (fit, results) = builder
+        .clone()
         .fit_fixed_dispersion_wald_factor_level_contrast(
             &counts,
             &design,
@@ -481,7 +619,11 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_character_contrast_all_ze
             FactorLevelContrast::new("condition", "B", "A", &levels),
         )
         .unwrap();
+    let (primitive_fit, _primitive_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1, 0.1], &[0.0, 1.0, 0.0])
+        .unwrap();
 
+    assert_wald_fit_intermediates_match(&fit, &primitive_fit, "factor-level contrast helper");
     assert_eq!(fit.wald.as_ref().unwrap().stat[0], Some(0.0));
     assert_eq!(fit.wald.as_ref().unwrap().pvalue[0], Some(1.0));
     assert_eq!(results.rows[0].log2_fold_change, Some(0.0));

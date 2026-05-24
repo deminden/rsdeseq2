@@ -107,9 +107,15 @@ where
                     iterations: iter + 1,
                 });
             }
+            let actual_directional_derivative =
+                actual_directional_derivative(&parameters, &candidate, &gradient);
+            if !actual_directional_derivative.is_finite() || actual_directional_derivative >= 0.0 {
+                step *= 0.5;
+                continue;
+            }
             let (candidate_value, candidate_gradient) = objective_and_gradient(&candidate)?;
             if candidate_value.is_finite()
-                && candidate_value <= value + options.armijo * step * directional_derivative
+                && candidate_value <= value + options.armijo * actual_directional_derivative
             {
                 validate_state(candidate_value, &candidate_gradient, parameters.len())?;
                 accepted = Some((candidate, candidate_value, candidate_gradient));
@@ -235,6 +241,21 @@ fn max_abs_difference(left: &[f64], right: &[f64]) -> f64 {
         .fold(0.0, f64::max)
 }
 
+fn actual_directional_derivative(parameters: &[f64], candidate: &[f64], gradient: &[f64]) -> f64 {
+    gradient
+        .iter()
+        .copied()
+        .zip(
+            candidate
+                .iter()
+                .copied()
+                .zip(parameters.iter().copied())
+                .map(|(candidate, parameter)| candidate - parameter),
+        )
+        .map(|(gradient, direction)| gradient * direction)
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,5 +295,12 @@ mod tests {
 
         assert!(output.converged);
         assert_relative_eq!(output.parameters[0], 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn actual_directional_derivative_uses_clamped_candidate_movement() {
+        let derivative = actual_directional_derivative(&[0.9], &[1.0], &[-2.0]);
+
+        assert_relative_eq!(derivative, -0.2, epsilon = 1e-12);
     }
 }

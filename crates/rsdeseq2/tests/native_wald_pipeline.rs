@@ -111,6 +111,44 @@ fn assert_matrix_close_or_nan(
     assert_slice_close_or_nan(actual.as_slice(), expected.as_slice(), label);
 }
 
+fn assert_wald_fit_state_matches(actual: &DeseqFit, expected: &DeseqFit, label: &str) {
+    assert_matrix_close_or_nan(
+        actual.beta.as_ref().unwrap(),
+        expected.beta.as_ref().unwrap(),
+        &format!("{label} beta"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_se.as_ref().unwrap(),
+        expected.beta_se.as_ref().unwrap(),
+        &format!("{label} beta_se"),
+    );
+    assert_matrix_close_or_nan(
+        actual.beta_covariance.as_ref().unwrap(),
+        expected.beta_covariance.as_ref().unwrap(),
+        &format!("{label} beta_covariance"),
+    );
+    assert_slice_close_or_nan(
+        actual.log_like.as_ref().unwrap(),
+        expected.log_like.as_ref().unwrap(),
+        &format!("{label} log_like"),
+    );
+    assert_slice_close_or_nan(
+        actual.full_deviance.as_ref().unwrap(),
+        expected.full_deviance.as_ref().unwrap(),
+        &format!("{label} full_deviance"),
+    );
+    assert_matrix_close_or_nan(
+        actual.mu.as_ref().unwrap(),
+        expected.mu.as_ref().unwrap(),
+        &format!("{label} fitted mu"),
+    );
+    assert_matrix_close_or_nan(
+        actual.hat_diagonal.as_ref().unwrap(),
+        expected.hat_diagonal.as_ref().unwrap(),
+        &format!("{label} hat diagonal"),
+    );
+}
+
 fn assert_option_close(actual: Option<f64>, expected: Option<f64>, label: &str) {
     match (actual, expected) {
         (Some(actual), Some(expected)) => assert_float_close_or_nan(actual, expected, label),
@@ -229,6 +267,7 @@ fn top_level_fit_runs_default_glm_mu_wald_for_last_coefficient() {
     assert_eq!(top_level_fit.design, wald_fit.design);
     assert_eq!(top_level_fit.all_zero, wald_fit.all_zero);
     assert_eq!(top_level_fit.beta_converged, wald_fit.beta_converged);
+    assert_wald_fit_state_matches(&top_level_fit, &wald_fit, "top-level Wald");
     assert_eq!(top_level_fit.wald, wald_fit.wald);
     assert!(top_level_fit.dispersion.is_some());
     assert!(top_level_fit.beta.is_some());
@@ -245,11 +284,323 @@ fn top_level_fit_with_results_returns_default_wald_results() {
     let (wald_fit, wald_results) = builder.fit_wald_glm_mu(&counts, &design, 1).unwrap();
 
     assert_eq!(top_level_fit.wald, wald_fit.wald);
+    assert_wald_fit_state_matches(&top_level_fit, &wald_fit, "top-level Wald results");
     assert_eq!(top_level_results, wald_results);
     assert_eq!(top_level_results.metadata.test_type, Some(TestType::Wald));
     assert_eq!(
         top_level_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
+    );
+}
+
+#[test]
+fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+    };
+
+    let top_level_output = builder
+        .fit_with_results_with_cooks_replacement(&counts, &design, &replacement_options)
+        .unwrap();
+    let wald_output = builder
+        .fit_wald_glm_mu_with_cooks_replacement(&counts, &design, 1, &replacement_options)
+        .unwrap();
+
+    assert_eq!(top_level_output.refit_plan, wald_output.refit_plan);
+    assert_eq!(
+        top_level_output.original_results,
+        wald_output.original_results
+    );
+    assert_wald_fit_state_matches(
+        &top_level_output.original_fit,
+        &wald_output.original_fit,
+        "top-level Wald replacement original",
+    );
+    assert_eq!(top_level_output.refit_results, wald_output.refit_results);
+    assert_wald_fit_state_matches(
+        top_level_output.refit_fit.as_ref().unwrap(),
+        wald_output.refit_fit.as_ref().unwrap(),
+        "top-level Wald replacement refit",
+    );
+    assert_eq!(top_level_output.results, wald_output.results);
+    assert!(top_level_output.refit_plan.should_refit);
+    assert_eq!(
+        top_level_output.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+}
+
+#[test]
+fn top_level_fit_with_results_contrast_runs_default_glm_mu_wald_contrast() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let contrast = [0.0, 1.0];
+
+    let (top_level_fit, top_level_results) = builder
+        .fit_with_results_contrast(&counts, &design, &contrast)
+        .unwrap();
+    let (contrast_fit, contrast_results) = builder
+        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
+        .unwrap();
+
+    assert_eq!(top_level_fit.wald, contrast_fit.wald);
+    assert_wald_fit_state_matches(
+        &top_level_fit,
+        &contrast_fit,
+        "top-level Wald contrast results",
+    );
+    assert_eq!(top_level_results, contrast_results);
+    assert_eq!(top_level_results.metadata.test_type, Some(TestType::Wald));
+    assert_eq!(
+        top_level_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
+fn top_level_fit_contrast_returns_default_glm_mu_wald_contrast_fit() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let contrast = [0.0, 1.0];
+
+    let top_level_fit = builder.fit_contrast(&counts, &design, &contrast).unwrap();
+    let (contrast_fit, _contrast_results) = builder
+        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)
+        .unwrap();
+
+    assert_eq!(top_level_fit.counts_summary, contrast_fit.counts_summary);
+    assert_eq!(top_level_fit.design, contrast_fit.design);
+    assert_eq!(top_level_fit.all_zero, contrast_fit.all_zero);
+    assert_eq!(top_level_fit.beta_converged, contrast_fit.beta_converged);
+    assert_wald_fit_state_matches(&top_level_fit, &contrast_fit, "top-level Wald contrast");
+    assert_eq!(top_level_fit.wald, contrast_fit.wald);
+    assert!(top_level_fit.dispersion.is_some());
+    assert!(top_level_fit.beta.is_some());
+    assert!(top_level_fit.wald.is_some());
+}
+
+#[test]
+fn top_level_fit_with_results_contrast_cooks_replacement_runs_default_glm_mu_wald_contrast() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let contrast = [0.0, 1.0];
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+    };
+
+    let top_level_output = builder
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+    let contrast_output = builder
+        .fit_wald_glm_mu_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(top_level_output.refit_plan, contrast_output.refit_plan);
+    assert_eq!(
+        top_level_output.original_results,
+        contrast_output.original_results
+    );
+    assert_wald_fit_state_matches(
+        &top_level_output.original_fit,
+        &contrast_output.original_fit,
+        "top-level Wald contrast replacement original",
+    );
+    assert_eq!(
+        top_level_output.refit_results,
+        contrast_output.refit_results
+    );
+    assert_wald_fit_state_matches(
+        top_level_output.refit_fit.as_ref().unwrap(),
+        contrast_output.refit_fit.as_ref().unwrap(),
+        "top-level Wald contrast replacement refit",
+    );
+    assert_eq!(top_level_output.results, contrast_output.results);
+    assert!(top_level_output.refit_plan.should_refit);
+    assert_eq!(
+        top_level_output.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
+fn top_level_fit_with_results_contrast_specs_set_metadata() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (primitive_fit, _primitive_results) = builder
+        .clone()
+        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    let (named_fit, named_results) = builder
+        .clone()
+        .fit_with_results_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+    let (factor_fit, factor_results) = builder
+        .fit_with_results_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+
+    assert_wald_fit_state_matches(
+        &named_fit,
+        &primitive_fit,
+        "top-level named Wald contrast results",
+    );
+    assert_wald_fit_state_matches(
+        &factor_fit,
+        &primitive_fit,
+        "top-level factor Wald contrast results",
+    );
+    assert_eq!(
+        named_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        named_results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+}
+
+#[test]
+fn top_level_fit_contrast_specs_return_default_glm_mu_wald_fits() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let named_fit = builder
+        .fit_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+    let factor_fit = builder
+        .fit_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+    let (expected_fit, _expected_results) = builder
+        .fit_wald_glm_mu_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+
+    assert_eq!(named_fit.wald, expected_fit.wald);
+    assert_eq!(factor_fit.wald, expected_fit.wald);
+    assert_eq!(named_fit.beta_converged, expected_fit.beta_converged);
+    assert_eq!(factor_fit.beta_converged, expected_fit.beta_converged);
+    assert_wald_fit_state_matches(&named_fit, &expected_fit, "top-level named Wald contrast");
+    assert_wald_fit_state_matches(&factor_fit, &expected_fit, "top-level factor Wald contrast");
+}
+
+#[test]
+fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: f64::MAX,
+        min_replicates: 3,
+        which_samples: None,
+    };
+
+    let named_output = builder
+        .fit_with_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+            &replacement_options,
+        )
+        .unwrap();
+    let factor_output = builder
+        .fit_with_results_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+            &replacement_options,
+        )
+        .unwrap();
+    let (expected_fit, _expected_results) = builder
+        .fit_wald_glm_mu_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+
+    assert_eq!(named_output.refit_plan.n_refit, 0);
+    assert_eq!(factor_output.refit_plan.n_refit, 0);
+    assert_wald_fit_state_matches(
+        &named_output.original_fit,
+        &expected_fit,
+        "top-level named Wald contrast no-refit original",
+    );
+    assert_wald_fit_state_matches(
+        &factor_output.original_fit,
+        &expected_fit,
+        "top-level factor Wald contrast no-refit original",
+    );
+    assert_eq!(
+        named_output.results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_output.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
     );
 }
 
@@ -263,6 +614,93 @@ fn top_level_fit_keeps_lrt_explicit_until_reduced_design_is_supplied() {
         .unwrap_err();
 
     assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
+}
+
+#[test]
+fn top_level_fit_with_results_contrast_keeps_lrt_explicit() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap_err();
+    let spec_err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_contrast_spec(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap_err();
+    let factor_err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap_err();
+
+    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
+    assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
+    assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
+}
+
+#[test]
+fn top_level_fit_with_results_cooks_replacement_keeps_lrt_explicit() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_with_cooks_replacement(
+            &counts,
+            &design,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap_err();
+    let contrast_err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, 1.0],
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap_err();
+    let spec_err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap_err();
+    let factor_err = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .fit_with_results_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap_err();
+
+    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
+    assert!(matches!(
+        contrast_err,
+        DeseqError::UnsupportedFeature { .. }
+    ));
+    assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
+    assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
 }
 
 #[test]
@@ -394,14 +832,19 @@ fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (_named_fit, named_results) = builder
+    let (primitive_fit, _primitive_results) = builder
+        .clone()
+        .fit_wald_linear_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    let (named_fit, named_results) = builder
+        .clone()
         .fit_wald_linear_mu_contrast_spec(
             &counts,
             &design,
             &ContrastSpec::coefficient_name("condition_B_vs_A"),
         )
         .unwrap();
-    let (_factor_fit, factor_results) = builder
+    let (factor_fit, factor_results) = builder
         .fit_wald_linear_mu_factor_level_contrast(
             &counts,
             &design,
@@ -409,6 +852,16 @@ fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         )
         .unwrap();
 
+    assert_wald_fit_state_matches(
+        &named_fit,
+        &primitive_fit,
+        "native linear named contrast spec",
+    );
+    assert_wald_fit_state_matches(
+        &factor_fit,
+        &primitive_fit,
+        "native linear factor-level contrast",
+    );
     assert_eq!(
         named_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
@@ -670,14 +1123,19 @@ fn native_glm_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         .map(String::from)
         .collect::<Vec<_>>();
 
-    let (_named_fit, named_results) = builder
+    let (primitive_fit, _primitive_results) = builder
+        .clone()
+        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    let (named_fit, named_results) = builder
+        .clone()
         .fit_wald_glm_mu_contrast_spec(
             &counts,
             &design,
             &ContrastSpec::coefficient_name("condition_B_vs_A"),
         )
         .unwrap();
-    let (_factor_fit, factor_results) = builder
+    let (factor_fit, factor_results) = builder
         .fit_wald_glm_mu_factor_level_contrast(
             &counts,
             &design,
@@ -685,6 +1143,16 @@ fn native_glm_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         )
         .unwrap();
 
+    assert_wald_fit_state_matches(
+        &named_fit,
+        &primitive_fit,
+        "native GLM-mu named contrast spec",
+    );
+    assert_wald_fit_state_matches(
+        &factor_fit,
+        &primitive_fit,
+        "native GLM-mu factor-level contrast",
+    );
     assert_eq!(
         named_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
@@ -1036,6 +1504,10 @@ fn native_glm_mu_contrast_spec_cooks_replacement_preserves_metadata() {
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder();
 
+    let (expected_fit, expected_results) = builder
+        .clone()
+        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
     let output = builder
         .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
             &counts,
@@ -1053,6 +1525,13 @@ fn native_glm_mu_contrast_spec_cooks_replacement_preserves_metadata() {
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(output.refit_fit.is_none());
     assert!(output.refit_results.is_none());
+    assert_wald_fit_state_matches(
+        &output.original_fit,
+        &expected_fit,
+        "native GLM-mu named contrast no-refit original",
+    );
+    assert_eq!(output.original_results.rows, expected_results.rows);
+    assert_eq!(output.results.rows, expected_results.rows);
     assert_eq!(
         output.original_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
@@ -1077,6 +1556,10 @@ fn native_glm_mu_factor_level_contrast_cooks_replacement_preserves_metadata() {
         .map(String::from)
         .collect::<Vec<_>>();
 
+    let (expected_fit, expected_results) = builder
+        .clone()
+        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
     let output = builder
         .fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
             &counts,
@@ -1094,6 +1577,13 @@ fn native_glm_mu_factor_level_contrast_cooks_replacement_preserves_metadata() {
     assert_eq!(output.refit_plan.n_refit, 0);
     assert!(output.refit_fit.is_none());
     assert!(output.refit_results.is_none());
+    assert_wald_fit_state_matches(
+        &output.original_fit,
+        &expected_fit,
+        "native GLM-mu factor-level contrast no-refit original",
+    );
+    assert_eq!(output.original_results.rows, expected_results.rows);
+    assert_eq!(output.results.rows, expected_results.rows);
     assert_eq!(
         output.original_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
@@ -1527,69 +2017,84 @@ fn builder_auto_vst_uses_fast_subset_when_enough_rows_are_eligible() {
 }
 
 #[test]
-fn builder_auto_vst_uses_full_trend_when_observation_weights_are_present() {
+fn builder_auto_vst_uses_fast_subset_when_observation_weights_are_present() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
+    let weights = nonunit_weights_for(&counts);
     let builder = glm_mu_native_wald_builder()
         .fit_type(FitType::Mean)
-        .observation_weights(unit_weights_for(&counts));
+        .observation_weights(weights.clone());
 
     let output = builder.vst_glm_mu_auto(&counts, &design, 4).unwrap();
-    let full_fit = builder
-        .fit_dispersion_trend_glm_mu(&counts, &design)
+    let fast = builder.fast_vst_glm_mu(&counts, &design, 4).unwrap();
+    let base_fit = builder
+        .fit_size_factors_and_base_means_with_design(&counts, &design)
         .unwrap();
-    let expected = full_fit.variance_stabilizing_transform(&counts).unwrap();
 
-    assert!(output.fast_subset.is_none());
+    assert_eq!(
+        output.fast_subset.as_ref().unwrap().row_indices,
+        vec![1, 7, 4, 6]
+    );
     assert_eq!(
         output.trend_source,
-        VstTrendSource::FullData {
+        VstTrendSource::FastSubset {
             nsub: 4,
             eligible_rows: 7,
-            reason: VstFullDataReason::ObservationWeightsPresent,
         }
     );
-    assert_eq!(
-        output.trend_source.full_data_reason(),
-        Some(VstFullDataReason::ObservationWeightsPresent)
-    );
-    assert_eq!(output.trend_source.as_str(), "fullData");
-    assert_eq!(
-        output.trend_source.full_data_reason().unwrap().as_str(),
-        "observationWeightsPresent"
-    );
+    assert!(output.trend_source.used_fast_subset());
+    assert_eq!(output.trend_source.as_str(), "fastSubset");
+    assert_eq!(output.trend_source.full_data_reason(), None);
     let metadata = output.metadata();
-    assert_eq!(metadata.trend_source, "fullData");
+    assert_eq!(metadata.trend_source, "fastSubset");
     assert_eq!(metadata.nsub, 4);
     assert_eq!(metadata.eligible_rows, 7);
-    assert!(!metadata.used_fast_subset);
-    assert_eq!(metadata.full_data_reason, Some("observationWeightsPresent"));
+    assert!(metadata.used_fast_subset);
+    assert_eq!(metadata.full_data_reason, None);
     assert_eq!(metadata.transformed_rows, counts.n_genes());
     assert_eq!(metadata.transformed_cols, counts.n_samples());
-    assert_eq!(metadata.trend_fit_rows, counts.n_genes());
+    assert_eq!(metadata.trend_fit_rows, 4);
     assert_eq!(metadata.trend_fit_cols, counts.n_samples());
     assert_eq!(metadata.trend_fit_type, Some("mean"));
-    assert_eq!(metadata.fast_subset_rows, None);
-    assert_eq!(metadata.fast_subset_indices, None);
-    assert_eq!(output.transformed, expected);
-    assert_eq!(output.trend_fit.counts_summary, full_fit.counts_summary);
-    for (idx, (actual, expected)) in output
-        .trend_fit
-        .disp_fit
-        .as_ref()
-        .unwrap()
-        .iter()
-        .zip(full_fit.disp_fit.as_ref().unwrap())
-        .enumerate()
-    {
-        assert_float_close_or_nan(
-            *actual,
-            *expected,
-            &format!("weighted auto VST dispFit {idx}"),
-        );
-    }
+    assert_eq!(metadata.fast_subset_rows, Some(4));
+    assert_eq!(metadata.fast_subset_indices, Some(vec![1, 7, 4, 6]));
+    assert_eq!(output.transformed, fast.transformed);
+    assert_eq!(output.trend_fit, fast.subset_fit);
     assert!(output.trend_fit.dispersion_trend.is_some());
     assert!(output.trend_fit.observation_weights.is_some());
+    assert!(output
+        .fast_subset
+        .as_ref()
+        .unwrap()
+        .observation_weights
+        .is_some());
+    for (subset_row, original_row) in output
+        .fast_subset
+        .as_ref()
+        .unwrap()
+        .row_indices
+        .iter()
+        .copied()
+        .enumerate()
+    {
+        assert_eq!(
+            output
+                .fast_subset
+                .as_ref()
+                .unwrap()
+                .observation_weights
+                .as_ref()
+                .unwrap()
+                .row(subset_row)
+                .unwrap(),
+            base_fit
+                .observation_weights
+                .as_ref()
+                .unwrap()
+                .row(original_row)
+                .unwrap()
+        );
+    }
 }
 
 #[test]
@@ -1700,10 +2205,14 @@ fn builder_fast_vst_glm_mu_preserves_normalization_factors() {
 }
 
 #[test]
-fn builder_rejects_fast_vst_subset_trend_with_observation_weights_for_now() {
+fn builder_fast_vst_subset_trend_preserves_observation_weights() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
-    let builder = glm_mu_native_wald_builder().observation_weights(unit_weights_for(&counts));
+    let weights = nonunit_weights_for(&counts);
+    let builder = glm_mu_native_wald_builder().observation_weights(weights.clone());
+    let base_fit = builder
+        .fit_size_factors_and_base_means_with_design(&counts, &design)
+        .unwrap();
 
     let invalid_nsub = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 0)
@@ -1713,11 +2222,34 @@ fn builder_rejects_fast_vst_subset_trend_with_observation_weights_for_now() {
         .to_string()
         .contains("fast VST subset size must be positive"));
 
-    let err = builder
+    let (subset_fit, subset) = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 4)
-        .unwrap_err();
+        .unwrap();
 
-    assert!(err.to_string().contains("observation weights"));
+    assert_eq!(subset.row_indices, vec![1, 7, 4, 6]);
+    assert!(subset.observation_weights.is_some());
+    assert!(subset_fit.observation_weights.is_some());
+    assert_eq!(
+        subset_fit.observation_weights,
+        subset.observation_weights.clone()
+    );
+    assert_eq!(subset_fit.counts_summary.n_genes, subset.row_indices.len());
+    for (subset_row, original_row) in subset.row_indices.iter().copied().enumerate() {
+        assert_eq!(
+            subset
+                .observation_weights
+                .as_ref()
+                .unwrap()
+                .row(subset_row)
+                .unwrap(),
+            base_fit
+                .observation_weights
+                .as_ref()
+                .unwrap()
+                .row(original_row)
+                .unwrap()
+        );
+    }
 }
 
 #[test]

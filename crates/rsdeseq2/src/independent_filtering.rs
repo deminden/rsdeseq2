@@ -324,7 +324,7 @@ pub fn select_filter_index_with_lowess(
     } else {
         (positive_residuals
             .iter()
-            .map(|value| value.powi(2))
+            .map(|value| value * value)
             .sum::<f64>()
             / positive_residuals.len() as f64)
             .sqrt()
@@ -515,7 +515,8 @@ fn lowess_sorted(
                 *weight = 0.0;
             } else {
                 let ratio = absolute / scale;
-                *weight = (1.0 - ratio.powi(2)).powi(2);
+                let one_minus_ratio_sq = 1.0 - ratio * ratio;
+                *weight = one_minus_ratio_sq * one_minus_ratio_sq;
             }
         }
     }
@@ -608,7 +609,10 @@ fn lowest_at(
             let proximity = if distance <= low {
                 1.0
             } else {
-                (1.0 - (distance / bandwidth).powi(3)).powi(3)
+                let ratio = distance / bandwidth;
+                let ratio_cubed = ratio * ratio * ratio;
+                let one_minus_ratio_cubed = 1.0 - ratio_cubed;
+                one_minus_ratio_cubed * one_minus_ratio_cubed * one_minus_ratio_cubed
             };
             let weight = proximity * robustness_weights[point];
             weights.push((point, weight));
@@ -633,7 +637,10 @@ fn lowest_at(
             .sum::<f64>();
         let variance = weights
             .iter()
-            .map(|(point, weight)| weight * (x[*point] - center).powi(2))
+            .map(|(point, weight)| {
+                let residual = x[*point] - center;
+                weight * residual * residual
+            })
             .sum::<f64>();
         if variance.sqrt() > 0.001 * range {
             let slope_factor = (target_x - center) / variance;

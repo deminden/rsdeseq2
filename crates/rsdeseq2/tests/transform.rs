@@ -45,6 +45,15 @@ fn norm_transform_value_matches_scalar_formula() {
 }
 
 #[test]
+fn norm_transform_value_keeps_tiny_counts_precise() {
+    let tiny = 1.0e-12_f64;
+
+    let transformed = norm_transform_value(tiny, 0).unwrap();
+
+    assert_relative_eq!(transformed, tiny / std::f64::consts::LN_2, epsilon = 1e-24);
+}
+
+#[test]
 fn norm_transform_rejects_negative_and_non_finite_counts() {
     let negative = RowMajorMatrix::from_row_major(1, 1, vec![-1.0]).unwrap();
     assert!(norm_transform(&negative).is_err());
@@ -545,6 +554,20 @@ fn vst_parametric_value_is_log2_like_for_large_counts() {
     let transformed = vst_parametric_value(q, trend, 0).unwrap();
 
     assert_relative_eq!(transformed, q.log2(), epsilon = 1e-9);
+}
+
+#[test]
+fn vst_parametric_value_stays_finite_for_extreme_counts() {
+    let q = 1e308_f64;
+    let trend = ParametricDispersionTrend {
+        asympt_disp: 0.2,
+        extra_pois: 1.5,
+    };
+
+    let transformed = vst_parametric_value(q, trend, 0).unwrap();
+
+    assert!(transformed.is_finite());
+    assert_relative_eq!(transformed, q.log2(), max_relative = 1e-12);
 }
 
 #[test]

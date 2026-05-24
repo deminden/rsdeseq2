@@ -113,9 +113,11 @@ pub fn calculate_cooks_distance(
         for sample in 0..counts.n_samples() {
             let mean = mu_row[sample];
             let h = h_row[sample];
-            let variance = mean + dispersion * mean.powi(2);
-            let pearson_sq = (f64::from(count_row[sample]) - mean).powi(2) / variance;
-            values.push(pearson_sq / p * h / (1.0 - h).powi(2));
+            let variance = mean * (1.0 + dispersion * mean);
+            let residual = f64::from(count_row[sample]) - mean;
+            let one_minus_h = 1.0 - h;
+            let pearson_sq = residual * residual / variance;
+            values.push(pearson_sq / p * h / (one_minus_h * one_minus_h));
         }
     }
 
@@ -356,7 +358,8 @@ pub fn robust_method_of_moments_dispersion(
         let row = normalized_counts.row(gene)?;
         let mean = row.iter().sum::<f64>() / row.len() as f64;
         let alpha = if mean > 0.0 {
-            (variance - mean) / mean.powi(2)
+            let inv_mean = mean.recip();
+            (variance - mean) * inv_mean * inv_mean
         } else {
             f64::NAN
         };
@@ -561,7 +564,10 @@ fn trimmed_cell_variance(
             let mean = trimmed_mean(values.clone(), trim_ratio(bin));
             let sq_errors = values
                 .into_iter()
-                .map(|value| (value - mean).powi(2))
+                .map(|value| {
+                    let residual = value - mean;
+                    residual * residual
+                })
                 .collect::<Vec<_>>();
             group_variances.push(trim_scale(bin) * trimmed_mean(sq_errors, trim_ratio(bin)));
         }
@@ -578,7 +584,10 @@ fn trimmed_variance(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>,
         let sq_errors = row
             .iter()
             .copied()
-            .map(|value| (value - mean).powi(2))
+            .map(|value| {
+                let residual = value - mean;
+                residual * residual
+            })
             .collect::<Vec<_>>();
         variances.push(1.51 * trimmed_mean(sq_errors, 1.0 / 8.0));
     }

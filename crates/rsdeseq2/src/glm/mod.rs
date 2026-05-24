@@ -13,10 +13,14 @@ pub use beta::{
     beta_prior_variance_to_ridge_lambda, estimate_beta, estimate_beta_prior_variance,
     fit_glms_with_beta_prior_variance, fit_glms_with_beta_prior_variance_and_normalization_factors,
     fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_estimated_beta_prior_variance, fit_intercept_only_fixed_dispersion,
+    fit_glms_with_beta_prior_variance_and_weights, fit_glms_with_estimated_beta_prior_variance,
+    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors,
+    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
+    fit_glms_with_estimated_beta_prior_variance_and_weights, fit_intercept_only_fixed_dispersion,
     fit_intercept_only_fixed_dispersion_with_normalization_factors,
     fit_intercept_only_fixed_dispersion_with_weights, match_upper_quantile_for_variance,
-    match_weighted_upper_quantile_for_variance, BetaPriorGlmFit, BetaPriorRefitOptions,
+    match_weighted_upper_quantile_for_variance, BetaPriorGlmFit,
+    BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
     BetaPriorVarianceMethod, BetaPriorVarianceOptions,
 };
 pub use dispersion_fit::fit_with_dispersion;

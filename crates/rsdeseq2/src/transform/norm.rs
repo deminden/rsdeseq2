@@ -32,5 +32,5 @@ pub fn norm_transform_value(normalized_count: f64, index: usize) -> Result<f64, 
             value: normalized_count,
         });
     }
-    Ok((normalized_count + 1.0).log2())
+    Ok(normalized_count.ln_1p() / std::f64::consts::LN_2)
 }

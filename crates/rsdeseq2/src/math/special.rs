@@ -16,7 +16,8 @@ pub fn trigamma(mut x: f64) -> Result<f64, DeseqError> {
 
     let mut result = 0.0;
     while x < 8.0 {
-        result += x.recip().powi(2);
+        let inv = x.recip();
+        result += inv * inv;
         x += 1.0;
     }
 

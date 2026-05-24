@@ -67,6 +67,24 @@ pub struct BetaPriorRefitOptions {
     pub variance_options: BetaPriorVarianceOptions,
 }
 
+/// Size-factor offsets and optional observation weights for beta-prior refits.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BetaPriorSizeFactorWeightInput<'a> {
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+}
+
+/// Normalization-factor offsets and optional observation weights for beta-prior refits.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BetaPriorNormalizationFactorWeightInput<'a> {
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+}
+
 /// Estimate fixed-dispersion beta coefficients with DESeq2-style GLM dispatch.
 ///
 /// This is a public beta-estimation convenience entry point for callers that
@@ -97,7 +115,8 @@ pub fn beta_prior_variance_to_ridge_lambda(
         .enumerate()
         .map(|(idx, variance)| {
             validate_positive_finite(variance, "beta prior variance", idx)?;
-            Ok(variance.recip() / std::f64::consts::LN_2.powi(2))
+            let inv_ln2 = std::f64::consts::LOG2_E;
+            Ok(variance.recip() * inv_ln2 * inv_ln2)
         })
         .collect()
 }
@@ -113,6 +132,28 @@ pub fn fit_glms_with_beta_prior_variance(
 ) -> Result<NbinomGlmFit, DeseqError> {
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
     fit_fixed_dispersion_irls(counts, design, size_factors, dispersions, options)
+}
+
+/// Refit a fixed-dispersion GLM with supplied beta prior variance, size factors, and weights.
+pub fn fit_glms_with_beta_prior_variance_and_weights(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
+    fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        &normalization_factors,
+        dispersions,
+        weights,
+        beta_prior_variance,
+        options,
+    )
 }
 
 /// Refit a fixed-dispersion GLM with supplied beta prior variance and offsets.
@@ -186,6 +227,99 @@ pub fn fit_glms_with_estimated_beta_prior_variance(
         design,
         size_factors,
         dispersions,
+        &beta_prior_variance,
+        fit_options,
+    )?;
+
+    Ok(BetaPriorGlmFit {
+        mle_fit,
+        prior_fit,
+        beta_prior_variance,
+    })
+}
+
+/// Run an MLE fixed-dispersion fit with size factors and weights, estimate beta prior variance, then refit.
+pub fn fit_glms_with_estimated_beta_prior_variance_and_weights(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    input: BetaPriorSizeFactorWeightInput<'_>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<BetaPriorGlmFit, DeseqError> {
+    let normalization_factors =
+        normalization_factors_from_size_factors(counts, input.size_factors)?;
+    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        BetaPriorNormalizationFactorWeightInput {
+            normalization_factors: &normalization_factors,
+            weights: input.weights,
+        },
+        dispersions,
+        base_mean,
+        disp_fit,
+        options,
+    )
+}
+
+/// Run an MLE fixed-dispersion fit with offsets, estimate beta prior variance, then refit.
+pub fn fit_glms_with_estimated_beta_prior_variance_and_normalization_factors(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<BetaPriorGlmFit, DeseqError> {
+    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        BetaPriorNormalizationFactorWeightInput {
+            normalization_factors,
+            weights: None,
+        },
+        dispersions,
+        base_mean,
+        disp_fit,
+        options,
+    )
+}
+
+/// Run an MLE fixed-dispersion fit with offsets and weights, estimate beta prior variance, then refit.
+pub fn fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    input: BetaPriorNormalizationFactorWeightInput<'_>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<BetaPriorGlmFit, DeseqError> {
+    let fit_options = options.fit_options;
+    let mle_fit = fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+        counts,
+        design,
+        input.normalization_factors,
+        dispersions,
+        input.weights,
+        fit_options.clone(),
+    )?;
+    let beta_prior_variance = estimate_beta_prior_variance(
+        &mle_fit.beta,
+        base_mean,
+        disp_fit,
+        design.coefficient_names(),
+        options.variance_options,
+    )?;
+    let prior_fit = fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        input.normalization_factors,
+        dispersions,
+        input.weights,
         &beta_prior_variance,
         fit_options,
     )?;
@@ -285,7 +419,8 @@ pub fn match_upper_quantile_for_variance(
         reason: format!("normal quantile construction failed: {error}"),
     })?;
     let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
-    Ok((quantile / normal_quantile).powi(2))
+    let scale = quantile / normal_quantile;
+    Ok(scale * scale)
 }
 
 /// Weighted version of [`match_upper_quantile_for_variance`].
@@ -307,7 +442,8 @@ pub fn match_weighted_upper_quantile_for_variance(
         reason: format!("normal quantile construction failed: {error}"),
     })?;
     let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
-    Ok((weighted_quantile / normal_quantile).powi(2))
+    let scale = weighted_quantile / normal_quantile;
+    Ok(scale * scale)
 }
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with size factors.
@@ -399,7 +535,8 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
         }
         let sigma = xtwx.recip();
         beta_se_values.push(std::f64::consts::LOG2_E * sigma.sqrt());
-        beta_covariance_values.push(std::f64::consts::LOG2_E.powi(2) * sigma);
+        let log2_e = std::f64::consts::LOG2_E;
+        beta_covariance_values.push(log2_e * log2_e * sigma);
         hat_values.extend(working_weights.into_iter().map(|value| value * sigma));
     }
 
@@ -504,7 +641,7 @@ fn intercept_working_weights(
     let mut out = Vec::with_capacity(mu.len());
     for (sample, value) in mu.iter().copied().enumerate() {
         validate_positive_finite(value, "mu", sample)?;
-        let working_weight = (value.recip() + dispersion).recip();
+        let working_weight = mean_dispersion_working_weight(value, dispersion);
         out.push(match weights {
             Some(weights) => {
                 let weight = weights[sample];
@@ -586,9 +723,16 @@ fn beta_prior_weights(
     for row in 0..n_rows {
         validate_positive_finite(base_mean[row], "beta prior baseMean", row)?;
         validate_positive_finite(disp_fit[row], "beta prior dispFit", row)?;
-        weights.push((base_mean[row].recip() + disp_fit[row]).recip());
+        weights.push(mean_dispersion_working_weight(
+            base_mean[row],
+            disp_fit[row],
+        ));
     }
     Ok(weights)
+}
+
+fn mean_dispersion_working_weight(mean: f64, dispersion: f64) -> f64 {
+    mean / (1.0 + mean * dispersion)
 }
 
 fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {

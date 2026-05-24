@@ -377,6 +377,52 @@ fn native_glm_mu_local_results_match_optional_deseq2_references() {
 }
 
 #[test]
+fn native_glm_mu_local_cox_reid_results_match_optional_deseq2_references() {
+    let Some(wald_rows) = read_optional_tsv("native_glm_mu_local_cr_results_wald.tsv") else {
+        return;
+    };
+    let Some(lrt_rows) = read_optional_tsv("native_glm_mu_local_cr_results_lrt.tsv") else {
+        return;
+    };
+    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
+        return;
+    };
+
+    let builder = DeseqBuilder::new()
+        .size_factors(size_factors)
+        .fit_type(FitType::Local)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+    let (_, wald_results) = builder
+        .clone()
+        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
+        .unwrap();
+    let (_, lrt_results) = builder
+        .fit_lrt_glm_mu(
+            &reference_counts(),
+            &reference_full_design(),
+            &reference_reduced_design(),
+            1,
+        )
+        .unwrap();
+
+    assert_result_rows_match_reference(
+        &wald_results,
+        &wald_rows,
+        "native GLM-mu Cox-Reid local Wald results",
+    );
+    assert_result_rows_match_reference(
+        &lrt_results,
+        &lrt_rows,
+        "native GLM-mu Cox-Reid local LRT results",
+    );
+}
+
+#[test]
 fn native_weighted_glm_mu_mean_cox_reid_results_match_optional_deseq2_references() {
     let Some(wald_rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_results_wald.tsv")
     else {
@@ -475,6 +521,58 @@ fn native_weighted_glm_mu_local_results_match_optional_deseq2_references() {
         &lrt_results,
         &lrt_rows,
         "native weighted GLM-mu local LRT results",
+    );
+}
+
+#[test]
+fn native_weighted_glm_mu_local_cox_reid_results_match_optional_deseq2_references() {
+    let Some(wald_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_results_wald.tsv")
+    else {
+        return;
+    };
+    let Some(lrt_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_results_lrt.tsv")
+    else {
+        return;
+    };
+    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
+        return;
+    };
+    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
+        return;
+    };
+
+    let builder = DeseqBuilder::new()
+        .size_factors(size_factors)
+        .observation_weights(observation_weights)
+        .fit_type(FitType::Local)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+    let (_, wald_results) = builder
+        .clone()
+        .fit_wald_glm_mu(&reference_counts(), &reference_full_design(), 1)
+        .unwrap();
+    let (_, lrt_results) = builder
+        .fit_lrt_glm_mu(
+            &reference_counts(),
+            &reference_full_design(),
+            &reference_reduced_design(),
+            1,
+        )
+        .unwrap();
+
+    assert_result_rows_match_reference(
+        &wald_results,
+        &wald_rows,
+        "native weighted GLM-mu Cox-Reid local Wald results",
+    );
+    assert_result_rows_match_reference(
+        &lrt_results,
+        &lrt_rows,
+        "native weighted GLM-mu Cox-Reid local LRT results",
     );
 }
 

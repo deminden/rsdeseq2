@@ -72,8 +72,7 @@ pub fn fast_vst_subset_indices(base_mean: &[f64], nsub: usize) -> Result<Vec<usi
     }
     eligible.sort_by(|left, right| {
         left.1
-            .partial_cmp(&right.1)
-            .expect("finite base means must be comparable")
+            .total_cmp(&right.1)
             .then_with(|| left.0.cmp(&right.0))
     });
 
@@ -494,13 +493,9 @@ pub fn vst_parametric_value(
     validate_normalized_count(normalized_count, index)?;
     let alpha = trend.asympt_disp;
     let extra = trend.extra_pois;
-    Ok(((1.0
-        + extra
-        + 2.0 * alpha * normalized_count
-        + 2.0 * (alpha * normalized_count * (1.0 + extra + alpha * normalized_count)).sqrt())
-        / (4.0 * alpha))
-        .ln()
-        / std::f64::consts::LN_2)
+    let alpha_count = alpha * normalized_count;
+    let numerator_root = alpha_count.sqrt() + (1.0 + extra + alpha_count).sqrt();
+    Ok((2.0 * numerator_root.ln() - (4.0 * alpha).ln()) / std::f64::consts::LN_2)
 }
 
 #[derive(Clone, Debug)]

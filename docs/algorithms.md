@@ -246,24 +246,22 @@ indices, subset trend-fit shape, and stable trend-fit type label
 The public fast-VST builder validates `nsub > 0` before other branch checks so
 invalid subset requests report the same error shape as the lower-level subset
 helpers and automatic VST.
-Observation-weighted fast-VST trend fitting remains
-explicit future work because preprocessed weight rows must not be treated as
-raw input weights a second time.
+Observation-weighted fast-VST trend fitting reuses the design-preprocessed
+weight matrix and subsets those rows alongside counts and normalization data.
 `DeseqBuilder::vst_glm_mu_auto` now performs the DESeq2-shaped automatic
 choice: use the deterministic fast subset when enough rows are eligible and
-observation weights are absent, or fit the selected Rust trend on all rows when
-the default subset is too large for the dataset or weights are present. The
-returned `VstGlmMuOutput` records whether the trend came from the fast subset
-or full data, the requested `nsub`, and the eligible-row count;
+carry any preprocessed observation weights through that subset, or fit the
+selected Rust trend on all rows when the default subset is too large for the
+dataset. The returned `VstGlmMuOutput` records whether the trend came from the
+fast subset or full data, the requested `nsub`, and the eligible-row count;
 `VstTrendSource` also exposes accessor helpers for these fields and for the
 fast-subset decision. Full-data trend metadata records whether that path was
-chosen because too few rows were eligible or because observation weights were
-present. The source and full-data reason enums expose stable labels:
-`fastSubset`, `fullData`, `insufficientEligibleRows`, and
-`observationWeightsPresent`. `VstGlmMuOutput::metadata()` packages those
-labels with `nsub`, eligible-row count, transform dimensions, trend-fit row
-and sample counts, stable trend-fit type label, optional fast-subset row count,
-and optional original fast-subset row indices for wrappers and benchmark logs.
+chosen because too few rows were eligible. The source and full-data reason
+enums expose stable labels: `fastSubset`, `fullData`, and
+`insufficientEligibleRows`. `VstGlmMuOutput::metadata()` packages those labels
+with `nsub`, eligible-row count, transform dimensions, trend-fit row and sample
+counts, stable trend-fit type label, optional fast-subset row count, and
+optional original fast-subset row indices for wrappers and benchmark logs.
 `blind_vst_glm_mu_auto` uses the same automatic choice with a named
 intercept-only design, matching the implemented part of DESeq2's `blind=TRUE`
 workflow without invoking any external runtime.
@@ -549,9 +547,10 @@ wide prior variance. The full high-level beta-prior refit and expanded
 model-matrix workflow are still tracked as future parity work.
 
 `fit_glms_with_beta_prior_variance()` performs the primitive fixed-dispersion
-refit from a supplied `betaPriorVar` vector. The vector is expressed on the
-log2 beta scale, matching DESeq2, then converted to the natural-log ridge used
-by the Rust IRLS solver:
+refit from a supplied `betaPriorVar` vector. Size-factor, normalization-factor,
+and optional observation-weight entry points share the same conversion. The
+vector is expressed on the log2 beta scale, matching DESeq2, then converted to
+the natural-log ridge used by the Rust IRLS solver:
 
 ```text
 lambda_log2 = 1 / betaPriorVar
@@ -561,7 +560,9 @@ lambda_natural_log = lambda_log2 / log(2)^2
 `fit_glms_with_estimated_beta_prior_variance()` combines the two primitive
 steps for fixed-dispersion matrices: first fit MLE betas, estimate the
 coefficient prior variances, and then refit with the converted per-coefficient
-ridge. Expanded-model prior averaging remains separate future work.
+ridge. Companion helpers cover the same estimated-prior workflow for
+normalization-factor offsets and optional observation weights. Expanded-model
+prior averaging remains separate future work.
 
 ## Observation-Weight Preprocessing
 
@@ -793,7 +794,10 @@ implemented diagnostics such as `dispGeneEst`, `dispGeneIter`, `dispFit`,
 view also reports the present column names in stable stage order for wrappers
 and parity-table exporters, and can assemble those fields into a typed
 diagnostic data-frame view. `io::write_deseq_mcols_diagnostics_tsv()` exports
-the same fields with a leading `gene` column and R-style `NA` values.
+the same fields with a leading `gene` column and R-style `NA` values. Matrix
+diagnostics such as fitted means and full/reduced hat diagonals remain on
+`DeseqFit`; they are not flattened into the `mcols(dds)`-style row-metadata
+view.
 Full Bioconductor result objects, formula-aware contrast metadata, and complete
 wrapper metadata preservation are future work.
 
@@ -873,7 +877,9 @@ dispersion/MAP path on the replacement counts while preserving the original
 size factors, then rerun the relevant Wald, Wald contrast, or LRT test, merge
 only `refitReplace` rows into the result table, clear result fields for
 `newAllZero` rows, and finally apply the caller's Cook's cutoff and independent
-filtering to the merged result rows.
+filtering to the merged result rows. Top-level GLM-mu result helpers expose this
+limited replacement-refit path for the default Wald/LRT coefficient and
+primitive numeric, named/list, and caller-supplied factor-level Wald contrasts.
 
 Automatic R formula/colData dispatch for the two-group low-count heuristic,
 remaining contrast edge cases, beta-prior behavior, and Bioconductor
@@ -962,9 +968,18 @@ parametric/local/mean-trend, deterministic-prior branches.
 `DeseqBuilder::fit()` and `DeseqBuilder::fit_with_results()` now expose the
 implemented GLM-mu Wald branch as a limited top-level workflow and report the
 last design coefficient by default, matching DESeq2's default result-coefficient
-shape. LRT remains available through `DeseqBuilder::fit_lrt()`,
-`DeseqBuilder::fit_lrt_with_results()`, and the branch-specific `fit_lrt_*`
-entry points because callers must provide a reduced design.
+shape. `fit_contrast()`, `fit_contrast_spec()`, and
+`fit_factor_level_contrast()` expose fit-only top-level Wald contrast helpers;
+`fit_with_results_contrast()`, `fit_with_results_contrast_spec()`, and
+`fit_with_results_factor_level_contrast()` expose the same branch with result
+rows for primitive numeric, named/list, and caller-supplied factor-level Wald
+contrasts. The corresponding `*_with_cooks_replacement()` helpers expose the limited
+replacement-refit workflow when callers supply replacement options. LRT
+remains available through `DeseqBuilder::fit_lrt()`,
+`DeseqBuilder::fit_lrt_with_results()`,
+`DeseqBuilder::fit_lrt_with_results_with_cooks_replacement()`, and the
+branch-specific `fit_lrt_*` entry points because callers must provide a reduced
+design.
 Gene/sample normalization factors are supported in this subset by following
 DESeq2's `linearModelMuNormalized`: projected normalized counts are multiplied
 by `getSizeOrNormFactors`, and moments starts use
@@ -989,7 +1004,10 @@ pvalue_i = pchisq(stat_i, df = ncol(full) - ncol(reduced), lower.tail = FALSE)
 standard-error, covariance, convergence, iteration, log-likelihood,
 DESeq2-style full deviance (`-2 * logLike`), fitted-mean, and hat-diagonal
 fields. LRT pipelines also store reduced-model log likelihood, beta
-convergence, and beta iteration vectors for stage-by-stage parity checks.
+convergence, beta iteration, fitted-mean, and hat-diagonal fields for
+stage-by-stage parity checks. The full/reduced fitted-mean and hat-diagonal
+matrices stay as matrix-valued `DeseqFit` state rather than `mcols(dds)` row
+metadata columns.
 `DeseqFit::deseq2_mcols_diagnostics()` also exposes the stable fitted
 dispersion trend type label when a parametric, local, or mean trend has been
 attached, keeping transform and result parity logs on the same label set.
@@ -1131,8 +1149,10 @@ DESeq2-style curvature checks, and high-level fit states retain the gene-wise
 iteration counts as `dispGeneIter`-compatible diagnostics. The current weighted
 GLM-mu mean and local-trend MAP/Wald/LRT branches have DESeq2 golden
 references, including compact result-table and BH-adjusted p-value checks for
-the matched result rows. The unweighted GLM-mu Cox-Reid local-trend branch has
-a MAP dispersion anchor. Broader full parity still requires exact local
+the matched result rows. The unweighted and weighted GLM-mu Cox-Reid
+local-trend branches have MAP/Wald/LRT anchors, including fitted means, hat
+diagonals, log-likelihoods, deviances, convergence, and compact result rows.
+Broader full parity still requires exact local
 `locfit` identity, glmGamPoi trend support, and remaining edge-case coverage.
 The local smoother now treats a single usable local-fit row as a constant
 log-dispersion trend, matching the generated tiny GLM-mu local fixture instead

@@ -45,7 +45,11 @@ Generated files should include:
 - `fixed_lrt_reference.tsv`, when DESeq2 internals are available
 - `fixed_mu_full.tsv`
 - `fixed_hat_full.tsv`
+- `fixed_mu_reduced.tsv`
+- `fixed_hat_reduced.tsv`
 - `fixed_cooks_full.tsv`
+- `fixed_weighted_mu_reduced.tsv`
+- `fixed_weighted_hat_reduced.tsv`
 - `native_glm_mu_cr_reference.tsv`, when DESeq2 internals are available
 - `native_glm_mu_cr_dispersion_mu.tsv`, when DESeq2 internals are available
 - `native_glm_mu_mean_reference.tsv`, when DESeq2 internals are available
@@ -84,8 +88,15 @@ dispersions, default `1e-6` beta ridge, `useQR=FALSE`, and `useOptim=FALSE`.
 They exist to validate the current Rust fixed-dispersion GLM path. They are
 not a substitute for full DESeq2 dispersion-estimation parity. The default
 reference set includes the unweighted fixed Wald/LRT, fitted `mu`, hat
-diagonal, Cook's distance files, and weighted fixed Wald/LRT files because
-these are numerically reproduced. The GLM-mu native files include the default
+diagonal, Cook's distance files, and weighted fixed Wald/LRT files including
+reduced-model fitted means and hat diagonals because these are numerically
+reproduced. The same supplied-dispersion MLE beta matrix
+also drives `beta_prior_variance_reference.tsv`, which records DESeq2
+`estimateBetaPriorVar` weighted and quantile beta-prior variance outputs for
+the primitive Rust beta-prior estimator, plus `beta_prior_refit_reference.tsv`,
+`beta_prior_refit_mu.tsv`, and `beta_prior_refit_hat.tsv` for the corresponding
+supplied-dispersion ridge refit. The forced-optim fallback reference includes
+both fitted means and hat diagonals. The GLM-mu native files include the default
 unweighted and weighted Cox-Reid gene-wise branches,
 `estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE)`, the default
 unweighted Cox-Reid mean-trend MAP/Wald/LRT branch, plus the current narrow
@@ -98,8 +109,10 @@ p-values for result-table parity. The unweighted GLM-mu local-trend fixture
 also records MAP, Wald, LRT, and result rows for the tiny-data case where one
 row is usable for the local fit; the weighted GLM-mu local fixture covers the
 same MAP/Wald/LRT/result-row surface with `weightsFail` expansion. A separate
-unweighted GLM-mu Cox-Reid local-trend fixture records the MAP dispersion
-intermediate and stored dispersion means for that combination.
+GLM-mu Cox-Reid local-trend fixture family records unweighted and weighted MAP
+dispersion intermediates, stored dispersion means, Wald fitted means and hat
+diagonals, LRT full/reduced likelihoods, and compact Wald/LRT result rows for
+that combination.
 
 Rust golden tests skip automatically when these files are absent. After running
 the R script, those same tests compare size factors, normalized counts,
