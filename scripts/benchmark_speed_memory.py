@@ -139,6 +139,28 @@ def median_or_blank(values: list[float | int | None]) -> str:
     return f"{statistics.median(present):.6g}"
 
 
+def min_or_blank(values: list[float | int | None]) -> str:
+    present = [float(value) for value in values if value not in (None, "")]
+    if not present:
+        return ""
+    return f"{min(present):.6g}"
+
+
+def max_or_blank(values: list[float | int | None]) -> str:
+    present = [float(value) for value in values if value not in (None, "")]
+    if not present:
+        return ""
+    return f"{max(present):.6g}"
+
+
+def mad_or_blank(values: list[float | int | None]) -> str:
+    present = [float(value) for value in values if value not in (None, "")]
+    if not present:
+        return ""
+    median = statistics.median(present)
+    return f"{statistics.median(abs(value - median) for value in present):.6g}"
+
+
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
@@ -185,7 +207,13 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
         "runs",
         "ok_runs",
         "median_elapsed_s",
+        "min_elapsed_s",
+        "max_elapsed_s",
+        "mad_elapsed_s",
         "median_max_rss_kb",
+        "min_max_rss_kb",
+        "max_max_rss_kb",
+        "mad_max_rss_kb",
         "max_abs_diff_vs_deseq2",
     ]
     with path.open("w", newline="") as handle:
@@ -197,6 +225,8 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
                 for row in group_rows
                 if row["max_abs_diff_vs_deseq2"] != ""
             ]
+            elapsed_values = [row["elapsed_s"] for row in group_rows]
+            rss_values = [row["max_rss_kb"] for row in group_rows]
             writer.writerow(
                 {
                     "tool": key[0],
@@ -206,12 +236,14 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
                     "samples": key[4],
                     "runs": len(group_rows),
                     "ok_runs": sum(row["status"] == "ok" for row in group_rows),
-                    "median_elapsed_s": median_or_blank(
-                        [row["elapsed_s"] for row in group_rows]
-                    ),
-                    "median_max_rss_kb": median_or_blank(
-                        [row["max_rss_kb"] for row in group_rows]
-                    ),
+                    "median_elapsed_s": median_or_blank(elapsed_values),
+                    "min_elapsed_s": min_or_blank(elapsed_values),
+                    "max_elapsed_s": max_or_blank(elapsed_values),
+                    "mad_elapsed_s": mad_or_blank(elapsed_values),
+                    "median_max_rss_kb": median_or_blank(rss_values),
+                    "min_max_rss_kb": min_or_blank(rss_values),
+                    "max_max_rss_kb": max_or_blank(rss_values),
+                    "mad_max_rss_kb": mad_or_blank(rss_values),
                     "max_abs_diff_vs_deseq2": median_or_blank(diff_values),
                 }
             )

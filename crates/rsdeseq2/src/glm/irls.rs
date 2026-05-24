@@ -3,15 +3,33 @@ use nalgebra::{DMatrix, DVector};
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
-use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted};
+use crate::glm::beta::fit_intercept_only_fixed_dispersion;
+use crate::glm::fallback::optim_fallback_rows;
+use crate::glm::nb::{
+    nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted, nbinom_log_pmf,
+};
 use crate::glm::NbinomGlmFit;
+use crate::math::optim::{BoundedOptimizationOutput, BoundedOptimizerOptions};
 use crate::matrix::RowMajorMatrix;
 
-/// Placeholder for future IRLS beta fitting.
-pub fn fit_irls() -> Result<(), DeseqError> {
-    Err(DeseqError::UnsupportedFeature {
-        feature: "full beta-prior, contrast-output, and optim-fallback IRLS variants".to_string(),
-    })
+/// Fit a fixed-dispersion negative-binomial GLM with DESeq2-style dispatch.
+///
+/// Intercept-only designs with the default tiny ridge use DESeq2's closed-form
+/// shortcut. Other designs use the general fixed-dispersion IRLS path.
+pub fn fit_irls(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    if is_intercept_only_design(design)
+        && options.uses_intercept_shortcut_for_coefficients(design.n_coefficients())?
+    {
+        fit_intercept_only_fixed_dispersion(counts, size_factors, dispersions)
+    } else {
+        fit_fixed_dispersion_irls(counts, design, size_factors, dispersions, options)
+    }
 }
 
 /// Linear solver for the IRLS weighted least-squares update.
@@ -47,6 +65,14 @@ pub struct IrlsOptions {
     pub ridge_lambda_by_coefficient: Option<Vec<f64>>,
     /// Weighted least-squares solver used inside each IRLS step.
     pub solver: IrlsSolver,
+    /// Also refit rows that fail to converge within `maxit` using bounded optimization.
+    pub use_optim: bool,
+    /// Send every row through bounded optimization after IRLS.
+    pub force_optim: bool,
+    /// Maximum bounded-optimizer iterations for fallback rows.
+    pub optim_maxit: usize,
+    /// Projected-gradient tolerance for fallback optimization.
+    pub optim_tol: f64,
 }
 
 impl Default for IrlsOptions {
@@ -59,6 +85,10 @@ impl Default for IrlsOptions {
             ridge_lambda: 1e-6 / std::f64::consts::LN_2.powi(2),
             ridge_lambda_by_coefficient: None,
             solver: IrlsSolver::NormalEquations,
+            use_optim: false,
+            force_optim: false,
+            optim_maxit: 200,
+            optim_tol: 1e-8,
         }
     }
 }
@@ -102,12 +132,22 @@ impl IrlsOptions {
     }
 }
 
+fn is_intercept_only_design(design: &DesignMatrix) -> bool {
+    design.n_coefficients() == 1
+        && design
+            .matrix()
+            .as_slice()
+            .iter()
+            .all(|value| (*value - 1.0).abs() <= f64::EPSILON)
+}
+
 /// Fit an unweighted fixed-dispersion NB GLM by IRLS.
 ///
 /// This implements the standard-design-matrix branch of DESeq2's `fitBeta`
 /// loop. The weighted least-squares update can use either the direct normal
-/// equations branch or DESeq2's augmented QR branch. Observation weights,
-/// contrast output, and optim fallback remain future work.
+/// equations branch or DESeq2's augmented QR branch. Observation weights are
+/// supported, and fallback rows can be refit with bounded pure-Rust
+/// optimization. Contrast output remains future work.
 pub fn fit_fixed_dispersion_irls(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -283,6 +323,38 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
         let _ = dev;
     }
 
+    let beta_for_routing =
+        RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values.clone())?;
+    let covariance_for_routing =
+        RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values.clone())?;
+    let fallback_rows = optim_fallback_rows(
+        &beta_converged,
+        &beta_for_routing,
+        &covariance_for_routing,
+        options.use_optim,
+        options.force_optim,
+    )?;
+    let mut optim_log_like = vec![None; counts.n_genes()];
+    if !fallback_rows.rows.is_empty() {
+        refit_optim_fallback_rows(
+            &fallback_rows.rows,
+            &mut beta_values,
+            &mut beta_var_values,
+            &mut beta_covariance_values,
+            &mut mu_values,
+            &mut beta_converged,
+            &mut optim_log_like,
+            OptimFallbackInput {
+                counts,
+                x: &x,
+                normalization_factors,
+                dispersions,
+                weights,
+                ridge_lambda: &ridge_lambda,
+                options: &options,
+            },
+        )?;
+    }
     let beta = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values)?;
     let beta_se = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_var_values)?;
     let beta_covariance =
@@ -290,7 +362,12 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let mu = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), mu_values)?;
     let hat_diagonal =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), hat_values)?;
-    let log_like = nbinom_log_likelihood_matrix(counts, &mu, dispersions, weights)?;
+    let mut log_like = nbinom_log_likelihood_matrix(counts, &mu, dispersions, weights)?;
+    for (gene, row_log_like) in optim_log_like.into_iter().enumerate() {
+        if let Some(row_log_like) = row_log_like {
+            log_like[gene] = row_log_like;
+        }
+    }
 
     Ok(NbinomGlmFit {
         log_like,
@@ -304,6 +381,362 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
         n_terms: p,
         hat_diagonal,
     })
+}
+
+struct OptimFallbackInput<'a> {
+    counts: &'a CountMatrix,
+    x: &'a DMatrix<f64>,
+    normalization_factors: &'a RowMajorMatrix<f64>,
+    dispersions: &'a [f64],
+    weights: Option<&'a RowMajorMatrix<f64>>,
+    ridge_lambda: &'a [f64],
+    options: &'a IrlsOptions,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn refit_optim_fallback_rows(
+    rows: &[usize],
+    beta_values: &mut [f64],
+    beta_var_values: &mut [f64],
+    beta_covariance_values: &mut [f64],
+    mu_values: &mut [f64],
+    beta_converged: &mut [bool],
+    optim_log_like: &mut [Option<f64>],
+    input: OptimFallbackInput<'_>,
+) -> Result<(), DeseqError> {
+    let p = input.x.ncols();
+    let n = input.x.nrows();
+    for gene in rows.iter().copied() {
+        let counts_row = input.counts.row(gene)?;
+        let nf = input.normalization_factors.row(gene)?;
+        let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
+        let dispersion = input.dispersions[gene];
+        let beta_start = optim_start_beta_log2(
+            &beta_values[gene * p..(gene + 1) * p],
+            input.x,
+            counts_row,
+            nf,
+            input.options.max_beta_abs,
+        )?;
+        let beta_input = BetaOptimInput {
+            x: input.x,
+            counts: counts_row,
+            nf,
+            dispersion,
+            weights: weight_row,
+            ridge_lambda: input.ridge_lambda,
+        };
+        let output = optimize_beta_log2(beta_input, &beta_start, input.options)?;
+
+        let mu_unfloored = fitted_mu_log2_unfloored(input.x, &output.parameters, nf)?;
+        let mu_for_inference = mu_unfloored
+            .iter()
+            .copied()
+            .map(|value| value.max(input.options.min_mu))
+            .collect::<Vec<_>>();
+        let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
+        let Some((beta_covariance, _hat_diag)) =
+            covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
+        else {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: "optim fallback covariance is singular".to_string(),
+            });
+        };
+
+        for (col, value) in output.parameters.iter().copied().enumerate() {
+            beta_values[gene * p + col] = value;
+            let covariance_value = beta_covariance[col * p + col];
+            beta_var_values[gene * p + col] =
+                std::f64::consts::LOG2_E * covariance_value.max(0.0).sqrt();
+        }
+        for (idx, value) in beta_covariance.into_iter().enumerate() {
+            beta_covariance_values[gene * p * p + idx] = std::f64::consts::LOG2_E.powi(2) * value;
+        }
+        for (sample, value) in mu_unfloored.iter().copied().enumerate() {
+            mu_values[gene * n + sample] = value;
+        }
+        beta_converged[gene] = output.converged;
+        optim_log_like[gene] = Some(nbinom_log_likelihood_weighted(
+            counts_row,
+            &mu_for_inference,
+            dispersion,
+            weight_row,
+        )?);
+    }
+    Ok(())
+}
+
+fn optim_start_beta_log2(
+    current_beta_log2: &[f64],
+    x: &DMatrix<f64>,
+    counts: &[u32],
+    nf: &[f64],
+    bound: f64,
+) -> Result<Vec<f64>, DeseqError> {
+    if current_beta_log2
+        .iter()
+        .copied()
+        .all(|value| value.is_finite() && value.abs() < bound)
+    {
+        return Ok(current_beta_log2
+            .iter()
+            .copied()
+            .map(|value| value.clamp(-bound, bound))
+            .collect());
+    }
+
+    let y = counts.iter().copied().map(f64::from).collect::<Vec<_>>();
+    Ok(initial_beta(x, &y, nf)?
+        .iter()
+        .copied()
+        .map(|value| (std::f64::consts::LOG2_E * value).clamp(-bound, bound))
+        .collect())
+}
+
+#[derive(Clone, Copy)]
+struct BetaOptimInput<'a> {
+    x: &'a DMatrix<f64>,
+    counts: &'a [u32],
+    nf: &'a [f64],
+    dispersion: f64,
+    weights: Option<&'a [f64]>,
+    ridge_lambda: &'a [f64],
+}
+
+fn optimize_beta_log2(
+    input: BetaOptimInput<'_>,
+    start: &[f64],
+    options: &IrlsOptions,
+) -> Result<BoundedOptimizationOutput, DeseqError> {
+    let optimizer_options = BoundedOptimizerOptions {
+        maxit: options.optim_maxit,
+        gradient_tol: options.optim_tol,
+        ..BoundedOptimizerOptions::default()
+    };
+    minimize_beta_log2_newton(
+        input,
+        start,
+        -options.max_beta_abs,
+        options.max_beta_abs,
+        optimizer_options,
+    )
+}
+
+fn minimize_beta_log2_newton(
+    input: BetaOptimInput<'_>,
+    start: &[f64],
+    lower: f64,
+    upper: f64,
+    options: BoundedOptimizerOptions,
+) -> Result<BoundedOptimizationOutput, DeseqError> {
+    let mut parameters = start
+        .iter()
+        .copied()
+        .map(|value| value.clamp(lower, upper))
+        .collect::<Vec<_>>();
+    let (mut value, mut gradient, mut hessian) =
+        beta_log2_objective_gradient_hessian(&input, &parameters)?;
+
+    for iter in 0..options.maxit {
+        if projected_gradient_norm(&parameters, &gradient, lower, upper) <= options.gradient_tol {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: true,
+                iterations: iter,
+            });
+        }
+
+        let Some(direction) = newton_direction(&hessian, &gradient)
+            .or_else(|| Some(gradient.iter().map(|value| -value).collect()))
+        else {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: false,
+                iterations: iter,
+            });
+        };
+        let directional_derivative = gradient
+            .iter()
+            .copied()
+            .zip(direction.iter().copied())
+            .map(|(gradient, direction)| gradient * direction)
+            .sum::<f64>();
+        if !directional_derivative.is_finite() || directional_derivative >= 0.0 {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: false,
+                iterations: iter,
+            });
+        }
+
+        let mut step = options.initial_step;
+        let mut accepted = None;
+        while step >= options.min_step {
+            let candidate = parameters
+                .iter()
+                .copied()
+                .zip(direction.iter().copied())
+                .map(|(value, delta)| (value + step * delta).clamp(lower, upper))
+                .collect::<Vec<_>>();
+            let movement = max_abs_difference(&parameters, &candidate);
+            if movement <= options.step_tol {
+                return Ok(BoundedOptimizationOutput {
+                    parameters,
+                    value,
+                    converged: true,
+                    iterations: iter + 1,
+                });
+            }
+            let (candidate_value, candidate_gradient, candidate_hessian) =
+                beta_log2_objective_gradient_hessian(&input, &candidate)?;
+            if candidate_value <= value + options.armijo * step * directional_derivative {
+                accepted = Some((
+                    candidate,
+                    candidate_value,
+                    candidate_gradient,
+                    candidate_hessian,
+                ));
+                break;
+            }
+            step *= 0.5;
+        }
+
+        let Some((candidate, candidate_value, candidate_gradient, candidate_hessian)) = accepted
+        else {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: false,
+                iterations: iter + 1,
+            });
+        };
+        parameters = candidate;
+        value = candidate_value;
+        gradient = candidate_gradient;
+        hessian = candidate_hessian;
+    }
+
+    Ok(BoundedOptimizationOutput {
+        parameters,
+        value,
+        converged: false,
+        iterations: options.maxit,
+    })
+}
+
+fn beta_log2_objective_gradient_hessian(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+) -> Result<(f64, Vec<f64>, DMatrix<f64>), DeseqError> {
+    let p = input.x.ncols();
+    if beta.len() != p {
+        return Err(invalid_dimensions("optim beta coefficients", p, beta.len()));
+    }
+    if input.ridge_lambda.len() != p {
+        return Err(invalid_dimensions(
+            "optim ridge coefficients",
+            p,
+            input.ridge_lambda.len(),
+        ));
+    }
+    if input.counts.len() != input.x.nrows() || input.nf.len() != input.x.nrows() {
+        return Err(invalid_dimensions(
+            "optim samples",
+            input.x.nrows(),
+            input.counts.len().min(input.nf.len()),
+        ));
+    }
+    if let Some(weights) = input.weights {
+        if weights.len() != input.x.nrows() {
+            return Err(invalid_dimensions(
+                "optim weights",
+                input.x.nrows(),
+                weights.len(),
+            ));
+        }
+    }
+    validate_positive_finite(input.dispersion, "dispersion", 0)?;
+
+    let mut log_like = 0.0;
+    let mut gradient = vec![0.0; p];
+    let mut hessian = DMatrix::zeros(p, p);
+    for sample in 0..input.x.nrows() {
+        validate_positive_finite(input.nf[sample], "normalization factor", sample)?;
+        let weight = input.weights.map_or(1.0, |weights| weights[sample]);
+        validate_nonnegative_finite(weight, "weight", sample)?;
+        let mut eta = 0.0;
+        for (col, beta_value) in beta.iter().copied().enumerate().take(p) {
+            eta += input.x[(sample, col)] * beta_value;
+        }
+        let mu = input.nf[sample] * 2.0_f64.powf(eta);
+        if !mu.is_finite() || mu <= 0.0 {
+            return Ok((1.0e300, vec![0.0; p], DMatrix::identity(p, p)));
+        }
+        log_like += weight * nbinom_log_pmf(input.counts[sample], mu, input.dispersion)?;
+        let sample_score = weight * std::f64::consts::LN_2 * (f64::from(input.counts[sample]) - mu)
+            / (1.0 + input.dispersion * mu);
+        for (col, gradient_value) in gradient.iter_mut().enumerate().take(p) {
+            *gradient_value -= input.x[(sample, col)] * sample_score;
+        }
+        let sample_hessian_weight = weight
+            * std::f64::consts::LN_2.powi(2)
+            * mu
+            * (1.0 + input.dispersion * f64::from(input.counts[sample]))
+            / (1.0 + input.dispersion * mu).powi(2);
+        for row in 0..p {
+            for col in 0..p {
+                hessian[(row, col)] +=
+                    input.x[(sample, row)] * sample_hessian_weight * input.x[(sample, col)];
+            }
+        }
+    }
+
+    let mut objective = -log_like;
+    for col in 0..p {
+        validate_nonnegative_finite(input.ridge_lambda[col], "ridge lambda", col)?;
+        let ridge_log2 = input.ridge_lambda[col] * std::f64::consts::LN_2.powi(2);
+        objective += 0.5 * ridge_log2 * beta[col] * beta[col];
+        gradient[col] += ridge_log2 * beta[col];
+        hessian[(col, col)] += ridge_log2;
+    }
+    Ok((objective, gradient, hessian))
+}
+
+fn newton_direction(hessian: &DMatrix<f64>, gradient: &[f64]) -> Option<Vec<f64>> {
+    let rhs = DVector::from_iterator(gradient.len(), gradient.iter().map(|value| -*value));
+    hessian
+        .clone()
+        .lu()
+        .solve(&rhs)
+        .map(|values| values.iter().copied().collect())
+}
+
+fn projected_gradient_norm(parameters: &[f64], gradient: &[f64], lower: f64, upper: f64) -> f64 {
+    parameters
+        .iter()
+        .copied()
+        .zip(gradient.iter().copied())
+        .map(|(parameter, gradient)| {
+            if (parameter <= lower && gradient > 0.0) || (parameter >= upper && gradient < 0.0) {
+                0.0
+            } else {
+                gradient
+            }
+        })
+        .map(|value| value * value)
+        .sum::<f64>()
+        .sqrt()
+}
+
+fn max_abs_difference(left: &[f64], right: &[f64]) -> f64 {
+    left.iter()
+        .copied()
+        .zip(right.iter().copied())
+        .map(|(left, right)| (left - right).abs())
+        .fold(0.0, f64::max)
 }
 
 fn initial_beta(x: &DMatrix<f64>, y: &[f64], nf: &[f64]) -> Result<DVector<f64>, DeseqError> {
@@ -340,6 +773,38 @@ fn fitted_mu_unfloored(
     nf: &[f64],
 ) -> Result<Vec<f64>, DeseqError> {
     fitted_mu_impl(x, beta, nf, None)
+}
+
+fn fitted_mu_log2_unfloored(
+    x: &DMatrix<f64>,
+    beta: &[f64],
+    nf: &[f64],
+) -> Result<Vec<f64>, DeseqError> {
+    if beta.len() != x.ncols() {
+        return Err(invalid_dimensions(
+            "log2 beta coefficients",
+            x.ncols(),
+            beta.len(),
+        ));
+    }
+    (0..x.nrows())
+        .map(|sample| {
+            validate_positive_finite(nf[sample], "normalization factor", sample)?;
+            let mut eta = 0.0;
+            for col in 0..x.ncols() {
+                eta += x[(sample, col)] * beta[col];
+            }
+            let mu = nf[sample] * 2.0_f64.powf(eta);
+            if !mu.is_finite() || mu <= 0.0 {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "optim fallback fitted mean".to_string(),
+                    index: Some(sample),
+                    value: mu,
+                });
+            }
+            Ok(mu)
+        })
+        .collect()
 }
 
 fn fitted_mu_impl(
@@ -598,6 +1063,9 @@ fn validate_nf_irls_inputs(
     if !options.beta_tol.is_finite()
         || options.beta_tol <= 0.0
         || options.maxit == 0
+        || options.optim_maxit == 0
+        || !options.optim_tol.is_finite()
+        || options.optim_tol <= 0.0
         || !options.min_mu.is_finite()
         || options.min_mu <= 0.0
         || !options.max_beta_abs.is_finite()

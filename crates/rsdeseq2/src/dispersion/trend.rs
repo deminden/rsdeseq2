@@ -1,4 +1,5 @@
 use crate::errors::{invalid_dimensions, DeseqError};
+use crate::options::FitType;
 
 /// Options for DESeq2-style parametric dispersion trend fitting.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -46,6 +47,27 @@ pub struct MeanDispersionTrendOptions {
     pub min_disp: f64,
     /// Fraction trimmed from each tail before averaging dispersion estimates.
     pub trim: f64,
+}
+
+/// Options for the pure-Rust local log-dispersion trend.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LocalDispersionTrendOptions {
+    /// Minimum dispersion used by DESeq2's local trend floor and fit rule.
+    pub min_disp: f64,
+    /// Fraction of fitted rows used in the adaptive local neighborhood.
+    pub span: f64,
+    /// Local polynomial degree on log(mean), capped to quadratic.
+    pub degree: usize,
+}
+
+impl Default for LocalDispersionTrendOptions {
+    fn default() -> Self {
+        Self {
+            min_disp: 1e-8,
+            span: 0.7,
+            degree: 2,
+        }
+    }
 }
 
 impl Default for MeanDispersionTrendOptions {
@@ -167,6 +189,136 @@ pub struct MeanDispersionTrendFit {
     pub genes_used_for_mean: usize,
 }
 
+/// Local dispersion trend fit on log mean/log dispersion scale.
+///
+/// DESeq2 uses the R `locfit` package for `fitType="local"`. This pure-Rust
+/// representation keeps the same fitted rows and base-mean weights, then
+/// evaluates a deterministic adaptive local polynomial smoother.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LocalDispersionTrend {
+    /// DESeq2 minimum dispersion used for the all-near-minimum fallback.
+    pub min_disp: f64,
+    /// Adaptive neighborhood fraction.
+    pub span: f64,
+    /// Local polynomial degree.
+    pub degree: usize,
+    /// Sorted log base means used for fitting.
+    pub log_means: Vec<f64>,
+    /// Log gene-wise dispersions used for fitting, aligned to `log_means`.
+    pub log_disps: Vec<f64>,
+    /// Base-mean weights used for local regression, aligned to `log_means`.
+    pub weights: Vec<f64>,
+}
+
+impl LocalDispersionTrend {
+    /// Evaluate the local dispersion trend at one positive mean.
+    pub fn evaluate(&self, mean: f64) -> Result<f64, DeseqError> {
+        validate_positive_mean(mean, None)?;
+        if !self.min_disp.is_finite() || self.min_disp <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "minimum dispersion must be finite and positive".to_string(),
+            });
+        }
+        if self.log_means.is_empty() {
+            return Ok(self.min_disp);
+        }
+        let predicted = local_polynomial_predict(
+            mean.ln(),
+            &self.log_means,
+            &self.log_disps,
+            &self.weights,
+            self.span,
+            self.degree,
+        )?;
+        let dispersion = predicted.exp();
+        if !dispersion.is_finite() || dispersion <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "local dispersion trend produced a non-positive fitted value".to_string(),
+            });
+        }
+        Ok(dispersion)
+    }
+
+    /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
+    pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+        means
+            .iter()
+            .copied()
+            .map(|mean| {
+                if mean.is_finite() && mean > 0.0 {
+                    self.evaluate(mean)
+                } else {
+                    Ok(f64::NAN)
+                }
+            })
+            .collect()
+    }
+}
+
+/// Output from a local dispersion trend fit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LocalDispersionTrendFit {
+    /// Fitted local trend.
+    pub trend: LocalDispersionTrend,
+    /// Fitted dispersion values for every input row; missing rows are `NaN`.
+    pub disp_fit: Vec<f64>,
+    /// Rows used by DESeq2's local rule, `dispGeneEst >= 10 * minDisp`.
+    pub use_for_fit: Vec<bool>,
+    /// Number of rows retained by `use_for_fit`.
+    pub genes_used: usize,
+    /// Whether the DESeq2 all-near-minimum fallback was used.
+    pub used_min_disp_floor: bool,
+}
+
+/// Fitted dispersion trend selected by a DESeq2-style `fitType`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DispersionTrendFit {
+    /// Parametric `asymptDisp + extraPois / mean` trend.
+    Parametric(ParametricDispersionTrendFit),
+    /// Pure-Rust local log-dispersion trend.
+    Local(LocalDispersionTrendFit),
+    /// Constant mean dispersion trend.
+    Mean(MeanDispersionTrendFit),
+}
+
+impl DispersionTrendFit {
+    /// Stable DESeq2-style fit type label for this fitted trend.
+    pub fn fit_type_label(&self) -> &'static str {
+        match self {
+            Self::Parametric(_) => "parametric",
+            Self::Local(_) => "local",
+            Self::Mean(_) => "mean",
+        }
+    }
+
+    /// Fitted dispersion values for every input row; missing rows are `NaN`.
+    pub fn disp_fit(&self) -> &[f64] {
+        match self {
+            Self::Parametric(fit) => &fit.disp_fit,
+            Self::Local(fit) => &fit.disp_fit,
+            Self::Mean(fit) => &fit.disp_fit,
+        }
+    }
+
+    /// Rows retained by the selected trend fit rule.
+    pub fn use_for_fit(&self) -> &[bool] {
+        match self {
+            Self::Parametric(fit) => &fit.use_for_fit,
+            Self::Local(fit) => &fit.use_for_fit,
+            Self::Mean(fit) => &fit.use_for_fit,
+        }
+    }
+
+    /// Number of rows retained by the selected trend fit rule.
+    pub fn genes_used(&self) -> usize {
+        match self {
+            Self::Parametric(fit) => fit.genes_used,
+            Self::Local(fit) => fit.genes_used,
+            Self::Mean(fit) => fit.genes_used,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct GammaIdentityFit {
     trend: ParametricDispersionTrend,
@@ -282,6 +434,63 @@ pub fn fit_mean_dispersion_trend(
     })
 }
 
+/// Fit DESeq2's `fitType="local"` dispersion trend.
+///
+/// DESeq2 fits local regression on `log(dispersion)` versus `log(mean)` after
+/// selecting rows with `dispGeneEst >= 10 * minDisp`, using base means as
+/// weights. This implementation keeps that data contract and evaluates a
+/// deterministic adaptive local polynomial smoother in Rust.
+pub fn fit_local_dispersion_trend(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    options: LocalDispersionTrendOptions,
+) -> Result<LocalDispersionTrendFit, DeseqError> {
+    validate_local_trend_inputs(base_mean, disp_gene_est, options)?;
+    let use_for_fit = local_trend_use_for_fit(base_mean, disp_gene_est, options.min_disp)?;
+    let genes_used = use_for_fit.iter().filter(|value| **value).count();
+    let used_min_disp_floor = genes_used == 0;
+
+    let mut local_rows = Vec::with_capacity(genes_used);
+    if !used_min_disp_floor {
+        for ((mean, disp), used) in base_mean
+            .iter()
+            .copied()
+            .zip(disp_gene_est.iter().copied())
+            .zip(use_for_fit.iter().copied())
+        {
+            if used {
+                local_rows.push((mean.ln(), disp.ln(), mean));
+            }
+        }
+    }
+    local_rows.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut log_means = Vec::with_capacity(local_rows.len());
+    let mut log_disps = Vec::with_capacity(local_rows.len());
+    let mut weights = Vec::with_capacity(local_rows.len());
+    for (log_mean, log_disp, weight) in local_rows {
+        log_means.push(log_mean);
+        log_disps.push(log_disp);
+        weights.push(weight);
+    }
+
+    let trend = LocalDispersionTrend {
+        min_disp: options.min_disp,
+        span: options.span,
+        degree: options.degree.min(2),
+        log_means,
+        log_disps,
+        weights,
+    };
+
+    Ok(LocalDispersionTrendFit {
+        disp_fit: trend.evaluate_many_allow_missing(base_mean)?,
+        trend,
+        use_for_fit,
+        genes_used,
+        used_min_disp_floor,
+    })
+}
+
 /// DESeq2's parametric trend row-selection rule.
 pub fn parametric_trend_use_for_fit(
     base_mean: &[f64],
@@ -306,6 +515,34 @@ pub fn parametric_trend_use_for_fit(
         .zip(disp_gene_est.iter().copied())
         .map(|(mean, disp)| {
             mean.is_finite() && mean > 0.0 && disp.is_finite() && disp > 100.0 * min_disp
+        })
+        .collect())
+}
+
+/// DESeq2's `fitType="local"` row-selection rule for local regression.
+pub fn local_trend_use_for_fit(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    min_disp: f64,
+) -> Result<Vec<bool>, DeseqError> {
+    if base_mean.len() != disp_gene_est.len() {
+        return Err(invalid_dimensions(
+            "local dispersion trend rows",
+            base_mean.len(),
+            disp_gene_est.len(),
+        ));
+    }
+    if !min_disp.is_finite() || min_disp <= 0.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "min_disp must be finite and positive".to_string(),
+        });
+    }
+    Ok(base_mean
+        .iter()
+        .copied()
+        .zip(disp_gene_est.iter().copied())
+        .map(|(mean, disp)| {
+            mean.is_finite() && mean > 0.0 && disp.is_finite() && disp >= 10.0 * min_disp
         })
         .collect())
 }
@@ -338,11 +575,36 @@ pub fn mean_trend_use_for_mean(
         .collect())
 }
 
-/// Placeholder for non-parametric dispersion trend types.
-pub fn fit_dispersion_trend() -> Result<(), DeseqError> {
-    Err(DeseqError::UnsupportedFeature {
-        feature: "non-parametric dispersion trend fitting".to_string(),
-    })
+/// Fit a dispersion trend using DESeq2-style `fitType` defaults.
+///
+/// Use the type-specific fitters when custom trend options are needed.
+pub fn fit_dispersion_trend(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    fit_type: FitType,
+) -> Result<DispersionTrendFit, DeseqError> {
+    match fit_type {
+        FitType::Parametric => Ok(DispersionTrendFit::Parametric(
+            fit_parametric_dispersion_trend(
+                base_mean,
+                disp_gene_est,
+                ParametricDispersionTrendOptions::default(),
+            )?,
+        )),
+        FitType::Local => Ok(DispersionTrendFit::Local(fit_local_dispersion_trend(
+            base_mean,
+            disp_gene_est,
+            LocalDispersionTrendOptions::default(),
+        )?)),
+        FitType::Mean => Ok(DispersionTrendFit::Mean(fit_mean_dispersion_trend(
+            base_mean,
+            disp_gene_est,
+            MeanDispersionTrendOptions::default(),
+        )?)),
+        FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
+            feature: "glmGamPoi dispersion trend fitting".to_string(),
+        }),
+    }
 }
 
 fn robust_parametric_trend_rows(
@@ -517,6 +779,196 @@ fn gamma_deviance(
     Ok(deviance)
 }
 
+fn local_polynomial_predict(
+    x0: f64,
+    xs: &[f64],
+    ys: &[f64],
+    weights: &[f64],
+    span: f64,
+    degree: usize,
+) -> Result<f64, DeseqError> {
+    if xs.len() != ys.len() || xs.len() != weights.len() {
+        return Err(invalid_dimensions(
+            "local dispersion trend fit rows",
+            xs.len(),
+            ys.len(),
+        ));
+    }
+    if xs.is_empty() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "no local dispersion fit rows are available".to_string(),
+        });
+    }
+
+    validate_sorted_local_means(xs)?;
+    let degree = degree.min(2).min(xs.len().saturating_sub(1));
+    let window = adaptive_nearest_window(x0, xs, span, degree + 1);
+    let bandwidth = local_window_bandwidth(x0, xs, window);
+    for local_degree in (0..=degree).rev() {
+        if let Some(beta0) =
+            local_polynomial_intercept(x0, xs, ys, weights, window, bandwidth, local_degree)
+        {
+            if beta0.is_finite() {
+                return Ok(beta0);
+            }
+        }
+    }
+
+    let mut numerator = 0.0;
+    let mut denominator = 0.0;
+    for idx in window.0..window.1 {
+        let weight = weights[idx] * tricube_weight((xs[idx] - x0).abs(), bandwidth);
+        let y = ys[idx];
+        if weight.is_finite() && weight > 0.0 && y.is_finite() {
+            numerator += weight * y;
+            denominator += weight;
+        }
+    }
+    if denominator > 0.0 {
+        Ok(numerator / denominator)
+    } else {
+        Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion trend has zero usable neighborhood weight".to_string(),
+        })
+    }
+}
+
+fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {
+    if xs.iter().any(|value| !value.is_finite()) {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion trend log means must be finite".to_string(),
+        });
+    }
+    if xs.windows(2).any(|window| window[0] > window[1]) {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion trend log means must be sorted".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn adaptive_nearest_window(x0: f64, xs: &[f64], span: f64, min_neighbors: usize) -> (usize, usize) {
+    let neighbors =
+        ((xs.len() as f64 * span).ceil() as usize).clamp(min_neighbors.max(1), xs.len());
+    let insertion = xs.partition_point(|x| *x < x0);
+    let mut start = insertion;
+    let mut end = insertion;
+    while end - start < neighbors {
+        if start == 0 {
+            end = (start + neighbors).min(xs.len());
+            break;
+        }
+        if end == xs.len() {
+            start = end.saturating_sub(neighbors);
+            break;
+        }
+        let left_distance = (xs[start - 1] - x0).abs();
+        let right_distance = (xs[end] - x0).abs();
+        if left_distance <= right_distance {
+            start -= 1;
+        } else {
+            end += 1;
+        }
+    }
+    (start, end)
+}
+
+fn local_window_bandwidth(x0: f64, xs: &[f64], window: (usize, usize)) -> f64 {
+    let mut bandwidth = 0.0_f64;
+    for x in xs[window.0..window.1].iter().copied() {
+        bandwidth = bandwidth.max((x - x0).abs());
+    }
+    bandwidth
+}
+
+fn tricube_weight(distance: f64, bandwidth: f64) -> f64 {
+    if bandwidth <= f64::EPSILON {
+        if distance <= f64::EPSILON {
+            1.0
+        } else {
+            0.0
+        }
+    } else if distance <= bandwidth {
+        let scaled = distance / bandwidth;
+        (1.0 - scaled.powi(3)).powi(3)
+    } else {
+        0.0
+    }
+}
+
+fn local_polynomial_intercept(
+    x0: f64,
+    xs: &[f64],
+    ys: &[f64],
+    weights: &[f64],
+    window: (usize, usize),
+    bandwidth: f64,
+    degree: usize,
+) -> Option<f64> {
+    let size = degree + 1;
+    let mut lhs = [[0.0; 3]; 3];
+    let mut rhs = [0.0; 3];
+    for idx in window.0..window.1 {
+        let x = xs[idx];
+        let y = ys[idx];
+        let weight = weights[idx] * tricube_weight((x - x0).abs(), bandwidth);
+        if !weight.is_finite() || weight <= 0.0 || !x.is_finite() || !y.is_finite() {
+            continue;
+        }
+        let dx = x - x0;
+        let powers = [1.0, dx, dx * dx, dx * dx * dx, dx * dx * dx * dx];
+        for row in 0..size {
+            rhs[row] += weight * powers[row] * y;
+            for col in 0..size {
+                lhs[row][col] += weight * powers[row + col];
+            }
+        }
+    }
+    solve_small_linear_system(lhs, rhs, size).map(|beta| beta[0])
+}
+
+fn solve_small_linear_system(
+    mut lhs: [[f64; 3]; 3],
+    mut rhs: [f64; 3],
+    size: usize,
+) -> Option<[f64; 3]> {
+    for pivot in 0..size {
+        let mut pivot_row = pivot;
+        for row in (pivot + 1)..size {
+            if lhs[row][pivot].abs() > lhs[pivot_row][pivot].abs() {
+                pivot_row = row;
+            }
+        }
+        if !lhs[pivot_row][pivot].is_finite() || lhs[pivot_row][pivot].abs() <= 1e-12 {
+            return None;
+        }
+        if pivot_row != pivot {
+            lhs.swap(pivot, pivot_row);
+            rhs.swap(pivot, pivot_row);
+        }
+        let pivot_value = lhs[pivot][pivot];
+        for value in lhs[pivot].iter_mut().take(size).skip(pivot) {
+            *value /= pivot_value;
+        }
+        rhs[pivot] /= pivot_value;
+        let pivot_values = lhs[pivot];
+        for row in 0..size {
+            if row == pivot {
+                continue;
+            }
+            let factor = lhs[row][pivot];
+            if factor == 0.0 {
+                continue;
+            }
+            for (col, pivot_entry) in pivot_values.iter().enumerate().take(size).skip(pivot) {
+                lhs[row][col] -= factor * pivot_entry;
+            }
+            rhs[row] -= factor * rhs[pivot];
+        }
+    }
+    Some(rhs)
+}
+
 fn validate_parametric_trend_inputs(
     base_mean: &[f64],
     disp_gene_est: &[f64],
@@ -576,6 +1028,43 @@ fn validate_parametric_trend_inputs(
             context: "parametric trend max IRLS iterations".to_string(),
             expected: 1,
             actual: 0,
+        });
+    }
+    Ok(())
+}
+
+fn validate_local_trend_inputs(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    options: LocalDispersionTrendOptions,
+) -> Result<(), DeseqError> {
+    if base_mean.len() != disp_gene_est.len() {
+        return Err(invalid_dimensions(
+            "local dispersion trend rows",
+            base_mean.len(),
+            disp_gene_est.len(),
+        ));
+    }
+    if base_mean.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "local dispersion trend rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "min_disp must be finite and positive".to_string(),
+        });
+    }
+    if !options.span.is_finite() || options.span <= 0.0 || options.span > 1.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion span must be finite and in (0, 1]".to_string(),
+        });
+    }
+    if options.degree > 2 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion polynomial degree must be 0, 1, or 2".to_string(),
         });
     }
     Ok(())

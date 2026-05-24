@@ -4,13 +4,15 @@
 //! count/design matrix validation, size-factor estimation, normalized counts,
 //! gene/sample normalization factors for implemented fixed-dispersion paths,
 //! base means, optionally weighted fixed-dispersion IRLS with scalar or
-//! per-coefficient ridge values and normal-equation or QR updates,
+//! per-coefficient ridge values, normal-equation or QR updates, and bounded
+//! optim fallback refits for routed rows,
 //! observation-weight preprocessing, primitive Wald linear contrasts, Wald/LRT
 //! statistics, Cook's diagnostics and low-count heuristic helper, primitive
 //! outlier count replacement, limited GLM-mu native Wald/LRT replacement refit
 //! metadata, BH adjusted p-values, independent filtering, and an inspectable
-//! fit-state skeleton.
+//! fit-state skeleton, plus implemented normTransform and VST helpers.
 
+pub(crate) mod all_zero;
 pub mod bindings;
 pub mod cli;
 pub mod contrasts;

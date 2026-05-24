@@ -49,6 +49,31 @@ fn irls_intercept_only_agrees_with_intercept_shortcut_for_equal_size_factors() {
 }
 
 #[test]
+fn fit_irls_dispatches_intercept_only_shortcut() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![6, 6, 12, 12]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        1,
+        vec![1.0, 1.0, 1.0, 1.0],
+        Some(vec!["Intercept".into()]),
+    )
+    .unwrap();
+
+    let wrapped = fit_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 2.0, 2.0],
+        &[0.2],
+        IrlsOptions::default(),
+    )
+    .unwrap();
+    let shortcut =
+        fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0, 2.0, 2.0], &[0.2]).unwrap();
+
+    assert_eq!(wrapped, shortcut);
+}
+
+#[test]
 fn irls_two_group_design_recovers_known_log2_fold_change() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(
@@ -91,6 +116,374 @@ fn irls_two_group_design_recovers_known_log2_fold_change() {
         fit.beta_se.row(0).unwrap()[0],
         epsilon = 1e-12
     );
+}
+
+#[test]
+fn fit_irls_dispatches_general_irls_for_multi_coefficient_design() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let options = no_ridge_options();
+
+    let wrapped = fit_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05],
+        options.clone(),
+    )
+    .unwrap();
+    let direct =
+        fit_fixed_dispersion_irls(&counts, &design, &[1.0, 1.0, 1.0, 1.0], &[0.05], options)
+            .unwrap();
+
+    assert_eq!(wrapped, direct);
+}
+
+#[test]
+fn estimate_beta_wraps_fixed_dispersion_beta_dispatch() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let options = no_ridge_options();
+
+    let beta_fit = estimate_beta(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05],
+        options.clone(),
+    )
+    .unwrap();
+    let irls_fit = fit_irls(&counts, &design, &[1.0, 1.0, 1.0, 1.0], &[0.05], options).unwrap();
+
+    assert_eq!(beta_fit, irls_fit);
+}
+
+fn normal_75_quantile() -> f64 {
+    0.674_489_750_196_081_7
+}
+
+fn normal_matched_variance(abs_quantile: f64) -> f64 {
+    (abs_quantile / normal_75_quantile()).powi(2)
+}
+
+#[test]
+fn beta_prior_quantile_matches_type7_upper_abs_quantile() {
+    let variance = match_upper_quantile_for_variance(&[1.0, -2.0, 3.0], 0.5).unwrap();
+
+    assert_relative_eq!(
+        variance,
+        normal_matched_variance(2.0),
+        epsilon = 1e-12,
+        max_relative = 1e-12
+    );
+}
+
+#[test]
+fn beta_prior_weighted_quantile_uses_row_weights() {
+    let variance =
+        match_weighted_upper_quantile_for_variance(&[1.0, 10.0, 20.0], &[98.0, 1.0, 1.0], 0.5)
+            .unwrap();
+
+    assert_relative_eq!(
+        variance,
+        normal_matched_variance(1.0),
+        epsilon = 1e-12,
+        max_relative = 1e-12
+    );
+}
+
+#[test]
+fn beta_prior_variance_filters_large_betas_and_sets_intercept_wide() {
+    let betas = RowMajorMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            2.0,
+            1.0, //
+            2.0,
+            2.0, //
+            2.0,
+            100.0, //
+            2.0,
+            f64::INFINITY,
+        ],
+    )
+    .unwrap();
+    let names = vec!["Intercept".to_string(), "condition_B_vs_A".to_string()];
+    let options = BetaPriorVarianceOptions {
+        method: BetaPriorVarianceMethod::Quantile,
+        upper_quantile: 0.5,
+        ..BetaPriorVarianceOptions::default()
+    };
+
+    let variance = estimate_beta_prior_variance(
+        &betas,
+        &[10.0, 20.0, 30.0, 40.0],
+        &[0.1; 4],
+        Some(&names),
+        options,
+    )
+    .unwrap();
+
+    assert_relative_eq!(variance[0], 1e6, epsilon = 1e-12);
+    assert_relative_eq!(
+        variance[1],
+        normal_matched_variance(1.5),
+        epsilon = 1e-12,
+        max_relative = 1e-12
+    );
+}
+
+#[test]
+fn beta_prior_variance_validates_dimensions_and_options() {
+    let betas = RowMajorMatrix::from_row_major(2, 1, vec![1.0, 2.0]).unwrap();
+
+    assert!(estimate_beta_prior_variance(
+        &betas,
+        &[10.0],
+        &[0.1, 0.2],
+        None,
+        BetaPriorVarianceOptions::default(),
+    )
+    .is_err());
+
+    assert!(estimate_beta_prior_variance(
+        &betas,
+        &[10.0, 20.0],
+        &[0.1, 0.2],
+        None,
+        BetaPriorVarianceOptions {
+            upper_quantile: 1.0,
+            ..BetaPriorVarianceOptions::default()
+        },
+    )
+    .is_err());
+}
+
+#[test]
+fn beta_prior_variance_to_ridge_lambda_matches_deseq2_scale() {
+    let ridge = beta_prior_variance_to_ridge_lambda(&[1e6, 0.25]).unwrap();
+
+    assert_relative_eq!(
+        ridge[0],
+        1.0 / (1e6 * std::f64::consts::LN_2.powi(2)),
+        epsilon = 1e-18,
+        max_relative = 1e-12
+    );
+    assert_relative_eq!(
+        ridge[1],
+        1.0 / (0.25 * std::f64::consts::LN_2.powi(2)),
+        epsilon = 1e-14,
+        max_relative = 1e-12
+    );
+    assert!(beta_prior_variance_to_ridge_lambda(&[0.0]).is_err());
+}
+
+#[test]
+fn beta_prior_refit_matches_manual_ridge_options() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 80, 80]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let beta_prior_variance = vec![1e6, 0.25];
+    let ridge = beta_prior_variance_to_ridge_lambda(&beta_prior_variance).unwrap();
+
+    let refit = fit_glms_with_beta_prior_variance(
+        &counts,
+        &design,
+        &[1.0; 4],
+        &[0.05],
+        &beta_prior_variance,
+        no_ridge_options(),
+    )
+    .unwrap();
+    let manual = fit_fixed_dispersion_irls(
+        &counts,
+        &design,
+        &[1.0; 4],
+        &[0.05],
+        no_ridge_options().ridge_lambda_by_coefficient(ridge),
+    )
+    .unwrap();
+    let mle = fit_fixed_dispersion_irls(&counts, &design, &[1.0; 4], &[0.05], no_ridge_options())
+        .unwrap();
+
+    assert_eq!(refit, manual);
+    assert!(refit.beta.as_slice()[1].abs() < mle.beta.as_slice()[1].abs());
+}
+
+#[test]
+fn beta_prior_estimated_refit_runs_mle_then_shrunk_fit() {
+    let counts = CountMatrix::from_row_major_u32(
+        3,
+        4,
+        vec![
+            10, 10, 20, 20, //
+            20, 20, 80, 80, //
+            12, 12, 12, 12,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let fit = fit_glms_with_estimated_beta_prior_variance(
+        &counts,
+        &design,
+        &[1.0; 4],
+        &[0.05; 3],
+        &[15.0, 50.0, 12.0],
+        &[0.1; 3],
+        BetaPriorRefitOptions {
+            fit_options: no_ridge_options(),
+            variance_options: BetaPriorVarianceOptions {
+                method: BetaPriorVarianceMethod::Quantile,
+                upper_quantile: 0.5,
+                ..BetaPriorVarianceOptions::default()
+            },
+        },
+    )
+    .unwrap();
+
+    assert_eq!(fit.beta_prior_variance.len(), 2);
+    assert_relative_eq!(fit.beta_prior_variance[0], 1e6, epsilon = 1e-12);
+    assert_relative_eq!(
+        fit.beta_prior_variance[1],
+        normal_matched_variance(1.0),
+        epsilon = 1e-8,
+        max_relative = 1e-8
+    );
+    assert!(fit.prior_fit.beta.as_slice()[3].abs() < fit.mle_fit.beta.as_slice()[3].abs());
+}
+
+#[test]
+fn fit_with_dispersion_wraps_fixed_dispersion_irls() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let options = no_ridge_options();
+
+    let wrapped = fit_with_dispersion(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05],
+        options.clone(),
+    )
+    .unwrap();
+    let direct =
+        fit_fixed_dispersion_irls(&counts, &design, &[1.0, 1.0, 1.0, 1.0], &[0.05], options)
+            .unwrap();
+
+    assert_eq!(wrapped, direct);
+}
+
+#[test]
+fn irls_optim_fallback_refits_nonconverged_rows_when_enabled() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+
+    let without_optim = fit_fixed_dispersion_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05],
+        IrlsOptions {
+            maxit: 1,
+            ridge_lambda: 0.0,
+            use_optim: false,
+            ..IrlsOptions::default()
+        },
+    )
+    .unwrap();
+    let with_optim = fit_fixed_dispersion_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05],
+        IrlsOptions {
+            maxit: 1,
+            ridge_lambda: 0.0,
+            use_optim: true,
+            ..IrlsOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert!(!without_optim.beta_converged[0]);
+    assert!(with_optim.beta_converged[0]);
+    assert_relative_eq!(
+        with_optim.beta.as_slice()[0],
+        10.0_f64.log2(),
+        epsilon = 1e-5
+    );
+    assert_relative_eq!(
+        with_optim.beta.as_slice()[1],
+        2.0_f64.log2(),
+        epsilon = 1e-5
+    );
+    assert!(with_optim.log_like[0] >= without_optim.log_like[0] - 1e-8);
 }
 
 #[test]

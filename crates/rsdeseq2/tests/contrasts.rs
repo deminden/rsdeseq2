@@ -49,6 +49,32 @@ fn coefficient_name_contrast_resolves_to_unit_vector() {
 }
 
 #[test]
+fn contrast_specs_expose_stable_result_metadata_labels() {
+    let coefficient = ContrastSpec::coefficient_name("condition_B_vs_A");
+    assert_eq!(coefficient.result_name(), "condition_B_vs_A");
+    assert_eq!(coefficient.comparison(), "coefficient condition_B_vs_A");
+
+    let factor = ContrastSpec::factor_level("condition", "B", "A");
+    assert_eq!(factor.result_name(), "condition_B_vs_A");
+    assert_eq!(
+        factor.comparison(),
+        "factor-level contrast: condition B vs A"
+    );
+
+    let list = ContrastSpec::list_with_values(
+        vec!["condition_B_vs_A".into()],
+        vec!["batch_Y_vs_X".into()],
+        0.5,
+        -2.0,
+    );
+    assert_eq!(list.result_name(), "contrast");
+    assert_eq!(
+        list.comparison(),
+        "coefficient list contrast: condition_B_vs_A at 0.5 vs batch_Y_vs_X at -2"
+    );
+}
+
+#[test]
 fn list_contrast_resolves_like_deseq2_name_lists() {
     let design = named_design();
     let contrast = ContrastSpec::list(vec!["condition_B_vs_A".into()], vec!["batch_Y_vs_X".into()]);

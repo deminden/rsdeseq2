@@ -71,6 +71,22 @@ fn prior_variance_subtracts_sampling_variance_and_floors_at_quarter() {
 }
 
 #[test]
+fn estimate_dispersion_prior_wraps_prior_variance_stage() {
+    let residuals = [-2.0_f64, -1.0, 0.0, 1.0, 2.0];
+    let disp_fit = vec![1.0; residuals.len()];
+    let disp_gene_est = residuals
+        .iter()
+        .map(|residual| residual.exp())
+        .collect::<Vec<_>>();
+
+    let stage_output = estimate_dispersion_prior(&disp_gene_est, &disp_fit, 1e-8, 10, 2).unwrap();
+    let variance_output =
+        estimate_dispersion_prior_variance(&disp_gene_est, &disp_fit, 1e-8, 10, 2).unwrap();
+
+    assert_eq!(stage_output, variance_output);
+}
+
+#[test]
 fn prior_variance_uses_quarter_floor_when_sampling_variance_is_large() {
     let residuals = [-0.2_f64, 0.0, 0.2, 0.4, -0.4];
     let disp_fit = vec![1.0; residuals.len()];

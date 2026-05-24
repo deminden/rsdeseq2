@@ -152,6 +152,15 @@ pub fn parse_optional_f64(row: &TsvRow, column: &str) -> Option<f64> {
     }
 }
 
+pub fn parse_required_usize(row: &TsvRow, column: &str) -> usize {
+    let value = row
+        .get(column)
+        .unwrap_or_else(|| panic!("missing column {column} in reference row"));
+    value
+        .parse::<usize>()
+        .unwrap_or_else(|error| panic!("invalid integer in column {column}: {value}: {error}"))
+}
+
 pub fn parse_required_bool(row: &TsvRow, column: &str) -> bool {
     match row
         .get(column)

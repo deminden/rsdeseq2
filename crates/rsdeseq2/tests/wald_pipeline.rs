@@ -251,6 +251,14 @@ fn fixed_dispersion_wald_contrast_spec_resolves_coefficient_name() {
         2.0_f64.log2(),
         epsilon = 1e-8
     );
+    assert_eq!(
+        results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
 }
 
 #[test]
@@ -291,6 +299,14 @@ fn fixed_dispersion_wald_contrast_spec_resolves_factor_level_shape() {
         results.rows[0].log2_fold_change.unwrap(),
         2.0_f64.log2(),
         epsilon = 1e-8
+    );
+    assert_eq!(
+        results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
     );
 }
 
@@ -343,6 +359,11 @@ fn fixed_dispersion_wald_contrast_spec_resolves_name_lists() {
         results.rows[0].log2_fold_change.unwrap(),
         expected,
         epsilon = 1e-10
+    );
+    assert_eq!(results.metadata.result_name.as_deref(), Some("contrast"));
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("coefficient list contrast: condition_B_vs_A at 1 vs batch_Y_vs_X at -1")
     );
 }
 
@@ -468,6 +489,14 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_character_contrast_all_ze
     assert_eq!(results.rows[0].pvalue, Some(1.0));
     assert!(results.rows[0].lfc_se.is_some());
     assert!(results.rows[1].pvalue.is_some());
+    assert_eq!(
+        results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
     assert_ne!(results.rows[1].pvalue, Some(1.0));
 }
 
@@ -647,6 +676,8 @@ fn fixed_dispersion_wald_pipeline_can_use_lfc_threshold() {
     assert_eq!(results.rows[0].padj, wald.pvalue[0]);
     assert!(wald.pvalue[0].unwrap() > 0.0);
     assert!(wald.pvalue[0].unwrap() < 0.5);
+    assert_eq!(results.metadata.lfc_threshold, 0.5);
+    assert_eq!(results.metadata.alt_hypothesis.as_deref(), Some("greater"));
 }
 
 #[test]

@@ -13,7 +13,13 @@ fn toy_fit(beta: Vec<f64>, beta_se: Vec<f64>, beta_converged: Vec<bool>) -> Nbin
         mu: RowMajorMatrix::from_row_major(n_genes, n_samples, vec![1.0; n_genes * n_samples])
             .unwrap(),
         beta_iter: vec![1; n_genes],
-        model_matrix: DesignMatrix::from_row_major(n_samples, 1, vec![1.0, 1.0], None).unwrap(),
+        model_matrix: DesignMatrix::from_row_major(
+            n_samples,
+            1,
+            vec![1.0, 1.0],
+            Some(vec!["Intercept".to_string()]),
+        )
+        .unwrap(),
         n_terms: 1,
         hat_diagonal: RowMajorMatrix::from_row_major(
             n_genes,
@@ -45,6 +51,62 @@ fn result_column_schema_matches_current_deseq2_shape() {
             "maxCooks",
             "cooksOutlier",
             "filtered"
+        ]
+    );
+}
+
+#[test]
+fn result_table_metadata_exposes_description_label_precedence() {
+    let wald = DeseqResultsTableMetadata {
+        test_type: Some(TestType::Wald),
+        result_name: Some("condition_B_vs_A".to_string()),
+        comparison: Some("coefficient condition_B_vs_A".to_string()),
+        ..DeseqResultsTableMetadata::default()
+    };
+    assert_eq!(
+        wald.effect_description_label(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        wald.test_description_label(),
+        Some("coefficient condition_B_vs_A")
+    );
+
+    let lrt = DeseqResultsTableMetadata {
+        test_type: Some(TestType::Lrt),
+        result_name: Some("condition_B_vs_A".to_string()),
+        comparison: Some("full model versus reduced model".to_string()),
+        ..DeseqResultsTableMetadata::default()
+    };
+    assert_eq!(lrt.effect_description_label(), Some("condition_B_vs_A"));
+    assert_eq!(
+        lrt.test_description_label(),
+        Some("full model versus reduced model")
+    );
+
+    assert_eq!(
+        lrt.scalar_metadata(),
+        vec![
+            DeseqResultsTableMetadataEntry {
+                name: "testType".to_string(),
+                value: "LRT".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "resultName".to_string(),
+                value: "condition_B_vs_A".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "comparison".to_string(),
+                value: "full model versus reduced model".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "lfcThreshold".to_string(),
+                value: "0".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "pAdjustMethod".to_string(),
+                value: "BH".to_string(),
+            },
         ]
     );
 }
@@ -85,6 +147,104 @@ fn build_wald_results_populates_deseq2_shaped_columns() {
             "converged"
         ]
     );
+    assert_eq!(results.metadata.test_type, Some(TestType::Wald));
+    assert_eq!(results.metadata.result_name.as_deref(), Some("Intercept"));
+    assert_eq!(results.metadata.lfc_threshold, 0.0);
+    assert_eq!(results.metadata.p_adjust_method, "BH");
+    let threshold_metadata = results.clone().with_wald_test_options(
+        &WaldTestOptions::normal().with_lfc_threshold(1.5, WaldAlternative::Less),
+    );
+    assert_eq!(threshold_metadata.metadata.lfc_threshold, 1.5);
+    assert_eq!(
+        threshold_metadata.metadata.alt_hypothesis.as_deref(),
+        Some("less")
+    );
+
+    let metadata = results.deseq2_metadata();
+    assert_eq!(metadata.table, results.metadata);
+    assert!(metadata.independent_filtering.is_none());
+    assert_eq!(metadata.columns[0].name, "baseMean");
+    assert_eq!(metadata.columns[0].column_type, "results");
+    assert_eq!(
+        metadata.columns[0].description,
+        "mean of normalized counts for all samples"
+    );
+    assert_eq!(
+        metadata.columns[1].description,
+        "log2 fold change (MLE): Intercept"
+    );
+    assert_eq!(metadata.columns[2].description, "standard error: Intercept");
+    assert_eq!(metadata.columns[3].description, "Wald statistic: Intercept");
+    assert_eq!(
+        metadata.columns[4].description,
+        "Wald test p-value: Intercept"
+    );
+    assert_eq!(metadata.columns[5].description, "BH adjusted p-values");
+    assert_eq!(metadata.columns[6].name, "dispersion");
+    assert_eq!(metadata.columns[6].column_type, "diagnostic");
+}
+
+#[test]
+fn result_data_frame_assembles_typed_columns_and_metadata() {
+    let fit = toy_fit(vec![2.0, f64::NAN], vec![0.5, 1.0], vec![true, false]);
+    let names = vec!["gene_a".to_string(), "gene_b".to_string()];
+    let results =
+        build_wald_results(&[10.0, 20.0], &fit, 0, Some(&names), Some(&[0.1, 0.2])).unwrap();
+
+    let frame = results.data_frame();
+
+    assert_eq!(
+        frame.row_names,
+        vec![Some("gene_a".to_string()), Some("gene_b".to_string())]
+    );
+    assert_eq!(frame.metadata, results.deseq2_metadata());
+    assert_eq!(
+        frame
+            .columns
+            .iter()
+            .map(|column| column.metadata.name.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "baseMean",
+            "log2FoldChange",
+            "lfcSE",
+            "stat",
+            "pvalue",
+            "padj",
+            "dispersion",
+            "converged"
+        ]
+    );
+
+    let base_mean = frame
+        .columns
+        .iter()
+        .find(|column| column.metadata.name == "baseMean")
+        .unwrap();
+    assert_eq!(base_mean.values.len(), 2);
+    assert_eq!(
+        base_mean.values.as_numeric().unwrap(),
+        &[Some(10.0), Some(20.0)]
+    );
+    assert!(base_mean.values.as_logical().is_none());
+
+    let lfc = frame
+        .columns
+        .iter()
+        .find(|column| column.metadata.name == "log2FoldChange")
+        .unwrap();
+    assert_eq!(lfc.values.as_numeric().unwrap(), &[Some(2.0), None]);
+
+    let converged = frame
+        .columns
+        .iter()
+        .find(|column| column.metadata.name == "converged")
+        .unwrap();
+    assert_eq!(
+        converged.values.as_logical().unwrap(),
+        &[Some(true), Some(false)]
+    );
+    assert!(converged.values.as_numeric().is_none());
 }
 
 #[test]
@@ -142,6 +302,25 @@ fn build_wald_contrast_results_uses_contrast_columns() {
     assert_eq!(results.rows[1].converged, Some(false));
     assert!(results.rows[0].padj.is_some());
     assert!(results.rows[1].padj.is_some());
+    assert_eq!(results.metadata.test_type, Some(TestType::Wald));
+    assert_eq!(results.metadata.result_name.as_deref(), Some("contrast"));
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+    let metadata = results.deseq2_metadata();
+    assert_eq!(
+        metadata.columns[1].description,
+        "log2 fold change (MLE): primitive numeric contrast"
+    );
+    assert_eq!(
+        metadata.columns[3].description,
+        "Wald statistic: primitive numeric contrast"
+    );
+    assert_eq!(
+        metadata.columns[4].description,
+        "Wald test p-value: primitive numeric contrast"
+    );
 }
 
 #[test]
@@ -200,6 +379,25 @@ fn build_lrt_results_uses_full_model_beta_and_lrt_pvalue() {
     assert_eq!(results.rows[0].pvalue, Some(0.04550026389635853));
     assert_eq!(results.rows[0].dispersion, Some(0.1));
     assert!(results.rows[0].padj.unwrap() <= results.rows[1].padj.unwrap());
+    assert_eq!(results.metadata.test_type, Some(TestType::Lrt));
+    assert_eq!(results.metadata.result_name.as_deref(), Some("Intercept"));
+    assert_eq!(
+        results.metadata.comparison.as_deref(),
+        Some("full model versus reduced model")
+    );
+    let metadata = results.deseq2_metadata();
+    assert_eq!(
+        metadata.columns[1].description,
+        "log2 fold change (MLE): Intercept"
+    );
+    assert_eq!(
+        metadata.columns[3].description,
+        "LRT statistic: full model versus reduced model"
+    );
+    assert_eq!(
+        metadata.columns[4].description,
+        "LRT p-value: full model versus reduced model"
+    );
 }
 
 #[test]

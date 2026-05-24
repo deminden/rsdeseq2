@@ -1,10 +1,13 @@
 use crate::core::CountMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
-use crate::glm::{wald_test_coefficient, LrtOutput, NbinomGlmFit, WaldContrastOutput, WaldOutput};
+use crate::glm::{
+    wald_test_coefficient, LrtOutput, NbinomGlmFit, WaldAlternative, WaldContrastOutput,
+    WaldOutput, WaldTestOptions,
+};
 use crate::independent_filtering::IndependentFilteringOutput;
 use crate::matrix::RowMajorMatrix;
 use crate::multiple_testing::bh_adjust;
-use crate::options::CooksCutoff;
+use crate::options::{CooksCutoff, TestType};
 use statrs::distribution::{ContinuousCDF, FisherSnedecor};
 
 /// Core DESeq2 `results()` column names emitted by the current Rust result rows.
@@ -25,6 +28,184 @@ pub const RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS: [&str; 5] = [
     "cooksOutlier",
     "filtered",
 ];
+
+/// Metadata for one DESeq2-style result-table column.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultColumnMetadata {
+    /// Column name.
+    pub name: String,
+    /// DESeq2-style column group. Core statistical columns use `results`.
+    pub column_type: String,
+    /// Human-readable column description.
+    pub description: String,
+}
+
+/// Table-level metadata for a primitive DESeq2-shaped result table.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultsTableMetadata {
+    /// Statistical test represented by the p-values.
+    pub test_type: Option<TestType>,
+    /// Name of the reported coefficient or contrast, if known.
+    pub result_name: Option<String>,
+    /// Free-form comparison description for wrappers or callers.
+    pub comparison: Option<String>,
+    /// Log2 fold-change threshold used for Wald-threshold tests.
+    pub lfc_threshold: f64,
+    /// Alternative hypothesis name for thresholded Wald tests.
+    pub alt_hypothesis: Option<String>,
+    /// P-value adjustment method. The current Rust implementation uses BH.
+    pub p_adjust_method: String,
+}
+
+/// One scalar table-level result metadata entry.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultsTableMetadataEntry {
+    /// Metadata key.
+    pub name: String,
+    /// Metadata value formatted for table/export consumers.
+    pub value: String,
+}
+
+impl Default for DeseqResultsTableMetadata {
+    fn default() -> Self {
+        Self {
+            test_type: None,
+            result_name: None,
+            comparison: None,
+            lfc_threshold: 0.0,
+            alt_hypothesis: None,
+            p_adjust_method: "BH".to_string(),
+        }
+    }
+}
+
+impl DeseqResultsTableMetadata {
+    /// Label used in effect-size column descriptions.
+    ///
+    /// Wald contrast result tables prefer the comparison label when present,
+    /// while LRT result tables keep the reported full-model coefficient as the
+    /// effect label and use the model comparison for test-statistic columns.
+    pub fn effect_description_label(&self) -> Option<&str> {
+        effect_description_label(self)
+    }
+
+    /// Label used in test-statistic and p-value column descriptions.
+    pub fn test_description_label(&self) -> Option<&str> {
+        test_description_label(self)
+    }
+
+    /// Assemble scalar table-level metadata entries.
+    ///
+    /// The names are stable Rust-side keys for wrapper and file exporters,
+    /// while values follow DESeq2-facing labels where applicable.
+    pub fn scalar_metadata(&self) -> Vec<DeseqResultsTableMetadataEntry> {
+        let mut entries = Vec::new();
+        if let Some(test_type) = self.test_type {
+            entries.push(DeseqResultsTableMetadataEntry {
+                name: "testType".to_string(),
+                value: test_type_label(test_type).to_string(),
+            });
+        }
+        if let Some(value) = &self.result_name {
+            entries.push(DeseqResultsTableMetadataEntry {
+                name: "resultName".to_string(),
+                value: value.clone(),
+            });
+        }
+        if let Some(value) = &self.comparison {
+            entries.push(DeseqResultsTableMetadataEntry {
+                name: "comparison".to_string(),
+                value: value.clone(),
+            });
+        }
+        entries.push(DeseqResultsTableMetadataEntry {
+            name: "lfcThreshold".to_string(),
+            value: self.lfc_threshold.to_string(),
+        });
+        if let Some(value) = &self.alt_hypothesis {
+            entries.push(DeseqResultsTableMetadataEntry {
+                name: "altHypothesis".to_string(),
+                value: value.clone(),
+            });
+        }
+        entries.push(DeseqResultsTableMetadataEntry {
+            name: "pAdjustMethod".to_string(),
+            value: self.p_adjust_method.clone(),
+        });
+        entries
+    }
+}
+
+/// Combined metadata view for a result table.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultsMetadata {
+    /// Table-level metadata.
+    pub table: DeseqResultsTableMetadata,
+    /// Column metadata for currently represented columns.
+    pub columns: Vec<DeseqResultColumnMetadata>,
+    /// Independent-filtering metadata, if filtering has run.
+    pub independent_filtering: Option<IndependentFilteringOutput>,
+}
+
+/// Typed values for one assembled result-table column.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DeseqResultColumnValues {
+    /// Numeric column values. Missing or non-finite values are represented as `None`.
+    Numeric(Vec<Option<f64>>),
+    /// Logical column values. Missing values are represented as `None`.
+    Logical(Vec<Option<bool>>),
+}
+
+impl DeseqResultColumnValues {
+    /// Number of values in the column.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Numeric(values) => values.len(),
+            Self::Logical(values) => values.len(),
+        }
+    }
+
+    /// Whether the column has no values.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Borrow numeric values when this is a numeric column.
+    pub fn as_numeric(&self) -> Option<&[Option<f64>]> {
+        match self {
+            Self::Numeric(values) => Some(values),
+            Self::Logical(_) => None,
+        }
+    }
+
+    /// Borrow logical values when this is a logical column.
+    pub fn as_logical(&self) -> Option<&[Option<bool>]> {
+        match self {
+            Self::Numeric(_) => None,
+            Self::Logical(values) => Some(values),
+        }
+    }
+}
+
+/// One assembled result-table column with values and DESeq2-style metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultColumn {
+    /// Metadata describing the column.
+    pub metadata: DeseqResultColumnMetadata,
+    /// Column values in result-row order.
+    pub values: DeseqResultColumnValues,
+}
+
+/// DESeq2-shaped typed data-frame view of a result table.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeseqResultsDataFrame {
+    /// Optional row names, typically gene identifiers.
+    pub row_names: Vec<Option<String>>,
+    /// Ordered result columns.
+    pub columns: Vec<DeseqResultColumn>,
+    /// Table and independent-filtering metadata.
+    pub metadata: DeseqResultsMetadata,
+}
 
 /// One row of a future DESeq2-like results table.
 #[derive(Clone, Debug, PartialEq)]
@@ -60,6 +241,8 @@ pub struct DeseqResultRow {
 pub struct DeseqResults {
     /// Rows in output order.
     pub rows: Vec<DeseqResultRow>,
+    /// Table-level metadata, such as test type and reported coefficient.
+    pub metadata: DeseqResultsTableMetadata,
     /// Independent-filtering metadata, when result assembly has run that stage.
     pub independent_filtering: Option<IndependentFilteringOutput>,
 }
@@ -99,6 +282,87 @@ impl DeseqResults {
             columns.push("filtered");
         }
         columns
+    }
+
+    /// Column metadata represented by this result table.
+    pub fn column_metadata(&self) -> Vec<DeseqResultColumnMetadata> {
+        self.column_names()
+            .into_iter()
+            .map(|name| DeseqResultColumnMetadata {
+                name: name.to_string(),
+                column_type: result_column_type(name).to_string(),
+                description: result_column_description(name, &self.metadata),
+            })
+            .collect()
+    }
+
+    /// DESeq2-style metadata view for table and represented columns.
+    pub fn deseq2_metadata(&self) -> DeseqResultsMetadata {
+        DeseqResultsMetadata {
+            table: self.metadata.clone(),
+            columns: self.column_metadata(),
+            independent_filtering: self.independent_filtering.clone(),
+        }
+    }
+
+    /// Assemble a typed DESeq2-shaped data-frame view.
+    ///
+    /// Row names are kept separate from result columns, matching R's
+    /// `DataFrame`/data-frame convention. Columns follow [`Self::column_names`]
+    /// and carry the same metadata returned by [`Self::deseq2_metadata`].
+    pub fn data_frame(&self) -> DeseqResultsDataFrame {
+        let column_metadata = self.column_metadata();
+        let columns = column_metadata
+            .iter()
+            .map(|metadata| DeseqResultColumn {
+                metadata: metadata.clone(),
+                values: self.column_values(&metadata.name),
+            })
+            .collect();
+        DeseqResultsDataFrame {
+            row_names: self.rows.iter().map(|row| row.gene.clone()).collect(),
+            columns,
+            metadata: DeseqResultsMetadata {
+                table: self.metadata.clone(),
+                columns: column_metadata,
+                independent_filtering: self.independent_filtering.clone(),
+            },
+        }
+    }
+
+    /// Return a copy with updated table metadata.
+    pub fn with_metadata(mut self, metadata: DeseqResultsTableMetadata) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    /// Attach the Wald threshold and alternative used to produce p-values.
+    pub fn apply_wald_test_options(&mut self, options: &WaldTestOptions) {
+        self.metadata.lfc_threshold = options.lfc_threshold;
+        self.metadata.alt_hypothesis = Some(wald_alternative_name(options.alternative).to_string());
+    }
+
+    /// Return a copy with Wald threshold metadata attached.
+    pub fn with_wald_test_options(mut self, options: &WaldTestOptions) -> Self {
+        self.apply_wald_test_options(options);
+        self
+    }
+
+    fn column_values(&self, name: &str) -> DeseqResultColumnValues {
+        match name {
+            "baseMean" => numeric_column(&self.rows, |row| finite_option(row.base_mean)),
+            "log2FoldChange" => numeric_column(&self.rows, |row| row.log2_fold_change),
+            "lfcSE" => numeric_column(&self.rows, |row| row.lfc_se),
+            "stat" => numeric_column(&self.rows, |row| row.stat),
+            "pvalue" => numeric_column(&self.rows, |row| row.pvalue),
+            "padj" => numeric_column(&self.rows, |row| row.padj),
+            "dispersion" => numeric_column(&self.rows, |row| row.dispersion),
+            "maxCooks" => numeric_column(&self.rows, |row| row.max_cooks),
+            "converged" => logical_column(&self.rows, |row| row.converged),
+            "cooksOutlier" => logical_column(&self.rows, |row| row.cooks_outlier),
+            "filtered" => logical_column(&self.rows, |row| row.filtered),
+            _ => numeric_column(&self.rows, |_| None),
+        }
     }
 }
 
@@ -171,6 +435,7 @@ pub fn build_wald_results_from_wald(
     }
     Ok(DeseqResults {
         rows,
+        metadata: wald_table_metadata(fit, coefficient),
         independent_filtering: None,
     })
 }
@@ -212,6 +477,12 @@ pub fn build_wald_contrast_results(
     }
     Ok(DeseqResults {
         rows,
+        metadata: DeseqResultsTableMetadata {
+            test_type: Some(TestType::Wald),
+            result_name: Some("contrast".to_string()),
+            comparison: Some("primitive numeric contrast".to_string()),
+            ..DeseqResultsTableMetadata::default()
+        },
         independent_filtering: None,
     })
 }
@@ -275,6 +546,7 @@ pub fn build_lrt_results(
     }
     Ok(DeseqResults {
         rows,
+        metadata: lrt_table_metadata(full_fit, coefficient),
         independent_filtering: None,
     })
 }
@@ -456,6 +728,20 @@ fn validate_cooks_heuristic_inputs(
     Ok(())
 }
 
+fn numeric_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
+where
+    F: Fn(&DeseqResultRow) -> Option<f64>,
+{
+    DeseqResultColumnValues::Numeric(rows.iter().map(selector).collect())
+}
+
+fn logical_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
+where
+    F: Fn(&DeseqResultRow) -> Option<bool>,
+{
+    DeseqResultColumnValues::Logical(rows.iter().map(selector).collect())
+}
+
 fn validate_result_inputs(
     base_mean: &[f64],
     fit: &NbinomGlmFit,
@@ -551,6 +837,131 @@ fn validate_wald_contrast_output(
         ));
     }
     validate_wald_output(&contrast.wald, n_genes)
+}
+
+fn wald_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTableMetadata {
+    DeseqResultsTableMetadata {
+        test_type: Some(TestType::Wald),
+        result_name: Some(result_name_for_coefficient(fit, coefficient)),
+        ..DeseqResultsTableMetadata::default()
+    }
+}
+
+fn lrt_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTableMetadata {
+    DeseqResultsTableMetadata {
+        test_type: Some(TestType::Lrt),
+        result_name: Some(result_name_for_coefficient(fit, coefficient)),
+        comparison: Some("full model versus reduced model".to_string()),
+        ..DeseqResultsTableMetadata::default()
+    }
+}
+
+fn result_name_for_coefficient(fit: &NbinomGlmFit, coefficient: usize) -> String {
+    fit.model_matrix
+        .coefficient_names()
+        .and_then(|names| names.get(coefficient))
+        .cloned()
+        .unwrap_or_else(|| format!("coefficient_{coefficient}"))
+}
+
+fn result_column_type(name: &str) -> &'static str {
+    match name {
+        "dispersion" | "converged" | "maxCooks" | "cooksOutlier" | "filtered" => "diagnostic",
+        _ => "results",
+    }
+}
+
+fn result_column_description(name: &str, metadata: &DeseqResultsTableMetadata) -> String {
+    match name {
+        "baseMean" => "mean of normalized counts for all samples".to_string(),
+        "log2FoldChange" => effect_description(metadata, "log2 fold change (MLE)"),
+        "lfcSE" => effect_description(metadata, "standard error"),
+        "stat" => statistic_description(metadata),
+        "pvalue" => pvalue_description(metadata),
+        "padj" => format!("{} adjusted p-values", metadata.p_adjust_method),
+        "dispersion" => "final dispersion estimate".to_string(),
+        "converged" => "whether beta fitting converged".to_string(),
+        "maxCooks" => "maximum Cook's distance over eligible samples".to_string(),
+        "cooksOutlier" => "whether Cook's cutoff masked the p-value".to_string(),
+        "filtered" => "whether independent filtering removed this row".to_string(),
+        _ => "result column".to_string(),
+    }
+}
+
+fn effect_description(metadata: &DeseqResultsTableMetadata, prefix: &str) -> String {
+    match effect_description_label(metadata) {
+        Some(label) => format!("{prefix}: {label}"),
+        None => prefix.to_string(),
+    }
+}
+
+fn statistic_description(metadata: &DeseqResultsTableMetadata) -> String {
+    match metadata.test_type {
+        Some(TestType::Wald) => {
+            labelled_description("Wald statistic", test_description_label(metadata))
+        }
+        Some(TestType::Lrt) => {
+            labelled_description("LRT statistic", test_description_label(metadata))
+        }
+        None => "test statistic".to_string(),
+    }
+}
+
+fn pvalue_description(metadata: &DeseqResultsTableMetadata) -> String {
+    match metadata.test_type {
+        Some(TestType::Wald) => {
+            labelled_description("Wald test p-value", test_description_label(metadata))
+        }
+        Some(TestType::Lrt) => {
+            labelled_description("LRT p-value", test_description_label(metadata))
+        }
+        None => "Wald or likelihood-ratio test p-value".to_string(),
+    }
+}
+
+fn labelled_description(prefix: &str, label: Option<&str>) -> String {
+    match label {
+        Some(label) => format!("{prefix}: {label}"),
+        None => prefix.to_string(),
+    }
+}
+
+fn effect_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
+    match metadata.test_type {
+        Some(TestType::Lrt) => metadata
+            .result_name
+            .as_deref()
+            .or(metadata.comparison.as_deref()),
+        _ => metadata
+            .comparison
+            .as_deref()
+            .or(metadata.result_name.as_deref()),
+    }
+}
+
+fn test_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
+    metadata
+        .comparison
+        .as_deref()
+        .or(metadata.result_name.as_deref())
+}
+
+fn test_type_label(test_type: TestType) -> &'static str {
+    match test_type {
+        TestType::Wald => "Wald",
+        TestType::Lrt => "LRT",
+    }
+}
+
+fn wald_alternative_name(alternative: WaldAlternative) -> &'static str {
+    match alternative {
+        WaldAlternative::GreaterAbs => "greaterAbs",
+        WaldAlternative::GreaterAbsUpshot => "greaterAbsUPSHOT",
+        WaldAlternative::GreaterAbs2014 => "greaterAbs2014",
+        WaldAlternative::LessAbs => "lessAbs",
+        WaldAlternative::Greater => "greater",
+        WaldAlternative::Less => "less",
+    }
 }
 
 fn finite_option(value: f64) -> Option<f64> {

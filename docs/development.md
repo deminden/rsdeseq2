@@ -11,9 +11,8 @@
 
 The current implementation is Rust-first: a Rust core, minimal Rust CLI,
 scripts for parity fixtures, docs, CI, validation outputs, and an experimental
-R package scaffold. Mature R wrapper paths must call the Rust core and must not
-fall back to R/Bioconductor DESeq2 for runtime computation. R/DESeq2 is used
-only as an external reference generator for tests.
+R package scaffold. R/DESeq2 is used only as an external reference generator
+for tests.
 
 ## Commands
 
@@ -52,9 +51,8 @@ scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
 
 ## Coding Conventions
 
-- Keep statistical computation in Rust. Future language wrappers must call the
-  Rust core and fail clearly for unsupported paths instead of delegating to
-  DESeq2 or another implementation.
+- Keep statistical computation in Rust; see the implementation plan for future
+  wrapper constraints.
 - Prefer explicit structs and enums over string options.
 - Return `DeseqError::UnsupportedFeature` for unimplemented stages.
 - Avoid panics in library code.

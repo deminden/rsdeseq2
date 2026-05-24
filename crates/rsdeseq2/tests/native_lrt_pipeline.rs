@@ -225,6 +225,66 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
 }
 
 #[test]
+fn top_level_fit_lrt_runs_default_glm_mu_lrt_for_last_coefficient() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder();
+
+    let top_level_fit = builder.fit_lrt(&counts, &full, &reduced).unwrap();
+    let (lrt_fit, _results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+
+    assert_eq!(top_level_fit.counts_summary, lrt_fit.counts_summary);
+    assert_eq!(top_level_fit.design, lrt_fit.design);
+    assert_eq!(top_level_fit.reduced_design, lrt_fit.reduced_design);
+    assert_eq!(top_level_fit.all_zero, lrt_fit.all_zero);
+    assert_eq!(
+        top_level_fit.reduced_beta_converged,
+        lrt_fit.reduced_beta_converged
+    );
+    assert_eq!(top_level_fit.lrt, lrt_fit.lrt);
+    assert!(top_level_fit.dispersion.is_some());
+    assert!(matches!(
+        top_level_fit.dispersion_trend.as_ref(),
+        Some(DispersionTrendFit::Mean(_))
+    ));
+    assert!(top_level_fit.beta.is_some());
+    assert!(top_level_fit.lrt.is_some());
+
+    let transformed = top_level_fit.vst(&counts).unwrap();
+    assert_eq!(transformed.n_rows(), counts.n_genes());
+    assert_eq!(transformed.n_cols(), counts.n_samples());
+    assert_eq!(
+        transformed,
+        top_level_fit
+            .variance_stabilizing_transform(&counts)
+            .unwrap()
+    );
+    assert!(transformed.as_slice().iter().all(|value| value.is_finite()));
+}
+
+#[test]
+fn top_level_fit_lrt_with_results_returns_default_lrt_results() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder();
+
+    let (top_level_fit, top_level_results) = builder
+        .fit_lrt_with_results(&counts, &full, &reduced)
+        .unwrap();
+    let (lrt_fit, lrt_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+
+    assert_eq!(top_level_fit.lrt, lrt_fit.lrt);
+    assert_eq!(top_level_results, lrt_results);
+    assert_eq!(top_level_results.metadata.test_type, Some(TestType::Lrt));
+    assert_eq!(
+        top_level_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+}
+
+#[test]
 fn native_glm_mu_lrt_cooks_replacement_refit_skips_when_no_rows_are_marked() {
     let counts = counts_with_zero_row();
     let full = full_design();
@@ -277,6 +337,89 @@ fn native_linear_mu_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() 
     assert_eq!(native_results.rows[0].pvalue, None);
 
     for gene in 0..counts.n_genes() {
+        assert_eq!(
+            native_fit.lrt.as_ref().unwrap().pvalue[gene],
+            fixed_fit.lrt.as_ref().unwrap().pvalue[gene]
+        );
+        assert_eq!(
+            native_results.rows[gene].pvalue,
+            fixed_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            native_results.rows[gene].stat,
+            fixed_results.rows[gene].stat
+        );
+    }
+}
+
+#[test]
+fn native_linear_mu_local_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder().fit_type(FitType::Local);
+
+    let (native_fit, native_results) = builder
+        .fit_lrt_linear_mu(&counts, &full, &reduced, 1)
+        .unwrap();
+    let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
+    let (fixed_fit, fixed_results) = builder
+        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
+        .unwrap();
+
+    assert!(native_fit.disp_prior_var.unwrap().is_finite());
+    assert_eq!(
+        native_fit.disp_fit.as_ref().unwrap().len(),
+        counts.n_genes()
+    );
+    assert_eq!(native_fit.lrt.as_ref().unwrap().degrees_of_freedom, 1);
+    assert_eq!(native_results.rows[0].pvalue, None);
+
+    for gene in 0..counts.n_genes() {
+        assert_eq!(
+            native_fit.lrt.as_ref().unwrap().pvalue[gene],
+            fixed_fit.lrt.as_ref().unwrap().pvalue[gene]
+        );
+        assert_eq!(
+            native_results.rows[gene].pvalue,
+            fixed_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            native_results.rows[gene].stat,
+            fixed_results.rows[gene].stat
+        );
+    }
+}
+
+#[test]
+fn native_glm_mu_local_lrt_matches_fixed_pipeline_when_reusing_final_dispersions() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder().fit_type(FitType::Local);
+
+    let (native_fit, native_results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let final_dispersions = native_fit.dispersion.as_ref().unwrap().clone();
+    let (fixed_fit, fixed_results) = builder
+        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &final_dispersions, 1)
+        .unwrap();
+
+    assert!(native_fit.disp_prior_var.unwrap().is_finite());
+    assert_eq!(
+        native_fit.disp_fit.as_ref().unwrap().len(),
+        counts.n_genes()
+    );
+    assert_eq!(native_fit.lrt.as_ref().unwrap().degrees_of_freedom, 1);
+    assert_eq!(native_results.rows[0].pvalue, None);
+
+    for gene in 0..counts.n_genes() {
+        let native_disp = native_fit.dispersion.as_ref().unwrap()[gene];
+        let fixed_disp = fixed_fit.dispersion.as_ref().unwrap()[gene];
+        if native_disp.is_nan() {
+            assert!(fixed_disp.is_nan());
+        } else {
+            assert_relative_eq!(native_disp, fixed_disp, epsilon = 1e-12);
+        }
         assert_eq!(
             native_fit.lrt.as_ref().unwrap().pvalue[gene],
             fixed_fit.lrt.as_ref().unwrap().pvalue[gene]

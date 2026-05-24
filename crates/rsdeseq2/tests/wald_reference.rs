@@ -172,6 +172,124 @@ fn fixed_dispersion_wald_t_matches_optional_deseq2_internal_reference() {
 }
 
 #[test]
+fn fixed_dispersion_force_optim_wald_matches_optional_deseq2_internal_reference() {
+    let Some(rows) = read_optional_tsv("fixed_force_optim_wald_reference.tsv") else {
+        return;
+    };
+    let Some(expected_mu) = read_optional_tsv("fixed_force_optim_mu_full.tsv") else {
+        return;
+    };
+    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
+        return;
+    };
+
+    let dispersions = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispersion"))
+        .collect::<Vec<_>>();
+    let (fit, results) = DeseqBuilder::new()
+        .size_factors(size_factors)
+        .disable_cooks_cutoff()
+        .disable_independent_filtering()
+        .irls_options(IrlsOptions {
+            use_optim: true,
+            force_optim: true,
+            ..IrlsOptions::default()
+        })
+        .fit_fixed_dispersion_wald(
+            &reference_counts(),
+            &reference_full_design(),
+            &dispersions,
+            1,
+        )
+        .unwrap();
+
+    let beta = fit.beta.as_ref().unwrap();
+    let beta_se = fit.beta_se.as_ref().unwrap();
+    let beta_converged = fit.beta_converged.as_ref().unwrap();
+    let beta_iter = fit.beta_iter.as_ref().unwrap();
+    let log_like = fit.log_like.as_ref().unwrap();
+    let mu = fit.mu.as_ref().unwrap();
+    let wald = fit.wald.as_ref().unwrap();
+    let samples = reference_sample_names();
+
+    assert_eq!(rows.len(), results.rows.len());
+    assert_eq!(expected_mu.len(), results.rows.len());
+    for (gene, row) in rows.iter().enumerate() {
+        assert_float_close(
+            beta.row(gene).unwrap()[0],
+            parse_required_f64(row, "beta_intercept"),
+            1e-1,
+            1e-3,
+            &format!("force-optim Wald beta intercept gene {gene}"),
+        );
+        assert_float_close(
+            beta.row(gene).unwrap()[1],
+            parse_required_f64(row, "beta_conditionB"),
+            1e-1,
+            1e-3,
+            &format!("force-optim Wald beta conditionB gene {gene}"),
+        );
+        assert_float_close(
+            beta_se.row(gene).unwrap()[0],
+            parse_required_f64(row, "beta_se_intercept"),
+            2e-4,
+            2e-4,
+            &format!("force-optim Wald beta SE intercept gene {gene}"),
+        );
+        assert_float_close(
+            beta_se.row(gene).unwrap()[1],
+            parse_required_f64(row, "beta_se_conditionB"),
+            2e-4,
+            2e-4,
+            &format!("force-optim Wald beta SE conditionB gene {gene}"),
+        );
+        assert_option_close(
+            wald.stat[gene],
+            Some(parse_required_f64(row, "stat_conditionB")),
+            1e-1,
+            1e-3,
+            &format!("force-optim Wald stat gene {gene}"),
+        );
+        assert_option_close(
+            wald.pvalue[gene],
+            Some(parse_required_f64(row, "pvalue_conditionB")),
+            1e-6,
+            1e-5,
+            &format!("force-optim Wald p-value gene {gene}"),
+        );
+        assert_float_close(
+            log_like[gene],
+            parse_required_f64(row, "log_like"),
+            2e-4,
+            2e-4,
+            &format!("force-optim Wald log-likelihood gene {gene}"),
+        );
+        assert_eq!(
+            beta_converged[gene],
+            parse_required_bool(row, "converged"),
+            "force-optim convergence gene {gene}"
+        );
+        assert_eq!(
+            beta_iter[gene],
+            parse_required_usize(row, "iterations"),
+            "force-optim IRLS iterations gene {gene}"
+        );
+
+        let mu_row = &expected_mu[gene];
+        for (sample, sample_name) in samples.iter().enumerate() {
+            assert_float_close(
+                mu.row(gene).unwrap()[sample],
+                parse_required_f64(mu_row, sample_name),
+                2e-4,
+                2e-4,
+                &format!("force-optim fitted mean gene {gene} sample {sample}"),
+            );
+        }
+    }
+}
+
+#[test]
 fn fixed_dispersion_cooks_match_optional_deseq2_internal_reference() {
     let Some(expected_cooks) = read_optional_tsv("fixed_cooks_full.tsv") else {
         return;

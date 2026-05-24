@@ -3,6 +3,24 @@
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).
 
+## Numerical Parity Snapshot
+
+The strongest current matches are stage-level primitives with generated
+DESeq2 fixtures or direct formula checks. They are suitable for
+apples-to-apples validation and benchmarking, but they are not a claim of full
+`DESeq()` workflow parity.
+
+| area | current numerical status | evidence |
+| --- | --- | --- |
+| Size factors and normalized counts | Matches DESeq2 `ratio` and `poscounts` behavior for covered fixtures, including supplied geometric means and control genes. | Hand tests, generated DESeq2 normalization fixtures, and real/synthetic CLI benchmark diffs. |
+| Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
+| Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
+| Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
+| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles and log2-to-natural ridge conversion. | Source-matched formula tests; expanded-model averaging and high-level plumbing still need fixture coverage. |
+| Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures, prior variance, MAP shrinkage, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/weighted GLM-mu fixtures and finite-difference objective tests. |
+| Results, Cook's, filtering | Matches implemented result-table assembly, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's and independent-filtering fixtures. |
+| Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, and implemented local numerical-integration helpers. | Formula tests and stage-level dispatch tests; full Bioconductor object workflow remains future work. |
+
 ## Implemented
 
 - Non-negative integer count matrix represented as genes x samples.
@@ -12,12 +30,16 @@ For a higher-level comparison against original DESeq2, see
 - Optional caller-supplied size factors.
 - Optional supplied geometric means.
 - Optional control-gene subset by row index.
-- Size-factor normalized counts.
+- Size-factor normalized counts, plus raw and normalized count-matrix TSV
+  export with gene and sample labels.
 - Gene/sample normalization factors that preempt size factors for normalized
   counts, base row metadata, supplied-dispersion fixed Wald/LRT GLM offsets,
-  and the current native linear-mu dispersion/Wald subset.
+  and the current native linear-mu dispersion/Wald subset, plus genes x samples
+  TSV export for normalization-factor matrices.
 - `baseMean`.
 - `baseVar` sample variance of normalized counts.
+- DESeq2-shaped TSV export for implemented early row metadata:
+  `baseMean`, `baseVar`, and `allZero`.
 - DESeq2-style weighted base metadata helpers that multiply normalized counts
   by observation weights before ordinary row means and variances.
 - Builder-owned observation weights with design-aware row-normalization,
@@ -35,11 +57,26 @@ For a higher-level comparison against original DESeq2, see
   values, and selectable normal-equation or DESeq2-style augmented QR solvers.
   Inspectable GLM fit state includes full/reduced log likelihoods,
   DESeq2-style full deviance, beta convergence, and beta iteration counts.
+- DESeq2-style optim fallback row routing for unstable IRLS rows, non-positive
+  coefficient variances, and optional non-converged rows, followed by bounded
+  pure-Rust refits that refresh beta estimates, SE/covariance, fitted means,
+  row log likelihoods, and convergence flags.
+- DESeq2-style beta-prior variance estimation for primitive MLE beta matrices:
+  unweighted type-7 quantile matching, DESeq2-vendored Hmisc weighted
+  upper-quantile matching using `1 / (1 / baseMean + dispFit)` row weights,
+  finite-beta filtering, and wide intercept priors.
+- Primitive beta-prior fixed-dispersion GLM refits from supplied or estimated
+  log2-scale beta-prior variances, including DESeq2's conversion to
+  natural-log-scale ridge values before IRLS.
 - DESeq2-style observation-weight preprocessing helper with row-max
   normalization, weighted design-rank checks, thresholded Cox-Reid sub-design
   checks, and `weights_fail` flags.
 - DESeq2-style full-rank design matrix checks for supplied-dispersion Wald/LRT
-  pipelines and the current native linear-mu dispersion path.
+  pipelines and native dispersion stages.
+- DESeq2-shaped fit diagnostics expose stored fitted dispersion trend type
+  labels and implemented dispersion-stage aliases, including `dispGeneEst`,
+  `dispFit`, `dispersion`, `dispIter`, and `dispOutlier`, plus stable present
+  column names, typed data-frame assembly, and TSV export for table exporters.
 - Initial linear-mu gene-wise dispersion estimator with rough and moments
   dispersion starts.
 - Initial GLM-mu gene-wise dispersion estimator with rough/moments
@@ -60,6 +97,49 @@ For a higher-level comparison against original DESeq2, see
 - Mean dispersion trend fitting with DESeq2's preliminary
   `dispGeneEst > 100 * minDisp` viability gate and the constant trimmed-mean
   fit over estimates above `10 * minDisp`.
+- `normTransform` and mean-fit, parametric, and local numerical-integration VST
+  primitives for normalized-count matrices, including dispatch from an
+  already-fitted `DispersionTrendFit` and DESeq2-shaped local VST size-factor
+  summary helpers. Factor-aware VST dispatch helpers now accept ordinary size
+  factors or normalization factors directly for the local branch. `DeseqFit`
+  retains the implemented fitted trend object and can produce normalized
+  counts, `normTransform`, and VST output for its source count matrix, with a
+  short `vst` method alias for the transform. It can also apply a caller-supplied
+  fitted trend to its full count matrix, which supports the fast-VST split
+  between full-data normalization and subset-fitted trend estimation. The
+  deterministic row-subset helper used by DESeq2's fast `vst()` wrapper
+  includes the DESeq2 default `nsub=1000` constant and explicit-size lower-level
+  building blocks: eligible-row counting under the same `baseMean > 5` rule,
+  normalized-count subsetting, aligned gene/sample matrix subsetting, raw count
+  `CountMatrix` row selection with name preservation, and a row-aligned subset
+  bundle for counts, normalized counts, optional normalization factors,
+  optional observation weights, and original row indices. `DeseqFit` exposes
+  the eligible-row count and that bundle using its stored `baseMean`,
+  normalization factors, and preprocessed observation weights. The builder can
+  fit the selected GLM-mu dispersion trend on the deterministic fast-VST subset
+  while preserving full-data size factors and subset normalization factors;
+  the paired fast-VST helper applies that subset-fitted trend to the full
+  normalized count matrix through size-factor or normalization-factor dispatch
+  and returns a named output with the transformed matrix, subset fit, and
+  subset diagnostics, plus a metadata view with full transform shape, subset
+  shape, subset row indices, trend-fit shape, and stable trend-fit type label.
+  The automatic GLM-mu VST helper uses the fast subset when
+  enough rows are eligible and otherwise fits the selected Rust trend on all
+  rows, with trend-source metadata for the chosen path, requested `nsub`, and
+  eligible-row count. Full-data trend metadata distinguishes too-few-eligible
+  rows from observation-weighted input, and exposes stable labels for source
+  and reason fields. The output metadata view packages those labels with
+  transform shape, trend-fit shape, trend-fit type label, optional fast-subset
+  row count, and optional original fast-subset row indices.
+  When observation weights are present,
+  automatic VST uses the full-data trend path because observation-weighted
+  fast-VST trend fitting is still held back until the weight preprocessing
+  semantics are wired without double-normalizing rows. The blind automatic
+  helper uses a named intercept-only design for the same decision.
+- Initial pure-Rust local dispersion trend fitting with DESeq2's
+  `dispGeneEst >= 10 * minDisp` local-fit rule, base-mean weights,
+  all-near-minimum floor behavior, builder dispatch, and a small offline
+  local-trend reference check.
 - Deterministic dispersion prior variance estimation, including R-compatible
   MAD scaling, `trigamma((m - p) / 2)` sampling-variance subtraction for
   residual degrees of freedom above 3, saturated designs, low-df histogram/KL
@@ -70,7 +150,7 @@ For a higher-level comparison against original DESeq2, see
   dispersion values for the linear-mu and GLM-mu branches.
 - Limited native Wald pipeline for the current linear-mu no-weight and GLM-mu
   optionally weighted, deterministic-prior MAP dispersion subsets with
-  parametric or mean dispersion trends.
+  parametric, local, or mean dispersion trends.
 - Default coefficient-level Wald statistic and standard-Normal p-value.
 - DESeq2-style Wald t p-values with residual, scalar, or per-gene degrees of
   freedom.
@@ -80,7 +160,8 @@ For a higher-level comparison against original DESeq2, see
 - Result-row assembly with BH adjustment for precomputed primitive numeric
   Wald contrasts.
 - Primitive coefficient-name, positive/negative coefficient-list, and common
-  factor-level contrast resolution against design coefficient names.
+  factor-level contrast resolution against design coefficient names, with
+  stable result-table names and comparison labels for named contrast specs.
 - Numeric/expanded DESeq2-style `contrastAllZero` handling for primitive Wald
   contrasts: selected samples are inferred from `modelMatrix %*%
   contrastBinary`, and eligible rows are assigned LFC/stat zero and p-value
@@ -89,8 +170,18 @@ For a higher-level comparison against original DESeq2, see
   factor-level Wald contrasts when the caller supplies sample levels.
 - Selected-coefficient Wald LFC-threshold alternatives from `results()`:
   `greaterAbs`, `greaterAbs2014`, `greaterAbsUPSHOT` without t p-values,
-  `lessAbs`, `greater`, and `less`.
+  `lessAbs`, `greater`, and `less`, with threshold and alternative metadata
+  carried by high-level Wald result tables.
 - Selected-coefficient Wald result rows with BH-adjusted p-values.
+- DESeq2-style result-column metadata descriptions for the reported
+  coefficient, primitive contrast, or LRT model comparison, with public
+  effect/test description label helpers and table-level scalar metadata for
+  wrapper and exporter parity.
+- Typed DESeq2-shaped result-table view for implemented primitive rows, with
+  row names, numeric/logical columns, and column metadata for wrapper/file
+  output, plus regular and `results(tidy = TRUE)`-style TSV result export,
+  `mcols(res)`-style result-column metadata export, and table-level result
+  metadata export.
 - Supplied-dispersion fixed-dispersion Wald pipeline for one coefficient and
   primitive numeric contrasts.
 - Supplied-dispersion fixed-dispersion LRT pipeline for full vs reduced design
@@ -121,7 +212,9 @@ For a higher-level comparison against original DESeq2, see
   size factors.
 - Base-mean independent filtering with filtered BH adjustment metadata and an
   R `stats::lowess`-shaped rejection-curve smoother for DESeq2's default
-  threshold-selection grid.
+  threshold-selection grid, plus a paired `filterNumRej`-shaped
+  theta/rejection-count view, a paired `lo.fit`-shaped lowess view, scalar
+  metadata entries, and TSV exporters for those metadata tables.
 
 ## Reference Points
 
@@ -214,20 +307,26 @@ fixed-dispersion Wald/LRT references with `weightsFail` rows expanded as
 missing, and weighted GLM-mu mean-trend dispersion/MAP/Wald/LRT intermediate
 references for the current native branch.
 
+The fixed-dispersion IRLS path now includes a bounded pure-Rust optim fallback
+for routed rows. The current checked reference fixtures still use
+`useOptim=FALSE`; the reference generator also has an optional
+`forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
+bounded fallback where DESeq2 is installed locally.
+
 ## Missing
 
-- Mature Rust-backed R package wrapper around the Rust core. It must not
-  fall back to R/Bioconductor DESeq2 for runtime computation.
+- Mature wrapper-facing interface around the Rust core.
 - R formula parsing in Rust.
 - Full DESeq2 dispersion estimation, including complete weighted dispersion
-  parity, local/glmGamPoi trend types, and production-ready end-to-end
-  dispersion parity.
+  parity, exact `locfit` local-trend numerical identity, glmGamPoi trend type,
+  and production-ready end-to-end dispersion parity.
 - High-level propagation of observation-weight `weights_fail` flags through
   complete DESeq2-like builder and future wrapper workflows.
 - Direct weighted low-level `fitNbinomGLMs` parity for rows that DESeq2 marks
   `weightsFail` but still returns ridge-stabilized coefficients for when that
   internal function is called directly.
-- Optim fallback for unstable or non-converged GLM rows.
+- Broader DESeq2 parity fixtures for unstable or non-converged rows routed
+  through the bounded optim fallback.
 - Full DESeq2 `results(contrast=...)` colData/formula-aware factor-level
   semantics, complete coefficient-name cleanup, and contrast-aware Cook's/refit
   edge cases.
@@ -238,19 +337,29 @@ references for the current native branch.
 - General Wald and LRT tests with native dispersion estimation beyond the
   current limited linear-mu/GLM-mu branches and without generated DESeq2
   references for all native LRT intermediates.
-- General all-zero row expansion for dispersion and full Bioconductor
-  result-table metadata. A lightweight `DeseqFit` diagnostic alias view exists
-  for implemented dispersion and Wald/LRT metadata names.
+- Full Bioconductor result-object metadata. Lightweight `DeseqFit` and
+  `DeseqResults` metadata views exist for implemented diagnostics, result
+  columns, test type, p-value adjustment method, Wald threshold settings,
+  comparison-aware column descriptions, effect/test description labels,
+  table-level scalar metadata, typed result-table output, regular and tidy TSV
+  result export, result-metadata export, and independent-filtering metadata
+  including paired `filterNumRej`- and `lo.fit`-shaped views plus scalar
+  metadata entries.
+  Shared internal all-zero row expansion helpers exist for compact GLM outputs
+  and full-length masked vectors.
 - High-level R-style contrast handling beyond primitive coefficient-name
   resolution.
-- VST, rlog, and lfcShrink-compatible hooks.
+- Full high-level VST object workflow, exact DESeq2 `splinefun` behavior for
+  local VST, rlog, and lfcShrink-compatible hooks. Mean-fit, parametric, local,
+  fast-subset selection/subsetting, automatic GLM-mu VST, blind automatic VST,
+  and fit-state VST helpers are available for normalized-count matrices and
+  implemented fitted trends. The transform namespace exports rlog as an
+  explicit unsupported marker until the regularized-log workflow is implemented.
 
 ## Known Deviations
 
 The Rust core accepts primitive matrices and explicit options. Formula
-semantics and model-matrix generation can be handled by a future wrapper, but
-runtime statistical computation must call Rust. There should be no fallback to
-R/Bioconductor DESeq2 for unsupported computations.
+semantics and model-matrix generation can be handled by a future wrapper.
 
 Gene/sample normalization factors are supported for normalized-count metadata,
 supplied-dispersion fixed Wald/LRT pipelines, and the current native linear-mu
@@ -280,14 +389,16 @@ Armijo line-search shape, including DESeq2's weighted Cox-Reid
 `weightThreshold` subset rule. The linear-mu branch is wired through trend,
 MAP, and the limited native Wald path. The newer GLM-mu branch performs
 mean/dispersion alternation using fixed-dispersion IRLS, can consume
-preprocessed builder observation weights, and is wired through parametric/mean
-trend fitting, MAP shrinkage, and the limited native Wald path.
+preprocessed builder observation weights, and is wired through
+parametric/local/mean trend fitting, MAP shrinkage, and the limited native
+Wald path.
 DESeq2 switches away from linear-mu fitting when observation weights are
 present. `rsdeseq2` now has the log-prior objective, first and second
 derivatives, weighted low-level objective variants, parametric and mean trend
 foundations, deterministic prior-variance branches including low residual
-degrees of freedom, and initial MAP stages, but not complete high-level
-weighted dispersion parity.
+degrees of freedom, and initial MAP stages, but not exact seeded Monte
+Carlo/loess identity for the low-df prior-variance branch or complete
+high-level weighted dispersion parity.
 Parity tests
 should therefore compare rough/moments starts, objective values, prior
 objective values, trend coefficients, `dispFit`, `dispPriorVar`, `dispMAP`,

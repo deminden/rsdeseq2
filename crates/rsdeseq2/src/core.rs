@@ -1,3 +1,7 @@
+use crate::all_zero::{
+    expand_gene_values_with_fill_rows, expand_gene_values_with_nan_rows,
+    expand_matrix_with_nan_rows, mask_all_zero_values_with_nan_rows, nonzero_gene_indices,
+};
 use crate::contrasts::{
     contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_contrast, ContrastSpec,
     FactorLevelContrast,
@@ -9,8 +13,9 @@ use crate::cooks::{
 use crate::design::DesignMatrix;
 use crate::dispersion::{
     estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_glm_mu,
-    estimate_gene_wise_dispersions_linear_mu, estimate_map_dispersions, fit_mean_dispersion_trend,
-    fit_parametric_dispersion_trend, GeneWiseDispersionInput, GeneWiseDispersionOptions,
+    estimate_gene_wise_dispersions_linear_mu, estimate_map_dispersions, fit_local_dispersion_trend,
+    fit_mean_dispersion_trend, fit_parametric_dispersion_trend, DispersionTrendFit,
+    GeneWiseDispersionInput, GeneWiseDispersionOptions, LocalDispersionTrendOptions,
     MapDispersionInput, MapDispersionOptions, MeanDispersionTrendOptions,
     ParametricDispersionTrendOptions,
 };
@@ -39,6 +44,15 @@ use crate::results::{
     apply_cooks_cutoff, build_lrt_results, build_wald_contrast_results,
     build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
+use crate::transform::{
+    fast_vst_eligible_count as count_fast_vst_eligible_rows,
+    fast_vst_subset as build_fast_vst_subset, norm_transform,
+    vst_with_dispersion_trend_and_normalization_factors,
+    vst_with_dispersion_trend_and_size_factors, FastVstSubset,
+};
+
+/// DESeq2's default number of genes used to fit the fast `vst()` trend.
+pub const DEFAULT_FAST_VST_NSUB: usize = 1000;
 
 /// Row-major genes x samples count matrix.
 #[derive(Clone, Debug, PartialEq)]
@@ -198,6 +212,35 @@ impl CountMatrix {
             all_zero_genes,
         }
     }
+
+    /// Select gene rows in caller-provided order while preserving sample names.
+    pub fn select_rows(&self, gene_indices: &[usize]) -> Result<Self, DeseqError> {
+        if gene_indices.is_empty() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "selected count rows".to_string(),
+                expected: 1,
+                actual: 0,
+            });
+        }
+        let mut values = Vec::with_capacity(gene_indices.len() * self.n_samples);
+        for gene in gene_indices {
+            values.extend_from_slice(self.row(*gene)?);
+        }
+        let gene_names = self.gene_names().map(|names| {
+            gene_indices
+                .iter()
+                .map(|gene| names[*gene].clone())
+                .collect::<Vec<_>>()
+        });
+        let sample_names = self.sample_names().map(<[String]>::to_vec);
+        CountMatrix::from_row_major_u32_with_names(
+            gene_indices.len(),
+            self.n_samples,
+            values,
+            gene_names,
+            sample_names,
+        )
+    }
 }
 
 /// Basic count matrix summary.
@@ -250,6 +293,8 @@ pub struct DeseqFit {
     pub disp_gene_iter: Option<Vec<usize>>,
     /// Fitted dispersion trend values.
     pub disp_fit: Option<Vec<f64>>,
+    /// Fitted dispersion trend object used by implemented VST dispatch.
+    pub dispersion_trend: Option<DispersionTrendFit>,
     /// MAP dispersion estimates before outlier replacement.
     pub disp_map: Option<Vec<f64>>,
     /// Final dispersion estimates.
@@ -315,6 +360,123 @@ pub struct DeseqBuilder {
     wald_test_options: WaldTestOptions,
     cooks_cutoff: CooksCutoff,
     independent_filtering_options: IndependentFilteringOptions,
+}
+
+impl DeseqFit {
+    /// Reconstruct DESeq2-style normalized counts for the count matrix used to create this fit.
+    pub fn normalized_counts(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        validate_fit_counts_shape(self, counts, "normalized counts")?;
+        match &self.normalization_factors {
+            Some(factors) => normalized_counts_with_factors(counts, factors),
+            None => normalized_counts(counts, &self.size_factors),
+        }
+    }
+
+    /// Apply DESeq2's `normTransform` to the count matrix used to create this fit.
+    pub fn norm_transform(&self, counts: &CountMatrix) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        let normalized = self.normalized_counts(counts)?;
+        norm_transform(&normalized)
+    }
+
+    /// Apply VST using this fit's stored dispersion trend.
+    ///
+    /// This is a lower-level analogue of DESeq2's
+    /// `getVarianceStabilizedData`: the fit must already include a fitted
+    /// dispersion trend from one of the implemented trend stages.
+    pub fn variance_stabilizing_transform(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        validate_fit_counts_shape(self, counts, "variance-stabilizing transform")?;
+        let trend_fit =
+            self.dispersion_trend
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "a fitted dispersion trend is required before VST".to_string(),
+                })?;
+        self.variance_stabilizing_transform_with_trend(counts, trend_fit)
+    }
+
+    /// Apply VST using a caller-supplied fitted dispersion trend.
+    ///
+    /// This is useful for DESeq2's fast `vst()` shape, where normalization and
+    /// full-count reconstruction come from the full fit but the trend may have
+    /// been estimated on a deterministic subset.
+    pub fn variance_stabilizing_transform_with_trend(
+        &self,
+        counts: &CountMatrix,
+        trend_fit: &DispersionTrendFit,
+    ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        validate_fit_counts_shape(self, counts, "variance-stabilizing transform")?;
+        let normalized = self.normalized_counts(counts)?;
+        match &self.normalization_factors {
+            Some(factors) => {
+                vst_with_dispersion_trend_and_normalization_factors(&normalized, trend_fit, factors)
+            }
+            None => vst_with_dispersion_trend_and_size_factors(
+                &normalized,
+                trend_fit,
+                &self.size_factors,
+            ),
+        }
+    }
+
+    /// Short alias for [`DeseqFit::variance_stabilizing_transform`].
+    pub fn vst(&self, counts: &CountMatrix) -> Result<RowMajorMatrix<f64>, DeseqError> {
+        self.variance_stabilizing_transform(counts)
+    }
+
+    /// Number of rows eligible for DESeq2's fast `vst()` subset.
+    ///
+    /// This uses the stored `baseMean` vector and the DESeq2 `baseMean > 5`
+    /// rule, with the same finite-value validation as subset construction.
+    pub fn fast_vst_eligible_count(&self) -> Result<usize, DeseqError> {
+        count_fast_vst_eligible_rows(&self.base_mean)
+    }
+
+    /// Build the row-aligned subset used by DESeq2's fast `vst()` trend fit.
+    ///
+    /// The returned bundle includes raw counts, normalized counts, optional
+    /// normalization factors, optional observation weights, and original row
+    /// indices, all selected from this fit's `baseMean` vector.
+    pub fn fast_vst_subset(
+        &self,
+        counts: &CountMatrix,
+        nsub: usize,
+    ) -> Result<FastVstSubset, DeseqError> {
+        validate_fit_counts_shape(self, counts, "fast VST subset")?;
+        let normalized = self.normalized_counts(counts)?;
+        build_fast_vst_subset(
+            counts,
+            &normalized,
+            &self.base_mean,
+            nsub,
+            self.normalization_factors.as_ref(),
+            self.observation_weights.as_ref(),
+        )
+    }
+}
+
+fn validate_fit_counts_shape(
+    fit: &DeseqFit,
+    counts: &CountMatrix,
+    context: &str,
+) -> Result<(), DeseqError> {
+    let expected = fit.counts_summary.n_genes * fit.counts_summary.n_samples;
+    let actual = counts.n_genes() * counts.n_samples();
+    if fit.counts_summary.n_genes != counts.n_genes()
+        || fit.counts_summary.n_samples != counts.n_samples()
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: context.to_string(),
+            expected,
+            actual,
+        });
+    }
+    Ok(())
 }
 
 struct NormalizationStages {
@@ -463,6 +625,212 @@ pub struct CooksReplacementLrtOutput {
     pub refit_results: Option<DeseqResults>,
     /// Final merged result rows after replacing only `refitRows`.
     pub results: DeseqResults,
+}
+
+/// Output from the current fast-VST GLM-mu helper.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FastVstGlmMuOutput {
+    /// Full count matrix transformed with the subset-fitted dispersion trend.
+    pub transformed: RowMajorMatrix<f64>,
+    /// Fit state for the deterministic fast-VST subset used to estimate the trend.
+    pub subset_fit: DeseqFit,
+    /// Row-aligned subset bundle with original row indices and optional factors.
+    pub subset: FastVstSubset,
+}
+
+/// Metadata summary for the explicit fast-VST GLM-mu helper.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FastVstGlmMuMetadata {
+    /// Number of rows in the transformed full matrix.
+    pub transformed_rows: usize,
+    /// Number of columns in the transformed full matrix.
+    pub transformed_cols: usize,
+    /// Number of rows in the deterministic fast subset.
+    pub fast_subset_rows: usize,
+    /// Number of samples in the deterministic fast subset.
+    pub fast_subset_cols: usize,
+    /// Original zero-based row indices selected for the fast subset.
+    pub fast_subset_indices: Vec<usize>,
+    /// Number of rows used to fit the subset trend.
+    pub trend_fit_rows: usize,
+    /// Number of samples in the subset trend fit.
+    pub trend_fit_cols: usize,
+    /// Stable fit-type label for the fitted dispersion trend.
+    pub trend_fit_type: Option<&'static str>,
+}
+
+/// Output from the automatic GLM-mu VST helper.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VstGlmMuOutput {
+    /// Full count matrix after variance stabilization.
+    pub transformed: RowMajorMatrix<f64>,
+    /// Fit state that supplied the dispersion trend.
+    pub trend_fit: DeseqFit,
+    /// Source of the fitted dispersion trend used for this transform.
+    pub trend_source: VstTrendSource,
+    /// Fast-VST subset diagnostics when the fast path was used.
+    pub fast_subset: Option<FastVstSubset>,
+}
+
+/// Metadata summary for the automatic GLM-mu VST helper.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VstGlmMuMetadata {
+    /// Stable source label for the fitted trend.
+    pub trend_source: &'static str,
+    /// Requested fast-subset size considered by automatic VST.
+    pub nsub: usize,
+    /// Number of rows passing the `baseMean > 5` fast-VST eligibility rule.
+    pub eligible_rows: usize,
+    /// Whether the deterministic fast subset supplied the fitted trend.
+    pub used_fast_subset: bool,
+    /// Stable reason label when the full-data trend path was selected.
+    pub full_data_reason: Option<&'static str>,
+    /// Number of rows in the transformed full matrix.
+    pub transformed_rows: usize,
+    /// Number of columns in the transformed full matrix.
+    pub transformed_cols: usize,
+    /// Number of rows used to fit the trend.
+    pub trend_fit_rows: usize,
+    /// Number of samples in the trend fit.
+    pub trend_fit_cols: usize,
+    /// Stable fit-type label for the fitted dispersion trend.
+    pub trend_fit_type: Option<&'static str>,
+    /// Number of rows in the fast subset, when that path was used.
+    pub fast_subset_rows: Option<usize>,
+    /// Original zero-based row indices in the fast subset, when that path was used.
+    pub fast_subset_indices: Option<Vec<usize>>,
+}
+
+/// Source of the fitted dispersion trend used by automatic VST.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum VstTrendSource {
+    /// The trend was fit on DESeq2's deterministic fast-VST subset.
+    FastSubset {
+        /// Requested fast-subset size.
+        nsub: usize,
+        /// Number of rows passing the `baseMean > 5` eligibility rule.
+        eligible_rows: usize,
+    },
+    /// The trend was fit on the full count matrix.
+    FullData {
+        /// Requested fast-subset size that could not be satisfied.
+        nsub: usize,
+        /// Number of rows passing the `baseMean > 5` eligibility rule.
+        eligible_rows: usize,
+        /// Reason the full-data trend path was selected.
+        reason: VstFullDataReason,
+    },
+}
+
+/// Reason automatic VST selected the full-data trend path.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VstFullDataReason {
+    /// Fewer than `nsub` rows passed the fast-VST eligibility rule.
+    InsufficientEligibleRows,
+    /// Observation weights are present and weighted fast-subset fitting is not implemented yet.
+    ObservationWeightsPresent,
+}
+
+impl FastVstGlmMuOutput {
+    /// DESeq2-shaped metadata view for explicit fast-VST diagnostics.
+    pub fn metadata(&self) -> FastVstGlmMuMetadata {
+        FastVstGlmMuMetadata {
+            transformed_rows: self.transformed.n_rows(),
+            transformed_cols: self.transformed.n_cols(),
+            fast_subset_rows: self.subset.counts.n_genes(),
+            fast_subset_cols: self.subset.counts.n_samples(),
+            fast_subset_indices: self.subset.row_indices.clone(),
+            trend_fit_rows: self.subset_fit.counts_summary.n_genes,
+            trend_fit_cols: self.subset_fit.counts_summary.n_samples,
+            trend_fit_type: self
+                .subset_fit
+                .dispersion_trend
+                .as_ref()
+                .map(|trend| trend.fit_type_label()),
+        }
+    }
+}
+
+impl VstGlmMuOutput {
+    /// DESeq2-shaped metadata view for automatic VST diagnostics.
+    pub fn metadata(&self) -> VstGlmMuMetadata {
+        VstGlmMuMetadata {
+            trend_source: self.trend_source.as_str(),
+            nsub: self.trend_source.nsub(),
+            eligible_rows: self.trend_source.eligible_rows(),
+            used_fast_subset: self.trend_source.used_fast_subset(),
+            full_data_reason: self
+                .trend_source
+                .full_data_reason()
+                .map(|reason| reason.as_str()),
+            transformed_rows: self.transformed.n_rows(),
+            transformed_cols: self.transformed.n_cols(),
+            trend_fit_rows: self.trend_fit.counts_summary.n_genes,
+            trend_fit_cols: self.trend_fit.counts_summary.n_samples,
+            trend_fit_type: self
+                .trend_fit
+                .dispersion_trend
+                .as_ref()
+                .map(|trend| trend.fit_type_label()),
+            fast_subset_rows: self
+                .fast_subset
+                .as_ref()
+                .map(|subset| subset.counts.n_genes()),
+            fast_subset_indices: self
+                .fast_subset
+                .as_ref()
+                .map(|subset| subset.row_indices.clone()),
+        }
+    }
+}
+
+impl VstTrendSource {
+    /// Stable DESeq2-shaped label for the automatic VST trend source.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::FastSubset { .. } => "fastSubset",
+            Self::FullData { .. } => "fullData",
+        }
+    }
+
+    /// Requested fast-subset size considered by the automatic VST helper.
+    pub fn nsub(&self) -> usize {
+        match self {
+            Self::FastSubset { nsub, .. } | Self::FullData { nsub, .. } => *nsub,
+        }
+    }
+
+    /// Number of rows passing the `baseMean > 5` fast-VST eligibility rule.
+    pub fn eligible_rows(&self) -> usize {
+        match self {
+            Self::FastSubset { eligible_rows, .. } | Self::FullData { eligible_rows, .. } => {
+                *eligible_rows
+            }
+        }
+    }
+
+    /// Whether automatic VST fit the trend on the deterministic fast subset.
+    pub fn used_fast_subset(&self) -> bool {
+        matches!(self, Self::FastSubset { .. })
+    }
+
+    /// Reason the full-data trend path was selected, if applicable.
+    pub fn full_data_reason(&self) -> Option<VstFullDataReason> {
+        match self {
+            Self::FastSubset { .. } => None,
+            Self::FullData { reason, .. } => Some(*reason),
+        }
+    }
+}
+
+impl VstFullDataReason {
+    /// Stable label for why automatic VST selected the full-data trend path.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InsufficientEligibleRows => "insufficientEligibleRows",
+            Self::ObservationWeightsPresent => "observationWeightsPresent",
+        }
+    }
 }
 
 impl Default for DeseqBuilder {
@@ -896,6 +1264,26 @@ impl DeseqBuilder {
         self.attach_mean_dispersion_trend(fit)
     }
 
+    /// Run linear-mu gene-wise dispersion estimation and fit the local trend.
+    pub fn fit_local_dispersion_trend_linear_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
+        self.attach_local_dispersion_trend(fit)
+    }
+
+    /// Run GLM-mu gene-wise dispersion estimation and fit the local trend.
+    pub fn fit_local_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
+        self.attach_local_dispersion_trend(fit)
+    }
+
     fn attach_parametric_dispersion_trend(
         &self,
         mut fit: DeseqFit,
@@ -914,7 +1302,8 @@ impl DeseqBuilder {
                 ..ParametricDispersionTrendOptions::default()
             },
         )?;
-        fit.disp_fit = Some(trend_fit.disp_fit);
+        fit.disp_fit = Some(trend_fit.disp_fit.clone());
+        fit.dispersion_trend = Some(DispersionTrendFit::Parametric(trend_fit));
         Ok(fit)
     }
 
@@ -933,15 +1322,36 @@ impl DeseqBuilder {
                 ..MeanDispersionTrendOptions::default()
             },
         )?;
-        fit.disp_fit = Some(trend_fit.disp_fit);
+        fit.disp_fit = Some(trend_fit.disp_fit.clone());
+        fit.dispersion_trend = Some(DispersionTrendFit::Mean(trend_fit));
+        Ok(fit)
+    }
+
+    fn attach_local_dispersion_trend(&self, mut fit: DeseqFit) -> Result<DeseqFit, DeseqError> {
+        let disp_gene_est =
+            fit.disp_gene_est
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
+                })?;
+        let trend_fit = fit_local_dispersion_trend(
+            &fit.base_mean,
+            disp_gene_est,
+            LocalDispersionTrendOptions {
+                min_disp: self.gene_wise_dispersion_options.min_disp,
+                ..LocalDispersionTrendOptions::default()
+            },
+        )?;
+        fit.disp_fit = Some(trend_fit.disp_fit.clone());
+        fit.dispersion_trend = Some(DispersionTrendFit::Local(trend_fit));
         Ok(fit)
     }
 
     /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
     ///
-    /// `Parametric` and `Mean` are currently implemented. `Local` and
-    /// `GlmGamPoi` return `UnsupportedFeature` until parity implementations
-    /// are added.
+    /// `Parametric`, `Local`, and `Mean` are currently implemented.
+    /// `GlmGamPoi` returns `UnsupportedFeature` until a parity implementation
+    /// is added.
     pub fn fit_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -950,9 +1360,7 @@ impl DeseqBuilder {
         match self.fit_type {
             FitType::Parametric => self.fit_parametric_dispersion_trend_linear_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_linear_mu(counts, design),
-            FitType::Local => Err(DeseqError::UnsupportedFeature {
-                feature: "linear-mu local dispersion trend fitting".to_string(),
-            }),
+            FitType::Local => self.fit_local_dispersion_trend_linear_mu(counts, design),
             FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
                 feature: "linear-mu glmGamPoi dispersion trend fitting".to_string(),
             }),
@@ -961,9 +1369,9 @@ impl DeseqBuilder {
 
     /// Run the implemented GLM-mu dispersion trend path selected by `fit_type`.
     ///
-    /// `Parametric` and `Mean` are currently implemented. `Local` and
-    /// `GlmGamPoi` return `UnsupportedFeature` until parity implementations
-    /// are added.
+    /// `Parametric`, `Local`, and `Mean` are currently implemented.
+    /// `GlmGamPoi` returns `UnsupportedFeature` until a parity implementation
+    /// is added.
     pub fn fit_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -972,19 +1380,206 @@ impl DeseqBuilder {
         match self.fit_type {
             FitType::Parametric => self.fit_parametric_dispersion_trend_glm_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_glm_mu(counts, design),
-            FitType::Local => Err(DeseqError::UnsupportedFeature {
-                feature: "GLM-mu local dispersion trend fitting".to_string(),
-            }),
+            FitType::Local => self.fit_local_dispersion_trend_glm_mu(counts, design),
             FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
                 feature: "GLM-mu glmGamPoi dispersion trend fitting".to_string(),
             }),
         }
     }
 
+    /// Fit the selected GLM-mu dispersion trend on DESeq2's fast-VST subset.
+    ///
+    /// This is a building block for the high-level fast `vst()` workflow:
+    /// size factors and normalization factors are derived from the full
+    /// dataset, the deterministic fast-VST row subset is selected from the
+    /// full-data `baseMean`, and the dispersion trend is fit on the subset
+    /// count matrix. The returned subset keeps the original row indices and
+    /// aligned normalized counts/factors for inspection.
+    pub fn fit_fast_vst_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        nsub: usize,
+    ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
+        if nsub == 0 {
+            return Err(DeseqError::InvalidOptions {
+                reason: "fast VST subset size must be positive".to_string(),
+            });
+        }
+        design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
+        let stages = self.normalization_stages(counts)?;
+        if self.observation_weights.is_some() {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: "fast VST trend fitting with observation weights".to_string(),
+            });
+        }
+        let subset = build_fast_vst_subset(
+            counts,
+            &stages.normalized,
+            &stages.base_mean,
+            nsub,
+            stages.normalization_factors.as_ref(),
+            None,
+        )?;
+        let mut subset_builder = self.clone();
+        subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
+        subset_builder.normalization_factors = subset.normalization_factors.clone();
+        subset_builder.observation_weights = None;
+        let fit = subset_builder.fit_dispersion_trend_glm_mu(&subset.counts, design)?;
+        Ok((fit, subset))
+    }
+
+    /// Fit the selected GLM-mu dispersion trend on the default fast-VST subset.
+    ///
+    /// Uses DESeq2's default `nsub=1000`.
+    pub fn fit_default_fast_vst_dispersion_trend_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
+        self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
+    }
+
+    /// Apply a fast-VST transform using a GLM-mu trend fit on the fast subset.
+    ///
+    /// This mirrors the implemented part of DESeq2's fast `vst()` workflow:
+    /// the dispersion trend is estimated on the deterministic subset, then the
+    /// fitted trend is applied to the full normalized count matrix. The subset
+    /// fit and row-aligned subset bundle are returned for diagnostics.
+    pub fn fast_vst_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        nsub: usize,
+    ) -> Result<FastVstGlmMuOutput, DeseqError> {
+        let (subset_fit, subset) =
+            self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub)?;
+        let trend_fit =
+            subset_fit
+                .dispersion_trend
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "a fitted fast-VST dispersion trend is required".to_string(),
+                })?;
+        let full_fit = Self::base_fit(
+            counts,
+            Some(design.clone()),
+            BaseFitInput {
+                size_factors: subset_fit.size_factors.clone(),
+                normalization_factors: self.normalization_factors.clone(),
+                observation_weights: None,
+                weights_fail: None,
+                weights_design_rank: None,
+                base_mean: vec![f64::NAN; counts.n_genes()],
+                base_var: vec![f64::NAN; counts.n_genes()],
+                all_zero: counts.all_zero_flags(),
+            },
+        );
+        let transformed = full_fit.variance_stabilizing_transform_with_trend(counts, trend_fit)?;
+        Ok(FastVstGlmMuOutput {
+            transformed,
+            subset_fit,
+            subset,
+        })
+    }
+
+    /// Apply fast VST using DESeq2's default `nsub=1000`.
+    pub fn default_fast_vst_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<FastVstGlmMuOutput, DeseqError> {
+        self.fast_vst_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
+    }
+
+    /// Apply the implemented GLM-mu VST path with DESeq2-like fast-path selection.
+    ///
+    /// When at least `nsub` rows have `baseMean > 5` and observation weights
+    /// are absent, the dispersion trend is fit on the deterministic fast-VST
+    /// subset and applied to the full count matrix. Otherwise, the selected
+    /// GLM-mu dispersion trend is fit on the full count matrix before
+    /// transforming the full matrix.
+    pub fn vst_glm_mu_auto(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        nsub: usize,
+    ) -> Result<VstGlmMuOutput, DeseqError> {
+        if nsub == 0 {
+            return Err(DeseqError::InvalidOptions {
+                reason: "automatic VST subset size must be positive".to_string(),
+            });
+        }
+        let base_fit = self.fit_size_factors_and_base_means_with_design(counts, design)?;
+        let eligible_rows = base_fit.fast_vst_eligible_count()?;
+        if eligible_rows >= nsub && self.observation_weights.is_none() {
+            let output = self.fast_vst_glm_mu(counts, design, nsub)?;
+            return Ok(VstGlmMuOutput {
+                transformed: output.transformed,
+                trend_fit: output.subset_fit,
+                trend_source: VstTrendSource::FastSubset {
+                    nsub,
+                    eligible_rows,
+                },
+                fast_subset: Some(output.subset),
+            });
+        }
+
+        let trend_fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
+        let transformed = trend_fit.variance_stabilizing_transform(counts)?;
+        let reason = if self.observation_weights.is_some() {
+            VstFullDataReason::ObservationWeightsPresent
+        } else {
+            VstFullDataReason::InsufficientEligibleRows
+        };
+        Ok(VstGlmMuOutput {
+            transformed,
+            trend_fit,
+            trend_source: VstTrendSource::FullData {
+                nsub,
+                eligible_rows,
+                reason,
+            },
+            fast_subset: None,
+        })
+    }
+
+    /// Apply automatic GLM-mu VST using DESeq2's default `nsub=1000`.
+    pub fn default_vst_glm_mu_auto(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<VstGlmMuOutput, DeseqError> {
+        self.vst_glm_mu_auto(counts, design, DEFAULT_FAST_VST_NSUB)
+    }
+
+    /// Apply automatic GLM-mu VST with an intercept-only design.
+    ///
+    /// This mirrors the implemented part of DESeq2's `blind=TRUE` VST shape:
+    /// the transform ignores sample groups by fitting the selected dispersion
+    /// trend with a one-column all-ones design, then uses the same automatic
+    /// fast-subset/full-data decision as [`Self::vst_glm_mu_auto`].
+    pub fn blind_vst_glm_mu_auto(
+        &self,
+        counts: &CountMatrix,
+        nsub: usize,
+    ) -> Result<VstGlmMuOutput, DeseqError> {
+        let design = DesignMatrix::intercept_only(counts.n_samples())?;
+        self.vst_glm_mu_auto(counts, &design, nsub)
+    }
+
+    /// Apply blind automatic GLM-mu VST using DESeq2's default `nsub=1000`.
+    pub fn default_blind_vst_glm_mu_auto(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<VstGlmMuOutput, DeseqError> {
+        self.blind_vst_glm_mu_auto(counts, DEFAULT_FAST_VST_NSUB)
+    }
+
     /// Run linear-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
     ///
     /// This fills final `dispersion` values using the builder's `fit_type`.
-    /// Parametric and mean trends are implemented. It follows the implemented
+    /// Parametric, local, and mean trends are implemented. It follows the implemented
     /// subset of DESeq2's
     /// `estimateDispersionsMAP(type="DESeq2")`: no observation weights and
     /// deterministic prior-variance estimation, including the low-df
@@ -1014,7 +1609,7 @@ impl DeseqBuilder {
     /// Run GLM-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
     ///
     /// This fills final `dispersion` values using the builder's `fit_type`.
-    /// Parametric and mean trends are implemented. Builder-supplied
+    /// Parametric, local, and mean trends are implemented. Builder-supplied
     /// observation weights flow through the GLM-mu gene-wise, MAP, and native
     /// Wald stages after DESeq2-style preprocessing.
     pub fn fit_map_dispersions_glm_mu(
@@ -1099,9 +1694,9 @@ impl DeseqBuilder {
     /// size factors, base means, linear-mu gene-wise dispersions, selected
     /// trend, deterministic prior variance, MAP dispersions, fixed-dispersion
     /// GLM fitting, Cook's distances, and selected-coefficient Wald results.
-    /// Parametric and mean trends are currently implemented. It does not yet
+    /// Parametric, local, and mean trends are currently implemented. It does not yet
     /// implement DESeq2's general mean/dispersion iteration, beta priors,
-    /// contrasts, local trends, or observation weights.
+    /// contrasts, exact locfit smoothing, or observation weights.
     pub fn fit_wald_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -1562,7 +2157,15 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let numeric_contrast = resolve_contrast(design, contrast)?;
-        self.fit_fixed_dispersion_wald_contrast(counts, design, dispersions, &numeric_contrast)
+        let (fit, mut results) = self.fit_fixed_dispersion_wald_contrast(
+            counts,
+            design,
+            dispersions,
+            &numeric_contrast,
+        )?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
     }
 
     /// Run a supplied-dispersion Wald pipeline for a factor-level contrast.
@@ -1599,7 +2202,7 @@ impl DeseqBuilder {
             contrast.denominator,
         )?;
         let stages = self.normalization_stages_for_design(counts, design)?;
-        let wald_output = self.fixed_dispersion_wald_contrast_components(
+        let mut wald_output = self.fixed_dispersion_wald_contrast_components(
             FixedDispersionGlmInput {
                 counts,
                 design,
@@ -1620,6 +2223,14 @@ impl DeseqBuilder {
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
         attach_glm_fit(&mut fit, wald_output.glm_fit);
         fit.wald = Some(wald_output.wald_contrast.wald);
+        wald_output.results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        wald_output.results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
         Ok((fit, wald_output.results))
     }
 
@@ -1843,6 +2454,7 @@ impl DeseqBuilder {
             Some(&expanded_dispersions),
             &wald,
         )?;
+        results.apply_wald_test_options(&self.wald_test_options);
         for (gene, all_zero) in input.all_zero.iter().copied().enumerate() {
             results.rows[gene].max_cooks = cooks.max_cooks[gene];
             if all_zero {
@@ -1914,6 +2526,7 @@ impl DeseqBuilder {
             input.counts.gene_names(),
             Some(&expanded_dispersions),
         )?;
+        results.apply_wald_test_options(&self.wald_test_options);
         for (gene, all_zero) in input.all_zero.iter().copied().enumerate() {
             results.rows[gene].max_cooks = cooks.max_cooks[gene];
             if all_zero {
@@ -2099,6 +2712,7 @@ impl DeseqBuilder {
             disp_gene_est: None,
             disp_gene_iter: None,
             disp_fit: None,
+            dispersion_trend: None,
             disp_map: None,
             dispersion: None,
             disp_iter: None,
@@ -2124,16 +2738,71 @@ impl DeseqBuilder {
         }
     }
 
-    /// Placeholder for the future full DESeq-like workflow.
-    pub fn fit(
-        &self,
-        _counts: &CountMatrix,
-        _design: &DesignMatrix,
-    ) -> Result<DeseqFit, DeseqError> {
-        Err(DeseqError::UnsupportedFeature {
-            feature: "full DESeq workflow with dispersion and GLM fitting".to_string(),
-        })
+    /// Run the currently implemented DESeq-like workflow.
+    ///
+    /// For `test=Wald`, this follows the implemented GLM-mu native path and
+    /// reports the last design coefficient, matching DESeq2's default
+    /// coefficient selection shape. `test=Lrt` remains explicit because callers
+    /// must supply a reduced design through `fit_lrt_*`.
+    pub fn fit(&self, counts: &CountMatrix, design: &DesignMatrix) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results(counts, design)
+            .map(|(fit, _results)| fit)
     }
+
+    /// Run the currently implemented DESeq-like workflow and return result rows.
+    ///
+    /// This is the result-table-producing companion to [`DeseqBuilder::fit`].
+    pub fn fit_with_results(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = default_results_coefficient(design)?;
+                self.fit_wald_glm_mu(counts, design, coefficient)
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit without a reduced design".to_string(),
+            }),
+        }
+    }
+
+    /// Run the currently implemented top-level LRT workflow with a reduced design.
+    ///
+    /// This follows the implemented GLM-mu native LRT path and reports the last
+    /// full-design coefficient by default.
+    pub fn fit_lrt(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results(counts, full_design, reduced_design)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and return result rows.
+    pub fn fit_lrt_with_results(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let coefficient = default_results_coefficient(full_design)?;
+        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+    }
+}
+
+fn default_results_coefficient(design: &DesignMatrix) -> Result<usize, DeseqError> {
+    design
+        .n_coefficients()
+        .checked_sub(1)
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "default results coefficient".to_string(),
+            expected: 1,
+            actual: 0,
+        })
 }
 
 fn validate_observation_weights_for_counts(
@@ -2344,34 +3013,8 @@ fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.filtered = None;
 }
 
-fn nonzero_gene_indices(all_zero: &[bool]) -> Vec<usize> {
-    all_zero
-        .iter()
-        .copied()
-        .enumerate()
-        .filter_map(|(gene, is_zero)| (!is_zero).then_some(gene))
-        .collect()
-}
-
 fn compact_counts(counts: &CountMatrix, gene_indices: &[usize]) -> Result<CountMatrix, DeseqError> {
-    let mut values = Vec::with_capacity(gene_indices.len() * counts.n_samples());
-    for gene in gene_indices {
-        values.extend_from_slice(counts.row(*gene)?);
-    }
-    let gene_names = counts.gene_names().map(|names| {
-        gene_indices
-            .iter()
-            .map(|gene| names[*gene].clone())
-            .collect::<Vec<_>>()
-    });
-    let sample_names = counts.sample_names().map(<[String]>::to_vec);
-    CountMatrix::from_row_major_u32_with_names(
-        gene_indices.len(),
-        counts.n_samples(),
-        values,
-        gene_names,
-        sample_names,
-    )
+    counts.select_rows(gene_indices)
 }
 
 fn compact_matrix_rows(
@@ -2433,58 +3076,6 @@ fn expand_glm_fit(
     })
 }
 
-fn expand_matrix_with_nan_rows(
-    matrix: &RowMajorMatrix<f64>,
-    all_zero: &[bool],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let n_cols = matrix.n_cols();
-    let mut values = vec![f64::NAN; all_zero.len() * n_cols];
-    let mut compact_row = 0_usize;
-    for (row, is_zero) in all_zero.iter().copied().enumerate() {
-        if is_zero {
-            continue;
-        }
-        let src = matrix.row(compact_row)?;
-        let start = row * n_cols;
-        values[start..start + n_cols].copy_from_slice(src);
-        compact_row += 1;
-    }
-    if compact_row != matrix.n_rows() {
-        return Err(invalid_dimensions(
-            "expanded matrix non-zero rows",
-            compact_row,
-            matrix.n_rows(),
-        ));
-    }
-    RowMajorMatrix::from_row_major(all_zero.len(), n_cols, values)
-}
-
-fn expand_gene_values_with_nan_rows(
-    values: &[f64],
-    all_zero: &[bool],
-) -> Result<Vec<f64>, DeseqError> {
-    expand_gene_values_with_fill_rows(values, all_zero, f64::NAN)
-}
-
-fn mask_all_zero_values_with_nan_rows(
-    values: &[f64],
-    all_zero: &[bool],
-) -> Result<Vec<f64>, DeseqError> {
-    if values.len() != all_zero.len() {
-        return Err(invalid_dimensions(
-            "all-zero masked vector rows",
-            all_zero.len(),
-            values.len(),
-        ));
-    }
-    Ok(values
-        .iter()
-        .copied()
-        .zip(all_zero.iter().copied())
-        .map(|(value, is_zero)| if is_zero { f64::NAN } else { value })
-        .collect())
-}
-
 fn mask_wald_degrees_of_freedom_for_all_zero_rows(
     wald: &mut WaldOutput,
     all_zero: &[bool],
@@ -2531,37 +3122,6 @@ fn apply_contrast_all_zero_to_wald_contrast(
         }
     }
     Ok(())
-}
-
-fn expand_gene_values_with_fill_rows<T: Copy>(
-    values: &[T],
-    all_zero: &[bool],
-    fill: T,
-) -> Result<Vec<T>, DeseqError> {
-    let mut expanded = vec![fill; all_zero.len()];
-    let mut compact_row = 0_usize;
-    for (row, is_zero) in all_zero.iter().copied().enumerate() {
-        if is_zero {
-            continue;
-        }
-        let Some(value) = values.get(compact_row) else {
-            return Err(invalid_dimensions(
-                "expanded vector non-zero rows",
-                compact_row + 1,
-                values.len(),
-            ));
-        };
-        expanded[row] = *value;
-        compact_row += 1;
-    }
-    if compact_row != values.len() {
-        return Err(invalid_dimensions(
-            "expanded vector non-zero rows",
-            compact_row,
-            values.len(),
-        ));
-    }
-    Ok(expanded)
 }
 
 fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {

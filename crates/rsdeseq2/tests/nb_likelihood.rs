@@ -84,6 +84,38 @@ fn negative_twice_log_likelihood_matches_deseq2_deviance_convention() {
 }
 
 #[test]
+fn math_distribution_helpers_wrap_nb_likelihood_primitives() {
+    let counts = [1_u32, 3];
+    let mu = [1.5, 2.5];
+    let weights = [0.25, 1.5];
+    let dispersion = 0.4;
+    let helpers = negative_binomial_helpers();
+
+    assert_relative_eq!(
+        negative_binomial_log_pmf(counts[0], mu[0], dispersion).unwrap(),
+        nbinom_log_pmf(counts[0], mu[0], dispersion).unwrap(),
+        epsilon = 1e-12
+    );
+    assert_relative_eq!(
+        helpers.log_likelihood(&counts, &mu, dispersion).unwrap(),
+        nbinom_log_likelihood(&counts, &mu, dispersion).unwrap(),
+        epsilon = 1e-12
+    );
+    assert_relative_eq!(
+        helpers
+            .log_likelihood_weighted(&counts, &mu, dispersion, Some(&weights))
+            .unwrap(),
+        nbinom_log_likelihood_weighted(&counts, &mu, dispersion, Some(&weights)).unwrap(),
+        epsilon = 1e-12
+    );
+    assert_relative_eq!(
+        negative_binomial_negative_twice_log_likelihood(&counts, &mu, dispersion).unwrap(),
+        nbinom_negative_twice_log_likelihood(&counts, &mu, dispersion).unwrap(),
+        epsilon = 1e-12
+    );
+}
+
+#[test]
 fn nb_log_pmf_approaches_poisson_for_small_dispersion() {
     let count = 4_u32;
     let mu = 3.0_f64;

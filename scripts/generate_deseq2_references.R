@@ -105,9 +105,13 @@ metadata <- data.frame(
     "fixed_glm_reference_mode",
     "normalization_factors_reference_mode",
     "native_nf_dispersion_reference_mode",
+    "fixed_glm_force_optim_reference_mode",
     "weighted_reference_mode",
     "native_weighted_glm_mu_cr_reference_mode",
-    "native_weighted_glm_mu_reference_mode"
+    "native_weighted_glm_mu_reference_mode",
+    "dispersion_trend_reference_mode",
+    "dispersion_prior_reference_mode",
+    "map_dispersion_reference_mode"
   ),
   value = c(
     as.character(utils::packageVersion("DESeq2")),
@@ -118,9 +122,13 @@ metadata <- data.frame(
     "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=FALSE",
     "counts(dds, normalized=TRUE) with normalizationFactors(dds), which preempt sizeFactors(dds)",
     "DESeq2 roughDispEstimate, momentsDispEstimate, and estimateDispersionsGeneEst stored mu with normalizationFactors(dds)",
+    "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=TRUE, forceOptim=TRUE",
     "getBaseMeansAndVariances with raw weights, getAndCheckWeights row-normalized weights, and fitNbinomGLMs with supplied dispersions",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) with observation weights for weighted Cox-Reid gene-wise dispersion anchors",
-    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights"
+    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights",
+    "parametricDispersionFit, estimateDispersionsFit(fitType='mean'), and localDispersionFit fixtures including prediction and threshold edge cases",
+    "estimateDispersionsPriorVar high-df and low-df fixtures; low-df uses DESeq2's seeded Monte Carlo/R loess branch",
+    "DESeq2:::fitDisp MAP dispersion fixture with explicit prior and Cox-Reid settings"
   )
 )
 write_tsv(metadata, file.path(data_dir, "metadata.tsv"))
@@ -766,6 +774,108 @@ write_tsv(
   file.path(data_dir, "parametric_trend_reference.tsv")
 )
 
+trend_prediction_means <- c(12, 30, 120, 500)
+write_tsv(
+  data.frame(
+    mean = trend_prediction_means,
+    dispFit = trend_fit(trend_prediction_means),
+    check.names = FALSE
+  ),
+  file.path(data_dir, "parametric_trend_prediction_reference.tsv")
+)
+
+mean_trend_means <- c(10, 20, 30, 40, 50, 60)
+mean_trend_disps <- c(5e-8, 2e-7, 0.1, 0.2, 0.3, 1000)
+dds_mean_trend <- DESeq2::DESeqDataSetFromMatrix(
+  countData = matrix(1L, nrow = length(mean_trend_means), ncol = ncol(counts)),
+  colData = col_data,
+  design = ~ condition
+)
+S4Vectors::mcols(dds_mean_trend)$baseMean <- mean_trend_means
+S4Vectors::mcols(dds_mean_trend)$allZero <- rep(FALSE, length(mean_trend_means))
+S4Vectors::mcols(dds_mean_trend)$dispGeneEst <- mean_trend_disps
+dds_mean_trend_fit <- DESeq2:::estimateDispersionsFit(
+  dds_mean_trend,
+  fitType = "mean",
+  minDisp = 1e-8,
+  quiet = TRUE
+)
+mean_trend_function <- DESeq2::dispersionFunction(dds_mean_trend_fit)
+write_tsv(
+  data.frame(
+    gene = paste0("mean_trend_gene", seq_along(mean_trend_means)),
+    baseMean = mean_trend_means,
+    dispGeneEst = mean_trend_disps,
+    dispFit = mean_trend_function(mean_trend_means),
+    meanDisp = unname(attr(mean_trend_function, "mean")),
+    useForFit = mean_trend_disps > 100 * 1e-8,
+    useForMean = mean_trend_disps > 10 * 1e-8,
+    check.names = FALSE
+  ),
+  file.path(data_dir, "mean_trend_reference.tsv")
+)
+
+local_trend_fit <- DESeq2:::localDispersionFit(trend_means, trend_disps, minDisp = 1e-8)
+write_tsv(
+  data.frame(
+    gene = paste0("trend_gene", seq_along(trend_means)),
+    baseMean = trend_means,
+    dispGeneEst = trend_disps,
+    dispFit = local_trend_fit(trend_means),
+    useForFit = trend_disps >= 10 * 1e-8,
+    usedMinDispFloor = all(trend_disps < 10 * 1e-8),
+    check.names = FALSE
+  ),
+  file.path(data_dir, "local_trend_reference.tsv")
+)
+
+local_prediction_means <- c(12, 30, 120, 500)
+write_tsv(
+  data.frame(
+    mean = local_prediction_means,
+    dispFit = local_trend_fit(local_prediction_means),
+    check.names = FALSE
+  ),
+  file.path(data_dir, "local_trend_prediction_reference.tsv")
+)
+
+local_floor_means <- c(5, 10, 20, 40)
+local_floor_disps <- c(1e-8, 2e-8, 5e-8, 9e-8)
+local_floor_fit <- DESeq2:::localDispersionFit(local_floor_means, local_floor_disps, minDisp = 1e-8)
+local_floor_disp_fit <- if (is.function(local_floor_fit)) {
+  local_floor_fit(local_floor_means)
+} else {
+  local_floor_fit
+}
+write_tsv(
+  data.frame(
+    gene = paste0("local_floor_gene", seq_along(local_floor_means)),
+    baseMean = local_floor_means,
+    dispGeneEst = local_floor_disps,
+    dispFit = local_floor_disp_fit,
+    useForFit = local_floor_disps >= 10 * 1e-8,
+    usedMinDispFloor = all(local_floor_disps < 10 * 1e-8),
+    check.names = FALSE
+  ),
+  file.path(data_dir, "local_trend_floor_reference.tsv")
+)
+
+local_mixed_means <- c(6, 9, 13, 20, 32, 50, 80, 125)
+local_mixed_disps <- c(1e-8, 5e-8, 1.1e-7, 0.045, 0.09, 0.055, 0.08, 0.04)
+local_mixed_fit <- DESeq2:::localDispersionFit(local_mixed_means, local_mixed_disps, minDisp = 1e-8)
+write_tsv(
+  data.frame(
+    gene = paste0("local_mixed_gene", seq_along(local_mixed_means)),
+    baseMean = local_mixed_means,
+    dispGeneEst = local_mixed_disps,
+    dispFit = local_mixed_fit(local_mixed_means),
+    useForFit = local_mixed_disps >= 10 * 1e-8,
+    usedMinDispFloor = all(local_mixed_disps < 10 * 1e-8),
+    check.names = FALSE
+  ),
+  file.path(data_dir, "local_trend_mixed_threshold_reference.tsv")
+)
+
 prior_residuals <- c(-2, -1, 0, 1, 2)
 prior_disp_fit <- rep(1, length(prior_residuals))
 prior_disp_gene_est <- exp(prior_residuals) * prior_disp_fit
@@ -792,6 +902,56 @@ write_tsv(
     check.names = FALSE
   ),
   file.path(data_dir, "dispersion_prior_variance_reference.tsv")
+)
+
+low_df_prior_residuals <- c(-1, 0, 1, 2)
+low_df_prior_disp_fit <- rep(1, length(low_df_prior_residuals))
+low_df_prior_disp_gene_est <- exp(low_df_prior_residuals) * low_df_prior_disp_fit
+low_df_prior_counts <- matrix(1L, nrow = length(low_df_prior_residuals), ncol = ncol(counts))
+rownames(low_df_prior_counts) <- paste0("low_df_prior_gene", seq_along(low_df_prior_residuals))
+colnames(low_df_prior_counts) <- colnames(counts)
+dds_low_df_prior <- DESeq2::DESeqDataSetFromMatrix(
+  countData = low_df_prior_counts,
+  colData = col_data,
+  design = ~ condition
+)
+DESeq2::sizeFactors(dds_low_df_prior) <- rep(1, ncol(counts))
+S4Vectors::mcols(dds_low_df_prior)$baseMean <- rep(1, length(low_df_prior_residuals))
+S4Vectors::mcols(dds_low_df_prior)$allZero <- rep(FALSE, length(low_df_prior_residuals))
+S4Vectors::mcols(dds_low_df_prior)$dispGeneEst <- low_df_prior_disp_gene_est
+S4Vectors::mcols(dds_low_df_prior)$dispFit <- low_df_prior_disp_fit
+low_df_prior_var_log <- mad(
+  log(low_df_prior_disp_gene_est) - log(low_df_prior_disp_fit),
+  na.rm = TRUE
+)^2
+low_df_prior_function <- function(means) rep(1, length(means))
+attr(low_df_prior_function, "varLogDispEsts") <- low_df_prior_var_log
+DESeq2::dispersionFunction(dds_low_df_prior) <- low_df_prior_function
+low_df_prior_design <- matrix(
+  c(1, 0, 1, 0, 1, 1, 1, 1),
+  nrow = ncol(counts),
+  byrow = TRUE
+)
+low_df_prior_var <- DESeq2:::estimateDispersionsPriorVar(
+  dds_low_df_prior,
+  minDisp = prior_min_disp,
+  modelMatrix = low_df_prior_design
+)
+write_tsv(
+  data.frame(
+    gene = rownames(low_df_prior_counts),
+    dispGeneEst = low_df_prior_disp_gene_est,
+    dispFit = low_df_prior_disp_fit,
+    aboveMinDisp = low_df_prior_disp_gene_est >= 100 * prior_min_disp,
+    nSamples = nrow(low_df_prior_design),
+    nCoefficients = ncol(low_df_prior_design),
+    residualDf = nrow(low_df_prior_design) - ncol(low_df_prior_design),
+    varLogDispEsts = low_df_prior_var_log,
+    expectedLogDispVariance = trigamma((nrow(low_df_prior_design) - ncol(low_df_prior_design)) / 2),
+    dispPriorVar = low_df_prior_var,
+    check.names = FALSE
+  ),
+  file.path(data_dir, "dispersion_prior_variance_low_df_reference.tsv")
 )
 
 map_counts <- matrix(c(10L, 30L, 10L, 30L), nrow = 1)
@@ -980,6 +1140,63 @@ if (!is.null(fixed_reference)) {
   write_matrix_tsv(full_fit$mu, "gene", file.path(data_dir, "fixed_mu_full.tsv"))
   write_matrix_tsv(full_fit$hat_diagonals, "gene", file.path(data_dir, "fixed_hat_full.tsv"))
   write_matrix_tsv(fixed_reference$cooks, "gene", file.path(data_dir, "fixed_cooks_full.tsv"))
+}
+
+fixed_force_optim_reference <- tryCatch({
+  dds_fixed <- dds_ratio
+  dds_fixed <- DESeq2::`dispersions<-`(dds_fixed, value = fixed_dispersions)
+  mcols_fixed <- S4Vectors::mcols(dds_fixed)
+  mcols_fixed$dispersion <- fixed_dispersions
+  mcols_fixed$allZero <- rowSums(counts) == 0
+  dds_fixed <- S4Vectors::`mcols<-`(dds_fixed, value = mcols_fixed)
+
+  full_fit <- DESeq2:::fitNbinomGLMs(
+    dds_fixed,
+    modelMatrix = full_design,
+    renameCols = FALSE,
+    betaTol = 1e-8,
+    maxit = 100,
+    useOptim = TRUE,
+    useQR = FALSE,
+    forceOptim = TRUE,
+    warnNonposVar = FALSE,
+    minmu = 0.5
+  )
+
+  coefficient <- 2L
+  wald_stat <- full_fit$betaMatrix[, coefficient] / full_fit$betaSE[, coefficient]
+  wald_pvalue <- 2 * stats::pnorm(abs(wald_stat), lower.tail = FALSE)
+
+  list(
+    full_fit = full_fit,
+    wald_stat = wald_stat,
+    wald_pvalue = wald_pvalue
+  )
+}, error = function(error) {
+  writeLines(conditionMessage(error), file.path(data_dir, "fixed_force_optim_reference_error.txt"))
+  NULL
+})
+
+if (!is.null(fixed_force_optim_reference)) {
+  full_fit <- fixed_force_optim_reference$full_fit
+  write_tsv(
+    data.frame(
+      gene = rownames(counts),
+      dispersion = fixed_dispersions,
+      beta_intercept = full_fit$betaMatrix[, 1],
+      beta_conditionB = full_fit$betaMatrix[, 2],
+      beta_se_intercept = full_fit$betaSE[, 1],
+      beta_se_conditionB = full_fit$betaSE[, 2],
+      stat_conditionB = fixed_force_optim_reference$wald_stat,
+      pvalue_conditionB = fixed_force_optim_reference$wald_pvalue,
+      log_like = full_fit$logLike,
+      converged = full_fit$betaConv,
+      iterations = full_fit$betaIter,
+      check.names = FALSE
+    ),
+    file.path(data_dir, "fixed_force_optim_wald_reference.tsv")
+  )
+  write_matrix_tsv(full_fit$mu, "gene", file.path(data_dir, "fixed_force_optim_mu_full.tsv"))
 }
 
 weighted_fixed_reference <- tryCatch({

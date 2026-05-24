@@ -119,11 +119,17 @@ pub struct WaldContrastOutput {
     pub wald: WaldOutput,
 }
 
-/// Placeholder for future Wald statistics.
-pub fn wald_test() -> Result<(), DeseqError> {
-    Err(DeseqError::UnsupportedFeature {
-        feature: "full Wald test pipeline".to_string(),
-    })
+/// Compute DESeq2-style Wald statistics for one coefficient with explicit options.
+///
+/// This is a convenience alias for the currently implemented selected-
+/// coefficient Wald path. Use `wald_test_contrast_with_options` for explicit
+/// linear contrasts.
+pub fn wald_test(
+    fit: &NbinomGlmFit,
+    coefficient: usize,
+    options: &WaldTestOptions,
+) -> Result<WaldOutput, DeseqError> {
+    wald_test_coefficient_with_options(fit, coefficient, options)
 }
 
 /// Compute default DESeq2-style Wald statistics for one coefficient.

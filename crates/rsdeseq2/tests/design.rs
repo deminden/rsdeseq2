@@ -1,6 +1,20 @@
 use rsdeseq2::prelude::*;
 
 #[test]
+fn intercept_only_design_has_named_all_ones_column() {
+    let design = DesignMatrix::intercept_only(3).unwrap();
+
+    assert_eq!(design.n_samples(), 3);
+    assert_eq!(design.n_coefficients(), 1);
+    assert_eq!(
+        design.coefficient_names().unwrap(),
+        &["Intercept".to_string()]
+    );
+    assert_eq!(design.matrix().as_slice(), &[1.0, 1.0, 1.0]);
+    assert!(design.is_full_rank().unwrap());
+}
+
+#[test]
 fn design_matrix_reports_full_rank() {
     let design = DesignMatrix::from_row_major(
         4,

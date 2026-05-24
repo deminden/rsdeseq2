@@ -1,0 +1,9 @@
+gene	baseMean	dispGeneEst	dispFit	useForFit	usedMinDispFloor
+local_mixed_gene1	6	1e-08	2.11155085572403e-23	FALSE	FALSE
+local_mixed_gene2	9	5e-08	6.79248102261156e-15	FALSE	FALSE
+local_mixed_gene3	13	1.1e-07	1.10000002144949e-07	TRUE	FALSE
+local_mixed_gene4	20	0.045	0.0450000000438908	TRUE	FALSE
+local_mixed_gene5	32	0.09	0.0880214436195302	TRUE	FALSE
+local_mixed_gene6	50	0.055	0.0550000000061305	TRUE	FALSE
+local_mixed_gene7	80	0.08	0.0800000000636958	TRUE	FALSE
+local_mixed_gene8	125	0.04	0.04000000000421	TRUE	FALSE

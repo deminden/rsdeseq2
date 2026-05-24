@@ -460,6 +460,232 @@ fn parametric_dispersion_trend_matches_optional_deseq2_reference() {
 }
 
 #[test]
+fn parametric_dispersion_trend_predicts_optional_deseq2_reference_means() {
+    let Some(fit_rows) = read_optional_tsv("parametric_trend_reference.tsv") else {
+        return;
+    };
+    let Some(prediction_rows) = read_optional_tsv("parametric_trend_prediction_reference.tsv")
+    else {
+        return;
+    };
+    let means = fit_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = fit_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+    let prediction_means = prediction_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "mean"))
+        .collect::<Vec<_>>();
+
+    let fit = fit_parametric_dispersion_trend(
+        &means,
+        &disps,
+        ParametricDispersionTrendOptions::default(),
+    )
+    .unwrap();
+    let predicted = fit
+        .trend
+        .evaluate_many_allow_missing(&prediction_means)
+        .unwrap();
+
+    for (idx, row) in prediction_rows.iter().enumerate() {
+        assert_float_close(
+            predicted[idx],
+            parse_required_f64(row, "dispFit"),
+            1e-8,
+            1e-8,
+            &format!("parametric trend prediction row {idx}"),
+        );
+    }
+}
+
+#[test]
+fn mean_dispersion_trend_matches_optional_deseq2_reference() {
+    let Some(rows) = read_optional_tsv("mean_trend_reference.tsv") else {
+        return;
+    };
+    let means = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+
+    let fit =
+        fit_mean_dispersion_trend(&means, &disps, MeanDispersionTrendOptions::default()).unwrap();
+    let expected_mean = parse_required_f64(&rows[0], "meanDisp");
+
+    assert_float_close(
+        fit.trend.mean_disp,
+        expected_mean,
+        1e-12,
+        1e-12,
+        "mean trend meanDisp",
+    );
+    for (idx, row) in rows.iter().enumerate() {
+        assert_eq!(fit.use_for_fit[idx], parse_required_bool(row, "useForFit"));
+        assert_eq!(
+            fit.use_for_mean[idx],
+            parse_required_bool(row, "useForMean")
+        );
+        assert_float_close(
+            fit.disp_fit[idx],
+            parse_required_f64(row, "dispFit"),
+            1e-12,
+            1e-12,
+            &format!("mean trend dispFit row {idx}"),
+        );
+    }
+}
+
+#[test]
+fn local_dispersion_trend_matches_optional_deseq2_reference_shape() {
+    let Some(rows) = read_optional_tsv("local_trend_reference.tsv") else {
+        return;
+    };
+    let means = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+
+    let fit =
+        fit_local_dispersion_trend(&means, &disps, LocalDispersionTrendOptions::default()).unwrap();
+
+    assert_eq!(
+        fit.used_min_disp_floor,
+        parse_required_bool(&rows[0], "usedMinDispFloor")
+    );
+    for (idx, row) in rows.iter().enumerate() {
+        assert_eq!(fit.use_for_fit[idx], parse_required_bool(row, "useForFit"));
+        assert_float_close(
+            fit.disp_fit[idx],
+            parse_required_f64(row, "dispFit"),
+            1e-3,
+            1e-3,
+            &format!("local trend dispFit row {idx}"),
+        );
+    }
+}
+
+#[test]
+fn local_dispersion_trend_predicts_optional_deseq2_reference_means() {
+    let Some(fit_rows) = read_optional_tsv("local_trend_reference.tsv") else {
+        return;
+    };
+    let Some(prediction_rows) = read_optional_tsv("local_trend_prediction_reference.tsv") else {
+        return;
+    };
+    let means = fit_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = fit_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+    let prediction_means = prediction_rows
+        .iter()
+        .map(|row| parse_required_f64(row, "mean"))
+        .collect::<Vec<_>>();
+
+    let fit =
+        fit_local_dispersion_trend(&means, &disps, LocalDispersionTrendOptions::default()).unwrap();
+    let predicted = fit
+        .trend
+        .evaluate_many_allow_missing(&prediction_means)
+        .unwrap();
+
+    for (idx, row) in prediction_rows.iter().enumerate() {
+        assert_float_close(
+            predicted[idx],
+            parse_required_f64(row, "dispFit"),
+            2e-3,
+            2e-3,
+            &format!("local trend prediction row {idx}"),
+        );
+    }
+}
+
+#[test]
+fn local_dispersion_trend_floor_matches_optional_deseq2_reference() {
+    let Some(rows) = read_optional_tsv("local_trend_floor_reference.tsv") else {
+        return;
+    };
+    let means = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+
+    let fit =
+        fit_local_dispersion_trend(&means, &disps, LocalDispersionTrendOptions::default()).unwrap();
+
+    assert_eq!(
+        fit.used_min_disp_floor,
+        parse_required_bool(&rows[0], "usedMinDispFloor")
+    );
+    assert_eq!(fit.genes_used, 0);
+    for (idx, row) in rows.iter().enumerate() {
+        assert_eq!(fit.use_for_fit[idx], parse_required_bool(row, "useForFit"));
+        assert_float_close(
+            fit.disp_fit[idx],
+            parse_required_f64(row, "dispFit"),
+            1e-15,
+            1e-15,
+            &format!("local trend floor dispFit row {idx}"),
+        );
+    }
+}
+
+#[test]
+fn local_dispersion_trend_mixed_threshold_matches_optional_deseq2_reference() {
+    let Some(rows) = read_optional_tsv("local_trend_mixed_threshold_reference.tsv") else {
+        return;
+    };
+    let means = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "baseMean"))
+        .collect::<Vec<_>>();
+    let disps = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+
+    let fit =
+        fit_local_dispersion_trend(&means, &disps, LocalDispersionTrendOptions::default()).unwrap();
+
+    assert_eq!(
+        fit.used_min_disp_floor,
+        parse_required_bool(&rows[0], "usedMinDispFloor")
+    );
+    assert!(fit.genes_used > 0);
+    assert!(fit.genes_used < rows.len());
+    for (idx, row) in rows.iter().enumerate() {
+        assert_eq!(fit.use_for_fit[idx], parse_required_bool(row, "useForFit"));
+        assert_float_close(
+            fit.disp_fit[idx],
+            parse_required_f64(row, "dispFit"),
+            2e-2,
+            2e-2,
+            &format!("local trend mixed threshold dispFit row {idx}"),
+        );
+    }
+}
+
+#[test]
 fn dispersion_prior_variance_matches_optional_deseq2_reference() {
     let Some(rows) = read_optional_tsv("dispersion_prior_variance_reference.tsv") else {
         return;
@@ -515,6 +741,59 @@ fn dispersion_prior_variance_matches_optional_deseq2_reference() {
             parse_required_bool(row, "aboveMinDisp")
         );
     }
+}
+
+#[test]
+fn low_df_dispersion_prior_variance_matches_optional_deseq2_reference_inputs() {
+    let Some(rows) = read_optional_tsv("dispersion_prior_variance_low_df_reference.tsv") else {
+        return;
+    };
+    let disp_gene_est = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispGeneEst"))
+        .collect::<Vec<_>>();
+    let disp_fit = rows
+        .iter()
+        .map(|row| parse_required_f64(row, "dispFit"))
+        .collect::<Vec<_>>();
+    let n_samples = parse_required_f64(&rows[0], "nSamples") as usize;
+    let n_coefficients = parse_required_f64(&rows[0], "nCoefficients") as usize;
+
+    let output = estimate_dispersion_prior_variance(
+        &disp_gene_est,
+        &disp_fit,
+        1e-8,
+        n_samples,
+        n_coefficients,
+    )
+    .unwrap();
+
+    assert_eq!(output.residual_degrees_of_freedom, 2);
+    for (idx, row) in rows.iter().enumerate() {
+        assert_eq!(
+            output.above_min_disp[idx],
+            parse_required_bool(row, "aboveMinDisp")
+        );
+    }
+    assert_float_close(
+        output.var_log_disp_estimates,
+        parse_required_f64(&rows[0], "varLogDispEsts"),
+        1e-12,
+        1e-12,
+        "low-df dispersion prior varLogDispEsts",
+    );
+    assert_float_close(
+        output.expected_log_dispersion_variance,
+        parse_required_f64(&rows[0], "expectedLogDispVariance"),
+        1e-12,
+        1e-12,
+        "low-df dispersion prior expected sampling variance",
+    );
+    let deseq2_prior_var = parse_required_f64(&rows[0], "dispPriorVar");
+    assert!(deseq2_prior_var >= 0.25);
+    assert!(deseq2_prior_var <= 8.0);
+    assert!(output.disp_prior_var >= 0.25);
+    assert!(output.disp_prior_var <= 8.0);
 }
 
 #[test]

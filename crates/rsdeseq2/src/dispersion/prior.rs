@@ -189,11 +189,19 @@ pub fn estimate_low_df_prior_variance(
     Ok(argmin_kl.max(0.25))
 }
 
-/// Placeholder for unsupported stochastic or wrapper-level prior estimation paths.
-pub fn estimate_dispersion_prior() -> Result<(), DeseqError> {
-    Err(DeseqError::UnsupportedFeature {
-        feature: "full dispersion prior estimation".to_string(),
-    })
+/// Estimate DESeq2's dispersion prior variance from gene-wise and trend dispersions.
+///
+/// This convenience wrapper returns the same detailed output as
+/// [`estimate_dispersion_prior_variance`]. It exists for callers that want a
+/// stage-shaped entry point named after DESeq2's dispersion-prior step.
+pub fn estimate_dispersion_prior(
+    disp_gene_est: &[f64],
+    disp_fit: &[f64],
+    min_disp: f64,
+    n_samples: usize,
+    n_coefficients: usize,
+) -> Result<DispersionPriorVarianceOutput, DeseqError> {
+    estimate_dispersion_prior_variance(disp_gene_est, disp_fit, min_disp, n_samples, n_coefficients)
 }
 
 fn validate_prior_variance_inputs(

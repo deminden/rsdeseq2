@@ -67,6 +67,17 @@ fn wald_test_coefficient_selects_requested_column() {
 }
 
 #[test]
+fn wald_test_wraps_selected_coefficient_with_options() {
+    let fit = toy_fit(vec![1.0, 2.0, 3.0, 4.0], vec![1.0, 0.5, 1.5, 2.0], 2, 2);
+    let options = WaldTestOptions::normal().with_lfc_threshold(1.0, WaldAlternative::Greater);
+
+    let wrapped = wald_test(&fit, 1, &options).unwrap();
+    let direct = wald_test_coefficient_with_options(&fit, 1, &options).unwrap();
+
+    assert_eq!(wrapped, direct);
+}
+
+#[test]
 fn wald_test_contrast_uses_full_beta_covariance() {
     let mut fit = toy_fit(vec![1.0, 3.0], vec![0.5, 0.7], 1, 2);
     fit.beta_covariance =

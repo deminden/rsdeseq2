@@ -20,6 +20,7 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add builder-owned caller-supplied size factors for fixed-size-factor
   parity tests and external caller integration.
 - [x] Add hand tests for DESeq2 size-factor error cases.
+- [x] Add fitted dispersion trend type labels to DESeq2-shaped fit diagnostics.
 - [x] Add skip-safe DESeq2 golden-reference tests for generated normalization,
   supplied-dispersion Wald/LRT, and Cook's diagnostic files.
 - [x] Add DESeq2-style gene/sample normalization factors for normalized counts
@@ -78,8 +79,10 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Size factors: `ratio`, `poscounts`, supplied geometric means, control
   gene index subset, and caller-supplied size factors.
 - [x] Normalized counts.
+- [x] TSV export for raw and normalized count matrices.
 - [x] Gene/sample normalization factors for normalized counts and base row
   metadata.
+- [x] TSV export for gene/sample normalization-factor matrices.
 - [x] `baseMean`.
 - [x] BH adjustment with missing-value support.
 - [x] Inspectable `DeseqFit` skeleton.
@@ -91,6 +94,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Make `baseVar` use sample variance, matching `matrixStats::rowVars`.
 - [x] Return `NaN` for `baseVar` when only one sample is present, matching R
   variance behavior.
+- [x] TSV export for implemented early row metadata: `baseMean`, `baseVar`,
+  and `allZero`.
 - [x] Add weighted base metadata helpers matching `getBaseMeansAndVariances`
   weighted-count preprocessing.
 - [x] Add builder APIs for DESeq2-like `geoMeans` and `controlGenes`.
@@ -103,6 +108,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Row and matrix negative-binomial log-likelihood helpers matching
   DESeq2 `nbinomLogLike`.
 - [x] DESeq2-style `-2 * logLik` helper for fitted rows.
+- [x] Public math distribution aliases and helper namespace for the
+  implemented DESeq2-parameterized negative-binomial primitives.
 - [x] Intercept-only fixed-dispersion shortcut matching `fitNbinomGLMs`.
 - [x] Initial fixed-dispersion IRLS beta fitting using the standard
   design-matrix branch.
@@ -115,6 +122,12 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Hat diagonals for the initial fixed-dispersion IRLS branch.
 - [x] QR branch foundation matching DESeq2's augmented least-squares update
   shape for fixed-dispersion IRLS.
+- [x] Public `fit_irls` dispatcher that uses the DESeq2-style intercept-only
+  shortcut when eligible and general fixed-dispersion IRLS otherwise.
+- [x] Public fixed-dispersion `estimate_beta` wrapper over the implemented beta
+  fitting dispatcher.
+- [x] Public supplied-dispersion GLM wrapper over the implemented
+  fixed-dispersion IRLS path.
 - [x] Observation weights for general IRLS, matching low-level `fitBeta`
   working-weight and deviance weighting semantics.
 - [x] DESeq2-style observation-weight preprocessing helper with row-max
@@ -126,13 +139,22 @@ reference; no DESeq2 source is vendored or translated line by line.
   DESeq2's `diag(lambda)` shape after log2-to-natural-scale conversion.
 - [x] Log2-scale beta covariance storage and primitive numeric Wald contrast
   helper using `c' beta` and `sqrt(c' Sigma c)`.
-- [ ] Full DESeq2 beta-prior variance estimation, expanded model-matrix
-  handling, and DESeq2-style contrast numerator/denominator construction.
+- [x] DESeq2-style beta-prior variance estimation for primitive MLE beta
+  matrices, including quantile and weighted quantile methods, finite-beta
+  filtering, and wide intercept priors.
+- [x] Primitive beta-prior GLM refit using supplied or estimated log2-scale
+  beta-prior variances, with DESeq2's `1 / betaPriorVar / log(2)^2`
+  natural-log ridge conversion.
+- [ ] Expanded model-matrix beta-prior averaging, high-level beta-prior
+  workflow plumbing, and DESeq2-style contrast numerator/denominator
+  construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.
 - [x] Selected-coefficient LFC-threshold Wald alternatives for the current
   primitive matrix result path.
+- [x] Public selected-coefficient Wald wrapper over the implemented
+  coefficient-with-options path.
 - [x] Supplied-dispersion Wald pipeline for primitive numeric contrasts with
   result rows, Cook's cutoff masking, and independent filtering.
 - [x] Selected-coefficient result-row assembly with `baseMean`, LFC, SE, stat,
@@ -148,6 +170,13 @@ reference; no DESeq2 source is vendored or translated line by line.
   fixed Wald/LRT pipelines.
 - [x] All-zero row expansion for the supplied-dispersion Wald/LRT pipelines, using
   `NaN` in internal matrices and `None` in result rows.
+- [x] Add DESeq2-style optim fallback row routing for unstable IRLS rows,
+  non-positive coefficient variances, and optional non-converged rows.
+- [x] Add bounded pure-Rust optim fallback refits for routed fixed-dispersion
+  IRLS rows, including optimized betas, SE/covariance, fitted means, and row
+  log likelihoods.
+- [x] Add optional DESeq2 reference-generation and skip-safe Rust test hooks
+  for fixed-dispersion force-optim fallback rows.
 - [x] DESeq2-style Cook's distance matrix for the supplied-dispersion Wald
   pipeline using robust method-of-moments dispersion.
 - [x] `samplesForCooks` and `maxCooks` behavior for model-matrix cells with at
@@ -160,13 +189,30 @@ reference; no DESeq2 source is vendored or translated line by line.
   implemented Wald/LRT fit-state fields.
 - [x] Expose gene-wise dispersion iteration diagnostics (`dispGeneIter`) in
   high-level fit state and the `mcols(dds)`-style alias view.
+- [x] Expose dispersion-stage `mcols(dds)`-style diagnostic aliases for
+  `dispGeneEst`, `dispFit`, `dispersion`, `dispIter`, and `dispOutlier`.
+- [x] Add stable present-column listing for the `mcols(dds)`-style diagnostic
+  alias view.
+- [x] Add typed data-frame assembly for present `mcols(dds)`-style diagnostic
+  aliases.
+- [x] Add TSV export for present `mcols(dds)`-style diagnostic aliases.
+- [x] Add primitive result-table metadata carrier for test type, reported
+  coefficient/contrast, column descriptions, p-value adjustment method, and
+  independent-filtering metadata.
+- [x] Carry Wald `lfcThreshold` and `altHypothesis` settings into high-level
+  result-table metadata.
+- [x] Add DESeq2-style comparison-aware descriptions for implemented result
+  columns.
+- [x] Add a typed data-frame view for implemented result rows, with row names,
+  numeric/logical columns, and per-column metadata.
+- [x] Factor shared all-zero row expansion helpers for compact GLM matrices,
+  compact per-gene vectors, and full-length masked vectors.
 - [x] Add initial linear-mu gene-wise dispersion foundation:
   `linearModelMu`, `roughDispEstimate`, `momentsDispEstimate`, bounded starts,
   Cox-Reid objective scoring, Armijo line search, and grid fallback.
-- [ ] Full result-table assembly with DESeq2-style metadata.
-- [ ] General all-zero row expansion helpers for future dispersion and full
-  result-table outputs.
-- [ ] Optim fallback for non-converged or unstable rows.
+- [x] Full result-table assembly with DESeq2-style metadata for implemented
+  primitive result rows.
+- [x] Optim fallback for non-converged or unstable fixed-dispersion IRLS rows.
 - [ ] Stage-by-stage comparison against DESeq2 internals on tiny datasets.
 
 ## Phase 3: Dispersion Estimation
@@ -195,10 +241,20 @@ reference; no DESeq2 source is vendored or translated line by line.
   and grid entry points.
 - [x] Parametric dispersion trend foundation:
   `asymptDisp + extraPois / mean`, DESeq2 row-selection rule, robust residual
-  filtering, and Gamma identity-link IRLS.
+  filtering, Gamma identity-link IRLS, and offline prediction reference
+  coverage.
 - [x] Mean dispersion trend:
   shared `100 * minDisp` viability gate, `10 * minDisp` filtered trimmed mean,
-  constant fitted trend expansion, and `FitType::Mean` builder dispatch.
+  constant fitted trend expansion, `FitType::Mean` builder dispatch, and
+  offline DESeq2 reference coverage.
+- [x] Initial local dispersion trend:
+  `10 * minDisp` fit rule, base-mean weights, all-near-minimum floor behavior,
+  pure-Rust adaptive local polynomial smoothing, `FitType::Local` builder
+  dispatch, optional DESeq2 local-trend reference check, and explicit
+  all-near-minimum local floor, mixed-threshold, and out-of-sample prediction
+  fixtures.
+- [x] Default `fit_dispersion_trend` dispatcher for implemented `FitType`
+  values: parametric, local, and mean.
 - [x] Dispersion prior variance branches:
   MAD-squared log residual variance, `trigamma((m - p) / 2)` subtraction, and
   `0.25` floor for residual df greater than 3, no subtraction for saturated
@@ -216,8 +272,13 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Second derivative of the Cox-Reid-adjusted profile likelihood.
 - [x] DESeq2-style weighted Cox-Reid threshold-subset objective, first
   derivative, and second derivative.
-- [ ] Local and glmGamPoi dispersion trend types.
+- [x] Initial local dispersion trend type.
+- [ ] glmGamPoi dispersion trend type and exact local `locfit` edge-case parity.
 - [x] DESeq2-shaped prior variance branch for residual df 1 through 3.
+- [x] Public `estimate_dispersion_prior` stage wrapper over the implemented
+  prior-variance estimator.
+- [ ] Exact DESeq2 seeded Monte Carlo/R `loess` numerical identity for
+  residual-df 1 through 3 prior variance.
 - [x] Low-level observation-weighted MAP dispersion fitting.
 - [x] Builder-level observation weights through the GLM-mu gene-wise
   dispersion, MAP, and native Wald path.
@@ -243,9 +304,13 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add native dispersion estimation to that pipeline for the limited
   linear-mu, parametric-trend, deterministic-prior, no-weight MAP branch.
 - [x] Generalize the limited native MAP/Wald branch to builder-selected
-  parametric or mean dispersion trends.
+  parametric, local, or mean dispersion trends.
 - [x] Generalize the limited native MAP/Wald branch to the GLM-mu mean-refit
   dispersion branch, including builder-level observation weights.
+- [x] Wire `DeseqBuilder::fit()` to the implemented top-level GLM-mu Wald
+  workflow, using the last design coefficient by default.
+- [x] Add top-level Wald result-table workflow via
+  `DeseqBuilder::fit_with_results()`.
 - [ ] Generalize the native Wald pipeline to DESeq2's full dispersion and GLM
   fitting behavior.
 - [ ] Keep mature R wrapper workflow exposure deferred until the Rust pipeline
@@ -255,10 +320,14 @@ reference; no DESeq2 source is vendored or translated line by line.
 
 - [x] Primitive numeric Wald linear contrasts.
 - [x] Result-row assembly for precomputed primitive numeric Wald contrasts.
+- [x] TSV writer for assembled result tables, preserving DESeq2-shaped column
+  order and R-style `NA` output for missing numeric or logical values.
 - [x] Builder-level supplied-dispersion Wald pipeline for primitive numeric
   contrasts.
 - [x] Primitive coefficient-name, positive/negative coefficient-list, and
   common factor-level contrast resolution against design coefficient names.
+- [x] Stable result-table names and comparison labels for named primitive
+  contrast specifications.
 - [x] Numeric/expanded `contrastAllZero` behavior for primitive Wald contrasts,
   matching DESeq2's `contrastAllZeroNumeric` model-matrix selection rule.
 - [x] Character/factor-level `contrastAllZero` behavior for primitive
@@ -293,20 +362,94 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Initial fixed-dispersion LRT.
 - [x] Limited native-dispersion LRT for current linear-mu and GLM-mu MAP
   dispersion branches.
+- [x] Limited native-dispersion LRT dispatch through the initial local
+  dispersion trend for current linear-mu and GLM-mu branches.
+- [x] Wire `DeseqBuilder::fit_lrt()` to the implemented top-level GLM-mu LRT
+  workflow, using the last full-design coefficient by default.
+- [x] Add top-level LRT result-table workflow via
+  `DeseqBuilder::fit_lrt_with_results()`.
 - [x] DESeq2-internal native weighted GLM-mu LRT reference hook for
   the current mean-trend branch.
 - [x] Default DESeq2-internal native weighted GLM-mu Wald/LRT reference checks
   for the current mean-trend branch.
-- [ ] Full LRT parity with native dispersion reference outputs, local/glmGamPoi
-  trends, optim fallback, and remaining edge cases.
+- [ ] Full LRT parity with native dispersion reference outputs, exact local
+  `locfit` behavior, glmGamPoi trends, optim fallback, and remaining edge
+  cases.
 
 ## Phase 6: Secondary Features
 
-- [ ] Local dispersion trend.
+- [x] Initial local dispersion trend.
 - [x] Mean fit type.
 - [ ] glmGamPoi-like mode if feasible.
-- [ ] VST.
-- [ ] rlog.
+- [x] `normTransform` log2 normalized-count-plus-one transform.
+- [x] Mean-fit VST closed-form transform for normalized counts.
+- [x] Parametric-trend VST closed-form transform for normalized counts.
+- [x] Local-trend VST numerical-integration transform for normalized counts.
+- [x] VST dispatch from an already-fitted `DispersionTrendFit`.
+- [x] Local VST `mean(1 / sizeFactors)` and normalization-factor `xim`
+  helpers.
+- [x] Factor-aware VST dispatch helpers for size factors and normalization
+  factors.
+- [x] Store implemented fitted dispersion trends in `DeseqFit` and expose
+  fit-level normalized-count, `normTransform`, and VST helpers.
+- [x] Fit-level VST helper that applies an external fitted trend to the full
+  count matrix, enabling the fast-subset trend/full-data transform split.
+- [x] Add a fit-level `vst` alias and LRT workflow coverage for fitted-trend
+  VST reuse.
+- [x] Fast-VST deterministic subset index helper matching DESeq2's
+  `baseMean > 5`, ordered row selection, and R-style rounding rule.
+- [x] Public fast-VST default `nsub=1000` constant and default-size builder
+  convenience methods.
+- [x] Public fast-VST eligible-row count helper, plus fit-level eligibility
+  query from stored `baseMean`.
+- [x] Fast-VST normalized-count row-subset helper for the selected trend-fit
+  subset.
+- [x] Fast-VST aligned gene/sample matrix row-subset helper for normalization
+  factors and observation weights.
+- [x] Public `CountMatrix::select_rows` helper for fast-VST raw count subsets,
+  preserving gene and sample names.
+- [x] Public fast-VST row-aligned subset bundle for raw counts, normalized
+  counts, optional normalization factors, optional observation weights, and
+  original row indices.
+- [x] Fast-VST subset metadata view with subset shape, original row indices,
+  and factor/weight presence flags.
+- [x] Fit-level fast-VST subset helper using stored `baseMean`, normalization
+  factors, and preprocessed observation weights.
+- [x] Builder-level GLM-mu fast-VST subset trend fitting that preserves
+  full-data size factors and subset normalization factors.
+- [x] Builder-level GLM-mu fast-VST transform applying the subset-fitted trend
+  to the full normalized count matrix with subset diagnostics.
+- [x] Named fast-VST GLM-mu output object for transformed counts, subset fit,
+  and row-aligned subset diagnostics.
+- [x] Explicit fast-VST output metadata view with transform shape, subset
+  shape, subset row indices, and trend-fit shape.
+- [x] Public fast-VST builder-level `nsub > 0` validation before branch-specific
+  unsupported-feature checks.
+- [x] Automatic GLM-mu VST helper that uses the deterministic fast subset when
+  enough rows are eligible and otherwise falls back to a full-data Rust trend
+  fit.
+- [x] Automatic VST trend-source metadata recording fast-subset vs full-data
+  trend fitting, requested `nsub`, and eligible-row count.
+- [x] Accessor helpers for automatic VST trend-source metadata.
+- [x] Automatic VST weighted-input guard that selects the full-data Rust trend
+  path while weighted fast-subset trend fitting remains unsupported.
+- [x] Full-data automatic VST reason metadata for insufficient eligible rows
+  versus observation-weighted input.
+- [x] Stable string labels for automatic VST trend-source and full-data reason
+  metadata.
+- [x] Automatic VST output metadata view with source labels, subset sizing,
+  transform shape, trend-fit row count, and optional fast-subset row count.
+- [x] Automatic VST output metadata includes trend-fit sample count and
+  original fast-subset row indices for parity diagnostics.
+- [x] Explicit and automatic VST output metadata includes stable trend-fit type
+  labels for parametric, local, and mean dispersion trends.
+- [x] Blind automatic GLM-mu VST helper using a named intercept-only design,
+  matching the implemented part of DESeq2's `blind=TRUE` transform shape.
+- [ ] Full VST with automatic trend estimation, frozen dispersion-function
+  reuse, fast-subset trend fitting, exact local `splinefun` parity, and object
+  metadata.
+- [ ] rlog implementation. The transform namespace currently exports an
+  explicit `UnsupportedFeature` marker for callers that probe support.
 - [ ] Mature R package wrapper backed only by Rust, with no fallback to
   R/Bioconductor DESeq2.
 - [ ] Mature CLI.

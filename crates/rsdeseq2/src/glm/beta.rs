@@ -1,15 +1,313 @@
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
+use crate::glm::irls::{
+    fit_fixed_dispersion_irls, fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
+    fit_irls, IrlsOptions,
+};
 use crate::glm::nb::nbinom_log_likelihood_matrix;
 use crate::glm::NbinomGlmFit;
 use crate::matrix::RowMajorMatrix;
+use statrs::distribution::{ContinuousCDF, Normal};
 
-/// Placeholder for future beta estimation helpers.
-pub fn estimate_beta() -> Result<(), DeseqError> {
-    Err(DeseqError::UnsupportedFeature {
-        feature: "beta estimation".to_string(),
+/// Method used to estimate DESeq2's beta prior variance.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BetaPriorVarianceMethod {
+    /// Match the upper absolute-beta quantile without mean/dispersion weights.
+    Quantile,
+    /// Match the upper absolute-beta quantile using DESeq2's
+    /// `1 / (1 / baseMean + dispFit)` weights.
+    Weighted,
+}
+
+/// Options for DESeq2-style beta prior variance estimation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BetaPriorVarianceOptions {
+    /// Estimation method. DESeq2 defaults to `weighted`.
+    pub method: BetaPriorVarianceMethod,
+    /// Upper tail probability matched against a zero-centered Normal.
+    pub upper_quantile: f64,
+    /// Wide prior variance used for intercepts and columns with no finite betas.
+    pub wide_prior_variance: f64,
+    /// Absolute beta cutoff used to discard near-infinite MLEs.
+    pub finite_beta_cutoff: f64,
+}
+
+impl Default for BetaPriorVarianceOptions {
+    fn default() -> Self {
+        Self {
+            method: BetaPriorVarianceMethod::Weighted,
+            upper_quantile: 0.05,
+            wide_prior_variance: 1e6,
+            finite_beta_cutoff: 10.0,
+        }
+    }
+}
+
+/// Two-stage fixed-dispersion GLM output for a DESeq2-style beta prior refit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BetaPriorGlmFit {
+    /// First pass MLE GLM fit used to estimate beta prior variances.
+    pub mle_fit: NbinomGlmFit,
+    /// Refit GLM using beta-prior variance as a per-coefficient ridge.
+    pub prior_fit: NbinomGlmFit,
+    /// Log2-scale beta prior variances, one per design coefficient.
+    pub beta_prior_variance: Vec<f64>,
+}
+
+/// Options for the two-stage beta-prior fixed-dispersion refit helper.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BetaPriorRefitOptions {
+    /// Options used for the first MLE GLM fit and the final prior refit.
+    ///
+    /// The prior refit replaces any ridge settings with values derived from
+    /// the estimated beta prior variances.
+    pub fit_options: IrlsOptions,
+    /// Options used when estimating beta prior variances from the MLE fit.
+    pub variance_options: BetaPriorVarianceOptions,
+}
+
+/// Estimate fixed-dispersion beta coefficients with DESeq2-style GLM dispatch.
+///
+/// This is a public beta-estimation convenience entry point for callers that
+/// already have size factors and per-gene dispersions. Intercept-only designs
+/// use the closed-form DESeq2 shortcut through `fit_irls`; other designs use
+/// the general fixed-dispersion IRLS implementation.
+pub fn estimate_beta(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_irls(counts, design, size_factors, dispersions, options)
+}
+
+/// Convert log2-scale beta prior variances to natural-log IRLS ridge values.
+///
+/// DESeq2 computes `lambda = 1 / betaPriorVar` on the log2 beta scale and then
+/// divides by `log(2)^2` before fitting on the natural-log scale. This helper
+/// exposes that conversion for primitive Rust GLM refits.
+pub fn beta_prior_variance_to_ridge_lambda(
+    beta_prior_variance: &[f64],
+) -> Result<Vec<f64>, DeseqError> {
+    beta_prior_variance
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, variance)| {
+            validate_positive_finite(variance, "beta prior variance", idx)?;
+            Ok(variance.recip() / std::f64::consts::LN_2.powi(2))
+        })
+        .collect()
+}
+
+/// Refit a fixed-dispersion GLM with supplied DESeq2-style beta prior variance.
+pub fn fit_glms_with_beta_prior_variance(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
+    fit_fixed_dispersion_irls(counts, design, size_factors, dispersions, options)
+}
+
+/// Refit a fixed-dispersion GLM with supplied beta prior variance and offsets.
+pub fn fit_glms_with_beta_prior_variance_and_normalization_factors(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        normalization_factors,
+        dispersions,
+        None,
+        beta_prior_variance,
+        options,
+    )
+}
+
+/// Refit a fixed-dispersion GLM with supplied beta prior variance, offsets, and weights.
+pub fn fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
+    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+        counts,
+        design,
+        normalization_factors,
+        dispersions,
+        weights,
+        options,
+    )
+}
+
+/// Run an MLE fixed-dispersion fit, estimate beta prior variance, then refit.
+pub fn fit_glms_with_estimated_beta_prior_variance(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<BetaPriorGlmFit, DeseqError> {
+    let fit_options = options.fit_options;
+    let mle_fit = fit_irls(
+        counts,
+        design,
+        size_factors,
+        dispersions,
+        fit_options.clone(),
+    )?;
+    let beta_prior_variance = estimate_beta_prior_variance(
+        &mle_fit.beta,
+        base_mean,
+        disp_fit,
+        design.coefficient_names(),
+        options.variance_options,
+    )?;
+    let prior_fit = fit_glms_with_beta_prior_variance(
+        counts,
+        design,
+        size_factors,
+        dispersions,
+        &beta_prior_variance,
+        fit_options,
+    )?;
+
+    Ok(BetaPriorGlmFit {
+        mle_fit,
+        prior_fit,
+        beta_prior_variance,
     })
+}
+
+/// Estimate DESeq2-style beta prior variances from unshrunken MLE betas.
+///
+/// This mirrors the computational core of DESeq2 `estimateBetaPriorVar` for
+/// already-built primitive matrices: each coefficient uses MLE betas whose
+/// absolute value is below the finite-beta cutoff, then matches an upper
+/// absolute-beta quantile to a zero-centered Normal. The weighted method uses
+/// DESeq2's `1 / (1 / baseMean + dispFit)` row weights. Intercept columns are
+/// assigned the configured wide prior variance.
+pub fn estimate_beta_prior_variance(
+    beta_matrix: &RowMajorMatrix<f64>,
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    coefficient_names: Option<&[String]>,
+    options: BetaPriorVarianceOptions,
+) -> Result<Vec<f64>, DeseqError> {
+    validate_beta_prior_inputs(beta_matrix, base_mean, disp_fit, coefficient_names, options)?;
+    let weights = match options.method {
+        BetaPriorVarianceMethod::Weighted => Some(beta_prior_weights(
+            base_mean,
+            disp_fit,
+            beta_matrix.n_rows(),
+        )?),
+        BetaPriorVarianceMethod::Quantile => None,
+    };
+
+    let mut prior_variance = Vec::with_capacity(beta_matrix.n_cols());
+    for coefficient in 0..beta_matrix.n_cols() {
+        let value = if beta_matrix.n_rows() == 1 {
+            let beta = beta_matrix.row(0)?[coefficient];
+            if beta.is_finite() {
+                beta * beta
+            } else {
+                options.wide_prior_variance
+            }
+        } else {
+            let mut betas = Vec::new();
+            let mut selected_weights = Vec::new();
+            for row in 0..beta_matrix.n_rows() {
+                let beta = beta_matrix.row(row)?[coefficient];
+                if beta.is_finite() && beta.abs() < options.finite_beta_cutoff {
+                    betas.push(beta);
+                    if let Some(weights) = &weights {
+                        selected_weights.push(weights[row]);
+                    }
+                }
+            }
+            if betas.is_empty() {
+                options.wide_prior_variance
+            } else {
+                match options.method {
+                    BetaPriorVarianceMethod::Quantile => {
+                        match_upper_quantile_for_variance(&betas, options.upper_quantile)?
+                    }
+                    BetaPriorVarianceMethod::Weighted => {
+                        match_weighted_upper_quantile_for_variance(
+                            &betas,
+                            &selected_weights,
+                            options.upper_quantile,
+                        )?
+                    }
+                }
+            }
+        };
+        prior_variance.push(value);
+    }
+
+    if let Some(names) = coefficient_names {
+        for (idx, name) in names.iter().enumerate() {
+            if name == "Intercept" || name == "(Intercept)" {
+                prior_variance[idx] = options.wide_prior_variance;
+            }
+        }
+    }
+    Ok(prior_variance)
+}
+
+/// Match an upper absolute-beta quantile to a zero-centered Normal variance.
+pub fn match_upper_quantile_for_variance(
+    betas: &[f64],
+    upper_quantile: f64,
+) -> Result<f64, DeseqError> {
+    validate_upper_quantile(upper_quantile)?;
+    let abs_betas = finite_abs_values(betas)?;
+    let quantile = quantile_type7(abs_betas, 1.0 - upper_quantile)?;
+    let normal = Normal::new(0.0, 1.0).map_err(|error| DeseqError::InvalidOptions {
+        reason: format!("normal quantile construction failed: {error}"),
+    })?;
+    let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
+    Ok((quantile / normal_quantile).powi(2))
+}
+
+/// Weighted version of [`match_upper_quantile_for_variance`].
+pub fn match_weighted_upper_quantile_for_variance(
+    betas: &[f64],
+    weights: &[f64],
+    upper_quantile: f64,
+) -> Result<f64, DeseqError> {
+    validate_upper_quantile(upper_quantile)?;
+    if betas.len() != weights.len() {
+        return Err(invalid_dimensions(
+            "beta prior variance weights",
+            betas.len(),
+            weights.len(),
+        ));
+    }
+    let weighted_quantile = weighted_abs_quantile(betas, weights, 1.0 - upper_quantile)?;
+    let normal = Normal::new(0.0, 1.0).map_err(|error| DeseqError::InvalidOptions {
+        reason: format!("normal quantile construction failed: {error}"),
+    })?;
+    let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
+    Ok((weighted_quantile / normal_quantile).powi(2))
 }
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with size factors.
@@ -217,6 +515,217 @@ fn intercept_working_weights(
         });
     }
     Ok(out)
+}
+
+fn options_with_beta_prior_variance(
+    design: &DesignMatrix,
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+) -> Result<IrlsOptions, DeseqError> {
+    if beta_prior_variance.len() != design.n_coefficients() {
+        return Err(invalid_dimensions(
+            "beta prior variance coefficients",
+            design.n_coefficients(),
+            beta_prior_variance.len(),
+        ));
+    }
+    let ridge_lambda = beta_prior_variance_to_ridge_lambda(beta_prior_variance)?;
+    Ok(options.ridge_lambda_by_coefficient(ridge_lambda))
+}
+
+fn validate_beta_prior_inputs(
+    beta_matrix: &RowMajorMatrix<f64>,
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    coefficient_names: Option<&[String]>,
+    options: BetaPriorVarianceOptions,
+) -> Result<(), DeseqError> {
+    if base_mean.len() != beta_matrix.n_rows() {
+        return Err(invalid_dimensions(
+            "beta prior variance baseMean rows",
+            beta_matrix.n_rows(),
+            base_mean.len(),
+        ));
+    }
+    if disp_fit.len() != beta_matrix.n_rows() {
+        return Err(invalid_dimensions(
+            "beta prior variance dispFit rows",
+            beta_matrix.n_rows(),
+            disp_fit.len(),
+        ));
+    }
+    if let Some(names) = coefficient_names {
+        if names.len() != beta_matrix.n_cols() {
+            return Err(invalid_dimensions(
+                "beta prior variance coefficient names",
+                beta_matrix.n_cols(),
+                names.len(),
+            ));
+        }
+    }
+    validate_upper_quantile(options.upper_quantile)?;
+    if !options.wide_prior_variance.is_finite() || options.wide_prior_variance <= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "wide beta prior variance must be finite and positive".to_string(),
+        });
+    }
+    if !options.finite_beta_cutoff.is_finite() || options.finite_beta_cutoff <= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "finite beta cutoff must be finite and positive".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn beta_prior_weights(
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    n_rows: usize,
+) -> Result<Vec<f64>, DeseqError> {
+    let mut weights = Vec::with_capacity(n_rows);
+    for row in 0..n_rows {
+        validate_positive_finite(base_mean[row], "beta prior baseMean", row)?;
+        validate_positive_finite(disp_fit[row], "beta prior dispFit", row)?;
+        weights.push((base_mean[row].recip() + disp_fit[row]).recip());
+    }
+    Ok(weights)
+}
+
+fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {
+    if !upper_quantile.is_finite() || upper_quantile <= 0.0 || upper_quantile >= 1.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "upper quantile must be finite and between 0 and 1".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
+    let out = values
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .map(f64::abs)
+        .collect::<Vec<_>>();
+    if out.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "beta prior variance quantile needs at least one finite beta".to_string(),
+        });
+    }
+    Ok(out)
+}
+
+fn quantile_type7(mut values: Vec<f64>, probability: f64) -> Result<f64, DeseqError> {
+    if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+        return Err(DeseqError::InvalidOptions {
+            reason: "quantile probability must be finite and between 0 and 1".to_string(),
+        });
+    }
+    values.sort_by(|a, b| a.total_cmp(b));
+    if values.len() == 1 {
+        return Ok(values[0]);
+    }
+    let h = (values.len() as f64 - 1.0) * probability + 1.0;
+    let lower = h.floor() as usize;
+    let fraction = h - lower as f64;
+    if lower == 0 {
+        Ok(values[0])
+    } else if lower >= values.len() {
+        Ok(values[values.len() - 1])
+    } else {
+        Ok(values[lower - 1] + fraction * (values[lower] - values[lower - 1]))
+    }
+}
+
+fn weighted_abs_quantile(
+    betas: &[f64],
+    weights: &[f64],
+    probability: f64,
+) -> Result<f64, DeseqError> {
+    if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted quantile probability must be finite and between 0 and 1".to_string(),
+        });
+    }
+    let mut pairs = Vec::with_capacity(betas.len());
+    for (idx, (beta, weight)) in betas
+        .iter()
+        .copied()
+        .zip(weights.iter().copied())
+        .enumerate()
+    {
+        if beta.is_finite() && weight.is_finite() && weight > 0.0 {
+            pairs.push((beta.abs(), weight));
+        } else if !weight.is_finite() || weight < 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: "beta prior variance weight".to_string(),
+                index: Some(idx),
+                value: weight,
+            });
+        }
+    }
+    if pairs.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted beta prior variance quantile needs positive finite weights"
+                .to_string(),
+        });
+    }
+    pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    let weight_sum = pairs.iter().map(|(_, weight)| *weight).sum::<f64>();
+    if !weight_sum.is_finite() || weight_sum <= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted beta prior variance quantile needs positive finite total weight"
+                .to_string(),
+        });
+    }
+
+    let norm_scale = pairs.len() as f64 / weight_sum;
+    let mut unique = Vec::<(f64, f64)>::with_capacity(pairs.len());
+    for (value, weight) in pairs {
+        let normalized_weight = weight * norm_scale;
+        if let Some((last_value, last_weight)) = unique.last_mut() {
+            if *last_value == value {
+                *last_weight += normalized_weight;
+                continue;
+            }
+        }
+        unique.push((value, normalized_weight));
+    }
+
+    if unique.len() == 1 {
+        return Ok(unique[0].0);
+    }
+
+    let n = unique.iter().map(|(_, weight)| *weight).sum::<f64>();
+    let order = 1.0 + (n - 1.0) * probability;
+    let low = order.floor().max(1.0);
+    let high = (low + 1.0).min(n);
+    let fraction = order.fract();
+
+    let mut cumulative_weights = Vec::with_capacity(unique.len());
+    let mut cumulative = 0.0;
+    for (_, weight) in &unique {
+        cumulative += *weight;
+        cumulative_weights.push(cumulative);
+    }
+
+    let low_quantile = weighted_order_statistic(&unique, &cumulative_weights, low);
+    let high_quantile = weighted_order_statistic(&unique, &cumulative_weights, high);
+    Ok((1.0 - fraction) * low_quantile + fraction * high_quantile)
+}
+
+fn weighted_order_statistic(
+    values_and_weights: &[(f64, f64)],
+    cumulative_weights: &[f64],
+    position: f64,
+) -> f64 {
+    for (idx, cumulative) in cumulative_weights.iter().copied().enumerate() {
+        if position <= cumulative {
+            return values_and_weights[idx].0;
+        }
+    }
+    values_and_weights[values_and_weights.len() - 1].0
 }
 
 fn validate_fit_inputs(

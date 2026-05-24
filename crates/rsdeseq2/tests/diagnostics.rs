@@ -1,6 +1,23 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
+fn assert_optional_float_vec_eq_with_nan(actual: Option<&Vec<f64>>, expected: Option<&Vec<f64>>) {
+    match (actual, expected) {
+        (Some(actual), Some(expected)) => {
+            assert_eq!(actual.len(), expected.len());
+            for (left, right) in actual.iter().zip(expected) {
+                if left.is_nan() || right.is_nan() {
+                    assert!(left.is_nan() && right.is_nan());
+                } else {
+                    assert_relative_eq!(*left, *right, epsilon = 0.0);
+                }
+            }
+        }
+        (None, None) => {}
+        _ => panic!("optional float vector presence differs"),
+    }
+}
+
 #[test]
 fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 12, 14, 20, 22, 24]).unwrap();
@@ -11,6 +28,7 @@ fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
     let diagnostics = fit.deseq2_mcols_diagnostics();
 
     assert_eq!(diagnostics, Deseq2McolsDiagnostics::default());
+    assert!(diagnostics.present_column_names().is_empty());
 }
 
 #[test]
@@ -33,6 +51,10 @@ fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
 
     let diagnostics = fit.deseq2_mcols_diagnostics();
     assert_eq!(
+        diagnostics.disp_gene_est.as_ref(),
+        fit.disp_gene_est.as_ref()
+    );
+    assert_eq!(
         diagnostics.disp_gene_iter.as_ref(),
         fit.disp_gene_iter.as_ref()
     );
@@ -44,6 +66,168 @@ fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
         .all(|iterations| *iterations > 0));
     assert_eq!(diagnostics.beta_conv, None);
     assert_eq!(diagnostics.deviance, None);
+    assert_eq!(
+        diagnostics.present_column_names(),
+        vec!["dispGeneEst", "dispGeneIter"]
+    );
+    let frame = diagnostics.data_frame();
+    assert_eq!(frame.columns.len(), 2);
+    assert_eq!(frame.columns[0].name, "dispGeneEst");
+    assert!(matches!(
+        &frame.columns[0].values,
+        Deseq2McolsDiagnosticValues::Numeric(values)
+            if values.len() == counts.n_genes()
+    ));
+    assert_eq!(frame.columns[1].name, "dispGeneIter");
+    assert!(matches!(
+        &frame.columns[1].values,
+        Deseq2McolsDiagnosticValues::Integer(values)
+            if values == fit.disp_gene_iter.as_ref().unwrap()
+    ));
+}
+
+#[test]
+fn deseq2_mcols_diagnostics_include_dispersion_fit_type() {
+    let counts = CountMatrix::from_row_major_u32(
+        8,
+        8,
+        vec![
+            0, 0, 0, 0, 0, 0, 0, 0, //
+            0, 20, 1, 19, 2, 18, 3, 17, //
+            12, 28, 10, 30, 14, 26, 11, 29, //
+            30, 50, 25, 55, 35, 45, 28, 52, //
+            55, 105, 60, 100, 50, 110, 65, 95, //
+            120, 200, 130, 190, 115, 205, 125, 195, //
+            240, 400, 250, 390, 230, 410, 260, 380, //
+            15, 18, 12, 17, 45, 50, 40, 55,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        None,
+    )
+    .unwrap();
+
+    let fit = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .fit_type(FitType::Mean)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_dispersion_trend_glm_mu(&counts, &design)
+        .unwrap();
+
+    let diagnostics = fit.deseq2_mcols_diagnostics();
+    assert_eq!(diagnostics.dispersion_fit_type, Some("mean"));
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.disp_gene_est.as_ref(),
+        fit.disp_gene_est.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(diagnostics.disp_fit.as_ref(), fit.disp_fit.as_ref());
+    assert_eq!(diagnostics.dispersion, None);
+    assert_eq!(diagnostics.disp_iter, None);
+    assert_eq!(diagnostics.disp_outlier, None);
+    assert_eq!(
+        diagnostics.dispersion_converged.as_ref(),
+        fit.dispersion_converged.as_ref()
+    );
+    assert_eq!(
+        diagnostics.present_column_names(),
+        vec!["dispGeneEst", "dispGeneIter", "dispFit"]
+    );
+}
+
+#[test]
+fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
+    let counts = CountMatrix::from_row_major_u32(
+        8,
+        8,
+        vec![
+            0, 0, 0, 0, 0, 0, 0, 0, //
+            0, 20, 1, 19, 2, 18, 3, 17, //
+            12, 28, 10, 30, 14, 26, 11, 29, //
+            30, 50, 25, 55, 35, 45, 28, 52, //
+            55, 105, 60, 100, 50, 110, 65, 95, //
+            120, 200, 130, 190, 115, 205, 125, 195, //
+            240, 400, 250, 390, 230, 410, 260, 380, //
+            15, 18, 12, 17, 45, 50, 40, 55,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        None,
+    )
+    .unwrap();
+
+    let fit = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .fit_type(FitType::Mean)
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+
+    let diagnostics = fit.deseq2_mcols_diagnostics();
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.disp_gene_est.as_ref(),
+        fit.disp_gene_est.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(diagnostics.disp_fit.as_ref(), fit.disp_fit.as_ref());
+    assert_optional_float_vec_eq_with_nan(diagnostics.dispersion.as_ref(), fit.dispersion.as_ref());
+    assert_eq!(diagnostics.disp_iter.as_ref(), fit.disp_iter.as_ref());
+    assert_eq!(diagnostics.disp_outlier.as_ref(), fit.disp_outlier.as_ref());
+    assert_eq!(
+        diagnostics.dispersion_converged.as_ref(),
+        fit.dispersion_converged.as_ref()
+    );
+    assert_eq!(diagnostics.dispersion_fit_type, Some("mean"));
+    assert_eq!(
+        diagnostics.present_column_names(),
+        vec![
+            "dispGeneEst",
+            "dispGeneIter",
+            "dispFit",
+            "dispersion",
+            "dispIter",
+            "dispOutlier",
+        ]
+    );
+    let frame = diagnostics.data_frame();
+    assert_eq!(
+        frame
+            .columns
+            .iter()
+            .map(|column| column.name)
+            .collect::<Vec<_>>(),
+        diagnostics.present_column_names()
+    );
+    assert!(matches!(
+        &frame.columns[3].values,
+        Deseq2McolsDiagnosticValues::Numeric(values)
+            if values.len() == counts.n_genes()
+    ));
+    assert!(matches!(
+        &frame.columns[5].values,
+        Deseq2McolsDiagnosticValues::Logical(values)
+            if values == fit.disp_outlier.as_ref().unwrap()
+    ));
 }
 
 #[test]
@@ -72,6 +256,24 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
     assert_eq!(diagnostics.reduced_beta_iter, None);
     assert_eq!(diagnostics.deviance.as_ref(), fit.full_deviance.as_ref());
     assert_eq!(diagnostics.max_cooks.as_ref(), fit.max_cooks.as_ref());
+    assert_eq!(
+        diagnostics.present_column_names(),
+        vec!["dispersion", "betaConv", "betaIter", "deviance", "maxCooks",]
+    );
+    let frame = diagnostics.data_frame();
+    assert_eq!(
+        frame
+            .columns
+            .iter()
+            .map(|column| column.name)
+            .collect::<Vec<_>>(),
+        diagnostics.present_column_names()
+    );
+    assert!(matches!(
+        &frame.columns[4].values,
+        Deseq2McolsDiagnosticValues::OptionalNumeric(values)
+            if values == fit.max_cooks.as_ref().unwrap()
+    ));
     assert_relative_eq!(
         diagnostics.deviance.as_ref().unwrap()[0],
         -2.0 * fit.log_like.as_ref().unwrap()[0],
@@ -129,6 +331,18 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
     assert_eq!(diagnostics.beta_iter.as_ref().unwrap()[0], 0);
     assert_eq!(diagnostics.reduced_beta_iter.as_ref().unwrap()[0], 0);
     assert!(diagnostics_deviance[0].is_nan());
+    assert_eq!(
+        diagnostics.present_column_names(),
+        vec![
+            "dispersion",
+            "fullBetaConv",
+            "reducedBetaConv",
+            "betaIter",
+            "reducedBetaIter",
+            "deviance",
+            "maxCooks",
+        ]
+    );
     assert_relative_eq!(
         diagnostics_deviance[1],
         -2.0 * fit.log_like.as_ref().unwrap()[1],

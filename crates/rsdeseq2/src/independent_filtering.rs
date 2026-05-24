@@ -53,6 +53,96 @@ pub struct IndependentFilteringOutput {
     pub alpha: f64,
 }
 
+/// One row of the DESeq2-style `filterNumRej` metadata table.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IndependentFilterNumRejRow {
+    /// Filter quantile evaluated by independent filtering.
+    pub theta: f64,
+    /// Number of adjusted p-values below the target alpha at this theta.
+    pub num_rejections: usize,
+}
+
+/// One row of the DESeq2-style `lo.fit` independent-filtering metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IndependentFilterLowessRow {
+    /// Filter quantile used as the lowess x coordinate.
+    pub theta: f64,
+    /// Smoothed rejection count at this theta.
+    pub fitted_rejections: f64,
+}
+
+/// One scalar entry from DESeq2-style independent-filtering metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IndependentFilterMetadataEntry {
+    /// Metadata key, such as `filterTheta`, `filterThreshold`, or `alpha`.
+    pub name: String,
+    /// Metadata value as a numeric scalar.
+    pub value: f64,
+}
+
+impl IndependentFilteringOutput {
+    /// Assemble the paired theta/rejection-count metadata table.
+    ///
+    /// DESeq2 stores this as `metadata(res)$filterNumRej` with `theta` and
+    /// `numRej` columns. Rust keeps the raw vectors for direct access and
+    /// exposes this paired view for wrappers and parity exporters.
+    pub fn filter_num_rej(&self) -> Vec<IndependentFilterNumRejRow> {
+        self.theta
+            .iter()
+            .copied()
+            .zip(self.num_rejections.iter().copied())
+            .map(|(theta, num_rejections)| IndependentFilterNumRejRow {
+                theta,
+                num_rejections,
+            })
+            .collect()
+    }
+
+    /// Assemble the paired lowess metadata table.
+    ///
+    /// DESeq2 stores this as `metadata(res)$lo.fit`, whose x coordinates are
+    /// the theta grid and whose y coordinates are the fitted rejection counts.
+    pub fn lowess_fit_table(&self) -> Vec<IndependentFilterLowessRow> {
+        let Some(lowess_fit) = &self.lowess_fit else {
+            return Vec::new();
+        };
+        self.theta
+            .iter()
+            .copied()
+            .zip(lowess_fit.iter().copied())
+            .map(|(theta, fitted_rejections)| IndependentFilterLowessRow {
+                theta,
+                fitted_rejections,
+            })
+            .collect()
+    }
+
+    /// Assemble scalar independent-filtering metadata entries.
+    ///
+    /// DESeq2 stores these values in `metadata(res)`. Missing optional entries
+    /// are omitted, which is the disabled-filtering shape.
+    pub fn scalar_metadata(&self) -> Vec<IndependentFilterMetadataEntry> {
+        let mut entries = Vec::new();
+        if let Some(value) = self.filter_threshold {
+            entries.push(IndependentFilterMetadataEntry {
+                name: "filterThreshold".to_string(),
+                value,
+            });
+        }
+        if let Some(value) = self.filter_theta {
+            entries.push(IndependentFilterMetadataEntry {
+                name: "filterTheta".to_string(),
+                value,
+            });
+        }
+        entries.push(IndependentFilterMetadataEntry {
+            name: "alpha".to_string(),
+            value: self.alpha,
+        });
+        entries
+    }
+}
+
 /// Apply DESeq2-style independent filtering to result rows.
 ///
 /// The current Rust path uses `baseMean` as the filter statistic, matching the

@@ -42,13 +42,26 @@ fn independent_filtering_applies_selected_threshold_and_metadata() {
     assert_eq!(output.selected_index, Some(0));
     assert_eq!(output.filter_theta, Some(1.0));
     assert_eq!(output.filter_threshold, Some(2.0));
-    assert_eq!(results.independent_filtering, Some(output));
+    assert_eq!(results.independent_filtering, Some(output.clone()));
     assert_eq!(results.rows[0].filtered, Some(true));
     assert_eq!(results.rows[1].filtered, Some(true));
     assert_eq!(results.rows[2].filtered, Some(false));
     assert_eq!(results.rows[0].padj, None);
     assert_eq!(results.rows[1].padj, None);
     assert!(results.rows[2].padj.is_some());
+    assert_eq!(
+        output.filter_num_rej(),
+        vec![
+            IndependentFilterNumRejRow {
+                theta: 1.0,
+                num_rejections: 1,
+            },
+            IndependentFilterNumRejRow {
+                theta: 1.0,
+                num_rejections: 1,
+            },
+        ]
+    );
     assert_eq!(
         results
             .independent_filtering
@@ -60,6 +73,39 @@ fn independent_filtering_applies_selected_threshold_and_metadata() {
             .len(),
         2
     );
+    let lowess_table = output.lowess_fit_table();
+    assert_eq!(lowess_table.len(), 2);
+    assert_eq!(
+        lowess_table[0],
+        IndependentFilterLowessRow {
+            theta: 1.0,
+            fitted_rejections: output.lowess_fit.as_ref().unwrap()[0],
+        }
+    );
+    assert_eq!(
+        output.scalar_metadata(),
+        vec![
+            IndependentFilterMetadataEntry {
+                name: "filterThreshold".to_string(),
+                value: 2.0,
+            },
+            IndependentFilterMetadataEntry {
+                name: "filterTheta".to_string(),
+                value: 1.0,
+            },
+            IndependentFilterMetadataEntry {
+                name: "alpha".to_string(),
+                value: 0.5,
+            },
+        ]
+    );
+    let metadata = results.deseq2_metadata();
+    assert_eq!(
+        metadata.independent_filtering,
+        results.independent_filtering
+    );
+    assert_eq!(metadata.columns.last().unwrap().name, "filtered");
+    assert_eq!(metadata.columns.last().unwrap().column_type, "diagnostic");
 }
 
 #[test]
@@ -87,6 +133,17 @@ fn independent_filtering_disabled_recomputes_regular_bh() {
     assert_eq!(
         results.independent_filtering.as_ref().unwrap().lowess_fit,
         None
+    );
+    assert_eq!(
+        results
+            .independent_filtering
+            .as_ref()
+            .unwrap()
+            .scalar_metadata(),
+        vec![IndependentFilterMetadataEntry {
+            name: "alpha".to_string(),
+            value: 0.1,
+        }]
     );
 }
 

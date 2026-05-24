@@ -158,6 +158,45 @@ impl ContrastSpec {
             reference: Some(reference.into()),
         }
     }
+
+    /// Stable result name for metadata after resolving this contrast.
+    pub fn result_name(&self) -> String {
+        match self {
+            Self::Numeric(_) => "contrast".to_string(),
+            Self::CoefficientName(name) => name.clone(),
+            Self::List { .. } => "contrast".to_string(),
+            Self::FactorLevel {
+                factor,
+                numerator,
+                denominator,
+                ..
+            } => format!("{factor}_{numerator}_vs_{denominator}"),
+        }
+    }
+
+    /// Stable comparison label for result-table metadata.
+    pub fn comparison(&self) -> String {
+        match self {
+            Self::Numeric(_) => "primitive numeric contrast".to_string(),
+            Self::CoefficientName(name) => format!("coefficient {name}"),
+            Self::List {
+                positive,
+                negative,
+                positive_weight,
+                negative_weight,
+            } => format!(
+                "coefficient list contrast: {} at {positive_weight} vs {} at {negative_weight}",
+                positive.join(","),
+                negative.join(",")
+            ),
+            Self::FactorLevel {
+                factor,
+                numerator,
+                denominator,
+                ..
+            } => format!("factor-level contrast: {factor} {numerator} vs {denominator}"),
+        }
+    }
 }
 
 /// Resolve a primitive contrast specification into a numeric contrast vector.

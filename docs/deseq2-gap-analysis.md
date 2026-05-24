@@ -5,9 +5,7 @@ not to vendor or translate DESeq2 line by line; the goal is a Rust
 implementation that matches DESeq2 behavior stage by stage.
 
 R/DESeq2 is allowed only as an offline reference generator for tests and
-benchmarks. Runtime APIs must execute Rust code. The experimental R package
-scaffold is for wrapper development; mature R wrapper paths must call the Rust
-core and must not fall back to DESeq2 for unsupported paths.
+benchmarks.
 
 ## Current Scope
 
@@ -26,6 +24,12 @@ CLI.
 
 ## Matched Or Partly Matched
 
+See [compatibility.md](compatibility.md) for a more detailed numerical parity
+snapshot with fixture evidence. In short, the strongest current matches are
+the normalization/base-metadata primitives, fixed-dispersion GLM/Wald/LRT
+internals with supplied dispersions, implemented dispersion trend/MAP pieces,
+and selected result/filtering/Cook's primitives.
+
 | DESeq2 area | rsdeseq2 status |
 | --- | --- |
 | Count matrix shape | Implemented as genes x samples, row-major. |
@@ -33,13 +37,14 @@ CLI.
 | Normalized counts | Size-factor and gene/sample normalization-factor paths. |
 | Base metadata | `baseMean`, `baseVar`, `allZero`, weighted base metadata. |
 | Observation weights | Row-max normalization, design checks, `weights_fail`, and implemented weighted fixed/native paths. |
-| Fixed-dispersion GLM | Intercept shortcut, IRLS, QR option, log likelihood, deviance, SEs, hats, Wald/LRT. |
+| Fixed-dispersion GLM | Intercept shortcut, IRLS, QR option, log likelihood, deviance, SEs, hats, beta-prior variance/refit primitives, Wald/LRT. |
 | Wald tests | Selected coefficients, primitive contrasts, threshold alternatives, normal and t p-values. |
 | LRT | Fixed-dispersion full vs reduced and limited native-dispersion branches. |
 | Cook's diagnostics | Cook's matrix, `maxCooks`, p-value masking, low-count heuristic primitive, replacement planning, limited refit. |
 | Independent filtering | BaseMean-driven filtered BH and DESeq2-shaped lowess threshold selection. |
 | Dispersion gene estimates | Linear-mu and GLM-mu foundations, rough/moments starts, Cox-Reid, Armijo, grid fallback. |
-| Dispersion trends | Parametric and mean trends. |
+| Dispersion trends | Parametric, mean, and initial pure-Rust local trends. |
+| Transformations | `normTransform` plus mean-fit, parametric, and local VST primitives for normalized counts; VST dispatch from fitted dispersion trends. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
 | Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including weighted GLM-mu anchors. |
@@ -57,8 +62,10 @@ cover only selected fixed-dispersion and limited native-dispersion branches.
 
 Still missing:
 
-- local dispersion trend,
+- exact local `locfit` edge-case parity,
 - glmGamPoi trend and MAP behavior,
+- exact seeded Monte Carlo/loess numerical identity for low-df dispersion prior
+  variance,
 - complete weighted dispersion parity beyond the current deterministic
   weighted GLM-mu fixtures,
 - broader stage-by-stage native LRT references,
@@ -68,9 +75,9 @@ Still missing:
 
 Still missing:
 
-- full DESeq2 beta-prior variance estimation,
-- expanded model-matrix handling,
-- `useOptim` fallback for unstable or non-converged rows,
+- expanded model-matrix beta-prior averaging and high-level workflow plumbing,
+- broader validation of the new bounded optim fallback against DESeq2 rows that
+  actually require backup fitting,
 - complete weighted low-level `fitNbinomGLMs` behavior for rows DESeq2 marks
   `weightsFail` but still fits when called directly.
 
@@ -82,7 +89,8 @@ Still missing:
 - formula/metadata-aware factor-level handling,
 - complete coefficient-name cleanup,
 - complete contrast-aware Cook's/refit behavior,
-- full result metadata compatible with DESeq2's user-facing result tables.
+- full Bioconductor result-object metadata and formula-aware result metadata
+  beyond the typed primitive table view.
 
 ### Outliers And Refits
 
@@ -97,7 +105,7 @@ Still missing:
 
 Still missing:
 
-- VST,
+- high-level VST object workflow and exact local `splinefun` parity,
 - rlog,
 - lfcShrink-compatible hooks,
 - plotting helpers,
@@ -141,5 +149,13 @@ Current benchmarks compare only implemented apples-to-apples primitives, mainly
 size-factor and base-mean CLI paths against equivalent DESeq2/R reference
 operations. They are not claims about full `DESeq()` speed, because full DESeq2
 workflow parity is not implemented yet.
+
+The latest local runs use `/usr/bin/time -v` with repeated process-level runs.
+On the 56,937 gene x 881 sample real count matrix, five-repeat medians were:
+
+- `size-factors`: `rsdeseq2` 1.15 s and 199 MiB RSS versus DESeq2/R 26.71 s
+  and 1.90 GiB RSS, max absolute difference `3.86e-14`.
+- `base-mean`: `rsdeseq2` 1.38 s and 581 MiB RSS versus DESeq2/R 27.55 s and
+  2.28 GiB RSS, max absolute difference `4.47e-07`.
 
 See [benchmarks.md](benchmarks.md) for running time/RAM benchmarks.

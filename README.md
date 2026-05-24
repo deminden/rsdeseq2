@@ -4,50 +4,38 @@
 primitives. It focuses on deterministic, inspectable building blocks for
 normalization, dispersion experiments, GLM tests, and result-table assembly.
 
-Use it today as a Rust crate or a narrow CLI for validated primitives. It is
-not a drop-in replacement for DESeq2 and is not production-ready for full
-differential expression analysis.
+Use it today as a Rust crate or narrow CLI for validated primitives. It is not
+yet a drop-in replacement for full DESeq2 differential expression analysis.
 
-## What Works
+## Current Scope
 
-- Size factors: `ratio`, `poscounts`, supplied geometric means, control genes,
-  and supplied size factors.
-- Normalized counts, gene/sample normalization factors, `baseMean`, `baseVar`,
-  `allZero`, and weighted base metadata.
-- Fixed-dispersion NB GLM primitives, selected Wald/LRT paths, Wald
-  thresholds, t p-values, primitive contrasts, Cook's distances, Cook's
-  masking, outlier-replacement planning, and independent filtering.
-- Linear-mu and GLM-mu native dispersion foundations with parametric/mean
-  trends, prior variance, MAP shrinkage, selected native Wald/LRT paths, and
-  observation-weight handling for the implemented GLM-mu branch.
-- Stage-by-stage reference tests for implemented behavior, including weighted
-  fixed Wald/LRT and weighted GLM-mu dispersion/MAP/Wald/LRT anchors.
+Implemented areas include size-factor estimation, normalized counts and base
+row metadata, fixed-dispersion NB GLM Wald/LRT primitives, native dispersion
+foundations, Cook's and independent-filtering helpers, beta-prior refit
+primitives, and `normTransform`/VST building blocks.
 
-## Still Missing
+Still in progress: full `DESeq()` workflow parity, formula-aware high-level
+result handling, expanded-model beta-prior workflows, full glmGamPoi behavior,
+rlog, lfcShrink, plotting, and mature high-level interfaces.
 
-- Full DESeq2 end-to-end `DESeq()` parity.
-- Local/glmGamPoi dispersion trends and glmGamPoi MAP behavior.
-- Full beta-prior variance, expanded-model handling, optim fallback, and all
-  contrast/refit edge cases.
-- Full formula/metadata-aware result handling, automatic Cook's heuristics, VST,
-  rlog, lfcShrink, plotting, and mature high-level interfaces.
-
-See [docs/deseq2-gap-analysis.md](docs/deseq2-gap-analysis.md) for the detailed
-comparison with original DESeq2.
+Detailed status lives in
+[docs/deseq2-gap-analysis.md](docs/deseq2-gap-analysis.md) and
+[docs/compatibility.md](docs/compatibility.md).
 
 ## Real-Data Benchmark
 
 Current README benchmarks are shown only for primitives with matching reference
 outputs. On a real muscle raw-count matrix with 56,937 genes and 881 samples,
-three process-level CLI runs gave:
+five process-level CLI runs gave these medians:
 
-| primitive | parity check | rsdeseq2 | DESeq2 reference | rsdeseq2 RSS | reference RSS |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `size-factors` | max diff `3.86e-14` | 1.26 s | 26.93 s | 199 MiB | 1.90 GiB |
-| `base-mean` | max diff `4.47e-07` | 1.63 s | 27.21 s | 581 MiB | 2.28 GiB |
+| primitive | parity check | rsdeseq2 | DESeq2 reference | speedup | rsdeseq2 RSS | reference RSS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `size-factors` | max diff `3.86e-14` | 1.15 s | 26.71 s | 23.2x | 199 MiB | 1.90 GiB |
+| `base-mean` | max diff `4.47e-07` | 1.38 s | 27.55 s | 20.0x | 581 MiB | 2.28 GiB |
 
-These numbers are for the validated primitive CLI paths, not full `DESeq()`.
-Benchmark details are in [docs/benchmarks.md](docs/benchmarks.md).
+These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
+Methodology and synthetic benchmark results are in
+[docs/benchmarks.md](docs/benchmarks.md).
 
 ## Rust Usage
 
@@ -112,5 +100,3 @@ Run speed/RAM benchmarks for current apples-to-apples primitives:
 ```bash
 scripts/benchmark_rsdeseq2.sh
 ```
-
-Benchmark details are in [docs/benchmarks.md](docs/benchmarks.md).

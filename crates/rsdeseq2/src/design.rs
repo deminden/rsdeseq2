@@ -13,6 +13,16 @@ pub struct DesignMatrix {
 }
 
 impl DesignMatrix {
+    /// Create an intercept-only design matrix with one all-ones coefficient.
+    pub fn intercept_only(n_samples: usize) -> Result<Self, DeseqError> {
+        Self::from_row_major(
+            n_samples,
+            1,
+            vec![1.0; n_samples],
+            Some(vec!["Intercept".to_string()]),
+        )
+    }
+
     /// Create a design matrix from row-major values.
     pub fn from_row_major(
         n_samples: usize,

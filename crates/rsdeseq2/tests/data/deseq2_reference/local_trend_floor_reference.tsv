@@ -1,0 +1,5 @@
+gene	baseMean	dispGeneEst	dispFit	useForFit	usedMinDispFloor
+local_floor_gene1	5	1e-08	1e-08	FALSE	TRUE
+local_floor_gene2	10	2e-08	1e-08	FALSE	TRUE
+local_floor_gene3	20	5e-08	1e-08	FALSE	TRUE
+local_floor_gene4	40	9e-08	1e-08	FALSE	TRUE

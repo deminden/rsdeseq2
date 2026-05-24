@@ -111,6 +111,33 @@ fn fit_parametric_dispersion_trend_validates_dimensions() {
 }
 
 #[test]
+fn fit_dispersion_trend_dispatches_default_fit_types() {
+    let (means, disps) = trend_data();
+
+    let parametric = fit_dispersion_trend(&means, &disps, FitType::Parametric).unwrap();
+    assert!(matches!(parametric, DispersionTrendFit::Parametric(_)));
+    assert_eq!(parametric.disp_fit().len(), means.len());
+    assert_eq!(parametric.use_for_fit(), vec![true; means.len()].as_slice());
+    assert_eq!(parametric.genes_used(), means.len());
+
+    let local = fit_dispersion_trend(&means, &disps, FitType::Local).unwrap();
+    assert!(matches!(local, DispersionTrendFit::Local(_)));
+    assert_eq!(local.disp_fit().len(), means.len());
+
+    let mean = fit_dispersion_trend(&means, &disps, FitType::Mean).unwrap();
+    assert!(matches!(mean, DispersionTrendFit::Mean(_)));
+    assert_eq!(mean.disp_fit().len(), means.len());
+}
+
+#[test]
+fn fit_dispersion_trend_rejects_glm_gam_poi_until_supported() {
+    let (means, disps) = trend_data();
+    let err = fit_dispersion_trend(&means, &disps, FitType::GlmGamPoi).unwrap_err();
+
+    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
+}
+
+#[test]
 fn mean_trend_evaluates_constant_for_positive_means() {
     let trend = MeanDispersionTrend { mean_disp: 0.2 };
 
@@ -122,6 +149,144 @@ fn mean_trend_evaluates_constant_for_positive_means() {
     assert!(fitted[1].is_nan());
     assert!(fitted[2].is_nan());
     assert_relative_eq!(fitted[3], 0.2, epsilon = 1e-12);
+}
+
+#[test]
+fn local_trend_use_for_fit_matches_deseq2_threshold() {
+    let use_for_fit = local_trend_use_for_fit(
+        &[0.0, 10.0, 20.0, f64::NAN, 40.0],
+        &[1.0, 5e-8, 1e-7, 1.0, f64::NAN],
+        1e-8,
+    )
+    .unwrap();
+
+    assert_eq!(use_for_fit, vec![false, false, true, false, false]);
+}
+
+#[test]
+fn fit_local_dispersion_trend_recovers_log_linear_curve() {
+    let means = vec![10.0, 20.0, 40.0, 80.0, 160.0, 320.0];
+    let disps = means
+        .iter()
+        .map(|mean| 0.8 * f64::powf(*mean, -0.35))
+        .collect::<Vec<_>>();
+
+    let fit = fit_local_dispersion_trend(
+        &means,
+        &disps,
+        LocalDispersionTrendOptions {
+            degree: 1,
+            ..LocalDispersionTrendOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(fit.genes_used, means.len());
+    assert!(!fit.used_min_disp_floor);
+    for (expected, fitted) in disps.iter().copied().zip(fit.disp_fit.iter().copied()) {
+        assert_relative_eq!(fitted, expected, epsilon = 1e-12);
+    }
+}
+
+#[test]
+fn fit_local_dispersion_trend_sorts_fit_rows_once() {
+    let means = vec![160.0, 10.0, 80.0, 20.0, 40.0];
+    let disps = means
+        .iter()
+        .map(|mean| 0.8 * f64::powf(*mean, -0.35))
+        .collect::<Vec<_>>();
+
+    let fit = fit_local_dispersion_trend(
+        &means,
+        &disps,
+        LocalDispersionTrendOptions {
+            degree: 1,
+            ..LocalDispersionTrendOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert!(fit
+        .trend
+        .log_means
+        .windows(2)
+        .all(|window| window[0] <= window[1]));
+    for (mean, expected) in means.iter().copied().zip(disps.iter().copied()) {
+        assert_relative_eq!(fit.trend.evaluate(mean).unwrap(), expected, epsilon = 1e-12);
+    }
+}
+
+#[test]
+fn local_dispersion_trend_rejects_manually_unsorted_fit_rows() {
+    let trend = LocalDispersionTrend {
+        min_disp: 1e-8,
+        span: 0.7,
+        degree: 1,
+        log_means: vec![2.0, 1.0],
+        log_disps: vec![-1.0, -2.0],
+        weights: vec![10.0, 20.0],
+    };
+
+    assert!(trend.evaluate(10.0).is_err());
+}
+
+#[test]
+fn fit_local_dispersion_trend_uses_min_disp_floor_when_all_estimates_are_near_minimum() {
+    let fit = fit_local_dispersion_trend(
+        &[10.0, 20.0, 0.0],
+        &[1e-8, 2e-8, 3e-8],
+        LocalDispersionTrendOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(fit.genes_used, 0);
+    assert!(fit.used_min_disp_floor);
+    assert_relative_eq!(fit.disp_fit[0], 1e-8, epsilon = 1e-15);
+    assert_relative_eq!(fit.disp_fit[1], 1e-8, epsilon = 1e-15);
+    assert!(fit.disp_fit[2].is_nan());
+}
+
+#[test]
+fn fit_local_dispersion_trend_returns_nan_for_missing_fitted_rows() {
+    let fit = fit_local_dispersion_trend(
+        &[10.0, 20.0, f64::NAN, 40.0],
+        &[0.1, 0.15, 0.2, 0.3],
+        LocalDispersionTrendOptions::default(),
+    )
+    .unwrap();
+
+    assert!(fit.disp_fit[0].is_finite());
+    assert!(fit.disp_fit[1].is_finite());
+    assert!(fit.disp_fit[2].is_nan());
+    assert!(fit.disp_fit[3].is_finite());
+}
+
+#[test]
+fn fit_local_dispersion_trend_validates_inputs() {
+    assert!(fit_local_dispersion_trend(
+        &[10.0, 20.0],
+        &[0.1],
+        LocalDispersionTrendOptions::default(),
+    )
+    .is_err());
+    assert!(fit_local_dispersion_trend(
+        &[10.0, 20.0],
+        &[0.1, 0.2],
+        LocalDispersionTrendOptions {
+            span: 0.0,
+            ..LocalDispersionTrendOptions::default()
+        },
+    )
+    .is_err());
+    assert!(fit_local_dispersion_trend(
+        &[10.0, 20.0],
+        &[0.1, 0.2],
+        LocalDispersionTrendOptions {
+            degree: 3,
+            ..LocalDispersionTrendOptions::default()
+        },
+    )
+    .is_err());
 }
 
 #[test]
@@ -213,4 +378,38 @@ fn builder_mean_fit_type_dispatch_populates_constant_disp_fit() {
     assert!(disp_fit[0].is_finite());
     assert_relative_eq!(disp_fit[0], disp_fit[1], epsilon = 1e-12);
     assert!(disp_fit[2].is_nan());
+}
+
+#[test]
+fn builder_local_fit_type_dispatch_populates_local_disp_fit() {
+    let counts = CountMatrix::from_row_major_u32(
+        4,
+        4,
+        vec![
+            10, 30, 10, 30, //
+            20, 60, 25, 55, //
+            40, 95, 45, 105, //
+            0, 0, 0, 0,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
+
+    let fit = DeseqBuilder::new()
+        .fit_type(FitType::Local)
+        .size_factors(vec![1.0; 4])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .fit_dispersion_trend_linear_mu(&counts, &design)
+        .unwrap();
+
+    let disp_fit = fit.disp_fit.unwrap();
+    assert_eq!(disp_fit.len(), counts.n_genes());
+    assert!(disp_fit[0].is_finite());
+    assert!(disp_fit[1].is_finite());
+    assert!(disp_fit[2].is_finite());
+    assert!(disp_fit[3].is_nan());
 }

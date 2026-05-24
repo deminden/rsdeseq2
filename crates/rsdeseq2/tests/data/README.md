@@ -11,12 +11,18 @@ Reference files should record:
 - `size_factors_ratio.tsv`, `size_factors_poscounts.tsv`,
   `normalized_counts_ratio.tsv`, `base_mean_ratio.tsv`, and
   `base_metadata_ratio.tsv`.
+- `normalization_factors.tsv`, `normalized_counts_nf.tsv`,
+  `base_metadata_nf.tsv`, `native_nf_dispersion_reference.tsv`, and
+  `native_nf_mu.tsv` for normalization-factor metadata and native
+  normalization-factor dispersion intermediates.
 - `results_wald_ratio.tsv` for future full-pipeline parity.
 - `fixed_dispersions.tsv`, `fixed_wald_reference.tsv`,
   `fixed_wald_t_reference.tsv`, `fixed_wald_weighted_reference.tsv`,
   `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`, and
   `fixed_cooks_full.tsv` for the current supplied-dispersion GLM parity checks,
   plus `fixed_lrt_weighted_reference.tsv` for weighted LRT parity.
+- `fixed_force_optim_wald_reference.tsv` and `fixed_force_optim_mu_full.tsv`
+  for the forced bounded-optimizer GLM fallback reference path.
 - `observation_weights.tsv`, `observation_weights_normalized.tsv`,
   `base_metadata_weighted.tsv` for weighted metadata checks.
 - `native_weighted_glm_mu_reference.tsv`,
@@ -28,9 +34,22 @@ Reference files should record:
   `native_weighted_glm_mu_wald_hat.tsv` for weighted GLM-mu
   dispersion/MAP/Wald/LRT intermediate checks, including gene-wise iteration
   diagnostics and the default weighted Cox-Reid gene-wise branch.
+- `parametric_trend_reference.tsv`,
+  `parametric_trend_prediction_reference.tsv`, `mean_trend_reference.tsv`,
+  `local_trend_reference.tsv`, `local_trend_prediction_reference.tsv`,
+  `local_trend_floor_reference.tsv`, and
+  `local_trend_mixed_threshold_reference.tsv` for dispersion-trend parity
+  checks.
+- `dispersion_prior_variance_reference.tsv`,
+  `dispersion_prior_variance_low_df_reference.tsv`, and
+  `map_dispersion_reference.tsv` for prior variance and MAP dispersion
+  checks. The low-df prior fixture documents DESeq2's seeded Monte Carlo/R
+  `loess` output; Rust currently checks the shared inputs and bounded output
+  contract while exact numerical identity remains future work.
 - `cooks_replacement_counts.tsv`, `cooks_replacement_design.tsv`,
   `cooks_replacement_cooks.tsv`, `cooks_replacement_size_factors.tsv`,
-  `cooks_replacement_options.tsv`, `cooks_replacement_candidate_counts.tsv`,
+  `cooks_replacement_options.tsv`, `cooks_replacement_original_counts.tsv`,
+  `cooks_replacement_candidate_counts.tsv`,
   `cooks_replacement_replaced_counts.tsv`, and
   `cooks_replacement_rows.tsv` for DESeq2 `replaceOutliers` and
   `refitWithoutOutliers` bookkeeping checks.
