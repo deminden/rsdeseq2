@@ -135,8 +135,10 @@ where
                 continue;
             }
             let (candidate_value, candidate_gradient) = objective_and_gradient(&candidate)?;
+            let armijo_bound =
+                checked_armijo_bound(value, options.armijo, actual_directional_derivative);
             if candidate_value.is_finite()
-                && candidate_value <= value + options.armijo * actual_directional_derivative
+                && armijo_bound.is_some_and(|bound| candidate_value <= bound)
             {
                 validate_state(candidate_value, &candidate_gradient, parameters.len())?;
                 accepted = Some((candidate, candidate_value, candidate_gradient));
@@ -243,30 +245,40 @@ fn projected_descent_direction(
 }
 
 fn l2_norm(values: &[f64]) -> Option<f64> {
+    let scale = values
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })?;
+    if scale == 0.0 {
+        return Some(0.0);
+    }
     let mut sum = 0.0;
     for value in values.iter().copied() {
-        let term = value * value;
+        let scaled = value / scale;
+        let term = scaled * scaled;
         let next = sum + term;
         if !term.is_finite() || !next.is_finite() {
             return None;
         }
         sum = next;
     }
-    let norm = sum.sqrt();
+    let norm = scale * sum.sqrt();
     norm.is_finite().then_some(norm)
 }
 
 fn dot(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(left.len().min(right.len()));
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
         let term = left * right;
-        let next = sum + term;
-        if !term.is_finite() || !next.is_finite() {
+        if !term.is_finite() {
             return None;
         }
-        sum = next;
+        terms.push(term);
     }
-    Some(sum)
+    scaled_sum(&terms)
 }
 
 fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
@@ -286,7 +298,7 @@ fn actual_directional_derivative(
     candidate: &[f64],
     gradient: &[f64],
 ) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(gradient.len().min(candidate.len()).min(parameters.len()));
     for (gradient, (candidate, parameter)) in gradient
         .iter()
         .copied()
@@ -294,13 +306,46 @@ fn actual_directional_derivative(
     {
         let direction = candidate - parameter;
         let term = gradient * direction;
-        let next = sum + term;
-        if !direction.is_finite() || !term.is_finite() || !next.is_finite() {
+        if !direction.is_finite() || !term.is_finite() {
+            return None;
+        }
+        terms.push(term);
+    }
+    scaled_sum(&terms)
+}
+
+fn scaled_sum(values: &[f64]) -> Option<f64> {
+    let scale = values
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })?;
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let mut sum = 0.0;
+    for value in values.iter().copied() {
+        let next = sum + value / scale;
+        if !next.is_finite() {
             return None;
         }
         sum = next;
     }
-    Some(sum)
+    let value = sum * scale;
+    value.is_finite().then_some(value)
+}
+
+fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
+    let term = armijo * derivative;
+    let bound = value + term;
+    (value.is_finite()
+        && armijo.is_finite()
+        && derivative.is_finite()
+        && term.is_finite()
+        && bound.is_finite())
+    .then_some(bound)
 }
 
 #[cfg(test)]
@@ -353,6 +398,17 @@ mod tests {
 
     #[test]
     fn scalar_helpers_reject_nonfinite_accumulation() {
+        assert_relative_eq!(
+            l2_norm(&[f64::MAX / 2.0, f64::MAX / 2.0]).unwrap(),
+            f64::MAX / 2.0 * 2.0_f64.sqrt(),
+            epsilon = 1e292
+        );
+        assert_eq!(dot(&[f64::MAX, f64::MAX], &[1.0, -1.0]).unwrap(), 0.0);
+        assert_eq!(
+            actual_directional_derivative(&[0.0, 0.0], &[1.0, 1.0], &[f64::MAX, -f64::MAX])
+                .unwrap(),
+            0.0
+        );
         assert_eq!(l2_norm(&[f64::MAX, f64::MAX]), None);
         assert_eq!(dot(&[f64::MAX], &[2.0]), None);
         assert_eq!(max_abs_difference(&[-f64::MAX], &[f64::MAX]), None);
@@ -360,6 +416,7 @@ mod tests {
             actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
             None
         );
+        assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
     }
 
     #[test]

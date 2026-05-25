@@ -820,10 +820,26 @@ fn weighted_gamma_identity_least_squares(
         }
         let x = mean.recip();
         checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT)?;
-        checked_add_assign(&mut s01, weight * x, PARAMETRIC_WLS_SUM_CONTEXT)?;
-        checked_add_assign(&mut s11, weight * x * x, PARAMETRIC_WLS_SUM_CONTEXT)?;
-        checked_add_assign(&mut t0, weight * disp, PARAMETRIC_WLS_SUM_CONTEXT)?;
-        checked_add_assign(&mut t1, weight * x * disp, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(
+            &mut s01,
+            checked_product2(weight, x, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            PARAMETRIC_WLS_SUM_CONTEXT,
+        )?;
+        checked_add_assign(
+            &mut s11,
+            checked_product3(weight, x, x, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            PARAMETRIC_WLS_SUM_CONTEXT,
+        )?;
+        checked_add_assign(
+            &mut t0,
+            checked_product2(weight, disp, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            PARAMETRIC_WLS_SUM_CONTEXT,
+        )?;
+        checked_add_assign(
+            &mut t1,
+            checked_product3(weight, x, disp, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            PARAMETRIC_WLS_SUM_CONTEXT,
+        )?;
     }
     let determinant =
         checked_product_difference(s00, s11, s01, s01, PARAMETRIC_WLS_DETERMINANT_CONTEXT)?;
@@ -860,6 +876,20 @@ fn checked_add_assign(total: &mut f64, value: f64, context: &str) -> Result<(), 
     }
     *total = next;
     Ok(())
+}
+
+fn checked_product2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let product = left * right;
+    if !left.is_finite() || !right.is_finite() || !product.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    Ok(product)
+}
+
+fn checked_product3(left: f64, middle: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    checked_product2(checked_product2(left, middle, context)?, right, context)
 }
 
 fn checked_product_difference(
@@ -1201,11 +1231,18 @@ fn local_polynomial_intercept(
             continue;
         }
         let dx = x - x0;
-        let powers = [1.0, dx, dx * dx, dx * dx * dx, dx * dx * dx * dx];
+        let dx2 = checked_option_product2(dx, dx)?;
+        let dx3 = checked_option_product2(dx2, dx)?;
+        let dx4 = checked_option_product2(dx2, dx2)?;
+        let powers = [1.0, dx, dx2, dx3, dx4];
         for row in 0..size {
-            rhs[row] += weight * powers[row] * y;
+            rhs[row] =
+                checked_option_sum2(rhs[row], checked_option_product3(weight, powers[row], y)?)?;
             for col in 0..size {
-                lhs[row][col] += weight * powers[row + col];
+                lhs[row][col] = checked_option_sum2(
+                    lhs[row][col],
+                    checked_option_product2(weight, powers[row + col])?,
+                )?;
             }
         }
     }
@@ -1223,18 +1260,39 @@ fn local_weighted_mean(
     let mut total_weight = 0.0;
     let mut mean = 0.0;
     for idx in window.0..window.1 {
-        let weight = weights[idx] * tricube_weight((xs[idx] - x0).abs(), bandwidth);
+        let weight = checked_option_product2(
+            weights[idx],
+            tricube_weight((xs[idx] - x0).abs(), bandwidth),
+        )?;
         if weight <= 0.0 {
             continue;
         }
-        let next_total = total_weight + weight;
-        if !next_total.is_finite() {
-            return None;
-        }
-        mean += (weight / next_total) * (ys[idx] - mean);
+        let next_total = checked_option_sum2(total_weight, weight)?;
+        let delta = checked_option_sub2(ys[idx], mean)?;
+        let step = checked_option_product2(weight / next_total, delta)?;
+        mean = checked_option_sum2(mean, step)?;
         total_weight = next_total;
     }
     (total_weight > 0.0 && mean.is_finite()).then_some(mean)
+}
+
+fn checked_option_sum2(left: f64, right: f64) -> Option<f64> {
+    let sum = left + right;
+    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
+}
+
+fn checked_option_product2(left: f64, right: f64) -> Option<f64> {
+    let product = left * right;
+    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
+}
+
+fn checked_option_sub2(left: f64, right: f64) -> Option<f64> {
+    let difference = left - right;
+    (left.is_finite() && right.is_finite() && difference.is_finite()).then_some(difference)
+}
+
+fn checked_option_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
+    checked_option_product2(checked_option_product2(left, middle)?, right)
 }
 
 fn solve_small_linear_system(
@@ -1259,8 +1317,14 @@ fn solve_small_linear_system(
         let pivot_value = lhs[pivot][pivot];
         for value in lhs[pivot].iter_mut().take(size).skip(pivot) {
             *value /= pivot_value;
+            if !value.is_finite() {
+                return None;
+            }
         }
         rhs[pivot] /= pivot_value;
+        if !rhs[pivot].is_finite() {
+            return None;
+        }
         let pivot_values = lhs[pivot];
         for row in 0..size {
             if row == pivot {
@@ -1271,9 +1335,11 @@ fn solve_small_linear_system(
                 continue;
             }
             for (col, pivot_entry) in pivot_values.iter().enumerate().take(size).skip(pivot) {
-                lhs[row][col] -= factor * pivot_entry;
+                let product = checked_option_product2(factor, *pivot_entry)?;
+                lhs[row][col] = checked_option_sub2(lhs[row][col], product)?;
             }
-            rhs[row] -= factor * rhs[pivot];
+            let rhs_product = checked_option_product2(factor, rhs[pivot])?;
+            rhs[row] = checked_option_sub2(rhs[row], rhs_product)?;
         }
     }
     rhs.iter()
@@ -1672,5 +1738,30 @@ mod tests {
         let rhs = [f64::INFINITY, 0.0, 0.0];
 
         assert!(solve_small_linear_system(lhs, rhs, 1).is_none());
+    }
+
+    #[test]
+    fn local_weighted_mean_rejects_nonfinite_online_update() {
+        let xs = [0.0, 0.0];
+        let ys = [f64::MAX, -f64::MAX];
+        let weights = [1.0, 1.0];
+
+        assert!(local_weighted_mean(0.0, &xs, &ys, &weights, (0, 2), 1.0).is_none());
+    }
+
+    #[test]
+    fn small_linear_solver_rejects_nonfinite_pivot_row_normalization() {
+        let lhs = [[2.0e-12, f64::MAX, 0.0], [0.0; 3], [0.0; 3]];
+        let rhs = [1.0, 0.0, 0.0];
+
+        assert!(solve_small_linear_system(lhs, rhs, 2).is_none());
+    }
+
+    #[test]
+    fn small_linear_solver_rejects_nonfinite_elimination_update() {
+        let lhs = [[1.0, f64::MAX, 0.0], [1.0, -f64::MAX, 0.0], [0.0; 3]];
+        let rhs = [1.0, 2.0, 0.0];
+
+        assert!(solve_small_linear_system(lhs, rhs, 2).is_none());
     }
 }

@@ -133,10 +133,24 @@ fn nb_log_pmf_zero_count_stays_finite_for_tiny_mu_dispersion() {
 }
 
 #[test]
-fn nb_log_pmf_rejects_nonfinite_numeric_result() {
-    let err = nbinom_log_pmf(0, f64::MAX, f64::MAX).unwrap_err();
+fn nb_log_pmf_stays_finite_when_mu_dispersion_product_overflows() {
+    let actual = nbinom_log_pmf(3, 1.0e200, 1.0e200).unwrap();
+    let size = 1.0e-200_f64;
+    let expected = ln_gamma(3.0 + size)
+        - ln_gamma(size)
+        - ln_gamma(4.0)
+        - size * (200.0_f64 * 10.0_f64.ln() + 200.0_f64 * 10.0_f64.ln());
 
-    assert!(err.to_string().contains("negative-binomial log PMF"));
+    assert!(actual.is_finite());
+    assert_relative_eq!(actual, expected, epsilon = 1e-12);
+}
+
+#[test]
+fn nb_log_pmf_keeps_extreme_zero_count_product_finite() {
+    let actual = nbinom_log_pmf(0, f64::MAX, f64::MAX).unwrap();
+
+    assert!(actual.is_finite());
+    assert_relative_eq!(actual, 0.0, epsilon = 1e-12);
 }
 
 #[test]

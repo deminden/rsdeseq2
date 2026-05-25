@@ -67,15 +67,24 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
 }
 
 fn lrt_deviance_statistic(full_log_like: f64, reduced_log_like: f64) -> Option<f64> {
-    let difference = full_log_like - reduced_log_like;
-    if !full_log_like.is_finite() || !reduced_log_like.is_finite() || !difference.is_finite() {
+    if !full_log_like.is_finite() || !reduced_log_like.is_finite() {
         return None;
     }
-    let statistic = 2.0 * difference;
+    let statistic = checked_product2(2.0, checked_sub(full_log_like, reduced_log_like)?)?;
     statistic.is_finite().then_some(statistic)
 }
 
 fn lrt_pvalue(distribution: &ChiSquared, statistic: f64) -> Option<f64> {
-    let pvalue = 1.0 - distribution.cdf(statistic.max(0.0));
+    let pvalue = distribution.sf(statistic.max(0.0));
     pvalue.is_finite().then_some(pvalue.clamp(0.0, 1.0))
+}
+
+fn checked_sub(left: f64, right: f64) -> Option<f64> {
+    let value = left - right;
+    value.is_finite().then_some(value)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let value = left * right;
+    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
 }

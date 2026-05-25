@@ -218,18 +218,23 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
     let mut values = Vec::with_capacity(design.n_samples() * design.n_coefficients());
     for (sample, weight) in weights.iter().copied().enumerate() {
         for col in 0..design.n_coefficients() {
-            let value = weight * design.matrix().get(sample, col).copied().unwrap_or(0.0);
-            if !value.is_finite() {
+            let design_value = design.matrix().get(sample, col).copied().unwrap_or(0.0);
+            let Some(value) = checked_product2(weight, design_value) else {
                 return Err(DeseqError::NonFiniteValue {
                     context: "weighted design value".to_string(),
                     index: Some(sample * design.n_coefficients() + col),
-                    value,
+                    value: weight * design_value,
                 });
-            }
+            };
             values.push(value);
         }
     }
     Ok(values)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let product = left * right;
+    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
 }
 
 fn checked_sum2(left: f64, right: f64) -> Option<f64> {

@@ -28,18 +28,14 @@ fn robust_dispersion_uses_trimmed_cell_variance_when_replicated_cells_exist() {
 }
 
 #[test]
-fn robust_dispersion_rejects_overflowed_row_mean() {
+fn robust_dispersion_keeps_large_finite_row_mean() {
     let normalized =
         RowMajorMatrix::from_row_major(1, 3, vec![f64::MAX, f64::MAX, f64::MAX]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let err = robust_method_of_moments_dispersion(&normalized, &design).unwrap_err();
+    let dispersion = robust_method_of_moments_dispersion(&normalized, &design).unwrap();
 
-    assert!(matches!(
-        err,
-        DeseqError::NonFiniteValue { context, index, .. }
-            if context == "Cook's robust dispersion mean" && index == Some(1)
-    ));
+    assert_eq!(dispersion[0], 0.04);
 }
 
 #[test]
@@ -149,6 +145,38 @@ fn replace_outlier_counts_uses_trimmed_mean_and_size_factors() {
             "s4".to_string()
         ]
     );
+}
+
+#[test]
+fn replace_outlier_counts_rejects_nonfinite_scaled_mean() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![1, 2, 3, 4]).unwrap();
+    let normalized = RowMajorMatrix::from_row_major(1, 4, vec![f64::MAX; 4]).unwrap();
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(1, 4, vec![2.0, 1.0, 1.0, 1.0]).unwrap();
+    let cooks = RowMajorMatrix::from_row_major(1, 4, vec![9.0, 0.0, 0.0, 0.0]).unwrap();
+    let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
+
+    let err = replace_outlier_counts(
+        &counts,
+        &normalized,
+        &[1.0; 4],
+        Some(&normalization_factors),
+        &cooks,
+        &design,
+        &CooksReplacementOptions {
+            trim: 0.0,
+            cooks_cutoff: 5.0,
+            min_replicates: 3,
+            which_samples: None,
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "replacement scaled mean" && index == Some(0)
+    ));
 }
 
 #[test]

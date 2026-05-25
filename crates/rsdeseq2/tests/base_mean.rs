@@ -136,14 +136,39 @@ fn base_variance_uses_sample_variance_like_row_vars() {
 fn base_metadata_rejects_nonfinite_accumulation() {
     let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, f64::MAX]).unwrap();
 
-    assert!(base_mean(&normalized)
-        .unwrap_err()
-        .to_string()
-        .contains("baseMean"));
+    let means = base_mean(&normalized).unwrap();
+    assert_eq!(means[0], f64::MAX);
+    assert_eq!(base_variance(&normalized).unwrap()[0], 0.0);
+
+    let signed = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, -f64::MAX]).unwrap();
+    assert_eq!(base_mean(&signed).unwrap()[0], 0.0);
+    assert!(
+        base_variance(&RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, 0.0]).unwrap())
+            .unwrap_err()
+            .to_string()
+            .contains("baseVar")
+    );
+}
+
+#[test]
+fn base_variance_avoids_finite_sum_squares_overflow() {
+    let deviation = (f64::MAX * 0.5).sqrt();
+    let normalized =
+        RowMajorMatrix::from_row_major(1, 4, vec![0.0, 2.0 * deviation, 0.0, 2.0 * deviation])
+            .unwrap();
+
+    let variances = base_variance(&normalized).unwrap();
+    assert_relative_eq!(variances[0], f64::MAX / 3.0 * 2.0, max_relative = 1e-12);
+}
+
+#[test]
+fn base_variance_rejects_overflowed_scaled_deviation() {
+    let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, -f64::MAX]).unwrap();
+
     assert!(base_variance(&normalized)
         .unwrap_err()
         .to_string()
-        .contains("baseVar mean"));
+        .contains("baseVar"));
 }
 
 #[test]
@@ -171,6 +196,41 @@ fn weighted_base_metadata_rejects_nonfinite_products() {
         .unwrap_err()
         .to_string()
         .contains("weighted baseMean"));
+    assert!(base_variance_with_weights(&normalized, &weights)
+        .unwrap_err()
+        .to_string()
+        .contains("weighted baseVar"));
+}
+
+#[test]
+fn weighted_base_mean_avoids_finite_sum_overflow() {
+    let normalized =
+        RowMajorMatrix::from_row_major(2, 2, vec![f64::MAX, f64::MAX, f64::MAX, -f64::MAX])
+            .unwrap();
+    let weights = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 1.0, 1.0, 1.0]).unwrap();
+
+    let means = base_mean_with_weights(&normalized, &weights).unwrap();
+    assert_eq!(means[0], f64::MAX);
+    assert_eq!(means[1], 0.0);
+}
+
+#[test]
+fn weighted_base_variance_avoids_finite_sum_squares_overflow() {
+    let deviation = (f64::MAX * 0.5).sqrt();
+    let normalized =
+        RowMajorMatrix::from_row_major(1, 4, vec![0.0, 2.0 * deviation, 0.0, 2.0 * deviation])
+            .unwrap();
+    let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, 1.0, 1.0]).unwrap();
+
+    let variances = base_variance_with_weights(&normalized, &weights).unwrap();
+    assert_relative_eq!(variances[0], f64::MAX / 3.0 * 2.0, max_relative = 1e-12);
+}
+
+#[test]
+fn weighted_base_variance_rejects_overflowed_scaled_deviation() {
+    let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, -f64::MAX]).unwrap();
+    let weights = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 1.0]).unwrap();
+
     assert!(base_variance_with_weights(&normalized, &weights)
         .unwrap_err()
         .to_string()

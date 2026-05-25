@@ -14,10 +14,18 @@ pub fn trigamma(mut x: f64) -> Result<f64, DeseqError> {
         });
     }
 
-    let mut result = 0.0;
+    let mut result = 0.0_f64;
     while x < 8.0 {
         let inv = x.recip();
-        result += inv * inv;
+        let term = inv * inv;
+        if !term.is_finite() || !result.is_finite() || !(result + term).is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "trigamma recurrence".to_string(),
+                index: None,
+                value: x,
+            });
+        }
+        result += term;
         x += 1.0;
     }
 
@@ -30,8 +38,16 @@ pub fn trigamma(mut x: f64) -> Result<f64, DeseqError> {
     let inv11 = inv9 * inv2;
     let inv13 = inv11 * inv2;
 
-    result += inv + 0.5 * inv2 + inv3 / 6.0 - inv5 / 30.0 + inv7 / 42.0 - inv9 / 30.0
+    let expansion = inv + 0.5 * inv2 + inv3 / 6.0 - inv5 / 30.0 + inv7 / 42.0 - inv9 / 30.0
         + 5.0 * inv11 / 66.0
         - 691.0 * inv13 / 2730.0;
+    if !expansion.is_finite() || !(result + expansion).is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: "trigamma asymptotic expansion".to_string(),
+            index: None,
+            value: x,
+        });
+    }
+    result += expansion;
     Ok(result)
 }

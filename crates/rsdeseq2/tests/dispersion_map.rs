@@ -56,6 +56,12 @@ fn map_dispersion_outlier_rejects_overflowed_threshold_arithmetic() {
 }
 
 #[test]
+fn map_dispersion_outlier_rejects_non_positive_threshold_multiplier() {
+    assert!(!map_dispersion_outlier(10.0, 0.1, 0.0, 0.01));
+    assert!(!map_dispersion_outlier(10.0, 0.1, -2.0, 0.01));
+}
+
+#[test]
 fn estimate_map_dispersions_runs_prior_aware_line_search() {
     let counts = one_gene_counts();
     let design = two_group_design();

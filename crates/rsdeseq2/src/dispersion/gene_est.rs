@@ -534,34 +534,22 @@ pub fn rough_dispersion_estimates(
         let mut sum = 0.0;
         for (sample, (count, fitted)) in y.iter().copied().zip(mu.iter().copied()).enumerate() {
             let fitted = fitted.max(1.0);
-            let residual = count - fitted;
+            let residual = checked_sub(count, fitted, sample, "rough dispersion residual")?;
             let inv_fitted = fitted.recip();
-            let residual_square = checked_mul(
+            let relative_residual = checked_mul(
                 residual,
-                residual,
-                sample,
-                "rough dispersion residual square",
-            )?;
-            let centered = residual_square - fitted;
-            if !centered.is_finite() {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "rough dispersion centered residual".to_string(),
-                    index: Some(sample),
-                    value: centered,
-                });
-            }
-            let inv_square = checked_mul(
-                inv_fitted,
                 inv_fitted,
                 sample,
-                "rough dispersion inverse fitted square",
+                "rough dispersion relative residual",
             )?;
-            checked_matrix_add_assign(
-                &mut sum,
-                checked_mul(centered, inv_square, sample, "rough dispersion term")?,
+            let relative_square = checked_mul(
+                relative_residual,
+                relative_residual,
                 sample,
-                "rough dispersion row sum",
+                "rough dispersion relative residual square",
             )?;
+            let term = checked_sub(relative_square, inv_fitted, sample, "rough dispersion term")?;
+            checked_matrix_add_assign(&mut sum, term, sample, "rough dispersion row sum")?;
         }
         estimates.push((sum / residual_df).max(0.0));
     }
@@ -1148,7 +1136,11 @@ fn bounded_log_alpha_proposal(
     {
         return None;
     }
-    let unclamped = log_alpha + step * direction;
+    let unclamped = checked_mul(step, direction, 0, "dispersion line-search proposal step")
+        .ok()
+        .and_then(|movement| {
+            checked_add(log_alpha, movement, 0, "dispersion line-search proposal").ok()
+        })?;
     let clamped = unclamped.clamp(lower, upper);
     let effective_step = (clamped - log_alpha) / direction;
     if effective_step.is_finite() && effective_step > 0.0 {
@@ -1444,18 +1436,14 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         });
     }
     let inv_alpha = alpha.recip();
-    let inv_alpha_squared = inv_alpha * inv_alpha;
     let mut derivative_alpha = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
-        let mu_alpha = mu * alpha;
-        let one_plus_mu_alpha = 1.0 + mu_alpha;
-        let term = digamma(inv_alpha) + mu_alpha.ln_1p()
-            - mu_alpha / one_plus_mu_alpha
-            - digamma(y + inv_alpha)
-            + y * alpha / one_plus_mu_alpha;
+        let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective derivative")?;
+        let term = digamma(inv_alpha) + mu_alpha.log1p - mu_alpha.ratio - digamma(y + inv_alpha)
+            + y * mu_alpha.alpha_over_one_plus;
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "dispersion objective derivative term".to_string(),
@@ -1475,16 +1463,11 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
             "dispersion objective derivative sum",
         )?;
     }
-    let value = inv_alpha_squared * derivative_alpha * alpha;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: "dispersion objective log-alpha derivative".to_string(),
-            index: None,
-            value,
-        })
-    }
+    checked_log_alpha_first_derivative(
+        inv_alpha,
+        derivative_alpha,
+        "dispersion objective log-alpha derivative",
+    )
 }
 
 /// Second derivative of DESeq2's NB likelihood kernel with respect to log alpha.
@@ -1534,17 +1517,14 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
-        let mu_alpha = mu * alpha;
-        let one_plus_mu_alpha = 1.0 + mu_alpha;
-        let inv_one_plus_mu_alpha = one_plus_mu_alpha.recip();
-        let first_term = digamma(inv_alpha) + mu_alpha.ln_1p()
-            - mu_alpha * inv_one_plus_mu_alpha
-            - digamma(y + inv_alpha)
-            + y * alpha * inv_one_plus_mu_alpha;
+        let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective second derivative")?;
+        let first_term =
+            digamma(inv_alpha) + mu_alpha.log1p - mu_alpha.ratio - digamma(y + inv_alpha)
+                + y * mu_alpha.alpha_over_one_plus;
         let second_term = -inv_alpha_squared * trigamma(inv_alpha)?
-            + mu * mu * alpha * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha
+            + mu_alpha.mu_squared_alpha_over_one_plus_squared
             + inv_alpha_squared * trigamma(y + inv_alpha)?
-            + y * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha;
+            + y * mu_alpha.inv_one_plus_squared;
         if !first_term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "dispersion objective second derivative first term".to_string(),
@@ -1584,16 +1564,13 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
     }
     let first_log_alpha =
         dispersion_nb_log_likelihood_kernel_derivative_weighted(counts, mu, log_alpha, weights)?;
-    let value = second_alpha_sum - 2.0 * inv_alpha * first_alpha_sum + first_log_alpha;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: "dispersion objective log-alpha second derivative".to_string(),
-            index: None,
-            value,
-        })
-    }
+    checked_log_alpha_second_derivative(
+        second_alpha_sum,
+        inv_alpha,
+        first_alpha_sum,
+        first_log_alpha,
+        "dispersion objective log-alpha second derivative",
+    )
 }
 
 /// Cox-Reid adjustment term for one gene and design matrix.
@@ -1711,10 +1688,7 @@ fn cox_reid_weighted_design_matrices_with_threshold(
     for sample in selected_samples {
         let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
-        let mu_alpha = mu * alpha;
-        let weight = mu / (1.0 + mu_alpha);
-        let d_weight = -weight * weight;
-        let d2_weight = 2.0 * weight * weight * weight;
+        let weight_terms = cox_reid_weight_terms(mu, alpha, sample)?;
         let row = design.matrix().row(sample)?;
         for (left_idx, left_col) in selected_columns.iter().copied().enumerate() {
             for (right_idx, right_col) in selected_columns.iter().copied().enumerate() {
@@ -1726,7 +1700,12 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                 )?;
                 checked_matrix_add_assign(
                     &mut xtwx[(left_idx, right_idx)],
-                    checked_mul(x_product, weight, sample, "Cox-Reid weighted design xtwx")?,
+                    checked_mul(
+                        x_product,
+                        weight_terms.weight,
+                        sample,
+                        "Cox-Reid weighted design xtwx",
+                    )?,
                     sample,
                     "Cox-Reid weighted design xtwx",
                 )?;
@@ -1734,7 +1713,7 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                     &mut d_xtwx[(left_idx, right_idx)],
                     checked_mul(
                         x_product,
-                        d_weight,
+                        weight_terms.d_weight,
                         sample,
                         "Cox-Reid weighted design derivative",
                     )?,
@@ -1745,7 +1724,7 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                     &mut d2_xtwx[(left_idx, right_idx)],
                     checked_mul(
                         x_product,
-                        d2_weight,
+                        weight_terms.d2_weight,
                         sample,
                         "Cox-Reid weighted design second derivative",
                     )?,
@@ -1922,7 +1901,7 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
         weights,
         weight_threshold,
     )?;
-    Ok(second_alpha * alpha * alpha + first_log_alpha)
+    checked_cox_reid_log_alpha_second_derivative(second_alpha, alpha, first_log_alpha)
 }
 
 /// DESeq2's log-dispersion prior kernel, omitting additive constants.
@@ -1936,8 +1915,19 @@ pub fn dispersion_prior_log_density(
         });
     }
     validate_dispersion_prior(Some(prior))?;
-    let residual = log_alpha - prior.log_mean;
-    Ok(-0.5 * residual * residual / prior.variance)
+    let residual = checked_sub(
+        log_alpha,
+        prior.log_mean,
+        0,
+        "dispersion prior log residual",
+    )?;
+    let residual_square = checked_mul(
+        residual,
+        residual,
+        0,
+        "dispersion prior log residual square",
+    )?;
+    Ok(-0.5 * residual_square / prior.variance)
 }
 
 /// Derivative of the log-dispersion prior kernel with respect to log alpha.
@@ -2039,19 +2029,27 @@ fn dispersion_log_posterior_objective(
                 feature: "Cox-Reid dispersion objective requires a design matrix".to_string(),
             });
         };
-        likelihood
-            + cox_reid_adjustment_weighted_with_threshold(
-                design,
-                input.mu,
-                log_alpha,
-                input.weights,
-                input.weight_threshold,
-            )?
+        checked_scaled_sum(
+            &[
+                likelihood,
+                cox_reid_adjustment_weighted_with_threshold(
+                    design,
+                    input.mu,
+                    log_alpha,
+                    input.weights,
+                    input.weight_threshold,
+                )?,
+            ],
+            "dispersion log posterior Cox-Reid sum",
+        )?
     } else {
         likelihood
     };
     if let Some(prior) = input.prior {
-        Ok(posterior + dispersion_prior_log_density(log_alpha, prior)?)
+        checked_scaled_sum(
+            &[posterior, dispersion_prior_log_density(log_alpha, prior)?],
+            "dispersion log posterior prior sum",
+        )
     } else {
         Ok(posterior)
     }
@@ -2135,19 +2133,27 @@ fn dispersion_log_posterior_derivative_objective(
                 feature: "Cox-Reid dispersion derivative requires a design matrix".to_string(),
             });
         };
-        likelihood
-            + cox_reid_adjustment_derivative_weighted_with_threshold(
-                design,
-                input.mu,
-                log_alpha,
-                input.weights,
-                input.weight_threshold,
-            )?
+        checked_scaled_sum(
+            &[
+                likelihood,
+                cox_reid_adjustment_derivative_weighted_with_threshold(
+                    design,
+                    input.mu,
+                    log_alpha,
+                    input.weights,
+                    input.weight_threshold,
+                )?,
+            ],
+            "dispersion log posterior derivative Cox-Reid sum",
+        )?
     } else {
         likelihood
     };
     if let Some(prior) = input.prior {
-        Ok(derivative + dispersion_prior_derivative(log_alpha, prior)?)
+        checked_scaled_sum(
+            &[derivative, dispersion_prior_derivative(log_alpha, prior)?],
+            "dispersion log posterior derivative prior sum",
+        )
     } else {
         Ok(derivative)
     }
@@ -2232,19 +2238,30 @@ fn dispersion_log_posterior_second_derivative_objective(
                     .to_string(),
             });
         };
-        likelihood
-            + cox_reid_adjustment_second_derivative_weighted_with_threshold(
-                design,
-                input.mu,
-                log_alpha,
-                input.weights,
-                input.weight_threshold,
-            )?
+        checked_scaled_sum(
+            &[
+                likelihood,
+                cox_reid_adjustment_second_derivative_weighted_with_threshold(
+                    design,
+                    input.mu,
+                    log_alpha,
+                    input.weights,
+                    input.weight_threshold,
+                )?,
+            ],
+            "dispersion log posterior second derivative Cox-Reid sum",
+        )?
     } else {
         likelihood
     };
     if let Some(prior) = input.prior {
-        Ok(second_derivative + dispersion_prior_second_derivative(log_alpha, prior)?)
+        checked_scaled_sum(
+            &[
+                second_derivative,
+                dispersion_prior_second_derivative(log_alpha, prior)?,
+            ],
+            "dispersion log posterior second derivative prior sum",
+        )
     } else {
         Ok(second_derivative)
     }
@@ -2545,6 +2562,32 @@ fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     }
 }
 
+fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left + right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left - right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
 fn checked_matrix_add_assign(
     sum: &mut f64,
     term: f64,
@@ -2573,6 +2616,202 @@ fn checked_sum_indexed(
         checked_matrix_add_assign(&mut sum, value, idx, context)?;
     }
     Ok(sum)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MuAlphaTerms {
+    log1p: f64,
+    ratio: f64,
+    alpha_over_one_plus: f64,
+    mu_squared_alpha_over_one_plus_squared: f64,
+    inv_one_plus_squared: f64,
+}
+
+fn mu_alpha_terms(
+    mu: f64,
+    alpha: f64,
+    index: usize,
+    context: &str,
+) -> Result<MuAlphaTerms, DeseqError> {
+    let mu_alpha = mu * alpha;
+    let terms = if mu_alpha.is_finite() {
+        let one_plus = 1.0 + mu_alpha;
+        let inv_one_plus = one_plus.recip();
+        let ratio = mu_alpha * inv_one_plus;
+        let alpha_over_one_plus = alpha * inv_one_plus;
+        let inv_one_plus_squared = checked_mul(
+            inv_one_plus,
+            inv_one_plus,
+            index,
+            &format!("{context} inverse denominator square"),
+        )?;
+        let ratio_squared = checked_mul(
+            ratio,
+            ratio,
+            index,
+            &format!("{context} mean-dispersion ratio square"),
+        )?;
+        let mu_squared_alpha_over_one_plus_squared = checked_mul(
+            ratio_squared,
+            alpha.recip(),
+            index,
+            &format!("{context} mean curvature term"),
+        )?;
+        MuAlphaTerms {
+            log1p: mu_alpha.ln_1p(),
+            ratio,
+            alpha_over_one_plus,
+            mu_squared_alpha_over_one_plus_squared,
+            inv_one_plus_squared,
+        }
+    } else {
+        let log1p = mu.ln() + alpha.ln();
+        let alpha_over_one_plus = mu.recip();
+        let mu_squared_alpha_over_one_plus_squared = alpha.recip();
+        MuAlphaTerms {
+            log1p,
+            ratio: 1.0,
+            alpha_over_one_plus,
+            mu_squared_alpha_over_one_plus_squared,
+            inv_one_plus_squared: 0.0,
+        }
+    };
+    for value in [
+        terms.log1p,
+        terms.ratio,
+        terms.alpha_over_one_plus,
+        terms.mu_squared_alpha_over_one_plus_squared,
+        terms.inv_one_plus_squared,
+    ] {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(index),
+                value,
+            });
+        }
+    }
+    Ok(terms)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CoxReidWeightTerms {
+    weight: f64,
+    d_weight: f64,
+    d2_weight: f64,
+}
+
+fn cox_reid_weight_terms(
+    mu: f64,
+    alpha: f64,
+    index: usize,
+) -> Result<CoxReidWeightTerms, DeseqError> {
+    let mu_alpha = mu_alpha_terms(mu, alpha, index, "Cox-Reid working weight")?;
+    let weight = checked_mul(
+        mu_alpha.ratio,
+        alpha.recip(),
+        index,
+        "Cox-Reid working weight",
+    )?;
+    let weight_square = checked_mul(weight, weight, index, "Cox-Reid working weight square")?;
+    let d_weight = -weight_square;
+    let d2_weight = checked_mul(
+        2.0,
+        checked_mul(weight_square, weight, index, "Cox-Reid working weight cube")?,
+        index,
+        "Cox-Reid working second derivative weight",
+    )?;
+    Ok(CoxReidWeightTerms {
+        weight,
+        d_weight,
+        d2_weight,
+    })
+}
+
+fn checked_scaled_sum(values: &[f64], context: &str) -> Result<f64, DeseqError> {
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: None,
+                value,
+            });
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let mut normalized_sum = 0.0;
+    for value in values.iter().copied() {
+        let term = value / scale;
+        let next = normalized_sum + term;
+        if !term.is_finite() || !next.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: None,
+                value: next,
+            });
+        }
+        normalized_sum = next;
+    }
+    let sum = normalized_sum * scale;
+    if sum.is_finite() {
+        Ok(sum)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value: sum,
+        })
+    }
+}
+
+fn checked_log_alpha_first_derivative(
+    inv_alpha: f64,
+    derivative_alpha: f64,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    checked_mul(inv_alpha, derivative_alpha, 0, context)
+}
+
+fn checked_log_alpha_second_derivative(
+    second_alpha_sum: f64,
+    inv_alpha: f64,
+    first_alpha_sum: f64,
+    first_log_alpha: f64,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let alpha_first_scale = checked_mul(2.0, inv_alpha, 0, context)?;
+    let alpha_first_term = -checked_mul(alpha_first_scale, first_alpha_sum, 0, context)?;
+    checked_scaled_sum(
+        &[second_alpha_sum, alpha_first_term, first_log_alpha],
+        context,
+    )
+}
+
+fn checked_cox_reid_log_alpha_second_derivative(
+    second_alpha: f64,
+    alpha: f64,
+    first_log_alpha: f64,
+) -> Result<f64, DeseqError> {
+    let alpha_squared = checked_mul(
+        alpha,
+        alpha,
+        0,
+        "Cox-Reid log-alpha second derivative alpha square",
+    )?;
+    let alpha_term = checked_mul(
+        second_alpha,
+        alpha_squared,
+        0,
+        "Cox-Reid log-alpha second derivative alpha term",
+    )?;
+    checked_scaled_sum(
+        &[alpha_term, first_log_alpha],
+        "Cox-Reid log-alpha second derivative",
+    )
 }
 
 fn validate_observation_weight_slice(
@@ -2639,6 +2878,103 @@ mod tests {
     #[test]
     fn bounded_log_alpha_proposal_rejects_no_movement_at_bound() {
         assert!(bounded_log_alpha_proposal(10.0, 2.0, 1.0, -30.0, 10.0).is_none());
+    }
+
+    #[test]
+    fn bounded_log_alpha_proposal_rejects_overflowed_step() {
+        assert!(bounded_log_alpha_proposal(0.0, f64::MAX, 2.0, -30.0, 10.0).is_none());
+    }
+
+    #[test]
+    fn checked_log_alpha_first_derivative_uses_reduced_product() {
+        let value =
+            checked_log_alpha_first_derivative(0.5, f64::MAX / 2.0, "test derivative").unwrap();
+
+        assert_eq!(value, f64::MAX / 4.0);
+    }
+
+    #[test]
+    fn checked_log_alpha_second_derivative_keeps_cancelling_large_terms() {
+        let value = checked_log_alpha_second_derivative(
+            f64::MAX / 2.0,
+            0.5,
+            f64::MAX / 2.0,
+            1.25,
+            "test second derivative",
+        )
+        .unwrap();
+
+        assert!((value - 1.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn checked_cox_reid_log_alpha_second_derivative_rejects_alpha_square_overflow() {
+        let err = checked_cox_reid_log_alpha_second_derivative(1.0, f64::MAX, 0.0).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "Cox-Reid log-alpha second derivative alpha square"
+                    && index == Some(0)
+        ));
+    }
+
+    #[test]
+    fn mu_alpha_terms_keep_overflowed_product_finite() {
+        let terms = mu_alpha_terms(f64::MAX / 2.0, 4.0, 0, "test mean-dispersion terms").unwrap();
+
+        assert!(terms.log1p.is_finite());
+        assert_eq!(terms.ratio, 1.0);
+        assert_eq!(terms.inv_one_plus_squared, 0.0);
+        assert!(terms.alpha_over_one_plus.is_finite());
+        assert_eq!(terms.mu_squared_alpha_over_one_plus_squared, 0.25);
+    }
+
+    #[test]
+    fn dispersion_derivatives_keep_overflowed_mu_alpha_products_finite() {
+        let counts = [0, 10];
+        let mu = [f64::MAX / 2.0, f64::MAX / 3.0];
+        let log_alpha = 4.0_f64.ln();
+
+        let derivative =
+            dispersion_nb_log_likelihood_kernel_derivative(&counts, &mu, log_alpha).unwrap();
+        let second_derivative =
+            dispersion_nb_log_likelihood_kernel_second_derivative(&counts, &mu, log_alpha).unwrap();
+
+        assert!(derivative.is_finite());
+        assert!(second_derivative.is_finite());
+    }
+
+    #[test]
+    fn cox_reid_weight_terms_keep_overflowed_mu_alpha_product_finite() {
+        let terms = cox_reid_weight_terms(f64::MAX / 2.0, 4.0, 0).unwrap();
+
+        assert_eq!(terms.weight, 0.25);
+        assert_eq!(terms.d_weight, -0.0625);
+        assert_eq!(terms.d2_weight, 0.03125);
+    }
+
+    #[test]
+    fn cox_reid_weight_terms_reject_overflowed_square() {
+        let err = cox_reid_weight_terms(f64::MAX / 2.0, f64::MIN_POSITIVE, 0).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "Cox-Reid working weight square" && index == Some(0)
+        ));
+    }
+
+    #[test]
+    fn dispersion_prior_log_density_rejects_overflowed_residual_square() {
+        let prior = DispersionPrior::new(0.0, 1.0).unwrap();
+        let err = dispersion_prior_log_density(f64::MAX, prior).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "dispersion prior log residual square" && index == Some(0)
+        ));
     }
 
     #[test]

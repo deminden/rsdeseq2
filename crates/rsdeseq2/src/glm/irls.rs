@@ -300,7 +300,9 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             (0..p).for_each(|_| beta_var_values.push(f64::NAN));
             (0..p * p).for_each(|_| beta_covariance_values.push(f64::NAN));
             hat_values.extend(vec![f64::NAN; counts.n_samples()]);
-            beta_values.extend(beta.iter().map(|value| std::f64::consts::LOG2_E * value));
+            for (col, value) in beta.iter().copied().enumerate() {
+                beta_values.push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
+            }
             let output_mu = fitted_mu_unfloored(&x, &beta, nf)?;
             mu_values.extend(output_mu.iter().copied());
             beta_iter.push(iter);
@@ -308,18 +310,24 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             continue;
         };
 
-        beta_values.extend(beta.iter().map(|value| std::f64::consts::LOG2_E * value));
+        for (col, value) in beta.iter().copied().enumerate() {
+            beta_values.push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
+        }
         for diagonal in 0..p {
             let value = beta_covariance[diagonal * p + diagonal];
-            beta_var_values.push(std::f64::consts::LOG2_E * value.max(0.0).sqrt());
+            beta_var_values.push(checked_log2_standard_error(
+                value,
+                diagonal,
+                "IRLS beta standard error",
+            )?);
         }
-        let log2_e = std::f64::consts::LOG2_E;
-        let log2_e_squared = log2_e * log2_e;
-        beta_covariance_values.extend(
-            beta_covariance
-                .into_iter()
-                .map(|value| log2_e_squared * value),
-        );
+        for (idx, value) in beta_covariance.into_iter().enumerate() {
+            beta_covariance_values.push(checked_log2_covariance(
+                value,
+                idx,
+                "IRLS beta covariance log2 scale",
+            )?);
+        }
         let output_mu = fitted_mu_unfloored(&x, &beta, nf)?;
         mu_values.extend(output_mu.iter().copied());
         hat_values.extend(hat_diag);
@@ -453,13 +461,18 @@ fn refit_optim_fallback_rows(
         for (col, value) in output.parameters.iter().copied().enumerate() {
             beta_values[gene * p + col] = value;
             let covariance_value = beta_covariance[col * p + col];
-            beta_var_values[gene * p + col] =
-                std::f64::consts::LOG2_E * covariance_value.max(0.0).sqrt();
+            beta_var_values[gene * p + col] = checked_log2_standard_error(
+                covariance_value,
+                gene * p + col,
+                "optim fallback beta standard error",
+            )?;
         }
-        let log2_e = std::f64::consts::LOG2_E;
-        let log2_e_squared = log2_e * log2_e;
         for (idx, value) in beta_covariance.into_iter().enumerate() {
-            beta_covariance_values[gene * p * p + idx] = log2_e_squared * value;
+            beta_covariance_values[gene * p * p + idx] = checked_log2_covariance(
+                value,
+                gene * p * p + idx,
+                "optim fallback beta covariance log2 scale",
+            )?;
         }
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;
@@ -620,7 +633,9 @@ fn minimize_beta_log2_newton(
             }
             let (candidate_value, candidate_gradient, candidate_hessian) =
                 beta_log2_objective_gradient_hessian(&input, &candidate)?;
-            if candidate_value <= value + options.armijo * actual_directional_derivative {
+            if checked_armijo_bound(value, options.armijo, actual_directional_derivative)
+                .is_some_and(|bound| candidate_value <= bound)
+            {
                 accepted = Some((
                     candidate,
                     candidate_value,
@@ -699,7 +714,9 @@ fn beta_log2_objective_gradient_hessian(
         validate_nonnegative_finite(weight, "weight", sample)?;
         let mut eta = 0.0;
         for (col, beta_value) in beta.iter().copied().enumerate().take(p) {
-            let term = input.x[(sample, col)] * beta_value;
+            let Some(term) = checked_product2(input.x[(sample, col)], beta_value) else {
+                return Ok(beta_optim_penalty(p));
+            };
             let Some(next_eta) = checked_sum2(eta, term) else {
                 return Ok(beta_optim_penalty(p));
             };
@@ -710,40 +727,67 @@ fn beta_log2_objective_gradient_hessian(
             return Ok(beta_optim_penalty(p));
         }
         let log_pmf = nbinom_log_pmf(input.counts[sample], mu, input.dispersion)?;
-        let weighted_log_pmf = weight * log_pmf;
+        let Some(weighted_log_pmf) = checked_product2(weight, log_pmf) else {
+            return Ok(beta_optim_penalty(p));
+        };
         let Some(next_log_like) = checked_sum2(log_like, weighted_log_pmf) else {
             return Ok(beta_optim_penalty(p));
         };
         log_like = next_log_like;
-        let one_plus_disp_mu = 1.0 + input.dispersion * mu;
+        let Some(disp_mu) = checked_product2(input.dispersion, mu) else {
+            return Ok(beta_optim_penalty(p));
+        };
+        let Some(one_plus_disp_mu) = checked_sum2(1.0, disp_mu) else {
+            return Ok(beta_optim_penalty(p));
+        };
         if !one_plus_disp_mu.is_finite() || one_plus_disp_mu <= 0.0 {
             return Ok(beta_optim_penalty(p));
         }
         let inv_one_plus_disp_mu = one_plus_disp_mu.recip();
-        let sample_score =
-            weight * ln2 * (f64::from(input.counts[sample]) - mu) * inv_one_plus_disp_mu;
-        if !sample_score.is_finite() {
+        let count_residual = f64::from(input.counts[sample]) - mu;
+        if !count_residual.is_finite() {
             return Ok(beta_optim_penalty(p));
         }
+        let Some(sample_score) =
+            checked_product4(weight, ln2, count_residual, inv_one_plus_disp_mu)
+        else {
+            return Ok(beta_optim_penalty(p));
+        };
         for (col, gradient_value) in gradient.iter_mut().enumerate().take(p) {
-            let term = -input.x[(sample, col)] * sample_score;
+            let Some(term) = checked_product2(-input.x[(sample, col)], sample_score) else {
+                return Ok(beta_optim_penalty(p));
+            };
             let Some(next_gradient) = checked_sum2(*gradient_value, term) else {
                 return Ok(beta_optim_penalty(p));
             };
             *gradient_value = next_gradient;
         }
-        let sample_hessian_weight = weight
-            * ln2_squared
-            * mu
-            * (1.0 + input.dispersion * f64::from(input.counts[sample]))
-            * inv_one_plus_disp_mu
-            * inv_one_plus_disp_mu;
-        if !sample_hessian_weight.is_finite() {
+        let Some(disp_count) = checked_product2(input.dispersion, f64::from(input.counts[sample]))
+        else {
             return Ok(beta_optim_penalty(p));
-        }
+        };
+        let Some(one_plus_disp_count) = checked_sum2(1.0, disp_count) else {
+            return Ok(beta_optim_penalty(p));
+        };
+        let Some(sample_hessian_weight) = checked_product6(
+            weight,
+            ln2_squared,
+            mu,
+            one_plus_disp_count,
+            inv_one_plus_disp_mu,
+            inv_one_plus_disp_mu,
+        ) else {
+            return Ok(beta_optim_penalty(p));
+        };
         for row in 0..p {
             for col in 0..p {
-                let term = input.x[(sample, row)] * sample_hessian_weight * input.x[(sample, col)];
+                let Some(term) = checked_product3(
+                    input.x[(sample, row)],
+                    sample_hessian_weight,
+                    input.x[(sample, col)],
+                ) else {
+                    return Ok(beta_optim_penalty(p));
+                };
                 let Some(next_hessian) = checked_sum2(hessian[(row, col)], term) else {
                     return Ok(beta_optim_penalty(p));
                 };
@@ -758,9 +802,15 @@ fn beta_log2_objective_gradient_hessian(
     }
     for col in 0..p {
         validate_nonnegative_finite(input.ridge_lambda[col], "ridge lambda", col)?;
-        let ridge_log2 = input.ridge_lambda[col] * ln2_squared;
-        let objective_term = 0.5 * ridge_log2 * beta[col] * beta[col];
-        let gradient_term = ridge_log2 * beta[col];
+        let Some(ridge_log2) = checked_product2(input.ridge_lambda[col], ln2_squared) else {
+            return Ok(beta_optim_penalty(p));
+        };
+        let Some(objective_term) = checked_product4(0.5, ridge_log2, beta[col], beta[col]) else {
+            return Ok(beta_optim_penalty(p));
+        };
+        let Some(gradient_term) = checked_product2(ridge_log2, beta[col]) else {
+            return Ok(beta_optim_penalty(p));
+        };
         let Some(next_objective) = checked_sum2(objective, objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
@@ -834,6 +884,23 @@ fn projected_gradient_norm(
     lower: f64,
     upper: f64,
 ) -> Option<f64> {
+    let scale = parameters
+        .iter()
+        .copied()
+        .zip(gradient.iter().copied())
+        .map(|(parameter, gradient)| {
+            if (parameter <= lower && gradient > 0.0) || (parameter >= upper && gradient < 0.0) {
+                0.0
+            } else {
+                gradient.abs()
+            }
+        })
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })?;
+    if scale == 0.0 {
+        return Some(0.0);
+    }
     let mut sum = 0.0;
     for (parameter, gradient) in parameters.iter().copied().zip(gradient.iter().copied()) {
         let value =
@@ -842,30 +909,81 @@ fn projected_gradient_norm(
             } else {
                 gradient
             };
-        let term = value * value;
+        let scaled = value / scale;
+        let term = scaled * scaled;
         let next = sum + term;
         if !term.is_finite() || !next.is_finite() {
             return None;
         }
         sum = next;
     }
-    let norm = sum.sqrt();
+    let norm = scale * sum.sqrt();
     norm.is_finite().then_some(norm)
 }
 
 fn checked_dot(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(left.len().min(right.len()));
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let term = left * right;
-        let next = checked_sum2(sum, term)?;
-        sum = next;
+        terms.push(checked_product2(left, right)?);
     }
-    Some(sum)
+    checked_scaled_sum(&terms)
 }
 
 fn checked_sum2(left: f64, right: f64) -> Option<f64> {
     let sum = left + right;
     (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
+}
+
+fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
+    let scale = values
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })?;
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let mut sum = 0.0;
+    for value in values.iter().copied() {
+        sum = checked_sum2(sum, value / scale)?;
+    }
+    checked_product2(sum, scale)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let product = left * right;
+    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
+}
+
+fn checked_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
+    checked_product2(checked_product2(left, middle)?, right)
+}
+
+fn checked_product4(first: f64, second: f64, third: f64, fourth: f64) -> Option<f64> {
+    checked_product2(
+        checked_product2(first, second)?,
+        checked_product2(third, fourth)?,
+    )
+}
+
+fn checked_product6(
+    first: f64,
+    second: f64,
+    third: f64,
+    fourth: f64,
+    fifth: f64,
+    sixth: f64,
+) -> Option<f64> {
+    checked_product2(
+        checked_product3(first, second, third)?,
+        checked_product3(fourth, fifth, sixth)?,
+    )
+}
+
+fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
+    checked_sum2(value, checked_product2(armijo, derivative)?)
 }
 
 fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
@@ -885,21 +1003,19 @@ fn actual_directional_derivative(
     candidate: &[f64],
     gradient: &[f64],
 ) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(gradient.len().min(candidate.len()).min(parameters.len()));
     for (gradient, (candidate, parameter)) in gradient
         .iter()
         .copied()
         .zip(candidate.iter().copied().zip(parameters.iter().copied()))
     {
         let direction = candidate - parameter;
-        let term = gradient * direction;
-        let next = sum + term;
-        if !direction.is_finite() || !term.is_finite() || !next.is_finite() {
+        if !direction.is_finite() {
             return None;
         }
-        sum = next;
+        terms.push(checked_product2(gradient, direction)?);
     }
-    Some(sum)
+    checked_scaled_sum(&terms)
 }
 
 fn initial_beta(x: &DMatrix<f64>, y: &[f64], nf: &[f64]) -> Result<DVector<f64>, DeseqError> {
@@ -1008,23 +1124,19 @@ fn fitted_mu_impl(
 }
 
 fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(x.ncols());
     for col in 0..x.ncols() {
-        let term = x[(row, col)] * beta[col];
-        let next = checked_sum2(sum, term)?;
-        sum = next;
+        terms.push(checked_product2(x[(row, col)], beta[col])?);
     }
-    Some(sum)
+    checked_scaled_sum(&terms)
 }
 
 fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> Option<f64> {
-    let mut sum = 0.0;
+    let mut terms = Vec::with_capacity(x.ncols());
     for col in 0..x.ncols() {
-        let term = x[(row, col)] * beta[col];
-        let next = checked_sum2(sum, term)?;
-        sum = next;
+        terms.push(checked_product2(x[(row, col)], beta[col])?);
     }
-    Some(sum)
+    checked_scaled_sum(&terms)
 }
 
 fn working_weights(
@@ -1074,7 +1186,7 @@ fn solve_weighted_least_squares(
 ) -> Option<DVector<f64>> {
     match solver {
         IrlsSolver::NormalEquations => {
-            let (xtwx, xtwz) = xtwx_and_xtwz(x, w, z, ridge_lambda);
+            let (xtwx, xtwz) = xtwx_and_xtwz(x, w, z, ridge_lambda)?;
             xtwx.lu().solve(&xtwz)
         }
         IrlsSolver::Qr => solve_weighted_least_squares_qr(x, w, z, ridge_lambda),
@@ -1096,9 +1208,9 @@ fn solve_weighted_least_squares_qr(
         if !sqrt_weight.is_finite() {
             return None;
         }
-        augmented_z[row] = z[row] * sqrt_weight;
+        augmented_z[row] = checked_product2(z[row], sqrt_weight)?;
         for col in 0..p {
-            augmented_x[(row, col)] = x[(row, col)] * sqrt_weight;
+            augmented_x[(row, col)] = checked_product2(x[(row, col)], sqrt_weight)?;
         }
     }
     for col in 0..p {
@@ -1119,26 +1231,36 @@ fn covariance_and_hat_diagonal(
     ridge_lambda: &[f64],
 ) -> Option<(Vec<f64>, Vec<f64>)> {
     let zeros = vec![0.0; x.nrows()];
-    let (xtwx_ridge, _) = xtwx_and_xtwz(x, w, &zeros, ridge_lambda);
-    let xtwx = xtwx_without_ridge(x, w);
+    let (xtwx_ridge, _) = xtwx_and_xtwz(x, w, &zeros, ridge_lambda)?;
+    let xtwx = xtwx_without_ridge(x, w)?;
     let inverse = xtwx_ridge.try_inverse()?;
     let sigma = &inverse * xtwx * &inverse;
     let mut beta_covariance = Vec::with_capacity(x.ncols() * x.ncols());
     for row in 0..x.ncols() {
         for col in 0..x.ncols() {
-            beta_covariance.push(sigma[(row, col)]);
+            let value = sigma[(row, col)];
+            if !value.is_finite() {
+                return None;
+            }
+            beta_covariance.push(value);
         }
     }
     let mut hat = Vec::with_capacity(x.nrows());
     for sample in 0..x.nrows() {
         let mut value = 0.0;
+        let sqrt_weight = w[sample].sqrt();
+        if !sqrt_weight.is_finite() {
+            return None;
+        }
         for left in 0..x.ncols() {
             for right in 0..x.ncols() {
-                value += x[(sample, left)]
-                    * w[sample].sqrt()
-                    * x[(sample, right)]
-                    * w[sample].sqrt()
-                    * inverse[(right, left)];
+                let weighted_left = checked_product2(x[(sample, left)], sqrt_weight)?;
+                let weighted_right = checked_product2(x[(sample, right)], sqrt_weight)?;
+                let weighted_product = checked_product2(weighted_left, weighted_right)?;
+                value = checked_sum2(
+                    value,
+                    checked_product2(weighted_product, inverse[(right, left)])?,
+                )?;
             }
         }
         hat.push(value);
@@ -1151,33 +1273,43 @@ fn xtwx_and_xtwz(
     w: &[f64],
     z: &[f64],
     ridge_lambda: &[f64],
-) -> (DMatrix<f64>, DVector<f64>) {
+) -> Option<(DMatrix<f64>, DVector<f64>)> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
     let mut xtwz = DVector::zeros(x.ncols());
     for sample in 0..x.nrows() {
         for col in 0..x.ncols() {
-            xtwz[col] += x[(sample, col)] * w[sample] * z[sample];
+            xtwz[col] = checked_sum2(
+                xtwz[col],
+                checked_product3(x[(sample, col)], w[sample], z[sample])?,
+            )?;
             for row in 0..x.ncols() {
-                xtwx[(row, col)] += x[(sample, row)] * w[sample] * x[(sample, col)];
+                xtwx[(row, col)] = checked_sum2(
+                    xtwx[(row, col)],
+                    checked_product3(x[(sample, row)], w[sample], x[(sample, col)])?,
+                )?;
             }
         }
     }
     for diagonal in 0..x.ncols() {
-        xtwx[(diagonal, diagonal)] += ridge_lambda[diagonal];
+        xtwx[(diagonal, diagonal)] =
+            checked_sum2(xtwx[(diagonal, diagonal)], ridge_lambda[diagonal])?;
     }
-    (xtwx, xtwz)
+    Some((xtwx, xtwz))
 }
 
-fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> DMatrix<f64> {
+fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
     for sample in 0..x.nrows() {
         for col in 0..x.ncols() {
             for row in 0..x.ncols() {
-                xtwx[(row, col)] += x[(sample, row)] * w[sample] * x[(sample, col)];
+                xtwx[(row, col)] = checked_sum2(
+                    xtwx[(row, col)],
+                    checked_product3(x[(sample, row)], w[sample], x[(sample, col)])?,
+                )?;
             }
         }
     }
-    xtwx
+    Some(xtwx)
 }
 
 fn normalization_factors_from_size_factors(
@@ -1290,6 +1422,43 @@ fn validate_nonnegative_finite(value: f64, context: &str, index: usize) -> Resul
     Ok(())
 }
 
+fn checked_log2_scale(value: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let scaled = std::f64::consts::LOG2_E * value;
+    if scaled.is_finite() {
+        Ok(scaled)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value: scaled,
+        })
+    }
+}
+
+fn checked_log2_standard_error(
+    covariance: f64,
+    index: usize,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let se = covariance.max(0.0).sqrt();
+    checked_log2_scale(se, index, context)
+}
+
+fn checked_log2_covariance(value: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let log2_e = std::f64::consts::LOG2_E;
+    let log2_e_squared = checked_log2_scale(log2_e, index, context)?;
+    let scaled = log2_e_squared * value;
+    if scaled.is_finite() {
+        Ok(scaled)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value: scaled,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1301,6 +1470,20 @@ mod tests {
         let direction = bounded_beta_descent_direction(&[0.0], &hessian, &[4.0], -30.0, 30.0);
 
         assert_relative_eq!(direction[0], -2.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn log2_output_scaling_rejects_nonfinite_values() {
+        assert!(matches!(
+            checked_log2_scale(f64::MAX, 0, "test beta scale"),
+            Err(DeseqError::NonFiniteValue { context, index, .. })
+                if context == "test beta scale" && index == Some(0)
+        ));
+        assert!(matches!(
+            checked_log2_covariance(f64::MAX, 1, "test covariance scale"),
+            Err(DeseqError::NonFiniteValue { context, index, .. })
+                if context == "test covariance scale" && index == Some(1)
+        ));
     }
 
     #[test]
@@ -1328,9 +1511,24 @@ mod tests {
 
     #[test]
     fn bounded_beta_numeric_helpers_reject_nonfinite_accumulation() {
+        assert_relative_eq!(
+            projected_gradient_norm(&[0.0, 0.0], &[f64::MAX / 2.0, f64::MAX / 2.0], -30.0, 30.0)
+                .unwrap(),
+            f64::MAX / 2.0 * 2.0_f64.sqrt(),
+            epsilon = 1e292
+        );
         assert_eq!(
-            projected_gradient_norm(&[0.0], &[f64::MAX], -30.0, 30.0),
+            projected_gradient_norm(&[0.0, 0.0], &[f64::MAX, f64::MAX], -30.0, 30.0),
             None
+        );
+        assert_eq!(
+            checked_dot(&[f64::MAX, f64::MAX], &[1.0, -1.0]).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            actual_directional_derivative(&[0.0, 0.0], &[1.0, 1.0], &[f64::MAX, -f64::MAX])
+                .unwrap(),
+            0.0
         );
         assert_eq!(checked_dot(&[f64::MAX], &[2.0]), None);
         assert_eq!(max_abs_difference(&[-f64::MAX], &[f64::MAX]), None);
@@ -1338,6 +1536,17 @@ mod tests {
             actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
             None
         );
+        assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
+    }
+
+    #[test]
+    fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
+        let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
+        assert!(xtwx_and_xtwz(&x, &[2.0], &[1.0], &[0.0]).is_none());
+        assert!(xtwx_without_ridge(&x, &[2.0]).is_none());
+
+        let unit_x = DMatrix::from_row_slice(1, 1, &[1.0]);
+        assert!(solve_weighted_least_squares_qr(&unit_x, &[4.0], &[f64::MAX], &[0.0]).is_none());
     }
 
     #[test]

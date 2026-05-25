@@ -23,7 +23,11 @@ pub fn median(values: &[f64]) -> Result<f64, DeseqError> {
     if sorted.len() % 2 == 1 {
         Ok(sorted[mid])
     } else {
-        Ok((sorted[mid - 1] + sorted[mid]) / 2.0)
+        midpoint(sorted[mid - 1], sorted[mid]).ok_or_else(|| DeseqError::NonFiniteValue {
+            context: "median midpoint".to_string(),
+            index: None,
+            value: sorted[mid - 1],
+        })
     }
 }
 
@@ -42,8 +46,13 @@ pub fn median_finite(values: &[f64]) -> Option<f64> {
     if sorted.len() % 2 == 1 {
         Some(sorted[mid])
     } else {
-        Some((sorted[mid - 1] + sorted[mid]) / 2.0)
+        midpoint(sorted[mid - 1], sorted[mid])
     }
+}
+
+fn midpoint(left: f64, right: f64) -> Option<f64> {
+    let value = left + (right - left) / 2.0;
+    value.is_finite().then_some(value)
 }
 
 #[cfg(test)]
@@ -58,6 +67,12 @@ mod tests {
     #[test]
     fn median_even_length() {
         assert_eq!(median(&[4.0, 1.0, 2.0, 3.0]).unwrap(), 2.5);
+    }
+
+    #[test]
+    fn median_even_large_values_avoids_midpoint_overflow() {
+        assert_eq!(median(&[f64::MAX, f64::MAX]).unwrap(), f64::MAX);
+        assert_eq!(median_finite(&[f64::MAX, f64::MAX]), Some(f64::MAX));
     }
 
     #[test]

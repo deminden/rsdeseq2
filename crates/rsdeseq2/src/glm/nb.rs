@@ -57,7 +57,13 @@ pub fn nbinom_log_likelihood_weighted(
             Some(weights) => {
                 let weight = weights[idx];
                 validate_weight(weight, Some(idx))?;
-                weight * term
+                checked_weighted_log_likelihood_term(weight, term).ok_or_else(|| {
+                    DeseqError::InvalidDispersion {
+                        reason: format!(
+                            "negative-binomial weighted log-likelihood term at sample {idx} must be finite"
+                        ),
+                    }
+                })?
             }
             None => term,
         };
@@ -126,15 +132,26 @@ fn nbinom_log_pmf_unchecked(count: u32, mu: f64, dispersion: f64) -> f64 {
     let y = f64::from(count);
     let size = dispersion.recip();
     let mu_dispersion = mu * dispersion;
-    ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0) - size * mu_dispersion.ln_1p()
+    ln_gamma(y + size)
+        - ln_gamma(size)
+        - ln_gamma(y + 1.0)
+        - size * log1p_mu_dispersion(mu, dispersion, mu_dispersion)
         + count_log_term(y, mu_dispersion)
 }
 
 fn count_log_term(y: f64, mu_dispersion: f64) -> f64 {
-    if y == 0.0 {
+    if y == 0.0 || (mu_dispersion.is_infinite() && mu_dispersion.is_sign_positive()) {
         0.0
     } else {
-        y * (mu_dispersion.ln() - mu_dispersion.ln_1p())
+        -y * mu_dispersion.recip().ln_1p()
+    }
+}
+
+fn log1p_mu_dispersion(mu: f64, dispersion: f64, mu_dispersion: f64) -> f64 {
+    if mu_dispersion.is_finite() {
+        mu_dispersion.ln_1p()
+    } else {
+        mu.ln() + dispersion.ln()
     }
 }
 
@@ -205,6 +222,11 @@ fn validate_weighted_log_likelihood_term(
         });
     }
     Ok(())
+}
+
+fn checked_weighted_log_likelihood_term(weight: f64, term: f64) -> Option<f64> {
+    let product = weight * term;
+    (weight.is_finite() && term.is_finite() && product.is_finite()).then_some(product)
 }
 
 fn checked_add_log_likelihood(total: &mut f64, term: f64) -> Result<(), DeseqError> {

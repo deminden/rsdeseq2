@@ -266,18 +266,25 @@ pub fn contrast_all_zero_numeric(
     let mut selected_samples = Vec::with_capacity(design.n_samples());
     for sample in 0..design.n_samples() {
         let row = design.matrix().row(sample)?;
-        let mut score = 0.0;
+        let mut terms = Vec::with_capacity(row.len());
         for (design_value, contrast_value) in row.iter().zip(contrast_binary.iter()) {
             let term = design_value * contrast_value;
-            let Some(next_score) = checked_sum2(score, term) else {
+            if !term.is_finite() {
                 return Err(DeseqError::NonFiniteValue {
                     context: "contrastAllZero design score".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
                 });
-            };
-            score = next_score;
+            }
+            terms.push(term);
         }
+        let Some(score) = checked_scaled_sum(&terms) else {
+            return Err(DeseqError::NonFiniteValue {
+                context: "contrastAllZero design score".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            });
+        };
         selected_samples.push(score != 0.0);
     }
 
@@ -294,9 +301,28 @@ pub fn contrast_all_zero_numeric(
     Ok(flags)
 }
 
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
+fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
+        if !value.is_finite() {
+            return None;
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let mut normalized_sum = 0.0;
+    for value in values.iter().copied() {
+        let term = value / scale;
+        let next = normalized_sum + term;
+        if !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        normalized_sum = next;
+    }
+    let sum = normalized_sum * scale;
+    sum.is_finite().then_some(sum)
 }
 
 /// Identify rows where both requested factor levels have zero counts.

@@ -49,16 +49,12 @@ fn rough_dispersion_matches_deseq2_formula() {
 }
 
 #[test]
-fn rough_dispersion_rejects_overflowed_residual_square() {
+fn rough_dispersion_keeps_large_finite_relative_residuals() {
     let normalized = RowMajorMatrix::from_row_major(1, 3, vec![3e154, 1.0, 1.0]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
-    let err = rough_dispersion_estimates(&normalized, &design).unwrap_err();
+    let rough = rough_dispersion_estimates(&normalized, &design).unwrap();
 
-    assert!(matches!(
-        err,
-        DeseqError::NonFiniteValue { context, index, .. }
-            if context == "rough dispersion residual square" && index == Some(0)
-    ));
+    assert_relative_eq!(rough[0], 3.0, epsilon = 1e-12);
 }
 
 #[test]

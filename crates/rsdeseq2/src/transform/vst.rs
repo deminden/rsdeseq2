@@ -345,21 +345,16 @@ pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, D
             actual: 0,
         });
     }
-    let mut sum = 0.0;
+    let mut inverse_size_factors = Vec::with_capacity(size_factors.len());
     for (idx, size_factor) in size_factors.iter().copied().enumerate() {
         if !size_factor.is_finite() || size_factor <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
                 reason: format!("local VST size factor at index {idx} must be finite and positive"),
             });
         }
-        sum = checked_add(
-            sum,
-            size_factor.recip(),
-            idx,
-            "local VST inverse size-factor sum",
-        )?;
+        inverse_size_factors.push(size_factor.recip());
     }
-    Ok(sum / size_factors.len() as f64)
+    checked_mean(&inverse_size_factors, "local VST inverse size-factor mean")
 }
 
 /// Compute the local-VST size-factor summary from normalization factors.
@@ -389,7 +384,7 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
             )?;
         }
     }
-    let mut inverse_sum = 0.0;
+    let mut inverse_column_means = Vec::with_capacity(normalization_factors.n_cols());
     for (sample, sum) in log_col_sums.into_iter().enumerate() {
         let column_geometric_mean = (sum / normalization_factors.n_rows() as f64).exp();
         if !column_geometric_mean.is_finite() || column_geometric_mean <= 0.0 {
@@ -399,14 +394,12 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
                 value: column_geometric_mean,
             });
         }
-        checked_add_assign(
-            &mut inverse_sum,
-            column_geometric_mean.recip(),
-            sample,
-            "local VST inverse normalization-factor mean sum",
-        )?;
+        inverse_column_means.push(column_geometric_mean.recip());
     }
-    Ok(inverse_sum / normalization_factors.n_cols() as f64)
+    checked_mean(
+        &inverse_column_means,
+        "local VST inverse normalization-factor mean",
+    )
 }
 
 /// Apply VST using an already-fitted dispersion trend.
@@ -500,10 +493,16 @@ pub fn vst_mean_value(
             value: normalized_count,
         });
     }
-    Ok((2.0 * (mean_dispersion * normalized_count).sqrt().asinh()
-        - mean_dispersion.ln()
-        - 4.0_f64.ln())
-        / std::f64::consts::LN_2)
+    let dispersion_count = mean_dispersion * normalized_count;
+    if dispersion_count.is_infinite() {
+        return Ok(normalized_count.log2());
+    }
+    finite_value(
+        (2.0 * dispersion_count.sqrt().asinh() - mean_dispersion.ln() - 4.0_f64.ln())
+            / std::f64::consts::LN_2,
+        Some(index),
+        "mean VST value",
+    )
 }
 
 /// Apply DESeq2's parametric-trend VST to one normalized count.
@@ -517,8 +516,15 @@ pub fn vst_parametric_value(
     let alpha = trend.asympt_disp;
     let extra = trend.extra_pois;
     let alpha_count = alpha * normalized_count;
+    if alpha_count.is_infinite() {
+        return Ok(normalized_count.log2());
+    }
     let numerator_root = alpha_count.sqrt() + (1.0 + extra + alpha_count).sqrt();
-    Ok((2.0 * numerator_root.ln() - (4.0 * alpha).ln()) / std::f64::consts::LN_2)
+    finite_value(
+        (2.0 * numerator_root.ln() - (4.0 * alpha).ln()) / std::f64::consts::LN_2,
+        Some(index),
+        "parametric VST value",
+    )
 }
 
 #[derive(Clone, Debug)]
@@ -593,21 +599,32 @@ impl LocalVstIntegral {
             });
         }
         if target <= self.x[0] {
-            let value = self.y[0] * target / self.x[0];
+            let value = checked_mul(
+                self.y[0],
+                target / self.x[0],
+                0,
+                "local VST interpolation lower extrapolation",
+            )?;
             return finite_value(value, None, "local VST interpolation lower extrapolation");
         }
         let last = self.x.len() - 1;
         if target >= self.x[last] {
             let slope = (self.y[last] - self.y[last - 1]) / (self.x[last] - self.x[last - 1]);
-            let value = self.y[last] + slope * (target - self.x[last]);
-            return finite_value(value, None, "local VST interpolation upper extrapolation");
+            let value = checked_interpolate(
+                self.y[last],
+                slope,
+                target - self.x[last],
+                "local VST interpolation upper extrapolation",
+            )?;
+            return Ok(value);
         }
         let upper = self.x.partition_point(|value| *value < target);
         let lower = upper - 1;
         let fraction = (target - self.x[lower]) / (self.x[upper] - self.x[lower]);
-        finite_value(
-            self.y[lower] + fraction * (self.y[upper] - self.y[lower]),
-            None,
+        checked_interpolate(
+            self.y[lower],
+            fraction,
+            self.y[upper] - self.y[lower],
             "local VST interpolation",
         )
     }
@@ -690,8 +707,7 @@ fn normalized_count_row_means(
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for row in 0..normalized_counts.n_rows() {
         let values = normalized_counts.row(row)?;
-        means
-            .push(checked_sum(values.iter().copied(), "local VST row mean")? / values.len() as f64);
+        means.push(checked_mean(values, "local VST row mean")?);
     }
     Ok(means)
 }
@@ -723,7 +739,12 @@ fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
     if lower_idx + 1 >= sorted.len() {
         return Ok(sorted[sorted.len() - 1]);
     }
-    Ok(sorted[lower_idx] + fraction * (sorted[lower_idx + 1] - sorted[lower_idx]))
+    checked_interpolate(
+        sorted[lower_idx],
+        fraction,
+        sorted[lower_idx + 1] - sorted[lower_idx],
+        "local VST quantile interpolation",
+    )
 }
 
 fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
@@ -746,12 +767,41 @@ fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     finite_value(value, Some(index), context)
 }
 
+fn checked_interpolate(
+    origin: f64,
+    scale: f64,
+    delta: f64,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    checked_add(origin, checked_mul(scale, delta, 0, context)?, 0, context)
+}
+
 fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
     let mut sum = 0.0;
     for (idx, value) in values.into_iter().enumerate() {
         sum = checked_add(sum, value, idx, context)?;
     }
     Ok(sum)
+}
+
+fn checked_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
+    let mut scale = 0.0_f64;
+    for (idx, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
+    let mean = normalized_sum / values.len() as f64 * scale;
+    finite_value(mean, None, context)
 }
 
 fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
@@ -763,5 +813,28 @@ fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, 
             index,
             value,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_interpolate_rejects_overflowed_product() {
+        let err = checked_interpolate(0.0, f64::MAX, 2.0, "test interpolation").unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "test interpolation" && index == Some(0)
+        ));
+    }
+
+    #[test]
+    fn quantile_type7_keeps_large_equal_values_finite() {
+        let value = quantile_type7(&[f64::MAX / 2.0, f64::MAX / 2.0], 0.5).unwrap();
+
+        assert_eq!(value, f64::MAX / 2.0);
     }
 }

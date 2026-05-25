@@ -16,11 +16,31 @@ fn trigamma_matches_known_values() {
 }
 
 #[test]
+fn trigamma_keeps_large_finite_recurrence_and_rejects_overflow() {
+    let finite = trigamma(1.0e-154).unwrap();
+    assert!(finite.is_finite());
+    assert!(finite > 1.0e307);
+
+    let err = trigamma(1.0e-200).unwrap_err();
+    assert!(err.to_string().contains("trigamma recurrence"));
+}
+
+#[test]
 fn mad_squared_matches_r_default_constant() {
     let residuals = [-2.0, -1.0, 0.0, 1.0, 2.0];
     let expected = 1.4826_f64.powi(2);
 
     assert_relative_eq!(mad_squared(&residuals).unwrap(), expected, epsilon = 1e-12);
+}
+
+#[test]
+fn mad_squared_rejects_overflowed_variance() {
+    let residuals = [-1.0e308, 0.0, 1.0e308];
+    let err = mad_squared(&residuals).unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("MAD squared produced non-finite dispersion prior variance"));
 }
 
 #[test]

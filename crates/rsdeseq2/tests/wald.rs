@@ -49,6 +49,15 @@ fn two_sided_t_pvalue_matches_r_pt_shape() {
 }
 
 #[test]
+fn two_sided_t_pvalue_uses_stable_upper_tail() {
+    let pvalue = two_sided_t_pvalue(1.0e6, 10.0).unwrap();
+
+    assert!(pvalue.is_finite());
+    assert!(pvalue > 0.0);
+    assert!(pvalue < 1.0e-50);
+}
+
+#[test]
 fn wald_probability_helpers_bound_or_reject_public_pvalues() {
     assert_eq!(two_sided_normal_pvalue(f64::INFINITY), 0.0);
     assert_eq!(two_sided_normal_pvalue(f64::NAN), 1.0);
@@ -125,6 +134,51 @@ fn wald_test_contrast_masks_nonfinite_estimate_or_variance_accumulation() {
     assert_eq!(contrast.lfc_se, vec![None, None]);
     assert_eq!(contrast.wald.stat, vec![None, None]);
     assert_eq!(contrast.wald.pvalue, vec![None, None]);
+}
+
+#[test]
+fn wald_test_contrast_keeps_large_cancelling_accumulations_finite() {
+    let mut fit = toy_fit(
+        vec![f64::MAX, f64::MAX, f64::MAX, -f64::MAX],
+        vec![0.5, 0.7, 0.5, 0.7],
+        2,
+        2,
+    );
+    fit.beta_covariance = Some(
+        RowMajorMatrix::from_row_major(2, 4, vec![0.25, 0.05, 0.05, 0.49, 0.25, 0.05, 0.05, 0.49])
+            .unwrap(),
+    );
+
+    let contrast = wald_test_contrast(&fit, &[1.0, 1.0]).unwrap();
+
+    assert_eq!(contrast.log2_fold_change[0], None);
+    assert_eq!(contrast.log2_fold_change[1], Some(0.0));
+    assert_eq!(contrast.lfc_se[0], None);
+    assert_relative_eq!(
+        contrast.lfc_se[1].unwrap(),
+        0.916515138991168,
+        epsilon = 1e-12
+    );
+    assert_eq!(contrast.wald.stat[1], Some(0.0));
+    assert_eq!(contrast.wald.pvalue[1], Some(1.0));
+}
+
+#[test]
+fn wald_test_contrast_orders_variance_products_by_magnitude() {
+    let mut fit = toy_fit(vec![0.0, 1.0e200], vec![0.5, 0.7], 1, 2);
+    fit.beta_covariance =
+        Some(RowMajorMatrix::from_row_major(1, 4, vec![0.0, 1.0e200, 1.0e200, 0.0]).unwrap());
+
+    let contrast = wald_test_contrast(&fit, &[1.0e200, 1.0e-200]).unwrap();
+
+    assert_eq!(contrast.log2_fold_change[0], Some(1.0));
+    assert_relative_eq!(
+        contrast.lfc_se[0].unwrap(),
+        (2.0e200_f64).sqrt(),
+        max_relative = 1e-12
+    );
+    assert!(contrast.wald.stat[0].unwrap().is_finite());
+    assert!(contrast.wald.pvalue[0].unwrap().is_finite());
 }
 
 #[test]
@@ -222,6 +276,23 @@ fn wald_test_coefficient_can_use_older_greater_abs_lfc_threshold() {
 }
 
 #[test]
+fn wald_test_coefficient_upper_tail_keeps_extreme_threshold_pvalue_finite() {
+    let fit = toy_fit(vec![1.0e6], vec![1.0], 1, 1);
+    let wald = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_degrees_of_freedom(10.0)
+            .with_lfc_threshold(1.0, WaldAlternative::Greater),
+    )
+    .unwrap();
+
+    let pvalue = wald.pvalue[0].unwrap();
+    assert!(pvalue.is_finite());
+    assert!(pvalue > 0.0);
+    assert!(pvalue < 1.0e-50);
+}
+
+#[test]
 fn original_greater_abs_upshot_matches_greater_abs_at_zero_threshold() {
     let fit = toy_fit(vec![2.0, -1.5], vec![0.5, 0.75], 2, 1);
     let upshot = wald_test_coefficient_with_options(
@@ -240,6 +311,20 @@ fn original_greater_abs_upshot_matches_greater_abs_at_zero_threshold() {
     assert_eq!(upshot.stat, greater_abs.stat);
     assert_eq!(upshot.pvalue, greater_abs.pvalue);
     assert_eq!(upshot.pvalue.len(), 2);
+}
+
+#[test]
+fn wald_test_coefficient_upshot_masks_overflowed_threshold_formula() {
+    let fit = toy_fit(vec![f64::MAX], vec![1.0], 1, 1);
+    let wald = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::normal().with_lfc_threshold(1.0, WaldAlternative::GreaterAbsUpshot),
+    )
+    .unwrap();
+
+    assert_eq!(wald.stat[0], Some(f64::MAX));
+    assert_eq!(wald.pvalue[0], None);
 }
 
 #[test]

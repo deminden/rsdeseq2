@@ -69,12 +69,30 @@ pub fn matrix_rank(
         let pivot_value = matrix[row * n_cols + col];
         for r in row + 1..n_rows {
             let factor = matrix[r * n_cols + col] / pivot_value;
+            if !factor.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "rank elimination factor".to_string(),
+                    index: Some(r * n_cols + col),
+                    value: factor,
+                });
+            }
             if factor == 0.0 {
                 continue;
             }
             matrix[r * n_cols + col] = 0.0;
             for c in col + 1..n_cols {
-                matrix[r * n_cols + c] -= factor * matrix[row * n_cols + c];
+                let source = matrix[row * n_cols + c];
+                let target = matrix[r * n_cols + c];
+                let product = factor * source;
+                let updated = target - product;
+                if !product.is_finite() || !updated.is_finite() {
+                    return Err(DeseqError::NonFiniteValue {
+                        context: "rank elimination update".to_string(),
+                        index: Some(r * n_cols + c),
+                        value: updated,
+                    });
+                }
+                matrix[r * n_cols + c] = updated;
             }
         }
         rank += 1;
@@ -84,4 +102,23 @@ pub fn matrix_rank(
         }
     }
     Ok(rank)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matrix_rank;
+
+    #[test]
+    fn matrix_rank_rejects_nonfinite_elimination_update() {
+        let values = [
+            1.0,
+            f64::MAX,
+            1.0,
+            -f64::MAX, //
+        ];
+
+        let err = matrix_rank(&values, 2, 2, 0.0).unwrap_err();
+
+        assert!(err.to_string().contains("rank elimination update"));
+    }
 }

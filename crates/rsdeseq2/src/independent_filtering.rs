@@ -499,8 +499,7 @@ fn lowess_sorted(
             })
             .collect::<Result<Vec<_>, DeseqError>>()?;
         let mean_absolute_residual =
-            checked_sum(residuals.iter().copied(), "lowess mean absolute residual")?
-                / residuals.len() as f64;
+            checked_scaled_mean(&residuals, "lowess mean absolute residual")?;
         let scale = six_mad(&residuals)?;
         if scale < 1e-7 * mean_absolute_residual {
             break;
@@ -717,7 +716,7 @@ fn six_mad(residuals: &[f64]) -> Result<f64, DeseqError> {
     sorted.sort_by(f64::total_cmp);
     let median = if sorted.len() % 2 == 0 {
         let upper = sorted.len() / 2;
-        0.5 * checked_add(sorted[upper - 1], sorted[upper], upper, "lowess MAD median")?
+        checked_midpoint(sorted[upper - 1], sorted[upper], upper, "lowess MAD median")?
     } else {
         sorted[sorted.len() / 2]
     };
@@ -736,17 +735,32 @@ fn positive_residual_rmse(residuals: &[f64]) -> Result<f64, DeseqError> {
     if residuals.is_empty() {
         return Ok(0.0);
     }
-    let squared_sum = checked_sum(
-        residuals
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, value)| checked_mul(value, value, idx, "independent-filter RMSE square"))
-            .collect::<Result<Vec<_>, _>>()?,
-        "independent-filter RMSE sum",
-    )?;
-    let mean_square = squared_sum / residuals.len() as f64;
-    finite_value(mean_square.sqrt(), None, "independent-filter RMSE")
+    let scale = residuals
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })
+        .ok_or_else(|| DeseqError::NonFiniteValue {
+            context: "independent-filter RMSE".to_string(),
+            index: None,
+            value: f64::NAN,
+        })?;
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let scaled_squares = residuals
+        .iter()
+        .copied()
+        .map(|value| {
+            let scaled = value / scale;
+            scaled * scaled
+        })
+        .collect::<Vec<_>>();
+    let mean_square =
+        checked_sum(scaled_squares, "independent-filter RMSE sum")? / residuals.len() as f64;
+    finite_value(scale * mean_square.sqrt(), None, "independent-filter RMSE")
 }
 
 fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
@@ -764,12 +778,43 @@ fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     finite_value(value, Some(index), context)
 }
 
+fn checked_midpoint(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    finite_value(left + (right - left) / 2.0, Some(index), context)
+}
+
 fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
     let mut sum = 0.0;
     for (idx, value) in values.into_iter().enumerate() {
         sum = checked_add(sum, value, idx, context)?;
     }
     Ok(sum)
+}
+
+fn checked_scaled_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
+    if values.is_empty() {
+        return Ok(0.0);
+    }
+    let scale = values
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .try_fold(0.0_f64, |scale, value| {
+            value.is_finite().then_some(scale.max(value))
+        })
+        .ok_or_else(|| DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value: f64::NAN,
+        })?;
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
+    finite_value(
+        scale * (normalized_sum / values.len() as f64),
+        None,
+        context,
+    )
 }
 
 fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
@@ -781,5 +826,31 @@ fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, 
             index,
             value,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn independent_filter_numeric_helpers_keep_large_finite_values() {
+        assert_eq!(
+            checked_scaled_mean(&[f64::MAX, f64::MAX], "test mean").unwrap(),
+            f64::MAX
+        );
+        assert_eq!(
+            checked_midpoint(f64::MAX, f64::MAX, 0, "test midpoint").unwrap(),
+            f64::MAX
+        );
+        assert_eq!(
+            positive_residual_rmse(&[f64::MAX / 2.0, f64::MAX / 2.0]).unwrap(),
+            f64::MAX / 2.0
+        );
+    }
+
+    #[test]
+    fn independent_filter_numeric_helpers_reject_nonfinite_inputs() {
+        assert!(positive_residual_rmse(&[f64::MAX, f64::INFINITY]).is_err());
     }
 }

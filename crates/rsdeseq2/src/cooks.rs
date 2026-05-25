@@ -200,8 +200,14 @@ pub fn replace_outlier_counts(
     for gene in 0..counts.n_genes() {
         let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
         let scale_row = scale_factors.row(gene)?;
-        for scale in scale_row {
-            candidate_values.push(replacement_count_from_scaled_mean(trim_mean * *scale)?);
+        for (sample, scale) in scale_row.iter().copied().enumerate() {
+            let scaled_mean = checked_product2(
+                trim_mean,
+                scale,
+                Some(gene * counts.n_samples() + sample),
+                "replacement scaled mean",
+            )?;
+            candidate_values.push(replacement_count_from_scaled_mean(scaled_mean)?);
         }
     }
 
@@ -385,8 +391,7 @@ pub fn robust_method_of_moments_dispersion(
     let mut dispersions = Vec::with_capacity(normalized_counts.n_rows());
     for (gene, variance) in variance.iter().copied().enumerate() {
         let row = normalized_counts.row(gene)?;
-        let mean =
-            checked_sum(row.iter().copied(), "Cook's robust dispersion mean")? / row.len() as f64;
+        let mean = checked_mean(row, "Cook's robust dispersion mean")?;
         let alpha = if mean > 0.0 {
             let inv_mean = mean.recip();
             let centered = variance - mean;
@@ -710,7 +715,7 @@ fn trimmed_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, D
         return Ok(f64::NAN);
     }
     let kept = &values[trim_count..end];
-    Ok(checked_sum(kept.iter().copied(), context)? / kept.len() as f64)
+    checked_mean(kept, context)
 }
 
 fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
@@ -771,6 +776,52 @@ fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f
         sum = checked_add(sum, value, idx, context)?;
     }
     Ok(sum)
+}
+
+fn checked_product2(
+    left: f64,
+    right: f64,
+    index: Option<usize>,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let product = left * right;
+    if left.is_finite() && right.is_finite() && product.is_finite() {
+        Ok(product)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index,
+            value: product,
+        })
+    }
+}
+
+fn checked_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: None,
+                value,
+            });
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
+    let mean = normalized_sum / values.len() as f64 * scale;
+    if mean.is_finite() {
+        Ok(mean)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value: mean,
+        })
+    }
 }
 
 fn replacement_count_from_scaled_mean(value: f64) -> Result<u32, DeseqError> {

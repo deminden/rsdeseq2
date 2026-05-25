@@ -3732,11 +3732,15 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
 }
 
 fn full_deviance_from_log_like(log_like: f64) -> f64 {
-    let deviance = -2.0 * log_like;
-    if log_like.is_finite() && deviance.is_finite() {
-        deviance
+    checked_product2(-2.0, log_like).unwrap_or(f64::NAN)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let deviance = left * right;
+    if left.is_finite() && right.is_finite() && deviance.is_finite() {
+        Some(deviance)
     } else {
-        f64::NAN
+        None
     }
 }
 
@@ -3788,5 +3792,6 @@ mod tests {
         assert_eq!(full_deviance_from_log_like(-2.0), 4.0);
         assert!(full_deviance_from_log_like(f64::NAN).is_nan());
         assert!(full_deviance_from_log_like(f64::MAX).is_nan());
+        assert!(full_deviance_from_log_like(-f64::MAX).is_nan());
     }
 }

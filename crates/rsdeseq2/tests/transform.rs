@@ -396,19 +396,15 @@ fn local_vst_size_factor_summaries_reject_invalid_values() {
 }
 
 #[test]
-fn local_vst_size_factor_summaries_reject_overflowed_accumulation() {
-    let err = local_vst_inverse_size_factor_mean(&[
+fn local_vst_size_factor_summaries_keep_large_finite_means() {
+    let observed = local_vst_inverse_size_factor_mean(&[
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
         f64::MIN_POSITIVE,
     ])
-    .unwrap_err();
-    assert!(matches!(
-        err,
-        DeseqError::NonFiniteValue { context, .. }
-            if context == "local VST inverse size-factor sum"
-    ));
+    .unwrap();
+    assert_relative_eq!(observed, f64::MIN_POSITIVE.recip(), max_relative = 1e-12);
 
     let factors = RowMajorMatrix::from_row_major(
         1,
@@ -422,12 +418,8 @@ fn local_vst_size_factor_summaries_reject_overflowed_accumulation() {
         ],
     )
     .unwrap();
-    let err = local_vst_inverse_size_factor_mean_from_normalization_factors(&factors).unwrap_err();
-    assert!(matches!(
-        err,
-        DeseqError::NonFiniteValue { context, .. }
-            if context == "local VST inverse normalization-factor mean sum"
-    ));
+    let observed = local_vst_inverse_size_factor_mean_from_normalization_factors(&factors).unwrap();
+    assert_relative_eq!(observed, f64::MIN_POSITIVE.recip(), max_relative = 1e-12);
 }
 
 #[test]
@@ -588,6 +580,15 @@ fn vst_mean_value_is_log2_like_for_large_counts() {
 }
 
 #[test]
+fn vst_mean_value_stays_finite_when_dispersion_count_overflows() {
+    let q = f64::MAX;
+    let transformed = vst_mean_value(q, 2.0, 0).unwrap();
+
+    assert!(transformed.is_finite());
+    assert_relative_eq!(transformed, q.log2(), max_relative = 1e-12);
+}
+
+#[test]
 fn vst_parametric_value_is_log2_like_for_large_counts() {
     let q = 1e10_f64;
     let trend = ParametricDispersionTrend {
@@ -605,6 +606,20 @@ fn vst_parametric_value_stays_finite_for_extreme_counts() {
     let q = 1e308_f64;
     let trend = ParametricDispersionTrend {
         asympt_disp: 0.2,
+        extra_pois: 1.5,
+    };
+
+    let transformed = vst_parametric_value(q, trend, 0).unwrap();
+
+    assert!(transformed.is_finite());
+    assert_relative_eq!(transformed, q.log2(), max_relative = 1e-12);
+}
+
+#[test]
+fn vst_parametric_value_stays_finite_when_dispersion_count_overflows() {
+    let q = f64::MAX;
+    let trend = ParametricDispersionTrend {
+        asympt_disp: 2.0,
         extra_pois: 1.5,
     };
 

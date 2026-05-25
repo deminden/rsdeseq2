@@ -57,6 +57,28 @@ fn lrt_test_masks_overflowed_deviance_statistic() {
 }
 
 #[test]
+fn lrt_test_masks_finite_difference_with_overflowed_scale() {
+    let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![f64::MAX / 2.0], 1, 2);
+    let reduced = toy_fit(vec![0.0], vec![1.0], vec![-f64::MAX / 2.0], 1, 1);
+
+    let lrt = lrt_test(&full, &reduced).unwrap();
+
+    assert_eq!(lrt.deviance[0], None);
+    assert_eq!(lrt.pvalue[0], None);
+}
+
+#[test]
+fn lrt_test_keeps_large_cancelling_log_likelihood_difference() {
+    let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![f64::MAX / 4.0], 1, 2);
+    let reduced = toy_fit(vec![0.0], vec![1.0], vec![f64::MAX / 4.0], 1, 1);
+
+    let lrt = lrt_test(&full, &reduced).unwrap();
+
+    assert_eq!(lrt.deviance[0], Some(0.0));
+    assert_eq!(lrt.pvalue[0], Some(1.0));
+}
+
+#[test]
 fn lrt_test_bounds_extreme_finite_pvalues() {
     let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![1e100], 1, 2);
     let reduced = toy_fit(vec![0.0], vec![1.0], vec![0.0], 1, 1);

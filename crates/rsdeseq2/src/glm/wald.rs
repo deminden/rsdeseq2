@@ -335,31 +335,29 @@ fn validate_contrast_inputs(fit: &NbinomGlmFit, contrast: &[f64]) -> Result<(), 
 }
 
 fn contrast_estimate(contrast: &[f64], beta: &[f64]) -> Option<f64> {
-    let mut estimate = 0.0;
+    let mut terms = Vec::with_capacity(contrast.len());
     for (contrast, beta) in contrast.iter().copied().zip(beta.iter().copied()) {
         let term = contrast * beta;
-        let next = estimate + term;
-        if !term.is_finite() || !next.is_finite() {
+        if !term.is_finite() {
             return None;
         }
-        estimate = next;
+        terms.push(term);
     }
-    Some(estimate)
+    checked_scaled_sum(&terms)
 }
 
 fn contrast_variance(contrast: &[f64], covariance: &[f64], p: usize) -> Option<f64> {
-    let mut variance = 0.0;
+    let mut terms = Vec::with_capacity(p * p);
     for row in 0..p {
         for col in 0..p {
-            let term = contrast[row] * covariance[row * p + col] * contrast[col];
-            let next = variance + term;
-            if !term.is_finite() || !next.is_finite() {
-                return None;
-            }
-            variance = next;
+            terms.push(checked_product3_ordered_by_magnitude(
+                contrast[row],
+                covariance[row * p + col],
+                contrast[col],
+            )?);
         }
     }
-    Some(variance)
+    checked_scaled_sum(&terms)
 }
 
 fn valid_contrast_se(estimate: f64, variance: f64) -> Option<f64> {
@@ -368,6 +366,30 @@ fn valid_contrast_se(estimate: f64, variance: f64) -> Option<f64> {
     }
     let se = variance.sqrt();
     se.is_finite().then_some(se)
+}
+
+fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
+        if !value.is_finite() {
+            return None;
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let mut normalized_sum = 0.0;
+    for value in values.iter().copied() {
+        let term = value / scale;
+        let next = normalized_sum + term;
+        if !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        normalized_sum = next;
+    }
+    let sum = normalized_sum * scale;
+    sum.is_finite().then_some(sum)
 }
 
 /// Compute one Wald statistic and two-sided standard-Normal p-value.
@@ -473,7 +495,7 @@ pub fn two_sided_t_pvalue(stat: f64, degrees_of_freedom: f64) -> Option<f64> {
         return None;
     }
     let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-    clamp_probability(2.0 * (1.0 - distribution.cdf(stat.abs())))
+    clamp_probability(2.0 * distribution.sf(stat.abs()))
 }
 
 fn resolve_wald_degrees_of_freedom(
@@ -535,14 +557,48 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
     let distribution = Normal::new(0.0, 1.0).ok()?;
     let a = (abs_beta + threshold) / beta_se;
     let b = (abs_beta - threshold) / beta_se;
-    let value = 2.0 / (b - a)
-        * (-a * distribution.cdf(-a) + distribution.pdf(a) + b * distribution.cdf(-b)
-            - distribution.pdf(b));
+    if !a.is_finite() || !b.is_finite() {
+        return None;
+    }
+    let denominator = checked_sub(b, a)?;
+    let scale = checked_div(2.0, denominator)?;
+    let left_tail_a = distribution.sf(a);
+    let left_tail_b = distribution.sf(b);
+    let value = checked_product2(
+        scale,
+        checked_scaled_sum(&[
+            checked_product2(-a, left_tail_a)?,
+            distribution.pdf(a),
+            checked_product2(b, left_tail_b)?,
+            -distribution.pdf(b),
+        ])?,
+    )?;
     clamp_probability(value)
 }
 
 fn clamp_probability(value: f64) -> Option<f64> {
     value.is_finite().then_some(value.clamp(0.0, 1.0))
+}
+
+fn checked_sub(left: f64, right: f64) -> Option<f64> {
+    let value = left - right;
+    value.is_finite().then_some(value)
+}
+
+fn checked_div(left: f64, right: f64) -> Option<f64> {
+    let value = left / right;
+    (left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite()).then_some(value)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let value = left * right;
+    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
+}
+
+fn checked_product3_ordered_by_magnitude(left: f64, middle: f64, right: f64) -> Option<f64> {
+    let mut factors = [left, middle, right];
+    factors.sort_by(|a, b| a.abs().total_cmp(&b.abs()));
+    checked_product2(checked_product2(factors[0], factors[1])?, factors[2])
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -589,7 +645,19 @@ impl WaldTail {
     }
 
     fn upper(self, q: f64) -> Option<f64> {
-        self.lower(q).and_then(|cdf| clamp_probability(1.0 - cdf))
+        if !q.is_finite() {
+            return None;
+        }
+        match self {
+            Self::Normal => {
+                let distribution = Normal::new(0.0, 1.0).ok()?;
+                clamp_probability(distribution.sf(q))
+            }
+            Self::T { degrees_of_freedom } => {
+                let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
+                clamp_probability(distribution.sf(q))
+            }
+        }
     }
 
     fn two_sided(self, stat: f64) -> Option<f64> {

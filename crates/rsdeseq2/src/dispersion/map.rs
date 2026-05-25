@@ -279,14 +279,25 @@ pub fn map_dispersion_outlier(
         || !disp_fit.is_finite()
         || disp_fit <= 0.0
         || !outlier_sd.is_finite()
+        || outlier_sd <= 0.0
         || !var_log_disp_estimates.is_finite()
         || var_log_disp_estimates < 0.0
     {
         return false;
     }
-    let residual = disp_gene_est.ln() - disp_fit.ln();
-    let threshold = outlier_sd * var_log_disp_estimates.sqrt();
-    residual.is_finite() && threshold.is_finite() && residual > threshold
+    let residual = checked_sub(
+        disp_gene_est.ln(),
+        disp_fit.ln(),
+        "MAP dispersion outlier log residual",
+    )
+    .ok();
+    let threshold = checked_mul(
+        outlier_sd,
+        var_log_disp_estimates.sqrt(),
+        "MAP dispersion outlier threshold",
+    )
+    .ok();
+    matches!((residual, threshold), (Some(residual), Some(threshold)) if residual > threshold)
 }
 
 fn optimizer_options(options: MapDispersionOptions) -> GeneWiseDispersionOptions {
@@ -446,6 +457,19 @@ fn validate_positive_scalar(value: f64, name: &str) -> Result<(), DeseqError> {
 
 fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
     let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
+}
+
+fn checked_sub(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left - right;
     if value.is_finite() {
         Ok(value)
     } else {

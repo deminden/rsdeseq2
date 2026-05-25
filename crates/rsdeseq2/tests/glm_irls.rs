@@ -204,6 +204,15 @@ fn beta_prior_quantile_matches_type7_upper_abs_quantile() {
 }
 
 #[test]
+fn beta_prior_quantile_rejects_overflowed_variance() {
+    let err = match_upper_quantile_for_variance(&[f64::MAX], 0.5).unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("beta prior variance quantile produced non-finite variance"));
+}
+
+#[test]
 fn beta_prior_weighted_quantile_uses_row_weights() {
     let variance =
         match_weighted_upper_quantile_for_variance(&[1.0, 10.0, 20.0], &[98.0, 1.0, 1.0], 0.5)
@@ -215,6 +224,15 @@ fn beta_prior_weighted_quantile_uses_row_weights() {
         epsilon = 1e-12,
         max_relative = 1e-12
     );
+}
+
+#[test]
+fn beta_prior_weighted_quantile_rejects_overflowed_variance() {
+    let err = match_weighted_upper_quantile_for_variance(&[f64::MAX], &[1.0], 0.5).unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("weighted beta prior variance quantile produced non-finite variance"));
 }
 
 #[test]

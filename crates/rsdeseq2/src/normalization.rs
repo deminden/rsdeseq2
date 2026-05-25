@@ -173,20 +173,11 @@ pub fn base_mean_with_weights(
     weights: &RowMajorMatrix<f64>,
 ) -> Result<Vec<f64>, DeseqError> {
     validate_weighted_base_inputs(normalized_counts, weights)?;
-    let n_samples = normalized_counts.n_cols();
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
         let weight_row = weights.row(gene)?;
-        let sum = checked_weighted_sum(row, weight_row, "weighted baseMean", gene)?;
-        let mean = sum / n_samples as f64;
-        if !mean.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: "weighted baseMean".to_string(),
-                index: Some(gene),
-                value: mean,
-            });
-        }
+        let mean = checked_weighted_mean(row, weight_row, "weighted baseMean", gene)?;
         means.push(mean);
     }
     Ok(means)
@@ -212,15 +203,13 @@ pub fn base_variance(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>
             index: Some(gene),
             value: f64::NAN,
         })?;
-        let sum_squares =
-            checked_centered_sum_squares(row.iter().copied(), mean).ok_or_else(|| {
-                DeseqError::NonFiniteValue {
-                    context: "baseVar".to_string(),
-                    index: Some(gene),
-                    value: f64::NAN,
-                }
-            })?;
-        variances.push(sum_squares / (n_samples as f64 - 1.0));
+        variances.push(checked_sample_variance(row, mean).ok_or_else(|| {
+            DeseqError::NonFiniteValue {
+                context: "baseVar".to_string(),
+                index: Some(gene),
+                value: f64::NAN,
+            }
+        })?);
     }
     Ok(variances)
 }
@@ -250,31 +239,43 @@ pub fn base_variance_with_weights(
             index: Some(gene),
             value: f64::NAN,
         })?;
-        let sum_squares = checked_centered_sum_squares(weighted_values.iter().copied(), mean)
-            .ok_or_else(|| DeseqError::NonFiniteValue {
-                context: "weighted baseVar".to_string(),
-                index: Some(gene),
-                value: f64::NAN,
-            })?;
-        variances.push(sum_squares / (n_samples as f64 - 1.0));
+        variances.push(
+            checked_sample_variance(&weighted_values, mean).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "weighted baseVar".to_string(),
+                    index: Some(gene),
+                    value: f64::NAN,
+                }
+            })?,
+        );
     }
     Ok(variances)
 }
 
 fn checked_mean(values: &[f64]) -> Option<f64> {
-    let sum = checked_sum(values.iter().copied())?;
-    let mean = sum / values.len() as f64;
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
+        if !value.is_finite() {
+            return None;
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale))?;
+    let mean = normalized_sum / values.len() as f64 * scale;
     mean.is_finite().then_some(mean)
 }
 
-fn checked_weighted_sum(
+fn checked_weighted_mean(
     values: &[f64],
     weights: &[f64],
     context: &str,
     gene: usize,
 ) -> Result<f64, DeseqError> {
     let weighted_values = checked_weighted_values(values, weights, context, gene)?;
-    checked_sum(weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
+    checked_mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
         context: context.to_string(),
         index: Some(gene),
         value: f64::NAN,
@@ -302,18 +303,28 @@ fn checked_weighted_values(
     Ok(out)
 }
 
-fn checked_centered_sum_squares(values: impl IntoIterator<Item = f64>, mean: f64) -> Option<f64> {
-    let mut sum = 0.0;
-    for value in values {
+fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
+    let mut scale = 0.0_f64;
+    for value in values.iter().copied() {
         let centered = value - mean;
-        let square = centered * centered;
-        let next = checked_sum2(sum, square)?;
-        if !centered.is_finite() || !square.is_finite() {
+        if !centered.is_finite() {
             return None;
         }
-        sum = next;
+        scale = scale.max(centered.abs());
     }
-    Some(sum)
+    if scale == 0.0 {
+        return Some(0.0);
+    }
+    let mut normalized_sum_squares = 0.0;
+    for value in values.iter().copied() {
+        let centered = (value - mean) / scale;
+        let square = centered * centered;
+        normalized_sum_squares = checked_sum2(normalized_sum_squares, square)?;
+    }
+    let normalized_variance = normalized_sum_squares / (values.len() as f64 - 1.0);
+    let scaled_deviation = checked_product2(normalized_variance.sqrt(), scale)?;
+    let variance = checked_product2(scaled_deviation, scaled_deviation)?;
+    variance.is_finite().then_some(variance)
 }
 
 fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
@@ -323,6 +334,11 @@ fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
 fn checked_sum2(left: f64, right: f64) -> Option<f64> {
     let sum = left + right;
     (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let product = left * right;
+    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
 }
 
 fn validate_weighted_base_inputs(

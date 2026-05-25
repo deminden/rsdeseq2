@@ -92,7 +92,14 @@ pub fn mad_squared(values: &[f64]) -> Result<f64, DeseqError> {
     let mad = median_finite(&deviations).ok_or_else(|| DeseqError::InvalidDispersion {
         reason: "cannot compute MAD of an empty or non-finite slice".to_string(),
     })? * 1.4826;
-    Ok(mad * mad)
+    let variance = mad * mad;
+    if variance.is_finite() {
+        Ok(variance)
+    } else {
+        Err(DeseqError::InvalidDispersion {
+            reason: "MAD squared produced non-finite dispersion prior variance".to_string(),
+        })
+    }
 }
 
 /// Log-dispersion residuals for rows used by DESeq2's prior variance estimate.
@@ -177,7 +184,9 @@ pub fn estimate_low_df_prior_variance(
                 .iter()
                 .copied()
                 .zip(normal_samples.iter().copied())
-                .map(|(base, normal)| base + variance.sqrt() * normal)
+                .map(|(base, normal)| low_df_simulated_residual(base, variance, normal))
+                .collect::<Result<Vec<_>, DeseqError>>()?
+                .into_iter()
                 .filter(|value| *value > LOW_DF_HIST_MIN && *value < LOW_DF_HIST_MAX)
                 .collect::<Vec<_>>();
             let simulated_density = histogram_density(&simulated)?;
@@ -399,9 +408,7 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         let mut sxy = 0.0;
         for (_, idx) in distances.iter().copied().take(span_points) {
             let scaled = ((x[idx] - target).abs() / max_distance).min(1.0);
-            let scaled_cubed = scaled * scaled * scaled;
-            let one_minus_scaled_cubed = 1.0 - scaled_cubed;
-            let weight = one_minus_scaled_cubed * one_minus_scaled_cubed * one_minus_scaled_cubed;
+            let weight = tricube_weight(scaled)?;
             sw = checked_add(sw, weight, "low-df prior variance smoother weights")?;
             sx = checked_add(
                 sx,
@@ -472,6 +479,42 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         });
     }
     Ok(best_x)
+}
+
+fn low_df_simulated_residual(base: f64, variance: f64, normal: f64) -> Result<f64, DeseqError> {
+    checked_add(
+        base,
+        checked_mul(variance.sqrt(), normal, "low-df simulated residual scale")?,
+        "low-df simulated residual",
+    )
+}
+
+fn tricube_weight(scaled: f64) -> Result<f64, DeseqError> {
+    let scaled_square = checked_mul(
+        scaled,
+        scaled,
+        "low-df prior variance smoother scaled square",
+    )?;
+    let scaled_cubed = checked_mul(
+        scaled_square,
+        scaled,
+        "low-df prior variance smoother scaled cube",
+    )?;
+    let one_minus_scaled_cubed = checked_sub(
+        1.0,
+        scaled_cubed,
+        "low-df prior variance smoother tricube complement",
+    )?;
+    let weight_square = checked_mul(
+        one_minus_scaled_cubed,
+        one_minus_scaled_cubed,
+        "low-df prior variance smoother tricube weight",
+    )?;
+    checked_mul(
+        weight_square,
+        one_minus_scaled_cubed,
+        "low-df prior variance smoother tricube weight",
+    )
 }
 
 fn checked_add(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
@@ -554,6 +597,23 @@ mod tests {
             DeseqError::NonFiniteValue { context, .. }
                 if context == "low-df prior variance smoother y"
         ));
+    }
+
+    #[test]
+    fn low_df_simulated_residual_rejects_overflowed_scale() {
+        let err = low_df_simulated_residual(0.0, f64::MAX, f64::MAX).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, .. }
+                if context == "low-df simulated residual scale"
+        ));
+    }
+
+    #[test]
+    fn tricube_weight_matches_boundary_values() {
+        assert_eq!(tricube_weight(0.0).unwrap(), 1.0);
+        assert_eq!(tricube_weight(1.0).unwrap(), 0.0);
     }
 
     #[test]

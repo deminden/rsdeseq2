@@ -256,6 +256,16 @@ fn contrast_all_zero_numeric_rejects_overflowed_design_score() {
 }
 
 #[test]
+fn contrast_all_zero_numeric_keeps_large_cancelling_design_score_finite() {
+    let counts = CountMatrix::from_row_major_u32(1, 1, vec![0]).unwrap();
+    let design = DesignMatrix::from_row_major(1, 2, vec![f64::MAX, -f64::MAX], None).unwrap();
+
+    let flags = contrast_all_zero_numeric(&counts, &design, &[1.0, -1.0]).unwrap();
+
+    assert_eq!(flags, vec![true]);
+}
+
+#[test]
 fn contrast_all_zero_factor_levels_matches_deseq2_character_shape() {
     let counts = CountMatrix::from_row_major_u32(
         4,
