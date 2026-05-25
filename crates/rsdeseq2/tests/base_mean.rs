@@ -50,6 +50,7 @@ fn normalization_factors_validate_dimensions_and_positive_values() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 20, 30]).unwrap();
     let bad_dims = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap();
     let zero_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 0.0, 2.0]).unwrap();
+    let negative_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, -1.0, 2.0]).unwrap();
     let nan_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, f64::NAN, 2.0]).unwrap();
 
     assert!(matches!(
@@ -58,6 +59,10 @@ fn normalization_factors_validate_dimensions_and_positive_values() {
     ));
     assert!(matches!(
         normalized_counts_with_factors(&counts, &zero_factor).unwrap_err(),
+        DeseqError::InvalidSizeFactors { .. }
+    ));
+    assert!(matches!(
+        normalized_counts_with_factors(&counts, &negative_factor).unwrap_err(),
         DeseqError::InvalidSizeFactors { .. }
     ));
     assert!(matches!(

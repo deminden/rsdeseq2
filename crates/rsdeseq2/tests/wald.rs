@@ -158,6 +158,34 @@ fn wald_test_coefficient_can_use_scalar_t_degrees_of_freedom() {
 }
 
 #[test]
+fn original_use_t_vector_degrees_of_freedom_drive_pvalues() {
+    let fit = toy_fit(vec![2.0, -2.0], vec![0.5, 0.5], 2, 1);
+    let wald = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_per_gene_degrees_of_freedom(vec![12.0, 6.0]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        wald.degrees_of_freedom.as_ref().unwrap(),
+        &vec![Some(12.0), Some(6.0)]
+    );
+    assert_relative_eq!(wald.stat[0].unwrap(), 4.0, epsilon = 1e-12);
+    assert_relative_eq!(wald.stat[1].unwrap(), -4.0, epsilon = 1e-12);
+    assert_relative_eq!(
+        wald.pvalue[0].unwrap(),
+        two_sided_t_pvalue(4.0, 12.0).unwrap(),
+        epsilon = 1e-15
+    );
+    assert_relative_eq!(
+        wald.pvalue[1].unwrap(),
+        two_sided_t_pvalue(-4.0, 6.0).unwrap(),
+        epsilon = 1e-15
+    );
+}
+
+#[test]
 fn wald_test_coefficient_can_use_greater_abs_lfc_threshold() {
     let fit = toy_fit(vec![2.0], vec![0.5], 1, 1);
     let wald = wald_test_coefficient_with_options(
@@ -191,6 +219,27 @@ fn wald_test_coefficient_can_use_older_greater_abs_lfc_threshold() {
         0.04550026389635842,
         epsilon = 1e-11
     );
+}
+
+#[test]
+fn original_greater_abs_upshot_matches_greater_abs_at_zero_threshold() {
+    let fit = toy_fit(vec![2.0, -1.5], vec![0.5, 0.75], 2, 1);
+    let upshot = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::normal().with_lfc_threshold(0.0, WaldAlternative::GreaterAbsUpshot),
+    )
+    .unwrap();
+    let greater_abs = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::normal().with_lfc_threshold(0.0, WaldAlternative::GreaterAbs),
+    )
+    .unwrap();
+
+    assert_eq!(upshot.stat, greater_abs.stat);
+    assert_eq!(upshot.pvalue, greater_abs.pvalue);
+    assert_eq!(upshot.pvalue.len(), 2);
 }
 
 #[test]

@@ -44,6 +44,64 @@ fn size_factor_geometric_means_keep_large_counts_finite() {
 }
 
 #[test]
+fn original_norm_matrix_path_preempts_size_factors() {
+    let counts = CountMatrix::from_row_major_u32(
+        4,
+        4,
+        vec![
+            2, 2, 2, 2, //
+            4, 4, 4, 4, //
+            6, 6, 6, 6, //
+            8, 8, 8, 8,
+        ],
+    )
+    .unwrap();
+    let norm_matrix = RowMajorMatrix::from_row_major(
+        4,
+        4,
+        vec![
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0,
+        ],
+    )
+    .unwrap();
+    let true_size_factors = [2.0, 1.0, 1.0, 0.5];
+    let normalization_factors = RowMajorMatrix::from_row_major(
+        4,
+        4,
+        norm_matrix
+            .as_slice()
+            .chunks(4)
+            .flat_map(|row| {
+                row.iter()
+                    .copied()
+                    .zip(true_size_factors)
+                    .map(|(norm, factor)| norm * factor)
+                    .collect::<Vec<_>>()
+            })
+            .collect(),
+    )
+    .unwrap();
+
+    let normalized = normalized_counts_with_factors(&counts, &normalization_factors).unwrap();
+
+    assert_relative_eq!(normalized.row(0).unwrap()[0], 1.0, epsilon = 1e-12);
+    assert_relative_eq!(normalized.row(0).unwrap()[3], 4.0, epsilon = 1e-12);
+    for gene in 0..counts.n_genes() {
+        for (sample, true_size_factor) in true_size_factors.iter().copied().enumerate() {
+            assert_relative_eq!(
+                normalization_factors.row(gene).unwrap()[sample]
+                    / norm_matrix.row(gene).unwrap()[sample],
+                true_size_factor,
+                epsilon = 1e-12
+            );
+        }
+    }
+}
+
+#[test]
 fn supplied_geo_means_are_stabilized() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
     let size_factors =

@@ -1271,6 +1271,73 @@ fn irls_qr_solver_matches_normal_equations_for_two_group_design() {
 }
 
 #[test]
+fn original_qr_results_match_non_qr_results_on_stable_rows() {
+    let counts = CountMatrix::from_row_major_u32(2, 4, vec![10, 10, 20, 20, 8, 14, 7, 15]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let normal = fit_fixed_dispersion_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05, 0.2],
+        no_ridge_options(),
+    )
+    .unwrap();
+    let qr = fit_fixed_dispersion_irls(
+        &counts,
+        &design,
+        &[1.0, 1.0, 1.0, 1.0],
+        &[0.05, 0.2],
+        no_ridge_qr_options(),
+    )
+    .unwrap();
+
+    let normal_wald = wald_test_coefficient(&normal, 1).unwrap();
+    let qr_wald = wald_test_coefficient(&qr, 1).unwrap();
+
+    for gene in 0..counts.n_genes() {
+        assert_relative_eq!(
+            qr.beta.row(gene).unwrap()[1],
+            normal.beta.row(gene).unwrap()[1],
+            epsilon = 1e-8,
+            max_relative = 1e-8
+        );
+        assert_relative_eq!(
+            qr.beta_se.row(gene).unwrap()[1],
+            normal.beta_se.row(gene).unwrap()[1],
+            epsilon = 1e-8,
+            max_relative = 1e-8
+        );
+    }
+    for (actual, expected) in qr_wald.stat.iter().zip(normal_wald.stat.iter()) {
+        assert_relative_eq!(
+            actual.unwrap(),
+            expected.unwrap(),
+            epsilon = 1e-8,
+            max_relative = 1e-8
+        );
+    }
+    for (actual, expected) in qr_wald.pvalue.iter().zip(normal_wald.pvalue.iter()) {
+        assert_relative_eq!(
+            actual.unwrap(),
+            expected.unwrap(),
+            epsilon = 1e-8,
+            max_relative = 1e-8
+        );
+    }
+}
+
+#[test]
 fn irls_qr_solver_handles_default_ridge() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(

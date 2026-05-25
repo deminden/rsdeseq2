@@ -248,6 +248,78 @@ fn result_data_frame_assembles_typed_columns_and_metadata() {
 }
 
 #[test]
+fn original_result_frame_keeps_optional_diagnostics_ordered_and_typed() {
+    let results = DeseqResults {
+        rows: vec![
+            DeseqResultRow {
+                gene: Some("gene_a".to_string()),
+                base_mean: 10.0,
+                log2_fold_change: Some(1.0),
+                lfc_se: Some(0.5),
+                stat: Some(2.0),
+                pvalue: Some(0.04),
+                padj: Some(0.08),
+                dispersion: None,
+                converged: Some(true),
+                max_cooks: Some(1.5),
+                cooks_outlier: Some(false),
+                filtered: None,
+            },
+            DeseqResultRow {
+                gene: Some("gene_b".to_string()),
+                base_mean: 20.0,
+                log2_fold_change: None,
+                lfc_se: None,
+                stat: None,
+                pvalue: None,
+                padj: None,
+                dispersion: Some(0.2),
+                converged: None,
+                max_cooks: None,
+                cooks_outlier: None,
+                filtered: Some(true),
+            },
+        ],
+        metadata: DeseqResultsTableMetadata::default(),
+        independent_filtering: None,
+    };
+
+    assert_eq!(
+        results.column_names(),
+        vec![
+            "baseMean",
+            "log2FoldChange",
+            "lfcSE",
+            "stat",
+            "pvalue",
+            "padj",
+            "dispersion",
+            "converged",
+            "maxCooks",
+            "cooksOutlier",
+            "filtered",
+        ]
+    );
+
+    let frame = results.data_frame();
+    let max_cooks = frame
+        .columns
+        .iter()
+        .find(|column| column.metadata.name == "maxCooks")
+        .unwrap();
+    assert_eq!(max_cooks.values.as_numeric().unwrap(), &[Some(1.5), None]);
+    assert!(max_cooks.values.as_logical().is_none());
+
+    let filtered = frame
+        .columns
+        .iter()
+        .find(|column| column.metadata.name == "filtered")
+        .unwrap();
+    assert_eq!(filtered.values.as_logical().unwrap(), &[None, Some(true)]);
+    assert!(filtered.values.as_numeric().is_none());
+}
+
+#[test]
 fn build_wald_results_preserves_missing_pvalues_and_padj() {
     let fit = toy_fit(vec![2.0, 1.0], vec![0.0, 1.0], vec![true, true]);
     let results = build_wald_results(&[10.0, 20.0], &fit, 0, None, None).unwrap();

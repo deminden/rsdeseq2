@@ -88,6 +88,15 @@ fn fast_vst_subset_indices_use_r_round_half_to_even_positions() {
 }
 
 #[test]
+fn original_fast_vst_single_subset_uses_first_ordered_eligible_row() {
+    let base_mean = vec![5.0, 12.0, 6.0, 6.0, 100.0];
+
+    let selected = fast_vst_subset_indices(&base_mean, 1).unwrap();
+
+    assert_eq!(selected, vec![2]);
+}
+
+#[test]
 fn fast_vst_subset_indices_reject_invalid_inputs() {
     assert!(fast_vst_subset_indices(&[6.0, 7.0], 0).is_err());
     assert!(fast_vst_subset_indices(&[1.0, 2.0, 6.0], 2).is_err());

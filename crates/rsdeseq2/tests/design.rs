@@ -75,6 +75,27 @@ fn design_matrix_reports_zero_columns_in_full_rank_error() {
 }
 
 #[test]
+fn original_design_full_rank_error_reports_unnamed_zero_column_index() {
+    let design = DesignMatrix::from_row_major(
+        3,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0,
+        ],
+        None,
+    )
+    .unwrap();
+
+    let error = design.validate_full_rank("test").unwrap_err();
+    let message = error.to_string();
+
+    assert!(message.contains("not full rank"));
+    assert!(message.contains("zero columns: 1"));
+}
+
+#[test]
 fn design_rank_validates_tolerance() {
     let design = DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], None).unwrap();
 

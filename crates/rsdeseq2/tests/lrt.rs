@@ -15,6 +15,26 @@ fn lrt_test_matches_chisq_upper_tail() {
 }
 
 #[test]
+fn original_lrt_uses_model_rank_difference_and_upper_tail_shape() {
+    let full = toy_fit(
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        vec![1.0; 6],
+        vec![11.0, 7.5],
+        2,
+        3,
+    );
+    let reduced = toy_fit(vec![0.0, 0.0], vec![1.0; 2], vec![8.0, 8.0], 2, 1);
+
+    let lrt = lrt_test(&full, &reduced).unwrap();
+
+    assert_eq!(lrt.degrees_of_freedom, 2);
+    assert_eq!(lrt.deviance[0], Some(6.0));
+    assert_relative_eq!(lrt.pvalue[0].unwrap(), 0.04978706836786395, epsilon = 1e-14);
+    assert_eq!(lrt.deviance[1], Some(-1.0));
+    assert_relative_eq!(lrt.pvalue[1].unwrap(), 1.0, epsilon = 1e-15);
+}
+
+#[test]
 fn lrt_test_handles_missing_log_likelihoods() {
     let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![f64::NAN], 1, 2);
     let reduced = toy_fit(vec![0.0], vec![1.0], vec![8.0], 1, 1);

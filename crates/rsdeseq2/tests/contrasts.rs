@@ -94,6 +94,19 @@ fn list_contrast_resolves_like_deseq2_name_lists() {
         vec![0.0, 0.5, -2.0]
     );
 
+    let numerator_only = ContrastSpec::list(vec!["condition_B_vs_A".into()], Vec::new());
+    assert_eq!(
+        resolve_contrast(&design, &numerator_only).unwrap(),
+        vec![0.0, 1.0, 0.0]
+    );
+
+    let denominator_only =
+        ContrastSpec::list_with_values(Vec::new(), vec!["batch_Y_vs_X".into()], 0.5, -0.5);
+    assert_eq!(
+        resolve_contrast(&design, &denominator_only).unwrap(),
+        vec![0.0, 0.0, -0.5]
+    );
+
     let overlap = ContrastSpec::list(
         vec!["condition_B_vs_A".into()],
         vec!["condition_B_vs_A".into()],
@@ -264,6 +277,54 @@ fn contrast_all_zero_factor_levels_matches_deseq2_character_shape() {
     assert_eq!(
         contrast_all_zero_factor_levels(&counts, &levels, "C", "A").unwrap(),
         vec![false, false, true, false]
+    );
+}
+
+#[test]
+fn original_zero_zero_d_vs_b_contrast_shape_is_preserved() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        8,
+        vec![
+            100, 110, 0, 0, 100, 110, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+    )
+    .unwrap();
+    let levels = vec!["A", "A", "B", "B", "C", "C", "D", "D"];
+    let design = DesignMatrix::from_row_major(
+        8,
+        4,
+        vec![
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 0.0, 0.0, 1.0, //
+            1.0, 0.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "condition_C_vs_A".into(),
+            "condition_D_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        contrast_all_zero_factor_levels(&counts, &levels, "D", "B").unwrap(),
+        vec![true, true]
+    );
+    assert_eq!(
+        contrast_all_zero_numeric(&counts, &design, &[0.0, -1.0, 0.0, 1.0]).unwrap(),
+        vec![true, true]
+    );
+    assert_eq!(
+        contrast_all_zero_numeric(&counts, &design, &[0.0, 0.0, 0.0, 1.0]).unwrap(),
+        vec![false, false]
     );
 }
 

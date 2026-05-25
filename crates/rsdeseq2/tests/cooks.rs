@@ -323,6 +323,42 @@ fn replace_outlier_counts_skips_when_samples_do_not_exceed_coefficients() {
 }
 
 #[test]
+fn original_infinite_min_replicates_disables_outlier_replacement() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![100_000, 10, 10, 10]).unwrap();
+    let normalized = normalized_counts(&counts, &[1.0, 1.0, 1.0, 1.0]).unwrap();
+    let cooks = RowMajorMatrix::from_row_major(1, 4, vec![100.0, 0.0, 0.0, 0.0]).unwrap();
+    let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
+
+    let output = replace_outlier_counts(
+        &counts,
+        &normalized,
+        &[1.0, 1.0, 1.0, 1.0],
+        None,
+        &cooks,
+        &design,
+        &CooksReplacementOptions {
+            trim: 0.2,
+            cooks_cutoff: 1.0,
+            min_replicates: usize::MAX,
+            which_samples: None,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(output.replaced_counts.as_slice(), counts.as_slice());
+    assert_eq!(
+        output.outlier_cells.as_slice(),
+        &[true, false, false, false]
+    );
+    assert_eq!(output.replace, vec![Some(true)]);
+    assert_eq!(output.replaceable_samples, vec![false, false, false, false]);
+    assert_eq!(
+        output.candidate_replacement_counts.as_slice(),
+        &[25007, 25007, 25007, 25007]
+    );
+}
+
+#[test]
 fn prepare_cooks_replacement_refit_identifies_refit_rows_and_base_metadata() {
     let counts = CountMatrix::from_row_major_u32(
         3,
