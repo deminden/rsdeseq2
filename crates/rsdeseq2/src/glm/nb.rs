@@ -10,13 +10,9 @@ use crate::matrix::RowMajorMatrix;
 pub fn nbinom_log_pmf(count: u32, mu: f64, dispersion: f64) -> Result<f64, DeseqError> {
     validate_mu(mu, Some(0))?;
     validate_dispersion(dispersion, Some(0))?;
-    let y = f64::from(count);
-    let size = dispersion.recip();
-    let mu_dispersion = mu * dispersion;
-    Ok(
-        ln_gamma(y + size) - ln_gamma(size) - ln_gamma(y + 1.0) - size * mu_dispersion.ln_1p()
-            + count_log_term(y, mu_dispersion),
-    )
+    let term = nbinom_log_pmf_unchecked(count, mu, dispersion);
+    validate_log_pmf_term(term, Some(0))?;
+    Ok(term)
 }
 
 /// Row log likelihood for one gene.
@@ -56,7 +52,8 @@ pub fn nbinom_log_likelihood_weighted(
     for (idx, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_mu(mu, Some(idx))?;
         let term = nbinom_log_pmf_unchecked(count, mu, dispersion);
-        log_like += match weights {
+        validate_log_pmf_term(term, Some(idx))?;
+        let weighted_term = match weights {
             Some(weights) => {
                 let weight = weights[idx];
                 validate_weight(weight, Some(idx))?;
@@ -64,6 +61,8 @@ pub fn nbinom_log_likelihood_weighted(
             }
             None => term,
         };
+        validate_weighted_log_likelihood_term(weighted_term, Some(idx))?;
+        checked_add_log_likelihood(&mut log_like, weighted_term)?;
     }
     Ok(log_like)
 }
@@ -74,7 +73,7 @@ pub fn nbinom_negative_twice_log_likelihood(
     mu: &[f64],
     dispersion: f64,
 ) -> Result<f64, DeseqError> {
-    Ok(-2.0 * nbinom_log_likelihood(counts, mu, dispersion)?)
+    negative_twice_log_likelihood_from_log_like(nbinom_log_likelihood(counts, mu, dispersion)?)
 }
 
 /// Row-wise log likelihoods for a count matrix.
@@ -173,4 +172,74 @@ fn validate_weight(weight: f64, index: Option<usize>) -> Result<(), DeseqError> 
         });
     }
     Ok(())
+}
+
+fn validate_log_pmf_term(term: f64, index: Option<usize>) -> Result<(), DeseqError> {
+    if !term.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: match index {
+                Some(index) => {
+                    format!("negative-binomial log PMF at sample {index} must be finite")
+                }
+                None => "negative-binomial log PMF must be finite".to_string(),
+            },
+        });
+    }
+    Ok(())
+}
+
+fn validate_weighted_log_likelihood_term(
+    term: f64,
+    index: Option<usize>,
+) -> Result<(), DeseqError> {
+    if !term.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: match index {
+                Some(index) => {
+                    format!(
+                        "negative-binomial weighted log-likelihood term at sample {index} must be finite"
+                    )
+                }
+                None => "negative-binomial weighted log-likelihood term must be finite".to_string(),
+            },
+        });
+    }
+    Ok(())
+}
+
+fn checked_add_log_likelihood(total: &mut f64, term: f64) -> Result<(), DeseqError> {
+    let next = *total + term;
+    if !next.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "negative-binomial row log-likelihood sum must remain finite".to_string(),
+        });
+    }
+    *total = next;
+    Ok(())
+}
+
+fn negative_twice_log_likelihood_from_log_like(log_like: f64) -> Result<f64, DeseqError> {
+    let deviance = -2.0 * log_like;
+    if log_like.is_finite() && deviance.is_finite() {
+        Ok(deviance)
+    } else {
+        Err(DeseqError::InvalidDispersion {
+            reason: "negative-binomial deviance must remain finite".to_string(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::negative_twice_log_likelihood_from_log_like;
+
+    #[test]
+    fn negative_twice_log_likelihood_rejects_nonfinite_scaling() {
+        assert_eq!(
+            negative_twice_log_likelihood_from_log_like(-2.0).unwrap(),
+            4.0
+        );
+        assert!(negative_twice_log_likelihood_from_log_like(f64::NAN).is_err());
+        assert!(negative_twice_log_likelihood_from_log_like(f64::MAX).is_err());
+    }
 }

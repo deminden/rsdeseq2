@@ -6,7 +6,7 @@ use rsdeseq2::prelude::{
     norm_transform_value, rlog, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
     vst_parametric_value, vst_with_dispersion_trend,
     vst_with_dispersion_trend_and_normalization_factors,
-    vst_with_dispersion_trend_and_size_factors, CountMatrix, DispersionTrendFit,
+    vst_with_dispersion_trend_and_size_factors, CountMatrix, DeseqError, DispersionTrendFit,
     LocalDispersionTrend, LocalDispersionTrendFit, MeanDispersionTrend, MeanDispersionTrendFit,
     ParametricDispersionTrend, ParametricDispersionTrendFit, RowMajorMatrix,
 };
@@ -387,6 +387,41 @@ fn local_vst_size_factor_summaries_reject_invalid_values() {
 }
 
 #[test]
+fn local_vst_size_factor_summaries_reject_overflowed_accumulation() {
+    let err = local_vst_inverse_size_factor_mean(&[
+        f64::MIN_POSITIVE,
+        f64::MIN_POSITIVE,
+        f64::MIN_POSITIVE,
+        f64::MIN_POSITIVE,
+    ])
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, .. }
+            if context == "local VST inverse size-factor sum"
+    ));
+
+    let factors = RowMajorMatrix::from_row_major(
+        1,
+        5,
+        vec![
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+        ],
+    )
+    .unwrap();
+    let err = local_vst_inverse_size_factor_mean_from_normalization_factors(&factors).unwrap_err();
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, .. }
+            if context == "local VST inverse normalization-factor mean sum"
+    ));
+}
+
+#[test]
 fn vst_with_dispersion_trend_dispatches_parametric_mean_and_local_branches() {
     let normalized = RowMajorMatrix::from_row_major(
         4,
@@ -602,6 +637,17 @@ fn vst_local_rejects_negative_counts_and_bad_size_factor_summary() {
     let normalized = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 2.0, 4.0, 8.0]).unwrap();
     assert!(vst_local(&normalized, &trend, 0.0).is_err());
     assert!(vst_local(&normalized, &trend, f64::NAN).is_err());
+}
+
+#[test]
+fn vst_local_rejects_overflowed_variance_curve() {
+    let trend = constant_local_trend(0.25);
+    let huge = RowMajorMatrix::from_row_major(1, 1, vec![f64::MAX]).unwrap();
+    let err = vst_local(&huge, &trend, 1.0).unwrap_err();
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { .. } | DeseqError::InvalidDispersion { .. }
+    ));
 }
 
 #[test]

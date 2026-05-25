@@ -340,9 +340,37 @@ fn build_wald_contrast_results_validates_dimensions() {
 }
 
 #[test]
+fn build_wald_contrast_results_rejects_invalid_optional_outputs() {
+    let fit = toy_fit(vec![1.0], vec![0.5], vec![true]);
+    let invalid_pvalue = WaldContrastOutput {
+        log2_fold_change: vec![Some(1.0)],
+        lfc_se: vec![Some(0.5)],
+        wald: WaldOutput {
+            stat: vec![Some(2.0)],
+            pvalue: vec![Some(1.2)],
+            degrees_of_freedom: None,
+        },
+    };
+    assert!(build_wald_contrast_results(&[10.0], &fit, &invalid_pvalue, None, None).is_err());
+
+    let invalid_df = WaldContrastOutput {
+        log2_fold_change: vec![Some(1.0)],
+        lfc_se: vec![Some(0.5)],
+        wald: WaldOutput {
+            stat: vec![Some(2.0)],
+            pvalue: vec![Some(0.05)],
+            degrees_of_freedom: Some(vec![Some(0.0)]),
+        },
+    };
+    assert!(build_wald_contrast_results(&[10.0], &fit, &invalid_df, None, None).is_err());
+}
+
+#[test]
 fn build_wald_results_validates_dimensions() {
     let fit = toy_fit(vec![1.0, 2.0], vec![1.0, 1.0], vec![true, true]);
     assert!(build_wald_results(&[1.0], &fit, 0, None, None).is_err());
+    assert!(build_wald_results(&[1.0, f64::NAN], &fit, 0, None, None).is_err());
+    assert!(build_wald_results(&[1.0, -1.0], &fit, 0, None, None).is_err());
 
     let bad_names = vec!["gene_a".to_string()];
     assert!(build_wald_results(&[1.0, 2.0], &fit, 0, Some(&bad_names), None).is_err());
@@ -414,11 +442,40 @@ fn build_lrt_results_validates_dimensions() {
 }
 
 #[test]
+fn build_lrt_results_rejects_invalid_optional_outputs() {
+    let fit = toy_fit(vec![1.0], vec![0.5], vec![true]);
+    let invalid_pvalue = LrtOutput {
+        deviance: vec![Some(4.0)],
+        pvalue: vec![Some(f64::NAN)],
+        degrees_of_freedom: 1,
+        reduced_converged: vec![true],
+    };
+    assert!(build_lrt_results(&[10.0], &fit, &invalid_pvalue, 0, None, None).is_err());
+
+    let invalid_deviance = LrtOutput {
+        deviance: vec![Some(f64::INFINITY)],
+        pvalue: vec![Some(0.05)],
+        degrees_of_freedom: 1,
+        reduced_converged: vec![true],
+    };
+    assert!(build_lrt_results(&[10.0], &fit, &invalid_deviance, 0, None, None).is_err());
+
+    let missing_reduced_flag = LrtOutput {
+        deviance: vec![Some(4.0)],
+        pvalue: vec![Some(0.05)],
+        degrees_of_freedom: 1,
+        reduced_converged: Vec::new(),
+    };
+    assert!(build_lrt_results(&[10.0], &fit, &missing_reduced_flag, 0, None, None).is_err());
+}
+
+#[test]
 fn default_cooks_cutoff_matches_deseq2_f_distribution_shape() {
     let cutoff = default_cooks_cutoff(3, 1).unwrap().unwrap();
     assert!(cutoff > 90.0);
     assert!(cutoff < 110.0);
     assert_eq!(default_cooks_cutoff(2, 2).unwrap(), None);
+    assert!(default_cooks_cutoff(3, 0).is_err());
 }
 
 #[test]
@@ -458,6 +515,24 @@ fn apply_cooks_cutoff_masks_outlier_pvalues_and_recomputes_padj() {
     assert_eq!(results.rows[2].cooks_outlier, None);
     assert!(results.rows[2].pvalue.is_some());
     assert!(results.rows[2].padj.is_some());
+}
+
+#[test]
+fn recompute_padj_rejects_invalid_mutated_pvalues() {
+    let fit = toy_fit(vec![0.0], vec![1.0], vec![true]);
+    let mut results = build_wald_results(&[1.0], &fit, 0, None, None).unwrap();
+    results.rows[0].pvalue = Some(1.2);
+
+    assert!(recompute_padj(&mut results).is_err());
+}
+
+#[test]
+fn apply_cooks_cutoff_rejects_nonfinite_max_cooks() {
+    let fit = toy_fit(vec![0.0], vec![1.0], vec![true]);
+    let mut results = build_wald_results(&[1.0], &fit, 0, None, None).unwrap();
+    results.rows[0].max_cooks = Some(f64::INFINITY);
+
+    assert!(apply_cooks_cutoff(&mut results, Some(5.0)).is_err());
 }
 
 #[test]
@@ -509,6 +584,14 @@ fn apply_cooks_cutoff_low_count_heuristic_validates_inputs() {
     assert!(apply_cooks_cutoff_with_low_count_heuristic(
         &mut results,
         Some(f64::NAN),
+        &counts,
+        &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
+    )
+    .is_err());
+    results.rows[0].max_cooks = Some(f64::NAN);
+    assert!(apply_cooks_cutoff_with_low_count_heuristic(
+        &mut results,
+        Some(5.0),
         &counts,
         &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
     )

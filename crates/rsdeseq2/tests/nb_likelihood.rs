@@ -133,6 +133,22 @@ fn nb_log_pmf_zero_count_stays_finite_for_tiny_mu_dispersion() {
 }
 
 #[test]
+fn nb_log_pmf_rejects_nonfinite_numeric_result() {
+    let err = nbinom_log_pmf(0, f64::MAX, f64::MAX).unwrap_err();
+
+    assert!(err.to_string().contains("negative-binomial log PMF"));
+}
+
+#[test]
+fn weighted_log_likelihood_rejects_nonfinite_weighted_term() {
+    let err = nbinom_log_likelihood_weighted(&[1], &[1.0], 0.3, Some(&[f64::MAX])).unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("negative-binomial weighted log-likelihood term"));
+}
+
+#[test]
 fn nb_likelihood_validates_inputs() {
     assert!(nbinom_log_pmf(1, 0.0, 0.1).is_err());
     assert!(nbinom_log_pmf(1, 1.0, 0.0).is_err());

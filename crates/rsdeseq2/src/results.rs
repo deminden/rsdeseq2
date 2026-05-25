@@ -508,20 +508,7 @@ pub fn build_lrt_results(
             actual: coefficient,
         });
     }
-    if lrt.deviance.len() != full_fit.beta.n_rows() {
-        return Err(invalid_dimensions(
-            "LRT statistic rows",
-            full_fit.beta.n_rows(),
-            lrt.deviance.len(),
-        ));
-    }
-    if lrt.pvalue.len() != full_fit.beta.n_rows() {
-        return Err(invalid_dimensions(
-            "LRT p-value rows",
-            full_fit.beta.n_rows(),
-            lrt.pvalue.len(),
-        ));
-    }
+    validate_lrt_output(lrt, full_fit.beta.n_rows())?;
     let padj = bh_adjust(&lrt.pvalue);
     let mut rows = Vec::with_capacity(full_fit.beta.n_rows());
     for gene in 0..full_fit.beta.n_rows() {
@@ -583,13 +570,28 @@ pub fn default_cooks_cutoff(
     }
     let df1 = n_coefficients as f64;
     let df2 = (n_samples - n_coefficients) as f64;
+    if !df1.is_finite() || df1 <= 0.0 || !df2.is_finite() || df2 <= 0.0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "Cook's cutoff degrees of freedom".to_string(),
+            expected: n_samples,
+            actual: n_coefficients,
+        });
+    }
     let distribution =
         FisherSnedecor::new(df1, df2).map_err(|error| DeseqError::InvalidDimensions {
             context: format!("Cook's cutoff F distribution: {error}"),
             expected: n_samples,
             actual: n_coefficients,
         })?;
-    Ok(Some(distribution.inverse_cdf(0.99)))
+    let cutoff = distribution.inverse_cdf(0.99);
+    if !cutoff.is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: "Cook's default cutoff".to_string(),
+            index: None,
+            value: cutoff,
+        });
+    }
+    Ok(Some(cutoff))
 }
 
 /// Apply Cook's p-value filtering and recompute BH-adjusted p-values.
@@ -612,13 +614,25 @@ pub fn apply_cooks_cutoff(
         });
     }
 
-    for row in &mut results.rows {
-        row.cooks_outlier = row.max_cooks.map(|value| value > cutoff);
+    for (idx, row) in results.rows.iter_mut().enumerate() {
+        row.cooks_outlier = match row.max_cooks {
+            Some(value) => {
+                if !value.is_finite() {
+                    return Err(DeseqError::NonFiniteValue {
+                        context: "result maxCooks".to_string(),
+                        index: Some(idx),
+                        value,
+                    });
+                }
+                Some(value > cutoff)
+            }
+            None => None,
+        };
         if row.cooks_outlier == Some(true) {
             row.pvalue = None;
         }
     }
-    recompute_padj(results);
+    recompute_padj(results)?;
     Ok(())
 }
 
@@ -649,7 +663,19 @@ pub fn apply_cooks_cutoff_with_low_count_heuristic(
     validate_cooks_heuristic_inputs(results, counts, cooks)?;
 
     for (gene, row) in results.rows.iter_mut().enumerate() {
-        let is_outlier = row.max_cooks.map(|value| value > cutoff);
+        let is_outlier = match row.max_cooks {
+            Some(value) => {
+                if !value.is_finite() {
+                    return Err(DeseqError::NonFiniteValue {
+                        context: "result maxCooks".to_string(),
+                        index: Some(gene),
+                        value,
+                    });
+                }
+                Some(value > cutoff)
+            }
+            None => None,
+        };
         row.cooks_outlier = match is_outlier {
             Some(true) => {
                 let spare =
@@ -664,21 +690,23 @@ pub fn apply_cooks_cutoff_with_low_count_heuristic(
             other => other,
         };
     }
-    recompute_padj(results);
+    recompute_padj(results)?;
     Ok(())
 }
 
 /// Recompute BH-adjusted p-values from the current result p-values.
-pub fn recompute_padj(results: &mut DeseqResults) {
+pub fn recompute_padj(results: &mut DeseqResults) -> Result<(), DeseqError> {
     let pvalues = results
         .rows
         .iter()
         .map(|row| row.pvalue)
         .collect::<Vec<_>>();
+    validate_optional_probability(&pvalues, "result p-value")?;
     let padj = bh_adjust(&pvalues);
     for (row, adjusted) in results.rows.iter_mut().zip(padj) {
         row.padj = adjusted;
     }
+    Ok(())
 }
 
 fn low_count_outlier_heuristic_spares_row(counts: &[u32], cooks: &[f64]) -> bool {
@@ -756,6 +784,15 @@ fn validate_result_inputs(
             base_mean.len(),
         ));
     }
+    for (idx, value) in base_mean.iter().copied().enumerate() {
+        if !value.is_finite() || value < 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: "result baseMean".to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
+    }
     if fit.beta_se.n_rows() != n_genes || fit.beta_se.n_cols() != fit.beta.n_cols() {
         return Err(invalid_dimensions(
             "result betaSE matrix values",
@@ -814,7 +851,10 @@ fn validate_wald_output(wald: &WaldOutput, n_genes: usize) -> Result<(), DeseqEr
                 df.len(),
             ));
         }
+        validate_optional_positive_finite(df, "Wald result degrees of freedom")?;
     }
+    validate_optional_finite(&wald.stat, "Wald result statistic")?;
+    validate_optional_probability(&wald.pvalue, "Wald result p-value")?;
     Ok(())
 }
 
@@ -837,6 +877,82 @@ fn validate_wald_contrast_output(
         ));
     }
     validate_wald_output(&contrast.wald, n_genes)
+}
+
+fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(), DeseqError> {
+    if lrt.deviance.len() != n_genes {
+        return Err(invalid_dimensions(
+            "LRT statistic rows",
+            n_genes,
+            lrt.deviance.len(),
+        ));
+    }
+    if lrt.pvalue.len() != n_genes {
+        return Err(invalid_dimensions(
+            "LRT p-value rows",
+            n_genes,
+            lrt.pvalue.len(),
+        ));
+    }
+    if lrt.reduced_converged.len() != n_genes {
+        return Err(invalid_dimensions(
+            "LRT reduced convergence flags",
+            n_genes,
+            lrt.reduced_converged.len(),
+        ));
+    }
+    if lrt.degrees_of_freedom == 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "LRT degrees of freedom must be positive".to_string(),
+        });
+    }
+    validate_optional_finite(&lrt.deviance, "LRT statistic")?;
+    validate_optional_probability(&lrt.pvalue, "LRT p-value")?;
+    Ok(())
+}
+
+fn validate_optional_finite(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
+        if let Some(value) = value {
+            if !value.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: context.to_string(),
+                    index: Some(idx),
+                    value,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_positive_finite(
+    values: &[Option<f64>],
+    context: &str,
+) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
+        if let Some(value) = value {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("{context} at index {idx} must be positive and finite"),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_probability(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
+        if let Some(value) = value {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn wald_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTableMetadata {

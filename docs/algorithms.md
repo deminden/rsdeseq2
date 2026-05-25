@@ -151,7 +151,9 @@ log p(y | mu, alpha) =
 ```
 
 The Rust helpers in `glm::nb` implement this parameterization and row-sum
-log-likelihoods matching DESeq2's `nbinomLogLike`.
+log-likelihoods matching DESeq2's `nbinomLogLike`. Individual log-PMF terms,
+weighted terms, and accumulated row log-likelihood sums are checked for finite
+values before they are returned to GLM, Wald, or LRT stages.
 
 ## Variance-Stabilizing Transform
 
@@ -364,20 +366,26 @@ dispGeneEst ~ 1 + I(1 / baseMean)
 
 using the equivalent IRLS weighted least-squares update with weights
 `1 / fittedDisp^2`. The outer loop stops when the squared log coefficient
-change is below `1e-6`, matching DESeq2's control flow. If all gene-wise
-estimates are within two orders of magnitude of `minDisp`, the trend fit
-returns an explicit error, matching DESeq2's guidance to use gene-wise
-estimates directly. Offline DESeq2 fixtures check both fitted training-row
-values and predictions at means outside the original fit rows.
+change is below `1e-6`, matching DESeq2's control flow. The Rust path rejects
+non-finite weighted least-squares terms, determinant and coefficient-numerator
+products, Gamma deviances, coefficient changes, and fitted trend values before
+they can propagate into later dispersion stages. If all gene-wise estimates are
+within two orders of magnitude of `minDisp`, the trend fit returns an explicit
+error, matching DESeq2's guidance to use gene-wise estimates directly. Offline
+DESeq2 fixtures check both fitted training-row values and predictions at means
+outside the original fit rows.
 
 The mean trend type is also implemented. It follows
 `estimateDispersionsFit(fitType="mean")`: first require at least one row with
 `dispGeneEst > 100 * minDisp`, then compute one constant fitted dispersion from
 the trimmed mean of finite estimates with `dispGeneEst > 10 * minDisp`
-(`trim = 0.001` by default). The fitted value is expanded back to every finite
-positive-base-mean row, with missing rows represented as `NaN`. An offline
-DESeq2 fixture checks the separate viability and mean-inclusion thresholds plus
-the constant fitted value.
+(`trim = 0.001` by default). Rust exposes those two row-selection masks
+separately, because DESeq2 uses the stricter threshold only as the preliminary
+viability gate. The fitted value is expanded back to every finite
+positive-base-mean row, with missing rows represented as `NaN`. The trimmed mean
+uses stable averaging so very large finite dispersion estimates do not overflow
+before division. An offline DESeq2 fixture checks the separate viability and
+mean-inclusion thresholds plus the constant fitted value.
 
 The local trend type has an initial pure-Rust implementation. It follows
 DESeq2's local-fit data contract by fitting on `log(dispGeneEst)` versus
@@ -390,7 +398,15 @@ fixture covering mixed rows above and below the `10 * minDisp` fit threshold
 and another fixture checking predictions at means outside the original fit
 rows. Fitted rows are sorted once on log mean; each prediction uses the
 adaptive nearest-neighbor window directly rather than allocating and sorting a
-full distance vector per gene. A separate offline fixture covers DESeq2's
+full distance vector per gene. Rank-degenerate local neighborhoods, including
+duplicated base means, fall back through lower polynomial degrees before using
+a stable weighted constant fit. Manually constructed local trends reuse the
+builder shape checks for span and polynomial degree, then validate finite log
+dispersions, positive finite local weights, and a consistent empty state for the
+minimum-dispersion floor branch before prediction. Batch trend evaluation
+prevalidates the fitted trend once before expanding finite positive rows and
+missing `NaN` rows, so malformed manual trend state is reported even when every
+requested mean is missing. A separate offline fixture covers DESeq2's
 all-near-minimum local floor branch, where the helper returns the
 minimum-dispersion vector directly rather than a prediction function. Exact
 `locfit` numerical identity and glmGamPoi trend support remain future work.
@@ -458,6 +474,10 @@ stability:
 ```text
 dispMAP = clamp(dispMAP, minDisp, max(10, n_samples))
 ```
+
+The MAP path checks initial-value threshold arithmetic, optimizer-produced
+dispersion values, and outlier-threshold arithmetic before those values drive
+clamping or final dispersion replacement.
 
 Final dispersions then apply DESeq2's high-side outlier rule:
 
@@ -674,7 +694,9 @@ resolved a contrast into numeric coefficients. The precomputed numeric contrast
 output can be assembled into DESeq2-shaped result rows with BH adjustment. The
 supplied-dispersion Wald builder and the native linear-mu/GLM-mu Wald builders
 can run a primitive numeric contrast through GLM fitting, Cook's cutoff
-masking, and independent filtering.
+masking, and independent filtering. Non-finite contrast estimates, covariance
+quadratic forms, or standard errors produce missing contrast statistics for the
+affected gene instead of propagating non-finite values downstream.
 
 The primitive contrast resolver also supports named forms when a
 `DesignMatrix` has coefficient names:
@@ -1127,6 +1149,89 @@ on accept:
 on reject:
   halve kappa
 ```
+
+The shared bounded optimizer and the GLM beta fallback reject non-finite norm,
+dot-product, movement, directional-derivative, and objective-building
+accumulations. Overflow in optimizer control quantities now produces a
+non-converged optimizer result for the affected row; overflow while building the
+beta objective, gradient, Hessian, or ridge penalty is converted into the same
+large finite penalty used for invalid fitted means. Fitted-mean reconstruction
+uses checked row-wise linear predictors so overflow is reported on the affected
+sample before exponentiation.
+The intercept-only fixed-dispersion shortcut also checks normalized mean,
+weighted mean, reconstructed fitted-mean, and intercept-information sums, and
+uses the stable `(1 / mu + alpha)^-1` working-weight formula.
+Weighted beta-prior quantile matching checks total, normalized, merged, and
+cumulative weights before interpolation so extreme observation-derived weights
+cannot silently overflow the shrinkage-scale estimate.
+Observation-weight preprocessing checks weighted design values and Cox-Reid
+subset column sums for finite arithmetic, while the rank-deficient zero-column
+path avoids unnecessary products when testing whether a column is represented.
+Gene-wise dispersion Cox-Reid matrix construction checks design cross-products,
+weighted derivative matrix terms, selected-column sums, and trace accumulations
+before determinant, derivative, or second-derivative values are used by the
+dispersion optimizer.
+Rough and moments dispersion starts check residual squares, inverse
+size-factor summaries, normalization-factor column means, and per-gene moment
+terms. The dispersion likelihood objective, derivative, and second derivative
+also check per-sample terms, observation-weight products, and row-level
+accumulations before line-search or grid-search decisions consume them.
+Ratio and poscounts size-factor estimation check per-gene geometric-mean log
+sums before median ratio construction, and frozen size-factor stabilization
+checks the final log-size-factor sum before rescaling to geometric mean one.
+Base mean and base variance metadata use checked row sums, checked
+observation-weight products, and checked centered sum-of-squares before those
+values are stored on the fitted state.
+Result assembly validates base means before building Wald or LRT result rows,
+so invalid upstream metadata is reported before adjusted p-values or
+diagnostic columns are emitted.
+Precomputed Wald/LRT outputs are also checked for finite statistics, bounded
+p-values, valid t degrees of freedom, and aligned reduced-model convergence
+flags before result tables are built.
+Later mutable result-table operations reuse the same p-value contract before
+recomputing BH adjustments, and Cook's filtering rejects non-finite `maxCooks`
+diagnostics before masking p-values.
+DESeq2-shaped diagnostic exports validate aligned column lengths and gene names
+before writing row-wise metadata.
+Size-factor and base-mean exports validate name alignment and finite value
+domains before writing scalar sample or gene metadata.
+Result-table exports validate manually assembled rows for finite effects,
+bounded p-values, positive dispersions, and non-negative Cook's diagnostics
+before serializing TSV output.
+Independent-filtering metadata exports validate theta domains, alpha, selected
+indices, lowess length, and finite rejection-curve values before writing.
+Wald p-value helpers clamp finite tail probabilities to `[0, 1]` and preserve
+missing p-values for non-finite tail calculations.
+Cook's default cutoff validates F-distribution degrees of freedom and the
+resulting quantile before it can mask result p-values.
+LRT result construction checks log-likelihood subtraction and deviance scaling
+before chi-square p-values are computed, preserving missing values for rows
+whose likelihood difference cannot be represented finitely.
+Finite LRT chi-square upper-tail probabilities are clamped to `[0, 1]`, and
+reduced-model convergence flags are validated before being copied into LRT
+diagnostics.
+Stored full-model deviance diagnostics use the same finite guard around
+`-2 * logLike`, turning non-representable values into the existing missing
+numeric representation.
+The public negative-binomial `-2 * logLik` helper also checks the final
+deviance scaling after the row log-likelihood has been accumulated.
+Cook's-distance robust dispersion and outlier replacement helpers check
+trimmed means, residual squares, variance factors, and Cook's-distance
+arithmetic so extreme finite values are reported before replacement or refit
+planning consumes them.
+The local VST path checks inverse size-factor summaries, normalization-factor
+geometric-mean summaries, row-mean accumulation, variance-curve products, and
+integration/interpolation arithmetic before producing transformed values.
+Independent-filtering lowess checks residual, robust-weight, local-linear
+center/variance, interpolation, fitted-value, RMSE, and threshold accumulations
+before selecting the final filter threshold.
+MAP shrinkage checks initial-threshold arithmetic, optimizer output, and
+outlier-threshold arithmetic before clamping or replacing final dispersions.
+Numeric `contrastAllZero` checks design-score accumulation before selecting
+samples for the all-zero contrast rule.
+The low-residual-df dispersion-prior branch also checks local smoother weighted
+regression sums and prediction arithmetic, so extreme finite KL grids fail
+explicitly instead of choosing a spurious prior-variance minimum.
 
 Rows that do not converge and remain above `minDisp * 10` fall back to the
 two-pass grid search, matching DESeq2's fallback structure:

@@ -1,6 +1,12 @@
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::options::FitType;
 
+const PARAMETRIC_WLS_SUM_CONTEXT: &str = "parametric dispersion weighted least-squares sums";
+const PARAMETRIC_WLS_DETERMINANT_CONTEXT: &str =
+    "parametric dispersion weighted least-squares determinant";
+const PARAMETRIC_WLS_NUMERATOR_CONTEXT: &str =
+    "parametric dispersion weighted least-squares coefficient numerator";
+
 /// Options for DESeq2-style parametric dispersion trend fitting.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ParametricDispersionTrendOptions {
@@ -56,7 +62,7 @@ pub struct LocalDispersionTrendOptions {
     pub min_disp: f64,
     /// Fraction of fitted rows used in the adaptive local neighborhood.
     pub span: f64,
-    /// Local polynomial degree on log(mean), capped to quadratic.
+    /// Local polynomial degree on log(mean), supported through quadratic.
     pub degree: usize,
 }
 
@@ -92,6 +98,39 @@ impl ParametricDispersionTrend {
     /// Evaluate the parametric dispersion trend at one positive mean.
     pub fn evaluate(&self, mean: f64) -> Result<f64, DeseqError> {
         validate_positive_mean(mean, None)?;
+        self.validate_fit()?;
+        self.evaluate_validated(mean)
+    }
+
+    /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
+    pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+        self.validate_fit()?;
+        means
+            .iter()
+            .copied()
+            .map(|mean| {
+                if mean.is_finite() && mean > 0.0 {
+                    self.evaluate_validated(mean)
+                } else {
+                    Ok(f64::NAN)
+                }
+            })
+            .collect()
+    }
+
+    fn evaluate_validated(&self, mean: f64) -> Result<f64, DeseqError> {
+        let fitted = self.asympt_disp + self.extra_pois / mean;
+        if !fitted.is_finite() || fitted <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason:
+                    "parametric dispersion trend produced a non-finite or non-positive fitted value"
+                        .to_string(),
+            });
+        }
+        Ok(fitted)
+    }
+
+    fn validate_fit(&self) -> Result<(), DeseqError> {
         if !self.asympt_disp.is_finite() || self.asympt_disp <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
                 reason: "asymptotic dispersion coefficient must be finite and positive".to_string(),
@@ -103,22 +142,7 @@ impl ParametricDispersionTrend {
                     .to_string(),
             });
         }
-        Ok(self.asympt_disp + self.extra_pois / mean)
-    }
-
-    /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
-    pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
-        means
-            .iter()
-            .copied()
-            .map(|mean| {
-                if mean.is_finite() && mean > 0.0 {
-                    self.evaluate(mean)
-                } else {
-                    Ok(f64::NAN)
-                }
-            })
-            .collect()
+        Ok(())
     }
 }
 
@@ -152,23 +176,37 @@ impl MeanDispersionTrend {
     /// Evaluate the constant mean dispersion trend at one positive mean.
     pub fn evaluate(&self, mean: f64) -> Result<f64, DeseqError> {
         validate_positive_mean(mean, None)?;
-        validate_positive_dispersion(self.mean_disp, None)?;
-        Ok(self.mean_disp)
+        self.validate_fit()?;
+        Ok(self.evaluate_validated())
     }
 
     /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
     pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+        self.validate_fit()?;
         means
             .iter()
             .copied()
             .map(|mean| {
                 if mean.is_finite() && mean > 0.0 {
-                    self.evaluate(mean)
+                    Ok(self.evaluate_validated())
                 } else {
                     Ok(f64::NAN)
                 }
             })
             .collect()
+    }
+
+    fn evaluate_validated(&self) -> f64 {
+        self.mean_disp
+    }
+
+    fn validate_fit(&self) -> Result<(), DeseqError> {
+        if !self.mean_disp.is_finite() || self.mean_disp <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "mean dispersion trend value must be finite and positive".to_string(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -214,11 +252,11 @@ impl LocalDispersionTrend {
     /// Evaluate the local dispersion trend at one positive mean.
     pub fn evaluate(&self, mean: f64) -> Result<f64, DeseqError> {
         validate_positive_mean(mean, None)?;
-        if !self.min_disp.is_finite() || self.min_disp <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "minimum dispersion must be finite and positive".to_string(),
-            });
-        }
+        self.validate_fit()?;
+        self.evaluate_validated(mean)
+    }
+
+    fn evaluate_validated(&self, mean: f64) -> Result<f64, DeseqError> {
         if self.log_means.is_empty() {
             return Ok(self.min_disp);
         }
@@ -233,7 +271,8 @@ impl LocalDispersionTrend {
         let dispersion = predicted.exp();
         if !dispersion.is_finite() || dispersion <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
-                reason: "local dispersion trend produced a non-positive fitted value".to_string(),
+                reason: "local dispersion trend produced a non-finite or non-positive fitted value"
+                    .to_string(),
             });
         }
         Ok(dispersion)
@@ -241,17 +280,37 @@ impl LocalDispersionTrend {
 
     /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
     pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+        self.validate_fit()?;
         means
             .iter()
             .copied()
             .map(|mean| {
                 if mean.is_finite() && mean > 0.0 {
-                    self.evaluate(mean)
+                    self.evaluate_validated(mean)
                 } else {
                     Ok(f64::NAN)
                 }
             })
             .collect()
+    }
+
+    fn validate_fit(&self) -> Result<(), DeseqError> {
+        if !self.min_disp.is_finite() || self.min_disp <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "minimum dispersion must be finite and positive".to_string(),
+            });
+        }
+        validate_local_trend_shape(self.span, self.degree)?;
+        if self.log_means.is_empty() && (!self.log_disps.is_empty() || !self.weights.is_empty()) {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "empty local dispersion trend must not carry fit values or weights"
+                    .to_string(),
+            });
+        }
+        if !self.log_means.is_empty() {
+            validate_local_trend_fit_rows(&self.log_means, &self.log_disps, &self.weights)?;
+        }
+        Ok(())
     }
 }
 
@@ -301,11 +360,45 @@ impl DispersionTrendFit {
     }
 
     /// Rows retained by the selected trend fit rule.
+    ///
+    /// For `fitType="mean"`, this is the preliminary viability mask using
+    /// `dispGeneEst > 100 * minDisp`; use [`Self::use_for_mean`] to inspect the
+    /// trimmed-mean mask.
     pub fn use_for_fit(&self) -> &[bool] {
         match self {
             Self::Parametric(fit) => &fit.use_for_fit,
             Self::Local(fit) => &fit.use_for_fit,
             Self::Mean(fit) => &fit.use_for_fit,
+        }
+    }
+
+    /// Rows used by the `fitType="mean"` trimmed-mean calculation.
+    ///
+    /// Returns `None` for parametric and local trends.
+    pub fn use_for_mean(&self) -> Option<&[bool]> {
+        match self {
+            Self::Mean(fit) => Some(&fit.use_for_mean),
+            Self::Parametric(_) | Self::Local(_) => None,
+        }
+    }
+
+    /// Number of rows used by the `fitType="mean"` trimmed-mean calculation.
+    ///
+    /// Returns `None` for parametric and local trends.
+    pub fn genes_used_for_mean(&self) -> Option<usize> {
+        match self {
+            Self::Mean(fit) => Some(fit.genes_used_for_mean),
+            Self::Parametric(_) | Self::Local(_) => None,
+        }
+    }
+
+    /// Whether `fitType="local"` used DESeq2's all-near-minimum dispersion floor.
+    ///
+    /// Returns `None` for parametric and mean trends.
+    pub fn used_min_disp_floor(&self) -> Option<bool> {
+        match self {
+            Self::Local(fit) => Some(fit.used_min_disp_floor),
+            Self::Parametric(_) | Self::Mean(_) => None,
         }
     }
 
@@ -373,10 +466,7 @@ pub fn fit_parametric_dispersion_trend(
                 reason: "parametric dispersion fit failed".to_string(),
             });
         }
-        let asympt_change = (trend.asympt_disp / old.asympt_disp).ln();
-        let extra_pois_change = (trend.extra_pois / old.extra_pois).ln();
-        let coefficient_change =
-            asympt_change * asympt_change + extra_pois_change * extra_pois_change;
+        let coefficient_change = parametric_coefficient_change(old, trend)?;
         if coefficient_change < options.coefficient_tol && fit.converged {
             return Ok(ParametricDispersionTrendFit {
                 trend,
@@ -407,7 +497,7 @@ pub fn fit_mean_dispersion_trend(
     options: MeanDispersionTrendOptions,
 ) -> Result<MeanDispersionTrendFit, DeseqError> {
     validate_mean_trend_inputs(base_mean, disp_gene_est, options)?;
-    let use_for_fit = parametric_trend_use_for_fit(base_mean, disp_gene_est, options.min_disp)?;
+    let use_for_fit = mean_trend_use_for_fit(base_mean, disp_gene_est, options.min_disp)?;
     let genes_used = use_for_fit.iter().filter(|value| **value).count();
     if genes_used == 0 {
         return Err(DeseqError::InvalidDispersion {
@@ -478,7 +568,7 @@ pub fn fit_local_dispersion_trend(
     let trend = LocalDispersionTrend {
         min_disp: options.min_disp,
         span: options.span,
-        degree: options.degree.min(2),
+        degree: options.degree,
         log_means,
         log_disps,
         weights,
@@ -499,18 +589,12 @@ pub fn parametric_trend_use_for_fit(
     disp_gene_est: &[f64],
     min_disp: f64,
 ) -> Result<Vec<bool>, DeseqError> {
-    if base_mean.len() != disp_gene_est.len() {
-        return Err(invalid_dimensions(
-            "parametric dispersion trend rows",
-            base_mean.len(),
-            disp_gene_est.len(),
-        ));
-    }
-    if !min_disp.is_finite() || min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
-    }
+    validate_trend_selection_inputs(
+        base_mean,
+        disp_gene_est,
+        min_disp,
+        "parametric dispersion trend rows",
+    )?;
     Ok(base_mean
         .iter()
         .copied()
@@ -527,18 +611,12 @@ pub fn local_trend_use_for_fit(
     disp_gene_est: &[f64],
     min_disp: f64,
 ) -> Result<Vec<bool>, DeseqError> {
-    if base_mean.len() != disp_gene_est.len() {
-        return Err(invalid_dimensions(
-            "local dispersion trend rows",
-            base_mean.len(),
-            disp_gene_est.len(),
-        ));
-    }
-    if !min_disp.is_finite() || min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
-    }
+    validate_trend_selection_inputs(
+        base_mean,
+        disp_gene_est,
+        min_disp,
+        "local dispersion trend rows",
+    )?;
     Ok(base_mean
         .iter()
         .copied()
@@ -549,15 +627,59 @@ pub fn local_trend_use_for_fit(
         .collect())
 }
 
+/// DESeq2's `fitType="mean"` preliminary viability rule.
+pub fn mean_trend_use_for_fit(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    min_disp: f64,
+) -> Result<Vec<bool>, DeseqError> {
+    validate_trend_selection_inputs(
+        base_mean,
+        disp_gene_est,
+        min_disp,
+        "mean dispersion trend fit rows",
+    )?;
+    Ok(base_mean
+        .iter()
+        .copied()
+        .zip(disp_gene_est.iter().copied())
+        .map(|(mean, disp)| {
+            mean.is_finite() && mean > 0.0 && disp.is_finite() && disp > 100.0 * min_disp
+        })
+        .collect())
+}
+
 /// DESeq2's `fitType="mean"` row-selection rule for the trimmed mean itself.
 pub fn mean_trend_use_for_mean(
     base_mean: &[f64],
     disp_gene_est: &[f64],
     min_disp: f64,
 ) -> Result<Vec<bool>, DeseqError> {
+    validate_trend_selection_inputs(
+        base_mean,
+        disp_gene_est,
+        min_disp,
+        "mean dispersion trend rows",
+    )?;
+    Ok(base_mean
+        .iter()
+        .copied()
+        .zip(disp_gene_est.iter().copied())
+        .map(|(mean, disp)| {
+            mean.is_finite() && mean > 0.0 && disp.is_finite() && disp > 10.0 * min_disp
+        })
+        .collect())
+}
+
+fn validate_trend_selection_inputs(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    min_disp: f64,
+    context: &str,
+) -> Result<(), DeseqError> {
     if base_mean.len() != disp_gene_est.len() {
         return Err(invalid_dimensions(
-            "mean dispersion trend rows",
+            context,
             base_mean.len(),
             disp_gene_est.len(),
         ));
@@ -567,14 +689,7 @@ pub fn mean_trend_use_for_mean(
             reason: "min_disp must be finite and positive".to_string(),
         });
     }
-    Ok(base_mean
-        .iter()
-        .copied()
-        .zip(disp_gene_est.iter().copied())
-        .map(|(mean, disp)| {
-            mean.is_finite() && mean > 0.0 && disp.is_finite() && disp > 10.0 * min_disp
-        })
-        .collect())
+    Ok(())
 }
 
 /// Fit a dispersion trend using DESeq2-style `fitType` defaults.
@@ -615,11 +730,13 @@ fn robust_parametric_trend_rows(
     trend: ParametricDispersionTrend,
     options: ParametricDispersionTrendOptions,
 ) -> Result<Vec<bool>, DeseqError> {
+    validate_parametric_work_rows(means, disps)?;
+    trend.validate_fit()?;
     let mut good = Vec::with_capacity(means.len());
     for (idx, (mean, disp)) in means.iter().copied().zip(disps.iter().copied()).enumerate() {
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate(mean)?;
+        let fitted = trend.evaluate_validated(mean)?;
         let residual = disp / fitted;
         good.push(
             residual.is_finite()
@@ -673,11 +790,13 @@ fn weighted_gamma_identity_least_squares(
     good: &[bool],
     trend: ParametricDispersionTrend,
 ) -> Result<ParametricDispersionTrend, DeseqError> {
+    validate_parametric_good_rows(means, disps, good)?;
     let mut s00 = 0.0;
     let mut s01 = 0.0;
     let mut s11 = 0.0;
     let mut t0 = 0.0;
     let mut t1 = 0.0;
+    trend.validate_fit()?;
     for (idx, ((mean, disp), used)) in means
         .iter()
         .copied()
@@ -690,17 +809,24 @@ fn weighted_gamma_identity_least_squares(
         }
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate(mean)?;
+        let fitted = trend.evaluate_validated(mean)?;
         let inv_fitted = fitted.recip();
         let weight = inv_fitted * inv_fitted;
+        if !weight.is_finite() {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "parametric dispersion weighted least-squares produced non-finite weights"
+                    .to_string(),
+            });
+        }
         let x = mean.recip();
-        s00 += weight;
-        s01 += weight * x;
-        s11 += weight * x * x;
-        t0 += weight * disp;
-        t1 += weight * x * disp;
+        checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(&mut s01, weight * x, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(&mut s11, weight * x * x, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(&mut t0, weight * disp, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        checked_add_assign(&mut t1, weight * x * disp, PARAMETRIC_WLS_SUM_CONTEXT)?;
     }
-    let determinant = s00 * s11 - s01 * s01;
+    let determinant =
+        checked_product_difference(s00, s11, s01, s01, PARAMETRIC_WLS_DETERMINANT_CONTEXT)?;
     if !determinant.is_finite() || determinant.abs() <= f64::EPSILON {
         return Err(DeseqError::InvalidDimensions {
             context: "parametric dispersion trend weighted design".to_string(),
@@ -708,10 +834,50 @@ fn weighted_gamma_identity_least_squares(
             actual: 0,
         });
     }
-    Ok(ParametricDispersionTrend {
-        asympt_disp: (t0 * s11 - t1 * s01) / determinant,
-        extra_pois: (s00 * t1 - s01 * t0) / determinant,
-    })
+    let asympt_numerator =
+        checked_product_difference(t0, s11, t1, s01, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
+    let extra_pois_numerator =
+        checked_product_difference(s00, t1, s01, t0, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
+    let target = ParametricDispersionTrend {
+        asympt_disp: asympt_numerator / determinant,
+        extra_pois: extra_pois_numerator / determinant,
+    };
+    if !target.asympt_disp.is_finite() || !target.extra_pois.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "parametric dispersion weighted least-squares produced non-finite coefficients"
+                .to_string(),
+        });
+    }
+    Ok(target)
+}
+
+fn checked_add_assign(total: &mut f64, value: f64, context: &str) -> Result<(), DeseqError> {
+    let next = *total + value;
+    if !value.is_finite() || !next.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    *total = next;
+    Ok(())
+}
+
+fn checked_product_difference(
+    left_a: f64,
+    left_b: f64,
+    right_a: f64,
+    right_b: f64,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let left = left_a * left_b;
+    let right = right_a * right_b;
+    let difference = left - right;
+    if !left.is_finite() || !right.is_finite() || !difference.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    Ok(difference)
 }
 
 fn positive_step_halving(
@@ -723,8 +889,16 @@ fn positive_step_halving(
     let mut step = 1.0;
     for _ in 0..50 {
         let candidate = ParametricDispersionTrend {
-            asympt_disp: current.asympt_disp + step * (target.asympt_disp - current.asympt_disp),
-            extra_pois: current.extra_pois + step * (target.extra_pois - current.extra_pois),
+            asympt_disp: interpolate_parametric_coefficient(
+                current.asympt_disp,
+                target.asympt_disp,
+                step,
+            ),
+            extra_pois: interpolate_parametric_coefficient(
+                current.extra_pois,
+                target.extra_pois,
+                step,
+            ),
         };
         if candidate.asympt_disp > 0.0
             && candidate.extra_pois > 0.0
@@ -739,15 +913,27 @@ fn positive_step_halving(
     })
 }
 
+fn interpolate_parametric_coefficient(current: f64, target: f64, step: f64) -> f64 {
+    current * (1.0 - step) + target * step
+}
+
 fn fitted_values_are_positive(
     means: &[f64],
     good: &[bool],
     trend: ParametricDispersionTrend,
 ) -> Result<bool, DeseqError> {
+    if means.len() != good.len() {
+        return Err(invalid_dimensions(
+            "parametric dispersion trend good rows",
+            means.len(),
+            good.len(),
+        ));
+    }
+    trend.validate_fit()?;
     for (idx, (mean, used)) in means.iter().copied().zip(good.iter().copied()).enumerate() {
         if used {
             validate_positive_mean(mean, Some(idx))?;
-            let fitted = trend.evaluate(mean)?;
+            let fitted = trend.asympt_disp + trend.extra_pois / mean;
             if !fitted.is_finite() || fitted <= 0.0 {
                 return Ok(false);
             }
@@ -762,6 +948,8 @@ fn gamma_deviance(
     good: &[bool],
     trend: ParametricDispersionTrend,
 ) -> Result<f64, DeseqError> {
+    validate_parametric_good_rows(means, disps, good)?;
+    trend.validate_fit()?;
     let mut deviance = 0.0;
     for (idx, ((mean, disp), used)) in means
         .iter()
@@ -775,12 +963,43 @@ fn gamma_deviance(
         }
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate(mean)?;
+        let fitted = trend.evaluate_validated(mean)?;
         let ratio = disp / fitted;
         let relative_delta = ratio - 1.0;
-        deviance += 2.0 * (relative_delta - relative_delta.ln_1p());
+        checked_add_assign(
+            &mut deviance,
+            2.0 * (relative_delta - relative_delta.ln_1p()),
+            "parametric dispersion gamma deviance",
+        )?;
     }
     Ok(deviance)
+}
+
+fn validate_parametric_work_rows(means: &[f64], disps: &[f64]) -> Result<(), DeseqError> {
+    if means.len() != disps.len() {
+        return Err(invalid_dimensions(
+            "parametric dispersion trend working rows",
+            means.len(),
+            disps.len(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_parametric_good_rows(
+    means: &[f64],
+    disps: &[f64],
+    good: &[bool],
+) -> Result<(), DeseqError> {
+    validate_parametric_work_rows(means, disps)?;
+    if means.len() != good.len() {
+        return Err(invalid_dimensions(
+            "parametric dispersion trend good rows",
+            means.len(),
+            good.len(),
+        ));
+    }
+    Ok(())
 }
 
 fn local_polynomial_predict(
@@ -791,13 +1010,9 @@ fn local_polynomial_predict(
     span: f64,
     degree: usize,
 ) -> Result<f64, DeseqError> {
-    if xs.len() != ys.len() || xs.len() != weights.len() {
-        return Err(invalid_dimensions(
-            "local dispersion trend fit rows",
-            xs.len(),
-            ys.len(),
-        ));
-    }
+    debug_assert_eq!(xs.len(), ys.len());
+    debug_assert_eq!(xs.len(), weights.len());
+    debug_assert!(!xs.is_empty());
     if xs.is_empty() {
         return Err(DeseqError::InvalidDispersion {
             reason: "no local dispersion fit rows are available".to_string(),
@@ -807,13 +1022,11 @@ fn local_polynomial_predict(
         return ys
             .first()
             .copied()
-            .filter(|value| value.is_finite())
             .ok_or_else(|| DeseqError::InvalidDispersion {
                 reason: "single-row local dispersion trend value must be finite".to_string(),
             });
     }
 
-    validate_sorted_local_means(xs)?;
     let degree = degree.min(2).min(xs.len().saturating_sub(1));
     let window = adaptive_nearest_window(x0, xs, span, degree + 1);
     let bandwidth = local_window_bandwidth(x0, xs, window);
@@ -827,28 +1040,41 @@ fn local_polynomial_predict(
         }
     }
 
-    let mut numerator = 0.0;
-    let mut denominator = 0.0;
-    for idx in window.0..window.1 {
-        let weight = weights[idx] * tricube_weight((xs[idx] - x0).abs(), bandwidth);
-        let y = ys[idx];
-        if weight.is_finite() && weight > 0.0 && y.is_finite() {
-            numerator += weight * y;
-            denominator += weight;
-        }
-    }
-    if denominator > 0.0 {
-        return Ok(numerator / denominator);
+    if let Some(beta0) = local_weighted_mean(x0, xs, ys, weights, window, bandwidth) {
+        return Ok(beta0);
     }
     xs.iter()
         .copied()
         .zip(ys.iter().copied())
         .min_by(|(left_x, _), (right_x, _)| (left_x - x0).abs().total_cmp(&(right_x - x0).abs()))
         .map(|(_, y)| y)
-        .filter(|value| value.is_finite())
         .ok_or_else(|| DeseqError::InvalidDispersion {
             reason: "local dispersion trend has zero usable neighborhood weight".to_string(),
         })
+}
+
+fn validate_local_trend_fit_rows(
+    xs: &[f64],
+    ys: &[f64],
+    weights: &[f64],
+) -> Result<(), DeseqError> {
+    if xs.len() != ys.len() {
+        return Err(invalid_dimensions(
+            "local dispersion trend fit rows",
+            xs.len(),
+            ys.len(),
+        ));
+    }
+    if xs.len() != weights.len() {
+        return Err(invalid_dimensions(
+            "local dispersion trend fit weights",
+            xs.len(),
+            weights.len(),
+        ));
+    }
+    validate_sorted_local_means(xs)?;
+    validate_local_trend_values(ys)?;
+    validate_local_trend_weights(weights)
 }
 
 fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {
@@ -860,6 +1086,41 @@ fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {
     if xs.windows(2).any(|window| window[0] > window[1]) {
         return Err(DeseqError::InvalidDispersion {
             reason: "local dispersion trend log means must be sorted".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_local_trend_values(ys: &[f64]) -> Result<(), DeseqError> {
+    if ys.iter().any(|value| !value.is_finite()) {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion trend log dispersions must be finite".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_local_trend_weights(weights: &[f64]) -> Result<(), DeseqError> {
+    if weights
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
+    {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion trend weights must be finite and positive".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_local_trend_shape(span: f64, degree: usize) -> Result<(), DeseqError> {
+    if !span.is_finite() || span <= 0.0 || span > 1.0 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion span must be finite and in (0, 1]".to_string(),
+        });
+    }
+    if degree > 2 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local dispersion polynomial degree must be 0, 1, or 2".to_string(),
         });
     }
     Ok(())
@@ -925,6 +1186,10 @@ fn local_polynomial_intercept(
     bandwidth: f64,
     degree: usize,
 ) -> Option<f64> {
+    if degree == 0 {
+        return local_weighted_mean(x0, xs, ys, weights, window, bandwidth);
+    }
+
     let size = degree + 1;
     let mut lhs = [[0.0; 3]; 3];
     let mut rhs = [0.0; 3];
@@ -932,7 +1197,7 @@ fn local_polynomial_intercept(
         let x = xs[idx];
         let y = ys[idx];
         let weight = weights[idx] * tricube_weight((x - x0).abs(), bandwidth);
-        if !weight.is_finite() || weight <= 0.0 || !x.is_finite() || !y.is_finite() {
+        if weight <= 0.0 {
             continue;
         }
         let dx = x - x0;
@@ -945,6 +1210,31 @@ fn local_polynomial_intercept(
         }
     }
     solve_small_linear_system(lhs, rhs, size).map(|beta| beta[0])
+}
+
+fn local_weighted_mean(
+    x0: f64,
+    xs: &[f64],
+    ys: &[f64],
+    weights: &[f64],
+    window: (usize, usize),
+    bandwidth: f64,
+) -> Option<f64> {
+    let mut total_weight = 0.0;
+    let mut mean = 0.0;
+    for idx in window.0..window.1 {
+        let weight = weights[idx] * tricube_weight((xs[idx] - x0).abs(), bandwidth);
+        if weight <= 0.0 {
+            continue;
+        }
+        let next_total = total_weight + weight;
+        if !next_total.is_finite() {
+            return None;
+        }
+        mean += (weight / next_total) * (ys[idx] - mean);
+        total_weight = next_total;
+    }
+    (total_weight > 0.0 && mean.is_finite()).then_some(mean)
 }
 
 fn solve_small_linear_system(
@@ -986,7 +1276,27 @@ fn solve_small_linear_system(
             rhs[row] -= factor * rhs[pivot];
         }
     }
-    Some(rhs)
+    rhs.iter()
+        .take(size)
+        .all(|value| value.is_finite())
+        .then_some(rhs)
+}
+
+fn parametric_coefficient_change(
+    old: ParametricDispersionTrend,
+    new: ParametricDispersionTrend,
+) -> Result<f64, DeseqError> {
+    old.validate_fit()?;
+    new.validate_fit()?;
+    let asympt_change = (new.asympt_disp / old.asympt_disp).ln();
+    let extra_pois_change = (new.extra_pois / old.extra_pois).ln();
+    let coefficient_change = asympt_change * asympt_change + extra_pois_change * extra_pois_change;
+    if !coefficient_change.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "parametric dispersion coefficient change must be finite".to_string(),
+        });
+    }
+    Ok(coefficient_change)
 }
 
 fn validate_parametric_trend_inputs(
@@ -994,25 +1304,12 @@ fn validate_parametric_trend_inputs(
     disp_gene_est: &[f64],
     options: ParametricDispersionTrendOptions,
 ) -> Result<(), DeseqError> {
-    if base_mean.len() != disp_gene_est.len() {
-        return Err(invalid_dimensions(
-            "parametric dispersion trend rows",
-            base_mean.len(),
-            disp_gene_est.len(),
-        ));
-    }
-    if base_mean.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "parametric dispersion trend rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
-    }
+    validate_trend_fit_rows(
+        base_mean,
+        disp_gene_est,
+        options.min_disp,
+        "parametric dispersion trend rows",
+    )?;
     if !options.initial_asympt_disp.is_finite() || options.initial_asympt_disp <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "initial asymptotic dispersion must be finite and positive".to_string(),
@@ -1043,6 +1340,13 @@ fn validate_parametric_trend_inputs(
             reason: "parametric trend GLM tolerance must be finite and positive".to_string(),
         });
     }
+    if options.max_outer_iter == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "parametric trend max outer iterations".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
     if options.max_irls_iter == 0 {
         return Err(DeseqError::InvalidDimensions {
             context: "parametric trend max IRLS iterations".to_string(),
@@ -1058,36 +1362,13 @@ fn validate_local_trend_inputs(
     disp_gene_est: &[f64],
     options: LocalDispersionTrendOptions,
 ) -> Result<(), DeseqError> {
-    if base_mean.len() != disp_gene_est.len() {
-        return Err(invalid_dimensions(
-            "local dispersion trend rows",
-            base_mean.len(),
-            disp_gene_est.len(),
-        ));
-    }
-    if base_mean.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "local dispersion trend rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
-    }
-    if !options.span.is_finite() || options.span <= 0.0 || options.span > 1.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local dispersion span must be finite and in (0, 1]".to_string(),
-        });
-    }
-    if options.degree > 2 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local dispersion polynomial degree must be 0, 1, or 2".to_string(),
-        });
-    }
-    Ok(())
+    validate_trend_fit_rows(
+        base_mean,
+        disp_gene_est,
+        options.min_disp,
+        "local dispersion trend rows",
+    )?;
+    validate_local_trend_shape(options.span, options.degree)
 }
 
 fn validate_mean_trend_inputs(
@@ -1095,28 +1376,32 @@ fn validate_mean_trend_inputs(
     disp_gene_est: &[f64],
     options: MeanDispersionTrendOptions,
 ) -> Result<(), DeseqError> {
-    if base_mean.len() != disp_gene_est.len() {
-        return Err(invalid_dimensions(
-            "mean dispersion trend rows",
-            base_mean.len(),
-            disp_gene_est.len(),
-        ));
-    }
-    if base_mean.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "mean dispersion trend rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
-    }
+    validate_trend_fit_rows(
+        base_mean,
+        disp_gene_est,
+        options.min_disp,
+        "mean dispersion trend rows",
+    )?;
     if !options.trim.is_finite() || !(0.0..=0.5).contains(&options.trim) {
         return Err(DeseqError::InvalidDispersion {
             reason: "mean dispersion trim must be finite and between 0 and 0.5".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_trend_fit_rows(
+    base_mean: &[f64],
+    disp_gene_est: &[f64],
+    min_disp: f64,
+    context: &str,
+) -> Result<(), DeseqError> {
+    validate_trend_selection_inputs(base_mean, disp_gene_est, min_disp, context)?;
+    if base_mean.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: context.to_string(),
+            expected: 1,
+            actual: 0,
         });
     }
     Ok(())
@@ -1134,7 +1419,7 @@ fn trimmed_mean(values: &[f64], trim: f64) -> Result<f64, DeseqError> {
     if trim == 0.5 {
         let mid = sorted.len() / 2;
         return if sorted.len() % 2 == 0 {
-            Ok((sorted[mid - 1] + sorted[mid]) / 2.0)
+            Ok(stable_midpoint(sorted[mid - 1], sorted[mid]))
         } else {
             Ok(sorted[mid])
         };
@@ -1147,13 +1432,25 @@ fn trimmed_mean(values: &[f64], trim: f64) -> Result<f64, DeseqError> {
             reason: "mean dispersion trim removed all usable estimates".to_string(),
         });
     }
-    Ok(sorted[start..end].iter().sum::<f64>() / (end - start) as f64)
+    Ok(stable_mean(&sorted[start..end]))
+}
+
+fn stable_mean(values: &[f64]) -> f64 {
+    let mut mean = 0.0;
+    for (idx, value) in values.iter().copied().enumerate() {
+        mean += (value - mean) / (idx + 1) as f64;
+    }
+    mean
+}
+
+fn stable_midpoint(left: f64, right: f64) -> f64 {
+    left + (right - left) / 2.0
 }
 
 fn validate_positive_mean(mean: f64, index: Option<usize>) -> Result<(), DeseqError> {
     if !mean.is_finite() || mean <= 0.0 {
         return Err(DeseqError::NonFiniteValue {
-            context: "parametric dispersion trend mean".to_string(),
+            context: "dispersion trend mean".to_string(),
             index,
             value: mean,
         });
@@ -1200,5 +1497,180 @@ mod tests {
         assert!(deviance.is_finite());
         assert!(deviance > 0.0);
         assert_relative_eq!(deviance, expected, max_relative = 1e-12);
+    }
+
+    #[test]
+    fn gamma_deviance_rejects_nonfinite_accumulation() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: f64::MIN_POSITIVE,
+            extra_pois: f64::MIN_POSITIVE,
+        };
+        let means = [1.0, 2.0];
+        let disps = [f64::MAX, f64::MAX];
+        let good = [true, true];
+
+        let err = gamma_deviance(&means, &disps, &good, trend).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("parametric dispersion gamma deviance"));
+    }
+
+    #[test]
+    fn parametric_work_helpers_validate_aligned_rows() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: 0.05,
+            extra_pois: 2.0,
+        };
+        let means = [20.0, 40.0];
+        let disps = [0.15];
+        let good = [true, true];
+
+        assert!(robust_parametric_trend_rows(
+            &means,
+            &disps,
+            trend,
+            ParametricDispersionTrendOptions::default(),
+        )
+        .is_err());
+        assert!(gamma_deviance(&means, &disps, &good, trend).is_err());
+        assert!(weighted_gamma_identity_least_squares(&means, &disps, &good, trend).is_err());
+        assert!(fitted_values_are_positive(&means, &[true], trend).is_err());
+    }
+
+    #[test]
+    fn weighted_gamma_identity_least_squares_rejects_nonfinite_coefficients() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: 0.05,
+            extra_pois: 2.0,
+        };
+        let means = [20.0, 40.0];
+        let disps = [f64::MAX, f64::MAX];
+        let good = [true, true];
+
+        assert!(weighted_gamma_identity_least_squares(&means, &disps, &good, trend).is_err());
+    }
+
+    #[test]
+    fn weighted_gamma_identity_least_squares_rejects_nonfinite_weights() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: f64::MIN_POSITIVE,
+            extra_pois: f64::MIN_POSITIVE,
+        };
+        let means = [1.0, 2.0];
+        let disps = [0.1, 0.2];
+        let good = [true, true];
+
+        let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
+
+        assert!(err.to_string().contains("non-finite weights"));
+    }
+
+    #[test]
+    fn weighted_gamma_identity_least_squares_rejects_nonfinite_determinant_product() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: 1.0,
+            extra_pois: f64::MIN_POSITIVE,
+        };
+        let means = [1.0e-154, 2.0e-154];
+        let disps = [0.1, 0.2];
+        let good = [true, true];
+
+        let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("parametric dispersion weighted least-squares determinant"));
+    }
+
+    #[test]
+    fn weighted_gamma_identity_least_squares_rejects_nonfinite_numerator_product() {
+        let trend = ParametricDispersionTrend {
+            asympt_disp: 1.0,
+            extra_pois: f64::MIN_POSITIVE,
+        };
+        let means = [1.0, 0.5];
+        let disps = [f64::MAX / 4.0, f64::MAX / 4.0];
+        let good = [true, true];
+
+        let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("parametric dispersion weighted least-squares coefficient numerator"));
+    }
+
+    #[test]
+    fn checked_add_assign_rejects_nonfinite_sum() {
+        let mut total = f64::MAX;
+
+        let err = checked_add_assign(&mut total, f64::MAX, "test accumulation").unwrap_err();
+
+        assert!(err.to_string().contains("test accumulation"));
+        assert_eq!(total, f64::MAX);
+    }
+
+    #[test]
+    fn checked_product_difference_rejects_nonfinite_product() {
+        let err = checked_product_difference(f64::MAX, 2.0, 1.0, 1.0, "test product").unwrap_err();
+
+        assert!(err.to_string().contains("test product"));
+    }
+
+    #[test]
+    fn checked_product_difference_matches_finite_difference() {
+        let observed = checked_product_difference(6.0, 7.0, 5.0, 3.0, "test product").unwrap();
+
+        assert_eq!(observed, 27.0);
+    }
+
+    #[test]
+    fn interpolate_parametric_coefficient_avoids_difference_overflow() {
+        let interpolated = interpolate_parametric_coefficient(f64::MAX, -f64::MAX, 0.5);
+
+        assert_eq!(interpolated, 0.0);
+    }
+
+    #[test]
+    fn parametric_coefficient_change_rejects_nonfinite_ratio() {
+        let old = ParametricDispersionTrend {
+            asympt_disp: f64::MIN_POSITIVE,
+            extra_pois: 1.0,
+        };
+        let new = ParametricDispersionTrend {
+            asympt_disp: f64::MAX,
+            extra_pois: 1.0,
+        };
+
+        let err = parametric_coefficient_change(old, new).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("parametric dispersion coefficient change"));
+    }
+
+    #[test]
+    fn parametric_coefficient_change_matches_log_squared_update() {
+        let old = ParametricDispersionTrend {
+            asympt_disp: 0.1,
+            extra_pois: 2.0,
+        };
+        let new = ParametricDispersionTrend {
+            asympt_disp: 0.2,
+            extra_pois: 1.0,
+        };
+
+        let observed = parametric_coefficient_change(old, new).unwrap();
+        let expected = 2.0 * 2.0_f64.ln().powi(2);
+
+        assert_relative_eq!(observed, expected, epsilon = 1e-15);
+    }
+
+    #[test]
+    fn small_linear_solver_rejects_nonfinite_solution() {
+        let lhs = [[1.0, 0.0, 0.0], [0.0; 3], [0.0; 3]];
+        let rhs = [f64::INFINITY, 0.0, 0.0];
+
+        assert!(solve_small_linear_system(lhs, rhs, 1).is_none());
     }
 }

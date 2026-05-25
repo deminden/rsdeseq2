@@ -69,7 +69,14 @@ where
 
     for iter in 0..options.maxit {
         let direction = projected_descent_direction(&parameters, &gradient, lower, upper);
-        let direction_norm = l2_norm(&direction);
+        let Some(direction_norm) = l2_norm(&direction) else {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: false,
+                iterations: iter,
+            });
+        };
         if direction_norm <= options.gradient_tol {
             return Ok(BoundedOptimizationOutput {
                 parameters,
@@ -79,8 +86,15 @@ where
             });
         }
 
-        let directional_derivative = dot(&gradient, &direction);
-        if directional_derivative >= 0.0 || !directional_derivative.is_finite() {
+        let Some(directional_derivative) = dot(&gradient, &direction) else {
+            return Ok(BoundedOptimizationOutput {
+                parameters,
+                value,
+                converged: false,
+                iterations: iter,
+            });
+        };
+        if directional_derivative >= 0.0 {
             return Ok(BoundedOptimizationOutput {
                 parameters,
                 value,
@@ -98,7 +112,10 @@ where
                 .zip(direction.iter().copied())
                 .map(|(value, delta)| (value + step * delta).clamp(lower, upper))
                 .collect::<Vec<_>>();
-            let movement = max_abs_difference(&parameters, &candidate);
+            let Some(movement) = max_abs_difference(&parameters, &candidate) else {
+                step *= 0.5;
+                continue;
+            };
             if movement <= options.step_tol {
                 return Ok(BoundedOptimizationOutput {
                     parameters,
@@ -107,9 +124,13 @@ where
                     iterations: iter + 1,
                 });
             }
-            let actual_directional_derivative =
-                actual_directional_derivative(&parameters, &candidate, &gradient);
-            if !actual_directional_derivative.is_finite() || actual_directional_derivative >= 0.0 {
+            let Some(actual_directional_derivative) =
+                actual_directional_derivative(&parameters, &candidate, &gradient)
+            else {
+                step *= 0.5;
+                continue;
+            };
+            if actual_directional_derivative >= 0.0 {
                 step *= 0.5;
                 continue;
             }
@@ -221,39 +242,65 @@ fn projected_descent_direction(
         .collect()
 }
 
-fn l2_norm(values: &[f64]) -> f64 {
-    values.iter().map(|value| value * value).sum::<f64>().sqrt()
+fn l2_norm(values: &[f64]) -> Option<f64> {
+    let mut sum = 0.0;
+    for value in values.iter().copied() {
+        let term = value * value;
+        let next = sum + term;
+        if !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        sum = next;
+    }
+    let norm = sum.sqrt();
+    norm.is_finite().then_some(norm)
 }
 
-fn dot(left: &[f64], right: &[f64]) -> f64 {
-    left.iter()
-        .copied()
-        .zip(right.iter().copied())
-        .map(|(left, right)| left * right)
-        .sum()
+fn dot(left: &[f64], right: &[f64]) -> Option<f64> {
+    let mut sum = 0.0;
+    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
+        let term = left * right;
+        let next = sum + term;
+        if !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        sum = next;
+    }
+    Some(sum)
 }
 
-fn max_abs_difference(left: &[f64], right: &[f64]) -> f64 {
-    left.iter()
-        .copied()
-        .zip(right.iter().copied())
-        .map(|(left, right)| (left - right).abs())
-        .fold(0.0, f64::max)
+fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
+    let mut max_difference = 0.0;
+    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
+        let difference = (left - right).abs();
+        if !difference.is_finite() {
+            return None;
+        }
+        max_difference = f64::max(max_difference, difference);
+    }
+    Some(max_difference)
 }
 
-fn actual_directional_derivative(parameters: &[f64], candidate: &[f64], gradient: &[f64]) -> f64 {
-    gradient
+fn actual_directional_derivative(
+    parameters: &[f64],
+    candidate: &[f64],
+    gradient: &[f64],
+) -> Option<f64> {
+    let mut sum = 0.0;
+    for (gradient, (candidate, parameter)) in gradient
         .iter()
         .copied()
-        .zip(
-            candidate
-                .iter()
-                .copied()
-                .zip(parameters.iter().copied())
-                .map(|(candidate, parameter)| candidate - parameter),
-        )
-        .map(|(gradient, direction)| gradient * direction)
-        .sum()
+        .zip(candidate.iter().copied().zip(parameters.iter().copied()))
+    {
+        let direction = candidate - parameter;
+        let term = gradient * direction;
+        let next = sum + term;
+        if !direction.is_finite() || !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        sum = next;
+    }
+    Some(sum)
 }
 
 #[cfg(test)]
@@ -299,8 +346,34 @@ mod tests {
 
     #[test]
     fn actual_directional_derivative_uses_clamped_candidate_movement() {
-        let derivative = actual_directional_derivative(&[0.9], &[1.0], &[-2.0]);
+        let derivative = actual_directional_derivative(&[0.9], &[1.0], &[-2.0]).unwrap();
 
         assert_relative_eq!(derivative, -0.2, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn scalar_helpers_reject_nonfinite_accumulation() {
+        assert_eq!(l2_norm(&[f64::MAX, f64::MAX]), None);
+        assert_eq!(dot(&[f64::MAX], &[2.0]), None);
+        assert_eq!(max_abs_difference(&[-f64::MAX], &[f64::MAX]), None);
+        assert_eq!(
+            actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
+            None
+        );
+    }
+
+    #[test]
+    fn bounded_optimizer_reports_nonconvergence_for_overflowed_gradient_norm() {
+        let output = minimize_bounded_projected_gradient(
+            &[0.0],
+            -10.0,
+            10.0,
+            BoundedOptimizerOptions::default(),
+            |_| Ok((1.0, vec![f64::MAX])),
+        )
+        .unwrap();
+
+        assert!(!output.converged);
+        assert_eq!(output.iterations, 0);
     }
 }

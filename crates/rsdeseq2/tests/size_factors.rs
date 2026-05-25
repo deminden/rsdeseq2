@@ -29,6 +29,21 @@ fn ratio_size_factors_use_deseq2_log_scale_location() {
 }
 
 #[test]
+fn size_factor_geometric_means_keep_large_counts_finite() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 3, vec![u32::MAX, u32::MAX, u32::MAX, 1, u32::MAX, 1])
+            .unwrap();
+
+    let ratio = estimate_size_factors_ratio(&counts).unwrap();
+    let poscounts = estimate_size_factors_poscounts(&counts).unwrap();
+
+    assert!(ratio.iter().all(|value| value.is_finite() && *value > 0.0));
+    assert!(poscounts
+        .iter()
+        .all(|value| value.is_finite() && *value > 0.0));
+}
+
+#[test]
 fn supplied_geo_means_are_stabilized() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
     let size_factors =

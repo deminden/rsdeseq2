@@ -111,13 +111,42 @@ pub fn calculate_cooks_distance(
         let mu_row = mu.row(gene)?;
         let h_row = hat_diagonal.row(gene)?;
         for sample in 0..counts.n_samples() {
+            if dispersion.is_nan() {
+                values.push(f64::NAN);
+                continue;
+            }
             let mean = mu_row[sample];
             let h = h_row[sample];
-            let variance = mean * (1.0 + dispersion * mean);
+            if mean.is_nan() || h.is_nan() {
+                values.push(f64::NAN);
+                continue;
+            }
+            let dispersion_mean = checked_mul(dispersion, mean, sample, "Cook's dispersion mean")?;
+            let variance = checked_mul(
+                mean,
+                checked_add(1.0, dispersion_mean, sample, "Cook's variance factor")?,
+                sample,
+                "Cook's variance",
+            )?;
             let residual = f64::from(count_row[sample]) - mean;
             let one_minus_h = 1.0 - h;
-            let pearson_sq = residual * residual / variance;
-            values.push(pearson_sq / p * h / (one_minus_h * one_minus_h));
+            let residual_sq = checked_mul(residual, residual, sample, "Cook's residual square")?;
+            let pearson_sq = residual_sq / variance;
+            let denominator = checked_mul(
+                one_minus_h,
+                one_minus_h,
+                sample,
+                "Cook's leverage denominator",
+            )?;
+            let value = pearson_sq / p * h / denominator;
+            if !value.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "Cook's distance".to_string(),
+                    index: Some(sample),
+                    value,
+                });
+            }
+            values.push(value);
         }
     }
 
@@ -356,10 +385,29 @@ pub fn robust_method_of_moments_dispersion(
     let mut dispersions = Vec::with_capacity(normalized_counts.n_rows());
     for (gene, variance) in variance.iter().copied().enumerate() {
         let row = normalized_counts.row(gene)?;
-        let mean = row.iter().sum::<f64>() / row.len() as f64;
+        let mean =
+            checked_sum(row.iter().copied(), "Cook's robust dispersion mean")? / row.len() as f64;
         let alpha = if mean > 0.0 {
             let inv_mean = mean.recip();
-            (variance - mean) * inv_mean * inv_mean
+            let centered = variance - mean;
+            if !centered.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "Cook's robust dispersion centered variance".to_string(),
+                    index: Some(gene),
+                    value: centered,
+                });
+            }
+            checked_mul(
+                centered,
+                checked_mul(
+                    inv_mean,
+                    inv_mean,
+                    gene,
+                    "Cook's robust dispersion inverse mean square",
+                )?,
+                gene,
+                "Cook's robust dispersion",
+            )?
         } else {
             f64::NAN
         };
@@ -561,15 +609,30 @@ fn trimmed_cell_variance(
                 .filter_map(|(sample, candidate)| (candidate == group).then_some(row[sample]))
                 .collect::<Vec<_>>();
             let bin = trim_bin(values.len());
-            let mean = trimmed_mean(values.clone(), trim_ratio(bin));
+            let mean = trimmed_mean(values.clone(), trim_ratio(bin), "Cook's trimmed cell mean")?;
             let sq_errors = values
                 .into_iter()
-                .map(|value| {
+                .enumerate()
+                .map(|(sample, value)| {
                     let residual = value - mean;
-                    residual * residual
+                    checked_mul(
+                        residual,
+                        residual,
+                        sample,
+                        "Cook's trimmed cell residual square",
+                    )
                 })
-                .collect::<Vec<_>>();
-            group_variances.push(trim_scale(bin) * trimmed_mean(sq_errors, trim_ratio(bin)));
+                .collect::<Result<Vec<_>, DeseqError>>()?;
+            group_variances.push(checked_mul(
+                trim_scale(bin),
+                trimmed_mean(
+                    sq_errors,
+                    trim_ratio(bin),
+                    "Cook's trimmed cell variance mean",
+                )?,
+                gene,
+                "Cook's trimmed cell variance",
+            )?);
         }
         variances.push(row_max(&group_variances));
     }
@@ -580,16 +643,22 @@ fn trimmed_variance(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>,
     let mut variances = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
-        let mean = trimmed_mean(row.to_vec(), 1.0 / 8.0);
+        let mean = trimmed_mean(row.to_vec(), 1.0 / 8.0, "Cook's trimmed mean")?;
         let sq_errors = row
             .iter()
             .copied()
-            .map(|value| {
+            .enumerate()
+            .map(|(sample, value)| {
                 let residual = value - mean;
-                residual * residual
+                checked_mul(residual, residual, sample, "Cook's trimmed residual square")
             })
-            .collect::<Vec<_>>();
-        variances.push(1.51 * trimmed_mean(sq_errors, 1.0 / 8.0));
+            .collect::<Result<Vec<_>, DeseqError>>()?;
+        variances.push(checked_mul(
+            1.51,
+            trimmed_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
+            gene,
+            "Cook's trimmed variance",
+        )?);
     }
     Ok(variances)
 }
@@ -630,18 +699,18 @@ fn trim_scale(bin: usize) -> f64 {
     [2.04, 1.86, 1.51][bin]
 }
 
-fn trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
+fn trimmed_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, DeseqError> {
     if values.is_empty() || values.iter().any(|value| value.is_nan()) {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
     values.sort_by(f64::total_cmp);
     let trim_count = (values.len() as f64 * trim).floor() as usize;
     let end = values.len().saturating_sub(trim_count);
     if trim_count >= end {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
     let kept = &values[trim_count..end];
-    kept.iter().sum::<f64>() / kept.len() as f64
+    Ok(checked_sum(kept.iter().copied(), context)? / kept.len() as f64)
 }
 
 fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
@@ -662,7 +731,46 @@ fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
     if trim_count >= end {
         return f64::NAN;
     }
-    values[trim_count..end].iter().sum::<f64>() / (end - trim_count) as f64
+    checked_sum(
+        values[trim_count..end].iter().copied(),
+        "replacement trimmed mean",
+    )
+    .map(|sum| sum / (end - trim_count) as f64)
+    .unwrap_or(f64::NAN)
+}
+
+fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left + right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
+    let mut sum = 0.0;
+    for (idx, value) in values.into_iter().enumerate() {
+        sum = checked_add(sum, value, idx, context)?;
+    }
+    Ok(sum)
 }
 
 fn replacement_count_from_scaled_mean(value: f64) -> Result<u32, DeseqError> {

@@ -508,7 +508,9 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
                         ),
                     });
                 }
-                normalized_row.iter().sum::<f64>() / counts.n_samples() as f64
+                checked_mean(normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
+                    reason: format!("gene {gene} has non-finite normalized intercept mean"),
+                })?
             }
         };
         if !mean_normalized.is_finite() || mean_normalized <= 0.0 {
@@ -521,13 +523,23 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
         beta_values.push(beta_log2);
 
         for factor in normalization_factors.row(gene)? {
-            mu_values.push(*factor * 2.0_f64.powf(beta_log2));
+            let mu = *factor * 2.0_f64.powf(beta_log2);
+            if !mu.is_finite() || mu <= 0.0 {
+                return Err(DeseqError::InvalidCounts {
+                    reason: format!("gene {gene} has non-finite fitted intercept mean"),
+                });
+            }
+            mu_values.push(mu);
         }
 
         let mu_start = gene * counts.n_samples();
         let mu_row = &mu_values[mu_start..mu_start + counts.n_samples()];
         let working_weights = intercept_working_weights(mu_row, dispersion, weight_row)?;
-        let xtwx = working_weights.iter().sum::<f64>();
+        let xtwx = checked_sum(working_weights.iter().copied()).ok_or_else(|| {
+            DeseqError::InvalidDispersion {
+                reason: format!("gene {gene} has non-finite intercept information"),
+            }
+        })?;
         if !xtwx.is_finite() || xtwx <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
                 reason: format!("gene {gene} has non-positive intercept information"),
@@ -621,8 +633,19 @@ fn weighted_mean(values: &[f64], weights: &[f64], gene: usize) -> Result<f64, De
         .enumerate()
     {
         validate_nonnegative_finite(weight, "weight", sample)?;
-        numerator += weight * value;
-        denominator += weight;
+        let value_term = weight * value;
+        let Some(next_numerator) = checked_sum2(numerator, value_term) else {
+            return Err(DeseqError::InvalidCounts {
+                reason: format!("gene {gene} has non-finite weighted normalized mean"),
+            });
+        };
+        let Some(next_denominator) = checked_sum2(denominator, weight) else {
+            return Err(DeseqError::InvalidCounts {
+                reason: format!("gene {gene} has non-finite total weight"),
+            });
+        };
+        numerator = next_numerator;
+        denominator = next_denominator;
     }
     if denominator <= 0.0 {
         return Err(DeseqError::InvalidCounts {
@@ -646,7 +669,15 @@ fn intercept_working_weights(
             Some(weights) => {
                 let weight = weights[sample];
                 validate_nonnegative_finite(weight, "weight", sample)?;
-                weight * working_weight
+                let weighted = weight * working_weight;
+                if !weighted.is_finite() {
+                    return Err(DeseqError::NonFiniteValue {
+                        context: "intercept working weight".to_string(),
+                        index: Some(sample),
+                        value: weighted,
+                    });
+                }
+                weighted
             }
             None => working_weight,
         });
@@ -732,7 +763,22 @@ fn beta_prior_weights(
 }
 
 fn mean_dispersion_working_weight(mean: f64, dispersion: f64) -> f64 {
-    mean / (1.0 + mean * dispersion)
+    (mean.recip() + dispersion).recip()
+}
+
+fn checked_mean(values: &[f64]) -> Option<f64> {
+    let sum = checked_sum(values.iter().copied())?;
+    let mean = sum / values.len() as f64;
+    mean.is_finite().then_some(mean)
+}
+
+fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
+    values.into_iter().try_fold(0.0, checked_sum2)
+}
+
+fn checked_sum2(left: f64, right: f64) -> Option<f64> {
+    let sum = left + right;
+    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
 fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {
@@ -816,8 +862,12 @@ fn weighted_abs_quantile(
     }
     pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    let weight_sum = pairs.iter().map(|(_, weight)| *weight).sum::<f64>();
-    if !weight_sum.is_finite() || weight_sum <= 0.0 {
+    let Some(weight_sum) = checked_sum(pairs.iter().map(|(_, weight)| *weight)) else {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted beta prior variance quantile needs finite total weight".to_string(),
+        });
+    };
+    if weight_sum <= 0.0 {
         return Err(DeseqError::InvalidOptions {
             reason: "weighted beta prior variance quantile needs positive finite total weight"
                 .to_string(),
@@ -828,9 +878,22 @@ fn weighted_abs_quantile(
     let mut unique = Vec::<(f64, f64)>::with_capacity(pairs.len());
     for (value, weight) in pairs {
         let normalized_weight = weight * norm_scale;
+        if !normalized_weight.is_finite() || normalized_weight <= 0.0 {
+            return Err(DeseqError::InvalidOptions {
+                reason:
+                    "weighted beta prior variance quantile produced non-finite normalized weight"
+                        .to_string(),
+            });
+        }
         if let Some((last_value, last_weight)) = unique.last_mut() {
             if *last_value == value {
-                *last_weight += normalized_weight;
+                let Some(next_weight) = checked_sum2(*last_weight, normalized_weight) else {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: "weighted beta prior variance quantile produced non-finite merged weight"
+                            .to_string(),
+                    });
+                };
+                *last_weight = next_weight;
                 continue;
             }
         }
@@ -841,8 +904,19 @@ fn weighted_abs_quantile(
         return Ok(unique[0].0);
     }
 
-    let n = unique.iter().map(|(_, weight)| *weight).sum::<f64>();
+    let Some(n) = checked_sum(unique.iter().map(|(_, weight)| *weight)) else {
+        return Err(DeseqError::InvalidOptions {
+            reason:
+                "weighted beta prior variance quantile produced non-finite total normalized weight"
+                    .to_string(),
+        });
+    };
     let order = 1.0 + (n - 1.0) * probability;
+    if !order.is_finite() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted beta prior variance quantile produced non-finite order".to_string(),
+        });
+    }
     let low = order.floor().max(1.0);
     let high = (low + 1.0).min(n);
     let fraction = order.fract();
@@ -850,13 +924,27 @@ fn weighted_abs_quantile(
     let mut cumulative_weights = Vec::with_capacity(unique.len());
     let mut cumulative = 0.0;
     for (_, weight) in &unique {
-        cumulative += *weight;
+        let Some(next_cumulative) = checked_sum2(cumulative, *weight) else {
+            return Err(DeseqError::InvalidOptions {
+                reason:
+                    "weighted beta prior variance quantile produced non-finite cumulative weight"
+                        .to_string(),
+            });
+        };
+        cumulative = next_cumulative;
         cumulative_weights.push(cumulative);
     }
 
     let low_quantile = weighted_order_statistic(&unique, &cumulative_weights, low);
     let high_quantile = weighted_order_statistic(&unique, &cumulative_weights, high);
-    Ok((1.0 - fraction) * low_quantile + fraction * high_quantile)
+    let quantile = (1.0 - fraction) * low_quantile + fraction * high_quantile;
+    if !quantile.is_finite() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "weighted beta prior variance quantile produced non-finite quantile"
+                .to_string(),
+        });
+    }
+    Ok(quantile)
 }
 
 fn weighted_order_statistic(

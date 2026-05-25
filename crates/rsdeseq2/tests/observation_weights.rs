@@ -67,6 +67,18 @@ fn observation_weights_use_thresholded_subset_for_cox_reid_check() {
 }
 
 #[test]
+fn observation_weights_reject_overflowed_cox_reid_column_sum() {
+    let design = DesignMatrix::from_row_major(2, 1, vec![f64::MAX, f64::MAX], None).unwrap();
+    let weights = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 1.0]).unwrap();
+
+    let err = preprocess_observation_weights(&weights, &design).unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("observation weight Cox-Reid column sum"));
+}
+
+#[test]
 fn observation_weights_for_non_full_rank_design_use_zero_column_check() {
     let design = DesignMatrix::from_row_major(
         3,

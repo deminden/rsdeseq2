@@ -328,6 +328,22 @@ fn selected_filter_index_matches_deseq2_dense_custom_theta_fixture() {
 }
 
 #[test]
+fn selected_filter_index_keeps_large_rejection_counts_finite() {
+    let theta = (0..50)
+        .map(|idx| 0.95 * idx as f64 / 49.0)
+        .collect::<Vec<_>>();
+    let num_rejections = (0..50)
+        .map(|idx| 1_000_000_000usize + idx * 10_000_000)
+        .collect::<Vec<_>>();
+
+    let (selected_index, lowess_fit) =
+        select_filter_index_with_lowess(&theta, &num_rejections).unwrap();
+
+    assert!(selected_index < theta.len());
+    assert!(lowess_fit.iter().all(|value| value.is_finite()));
+}
+
+#[test]
 fn independent_filtering_rejects_invalid_options() {
     let fit = toy_fit(vec![1.0], vec![1.0], vec![true]);
     let mut results = build_wald_results(&[1.0], &fit, 0, None, None).unwrap();

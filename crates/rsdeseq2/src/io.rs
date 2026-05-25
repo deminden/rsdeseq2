@@ -202,6 +202,9 @@ pub fn write_size_factors_tsv(
     sample_names: Option<&[String]>,
     size_factors: &[f64],
 ) -> Result<(), DeseqError> {
+    validate_optional_names("size-factor sample names", sample_names, size_factors.len())?;
+    validate_positive_finite_values("size-factor export", size_factors)?;
+
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["sample", "size_factor"])?;
     for (idx, size_factor) in size_factors.iter().copied().enumerate() {
@@ -221,6 +224,9 @@ pub fn write_base_mean_tsv(
     gene_names: Option<&[String]>,
     base_mean: &[f64],
 ) -> Result<(), DeseqError> {
+    validate_optional_names("base-mean gene names", gene_names, base_mean.len())?;
+    validate_nonnegative_finite_values("base-mean export", base_mean)?;
+
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["gene", "base_mean"])?;
     for (idx, value) in base_mean.iter().copied().enumerate() {
@@ -324,10 +330,27 @@ fn validate_positive_finite_matrix(
     context: &str,
     matrix: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
-    for (idx, value) in matrix.as_slice().iter().copied().enumerate() {
+    validate_positive_finite_values(context, matrix.as_slice())
+}
+
+fn validate_positive_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() || value <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
                 reason: format!("{context} value at index {idx} must be finite and positive"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_nonnegative_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() || value < 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
             });
         }
     }
@@ -380,6 +403,7 @@ fn write_deseq_results_with_row_header_tsv(
     row_header: &str,
     fallback_prefix: &str,
 ) -> Result<(), DeseqError> {
+    validate_deseq_results_export(results)?;
     let frame = results.data_frame();
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
@@ -405,6 +429,90 @@ fn write_deseq_results_with_row_header_tsv(
         writer.write_record(&record)?;
     }
     writer.flush()?;
+    Ok(())
+}
+
+fn validate_deseq_results_export(results: &DeseqResults) -> Result<(), DeseqError> {
+    for (idx, row) in results.rows.iter().enumerate() {
+        if !row.base_mean.is_finite() || row.base_mean < 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: "result export baseMean".to_string(),
+                index: Some(idx),
+                value: row.base_mean,
+            });
+        }
+        validate_optional_export_finite(row.log2_fold_change, "result export log2FoldChange", idx)?;
+        validate_optional_export_finite(row.lfc_se, "result export lfcSE", idx)?;
+        validate_optional_export_finite(row.stat, "result export stat", idx)?;
+        validate_optional_export_probability(row.pvalue, "result export pvalue", idx)?;
+        validate_optional_export_probability(row.padj, "result export padj", idx)?;
+        validate_optional_export_positive(row.dispersion, "result export dispersion", idx)?;
+        validate_optional_export_nonnegative(row.max_cooks, "result export maxCooks", idx)?;
+    }
+    Ok(())
+}
+
+fn validate_optional_export_finite(
+    value: Option<f64>,
+    context: &str,
+    idx: usize,
+) -> Result<(), DeseqError> {
+    if let Some(value) = value {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_export_probability(
+    value: Option<f64>,
+    context: &str,
+    idx: usize,
+) -> Result<(), DeseqError> {
+    if let Some(value) = value {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_export_positive(
+    value: Option<f64>,
+    context: &str,
+    idx: usize,
+) -> Result<(), DeseqError> {
+    if let Some(value) = value {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: format!("{context} at index {idx} must be finite and positive"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_export_nonnegative(
+    value: Option<f64>,
+    context: &str,
+    idx: usize,
+) -> Result<(), DeseqError> {
+    if let Some(value) = value {
+        if !value.is_finite() || value < 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
+    }
     Ok(())
 }
 
@@ -451,7 +559,16 @@ pub fn write_deseq_mcols_diagnostics_tsv(
     diagnostics: &Deseq2McolsDiagnostics,
 ) -> Result<(), DeseqError> {
     let frame = diagnostics.data_frame();
-    let n_rows = diagnostic_frame_row_count(&frame.columns);
+    let n_rows = diagnostic_frame_row_count(&frame.columns)?;
+    if let Some(names) = gene_names {
+        if names.len() != n_rows {
+            return Err(invalid_dimensions(
+                "diagnostic gene names",
+                n_rows,
+                names.len(),
+            ));
+        }
+    }
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
     header.push("gene".to_string());
@@ -483,6 +600,7 @@ pub fn write_independent_filter_num_rej_tsv(
     path: impl AsRef<Path>,
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
+    validate_independent_filtering_export(filtering)?;
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["theta", "numRej"])?;
     for row in filtering.filter_num_rej() {
@@ -499,6 +617,7 @@ pub fn write_independent_filter_lowess_tsv(
     path: impl AsRef<Path>,
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
+    validate_independent_filtering_export(filtering)?;
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["x", "y"])?;
     for row in filtering.lowess_fit_table() {
@@ -516,6 +635,7 @@ pub fn write_independent_filter_metadata_tsv(
     path: impl AsRef<Path>,
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
+    validate_independent_filtering_export(filtering)?;
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["name", "value"])?;
     for entry in filtering.scalar_metadata() {
@@ -525,16 +645,79 @@ pub fn write_independent_filter_metadata_tsv(
     Ok(())
 }
 
-fn diagnostic_frame_row_count(columns: &[Deseq2McolsDiagnosticColumn]) -> usize {
-    columns
-        .first()
-        .map(|column| match &column.values {
-            Deseq2McolsDiagnosticValues::Numeric(values) => values.len(),
-            Deseq2McolsDiagnosticValues::OptionalNumeric(values) => values.len(),
-            Deseq2McolsDiagnosticValues::Integer(values) => values.len(),
-            Deseq2McolsDiagnosticValues::Logical(values) => values.len(),
-        })
-        .unwrap_or(0)
+fn validate_independent_filtering_export(
+    filtering: &IndependentFilteringOutput,
+) -> Result<(), DeseqError> {
+    if filtering.theta.len() != filtering.num_rejections.len() {
+        return Err(invalid_dimensions(
+            "independent-filter numRej rows",
+            filtering.theta.len(),
+            filtering.num_rejections.len(),
+        ));
+    }
+    for (idx, theta) in filtering.theta.iter().copied().enumerate() {
+        if !theta.is_finite() || !(0.0..=1.0).contains(&theta) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("independent-filter theta at index {idx} must be within [0, 1]"),
+            });
+        }
+    }
+    if let Some(lowess_fit) = &filtering.lowess_fit {
+        if lowess_fit.len() != filtering.theta.len() {
+            return Err(invalid_dimensions(
+                "independent-filter lowess rows",
+                filtering.theta.len(),
+                lowess_fit.len(),
+            ));
+        }
+        validate_nonnegative_finite_values("independent-filter lowess export", lowess_fit)?;
+    }
+    if let Some(selected_index) = filtering.selected_index {
+        if selected_index >= filtering.theta.len() {
+            return Err(invalid_dimensions(
+                "independent-filter selected index",
+                filtering.theta.len().saturating_sub(1),
+                selected_index,
+            ));
+        }
+    }
+    validate_optional_export_probability(filtering.filter_theta, "independent-filter theta", 0)?;
+    validate_optional_export_nonnegative(
+        filtering.filter_threshold,
+        "independent-filter threshold",
+        0,
+    )?;
+    validate_optional_export_probability(Some(filtering.alpha), "independent-filter alpha", 0)?;
+    Ok(())
+}
+
+fn diagnostic_frame_row_count(
+    columns: &[Deseq2McolsDiagnosticColumn],
+) -> Result<usize, DeseqError> {
+    let Some(first) = columns.first() else {
+        return Ok(0);
+    };
+    let expected = diagnostic_column_len(first);
+    for column in columns.iter().skip(1) {
+        let actual = diagnostic_column_len(column);
+        if actual != expected {
+            return Err(invalid_dimensions(
+                format!("diagnostic column {}", column.name),
+                expected,
+                actual,
+            ));
+        }
+    }
+    Ok(expected)
+}
+
+fn diagnostic_column_len(column: &Deseq2McolsDiagnosticColumn) -> usize {
+    match &column.values {
+        Deseq2McolsDiagnosticValues::Numeric(values) => values.len(),
+        Deseq2McolsDiagnosticValues::OptionalNumeric(values) => values.len(),
+        Deseq2McolsDiagnosticValues::Integer(values) => values.len(),
+        Deseq2McolsDiagnosticValues::Logical(values) => values.len(),
+    }
 }
 
 fn format_result_column_value(values: &DeseqResultColumnValues, row_idx: usize) -> String {
@@ -748,6 +931,46 @@ mod tests {
     }
 
     #[test]
+    fn write_size_factors_tsv_validates_names_and_values() {
+        let path = unique_test_path("bad_size_factors.tsv");
+        let sample_names = vec!["sample_1".to_string(), "sample_2".to_string()];
+
+        assert!(matches!(
+            write_size_factors_tsv(&path, Some(&sample_names), &[1.0]),
+            Err(DeseqError::InvalidDimensions { .. })
+        ));
+        assert!(matches!(
+            write_size_factors_tsv(&path, None, &[1.0, 0.0]),
+            Err(DeseqError::InvalidSizeFactors { .. })
+        ));
+        assert!(matches!(
+            write_size_factors_tsv(&path, None, &[1.0, f64::NAN]),
+            Err(DeseqError::InvalidSizeFactors { .. })
+        ));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn write_base_mean_tsv_validates_names_and_values() {
+        let path = unique_test_path("bad_base_mean.tsv");
+        let gene_names = vec!["gene_a".to_string(), "gene_b".to_string()];
+
+        assert!(matches!(
+            write_base_mean_tsv(&path, Some(&gene_names), &[1.0]),
+            Err(DeseqError::InvalidDimensions { .. })
+        ));
+        assert!(matches!(
+            write_base_mean_tsv(&path, None, &[1.0, -1.0]),
+            Err(DeseqError::NonFiniteValue { .. })
+        ));
+        assert!(matches!(
+            write_base_mean_tsv(&path, None, &[1.0, f64::INFINITY]),
+            Err(DeseqError::NonFiniteValue { .. })
+        ));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
     fn write_base_metadata_tsv_writes_deseq2_shape_and_validates_lengths() {
         let path = unique_test_path("base_metadata.tsv");
         let bad_path = unique_test_path("bad_base_metadata.tsv");
@@ -807,7 +1030,7 @@ mod tests {
                 },
                 DeseqResultRow {
                     gene: None,
-                    base_mean: f64::NAN,
+                    base_mean: 20.0,
                     log2_fold_change: None,
                     lfc_se: Some(0.5),
                     stat: None,
@@ -850,7 +1073,7 @@ mod tests {
                 "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\t",
                 "dispersion\tconverged\tmaxCooks\tcooksOutlier\n",
                 "gene_a\t10\t1.25\tNA\t-2\tNA\t0.05\t0.1\tTRUE\t4\tFALSE\n",
-                "gene2\tNA\tNA\t0.5\tNA\t0.8\tNA\tNA\tFALSE\tNA\tNA\n"
+                "gene2\t20\tNA\t0.5\tNA\t0.8\tNA\tNA\tFALSE\tNA\tNA\n"
             )
         );
         assert_eq!(
@@ -859,7 +1082,7 @@ mod tests {
                 "row\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\t",
                 "dispersion\tconverged\tmaxCooks\tcooksOutlier\n",
                 "gene_a\t10\t1.25\tNA\t-2\tNA\t0.05\t0.1\tTRUE\t4\tFALSE\n",
-                "row2\tNA\tNA\t0.5\tNA\t0.8\tNA\tNA\tFALSE\tNA\tNA\n"
+                "row2\t20\tNA\t0.5\tNA\t0.8\tNA\tNA\tFALSE\tNA\tNA\n"
             )
         );
         assert!(metadata.starts_with("name\ttype\tdescription\n"));
@@ -877,6 +1100,38 @@ mod tests {
                 "pAdjustMethod\tBH\n",
             )
         );
+    }
+
+    #[test]
+    fn write_deseq_results_tsv_rejects_invalid_numeric_rows() {
+        let path = unique_test_path("bad_deseq_results.tsv");
+        let mut results = DeseqResults {
+            rows: vec![DeseqResultRow {
+                gene: Some("gene_a".to_string()),
+                base_mean: 10.0,
+                log2_fold_change: Some(1.25),
+                lfc_se: Some(0.5),
+                stat: Some(-2.0),
+                pvalue: Some(0.04),
+                padj: Some(0.05),
+                dispersion: Some(0.1),
+                converged: Some(true),
+                max_cooks: Some(4.0),
+                cooks_outlier: Some(false),
+                filtered: None,
+            }],
+            ..DeseqResults::default()
+        };
+
+        results.rows[0].pvalue = Some(1.2);
+        assert!(write_deseq_results_tsv(&path, &results).is_err());
+        results.rows[0].pvalue = Some(0.04);
+        results.rows[0].max_cooks = Some(f64::NAN);
+        assert!(write_deseq_results_tsv(&path, &results).is_err());
+        results.rows[0].max_cooks = Some(4.0);
+        results.rows[0].base_mean = -1.0;
+        assert!(write_deseq_results_tsv(&path, &results).is_err());
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
@@ -903,6 +1158,32 @@ mod tests {
                 "gene_b\t0.2\t3\tTRUE\t4.5\n"
             )
         );
+    }
+
+    #[test]
+    fn write_deseq_mcols_diagnostics_tsv_rejects_misaligned_columns() {
+        let path = unique_test_path("mcols_bad_diagnostics.tsv");
+        let diagnostics = Deseq2McolsDiagnostics {
+            disp_gene_est: Some(vec![0.1, 0.2]),
+            disp_gene_iter: Some(vec![1]),
+            ..Deseq2McolsDiagnostics::default()
+        };
+
+        assert!(write_deseq_mcols_diagnostics_tsv(&path, None, &diagnostics).is_err());
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn write_deseq_mcols_diagnostics_tsv_rejects_misaligned_gene_names() {
+        let path = unique_test_path("mcols_bad_names.tsv");
+        let gene_names = vec!["gene_a".to_string()];
+        let diagnostics = Deseq2McolsDiagnostics {
+            disp_gene_est: Some(vec![0.1, 0.2]),
+            ..Deseq2McolsDiagnostics::default()
+        };
+
+        assert!(write_deseq_mcols_diagnostics_tsv(&path, Some(&gene_names), &diagnostics).is_err());
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
@@ -937,6 +1218,35 @@ mod tests {
             scalar,
             "name\tvalue\nfilterThreshold\t10\nfilterTheta\t0.5\nalpha\t0.1\n"
         );
+    }
+
+    #[test]
+    fn write_independent_filter_metadata_tsv_rejects_invalid_shapes() {
+        let path = unique_test_path("bad_filter_metadata.tsv");
+        let mut filtering = IndependentFilteringOutput {
+            enabled: true,
+            theta: vec![0.0, 0.5],
+            num_rejections: vec![1],
+            selected_index: Some(1),
+            filter_theta: Some(0.5),
+            filter_threshold: Some(10.0),
+            lowess_fit: Some(vec![1.25, 2.75]),
+            alpha: 0.1,
+        };
+
+        assert!(write_independent_filter_num_rej_tsv(&path, &filtering).is_err());
+        filtering.num_rejections = vec![1, 3];
+        filtering.lowess_fit = Some(vec![1.25]);
+        assert!(write_independent_filter_lowess_tsv(&path, &filtering).is_err());
+        filtering.lowess_fit = Some(vec![1.25, f64::NAN]);
+        assert!(write_independent_filter_lowess_tsv(&path, &filtering).is_err());
+        filtering.lowess_fit = Some(vec![1.25, 2.75]);
+        filtering.theta[1] = 1.2;
+        assert!(write_independent_filter_metadata_tsv(&path, &filtering).is_err());
+        filtering.theta[1] = 0.5;
+        filtering.alpha = f64::NAN;
+        assert!(write_independent_filter_metadata_tsv(&path, &filtering).is_err());
+        let _ = fs::remove_file(&path);
     }
 
     fn unique_test_path(name: &str) -> PathBuf {

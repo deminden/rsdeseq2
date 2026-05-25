@@ -49,6 +49,13 @@ fn two_sided_t_pvalue_matches_r_pt_shape() {
 }
 
 #[test]
+fn wald_probability_helpers_bound_or_reject_public_pvalues() {
+    assert_eq!(two_sided_normal_pvalue(f64::INFINITY), 0.0);
+    assert_eq!(two_sided_normal_pvalue(f64::NAN), 1.0);
+    assert_eq!(two_sided_t_pvalue(f64::INFINITY, 10.0), None);
+}
+
+#[test]
 fn wald_test_coefficient_selects_requested_column() {
     let fit = toy_fit(vec![1.0, 2.0, 3.0, 4.0], vec![1.0, 0.5, 1.5, 2.0], 2, 2);
     let wald = wald_test_coefficient(&fit, 1).unwrap();
@@ -93,6 +100,31 @@ fn wald_test_contrast_uses_full_beta_covariance() {
         two_sided_normal_pvalue(2.5),
         epsilon = 1e-12
     );
+}
+
+#[test]
+fn wald_test_contrast_masks_nonfinite_estimate_or_variance_accumulation() {
+    let mut fit = toy_fit(
+        vec![f64::MAX, f64::MAX, 1.0, 3.0],
+        vec![0.5, 0.7, 0.5, 0.7],
+        2,
+        2,
+    );
+    fit.beta_covariance = Some(
+        RowMajorMatrix::from_row_major(
+            2,
+            4,
+            vec![0.25, 0.05, 0.05, 0.49, f64::MAX, 0.0, 0.0, f64::MAX],
+        )
+        .unwrap(),
+    );
+
+    let contrast = wald_test_contrast(&fit, &[1.0, 1.0]).unwrap();
+
+    assert_eq!(contrast.log2_fold_change, vec![None, None]);
+    assert_eq!(contrast.lfc_se, vec![None, None]);
+    assert_eq!(contrast.wald.stat, vec![None, None]);
+    assert_eq!(contrast.wald.pvalue, vec![None, None]);
 }
 
 #[test]

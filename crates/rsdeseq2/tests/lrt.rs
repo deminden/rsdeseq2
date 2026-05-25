@@ -26,6 +26,30 @@ fn lrt_test_handles_missing_log_likelihoods() {
 }
 
 #[test]
+fn lrt_test_masks_overflowed_deviance_statistic() {
+    let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![f64::MAX], 1, 2);
+    let reduced = toy_fit(vec![0.0], vec![1.0], vec![-f64::MAX], 1, 1);
+
+    let lrt = lrt_test(&full, &reduced).unwrap();
+
+    assert_eq!(lrt.deviance[0], None);
+    assert_eq!(lrt.pvalue[0], None);
+}
+
+#[test]
+fn lrt_test_bounds_extreme_finite_pvalues() {
+    let full = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![1e100], 1, 2);
+    let reduced = toy_fit(vec![0.0], vec![1.0], vec![0.0], 1, 1);
+
+    let lrt = lrt_test(&full, &reduced).unwrap();
+
+    assert_eq!(lrt.deviance[0], Some(2e100));
+    let pvalue = lrt.pvalue[0].unwrap();
+    assert!(pvalue.is_finite());
+    assert!((0.0..=1.0).contains(&pvalue));
+}
+
+#[test]
 fn lrt_test_validates_inputs() {
     let full = toy_fit(vec![0.0], vec![1.0], vec![10.0], 1, 1);
     let reduced = toy_fit(vec![0.0], vec![1.0], vec![8.0], 1, 1);
@@ -33,6 +57,11 @@ fn lrt_test_validates_inputs() {
 
     let bad_reduced = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![8.0, 9.0], 2, 1);
     assert!(lrt_test(&full, &bad_reduced).is_err());
+
+    let full_two_coef = toy_fit(vec![0.0, 0.0], vec![1.0, 1.0], vec![10.0], 1, 2);
+    let mut bad_flags = toy_fit(vec![0.0], vec![1.0], vec![8.0], 1, 1);
+    bad_flags.beta_converged.clear();
+    assert!(lrt_test(&full_two_coef, &bad_flags).is_err());
 }
 
 fn toy_fit(

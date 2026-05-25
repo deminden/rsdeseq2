@@ -3718,7 +3718,7 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     let full_deviance = glm_fit
         .log_like
         .iter()
-        .map(|log_like| -2.0 * *log_like)
+        .map(|log_like| full_deviance_from_log_like(*log_like))
         .collect();
     fit.beta = Some(glm_fit.beta);
     fit.beta_se = Some(glm_fit.beta_se);
@@ -3729,6 +3729,15 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     fit.full_deviance = Some(full_deviance);
     fit.mu = Some(glm_fit.mu);
     fit.hat_diagonal = Some(glm_fit.hat_diagonal);
+}
+
+fn full_deviance_from_log_like(log_like: f64) -> f64 {
+    let deviance = -2.0 * log_like;
+    if log_like.is_finite() && deviance.is_finite() {
+        deviance
+    } else {
+        f64::NAN
+    }
 }
 
 fn validate_pipeline_wald_coefficient(
@@ -3747,7 +3756,7 @@ fn validate_pipeline_wald_coefficient(
 
 #[cfg(test)]
 mod tests {
-    use super::CountMatrix;
+    use super::{full_deviance_from_log_like, CountMatrix};
 
     #[test]
     fn count_matrix_rejects_bad_length() {
@@ -3772,5 +3781,12 @@ mod tests {
         let counts = CountMatrix::from_row_major_u32(2, 3, vec![0, 0, 0, 4, 5, 6]).unwrap();
         assert!(counts.is_all_zero_gene(0).unwrap());
         assert!(!counts.is_all_zero_gene(1).unwrap());
+    }
+
+    #[test]
+    fn full_deviance_from_log_like_masks_nonfinite_values() {
+        assert_eq!(full_deviance_from_log_like(-2.0), 4.0);
+        assert!(full_deviance_from_log_like(f64::NAN).is_nan());
+        assert!(full_deviance_from_log_like(f64::MAX).is_nan());
     }
 }

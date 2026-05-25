@@ -218,6 +218,18 @@ fn beta_prior_weighted_quantile_uses_row_weights() {
 }
 
 #[test]
+fn beta_prior_weighted_quantile_rejects_overflowed_weight_sum() {
+    let err = match_weighted_upper_quantile_for_variance(
+        &[1.0, 10.0, 20.0],
+        &[f64::MAX, f64::MAX, 1.0],
+        0.5,
+    )
+    .unwrap_err();
+
+    assert!(err.to_string().contains("finite total weight"));
+}
+
+#[test]
 fn beta_prior_variance_handles_extreme_mean_dispersion_weights() {
     let betas = RowMajorMatrix::from_row_major(3, 1, vec![1.0, 2.0, 3.0]).unwrap();
     let variance = estimate_beta_prior_variance(

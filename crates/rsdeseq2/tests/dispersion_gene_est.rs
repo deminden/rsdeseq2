@@ -49,11 +49,46 @@ fn rough_dispersion_matches_deseq2_formula() {
 }
 
 #[test]
+fn rough_dispersion_rejects_overflowed_residual_square() {
+    let normalized = RowMajorMatrix::from_row_major(1, 3, vec![3e154, 1.0, 1.0]).unwrap();
+    let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
+    let err = rough_dispersion_estimates(&normalized, &design).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "rough dispersion residual square" && index == Some(0)
+    ));
+}
+
+#[test]
 fn moments_dispersion_matches_deseq2_formula() {
     let moments =
         moments_dispersion_estimates(&[20.0], &[400.0 / 3.0], &[1.0, 1.0, 1.0, 1.0]).unwrap();
 
     assert_relative_eq!(moments[0], 17.0 / 60.0, epsilon = 1e-12);
+}
+
+#[test]
+fn moments_dispersion_rejects_overflowed_inverse_size_factor_sum() {
+    let err = moments_dispersion_estimates(
+        &[20.0],
+        &[400.0 / 3.0],
+        &[
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+        ],
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "moments dispersion inverse size-factor sum" && index == Some(3)
+    ));
 }
 
 #[test]
@@ -70,6 +105,25 @@ fn moments_dispersion_uses_normalization_factor_column_means() {
 
     assert_relative_eq!(moments[0], 29.0 / 120.0, epsilon = 1e-12);
     assert_relative_eq!(moments[1], 53.0 / 240.0, epsilon = 1e-12);
+}
+
+#[test]
+fn moments_dispersion_rejects_overflowed_normalization_factor_column_sum() {
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(2, 1, vec![f64::MAX, f64::MAX]).unwrap();
+    let err = moments_dispersion_estimates_with_normalization_factors(
+        &[10.0, 20.0],
+        &[30.0, 100.0],
+        &normalization_factors,
+        Some(&[false, false]),
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "moments dispersion normalization-factor column sum" && index == Some(0)
+    ));
 }
 
 #[test]
@@ -204,6 +258,22 @@ fn weighted_likelihood_kernel_matches_unweighted_for_unit_weights() {
 }
 
 #[test]
+fn weighted_likelihood_rejects_overflowed_weighted_term() {
+    let counts = [10];
+    let mu = [20.0];
+    let weights = [f64::MAX];
+    let err =
+        dispersion_nb_log_likelihood_kernel_weighted(&counts, &mu, 0.25_f64.ln(), Some(&weights))
+            .unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "dispersion objective weighted likelihood term" && index == Some(0)
+    ));
+}
+
+#[test]
 fn weighted_likelihood_derivative_matches_finite_difference() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
@@ -295,6 +365,33 @@ fn weighted_cox_reid_adjustment_uses_thresholded_design_subset() {
         cox_reid_adjustment_weighted(&design, &mu, alpha.ln(), Some(&weights)).unwrap();
 
     assert_relative_eq!(adjustment, -0.5 * expected_weight_sum.ln(), epsilon = 1e-12);
+}
+
+#[test]
+fn cox_reid_adjustment_rejects_overflowed_design_product() {
+    let design = DesignMatrix::from_row_major(2, 1, vec![2e154, 2e154], None).unwrap();
+    let mu = [1.0, 1.0];
+    let err = cox_reid_adjustment(&design, &mu, 1.0_f64.ln()).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "Cox-Reid weighted design product" && index == Some(0)
+    ));
+}
+
+#[test]
+fn weighted_cox_reid_rejects_overflowed_column_subset_sum() {
+    let design = DesignMatrix::from_row_major(2, 1, vec![f64::MAX, f64::MAX], None).unwrap();
+    let mu = [1.0, 1.0];
+    let weights = [1.0, 1.0];
+    let err = cox_reid_adjustment_weighted(&design, &mu, 1.0_f64.ln(), Some(&weights)).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "Cox-Reid selected design column sum" && index == Some(1)
+    ));
 }
 
 #[test]

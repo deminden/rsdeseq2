@@ -153,17 +153,23 @@ fn cox_reid_subset_full_rank(
 
     let mut keep_cols = Vec::new();
     for col in 0..design.n_coefficients() {
-        let col_sum = kept_rows
-            .iter()
-            .map(|sample| {
-                design
-                    .matrix()
-                    .get(*sample, col)
-                    .copied()
-                    .unwrap_or(0.0)
-                    .abs()
-            })
-            .sum::<f64>();
+        let mut col_sum = 0.0;
+        for sample in &kept_rows {
+            let value = design
+                .matrix()
+                .get(*sample, col)
+                .copied()
+                .unwrap_or(0.0)
+                .abs();
+            let Some(next_sum) = checked_sum2(col_sum, value) else {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "observation weight Cox-Reid column sum".to_string(),
+                    index: Some(col),
+                    value,
+                });
+            };
+            col_sum = next_sum;
+        }
         if col_sum > 0.0 {
             keep_cols.push(col);
         }
@@ -189,7 +195,7 @@ fn weighted_design_has_no_zero_columns(
         let mut has_nonzero = false;
         for (sample, weight) in weights.iter().copied().enumerate() {
             let value = design.matrix().get(sample, col).copied().unwrap_or(0.0);
-            if weight * value != 0.0 {
+            if weight != 0.0 && value != 0.0 {
                 has_nonzero = true;
                 break;
             }
@@ -212,10 +218,23 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
     let mut values = Vec::with_capacity(design.n_samples() * design.n_coefficients());
     for (sample, weight) in weights.iter().copied().enumerate() {
         for col in 0..design.n_coefficients() {
-            values.push(weight * design.matrix().get(sample, col).copied().unwrap_or(0.0));
+            let value = weight * design.matrix().get(sample, col).copied().unwrap_or(0.0);
+            if !value.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "weighted design value".to_string(),
+                    index: Some(sample * design.n_coefficients() + col),
+                    value,
+                });
+            }
+            values.push(value);
         }
     }
     Ok(values)
+}
+
+fn checked_sum2(left: f64, right: f64) -> Option<f64> {
+    let sum = left + right;
+    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
 fn validate_weight_options(options: ObservationWeightOptions) -> Result<(), DeseqError> {

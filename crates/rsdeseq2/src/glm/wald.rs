@@ -183,13 +183,20 @@ pub fn wald_test_contrast_with_options(
     for gene in 0..fit.beta.n_rows() {
         let beta = fit.beta.row(gene)?;
         let covariance = covariance.row(gene)?;
-        let estimate = contrast
-            .iter()
-            .copied()
-            .zip(beta.iter().copied())
-            .map(|(contrast, beta)| contrast * beta)
-            .sum::<f64>();
-        let variance = contrast_variance(contrast, covariance, p);
+        let Some(estimate) = contrast_estimate(contrast, beta) else {
+            log2_fold_change.push(None);
+            lfc_se.push(None);
+            stat.push(None);
+            pvalue.push(None);
+            continue;
+        };
+        let Some(variance) = contrast_variance(contrast, covariance, p) else {
+            log2_fold_change.push(None);
+            lfc_se.push(None);
+            stat.push(None);
+            pvalue.push(None);
+            continue;
+        };
         let Some(se) = valid_contrast_se(estimate, variance) else {
             log2_fold_change.push(None);
             lfc_se.push(None);
@@ -327,14 +334,32 @@ fn validate_contrast_inputs(fit: &NbinomGlmFit, contrast: &[f64]) -> Result<(), 
     Ok(())
 }
 
-fn contrast_variance(contrast: &[f64], covariance: &[f64], p: usize) -> f64 {
+fn contrast_estimate(contrast: &[f64], beta: &[f64]) -> Option<f64> {
+    let mut estimate = 0.0;
+    for (contrast, beta) in contrast.iter().copied().zip(beta.iter().copied()) {
+        let term = contrast * beta;
+        let next = estimate + term;
+        if !term.is_finite() || !next.is_finite() {
+            return None;
+        }
+        estimate = next;
+    }
+    Some(estimate)
+}
+
+fn contrast_variance(contrast: &[f64], covariance: &[f64], p: usize) -> Option<f64> {
     let mut variance = 0.0;
     for row in 0..p {
         for col in 0..p {
-            variance += contrast[row] * covariance[row * p + col] * contrast[col];
+            let term = contrast[row] * covariance[row * p + col] * contrast[col];
+            let next = variance + term;
+            if !term.is_finite() || !next.is_finite() {
+                return None;
+            }
+            variance = next;
         }
     }
-    variance
+    Some(variance)
 }
 
 fn valid_contrast_se(estimate: f64, variance: f64) -> Option<f64> {
@@ -377,7 +402,9 @@ pub fn wald_stat_and_pvalue_with_options(
             let q2 = (-abs_beta - threshold) / beta_se;
             (
                 default_stat,
-                tail.lower(q1).zip(tail.lower(q2)).map(|(a, b)| a + b),
+                tail.lower(q1)
+                    .zip(tail.lower(q2))
+                    .and_then(|(a, b)| clamp_probability(a + b)),
             )
         }
         WaldAlternative::GreaterAbsUpshot if threshold == 0.0 => {
@@ -393,7 +420,9 @@ pub fn wald_stat_and_pvalue_with_options(
         WaldAlternative::GreaterAbs2014 => {
             let shifted = (abs_beta - threshold) / beta_se;
             let stat = beta.signum() * shifted.max(0.0);
-            let pvalue = tail.upper(shifted).map(|pvalue| (2.0 * pvalue).min(1.0));
+            let pvalue = tail
+                .upper(shifted)
+                .and_then(|pvalue| clamp_probability(2.0 * pvalue));
             (stat, pvalue)
         }
         WaldAlternative::LessAbs => {
@@ -432,7 +461,10 @@ fn wald_stat(beta: f64, beta_se: f64) -> Option<f64> {
 
 /// Two-sided standard-Normal p-value.
 pub fn two_sided_normal_pvalue(stat: f64) -> f64 {
-    erfc(stat.abs() / std::f64::consts::SQRT_2)
+    if stat.is_nan() {
+        return 1.0;
+    }
+    erfc(stat.abs() / std::f64::consts::SQRT_2).clamp(0.0, 1.0)
 }
 
 /// Two-sided Student t p-value.
@@ -441,7 +473,7 @@ pub fn two_sided_t_pvalue(stat: f64, degrees_of_freedom: f64) -> Option<f64> {
         return None;
     }
     let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-    Some(2.0 * (1.0 - distribution.cdf(stat.abs())))
+    clamp_probability(2.0 * (1.0 - distribution.cdf(stat.abs())))
 }
 
 fn resolve_wald_degrees_of_freedom(
@@ -506,6 +538,10 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
     let value = 2.0 / (b - a)
         * (-a * distribution.cdf(-a) + distribution.pdf(a) + b * distribution.cdf(-b)
             - distribution.pdf(b));
+    clamp_probability(value)
+}
+
+fn clamp_probability(value: f64) -> Option<f64> {
     value.is_finite().then_some(value.clamp(0.0, 1.0))
 }
 
@@ -543,17 +579,17 @@ impl WaldTail {
         match self {
             Self::Normal => {
                 let distribution = Normal::new(0.0, 1.0).ok()?;
-                Some(distribution.cdf(q))
+                clamp_probability(distribution.cdf(q))
             }
             Self::T { degrees_of_freedom } => {
                 let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-                Some(distribution.cdf(q))
+                clamp_probability(distribution.cdf(q))
             }
         }
     }
 
     fn upper(self, q: f64) -> Option<f64> {
-        self.lower(q).map(|cdf| 1.0 - cdf)
+        self.lower(q).and_then(|cdf| clamp_probability(1.0 - cdf))
     }
 
     fn two_sided(self, stat: f64) -> Option<f64> {

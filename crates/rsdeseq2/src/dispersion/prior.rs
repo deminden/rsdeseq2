@@ -303,12 +303,23 @@ fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError>
             reason: "low-df dispersion histograms have no positive bins".to_string(),
         });
     }
-    Ok(observed
-        .iter()
-        .copied()
-        .zip(simulated.iter().copied())
-        .map(|(obs, sim)| obs * ((obs + small) / (sim + small)).ln())
-        .sum())
+    let mut divergence = 0.0;
+    for (obs, sim) in observed.iter().copied().zip(simulated.iter().copied()) {
+        let obs_adjusted = checked_add(obs, small, "low-df dispersion KL observed bin")?;
+        let sim_adjusted = checked_add(sim, small, "low-df dispersion KL simulated bin")?;
+        let ratio = checked_div(obs_adjusted, sim_adjusted, "low-df dispersion KL bin ratio")?;
+        let log_ratio = ratio.ln();
+        if !log_ratio.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "low-df dispersion KL log ratio".to_string(),
+                index: None,
+                value: log_ratio,
+            });
+        }
+        let term = checked_mul(obs, log_ratio, "low-df dispersion KL term")?;
+        divergence = checked_add(divergence, term, "low-df dispersion KL sum")?;
+    }
+    Ok(divergence)
 }
 
 fn low_df_quasi_samples(
@@ -391,22 +402,64 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
             let scaled_cubed = scaled * scaled * scaled;
             let one_minus_scaled_cubed = 1.0 - scaled_cubed;
             let weight = one_minus_scaled_cubed * one_minus_scaled_cubed * one_minus_scaled_cubed;
-            sw += weight;
-            sx += weight * x[idx];
-            sy += weight * y[idx];
-            sxx += weight * x[idx] * x[idx];
-            sxy += weight * x[idx] * y[idx];
+            sw = checked_add(sw, weight, "low-df prior variance smoother weights")?;
+            sx = checked_add(
+                sx,
+                checked_mul(weight, x[idx], "low-df prior variance smoother x")?,
+                "low-df prior variance smoother x",
+            )?;
+            sy = checked_add(
+                sy,
+                checked_mul(weight, y[idx], "low-df prior variance smoother y")?,
+                "low-df prior variance smoother y",
+            )?;
+            let weighted_x = checked_mul(weight, x[idx], "low-df prior variance smoother xx")?;
+            sxx = checked_add(
+                sxx,
+                checked_mul(weighted_x, x[idx], "low-df prior variance smoother xx")?,
+                "low-df prior variance smoother xx",
+            )?;
+            sxy = checked_add(
+                sxy,
+                checked_mul(weighted_x, y[idx], "low-df prior variance smoother xy")?,
+                "low-df prior variance smoother xy",
+            )?;
         }
         if sw <= 0.0 {
             continue;
         }
-        let denominator = sw * sxx - sx * sx;
+        let denominator = checked_sub(
+            checked_mul(sw, sxx, "low-df prior variance smoother denominator")?,
+            checked_mul(sx, sx, "low-df prior variance smoother denominator")?,
+            "low-df prior variance smoother denominator",
+        )?;
         let predicted = if denominator.abs() > f64::EPSILON {
-            let slope = (sw * sxy - sx * sy) / denominator;
-            let intercept = (sy - slope * sx) / sw;
-            intercept + slope * target
+            let numerator = checked_sub(
+                checked_mul(sw, sxy, "low-df prior variance smoother slope")?,
+                checked_mul(sx, sy, "low-df prior variance smoother slope")?,
+                "low-df prior variance smoother slope",
+            )?;
+            let slope = checked_div(
+                numerator,
+                denominator,
+                "low-df prior variance smoother slope",
+            )?;
+            let intercept = checked_div(
+                checked_sub(
+                    sy,
+                    checked_mul(slope, sx, "low-df prior variance smoother intercept")?,
+                    "low-df prior variance smoother intercept",
+                )?,
+                sw,
+                "low-df prior variance smoother intercept",
+            )?;
+            checked_add(
+                intercept,
+                checked_mul(slope, target, "low-df prior variance smoother prediction")?,
+                "low-df prior variance smoother prediction",
+            )?
         } else {
-            sy / sw
+            checked_div(sy, sw, "low-df prior variance smoother mean")?
         };
         if predicted < best_y {
             best_y = predicted;
@@ -419,4 +472,101 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         });
     }
     Ok(best_x)
+}
+
+fn checked_add(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left + right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
+}
+
+fn checked_sub(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left - right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
+}
+
+fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
+}
+
+fn checked_div(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left / right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn low_df_smoother_rejects_overflowed_weighted_accumulation() {
+        let err =
+            local_linear_smoothed_argmin(&[2e154, 2.000000000000001e154], &[1.0, 2.0], &[2e154])
+                .unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, .. }
+                if context == "low-df prior variance smoother xx"
+        ));
+    }
+
+    #[test]
+    fn low_df_smoother_rejects_overflowed_response_accumulation() {
+        let x = (0..20).map(|idx| idx as f64 * 0.1).collect::<Vec<_>>();
+        let y = vec![1e308; x.len()];
+        let err = local_linear_smoothed_argmin(&x, &y, &[0.0]).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, .. }
+                if context == "low-df prior variance smoother y"
+        ));
+    }
+
+    #[test]
+    fn kl_divergence_rejects_overflowed_bin_adjustment() {
+        let err = kl_divergence(&[f64::MAX], &[1.0]).unwrap_err();
+
+        assert!(matches!(err, DeseqError::NonFiniteValue { .. }));
+    }
+
+    #[test]
+    fn kl_divergence_keeps_large_finite_bins_finite() {
+        let divergence = kl_divergence(&[1e100, 2e100], &[2e100, 1e100]).unwrap();
+
+        assert!(divergence.is_finite());
+    }
 }

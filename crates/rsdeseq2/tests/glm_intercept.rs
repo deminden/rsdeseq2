@@ -96,3 +96,38 @@ fn intercept_only_fit_validates_inputs() {
     )
     .is_err());
 }
+
+#[test]
+fn intercept_only_fit_rejects_nonfinite_normalized_mean() {
+    let counts = CountMatrix::from_row_major_u32(1, 2, vec![u32::MAX, u32::MAX]).unwrap();
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(1, 2, vec![f64::MIN_POSITIVE, f64::MIN_POSITIVE]).unwrap();
+
+    let err = fit_intercept_only_fixed_dispersion_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &[0.1],
+        None,
+    )
+    .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("non-finite normalized intercept mean"));
+}
+
+#[test]
+fn intercept_only_fit_rejects_nonfinite_reconstructed_mu() {
+    let counts = CountMatrix::from_row_major_u32(1, 2, vec![4, 1]).unwrap();
+    let normalization_factors = RowMajorMatrix::from_row_major(1, 2, vec![1.0, f64::MAX]).unwrap();
+
+    let err = fit_intercept_only_fixed_dispersion_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &[0.1],
+        None,
+    )
+    .unwrap_err();
+
+    assert!(err.to_string().contains("non-finite fitted intercept mean"));
+}

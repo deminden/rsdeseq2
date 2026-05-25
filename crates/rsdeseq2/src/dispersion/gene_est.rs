@@ -531,17 +531,38 @@ pub fn rough_dispersion_estimates(
     for gene in 0..normalized_counts.n_rows() {
         let y = normalized_counts.row(gene)?;
         let mu = mu.row(gene)?;
-        let sum = y
-            .iter()
-            .copied()
-            .zip(mu.iter().copied())
-            .map(|(count, fitted)| {
-                let fitted = fitted.max(1.0);
-                let residual = count - fitted;
-                let inv_fitted = fitted.recip();
-                (residual * residual - fitted) * inv_fitted * inv_fitted
-            })
-            .sum::<f64>();
+        let mut sum = 0.0;
+        for (sample, (count, fitted)) in y.iter().copied().zip(mu.iter().copied()).enumerate() {
+            let fitted = fitted.max(1.0);
+            let residual = count - fitted;
+            let inv_fitted = fitted.recip();
+            let residual_square = checked_mul(
+                residual,
+                residual,
+                sample,
+                "rough dispersion residual square",
+            )?;
+            let centered = residual_square - fitted;
+            if !centered.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "rough dispersion centered residual".to_string(),
+                    index: Some(sample),
+                    value: centered,
+                });
+            }
+            let inv_square = checked_mul(
+                inv_fitted,
+                inv_fitted,
+                sample,
+                "rough dispersion inverse fitted square",
+            )?;
+            checked_matrix_add_assign(
+                &mut sum,
+                checked_mul(centered, inv_square, sample, "rough dispersion term")?,
+                sample,
+                "rough dispersion row sum",
+            )?;
+        }
         estimates.push((sum / residual_df).max(0.0));
     }
     Ok(estimates)
@@ -561,21 +582,12 @@ pub fn moments_dispersion_estimates(
         ));
     }
     validate_size_factors(size_factors)?;
-    let xim =
-        size_factors.iter().map(|value| value.recip()).sum::<f64>() / size_factors.len() as f64;
-    Ok(base_mean
-        .iter()
-        .copied()
-        .zip(base_var.iter().copied())
-        .map(|(mean, variance)| {
-            if mean > 0.0 {
-                let inv_mean = mean.recip();
-                (variance - xim * mean) * inv_mean * inv_mean
-            } else {
-                f64::NAN
-            }
-        })
-        .collect())
+    let inverse_sum = checked_sum_indexed(
+        size_factors.iter().copied().map(f64::recip),
+        "moments dispersion inverse size-factor sum",
+    )?;
+    let xim = inverse_sum / size_factors.len() as f64;
+    moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }
 
 /// DESeq2-style moments dispersion estimates with gene/sample normalization factors.
@@ -635,19 +647,41 @@ fn moments_dispersion_estimates_with_xim(
                 .to_string(),
         });
     }
-    Ok(base_mean
+    let mut estimates = Vec::with_capacity(base_mean.len());
+    for (gene, (mean, variance)) in base_mean
         .iter()
         .copied()
         .zip(base_var.iter().copied())
-        .map(|(mean, variance)| {
-            if mean > 0.0 {
-                let inv_mean = mean.recip();
-                (variance - xim * mean) * inv_mean * inv_mean
-            } else {
-                f64::NAN
+        .enumerate()
+    {
+        if mean > 0.0 {
+            let inv_mean = mean.recip();
+            let xim_mean = checked_mul(xim, mean, gene, "moments dispersion xim mean")?;
+            let centered = variance - xim_mean;
+            if !centered.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "moments dispersion centered variance".to_string(),
+                    index: Some(gene),
+                    value: centered,
+                });
             }
-        })
-        .collect())
+            let inv_square = checked_mul(
+                inv_mean,
+                inv_mean,
+                gene,
+                "moments dispersion inverse mean square",
+            )?;
+            estimates.push(checked_mul(
+                centered,
+                inv_square,
+                gene,
+                "moments dispersion estimate",
+            )?);
+        } else {
+            estimates.push(f64::NAN);
+        }
+    }
+    Ok(estimates)
 }
 
 fn normalization_factor_moments_xim(
@@ -662,7 +696,12 @@ fn normalization_factor_moments_xim(
         }
         for (sample, value) in normalization_factors.row(row)?.iter().copied().enumerate() {
             validate_normalization_factor(value, sample)?;
-            col_sums[sample] += value;
+            checked_matrix_add_assign(
+                &mut col_sums[sample],
+                value,
+                sample,
+                "moments dispersion normalization-factor column sum",
+            )?;
         }
         n_rows_used += 1;
     }
@@ -672,25 +711,23 @@ fn normalization_factor_moments_xim(
                 .to_string(),
         });
     }
-    let inverse_col_mean_sum = col_sums
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(sample, sum)| {
-            let col_mean = sum / n_rows_used as f64;
-            if !col_mean.is_finite() || col_mean <= 0.0 {
-                Err(DeseqError::InvalidSizeFactors {
-                    reason: format!(
-                        "normalization-factor column mean at sample {sample} must be finite and positive"
-                    ),
-                })
-            } else {
-                Ok(col_mean.recip())
-            }
-        })
-        .collect::<Result<Vec<_>, DeseqError>>()?
-        .into_iter()
-        .sum::<f64>();
+    let mut inverse_col_mean_sum = 0.0;
+    for (sample, sum) in col_sums.iter().copied().enumerate() {
+        let col_mean = sum / n_rows_used as f64;
+        if !col_mean.is_finite() || col_mean <= 0.0 {
+            return Err(DeseqError::InvalidSizeFactors {
+                reason: format!(
+                    "normalization-factor column mean at sample {sample} must be finite and positive"
+                ),
+            });
+        }
+        checked_matrix_add_assign(
+            &mut inverse_col_mean_sum,
+            col_mean.recip(),
+            sample,
+            "moments dispersion inverse normalization-factor mean sum",
+        )?;
+    }
     Ok(inverse_col_mean_sum / normalization_factors.n_cols() as f64)
 }
 
@@ -1343,9 +1380,26 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu * alpha;
-        total += observation_weight
-            * (ln_gamma(y + inv_alpha) - ln_gamma(inv_alpha) + y * log_alpha
-                - (y + inv_alpha) * mu_alpha.ln_1p());
+        let term = ln_gamma(y + inv_alpha) - ln_gamma(inv_alpha) + y * log_alpha
+            - (y + inv_alpha) * mu_alpha.ln_1p();
+        if !term.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion objective likelihood term".to_string(),
+                index: Some(sample),
+                value: term,
+            });
+        }
+        checked_matrix_add_assign(
+            &mut total,
+            checked_mul(
+                observation_weight,
+                term,
+                sample,
+                "dispersion objective weighted likelihood term",
+            )?,
+            sample,
+            "dispersion objective likelihood sum",
+        )?;
     }
     Ok(total)
 }
@@ -1398,13 +1452,39 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         let y = f64::from(count);
         let mu_alpha = mu * alpha;
         let one_plus_mu_alpha = 1.0 + mu_alpha;
-        derivative_alpha += observation_weight
-            * (digamma(inv_alpha) + mu_alpha.ln_1p()
-                - mu_alpha / one_plus_mu_alpha
-                - digamma(y + inv_alpha)
-                + y * alpha / one_plus_mu_alpha);
+        let term = digamma(inv_alpha) + mu_alpha.ln_1p()
+            - mu_alpha / one_plus_mu_alpha
+            - digamma(y + inv_alpha)
+            + y * alpha / one_plus_mu_alpha;
+        if !term.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion objective derivative term".to_string(),
+                index: Some(sample),
+                value: term,
+            });
+        }
+        checked_matrix_add_assign(
+            &mut derivative_alpha,
+            checked_mul(
+                observation_weight,
+                term,
+                sample,
+                "dispersion objective weighted derivative term",
+            )?,
+            sample,
+            "dispersion objective derivative sum",
+        )?;
     }
-    Ok(inv_alpha_squared * derivative_alpha * alpha)
+    let value = inv_alpha_squared * derivative_alpha * alpha;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: "dispersion objective log-alpha derivative".to_string(),
+            index: None,
+            value,
+        })
+    }
 }
 
 /// Second derivative of DESeq2's NB likelihood kernel with respect to log alpha.
@@ -1465,12 +1545,55 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
             + mu * mu * alpha * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha
             + inv_alpha_squared * trigamma(y + inv_alpha)?
             + y * inv_one_plus_mu_alpha * inv_one_plus_mu_alpha;
-        first_alpha_sum += observation_weight * first_term;
-        second_alpha_sum += observation_weight * second_term;
+        if !first_term.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion objective second derivative first term".to_string(),
+                index: Some(sample),
+                value: first_term,
+            });
+        }
+        if !second_term.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion objective second derivative term".to_string(),
+                index: Some(sample),
+                value: second_term,
+            });
+        }
+        checked_matrix_add_assign(
+            &mut first_alpha_sum,
+            checked_mul(
+                observation_weight,
+                first_term,
+                sample,
+                "dispersion objective weighted first derivative term",
+            )?,
+            sample,
+            "dispersion objective first derivative sum",
+        )?;
+        checked_matrix_add_assign(
+            &mut second_alpha_sum,
+            checked_mul(
+                observation_weight,
+                second_term,
+                sample,
+                "dispersion objective weighted second derivative term",
+            )?,
+            sample,
+            "dispersion objective second derivative sum",
+        )?;
     }
     let first_log_alpha =
         dispersion_nb_log_likelihood_kernel_derivative_weighted(counts, mu, log_alpha, weights)?;
-    Ok(second_alpha_sum - 2.0 * inv_alpha * first_alpha_sum + first_log_alpha)
+    let value = second_alpha_sum - 2.0 * inv_alpha * first_alpha_sum + first_log_alpha;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: "dispersion objective log-alpha second derivative".to_string(),
+            index: None,
+            value,
+        })
+    }
 }
 
 /// Cox-Reid adjustment term for one gene and design matrix.
@@ -1595,10 +1718,40 @@ fn cox_reid_weighted_design_matrices_with_threshold(
         let row = design.matrix().row(sample)?;
         for (left_idx, left_col) in selected_columns.iter().copied().enumerate() {
             for (right_idx, right_col) in selected_columns.iter().copied().enumerate() {
-                let x_product = row[left_col] * row[right_col];
-                xtwx[(left_idx, right_idx)] += x_product * weight;
-                d_xtwx[(left_idx, right_idx)] += x_product * d_weight;
-                d2_xtwx[(left_idx, right_idx)] += x_product * d2_weight;
+                let x_product = checked_mul(
+                    row[left_col],
+                    row[right_col],
+                    sample,
+                    "Cox-Reid weighted design product",
+                )?;
+                checked_matrix_add_assign(
+                    &mut xtwx[(left_idx, right_idx)],
+                    checked_mul(x_product, weight, sample, "Cox-Reid weighted design xtwx")?,
+                    sample,
+                    "Cox-Reid weighted design xtwx",
+                )?;
+                checked_matrix_add_assign(
+                    &mut d_xtwx[(left_idx, right_idx)],
+                    checked_mul(
+                        x_product,
+                        d_weight,
+                        sample,
+                        "Cox-Reid weighted design derivative",
+                    )?,
+                    sample,
+                    "Cox-Reid weighted design derivative",
+                )?;
+                checked_matrix_add_assign(
+                    &mut d2_xtwx[(left_idx, right_idx)],
+                    checked_mul(
+                        x_product,
+                        d2_weight,
+                        sample,
+                        "Cox-Reid weighted design second derivative",
+                    )?,
+                    sample,
+                    "Cox-Reid weighted design second derivative",
+                )?;
             }
         }
     }
@@ -1633,7 +1786,12 @@ fn cox_reid_column_indices(
     for column in 0..design.n_coefficients() {
         let mut sum_abs = 0.0;
         for sample in selected_samples {
-            sum_abs += design.matrix().row(*sample)?[column].abs();
+            checked_matrix_add_assign(
+                &mut sum_abs,
+                design.matrix().row(*sample)?[column].abs(),
+                *sample,
+                "Cox-Reid selected design column sum",
+            )?;
         }
         if sum_abs > 0.0 {
             selected.push(column);
@@ -1642,9 +1800,9 @@ fn cox_reid_column_indices(
     Ok(selected)
 }
 
-fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> f64 {
+fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> Result<f64, DeseqError> {
     let product = left * right;
-    product.diagonal().iter().sum()
+    checked_sum_indexed(product.diagonal().iter().copied(), "Cox-Reid trace product")
 }
 
 /// Derivative of the Cox-Reid adjustment with respect to log alpha.
@@ -1697,7 +1855,7 @@ fn cox_reid_adjustment_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    Ok(-0.5 * trace_product(&inverse, &matrices.d_xtwx) * alpha)
+    Ok(-0.5 * trace_product(&inverse, &matrices.d_xtwx)? * alpha)
 }
 
 /// Second derivative of the Cox-Reid adjustment with respect to log alpha.
@@ -1750,11 +1908,12 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    let second_trace = (&inverse * &matrices.d_xtwx * &inverse * &matrices.d_xtwx)
-        .diagonal()
-        .iter()
-        .sum::<f64>();
-    let trace_bi_d2b = trace_product(&inverse, &matrices.d2_xtwx);
+    let second_trace_product = &inverse * &matrices.d_xtwx * &inverse * &matrices.d_xtwx;
+    let second_trace = checked_sum_indexed(
+        second_trace_product.diagonal().iter().copied(),
+        "Cox-Reid second trace product",
+    )?;
+    let trace_bi_d2b = trace_product(&inverse, &matrices.d2_xtwx)?;
     let second_alpha = 0.5 * (second_trace - trace_bi_d2b);
     let first_log_alpha = cox_reid_adjustment_derivative_weighted_with_threshold(
         design,
@@ -2371,6 +2530,49 @@ fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
         });
     }
     Ok(())
+}
+
+fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_matrix_add_assign(
+    sum: &mut f64,
+    term: f64,
+    index: usize,
+    context: &str,
+) -> Result<(), DeseqError> {
+    let value = *sum + term;
+    if value.is_finite() {
+        *sum = value;
+        Ok(())
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_sum_indexed(
+    values: impl IntoIterator<Item = f64>,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let mut sum = 0.0;
+    for (idx, value) in values.into_iter().enumerate() {
+        checked_matrix_add_assign(&mut sum, value, idx, context)?;
+    }
+    Ok(sum)
 }
 
 fn validate_observation_weight_slice(

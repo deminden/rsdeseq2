@@ -155,7 +155,7 @@ pub fn apply_independent_filtering(
 ) -> Result<IndependentFilteringOutput, DeseqError> {
     validate_alpha(options.alpha)?;
     if !options.enabled {
-        recompute_padj(results);
+        recompute_padj(results)?;
         for row in &mut results.rows {
             row.filtered = None;
         }
@@ -319,22 +319,15 @@ pub fn select_filter_index_with_lowess(
         .zip(smooth.iter().copied())
         .filter_map(|(count, fitted)| (count > 0).then_some(count as f64 - fitted))
         .collect::<Vec<_>>();
-    let rmse = if positive_residuals.is_empty() {
-        0.0
-    } else {
-        (positive_residuals
-            .iter()
-            .map(|value| value * value)
-            .sum::<f64>()
-            / positive_residuals.len() as f64)
-            .sqrt()
-    };
+    let rmse = positive_residual_rmse(&positive_residuals)?;
     let max_fit = smooth.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let threshold = max_fit - rmse;
+    let threshold = checked_sub(max_fit, rmse, 0, "independent-filter threshold")?;
+    let fallback_90 = checked_mul(0.9, max_fit, 0, "independent-filter fallback threshold")?;
+    let fallback_80 = checked_mul(0.8, max_fit, 0, "independent-filter fallback threshold")?;
 
     let selected = first_index_above(num_rejections, threshold)
-        .or_else(|| first_index_above(num_rejections, 0.9 * max_fit))
-        .or_else(|| first_index_above(num_rejections, 0.8 * max_fit))
+        .or_else(|| first_index_above(num_rejections, fallback_90))
+        .or_else(|| first_index_above(num_rejections, fallback_80))
         .unwrap_or(0);
     Ok((selected, smooth))
 }
@@ -388,7 +381,7 @@ pub fn lowess_fitted_values(
         .collect::<Vec<_>>();
 
     let delta = 0.01 * (sorted_x[n - 1] - sorted_x[0]);
-    let fitted_sorted = lowess_sorted(&sorted_x, &sorted_y, span_fraction, 3, delta);
+    let fitted_sorted = lowess_sorted(&sorted_x, &sorted_y, span_fraction, 3, delta)?;
     let mut fitted = vec![0.0; n];
     for (sorted_idx, original_idx) in order.into_iter().enumerate() {
         fitted[original_idx] = fitted_sorted[sorted_idx];
@@ -485,14 +478,14 @@ fn lowess_sorted(
     span_fraction: f64,
     robust_iterations: usize,
     delta: f64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, DeseqError> {
     let n = x.len();
     let span = ((span_fraction * n as f64 + 1e-7) as usize).clamp(2, n);
     let mut robustness_weights = vec![1.0; n];
     let mut fitted = vec![0.0; n];
 
     for iteration in 0..=robust_iterations {
-        fitted = lowess_delta_pass(x, y, span, &robustness_weights, delta);
+        fitted = lowess_delta_pass(x, y, span, &robustness_weights, delta)?;
         if iteration == robust_iterations {
             break;
         }
@@ -500,10 +493,15 @@ fn lowess_sorted(
             .iter()
             .copied()
             .zip(fitted.iter().copied())
-            .map(|(observed, fitted)| (observed - fitted).abs())
-            .collect::<Vec<_>>();
-        let mean_absolute_residual = residuals.iter().sum::<f64>() / residuals.len() as f64;
-        let scale = six_mad(&residuals);
+            .enumerate()
+            .map(|(idx, (observed, fitted))| {
+                checked_sub(observed, fitted, idx, "lowess residual").map(f64::abs)
+            })
+            .collect::<Result<Vec<_>, DeseqError>>()?;
+        let mean_absolute_residual =
+            checked_sum(residuals.iter().copied(), "lowess mean absolute residual")?
+                / residuals.len() as f64;
+        let scale = six_mad(&residuals)?;
         if scale < 1e-7 * mean_absolute_residual {
             break;
         }
@@ -515,12 +513,19 @@ fn lowess_sorted(
                 *weight = 0.0;
             } else {
                 let ratio = absolute / scale;
-                let one_minus_ratio_sq = 1.0 - ratio * ratio;
-                *weight = one_minus_ratio_sq * one_minus_ratio_sq;
+                let ratio_sq = checked_mul(ratio, ratio, 0, "lowess robustness ratio square")?;
+                let one_minus_ratio_sq =
+                    checked_sub(1.0, ratio_sq, 0, "lowess robustness weight base")?;
+                *weight = checked_mul(
+                    one_minus_ratio_sq,
+                    one_minus_ratio_sq,
+                    0,
+                    "lowess robustness weight",
+                )?;
             }
         }
     }
-    fitted
+    Ok(fitted)
 }
 
 fn lowess_delta_pass(
@@ -529,7 +534,7 @@ fn lowess_delta_pass(
     span: usize,
     robustness_weights: &[f64],
     delta: f64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, DeseqError> {
     let n = x.len();
     let mut fitted = vec![0.0; n];
     let mut n_left = 0_usize;
@@ -549,7 +554,7 @@ fn lowess_delta_pass(
         }
 
         let fitted_value =
-            lowest_at(x, y, idx, n_left, n_right, robustness_weights).unwrap_or_else(|| y[idx]);
+            lowest_at(x, y, idx, n_left, n_right, robustness_weights)?.unwrap_or(y[idx]);
         fitted[idx] = fitted_value;
 
         if let Some(last) = last_estimated {
@@ -560,7 +565,22 @@ fn lowess_delta_pass(
                         fitted[last]
                     } else {
                         let fraction = (x[point] - x[last]) / denominator;
-                        fraction * fitted[idx] + (1.0 - fraction) * fitted[last]
+                        checked_add(
+                            checked_mul(
+                                fraction,
+                                fitted[idx],
+                                point,
+                                "lowess interpolation upper term",
+                            )?,
+                            checked_mul(
+                                1.0 - fraction,
+                                fitted[last],
+                                point,
+                                "lowess interpolation lower term",
+                            )?,
+                            point,
+                            "lowess interpolation fitted value",
+                        )?
                     };
                 }
             }
@@ -584,7 +604,7 @@ fn lowess_delta_pass(
         }
         idx = (next.saturating_sub(1)).max(last + 1);
     }
-    fitted
+    Ok(fitted)
 }
 
 fn lowest_at(
@@ -594,7 +614,7 @@ fn lowest_at(
     n_left: usize,
     n_right: usize,
     robustness_weights: &[f64],
-) -> Option<f64> {
+) -> Result<Option<f64>, DeseqError> {
     let target_x = x[idx];
     let range = x[x.len() - 1] - x[0];
     let bandwidth = (target_x - x[n_left]).max(x[n_right] - target_x);
@@ -614,16 +634,21 @@ fn lowest_at(
                 let one_minus_ratio_cubed = 1.0 - ratio_cubed;
                 one_minus_ratio_cubed * one_minus_ratio_cubed * one_minus_ratio_cubed
             };
-            let weight = proximity * robustness_weights[point];
+            let weight = checked_mul(
+                proximity,
+                robustness_weights[point],
+                point,
+                "lowess tricube robustness weight",
+            )?;
             weights.push((point, weight));
-            sum_weights += weight;
+            sum_weights = checked_add(sum_weights, weight, point, "lowess weight sum")?;
         } else if x[point] > target_x {
             break;
         }
         point += 1;
     }
     if sum_weights <= 0.0 {
-        return None;
+        return Ok(None);
     }
 
     for (_, weight) in &mut weights {
@@ -633,44 +658,70 @@ fn lowest_at(
     if bandwidth > 0.0 {
         let center = weights
             .iter()
-            .map(|(point, weight)| weight * x[*point])
-            .sum::<f64>();
-        let variance = weights
-            .iter()
-            .map(|(point, weight)| {
-                let residual = x[*point] - center;
-                weight * residual * residual
-            })
-            .sum::<f64>();
+            .map(|(point, weight)| checked_mul(*weight, x[*point], *point, "lowess weighted x"))
+            .collect::<Result<Vec<_>, DeseqError>>()?;
+        let center = checked_sum(center, "lowess center")?;
+        let mut variance = 0.0;
+        for (point, weight) in &weights {
+            let residual = checked_sub(x[*point], center, *point, "lowess centered x")?;
+            let residual_sq = checked_mul(residual, residual, *point, "lowess centered x square")?;
+            variance = checked_add(
+                variance,
+                checked_mul(
+                    *weight,
+                    residual_sq,
+                    *point,
+                    "lowess weighted variance term",
+                )?,
+                *point,
+                "lowess variance",
+            )?;
+        }
         if variance.sqrt() > 0.001 * range {
             let slope_factor = (target_x - center) / variance;
             for (point, weight) in &mut weights {
-                *weight *= slope_factor * (x[*point] - center) + 1.0;
+                let centered = checked_sub(x[*point], center, *point, "lowess slope centered x")?;
+                let adjustment = checked_add(
+                    checked_mul(
+                        slope_factor,
+                        centered,
+                        *point,
+                        "lowess slope weight adjustment",
+                    )?,
+                    1.0,
+                    *point,
+                    "lowess slope weight factor",
+                )?;
+                *weight = checked_mul(*weight, adjustment, *point, "lowess slope weight")?;
             }
         }
     }
 
-    Some(
-        weights
-            .iter()
-            .map(|(point, weight)| weight * y[*point])
-            .sum(),
-    )
+    let mut fitted = 0.0;
+    for (point, weight) in weights {
+        fitted = checked_add(
+            fitted,
+            checked_mul(weight, y[point], point, "lowess fitted weighted y")?,
+            point,
+            "lowess fitted value",
+        )?;
+    }
+    Ok(Some(fitted))
 }
 
-fn six_mad(residuals: &[f64]) -> f64 {
+fn six_mad(residuals: &[f64]) -> Result<f64, DeseqError> {
     if residuals.is_empty() {
-        return 0.0;
+        return Ok(0.0);
     }
     let mut sorted = residuals.to_vec();
     sorted.sort_by(f64::total_cmp);
     let median = if sorted.len() % 2 == 0 {
         let upper = sorted.len() / 2;
-        0.5 * (sorted[upper - 1] + sorted[upper])
+        0.5 * checked_add(sorted[upper - 1], sorted[upper], upper, "lowess MAD median")?
     } else {
         sorted[sorted.len() / 2]
     };
-    6.0 * median
+    checked_mul(6.0, median, 0, "lowess MAD scale")
 }
 
 fn first_index_above(values: &[usize], threshold: f64) -> Option<usize> {
@@ -679,4 +730,56 @@ fn first_index_above(values: &[usize], threshold: f64) -> Option<usize> {
         .copied()
         .enumerate()
         .find_map(|(idx, value)| (value as f64 > threshold).then_some(idx))
+}
+
+fn positive_residual_rmse(residuals: &[f64]) -> Result<f64, DeseqError> {
+    if residuals.is_empty() {
+        return Ok(0.0);
+    }
+    let squared_sum = checked_sum(
+        residuals
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, value)| checked_mul(value, value, idx, "independent-filter RMSE square"))
+            .collect::<Result<Vec<_>, _>>()?,
+        "independent-filter RMSE sum",
+    )?;
+    let mean_square = squared_sum / residuals.len() as f64;
+    finite_value(mean_square.sqrt(), None, "independent-filter RMSE")
+}
+
+fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left + right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left - right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
+    let mut sum = 0.0;
+    for (idx, value) in values.into_iter().enumerate() {
+        sum = checked_add(sum, value, idx, context)?;
+    }
+    Ok(sum)
+}
+
+fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index,
+            value,
+        })
+    }
 }

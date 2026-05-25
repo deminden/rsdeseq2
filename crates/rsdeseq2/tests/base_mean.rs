@@ -128,6 +128,20 @@ fn base_variance_uses_sample_variance_like_row_vars() {
 }
 
 #[test]
+fn base_metadata_rejects_nonfinite_accumulation() {
+    let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, f64::MAX]).unwrap();
+
+    assert!(base_mean(&normalized)
+        .unwrap_err()
+        .to_string()
+        .contains("baseMean"));
+    assert!(base_variance(&normalized)
+        .unwrap_err()
+        .to_string()
+        .contains("baseVar mean"));
+}
+
+#[test]
 fn weighted_base_metadata_multiplies_normalized_counts_by_weights() {
     let normalized =
         RowMajorMatrix::from_row_major(2, 3, vec![10.0, 20.0, 30.0, 2.0, 4.0, 8.0]).unwrap();
@@ -141,6 +155,21 @@ fn weighted_base_metadata_multiplies_normalized_counts_by_weights() {
     assert_relative_eq!(variances[0], 100.0 / 3.0, epsilon = 1e-12);
     assert_relative_eq!(means[1], 7.0 / 3.0, epsilon = 1e-12);
     assert_relative_eq!(variances[1], 7.0 / 3.0, epsilon = 1e-12);
+}
+
+#[test]
+fn weighted_base_metadata_rejects_nonfinite_products() {
+    let normalized = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, 1.0]).unwrap();
+    let weights = RowMajorMatrix::from_row_major(1, 2, vec![2.0, 1.0]).unwrap();
+
+    assert!(base_mean_with_weights(&normalized, &weights)
+        .unwrap_err()
+        .to_string()
+        .contains("weighted baseMean"));
+    assert!(base_variance_with_weights(&normalized, &weights)
+        .unwrap_err()
+        .to_string()
+        .contains("weighted baseVar"));
 }
 
 #[test]

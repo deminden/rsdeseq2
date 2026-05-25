@@ -352,7 +352,12 @@ pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, D
                 reason: format!("local VST size factor at index {idx} must be finite and positive"),
             });
         }
-        sum += size_factor.recip();
+        sum = checked_add(
+            sum,
+            size_factor.recip(),
+            idx,
+            "local VST inverse size-factor sum",
+        )?;
     }
     Ok(sum / size_factors.len() as f64)
 }
@@ -376,13 +381,31 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
                     ),
                 });
             }
-            log_col_sums[sample] += factor.ln();
+            checked_add_assign(
+                &mut log_col_sums[sample],
+                factor.ln(),
+                row * normalization_factors.n_cols() + sample,
+                "local VST normalization-factor log column sum",
+            )?;
         }
     }
-    let inverse_sum = log_col_sums
-        .into_iter()
-        .map(|sum| (sum / normalization_factors.n_rows() as f64).exp().recip())
-        .sum::<f64>();
+    let mut inverse_sum = 0.0;
+    for (sample, sum) in log_col_sums.into_iter().enumerate() {
+        let column_geometric_mean = (sum / normalization_factors.n_rows() as f64).exp();
+        if !column_geometric_mean.is_finite() || column_geometric_mean <= 0.0 {
+            return Err(DeseqError::NonFiniteValue {
+                context: "local VST normalization-factor geometric mean".to_string(),
+                index: Some(sample),
+                value: column_geometric_mean,
+            });
+        }
+        checked_add_assign(
+            &mut inverse_sum,
+            column_geometric_mean.recip(),
+            sample,
+            "local VST inverse normalization-factor mean sum",
+        )?;
+    }
     Ok(inverse_sum / normalization_factors.n_cols() as f64)
 }
 
@@ -522,7 +545,11 @@ impl LocalVstIntegral {
             .copied()
             .map(|q| {
                 let dispersion = trend.evaluate(q)?;
-                let variance = dispersion * q * q + inverse_size_factor_mean * q;
+                let dispersion_q = checked_mul(dispersion, q, 0, "local VST dispersion q")?;
+                let dispersion_q2 = checked_mul(dispersion_q, q, 0, "local VST dispersion q2")?;
+                let poisson_q = checked_mul(inverse_size_factor_mean, q, 0, "local VST Poisson q")?;
+                let variance =
+                    checked_add(dispersion_q2, poisson_q, 0, "local VST variance curve")?;
                 if !variance.is_finite() || variance <= 0.0 {
                     return Err(DeseqError::InvalidDispersion {
                         reason: "local VST variance curve must be finite and positive".to_string(),
@@ -535,7 +562,15 @@ impl LocalVstIntegral {
         let mut y = Vec::with_capacity(grid.len() - 1);
         let mut cumulative = 0.0;
         for idx in 1..grid.len() {
-            cumulative += (grid[idx] - grid[idx - 1]) * (integrand[idx] + integrand[idx - 1]) / 2.0;
+            let width = grid[idx] - grid[idx - 1];
+            let height_sum = checked_add(
+                integrand[idx],
+                integrand[idx - 1],
+                idx,
+                "local VST integration height sum",
+            )?;
+            let area = checked_mul(width, height_sum, idx, "local VST integration area")? / 2.0;
+            cumulative = checked_add(cumulative, area, idx, "local VST integration cumulative")?;
             x.push(((grid[idx] + grid[idx - 1]) / 2.0).asinh());
             y.push(cumulative);
         }
@@ -558,17 +593,23 @@ impl LocalVstIntegral {
             });
         }
         if target <= self.x[0] {
-            return Ok(self.y[0] * target / self.x[0]);
+            let value = self.y[0] * target / self.x[0];
+            return finite_value(value, None, "local VST interpolation lower extrapolation");
         }
         let last = self.x.len() - 1;
         if target >= self.x[last] {
             let slope = (self.y[last] - self.y[last - 1]) / (self.x[last] - self.x[last - 1]);
-            return Ok(self.y[last] + slope * (target - self.x[last]));
+            let value = self.y[last] + slope * (target - self.x[last]);
+            return finite_value(value, None, "local VST interpolation upper extrapolation");
         }
         let upper = self.x.partition_point(|value| *value < target);
         let lower = upper - 1;
         let fraction = (target - self.x[lower]) / (self.x[upper] - self.x[lower]);
-        Ok(self.y[lower] + fraction * (self.y[upper] - self.y[lower]))
+        finite_value(
+            self.y[lower] + fraction * (self.y[upper] - self.y[lower]),
+            None,
+            "local VST interpolation",
+        )
     }
 }
 
@@ -649,7 +690,8 @@ fn normalized_count_row_means(
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for row in 0..normalized_counts.n_rows() {
         let values = normalized_counts.row(row)?;
-        means.push(values.iter().copied().sum::<f64>() / values.len() as f64);
+        means
+            .push(checked_sum(values.iter().copied(), "local VST row mean")? / values.len() as f64);
     }
     Ok(means)
 }
@@ -682,4 +724,44 @@ fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
         return Ok(sorted[sorted.len() - 1]);
     }
     Ok(sorted[lower_idx] + fraction * (sorted[lower_idx + 1] - sorted[lower_idx]))
+}
+
+fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left + right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_add_assign(
+    sum: &mut f64,
+    term: f64,
+    index: usize,
+    context: &str,
+) -> Result<(), DeseqError> {
+    *sum = checked_add(*sum, term, index, context)?;
+    Ok(())
+}
+
+fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
+    let mut sum = 0.0;
+    for (idx, value) in values.into_iter().enumerate() {
+        sum = checked_add(sum, value, idx, context)?;
+    }
+    Ok(sum)
+}
+
+fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index,
+            value,
+        })
+    }
 }

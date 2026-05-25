@@ -218,6 +218,11 @@ pub fn estimate_map_dispersions(
                 }
             };
         }
+        if !map_value.is_finite() || map_value <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "MAP dispersion optimizer produced a non-finite estimate".to_string(),
+            });
+        }
         map_value = map_value.clamp(options.min_disp, max_disp);
         let outlier = map_dispersion_outlier(
             gene_est,
@@ -254,7 +259,8 @@ pub fn map_dispersion_initial_value(disp_gene_est: f64, disp_fit: f64) -> Result
             reason: "gene-wise dispersion must be finite and positive or NaN".to_string(),
         });
     }
-    if disp_gene_est > 0.1 * disp_fit {
+    let lower_fit_rule = checked_mul(0.1, disp_fit, "MAP initial fitted-dispersion threshold")?;
+    if disp_gene_est > lower_fit_rule {
         Ok(disp_gene_est)
     } else {
         Ok(disp_fit)
@@ -278,7 +284,9 @@ pub fn map_dispersion_outlier(
     {
         return false;
     }
-    disp_gene_est.ln() > disp_fit.ln() + outlier_sd * var_log_disp_estimates.sqrt()
+    let residual = disp_gene_est.ln() - disp_fit.ln();
+    let threshold = outlier_sd * var_log_disp_estimates.sqrt();
+    residual.is_finite() && threshold.is_finite() && residual > threshold
 }
 
 fn optimizer_options(options: MapDispersionOptions) -> GeneWiseDispersionOptions {
@@ -434,6 +442,19 @@ fn validate_positive_scalar(value: f64, name: &str) -> Result<(), DeseqError> {
         });
     }
     Ok(())
+}
+
+fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: None,
+            value,
+        })
+    }
 }
 
 fn max_dispersion(options: MapDispersionOptions, n_samples: usize) -> f64 {

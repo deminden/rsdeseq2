@@ -28,6 +28,21 @@ fn robust_dispersion_uses_trimmed_cell_variance_when_replicated_cells_exist() {
 }
 
 #[test]
+fn robust_dispersion_rejects_overflowed_row_mean() {
+    let normalized =
+        RowMajorMatrix::from_row_major(1, 3, vec![f64::MAX, f64::MAX, f64::MAX]).unwrap();
+    let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
+
+    let err = robust_method_of_moments_dispersion(&normalized, &design).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "Cook's robust dispersion mean" && index == Some(1)
+    ));
+}
+
+#[test]
 fn cooks_distance_matches_hand_formula_for_intercept_cell() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
     let normalized = RowMajorMatrix::from_row_major(1, 3, vec![2.0_f64, 4.0_f64, 6.0_f64]).unwrap();
@@ -45,6 +60,19 @@ fn cooks_distance_matches_hand_formula_for_intercept_cell() {
     assert_relative_eq!(output.cooks.row(0).unwrap()[1], 0.0, epsilon = 1e-12);
     assert_relative_eq!(output.cooks.row(0).unwrap()[2], expected, epsilon = 1e-12);
     assert_relative_eq!(output.max_cooks[0].unwrap(), expected, epsilon = 1e-12);
+}
+
+#[test]
+fn cooks_distance_rejects_overflowed_variance() {
+    let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
+    let normalized = RowMajorMatrix::from_row_major(1, 3, vec![2.0_f64, 4.0_f64, 6.0_f64]).unwrap();
+    let mu = RowMajorMatrix::from_row_major(1, 3, vec![2e154, 2e154, 2e154]).unwrap();
+    let hat = RowMajorMatrix::from_row_major(1, 3, vec![0.1_f64, 0.1_f64, 0.1_f64]).unwrap();
+    let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
+
+    let err = calculate_cooks_distance(&counts, &normalized, &mu, &hat, &design).unwrap_err();
+
+    assert!(matches!(err, DeseqError::NonFiniteValue { .. }));
 }
 
 #[test]

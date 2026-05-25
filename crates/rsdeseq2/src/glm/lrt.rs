@@ -22,6 +22,13 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
             reduced.beta.n_rows(),
         ));
     }
+    if reduced.beta_converged.len() != reduced.beta.n_rows() {
+        return Err(invalid_dimensions(
+            "LRT reduced convergence flags",
+            reduced.beta.n_rows(),
+            reduced.beta_converged.len(),
+        ));
+    }
     if full.beta.n_cols() <= reduced.beta.n_cols() {
         return Err(DeseqError::InvalidDimensions {
             context: "LRT degrees of freedom".to_string(),
@@ -43,10 +50,9 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
         .copied()
         .zip(reduced.log_like.iter().copied())
     {
-        let statistic = 2.0 * (full_log_like - reduced_log_like);
-        if statistic.is_finite() {
+        if let Some(statistic) = lrt_deviance_statistic(full_log_like, reduced_log_like) {
             deviance.push(Some(statistic));
-            pvalue.push(Some(1.0 - distribution.cdf(statistic.max(0.0))));
+            pvalue.push(lrt_pvalue(&distribution, statistic));
         } else {
             deviance.push(None);
             pvalue.push(None);
@@ -58,4 +64,18 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
         degrees_of_freedom,
         reduced_converged: reduced.beta_converged.clone(),
     })
+}
+
+fn lrt_deviance_statistic(full_log_like: f64, reduced_log_like: f64) -> Option<f64> {
+    let difference = full_log_like - reduced_log_like;
+    if !full_log_like.is_finite() || !reduced_log_like.is_finite() || !difference.is_finite() {
+        return None;
+    }
+    let statistic = 2.0 * difference;
+    statistic.is_finite().then_some(statistic)
+}
+
+fn lrt_pvalue(distribution: &ChiSquared, statistic: f64) -> Option<f64> {
+    let pvalue = 1.0 - distribution.cdf(statistic.max(0.0));
+    pvalue.is_finite().then_some(pvalue.clamp(0.0, 1.0))
 }

@@ -51,6 +51,11 @@ fn map_dispersion_outlier_matches_log_residual_rule() {
 }
 
 #[test]
+fn map_dispersion_outlier_rejects_overflowed_threshold_arithmetic() {
+    assert!(!map_dispersion_outlier(10.0, 0.1, f64::MAX, f64::MAX));
+}
+
+#[test]
 fn estimate_map_dispersions_runs_prior_aware_line_search() {
     let counts = one_gene_counts();
     let design = two_group_design();
