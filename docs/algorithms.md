@@ -615,15 +615,32 @@ workflows with size-factor, normalization-factor, and optional
 observation-weight inputs. A primitive formula helper now parses a
 DESeq2-style subset (`1` intercept-only, `+`, `:`, `/`, `*` shorthand, and
 `0`/`-1` intercept removal), including lower-order-omitted pairwise
-interactions and three-variable interaction/nesting/star-expansion terms. It
-builds expanded all-level interaction products and reported treatment-style
-columns according to the supported formula terms. Formula-driven
-fit-and-results helpers run the same expanded beta-prior Wald coefficient and
-numeric-contrast workflows from that parsed design. Splines, transformed
-variables, offsets, arbitrary term subtraction, interactions beyond three
-variables, deeper nesting, and complete formula semantics remain future work;
-the runtime numeric path is pure Rust and expects callers or wrappers to
-provide or derive unsupported design surfaces explicitly.
+interactions, higher-order interaction/nesting/star-expansion terms, and
+primitive `- term` subtraction for the same supported term subset. Additive
+parenthesized groups, including nested additive groups, distribute through
+`*`, `:`, `/`, and subtraction in that same primitive subset. Integer numeric
+power transforms such as `I(dose^2)` and common numeric function transforms
+`log(numeric)`, `log2(numeric)`, `log10(numeric)`, `sqrt(numeric)`, and
+`scale(numeric)` are materialized as derived numeric covariates with sanitized
+coefficient names. `scale(numeric)` supports boolean or scalar numeric
+`center=` and `scale=` arguments and follows R's single-column default:
+centered scaling divides by sample standard deviation, while uncentered
+scaling divides by root mean square.
+Raw polynomial transforms `poly(numeric, degree, raw=TRUE)` are materialized as
+`numeric_poly_1` through `numeric_poly_degree`, and the generated additive
+group participates in supported main-effect, interaction, shorthand, and
+subtraction expansion. Orthogonal `poly()` remains outside the native formula
+subset.
+`offset(numeric)` terms are extracted by
+`expanded_formula_design_with_offsets()` into per-sample log-offset vectors,
+with multiple offsets summed sample-wise. Formula-driven fit-and-results
+helpers exponentiate those log offsets and multiply them into either
+sample-level size factors expanded across genes or supplied gene/sample
+normalization factors, then run the same expanded beta-prior Wald coefficient
+and numeric-contrast workflows from the parsed design. Splines, arbitrary R
+expressions, orthogonal polynomial bases, and complete R-compatible formula
+semantics remain future work; the runtime numeric path is pure Rust and expects
+callers or wrappers to provide or derive unsupported design surfaces explicitly.
 
 `fit_glms_with_beta_prior_variance()` performs the primitive fixed-dispersion
 refit from a supplied `betaPriorVar` vector. Size-factor, normalization-factor,

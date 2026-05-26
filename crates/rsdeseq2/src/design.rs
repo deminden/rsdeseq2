@@ -96,6 +96,15 @@ pub struct ExpandedAdditiveFactorDesign {
     pub higher_order_interactions: Vec<String>,
 }
 
+/// Expanded formula design plus per-sample log-scale formula offsets.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFormulaDesignWithOffsets {
+    /// Parsed expanded and reported design surfaces.
+    pub design: ExpandedAdditiveFactorDesign,
+    /// Per-sample offset values from supported `offset(numeric)` terms.
+    pub offsets: Vec<f64>,
+}
+
 impl DesignMatrix {
     /// Create an intercept-only design matrix with one all-ones coefficient.
     pub fn intercept_only(n_samples: usize) -> Result<Self, DeseqError> {
@@ -699,25 +708,55 @@ pub fn expanded_additive_design_with_all_interactions(
 /// Interaction variables can appear without corresponding main effects. The
 /// reported standard-design interaction columns then follow R model-matrix
 /// treatment-coding shape for the supported primitive terms. Intercept removal
-/// with `0` or `-1` is supported for these primitive terms. Higher-order
-/// formula interactions are currently limited to three variables. Transforms,
-/// offsets, higher-order terms beyond three variables, and splines are rejected
-/// so unsupported DESeq2 semantics do not silently produce a different model.
+/// with `0` or `-1` is supported for these primitive terms. Formula
+/// interactions can contain two or more variables. Primitive `- term`
+/// subtraction is supported for the same term subset. Integer numeric power
+/// transforms are materialized as derived numeric covariates. Supported
+/// `offset(numeric)` terms are parsed by [`expanded_formula_design_with_offsets`];
+/// this compatibility helper returns only the design surface.
 pub fn expanded_formula_design<'a>(
     formula: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
+    Ok(expanded_formula_design_with_offsets(formula, factors, numeric_covariates)?.design)
+}
+
+/// Build an expanded formula design and return supported per-sample offsets.
+///
+/// Supported offsets are `offset(numeric)` terms where `numeric` names a
+/// supplied numeric covariate. Multiple offset terms are summed sample-wise.
+pub fn expanded_formula_design_with_offsets<'a>(
+    formula: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
     let rhs = formula_rhs(formula)?;
+    let (rhs, offsets) = extract_formula_offsets(rhs, numeric_covariates)?;
+    let (rhs, derived_numeric_covariates) =
+        expand_formula_numeric_transform_terms(&rhs, numeric_covariates)?;
+    let mut all_numeric_covariates =
+        Vec::with_capacity(numeric_covariates.len() + derived_numeric_covariates.len());
+    all_numeric_covariates.extend(numeric_covariates.iter().cloned());
+    all_numeric_covariates.extend(derived_numeric_covariates.iter().map(|covariate| {
+        ExpandedNumericSpec {
+            name: covariate.name.as_str(),
+            values: covariate.values.as_slice(),
+        }
+    }));
     let mut state = ExpandedFormulaDesignState::default();
 
-    let rhs = normalize_formula_intercept_removal(rhs)?;
-    for raw_term in rhs.split('+') {
+    let rhs = expand_parenthesized_formula_terms(&rhs)?;
+    for (sign, raw_term) in split_formula_signed_terms(&rhs)? {
         let term = raw_term.trim();
         if term.is_empty() {
             return Err(DeseqError::InvalidOptions {
                 reason: format!("formula '{formula}' contains an empty term"),
             });
+        }
+        if sign < 0 {
+            remove_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            continue;
         }
         if term == "1" {
             continue;
@@ -732,27 +771,28 @@ pub fn expanded_formula_design<'a>(
             });
         }
         if term.contains('/') {
-            add_nested_formula_term(term, factors, numeric_covariates, &mut state)?;
+            add_nested_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if term.contains('*') {
-            add_star_formula_term(term, factors, numeric_covariates, &mut state)?;
+            add_star_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if term.contains(':') {
-            add_interaction_formula_term(term, factors, numeric_covariates, &mut state)?;
+            add_interaction_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         add_main_formula_term(
             term,
             factors,
-            numeric_covariates,
+            &all_numeric_covariates,
             &mut state.selected_factors,
             &mut state.selected_numeric_covariates,
         )?;
     }
 
-    expanded_formula_design_from_state(&state, factors, numeric_covariates)
+    let design = expanded_formula_design_from_state(&state, factors, &all_numeric_covariates)?;
+    Ok(ExpandedFormulaDesignWithOffsets { design, offsets })
 }
 
 struct ExpandedFormulaDesignState<'a> {
@@ -768,6 +808,22 @@ struct ExpandedFormulaDesignState<'a> {
 #[derive(Clone, Debug, PartialEq)]
 struct FormulaHigherOrderInteractionSpec<'a> {
     variables: Vec<FormulaVariableRef<'a>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct FormulaDerivedNumericCovariate {
+    name: String,
+    values: Vec<f64>,
+}
+
+type FormulaDerivedNumericTerm = (String, Vec<f64>);
+type FormulaNumericTransformExpansion = (String, Vec<FormulaDerivedNumericTerm>);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FormulaScaleOption {
+    Auto,
+    Disabled,
+    Explicit(f64),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -814,29 +870,863 @@ fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
     Ok(rhs)
 }
 
-fn normalize_formula_intercept_removal(rhs: &str) -> Result<String, DeseqError> {
-    let mut normalized = String::with_capacity(rhs.len() + 4);
-    let mut chars = rhs.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character != '-' {
-            normalized.push(character);
+fn extract_formula_offsets(
+    rhs: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<(String, Vec<f64>), DeseqError> {
+    let signed_terms = split_formula_signed_terms(rhs)?;
+    let n_samples = numeric_covariates
+        .first()
+        .map(|covariate| covariate.values.len())
+        .unwrap_or(0);
+    let mut offsets = vec![0.0; n_samples];
+    let mut remaining_terms = Vec::new();
+    for (sign, term) in signed_terms {
+        let Some(offset_name) = formula_offset_name(&term)? else {
+            if sign < 0 {
+                remaining_terms.push(format!("- {term}"));
+            } else {
+                remaining_terms.push(term);
+            }
             continue;
-        }
-        while chars
-            .peek()
-            .is_some_and(|candidate| candidate.is_whitespace())
-        {
-            chars.next();
-        }
-        if chars.next() != Some('1') {
+        };
+        if sign < 0 {
             return Err(DeseqError::InvalidOptions {
-                reason: "formula subtraction is only supported for intercept removal with -1"
-                    .to_string(),
+                reason: "formula offset terms cannot be subtracted".to_string(),
             });
         }
-        normalized.push_str("+-1");
+        let covariate = numeric_covariates
+            .iter()
+            .find(|candidate| candidate.name == offset_name)
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula offset numeric covariate '{offset_name}' is not present in supplied design metadata"
+                ),
+            })?;
+        if offsets.is_empty() {
+            offsets.resize(covariate.values.len(), 0.0);
+        }
+        if covariate.values.len() != offsets.len() {
+            return Err(invalid_dimensions(
+                "formula offset values",
+                offsets.len(),
+                covariate.values.len(),
+            ));
+        }
+        for (idx, value) in covariate.values.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("formula offset '{offset_name}' is non-finite at sample {idx}"),
+                });
+            }
+            offsets[idx] += value;
+            if !offsets[idx].is_finite() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("formula offsets sum to a non-finite value at sample {idx}"),
+                });
+            }
+        }
     }
-    Ok(normalized)
+    if remaining_terms.is_empty() {
+        remaining_terms.push("1".to_string());
+    }
+    Ok((join_formula_terms(&remaining_terms), offsets))
+}
+
+fn formula_offset_name(term: &str) -> Result<Option<&str>, DeseqError> {
+    let term = term.trim();
+    if !term.starts_with("offset") {
+        return Ok(None);
+    }
+    let Some(inner) = term
+        .strip_prefix("offset(")
+        .and_then(|value| value.strip_suffix(')'))
+    else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula offset term '{term}' must be offset(numeric)"),
+        });
+    };
+    let inner = inner.trim();
+    validate_formula_variable(inner)?;
+    Ok(Some(inner))
+}
+
+fn expand_formula_numeric_transform_terms(
+    rhs: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<(String, Vec<FormulaDerivedNumericCovariate>), DeseqError> {
+    let mut expanded = String::with_capacity(rhs.len());
+    let mut derived = Vec::new();
+    let mut remainder = rhs;
+    while let Some((start, transform)) = next_formula_numeric_transform(remainder) {
+        expanded.push_str(&remainder[..start]);
+        let after_open = &remainder[start + transform.prefix.len()..];
+        let Some(close) = after_open.find(')') else {
+            return Err(DeseqError::InvalidOptions {
+                reason: "formula transform has unbalanced parentheses".to_string(),
+            });
+        };
+        let expression = after_open[..close].trim();
+        let (replacement, transformed_covariates) =
+            formula_numeric_transform_term(transform, expression, numeric_covariates)?;
+        for (name, values) in transformed_covariates {
+            if !derived
+                .iter()
+                .any(|candidate: &FormulaDerivedNumericCovariate| candidate.name == name)
+            {
+                derived.push(FormulaDerivedNumericCovariate { name, values });
+            }
+        }
+        expanded.push_str(&replacement);
+        remainder = &after_open[close + 1..];
+    }
+    expanded.push_str(remainder);
+    Ok((expanded, derived))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FormulaNumericTransform {
+    prefix: &'static str,
+    label: &'static str,
+    apply: fn(f64) -> f64,
+}
+
+const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 7] = [
+    FormulaNumericTransform {
+        prefix: "poly(",
+        label: "poly",
+        apply: std::convert::identity,
+    },
+    FormulaNumericTransform {
+        prefix: "scale(",
+        label: "scale",
+        apply: std::convert::identity,
+    },
+    FormulaNumericTransform {
+        prefix: "log10(",
+        label: "log10",
+        apply: f64::log10,
+    },
+    FormulaNumericTransform {
+        prefix: "log2(",
+        label: "log2",
+        apply: f64::log2,
+    },
+    FormulaNumericTransform {
+        prefix: "sqrt(",
+        label: "sqrt",
+        apply: f64::sqrt,
+    },
+    FormulaNumericTransform {
+        prefix: "log(",
+        label: "log",
+        apply: f64::ln,
+    },
+    FormulaNumericTransform {
+        prefix: "I(",
+        label: "I",
+        apply: std::convert::identity,
+    },
+];
+
+fn next_formula_numeric_transform(rhs: &str) -> Option<(usize, FormulaNumericTransform)> {
+    FORMULA_NUMERIC_TRANSFORMS
+        .iter()
+        .filter_map(|transform| rhs.find(transform.prefix).map(|idx| (idx, *transform)))
+        .min_by_key(|(idx, _)| *idx)
+}
+
+fn formula_numeric_transform_term(
+    transform: FormulaNumericTransform,
+    expression: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<FormulaNumericTransformExpansion, DeseqError> {
+    match transform.label {
+        "I" => {
+            let (name, values) = formula_numeric_power_term(expression, numeric_covariates)?;
+            Ok((name.clone(), vec![(name, values)]))
+        }
+        "poly" => formula_numeric_raw_poly_term(expression, numeric_covariates),
+        "scale" => {
+            let (name, values) = formula_numeric_scale_term(expression, numeric_covariates)?;
+            Ok((name.clone(), vec![(name, values)]))
+        }
+        _ => {
+            let (name, values) =
+                formula_numeric_function_term(transform, expression, numeric_covariates)?;
+            Ok((name.clone(), vec![(name, values)]))
+        }
+    }
+}
+
+fn formula_numeric_function_term(
+    transform: FormulaNumericTransform,
+    expression: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<(String, Vec<f64>), DeseqError> {
+    validate_formula_variable(expression)?;
+    let covariate = numeric_covariates
+        .iter()
+        .find(|candidate| candidate.name == expression)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula numeric covariate '{expression}' is not present in supplied design metadata"
+            ),
+        })?;
+    let mut values = Vec::with_capacity(covariate.values.len());
+    for (idx, value) in covariate.values.iter().copied().enumerate() {
+        let transformed = (transform.apply)(value);
+        if !transformed.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform '{}({expression})' produced non-finite value at sample {idx}",
+                    transform.label
+                ),
+            });
+        }
+        values.push(transformed);
+    }
+    Ok((format!("{}_{}", expression, transform.label), values))
+}
+
+fn formula_numeric_scale_term(
+    expression: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<(String, Vec<f64>), DeseqError> {
+    let arguments = split_formula_transform_arguments(expression)?;
+    let Some(numeric_name) = arguments.first().map(|value| value.trim()) else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'scale({expression})' must provide a numeric covariate"
+            ),
+        });
+    };
+    validate_formula_variable(numeric_name)?;
+    let mut center = FormulaScaleOption::Auto;
+    let mut scale = FormulaScaleOption::Auto;
+    for argument in arguments.iter().skip(1) {
+        let normalized = argument
+            .split_whitespace()
+            .collect::<String>()
+            .to_ascii_lowercase();
+        if let Some(value) = normalized.strip_prefix("center=") {
+            center = parse_formula_scale_option(value, "center", expression)?;
+            continue;
+        }
+        if let Some(value) = normalized.strip_prefix("scale=") {
+            scale = parse_formula_scale_option(value, "scale", expression)?;
+            continue;
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'scale({expression})' has unsupported argument '{argument}'"
+            ),
+        });
+    }
+    let covariate = numeric_covariates
+        .iter()
+        .find(|candidate| candidate.name == numeric_name)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
+            ),
+        })?;
+    if scale == FormulaScaleOption::Auto && covariate.values.len() < 2 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'scale({expression})' requires at least two samples"
+            ),
+        });
+    }
+    let mut sum = 0.0_f64;
+    for (idx, value) in covariate.values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula transform 'scale({expression})' received non-finite value at sample {idx}"),
+            });
+        }
+        sum += value;
+        if !sum.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'scale({expression})' produced non-finite center"
+                ),
+            });
+        }
+    }
+    let center_value = match center {
+        FormulaScaleOption::Auto => sum / covariate.values.len() as f64,
+        FormulaScaleOption::Disabled => 0.0,
+        FormulaScaleOption::Explicit(value) => value,
+    };
+    let divisor = match scale {
+        FormulaScaleOption::Auto => {
+            formula_scale_auto_divisor(expression, covariate.values, center_value)?
+        }
+        FormulaScaleOption::Disabled => 1.0,
+        FormulaScaleOption::Explicit(value) => value,
+    };
+    let values = covariate
+        .values
+        .iter()
+        .map(|value| (value - center_value) / divisor)
+        .collect::<Vec<_>>();
+    let label = match (center, scale) {
+        (FormulaScaleOption::Auto, FormulaScaleOption::Auto) => "scale",
+        (FormulaScaleOption::Disabled, FormulaScaleOption::Auto) => "scale_uncentered",
+        (FormulaScaleOption::Auto, FormulaScaleOption::Disabled) => "center",
+        (FormulaScaleOption::Disabled, FormulaScaleOption::Disabled) => "identity",
+        (FormulaScaleOption::Explicit(_), FormulaScaleOption::Disabled) => "centered",
+        (FormulaScaleOption::Disabled, FormulaScaleOption::Explicit(_)) => "scaled",
+        _ => "centered_scaled",
+    };
+    Ok((format!("{numeric_name}_{label}"), values))
+}
+
+fn formula_scale_auto_divisor(
+    expression: &str,
+    values: &[f64],
+    center: f64,
+) -> Result<f64, DeseqError> {
+    let mut sum_squares = 0.0_f64;
+    for value in values.iter().copied() {
+        let adjusted = value - center;
+        let square = adjusted * adjusted;
+        if !square.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'scale({expression})' produced non-finite scale"
+                ),
+            });
+        }
+        sum_squares += square;
+        if !sum_squares.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'scale({expression})' produced non-finite scale"
+                ),
+            });
+        }
+    }
+    let divisor = (sum_squares / (values.len() as f64 - 1.0)).sqrt();
+    if !divisor.is_finite() || divisor <= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula transform 'scale({expression})' requires non-zero scale"),
+        });
+    }
+    Ok(divisor)
+}
+
+fn parse_formula_scale_option(
+    value: &str,
+    argument: &str,
+    expression: &str,
+) -> Result<FormulaScaleOption, DeseqError> {
+    match value {
+        "true" | "t" => Ok(FormulaScaleOption::Auto),
+        "false" | "f" => Ok(FormulaScaleOption::Disabled),
+        _ => {
+            let parsed = value
+                .parse::<f64>()
+                .map_err(|_| DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite number"
+                    ),
+                })?;
+            if !parsed.is_finite() || (argument == "scale" && parsed <= 0.0) {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite positive scale"
+                    ),
+                });
+            }
+            Ok(FormulaScaleOption::Explicit(parsed))
+        }
+    }
+}
+
+fn formula_numeric_raw_poly_term(
+    expression: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<FormulaNumericTransformExpansion, DeseqError> {
+    let arguments = split_formula_transform_arguments(expression)?;
+    if arguments.len() < 3 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'poly({expression})' must provide numeric, degree, and raw=TRUE"
+            ),
+        });
+    }
+    let numeric_name = arguments[0].trim();
+    validate_formula_variable(numeric_name)?;
+    let mut degree_text = None;
+    let mut has_raw_true = false;
+    for (idx, argument) in arguments.iter().enumerate().skip(1) {
+        let normalized = argument
+            .split_whitespace()
+            .collect::<String>()
+            .to_ascii_lowercase();
+        if normalized == "raw=true" || normalized == "raw=t" {
+            has_raw_true = true;
+            continue;
+        }
+        if let Some(named_degree) = normalized.strip_prefix("degree=") {
+            degree_text = Some(named_degree.to_string());
+            continue;
+        }
+        if idx == 1 && degree_text.is_none() {
+            degree_text = Some(argument.trim().to_string());
+            continue;
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'poly({expression})' has unsupported argument '{argument}'"
+            ),
+        });
+    }
+    let Some(degree_text) = degree_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula transform 'poly({expression})' must provide a degree"),
+        });
+    };
+    let degree = degree_text
+        .parse::<i32>()
+        .map_err(|_| DeseqError::InvalidOptions {
+            reason: format!("formula raw polynomial degree '{degree_text}' must be an integer"),
+        })?;
+    if !(1..=16).contains(&degree) {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula raw polynomial degrees must be integers from 1 through 16".to_string(),
+        });
+    }
+    if !has_raw_true {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula poly() transforms require raw=TRUE".to_string(),
+        });
+    }
+    let covariate = numeric_covariates
+        .iter()
+        .find(|candidate| candidate.name == numeric_name)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
+            ),
+        })?;
+    let mut replacement_terms = Vec::with_capacity(degree as usize);
+    let mut derived = Vec::with_capacity(degree as usize);
+    for exponent in 1..=degree {
+        let name = format!("{numeric_name}_poly_{exponent}");
+        let mut values = Vec::with_capacity(covariate.values.len());
+        for (idx, value) in covariate.values.iter().copied().enumerate() {
+            let transformed = value.powi(exponent);
+            if !transformed.is_finite() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula transform 'poly({expression})' produced non-finite value at sample {idx}"
+                    ),
+                });
+            }
+            values.push(transformed);
+        }
+        replacement_terms.push(name.clone());
+        derived.push((name, values));
+    }
+    Ok((format!("({})", replacement_terms.join(" + ")), derived))
+}
+
+fn split_formula_transform_arguments(expression: &str) -> Result<Vec<String>, DeseqError> {
+    split_formula_top_level(expression, ',')
+}
+
+fn formula_numeric_power_term(
+    expression: &str,
+    numeric_covariates: &[ExpandedNumericSpec<'_>],
+) -> Result<(String, Vec<f64>), DeseqError> {
+    let Some((numeric_name, exponent_text)) = expression.split_once('^') else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula transform 'I({expression})' is not supported"),
+        });
+    };
+    let numeric_name = numeric_name.trim();
+    validate_formula_variable(numeric_name)?;
+    let exponent = exponent_text
+        .trim()
+        .parse::<i32>()
+        .map_err(|_| DeseqError::InvalidOptions {
+            reason: format!("formula transform exponent '{exponent_text}' must be an integer"),
+        })?;
+    if !(2..=16).contains(&exponent) {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula transform powers must be integers from 2 through 16".to_string(),
+        });
+    }
+    let covariate = numeric_covariates
+        .iter()
+        .find(|candidate| candidate.name == numeric_name)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
+            ),
+        })?;
+    let mut values = Vec::with_capacity(covariate.values.len());
+    for (idx, value) in covariate.values.iter().copied().enumerate() {
+        let transformed = value.powi(exponent);
+        if !transformed.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'I({expression})' produced non-finite value at sample {idx}"
+                ),
+            });
+        }
+        values.push(transformed);
+    }
+    Ok((format!("{numeric_name}_pow_{exponent}"), values))
+}
+
+fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, DeseqError> {
+    let signed_terms = split_formula_signed_terms(rhs)?;
+    let mut expanded = Vec::new();
+    for (sign, term) in signed_terms {
+        for expanded_term in expand_parenthesized_formula_term(&term)? {
+            if sign < 0 {
+                expanded.push(format!("- {expanded_term}"));
+            } else {
+                expanded.push(expanded_term);
+            }
+        }
+    }
+    Ok(join_formula_terms(&expanded))
+}
+
+fn join_formula_terms(terms: &[String]) -> String {
+    let mut joined = String::new();
+    for term in terms {
+        if joined.is_empty() {
+            joined.push_str(term);
+        } else if term.trim_start().starts_with('-') {
+            joined.push(' ');
+            joined.push_str(term);
+        } else {
+            joined.push_str(" + ");
+            joined.push_str(term);
+        }
+    }
+    joined
+}
+
+fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError> {
+    let mut terms = Vec::new();
+    let mut depth = 0_i32;
+    let mut sign = 1_i8;
+    let mut start = 0_usize;
+    let mut saw_term = false;
+    for (idx, character) in rhs.char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: "formula parentheses are unbalanced".to_string(),
+                    });
+                }
+            }
+            '+' | '-' if depth == 0 => {
+                let term = rhs[start..idx].trim();
+                if term.is_empty() {
+                    if saw_term || character == '+' {
+                        return Err(DeseqError::InvalidOptions {
+                            reason: "formula contains an empty term".to_string(),
+                        });
+                    }
+                    sign = -1;
+                    start = idx + character.len_utf8();
+                    continue;
+                }
+                terms.push((sign, term.to_string()));
+                saw_term = true;
+                sign = if character == '-' { -1 } else { 1 };
+                start = idx + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula parentheses are unbalanced".to_string(),
+        });
+    }
+    let term = rhs[start..].trim();
+    if term.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula contains an empty term".to_string(),
+        });
+    }
+    terms.push((sign, term.to_string()));
+    Ok(terms)
+}
+
+fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqError> {
+    let term = strip_formula_outer_parentheses(term.trim())?;
+    if term.contains('-') {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula term '{term}' contains unsupported nested subtraction"),
+        });
+    }
+    let additive_pieces = split_formula_top_level(term, '+')?;
+    if additive_pieces.len() > 1 {
+        return split_formula_additive_group(term);
+    }
+    for delimiter in ['*', ':', '/'] {
+        let pieces = split_formula_top_level(term, delimiter)?;
+        if pieces.len() > 1 {
+            return expand_parenthesized_formula_operator(&pieces, delimiter);
+        }
+    }
+    if term.contains('(') || term.contains(')') {
+        return split_formula_additive_group(term);
+    }
+    Ok(vec![term.to_string()])
+}
+
+fn expand_parenthesized_formula_operator(
+    pieces: &[String],
+    delimiter: char,
+) -> Result<Vec<String>, DeseqError> {
+    let mut alternatives = Vec::with_capacity(pieces.len());
+    for piece in pieces {
+        alternatives.push(split_formula_additive_group(piece)?);
+    }
+    match delimiter {
+        '*' => expand_parenthesized_star(&alternatives),
+        ':' => Ok(formula_alternative_products(&alternatives)
+            .into_iter()
+            .map(|product| product.join(":"))
+            .collect()),
+        '/' => {
+            let mut terms = Vec::new();
+            for product in formula_alternative_products(&alternatives) {
+                for prefix_len in 1..=product.len() {
+                    push_unique_formula_term(&mut terms, product[..prefix_len].join(":"));
+                }
+            }
+            Ok(terms)
+        }
+        _ => unreachable!("unsupported formula delimiter"),
+    }
+}
+
+fn expand_parenthesized_star(alternatives: &[Vec<String>]) -> Result<Vec<String>, DeseqError> {
+    let mut terms = Vec::new();
+    for group in alternatives {
+        for term in group {
+            push_unique_formula_term(&mut terms, term.clone());
+        }
+    }
+    for order in 2..=alternatives.len() {
+        for group_subset in formula_group_combinations(alternatives, order) {
+            for product in formula_alternative_products(&group_subset) {
+                push_unique_formula_term(&mut terms, product.join(":"));
+            }
+        }
+    }
+    Ok(terms)
+}
+
+fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
+    let stripped = strip_formula_outer_parentheses(term.trim())?;
+    let pieces = split_formula_top_level(stripped, '+')?;
+    if pieces.len() == 1 {
+        if stripped.contains('-') {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula term '{term}' contains unsupported nested subtraction"),
+            });
+        }
+        if stripped.contains('(') || stripped.contains(')') {
+            return expand_parenthesized_formula_term(stripped);
+        }
+        return Ok(vec![stripped.to_string()]);
+    }
+    let mut terms = Vec::new();
+    for piece in pieces {
+        if piece.contains('-') {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula group '{term}' contains unsupported nested subtraction"),
+            });
+        }
+        for expanded in expand_parenthesized_formula_term(&piece)? {
+            push_unique_formula_term(&mut terms, expanded);
+        }
+    }
+    Ok(terms)
+}
+
+fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
+    let mut stripped = term.trim();
+    loop {
+        if !(stripped.starts_with('(') && stripped.ends_with(')')) {
+            return Ok(stripped);
+        }
+        let mut depth = 0_i32;
+        let mut encloses_whole_term = true;
+        for (idx, character) in stripped.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth < 0 {
+                        return Err(DeseqError::InvalidOptions {
+                            reason: "formula parentheses are unbalanced".to_string(),
+                        });
+                    }
+                    if depth == 0 && idx + character.len_utf8() < stripped.len() {
+                        encloses_whole_term = false;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth != 0 {
+            return Err(DeseqError::InvalidOptions {
+                reason: "formula parentheses are unbalanced".to_string(),
+            });
+        }
+        if !encloses_whole_term {
+            return Ok(stripped);
+        }
+        stripped = stripped[1..stripped.len() - 1].trim();
+    }
+}
+
+fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
+    let mut pieces = Vec::new();
+    let mut depth = 0_i32;
+    let mut start = 0_usize;
+    for (idx, character) in term.char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: "formula parentheses are unbalanced".to_string(),
+                    });
+                }
+            }
+            _ if character == delimiter && depth == 0 => {
+                let piece = term[start..idx].trim();
+                if piece.is_empty() {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!("formula term '{term}' contains an empty component"),
+                    });
+                }
+                pieces.push(piece.to_string());
+                start = idx + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula parentheses are unbalanced".to_string(),
+        });
+    }
+    let piece = term[start..].trim();
+    if piece.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula term '{term}' contains an empty component"),
+        });
+    }
+    pieces.push(piece.to_string());
+    Ok(pieces)
+}
+
+fn formula_alternative_products(alternatives: &[Vec<String>]) -> Vec<Vec<String>> {
+    let mut products: Vec<Vec<String>> = vec![Vec::new()];
+    for group in alternatives {
+        let mut next = Vec::new();
+        for prefix in &products {
+            for term in group {
+                let mut product = prefix.clone();
+                product.push(term.clone());
+                next.push(product);
+            }
+        }
+        products = next;
+    }
+    products
+}
+
+fn formula_group_combinations(groups: &[Vec<String>], order: usize) -> Vec<Vec<Vec<String>>> {
+    fn push_group_combinations(
+        groups: &[Vec<String>],
+        order: usize,
+        start: usize,
+        current: &mut Vec<Vec<String>>,
+        output: &mut Vec<Vec<Vec<String>>>,
+    ) {
+        if current.len() == order {
+            output.push(current.clone());
+            return;
+        }
+        let remaining = order - current.len();
+        for idx in start..=groups.len() - remaining {
+            current.push(groups[idx].clone());
+            push_group_combinations(groups, order, idx + 1, current, output);
+            current.pop();
+        }
+    }
+    if order == 0 || order > groups.len() {
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    push_group_combinations(groups, order, 0, &mut Vec::new(), &mut output);
+    output
+}
+
+fn push_unique_formula_term(terms: &mut Vec<String>, term: String) {
+    if !terms.iter().any(|candidate| candidate == &term) {
+        terms.push(term);
+    }
+}
+
+fn remove_formula_term<'a>(
+    term: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    if term.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula subtraction must be followed by a term".to_string(),
+        });
+    }
+    if term == "1" {
+        state.has_intercept = false;
+        return Ok(());
+    }
+    if term == "0" || term == "-1" {
+        return Ok(());
+    }
+    if term.contains('^') || term.contains('(') || term.contains(')') {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula term '{term}' is not supported by the primitive parser"),
+        });
+    }
+    if term.contains('/') {
+        remove_nested_formula_term(term, factors, numeric_covariates, state)?;
+        return Ok(());
+    }
+    if term.contains('*') {
+        remove_star_formula_term(term, factors, numeric_covariates, state)?;
+        return Ok(());
+    }
+    if term.contains(':') {
+        remove_interaction_formula_term(term, factors, numeric_covariates, state)?;
+        return Ok(());
+    }
+    remove_main_formula_term(term, factors, numeric_covariates, state)
 }
 
 fn add_star_formula_term<'a>(
@@ -846,11 +1736,6 @@ fn add_star_formula_term<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '*')?;
-    if pieces.len() > 3 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' supports at most three-way '*' expansion"),
-        });
-    }
     for piece in &pieces {
         add_main_formula_term(
             piece,
@@ -872,8 +1757,16 @@ fn add_star_formula_term<'a>(
             )?;
         }
     }
-    if pieces.len() == 3 {
-        add_higher_order_formula_interaction(&pieces, term, factors, numeric_covariates, state)?;
+    for order in 3..=pieces.len() {
+        for subset in formula_piece_combinations(&pieces, order) {
+            add_higher_order_formula_interaction(
+                &subset,
+                term,
+                factors,
+                numeric_covariates,
+                state,
+            )?;
+        }
     }
     Ok(())
 }
@@ -885,11 +1778,6 @@ fn add_nested_formula_term<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '/')?;
-    if pieces.len() > 3 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' supports at most three nested variables"),
-        });
-    }
     add_main_formula_term(
         pieces[0],
         factors,
@@ -905,8 +1793,63 @@ fn add_nested_formula_term<'a>(
         numeric_covariates,
         state,
     )?;
-    if pieces.len() == 3 {
-        add_higher_order_formula_interaction(&pieces, term, factors, numeric_covariates, state)?;
+    for prefix_len in 3..=pieces.len() {
+        add_higher_order_formula_interaction(
+            &pieces[..prefix_len],
+            term,
+            factors,
+            numeric_covariates,
+            state,
+        )?;
+    }
+    Ok(())
+}
+
+fn remove_star_formula_term<'a>(
+    term: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    let pieces = split_formula_pieces(term, '*')?;
+    for piece in &pieces {
+        remove_main_formula_term(piece, factors, numeric_covariates, state)?;
+    }
+    for left in 0..pieces.len() {
+        for right in (left + 1)..pieces.len() {
+            remove_pairwise_formula_interaction(
+                pieces[left],
+                pieces[right],
+                factors,
+                numeric_covariates,
+                state,
+            )?;
+        }
+    }
+    for order in 3..=pieces.len() {
+        for subset in formula_piece_combinations(&pieces, order) {
+            remove_higher_order_formula_interaction(&subset, factors, numeric_covariates, state)?;
+        }
+    }
+    Ok(())
+}
+
+fn remove_nested_formula_term<'a>(
+    term: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    let pieces = split_formula_pieces(term, '/')?;
+    remove_main_formula_term(pieces[0], factors, numeric_covariates, state)?;
+    remove_pairwise_formula_interaction(pieces[0], pieces[1], factors, numeric_covariates, state)?;
+    for prefix_len in 3..=pieces.len() {
+        remove_higher_order_formula_interaction(
+            &pieces[..prefix_len],
+            factors,
+            numeric_covariates,
+            state,
+        )?;
     }
     Ok(())
 }
@@ -951,6 +1894,33 @@ fn add_main_formula_term<'a>(
     })
 }
 
+fn remove_main_formula_term<'a>(
+    term: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    validate_formula_variable(term)?;
+    if factors.iter().any(|candidate| candidate.factor == term) {
+        state
+            .selected_factors
+            .retain(|candidate| candidate.factor != term);
+        return Ok(());
+    }
+    if numeric_covariates
+        .iter()
+        .any(|candidate| candidate.name == term)
+    {
+        state
+            .selected_numeric_covariates
+            .retain(|candidate| candidate.name != term);
+        return Ok(());
+    }
+    Err(DeseqError::InvalidOptions {
+        reason: format!("formula variable '{term}' is not present in supplied design metadata"),
+    })
+}
+
 fn add_interaction_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -958,21 +1928,17 @@ fn add_interaction_formula_term<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, ':')?;
-    match pieces.len() {
-        2 => add_pairwise_formula_interaction(
+    if pieces.len() == 2 {
+        add_pairwise_formula_interaction(
             pieces[0],
             pieces[1],
             term,
             factors,
             numeric_covariates,
             state,
-        ),
-        3 => {
-            add_higher_order_formula_interaction(&pieces, term, factors, numeric_covariates, state)
-        }
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' supports at most three-way interactions"),
-        }),
+        )
+    } else {
+        add_higher_order_formula_interaction(&pieces, term, factors, numeric_covariates, state)
     }
 }
 
@@ -1065,6 +2031,69 @@ fn add_pairwise_formula_interaction<'a>(
     Ok(())
 }
 
+fn remove_interaction_formula_term<'a>(
+    term: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    let pieces = split_formula_pieces(term, ':')?;
+    if pieces.len() == 2 {
+        remove_pairwise_formula_interaction(
+            pieces[0],
+            pieces[1],
+            factors,
+            numeric_covariates,
+            state,
+        )
+    } else {
+        remove_higher_order_formula_interaction(&pieces, factors, numeric_covariates, state)
+    }
+}
+
+fn remove_pairwise_formula_interaction<'a>(
+    left: &str,
+    right: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    validate_formula_variable(left)?;
+    validate_formula_variable(right)?;
+    if left == right {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula interaction '{left}:{right}' cannot use one variable twice"),
+        });
+    }
+    let left_variable = resolve_formula_variable(left, factors, numeric_covariates)?;
+    let right_variable = resolve_formula_variable(right, factors, numeric_covariates)?;
+    match (&left_variable, &right_variable) {
+        (FormulaVariableRef::Factor(left_factor), FormulaVariableRef::Factor(right_factor)) => {
+            state.factor_interactions.retain(|interaction| {
+                !((interaction.left_factor == *left_factor
+                    && interaction.right_factor == *right_factor)
+                    || (interaction.left_factor == *right_factor
+                        && interaction.right_factor == *left_factor))
+            });
+        }
+        (FormulaVariableRef::Factor(factor), FormulaVariableRef::Numeric(numeric))
+        | (FormulaVariableRef::Numeric(numeric), FormulaVariableRef::Factor(factor)) => {
+            state.factor_numeric_interactions.retain(|interaction| {
+                !(interaction.factor == *factor && interaction.numeric == *numeric)
+            });
+        }
+        (FormulaVariableRef::Numeric(left_numeric), FormulaVariableRef::Numeric(right_numeric)) => {
+            state.numeric_interactions.retain(|interaction| {
+                !((interaction.left_numeric == *left_numeric
+                    && interaction.right_numeric == *right_numeric)
+                    || (interaction.left_numeric == *right_numeric
+                        && interaction.right_numeric == *left_numeric))
+            });
+        }
+    }
+    Ok(())
+}
+
 fn add_higher_order_formula_interaction<'a>(
     pieces: &[&str],
     display_term: &str,
@@ -1072,9 +2101,11 @@ fn add_higher_order_formula_interaction<'a>(
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
-    if pieces.len() != 3 {
+    if pieces.len() < 3 {
         return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{display_term}' must use three variables"),
+            reason: format!(
+                "formula interaction '{display_term}' must use at least three variables"
+            ),
         });
     }
     let mut variables = Vec::with_capacity(pieces.len());
@@ -1108,6 +2139,43 @@ fn add_higher_order_formula_interaction<'a>(
     state
         .higher_order_interactions
         .push(FormulaHigherOrderInteractionSpec { variables });
+    Ok(())
+}
+
+fn remove_higher_order_formula_interaction<'a>(
+    pieces: &[&str],
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    state: &mut ExpandedFormulaDesignState<'a>,
+) -> Result<(), DeseqError> {
+    if pieces.len() < 3 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula interaction removal must use at least three variables".to_string(),
+        });
+    }
+    let mut variables = Vec::with_capacity(pieces.len());
+    for piece in pieces {
+        validate_formula_variable(piece)?;
+        if variables
+            .iter()
+            .any(|variable: &FormulaVariableRef<'_>| variable.name() == *piece)
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula interaction '{}' cannot use one variable twice",
+                    pieces.join(":")
+                ),
+            });
+        }
+        variables.push(resolve_formula_variable(
+            piece,
+            factors,
+            numeric_covariates,
+        )?);
+    }
+    state
+        .higher_order_interactions
+        .retain(|interaction| !same_formula_variable_set(&interaction.variables, &variables));
     Ok(())
 }
 
@@ -1996,6 +3064,34 @@ fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<&str>, DeseqE
         });
     }
     Ok(pieces)
+}
+
+fn formula_piece_combinations<'a>(pieces: &[&'a str], order: usize) -> Vec<Vec<&'a str>> {
+    fn push_combinations<'a>(
+        pieces: &[&'a str],
+        order: usize,
+        start: usize,
+        current: &mut Vec<&'a str>,
+        output: &mut Vec<Vec<&'a str>>,
+    ) {
+        if current.len() == order {
+            output.push(current.clone());
+            return;
+        }
+        let remaining = order - current.len();
+        for idx in start..=pieces.len() - remaining {
+            current.push(pieces[idx]);
+            push_combinations(pieces, order, idx + 1, current, output);
+            current.pop();
+        }
+    }
+
+    if order == 0 || order > pieces.len() {
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    push_combinations(pieces, order, 0, &mut Vec::new(), &mut output);
+    output
 }
 
 fn validate_formula_variable(variable: &str) -> Result<(), DeseqError> {

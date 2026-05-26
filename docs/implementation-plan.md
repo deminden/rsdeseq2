@@ -207,13 +207,33 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Primitive formula-to-expanded-design parser support for three-variable
   `:`, `/`, and `*` terms, including treatment-style reported columns and
   expanded-design product columns for factor and numeric combinations.
+- [x] Generalized primitive formula higher-order `:`, `/`, and `*` terms beyond
+  three variables, including direct interactions, nested prefix expansion, and
+  star expansion over all lower-order interaction subsets.
+- [x] Primitive formula `- term` subtraction for supported main effects,
+  interactions, nested shorthand, and star-expanded terms.
+- [x] Primitive additive parenthesized formula groups, distributed through
+  supported `*`, `:`, `/`, and `- term` syntax.
+- [x] Nested additive parenthesized formula groups for supported `+`, `*`,
+  `:`, `/`, and `- term` syntax.
+- [x] Primitive `I(numeric^k)` formula transforms for finite integer powers,
+  materialized as derived numeric covariates in formula-expanded designs.
+- [x] Primitive raw polynomial formula transforms
+  `poly(numeric, degree, raw=TRUE)`, materialized as derived numeric
+  covariates in formula-expanded designs.
+- [x] Primitive common numeric function transforms in formulas: `log`,
+  `log2`, `log10`, `sqrt`, and `scale` of supplied numeric covariates.
+- [x] Primitive `offset(numeric)` formula extraction into per-sample log-offset
+  vectors beside formula-expanded designs.
 - [x] Additive-factor expanded beta-prior fit-and-Wald-results helpers that own
   design construction before running coefficient or numeric-contrast workflows.
 - [x] Formula-driven expanded beta-prior fit-and-Wald-results helpers for the
   supported primitive formula subset.
-- [ ] Offsets, splines, transformed variables, arbitrary term subtraction,
-  nested terms beyond three variables, higher-order interactions beyond three
-  variables, and complete formula-aware expanded model matrix construction.
+- [x] Wire primitive formula offsets into formula-driven expanded beta-prior
+  Wald coefficient and contrast workflows through size-factor and
+  normalization-factor GLM offsets.
+- [ ] Orthogonal `poly()`, splines, arbitrary R expression transforms, and
+  complete formula-aware expanded model matrix construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.

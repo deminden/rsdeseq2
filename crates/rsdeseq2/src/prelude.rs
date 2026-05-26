@@ -18,9 +18,10 @@ pub use crate::core::{
 pub use crate::design::{
     expanded_additive_design, expanded_additive_design_with_all_interactions,
     expanded_additive_design_with_interactions, expanded_additive_factor_design,
-    expanded_factor_design, expanded_formula_design, DesignMatrix, ExpandedAdditiveFactorDesign,
-    ExpandedFactorDesign, ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec,
-    ExpandedFactorSpec, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+    expanded_factor_design, expanded_formula_design, expanded_formula_design_with_offsets,
+    DesignMatrix, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
+    ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec,
+    ExpandedFormulaDesignWithOffsets, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
 };
 pub use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,

@@ -1,8 +1,9 @@
 use crate::core::CountMatrix;
 use crate::design::{
-    expanded_factor_design, expanded_formula_design, DesignMatrix, ExpandedAdditiveFactorDesign,
-    ExpandedFactorDesign, ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec,
-    ExpandedFactorSpec, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+    expanded_factor_design, expanded_formula_design_with_offsets, DesignMatrix,
+    ExpandedAdditiveFactorDesign, ExpandedFactorDesign, ExpandedFactorInteractionSpec,
+    ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec, ExpandedNumericInteractionSpec,
+    ExpandedNumericSpec,
 };
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::glm::{
@@ -1145,7 +1146,40 @@ pub fn fit_expanded_formula_beta_prior_wald_results(
     input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
     coefficient: usize,
 ) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
-    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_factors =
+        formula_size_factor_offsets(input.counts, input.size_factors, &formula_design.offsets)?;
+    if let Some(normalization_factors) = offset_factors.as_ref() {
+        let fit_and_results =
+            fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: input.counts,
+                    design: ExpandedModelBetaPriorDesignInput {
+                        expanded_design: &design.expanded_design,
+                        standard_design: &design.standard_design,
+                        coefficient_groups: &design.coefficient_groups,
+                    },
+                    normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: input.base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                coefficient,
+            )?;
+        return Ok(ExpandedAdditiveBetaPriorWaldResults {
+            design,
+            fit: fit_and_results.fit,
+            results: fit_and_results.results,
+        });
+    }
     let fit_and_results = {
         let design_input = ExpandedModelBetaPriorDesignInput {
             expanded_design: &design.expanded_design,
@@ -1179,7 +1213,40 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results(
     input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
     contrast: &[f64],
 ) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
-    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_factors =
+        formula_size_factor_offsets(input.counts, input.size_factors, &formula_design.offsets)?;
+    if let Some(normalization_factors) = offset_factors.as_ref() {
+        let fit_and_results =
+            fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: input.counts,
+                    design: ExpandedModelBetaPriorDesignInput {
+                        expanded_design: &design.expanded_design,
+                        standard_design: &design.standard_design,
+                        coefficient_groups: &design.coefficient_groups,
+                    },
+                    normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: input.base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                contrast,
+            )?;
+        return Ok(ExpandedAdditiveBetaPriorWaldResults {
+            design,
+            fit: fit_and_results.fit,
+            results: fit_and_results.results,
+        });
+    }
     let fit_and_results = {
         let design_input = ExpandedModelBetaPriorDesignInput {
             expanded_design: &design.expanded_design,
@@ -1213,7 +1280,20 @@ pub fn fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_a
     input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
     coefficient: usize,
 ) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
-    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_normalization_factors = formula_normalization_factor_offsets(
+        input.counts,
+        input.normalization_factors,
+        &formula_design.offsets,
+    )?;
+    let normalization_factors = offset_normalization_factors
+        .as_ref()
+        .unwrap_or(input.normalization_factors);
     let fit_and_results = {
         let design_input = ExpandedModelBetaPriorDesignInput {
             expanded_design: &design.expanded_design,
@@ -1224,7 +1304,7 @@ pub fn fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_a
             ExpandedBetaPriorWaldNormalizedResultsInput {
                 counts: input.counts,
                 design: design_input,
-                normalization_factors: input.normalization_factors,
+                normalization_factors,
                 weights: input.weights,
                 dispersions: input.dispersions,
                 base_mean: input.base_mean,
@@ -1247,7 +1327,20 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_
     input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
     contrast: &[f64],
 ) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
-    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_normalization_factors = formula_normalization_factor_offsets(
+        input.counts,
+        input.normalization_factors,
+        &formula_design.offsets,
+    )?;
+    let normalization_factors = offset_normalization_factors
+        .as_ref()
+        .unwrap_or(input.normalization_factors);
     let fit_and_results = {
         let design_input = ExpandedModelBetaPriorDesignInput {
             expanded_design: &design.expanded_design,
@@ -1258,7 +1351,7 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_
             ExpandedBetaPriorWaldNormalizedResultsInput {
                 counts: input.counts,
                 design: design_input,
-                normalization_factors: input.normalization_factors,
+                normalization_factors,
                 weights: input.weights,
                 dispersions: input.dispersions,
                 base_mean: input.base_mean,
@@ -1274,6 +1367,116 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_
         fit: fit_and_results.fit,
         results: fit_and_results.results,
     })
+}
+
+fn formula_size_factor_offsets(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    offsets: &[f64],
+) -> Result<Option<RowMajorMatrix<f64>>, DeseqError> {
+    if !formula_offsets_are_active(offsets) {
+        return Ok(None);
+    }
+    if size_factors.len() != counts.n_samples() {
+        return Err(invalid_dimensions(
+            "formula offset size factors",
+            counts.n_samples(),
+            size_factors.len(),
+        ));
+    }
+    let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
+    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for _ in 0..counts.n_genes() {
+        for (sample, size_factor) in size_factors.iter().copied().enumerate() {
+            if !size_factor.is_finite() || size_factor <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("size factor at sample {sample} must be finite and positive"),
+                });
+            }
+            let factor = size_factor * offset_scales[sample];
+            if !factor.is_finite() || factor <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula offset normalization factor at sample {sample} must be finite and positive"
+                    ),
+                });
+            }
+            values.push(factor);
+        }
+    }
+    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
+}
+
+fn formula_normalization_factor_offsets(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    offsets: &[f64],
+) -> Result<Option<RowMajorMatrix<f64>>, DeseqError> {
+    if !formula_offsets_are_active(offsets) {
+        return Ok(None);
+    }
+    if normalization_factors.n_rows() != counts.n_genes()
+        || normalization_factors.n_cols() != counts.n_samples()
+    {
+        return Err(invalid_dimensions(
+            "formula offset normalization factors",
+            counts.n_genes() * counts.n_samples(),
+            normalization_factors.len(),
+        ));
+    }
+    let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
+    let mut values = Vec::with_capacity(normalization_factors.len());
+    for gene in 0..normalization_factors.n_rows() {
+        for (sample, value) in normalization_factors.row(gene)?.iter().copied().enumerate() {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "normalization factor at gene {gene}, sample {sample} must be finite and positive"
+                    ),
+                });
+            }
+            let factor = value * offset_scales[sample];
+            if !factor.is_finite() || factor <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula offset normalization factor at gene {gene}, sample {sample} must be finite and positive"
+                    ),
+                });
+            }
+            values.push(factor);
+        }
+    }
+    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
+}
+
+fn formula_offsets_are_active(offsets: &[f64]) -> bool {
+    offsets.iter().any(|value| *value != 0.0)
+}
+
+fn formula_offset_scales(offsets: &[f64], n_samples: usize) -> Result<Vec<f64>, DeseqError> {
+    if offsets.len() != n_samples {
+        return Err(invalid_dimensions(
+            "formula offsets",
+            n_samples,
+            offsets.len(),
+        ));
+    }
+    offsets
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(sample, offset)| {
+            let scale = offset.exp();
+            if !scale.is_finite() || scale <= 0.0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula offset scale at sample {sample} must be finite and positive"
+                    ),
+                });
+            }
+            Ok(scale)
+        })
+        .collect()
 }
 
 /// Build DESeq2-shaped Wald result rows from precomputed Wald statistics.
