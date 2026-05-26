@@ -184,11 +184,7 @@ impl ContrastSpec {
                 negative,
                 positive_weight,
                 negative_weight,
-            } => format!(
-                "coefficient list contrast: {} at {positive_weight} vs {} at {negative_weight}",
-                positive.join(","),
-                negative.join(",")
-            ),
+            } => list_contrast_comparison(positive, negative, *positive_weight, *negative_weight),
             Self::FactorLevel {
                 factor,
                 numerator,
@@ -439,6 +435,15 @@ fn resolve_factor_level_contrast(
         return Ok(values);
     }
 
+    if let Some((numerator_index, denominator_index)) =
+        find_shared_reference_standard_coefficients(names, factor, numerator, denominator)
+    {
+        let mut values = vec![0.0; design.n_coefficients()];
+        values[numerator_index] = 1.0;
+        values[denominator_index] = -1.0;
+        return Ok(values);
+    }
+
     let numerator_index =
         find_first_coefficient(names, &expanded_coefficient_names(factor, numerator));
     let denominator_index =
@@ -543,6 +548,16 @@ fn validate_list_values(
             });
         }
     }
+    if positive_weight <= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "positive contrast weight must be greater than zero".to_string(),
+        });
+    }
+    if negative_weight >= 0.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "negative contrast weight must be less than zero".to_string(),
+        });
+    }
     Ok(())
 }
 
@@ -581,6 +596,41 @@ fn find_coefficient(names: &[String], wanted: &str) -> Result<usize, DeseqError>
         })
 }
 
+fn list_contrast_comparison(
+    positive: &[String],
+    negative: &[String],
+    positive_weight: f64,
+    negative_weight: f64,
+) -> String {
+    let positive_label = weighted_list_label(positive, positive_weight.abs());
+    let negative_label = weighted_list_label(negative, negative_weight.abs());
+    if !positive.is_empty() && !negative.is_empty() {
+        format!("coefficient list contrast: {positive_label} vs {negative_label}")
+    } else if !positive.is_empty() {
+        format!("coefficient list contrast: {positive_label} effect")
+    } else {
+        format!("coefficient list contrast: -{negative_label} effect")
+    }
+}
+
+fn weighted_list_label(names: &[String], weight: f64) -> String {
+    let names = names.join("+");
+    if (weight - 1.0).abs() <= f64::EPSILON {
+        names
+    } else {
+        format!("{} {names}", format_rounded_weight(weight))
+    }
+}
+
+fn format_rounded_weight(weight: f64) -> String {
+    let rounded = (weight * 1000.0).round() / 1000.0;
+    let formatted = format!("{rounded:.3}");
+    formatted
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
 fn find_first_coefficient(names: &[String], candidates: &[String]) -> Result<usize, DeseqError> {
     candidates
         .iter()
@@ -591,6 +641,44 @@ fn find_first_coefficient(names: &[String], candidates: &[String]) -> Result<usi
                 candidates.join(", ")
             ),
         })
+}
+
+fn find_shared_reference_standard_coefficients(
+    names: &[String],
+    factor: &str,
+    numerator: &str,
+    denominator: &str,
+) -> Option<(usize, usize)> {
+    let numerator_pairs = standard_coefficients_for_level(names, factor, numerator);
+    let denominator_pairs = standard_coefficients_for_level(names, factor, denominator);
+    numerator_pairs
+        .iter()
+        .find_map(|(numerator_index, numerator_reference)| {
+            denominator_pairs
+                .iter()
+                .find(|(_, denominator_reference)| denominator_reference == numerator_reference)
+                .map(|(denominator_index, _)| (*numerator_index, *denominator_index))
+        })
+}
+
+fn standard_coefficients_for_level(
+    names: &[String],
+    factor: &str,
+    level: &str,
+) -> Vec<(usize, String)> {
+    standard_coefficient_prefixes(factor, level)
+        .into_iter()
+        .flat_map(|prefix| {
+            names.iter().enumerate().filter_map(move |(index, name)| {
+                name.strip_prefix(&prefix)
+                    .map(|reference| (index, reference.to_string()))
+            })
+        })
+        .collect()
+}
+
+fn standard_coefficient_prefixes(factor: &str, level: &str) -> Vec<String> {
+    candidate_names(&format!("{factor}_{level}_vs_"))
 }
 
 fn standard_coefficient_names(factor: &str, level: &str, reference: &str) -> Vec<String> {

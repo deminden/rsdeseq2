@@ -185,6 +185,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Supplied-dispersion fixed-dispersion Wald pipeline for one coefficient.
 - [x] Supplied-dispersion fixed-dispersion LRT pipeline for full vs reduced
   design matrices.
+- [x] Supplied-dispersion fixed-dispersion LRT pipeline for primitive numeric,
+  named/list, and caller-supplied factor-level effect-size contrasts.
 - [x] DESeq2-style full-model deviance diagnostic (`-2 * logLike`) in
   `DeseqFit` for GLM-backed pipelines.
 - [x] LRT fit-state diagnostics for reduced-model log likelihood, beta
@@ -374,6 +376,8 @@ reference; no DESeq2 source is vendored or translated line by line.
   named/list, and caller-supplied factor-level contrasts.
 - [x] Add fit-only top-level GLM-mu Wald contrast helpers mirroring the
   result-table contrast routes.
+- [x] Add compatibility-named parametric-only native Wald contrast routes for
+  linear-mu and GLM-mu branches.
 - [ ] Generalize the native Wald pipeline to DESeq2's full dispersion and GLM
   fitting behavior.
 - [ ] Keep mature R wrapper workflow exposure deferred until the Rust pipeline
@@ -388,9 +392,15 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Builder-level supplied-dispersion Wald pipeline for primitive numeric
   contrasts.
 - [x] Primitive coefficient-name, positive/negative coefficient-list, and
-  common factor-level contrast resolution against design coefficient names.
+  common factor-level contrast resolution against design coefficient names,
+  including shared-reference inference for non-reference factor-level
+  comparisons such as `C` vs `B` from `B_vs_A` and `C_vs_A` coefficients.
+- [x] Match DESeq2 `listValues` sign validation for primitive coefficient-list
+  contrasts.
 - [x] Stable result-table names and comparison labels for named primitive
   contrast specifications.
+- [x] DESeq2-shaped coefficient-list comparison labels for two-sided,
+  positive-only, and negative-only primitive list contrasts.
 - [x] Numeric/expanded `contrastAllZero` behavior for primitive Wald contrasts,
   matching DESeq2's `contrastAllZeroNumeric` model-matrix selection rule.
 - [x] Character/factor-level `contrastAllZero` behavior for primitive
@@ -398,7 +408,29 @@ reference; no DESeq2 source is vendored or translated line by line.
   DESeq2's `contrastAllZeroCharacter` selected-sample rule.
 - [x] Native linear-mu and GLM-mu Wald contrast wrappers for primitive numeric,
   coefficient-name/list, and caller-supplied factor-level requests.
+- [x] Add design coefficient-name selection for top-level Wald result helpers
+  and the native CLI, separate from contrast semantics.
 - [x] Expose coefficient-name Wald contrasts through the native CLI.
+- [x] Expose positive/negative coefficient-list Wald contrasts through the
+  native CLI.
+- [x] Expose coefficient-name factor-level Wald contrasts through the native
+  CLI.
+- [x] Align CLI design-matrix rows by count-matrix sample labels for VST, Wald,
+  and LRT file inputs.
+- [x] Align CLI size-factor rows by count-matrix sample labels for normalized
+  counts, VST, Wald, and LRT file inputs.
+- [x] Align CLI geometric-mean and Wald t degrees-of-freedom rows by
+  count-matrix gene labels.
+- [x] Align CLI normalization-factor and observation-weight matrices by
+  count-matrix gene and sample labels.
+- [x] Expose caller-supplied sample levels for CLI factor-level Wald contrasts,
+  aligned by count-matrix sample labels, enabling native character/factor-level
+  all-zero handling without formula parsing.
+- [x] Expose caller-supplied sample levels for CLI factor-level LRT contrasts,
+  aligned by count-matrix sample labels, with LRT-specific LFC-only all-zero
+  cleanup.
+- [x] Reject standalone CLI sample-level contrast files unless they accompany
+  a complete factor-level contrast request.
 - [ ] Full DESeq2 contrast handling for `results(contrast=...)`, including
   colData/formula-aware factor-level semantics, complete coefficient-name
   cleanup, and contrast-aware Cook's/refit edge cases.
@@ -419,6 +451,10 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
   including primitive numeric, named/list, and caller-supplied factor-level
   contrast routes.
+- [x] Limited Cook's replacement-refit path for GLM-mu native LRT contrasts,
+  including primitive numeric, named/list, and caller-supplied factor-level
+  full-model effect-size contrast routes while preserving the full-vs-reduced
+  LRT p-values.
 - [x] Top-level GLM-mu Wald/LRT result helpers for limited Cook's replacement
   refit, including default coefficient and primitive contrast result routes.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
@@ -440,6 +476,25 @@ reference; no DESeq2 source is vendored or translated line by line.
   workflow, using the last full-design coefficient by default.
 - [x] Add top-level LRT result-table workflow via
   `DeseqBuilder::fit_lrt_with_results()`.
+- [x] Add full-design coefficient-name selection for top-level LRT result
+  helpers and the native CLI.
+- [x] Add primitive numeric and named full-model contrast reporting for native
+  LRT result tables while preserving the same full-vs-reduced LRT statistic
+  and p-values.
+- [x] Extend native linear-mu LRT with primitive numeric, named/list, and
+  caller-supplied factor-level full-model effect-size contrast routes.
+- [x] Add compatibility-named parametric-only native LRT contrast routes for
+  linear-mu and GLM-mu branches.
+- [x] Add fit-only top-level LRT helpers mirroring default, named-coefficient,
+  numeric-contrast, named-contrast, and factor-level contrast result-table
+  routes.
+- [x] Add caller-supplied factor-level LRT contrast routes with character-style
+  `contrastAllZero` handling and replacement-refit coverage.
+- [x] Match DESeq2's LRT contrast all-zero cleanup split: contrast all-zero
+  rows zero only the reported `log2FoldChange`, while LRT statistic and
+  p-values remain the full-vs-reduced test outputs.
+- [x] Harden Wald/LRT primitive contrast result builders so non-finite
+  contrast estimates or standard errors fail before table assembly.
 - [x] DESeq2-internal native weighted GLM-mu LRT reference hook for
   the current mean-trend branch.
 - [x] Default DESeq2-internal native weighted GLM-mu Wald/LRT reference checks

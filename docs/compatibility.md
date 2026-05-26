@@ -154,6 +154,8 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   optionally weighted, deterministic-prior MAP dispersion subsets with
   parametric, local, or mean dispersion trends.
 - Default coefficient-level Wald statistic and standard-Normal p-value.
+- Top-level Wald result helpers can report the selected design coefficient by
+  index or coefficient name.
 - DESeq2-style Wald t p-values with residual, scalar, or per-gene degrees of
   freedom.
 - Log2-scale beta covariance matrices exposed in `DeseqFit` for implemented GLM
@@ -164,9 +166,15 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Primitive coefficient-name, positive/negative coefficient-list, and common
   factor-level contrast resolution against design coefficient names, with
   stable result-table names and comparison labels for named contrast specs.
+  Non-reference factor-level comparisons can infer a shared reference from
+  coefficient names such as `B_vs_A` and `C_vs_A`. Coefficient-list contrast
+  weights follow DESeq2 `listValues` sign validation, and list comparison
+  labels follow DESeq2's two-sided and one-sided naming shape.
 - Native linear-mu and GLM-mu Wald contrast entry points reuse the implemented
   MAP dispersion paths, then run numeric, named/list, or caller-supplied
-  factor-level contrast result assembly.
+  factor-level contrast result assembly. Compatibility-named parametric-only
+  Wald helpers expose the same contrast result surface while pinning the
+  dispersion trend to the parametric branch.
 - Numeric/expanded DESeq2-style `contrastAllZero` handling for primitive Wald
   contrasts: selected samples are inferred from `modelMatrix %*%
   contrastBinary`, and eligible rows are assigned LFC/stat zero and p-value
@@ -182,6 +190,8 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   coefficient, primitive contrast, or LRT model comparison, with public
   effect/test description label helpers and table-level scalar metadata for
   wrapper and exporter parity.
+- Primitive contrast result builders validate finite effect estimates and
+  standard errors before assembling Wald or LRT result tables.
 - Typed DESeq2-shaped result-table view for implemented primitive rows, with
   row names, numeric/logical columns, and column metadata for wrapper/file
   output, plus regular and `results(tidy = TRUE)`-style TSV result export,
@@ -191,10 +201,24 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   primitive numeric contrasts.
 - Supplied-dispersion fixed-dispersion LRT pipeline for full vs reduced design
   matrices, with full and reduced log-likelihood, beta convergence, and
-  iteration diagnostics in `DeseqFit`.
+  iteration diagnostics in `DeseqFit`, plus primitive numeric, named/list, and
+  caller-supplied factor-level effect-size contrast result tables.
 - Limited native-dispersion LRT pipelines for the implemented linear-mu and
   GLM-mu MAP dispersion branches, with the full design used for dispersion
-  estimation before full-vs-reduced testing.
+  estimation before full-vs-reduced testing, and top-level result helpers that
+  can report the full-design coefficient by index or coefficient name.
+- Native linear-mu and GLM-mu LRT result helpers can report primitive numeric
+  or named/list full-model effect-size contrasts, plus caller-supplied
+  factor-level contrasts with sample-level all-zero cleanup, while preserving
+  the full-vs-reduced LRT statistic and p-values. Compatibility-named
+  parametric-only LRT helpers expose the same contrast result surface. Fit-only
+  top-level LRT helpers mirror the default, named-coefficient,
+  numeric-contrast, named-contrast, and factor-level contrast result routes.
+- Numeric/expanded DESeq2-style `contrastAllZero` handling for LRT contrast
+  result tables zeroes only the reported `log2FoldChange`; the LRT statistic,
+  p-value, and adjusted p-value remain the model-comparison outputs. The same
+  LFC-only cleanup is available for character/factor-level LRT contrasts when
+  the caller supplies sample levels.
 - All-zero row expansion for the supplied-dispersion Wald/LRT pipelines and
   limited native Wald/LRT paths, using missing numeric outputs for skipped
   all-zero rows.
@@ -355,8 +379,13 @@ bounded fallback where DESeq2 is installed locally.
 - Broader DESeq2 parity fixtures for unstable or non-converged rows routed
   through the bounded optim fallback.
 - Full DESeq2 `results(contrast=...)` colData/formula-aware factor-level
-  semantics, complete coefficient-name cleanup, and contrast-aware Cook's/refit
-  edge cases.
+  semantics, complete coefficient-name cleanup, and remaining contrast-aware
+  Cook's/refit edge cases. Primitive numeric and named/list Wald contrasts are
+  implemented with replacement refit; LRT can report primitive numeric and
+  named full-model contrasts, including the limited replacement-refit path,
+  while preserving the full-vs-reduced LRT statistic and p-values. LRT
+  contrast all-zero cleanup follows DESeq2's split behavior by zeroing only
+  the displayed log2 fold change before restoring LRT statistics and p-values.
 - Automatic formula-aware application of the two-group low-count Cook's
   heuristic from high-level wrappers.
 - Full Cook's outlier replacement behavior for beta priors, Bioconductor assay

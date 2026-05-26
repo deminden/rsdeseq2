@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use csv::{ReaderBuilder, WriterBuilder};
@@ -11,6 +12,53 @@ use crate::errors::{invalid_dimensions, DeseqError};
 use crate::independent_filtering::IndependentFilteringOutput;
 use crate::matrix::RowMajorMatrix;
 use crate::results::{DeseqResultColumnValues, DeseqResults};
+
+/// One sample-level factor value loaded from a two-column TSV.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SampleLevel {
+    /// Sample label.
+    pub sample: String,
+    /// Factor level for the sample.
+    pub level: String,
+}
+
+/// One finite numeric value associated with a sample label.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SampleNumericValue {
+    /// Sample label.
+    pub sample: String,
+    /// Numeric value for the sample.
+    pub value: f64,
+}
+
+/// One finite numeric value associated with a gene label.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeneNumericValue {
+    /// Gene label.
+    pub gene: String,
+    /// Numeric value for the gene.
+    pub value: f64,
+}
+
+/// Numeric design matrix plus the row sample labels read from TSV.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LabeledDesignMatrix {
+    /// Design matrix in file row order.
+    pub design: DesignMatrix,
+    /// One sample label per design row.
+    pub sample_names: Vec<String>,
+}
+
+/// Gene x sample numeric matrix plus row and column labels read from TSV.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LabeledAssayMatrix {
+    /// Matrix in file row and column order.
+    pub matrix: RowMajorMatrix<f64>,
+    /// One gene label per matrix row.
+    pub gene_names: Vec<String>,
+    /// One sample label per matrix column.
+    pub sample_names: Vec<String>,
+}
 
 /// Read a tab-delimited count matrix with gene IDs in the first column.
 pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, DeseqError> {
@@ -64,6 +112,13 @@ pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, Dese
 /// core; remaining header fields become coefficient names. Rows must already be
 /// in the same sample order as the count matrix used by the caller.
 pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, DeseqError> {
+    Ok(read_labeled_design_matrix_tsv(path)?.design)
+}
+
+/// Read a tab-delimited numeric design matrix and preserve sample row labels.
+pub fn read_labeled_design_matrix_tsv(
+    path: impl AsRef<Path>,
+) -> Result<LabeledDesignMatrix, DeseqError> {
     let path_ref = path.as_ref();
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
@@ -83,6 +138,7 @@ pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, De
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
     let n_coefficients = coefficient_names.len();
+    let mut sample_names = Vec::new();
     let mut values = Vec::new();
     let mut n_samples = 0_usize;
     for record in reader.records() {
@@ -94,6 +150,13 @@ pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, De
                 actual: record.len(),
             });
         }
+        let sample = record.get(0).unwrap_or_default();
+        if sample.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "design sample names must not be empty".to_string(),
+            });
+        }
+        sample_names.push(sample.to_string());
         for (column, field) in record.iter().skip(1).enumerate() {
             values.push(parse_finite_float_field(
                 field,
@@ -111,7 +174,12 @@ pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, De
             actual: 0,
         });
     }
-    DesignMatrix::from_row_major(n_samples, n_coefficients, values, Some(coefficient_names))
+    let design =
+        DesignMatrix::from_row_major(n_samples, n_coefficients, values, Some(coefficient_names))?;
+    Ok(LabeledDesignMatrix {
+        design,
+        sample_names,
+    })
 }
 
 /// Read a tab-delimited gene/sample normalization-factor matrix.
@@ -123,50 +191,23 @@ pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, De
 pub fn read_normalization_factors_tsv(
     path: impl AsRef<Path>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    Ok(read_labeled_normalization_factors_tsv(path)?.matrix)
+}
+
+/// Read a tab-delimited gene/sample normalization-factor matrix with labels preserved.
+pub fn read_labeled_normalization_factors_tsv(
+    path: impl AsRef<Path>,
+) -> Result<LabeledAssayMatrix, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
-    let headers = reader.headers()?.clone();
-    if headers.len() < 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "normalization factor columns".to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let n_samples = headers.len() - 1;
-    let mut values = Vec::new();
-    let mut n_genes = 0_usize;
-    for record in reader.records() {
-        let record = record?;
-        if record.len() != headers.len() {
-            return Err(DeseqError::InvalidDimensions {
-                context: "normalization factor record columns".to_string(),
-                expected: headers.len(),
-                actual: record.len(),
-            });
-        }
-        for (sample, field) in record.iter().skip(1).enumerate() {
-            values.push(parse_finite_float_field(
-                field,
-                path_ref,
-                n_genes * n_samples + sample,
-                "normalization factor matrix",
-            )?);
-        }
-        n_genes += 1;
-    }
-    if n_genes == 0 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "normalization factor rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    let factors = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
-    validate_positive_finite_matrix("normalization factor matrix", &factors)?;
+    let factors = read_labeled_assay_matrix_tsv(
+        path_ref,
+        "normalization factor columns",
+        "normalization factor record columns",
+        "normalization factor rows",
+        "normalization factor matrix",
+        "normalization factor gene names",
+    )?;
+    validate_positive_finite_matrix("normalization factor matrix", &factors.matrix)?;
     Ok(factors)
 }
 
@@ -179,7 +220,34 @@ pub fn read_normalization_factors_tsv(
 pub fn read_observation_weights_tsv(
     path: impl AsRef<Path>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    Ok(read_labeled_observation_weights_tsv(path)?.matrix)
+}
+
+/// Read a tab-delimited gene/sample observation-weight matrix with labels preserved.
+pub fn read_labeled_observation_weights_tsv(
+    path: impl AsRef<Path>,
+) -> Result<LabeledAssayMatrix, DeseqError> {
     let path_ref = path.as_ref();
+    let weights = read_labeled_assay_matrix_tsv(
+        path_ref,
+        "observation weight columns",
+        "observation weight record columns",
+        "observation weight rows",
+        "observation weights",
+        "observation weight gene names",
+    )?;
+    validate_nonnegative_finite_values("observation weight input", weights.matrix.as_slice())?;
+    Ok(weights)
+}
+
+fn read_labeled_assay_matrix_tsv(
+    path_ref: &Path,
+    column_context: &str,
+    record_context: &str,
+    row_context: &str,
+    value_context: &str,
+    gene_context: &str,
+) -> Result<LabeledAssayMatrix, DeseqError> {
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
@@ -187,43 +255,59 @@ pub fn read_observation_weights_tsv(
     let headers = reader.headers()?.clone();
     if headers.len() < 2 {
         return Err(DeseqError::InvalidDimensions {
-            context: "observation weight columns".to_string(),
+            context: column_context.to_string(),
             expected: 2,
             actual: headers.len(),
         });
     }
+    let sample_names = headers
+        .iter()
+        .skip(1)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
     let n_samples = headers.len() - 1;
+    let mut gene_names = Vec::new();
     let mut values = Vec::new();
     let mut n_genes = 0_usize;
     for record in reader.records() {
         let record = record?;
         if record.len() != headers.len() {
             return Err(DeseqError::InvalidDimensions {
-                context: "observation weight record columns".to_string(),
+                context: record_context.to_string(),
                 expected: headers.len(),
                 actual: record.len(),
             });
         }
+        let gene = record.get(0).unwrap_or_default();
+        if gene.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{gene_context} must not be empty"),
+            });
+        }
+        gene_names.push(gene.to_string());
         for (sample, field) in record.iter().skip(1).enumerate() {
             values.push(parse_finite_float_field(
                 field,
                 path_ref,
                 n_genes * n_samples + sample,
-                "observation weights",
+                value_context,
             )?);
         }
         n_genes += 1;
     }
     if n_genes == 0 {
         return Err(DeseqError::InvalidDimensions {
-            context: "observation weight rows".to_string(),
+            context: row_context.to_string(),
             expected: 1,
             actual: 0,
         });
     }
-    let weights = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
-    validate_nonnegative_finite_values("observation weight input", weights.as_slice())?;
-    Ok(weights)
+    let matrix = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
+    Ok(LabeledAssayMatrix {
+        matrix,
+        gene_names,
+        sample_names,
+    })
 }
 
 /// Read a tab-delimited sample-level size-factor table.
@@ -233,6 +317,16 @@ pub fn read_observation_weights_tsv(
 /// alignment by the caller; this primitive reader returns only the numeric
 /// vector in file order.
 pub fn read_size_factors_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    Ok(read_labeled_size_factors_tsv(path)?
+        .into_iter()
+        .map(|entry| entry.value)
+        .collect())
+}
+
+/// Read a tab-delimited sample-level size-factor table with labels preserved.
+pub fn read_labeled_size_factors_tsv(
+    path: impl AsRef<Path>,
+) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
@@ -256,12 +350,22 @@ pub fn read_size_factors_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqEr
                 actual: record.len(),
             });
         }
-        values.push(parse_finite_float_field(
+        let sample = record.get(0).unwrap_or_default();
+        if sample.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "size-factor sample names must not be empty".to_string(),
+            });
+        }
+        let value = parse_finite_float_field(
             record.get(1).unwrap_or_default(),
             path_ref,
             idx,
             "size factors",
-        )?);
+        )?;
+        values.push(SampleNumericValue {
+            sample: sample.to_string(),
+            value,
+        });
     }
     if values.is_empty() {
         return Err(DeseqError::InvalidDimensions {
@@ -270,7 +374,10 @@ pub fn read_size_factors_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqEr
             actual: 0,
         });
     }
-    validate_positive_finite_values("size-factor input", &values)?;
+    validate_positive_finite_values(
+        "size-factor input",
+        &values.iter().map(|entry| entry.value).collect::<Vec<_>>(),
+    )?;
     Ok(values)
 }
 
@@ -281,6 +388,16 @@ pub fn read_size_factors_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqEr
 /// the values in file order. Values must be non-negative and finite, matching
 /// the size-factor estimator's supported geometric-mean domain.
 pub fn read_geometric_means_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    Ok(read_labeled_geometric_means_tsv(path)?
+        .into_iter()
+        .map(|entry| entry.value)
+        .collect())
+}
+
+/// Read one supplied geometric mean per gene with labels preserved.
+pub fn read_labeled_geometric_means_tsv(
+    path: impl AsRef<Path>,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
@@ -304,12 +421,22 @@ pub fn read_geometric_means_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, Dese
                 actual: record.len(),
             });
         }
-        values.push(parse_finite_float_field(
+        let gene = record.get(0).unwrap_or_default();
+        if gene.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "geometric-mean gene names must not be empty".to_string(),
+            });
+        }
+        let value = parse_finite_float_field(
             record.get(1).unwrap_or_default(),
             path_ref,
             idx,
             "geometric means",
-        )?);
+        )?;
+        values.push(GeneNumericValue {
+            gene: gene.to_string(),
+            value,
+        });
     }
     if values.is_empty() {
         return Err(DeseqError::InvalidDimensions {
@@ -318,7 +445,7 @@ pub fn read_geometric_means_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, Dese
             actual: 0,
         });
     }
-    for (idx, value) in values.iter().copied().enumerate() {
+    for (idx, value) in values.iter().map(|entry| entry.value).enumerate() {
         if value < 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
                 reason: format!("geometric mean at index {idx} must be non-negative"),
@@ -334,6 +461,16 @@ pub fn read_geometric_means_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, Dese
 /// Labels are accepted for caller-side alignment; this primitive reader returns
 /// the values in file order.
 pub fn read_wald_t_degrees_of_freedom_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    Ok(read_labeled_wald_t_degrees_of_freedom_tsv(path)?
+        .into_iter()
+        .map(|entry| entry.value)
+        .collect())
+}
+
+/// Read one finite numeric Wald t degrees-of-freedom value per gene with labels preserved.
+pub fn read_labeled_wald_t_degrees_of_freedom_tsv(
+    path: impl AsRef<Path>,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
@@ -357,12 +494,22 @@ pub fn read_wald_t_degrees_of_freedom_tsv(path: impl AsRef<Path>) -> Result<Vec<
                 actual: record.len(),
             });
         }
-        values.push(parse_finite_float_field(
+        let gene = record.get(0).unwrap_or_default();
+        if gene.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "Wald t degrees-of-freedom gene names must not be empty".to_string(),
+            });
+        }
+        let value = parse_finite_float_field(
             record.get(1).unwrap_or_default(),
             path_ref,
             idx,
             "Wald t degrees of freedom",
-        )?);
+        )?;
+        values.push(GeneNumericValue {
+            gene: gene.to_string(),
+            value,
+        });
     }
     if values.is_empty() {
         return Err(DeseqError::InvalidDimensions {
@@ -372,6 +519,276 @@ pub fn read_wald_t_degrees_of_freedom_tsv(path: impl AsRef<Path>) -> Result<Vec<
         });
     }
     Ok(values)
+}
+
+/// Read one factor level per sample for CLI factor-level contrasts.
+///
+/// The file has a leading sample label column and one string level column.
+/// Labels are preserved so callers can align levels against count-matrix sample
+/// columns before applying DESeq2-style factor-level contrast handling.
+pub fn read_sample_levels_tsv(path: impl AsRef<Path>) -> Result<Vec<SampleLevel>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "sample-level columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let mut values = Vec::new();
+    for record in reader.records() {
+        let record = record?;
+        if record.len() != 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: "sample-level record columns".to_string(),
+                expected: 2,
+                actual: record.len(),
+            });
+        }
+        let sample = record.get(0).unwrap_or_default();
+        if sample.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "sample names must not be empty".to_string(),
+            });
+        }
+        let level = record.get(1).unwrap_or_default();
+        if level.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "sample levels must not be empty".to_string(),
+            });
+        }
+        values.push(SampleLevel {
+            sample: sample.to_string(),
+            level: level.to_string(),
+        });
+    }
+    if values.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "sample-level rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    Ok(values)
+}
+
+/// Align sample-level factor values to count-matrix sample order.
+pub fn align_sample_levels_to_samples(
+    levels: &[SampleLevel],
+    sample_names: &[String],
+) -> Result<Vec<String>, DeseqError> {
+    if levels.len() != sample_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "sample-level rows".to_string(),
+            expected: sample_names.len(),
+            actual: levels.len(),
+        });
+    }
+    let mut by_sample = HashMap::with_capacity(levels.len());
+    for level in levels {
+        if by_sample
+            .insert(level.sample.as_str(), level.level.as_str())
+            .is_some()
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate sample level for {}", level.sample),
+            });
+        }
+    }
+    let mut aligned = Vec::with_capacity(sample_names.len());
+    for sample in sample_names {
+        let level = by_sample
+            .get(sample.as_str())
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("missing sample level for {sample}"),
+            })?;
+        aligned.push((*level).to_string());
+    }
+    Ok(aligned)
+}
+
+/// Align sample-level numeric values to count-matrix sample order.
+pub fn align_sample_numeric_values_to_samples(
+    values: &[SampleNumericValue],
+    sample_names: &[String],
+    context: &str,
+) -> Result<Vec<f64>, DeseqError> {
+    if values.len() != sample_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} rows"),
+            expected: sample_names.len(),
+            actual: values.len(),
+        });
+    }
+    let mut by_sample = HashMap::with_capacity(values.len());
+    for value in values {
+        if by_sample
+            .insert(value.sample.as_str(), value.value)
+            .is_some()
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate {context} value for sample {}", value.sample),
+            });
+        }
+    }
+    let mut aligned = Vec::with_capacity(sample_names.len());
+    for sample in sample_names {
+        let value = by_sample
+            .get(sample.as_str())
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("missing {context} value for sample {sample}"),
+            })?;
+        aligned.push(*value);
+    }
+    Ok(aligned)
+}
+
+/// Align gene-level numeric values to count-matrix gene order.
+pub fn align_gene_numeric_values_to_genes(
+    values: &[GeneNumericValue],
+    gene_names: &[String],
+    context: &str,
+) -> Result<Vec<f64>, DeseqError> {
+    if values.len() != gene_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} rows"),
+            expected: gene_names.len(),
+            actual: values.len(),
+        });
+    }
+    let mut by_gene = HashMap::with_capacity(values.len());
+    for value in values {
+        if by_gene.insert(value.gene.as_str(), value.value).is_some() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate {context} value for gene {}", value.gene),
+            });
+        }
+    }
+    let mut aligned = Vec::with_capacity(gene_names.len());
+    for gene in gene_names {
+        let value = by_gene
+            .get(gene.as_str())
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("missing {context} value for gene {gene}"),
+            })?;
+        aligned.push(*value);
+    }
+    Ok(aligned)
+}
+
+/// Align a labeled gene x sample matrix to count-matrix gene and sample order.
+pub fn align_labeled_assay_matrix_to_counts(
+    labeled: LabeledAssayMatrix,
+    counts: &CountMatrix,
+    context: &str,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let gene_names = counts
+        .gene_names()
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!("count gene names are required to align {context}"),
+        })?;
+    let sample_names = counts
+        .sample_names()
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!("count sample names are required to align {context}"),
+        })?;
+    if labeled.gene_names.len() != gene_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} gene rows"),
+            expected: gene_names.len(),
+            actual: labeled.gene_names.len(),
+        });
+    }
+    if labeled.sample_names.len() != sample_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} sample columns"),
+            expected: sample_names.len(),
+            actual: labeled.sample_names.len(),
+        });
+    }
+    let mut gene_rows = HashMap::with_capacity(labeled.gene_names.len());
+    for (idx, gene) in labeled.gene_names.iter().enumerate() {
+        if gene_rows.insert(gene.as_str(), idx).is_some() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate {context} row for gene {gene}"),
+            });
+        }
+    }
+    let mut sample_cols = HashMap::with_capacity(labeled.sample_names.len());
+    for (idx, sample) in labeled.sample_names.iter().enumerate() {
+        if sample_cols.insert(sample.as_str(), idx).is_some() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate {context} column for sample {sample}"),
+            });
+        }
+    }
+    let mut values = Vec::with_capacity(gene_names.len() * sample_names.len());
+    for gene in gene_names {
+        let row = gene_rows
+            .get(gene.as_str())
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("missing {context} row for gene {gene}"),
+            })?;
+        for sample in sample_names {
+            let col =
+                sample_cols
+                    .get(sample.as_str())
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: format!("missing {context} column for sample {sample}"),
+                    })?;
+            values.push(*labeled.matrix.get(*row, *col).ok_or_else(|| {
+                DeseqError::InvalidDimensions {
+                    context: format!("{context} aligned value"),
+                    expected: labeled.matrix.len(),
+                    actual: *row * labeled.matrix.n_cols() + *col,
+                }
+            })?);
+        }
+    }
+    RowMajorMatrix::from_row_major(gene_names.len(), sample_names.len(), values)
+}
+
+/// Align a labeled design matrix to count-matrix sample order.
+pub fn align_design_matrix_to_samples(
+    labeled: LabeledDesignMatrix,
+    sample_names: &[String],
+) -> Result<DesignMatrix, DeseqError> {
+    if labeled.sample_names.len() != sample_names.len() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "design sample rows".to_string(),
+            expected: sample_names.len(),
+            actual: labeled.sample_names.len(),
+        });
+    }
+    let mut by_sample = HashMap::with_capacity(labeled.sample_names.len());
+    for (row, sample) in labeled.sample_names.iter().enumerate() {
+        if by_sample.insert(sample.as_str(), row).is_some() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("duplicate design row for sample {sample}"),
+            });
+        }
+    }
+    let n_coefficients = labeled.design.n_coefficients();
+    let mut values = Vec::with_capacity(sample_names.len() * n_coefficients);
+    for sample in sample_names {
+        let row = by_sample
+            .get(sample.as_str())
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("missing design row for sample {sample}"),
+            })?;
+        values.extend_from_slice(labeled.design.matrix().row(*row)?);
+    }
+    DesignMatrix::from_row_major(
+        sample_names.len(),
+        n_coefficients,
+        values,
+        labeled.design.coefficient_names().map(<[String]>::to_vec),
+    )
 }
 
 fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
@@ -1170,6 +1587,75 @@ mod tests {
     }
 
     #[test]
+    fn read_labeled_design_matrix_tsv_preserves_sample_names() {
+        let path = unique_test_path("labeled_design.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "sample\tIntercept\tcondition_B_vs_A\n",
+                "s1\t1\t0\n",
+                "s2\t1\t0\n",
+                "s3\t1\t1\n",
+            ),
+        )
+        .unwrap();
+
+        let labeled = read_labeled_design_matrix_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            labeled.sample_names,
+            vec!["s1".to_string(), "s2".to_string(), "s3".to_string()]
+        );
+        assert_eq!(
+            labeled.design.matrix().as_slice(),
+            &[1.0, 0.0, 1.0, 0.0, 1.0, 1.0]
+        );
+    }
+
+    #[test]
+    fn align_design_matrix_to_samples_uses_count_sample_order() {
+        let design = DesignMatrix::from_row_major(
+            3,
+            2,
+            vec![1.0, 1.0, 1.0, 0.0, 1.0, 2.0],
+            Some(vec!["Intercept".to_string(), "condition".to_string()]),
+        )
+        .unwrap();
+        let labeled = LabeledDesignMatrix {
+            design,
+            sample_names: vec!["s3".to_string(), "s1".to_string(), "s2".to_string()],
+        };
+        let samples = vec!["s1".to_string(), "s2".to_string(), "s3".to_string()];
+
+        let aligned = align_design_matrix_to_samples(labeled, &samples).unwrap();
+
+        assert_eq!(aligned.matrix().as_slice(), &[1.0, 0.0, 1.0, 2.0, 1.0, 1.0]);
+        assert_eq!(
+            aligned.coefficient_names().unwrap(),
+            &["Intercept".to_string(), "condition".to_string()]
+        );
+    }
+
+    #[test]
+    fn align_design_matrix_to_samples_rejects_missing_and_duplicate_samples() {
+        let samples = vec!["s1".to_string(), "s2".to_string()];
+        let missing = LabeledDesignMatrix {
+            design: DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], Some(vec!["x".to_string()]))
+                .unwrap(),
+            sample_names: vec!["s1".to_string(), "s3".to_string()],
+        };
+        assert!(align_design_matrix_to_samples(missing, &samples).is_err());
+
+        let duplicated = LabeledDesignMatrix {
+            design: DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], Some(vec!["x".to_string()]))
+                .unwrap(),
+            sample_names: vec!["s1".to_string(), "s1".to_string()],
+        };
+        assert!(align_design_matrix_to_samples(duplicated, &samples).is_err());
+    }
+
+    #[test]
     fn read_design_matrix_tsv_validates_shape_and_values() {
         let bad_value = unique_test_path("bad_design_value.tsv");
         fs::write(
@@ -1212,6 +1698,80 @@ mod tests {
         assert_eq!(factors.n_rows(), 2);
         assert_eq!(factors.n_cols(), 2);
         assert_eq!(factors.as_slice(), &[1.0, 2.0, 0.5, 4.0]);
+    }
+
+    #[test]
+    fn read_labeled_normalization_factors_tsv_preserves_names() {
+        let path = unique_test_path("read_labeled_normalization_factors.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "gene\tsample_1\tsample_2\n",
+                "gene_a\t1\t2\n",
+                "gene_b\t0.5\t4\n",
+            ),
+        )
+        .unwrap();
+
+        let factors = read_labeled_normalization_factors_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            factors.gene_names,
+            vec!["gene_a".to_string(), "gene_b".to_string()]
+        );
+        assert_eq!(
+            factors.sample_names,
+            vec!["sample_1".to_string(), "sample_2".to_string()]
+        );
+        assert_eq!(factors.matrix.as_slice(), &[1.0, 2.0, 0.5, 4.0]);
+    }
+
+    #[test]
+    fn align_labeled_assay_matrix_to_counts_uses_gene_and_sample_order() {
+        let counts = CountMatrix::from_row_major_u32_with_names(
+            2,
+            2,
+            vec![1, 2, 3, 4],
+            Some(vec!["gene_a".to_string(), "gene_b".to_string()]),
+            Some(vec!["sample_1".to_string(), "sample_2".to_string()]),
+        )
+        .unwrap();
+        let labeled = LabeledAssayMatrix {
+            matrix: RowMajorMatrix::from_row_major(2, 2, vec![4.0, 3.0, 2.0, 1.0]).unwrap(),
+            gene_names: vec!["gene_b".to_string(), "gene_a".to_string()],
+            sample_names: vec!["sample_2".to_string(), "sample_1".to_string()],
+        };
+
+        let aligned =
+            align_labeled_assay_matrix_to_counts(labeled, &counts, "test matrix").unwrap();
+
+        assert_eq!(aligned.as_slice(), &[1.0, 2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn align_labeled_assay_matrix_to_counts_rejects_missing_and_duplicate_names() {
+        let counts = CountMatrix::from_row_major_u32_with_names(
+            1,
+            2,
+            vec![1, 2],
+            Some(vec!["gene_a".to_string()]),
+            Some(vec!["sample_1".to_string(), "sample_2".to_string()]),
+        )
+        .unwrap();
+        let missing = LabeledAssayMatrix {
+            matrix: RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap(),
+            gene_names: vec!["gene_b".to_string()],
+            sample_names: vec!["sample_1".to_string(), "sample_2".to_string()],
+        };
+        assert!(align_labeled_assay_matrix_to_counts(missing, &counts, "test matrix").is_err());
+
+        let duplicated = LabeledAssayMatrix {
+            matrix: RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap(),
+            gene_names: vec!["gene_a".to_string()],
+            sample_names: vec!["sample_1".to_string(), "sample_1".to_string()],
+        };
+        assert!(align_labeled_assay_matrix_to_counts(duplicated, &counts, "test matrix").is_err());
     }
 
     #[test]
@@ -1260,6 +1820,33 @@ mod tests {
     }
 
     #[test]
+    fn read_labeled_observation_weights_tsv_preserves_names() {
+        let path = unique_test_path("read_labeled_observation_weights.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "gene\tsample_1\tsample_2\n",
+                "gene_a\t1\t0\n",
+                "gene_b\t0.5\t4\n",
+            ),
+        )
+        .unwrap();
+
+        let weights = read_labeled_observation_weights_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            weights.gene_names,
+            vec!["gene_a".to_string(), "gene_b".to_string()]
+        );
+        assert_eq!(
+            weights.sample_names,
+            vec!["sample_1".to_string(), "sample_2".to_string()]
+        );
+        assert_eq!(weights.matrix.as_slice(), &[1.0, 0.0, 0.5, 4.0]);
+    }
+
+    #[test]
     fn read_observation_weights_tsv_validates_shape_and_values() {
         let bad_value = unique_test_path("bad_observation_weight_value.tsv");
         fs::write(
@@ -1301,6 +1888,91 @@ mod tests {
         let _ = fs::remove_file(&path);
 
         assert_eq!(size_factors, vec![1.0, 0.5, 2.0]);
+    }
+
+    #[test]
+    fn read_labeled_size_factors_tsv_preserves_sample_names() {
+        let path = unique_test_path("read_labeled_size_factors.tsv");
+        fs::write(
+            &path,
+            concat!("sample\tsize_factor\n", "sample_1\t1\n", "sample_2\t0.5\n",),
+        )
+        .unwrap();
+
+        let size_factors = read_labeled_size_factors_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            size_factors,
+            vec![
+                SampleNumericValue {
+                    sample: "sample_1".to_string(),
+                    value: 1.0
+                },
+                SampleNumericValue {
+                    sample: "sample_2".to_string(),
+                    value: 0.5
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn align_sample_numeric_values_to_samples_uses_count_sample_order() {
+        let values = vec![
+            SampleNumericValue {
+                sample: "sample_3".to_string(),
+                value: 3.0,
+            },
+            SampleNumericValue {
+                sample: "sample_1".to_string(),
+                value: 1.0,
+            },
+            SampleNumericValue {
+                sample: "sample_2".to_string(),
+                value: 2.0,
+            },
+        ];
+        let samples = vec![
+            "sample_1".to_string(),
+            "sample_2".to_string(),
+            "sample_3".to_string(),
+        ];
+
+        assert_eq!(
+            align_sample_numeric_values_to_samples(&values, &samples, "size-factor").unwrap(),
+            vec![1.0, 2.0, 3.0]
+        );
+    }
+
+    #[test]
+    fn align_sample_numeric_values_to_samples_rejects_missing_and_duplicate_samples() {
+        let samples = vec!["sample_1".to_string(), "sample_2".to_string()];
+        let missing = vec![
+            SampleNumericValue {
+                sample: "sample_1".to_string(),
+                value: 1.0,
+            },
+            SampleNumericValue {
+                sample: "sample_3".to_string(),
+                value: 3.0,
+            },
+        ];
+        assert!(align_sample_numeric_values_to_samples(&missing, &samples, "size-factor").is_err());
+
+        let duplicated = vec![
+            SampleNumericValue {
+                sample: "sample_1".to_string(),
+                value: 1.0,
+            },
+            SampleNumericValue {
+                sample: "sample_1".to_string(),
+                value: 2.0,
+            },
+        ];
+        assert!(
+            align_sample_numeric_values_to_samples(&duplicated, &samples, "size-factor").is_err()
+        );
     }
 
     #[test]
@@ -1348,6 +2020,89 @@ mod tests {
     }
 
     #[test]
+    fn read_labeled_geometric_means_tsv_preserves_gene_names() {
+        let path = unique_test_path("read_labeled_geometric_means.tsv");
+        fs::write(
+            &path,
+            concat!("gene\tgeo_mean\n", "gene_1\t1\n", "gene_2\t0\n",),
+        )
+        .unwrap();
+
+        let geometric_means = read_labeled_geometric_means_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            geometric_means,
+            vec![
+                GeneNumericValue {
+                    gene: "gene_1".to_string(),
+                    value: 1.0
+                },
+                GeneNumericValue {
+                    gene: "gene_2".to_string(),
+                    value: 0.0
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn align_gene_numeric_values_to_genes_uses_count_gene_order() {
+        let values = vec![
+            GeneNumericValue {
+                gene: "gene_3".to_string(),
+                value: 3.0,
+            },
+            GeneNumericValue {
+                gene: "gene_1".to_string(),
+                value: 1.0,
+            },
+            GeneNumericValue {
+                gene: "gene_2".to_string(),
+                value: 2.0,
+            },
+        ];
+        let genes = vec![
+            "gene_1".to_string(),
+            "gene_2".to_string(),
+            "gene_3".to_string(),
+        ];
+
+        assert_eq!(
+            align_gene_numeric_values_to_genes(&values, &genes, "geometric-mean").unwrap(),
+            vec![1.0, 2.0, 3.0]
+        );
+    }
+
+    #[test]
+    fn align_gene_numeric_values_to_genes_rejects_missing_and_duplicate_genes() {
+        let genes = vec!["gene_1".to_string(), "gene_2".to_string()];
+        let missing = vec![
+            GeneNumericValue {
+                gene: "gene_1".to_string(),
+                value: 1.0,
+            },
+            GeneNumericValue {
+                gene: "gene_3".to_string(),
+                value: 3.0,
+            },
+        ];
+        assert!(align_gene_numeric_values_to_genes(&missing, &genes, "geometric-mean").is_err());
+
+        let duplicated = vec![
+            GeneNumericValue {
+                gene: "gene_1".to_string(),
+                value: 1.0,
+            },
+            GeneNumericValue {
+                gene: "gene_1".to_string(),
+                value: 2.0,
+            },
+        ];
+        assert!(align_gene_numeric_values_to_genes(&duplicated, &genes, "geometric-mean").is_err());
+    }
+
+    #[test]
     fn read_geometric_means_tsv_validates_shape_and_values() {
         let bad_value = unique_test_path("bad_geometric_mean_value.tsv");
         fs::write(&bad_value, concat!("gene\tgeo_mean\n", "gene_1\t-1\n")).unwrap();
@@ -1379,6 +2134,29 @@ mod tests {
     }
 
     #[test]
+    fn read_labeled_wald_t_degrees_of_freedom_tsv_preserves_gene_names() {
+        let path = unique_test_path("read_labeled_wald_t_df.tsv");
+        fs::write(&path, concat!("gene\tdf\n", "gene_1\t4\n", "gene_2\t2.5\n")).unwrap();
+
+        let degrees_of_freedom = read_labeled_wald_t_degrees_of_freedom_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            degrees_of_freedom,
+            vec![
+                GeneNumericValue {
+                    gene: "gene_1".to_string(),
+                    value: 4.0
+                },
+                GeneNumericValue {
+                    gene: "gene_2".to_string(),
+                    value: 2.5
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn read_wald_t_degrees_of_freedom_tsv_validates_shape_and_values() {
         let bad_value = unique_test_path("bad_wald_t_df_value.tsv");
         fs::write(&bad_value, concat!("gene\tdf\n", "gene_1\tNA\n")).unwrap();
@@ -1389,6 +2167,115 @@ mod tests {
         fs::write(&bad_shape, concat!("gene\tdf\n", "gene_1\t4\textra\n")).unwrap();
         assert!(read_wald_t_degrees_of_freedom_tsv(&bad_shape).is_err());
         let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_sample_levels_tsv_reads_labeled_string_levels() {
+        let path = unique_test_path("read_sample_levels.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "sample\tcondition\n",
+                "sample_1\tA\n",
+                "sample_2\tB\n",
+                "sample_3\tA\n",
+            ),
+        )
+        .unwrap();
+
+        let levels = read_sample_levels_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(
+            levels,
+            vec![
+                SampleLevel {
+                    sample: "sample_1".to_string(),
+                    level: "A".to_string()
+                },
+                SampleLevel {
+                    sample: "sample_2".to_string(),
+                    level: "B".to_string()
+                },
+                SampleLevel {
+                    sample: "sample_3".to_string(),
+                    level: "A".to_string()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn read_sample_levels_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_sample_level_value.tsv");
+        fs::write(&bad_value, concat!("sample\tcondition\n", "sample_1\t\n")).unwrap();
+        assert!(read_sample_levels_tsv(&bad_value).is_err());
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_sample_level_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("sample\tcondition\n", "sample_1\tA\textra\n"),
+        )
+        .unwrap();
+        assert!(read_sample_levels_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn align_sample_levels_to_samples_uses_count_sample_order() {
+        let levels = vec![
+            SampleLevel {
+                sample: "sample_3".to_string(),
+                level: "C".to_string(),
+            },
+            SampleLevel {
+                sample: "sample_1".to_string(),
+                level: "A".to_string(),
+            },
+            SampleLevel {
+                sample: "sample_2".to_string(),
+                level: "B".to_string(),
+            },
+        ];
+        let samples = vec![
+            "sample_1".to_string(),
+            "sample_2".to_string(),
+            "sample_3".to_string(),
+        ];
+
+        assert_eq!(
+            align_sample_levels_to_samples(&levels, &samples).unwrap(),
+            vec!["A".to_string(), "B".to_string(), "C".to_string()]
+        );
+    }
+
+    #[test]
+    fn align_sample_levels_to_samples_rejects_missing_and_duplicate_samples() {
+        let samples = vec!["sample_1".to_string(), "sample_2".to_string()];
+        let missing = vec![
+            SampleLevel {
+                sample: "sample_1".to_string(),
+                level: "A".to_string(),
+            },
+            SampleLevel {
+                sample: "sample_3".to_string(),
+                level: "C".to_string(),
+            },
+        ];
+        assert!(align_sample_levels_to_samples(&missing, &samples).is_err());
+
+        let duplicated = vec![
+            SampleLevel {
+                sample: "sample_1".to_string(),
+                level: "A".to_string(),
+            },
+            SampleLevel {
+                sample: "sample_1".to_string(),
+                level: "B".to_string(),
+            },
+        ];
+        assert!(align_sample_levels_to_samples(&duplicated, &samples).is_err());
     }
 
     #[test]

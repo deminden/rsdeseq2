@@ -30,7 +30,8 @@ rsdeseq2 wald \
   --size-factors size_factors.tsv \
   --observation-weights observation_weights.tsv \
   --fit-type parametric \
-  --contrast-name condition_B_vs_A \
+  --contrast-positive condition_B_vs_A \
+  --contrast-negative Intercept \
   --lfc-threshold 0.5 \
   --alternative greater \
   --use-t \
@@ -52,8 +53,9 @@ rsdeseq2 lrt \
 ```
 
 `counts.tsv` has a leading `gene` column followed by samples. `design.tsv` has
-a leading `sample` column followed by numeric design-matrix columns, in the same
-sample order as the count matrix:
+a leading `sample` column followed by numeric design-matrix columns. For
+commands that take both files, design rows are aligned by sample label against
+the count-matrix columns:
 
 ```text
 sample	Intercept	condition_B_vs_A
@@ -64,7 +66,8 @@ s3	1	1
 
 `normalization_factors.tsv` is optional for `base-mean`, `normalized-counts`,
 `vst`, `wald`, and `lrt`. When supplied, it preempts estimated size factors and
-must have the same gene x sample shape as the count matrix:
+must have the same gene x sample shape as the count matrix. Rows and columns
+are aligned by gene and sample labels:
 
 ```text
 gene	s1	s2	s3
@@ -74,7 +77,7 @@ gene2	1.2	1.0	0.8
 
 `size_factors.tsv` is also optional for `base-mean`, `normalized-counts`, `vst`,
 `wald`, and `lrt`. It is a sample-level table with one positive finite factor per
-sample:
+sample. Rows are aligned by sample label against the count-matrix columns:
 
 ```text
 sample	size_factor
@@ -93,7 +96,8 @@ the normalization directly.
 
 `geometric_means.tsv` is optional for `size-factors`, `base-mean`,
 `normalized-counts`, `vst`, `wald`, and `lrt`. It is a two-column gene/value
-table used for frozen size-factor estimation:
+table used for frozen size-factor estimation. Rows are aligned by gene label
+against the count-matrix rows:
 
 ```text
 gene	geo_mean
@@ -108,7 +112,7 @@ sample size factors or gene/sample normalization factors preempt estimation.
 
 `observation_weights.tsv` is optional for `base-mean`, `vst`, `wald`, and `lrt`. It
 uses the same gene x sample shape as the count matrix and accepts non-negative
-finite weights:
+finite weights. Rows and columns are aligned by gene and sample labels:
 
 ```text
 gene	s1	s2	s3
@@ -118,16 +122,36 @@ gene2	0.5	1.0	1.0
 
 The `wald` and `lrt` commands use the implemented GLM-mu native dispersion,
 MAP, Cook's cutoff, replacement/refit, independent-filtering, and result-table
-assembly path. `wald` can report a coefficient through `--coefficient`, a
-design-column name through `--contrast-name`, or a primitive numeric contrast
-through `--contrast 0,1,...` in design-column order. It also accepts
-thresholded p-values through
+assembly path. `wald` and `lrt` can report a design coefficient by zero-based
+`--coefficient` or by `--coefficient-name`. They can also report a
+design-column contrast through `--contrast-name`, a positive/negative coefficient
+list through `--contrast-positive` and `--contrast-negative`, a factor-level
+contrast through `--contrast-factor`, `--contrast-numerator`, and
+`--contrast-denominator`, or a primitive numeric contrast through
+`--contrast 0,1,...` in design-column order. For LRT, contrast flags only
+change the displayed effect-size columns; the statistic and p-values remain
+the full-vs-reduced likelihood-ratio test. List contrasts can use
+`--contrast-positive-weight` and `--contrast-negative-weight` to override the
+default `1` and `-1` weights; matching DESeq2 `listValues`, the positive
+weight must be greater than zero and the negative weight must be less than
+zero. Factor-level contrasts resolve against existing
+design coefficient names, with optional `--contrast-reference`; common
+non-reference comparisons can also infer a shared reference from coefficient
+names such as `condition_B_vs_A` and `condition_C_vs_A`. Supplying
+`--contrast-sample-levels` as a two-column sample/level TSV additionally
+enables DESeq2-style factor-level all-zero contrast handling and must be paired
+with a factor-level contrast request; sample rows are aligned by label against
+the count-matrix columns. For LRT result tables, this cleanup zeroes only the
+displayed log2 fold change and keeps the
+full-vs-reduced statistic and p-values. The CLI still does not parse formulas.
+It also accepts thresholded p-values through
 `--lfc-threshold` and `--alternative`, with alternatives `greater-abs`,
 `greater-abs-upshot`, `greater-abs2014`, `less-abs`, `greater`, and `less`.
 It supports Student t p-values with `--use-t` for residual degrees of freedom
 or `--t-degrees-of-freedom` for one scalar value recycled over genes.
 `--t-degrees-of-freedom-file` accepts a two-column gene/value TSV for per-gene
-degrees of freedom.
+degrees of freedom. Rows are aligned by gene label against the count-matrix
+rows.
 Both commands accept `--cooks-cutoff`, `--disable-cooks-cutoff`,
 `--disable-independent-filtering`, `--independent-filtering-alpha`, and
 `--independent-filtering-theta` for DESeq2-style result filtering control.

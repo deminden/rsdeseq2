@@ -35,6 +35,29 @@ fn design_matrix_reports_full_rank() {
 }
 
 #[test]
+fn design_matrix_resolves_coefficient_names() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+
+    assert_eq!(design.coefficient_index("Intercept").unwrap(), 0);
+    assert_eq!(design.coefficient_index("condition_B_vs_A").unwrap(), 1);
+    assert!(design.coefficient_index("missing").is_err());
+
+    let unnamed = DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], None).unwrap();
+    assert!(unnamed.coefficient_index("Intercept").is_err());
+}
+
+#[test]
 fn design_matrix_detects_dependent_columns() {
     let design = DesignMatrix::from_row_major(
         3,

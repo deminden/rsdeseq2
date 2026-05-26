@@ -111,14 +111,16 @@ clearly in the raw output rather than being substituted by any fallback.
 On 2026-05-26, `scripts/real_data_parity.py` compared the Rust CLI with
 offline DESeq2 outputs from a fresh publication-data study. The script does not
 call R; it treats saved DESeq2 outputs as fixtures, derives full-tissue size
-factors from the reference normalized-count matrices, and compares only output
-classes where the current Rust CLI has the same inputs.
+factors from the reference normalized-count matrices, and compares only outputs
+where the current Rust CLI has matched inputs. The latest run used the current
+release binary and completed with zero swaps for every command.
 
 Command shape:
 
 ```bash
-RSDESEQ2_REAL_DATA_ROOT=/path/to/decor_method_study \
 python3 scripts/real_data_parity.py \
+  --study-root /path/to/decor_method_study \
+  --binary target/release/rsdeseq2 \
   --tissue kidney \
   --tissue liver \
   --tissue pancreas \
@@ -132,9 +134,9 @@ Primitive parity results:
 
 | output | coverage | median elapsed | max RSS | harshest max abs diff | harshest max rel diff | mismatches |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `size-factors` | 5 tissues, 1,998 samples | 1.69 s | 238 MiB | `2.62e-14` | `1.99e-14` | 0 |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | 7.55 s | 693 MiB | `1.19e-07` | `9.74e-15` | 0 |
-| `base-mean` | 5 tissues, 341,286 genes | 1.70 s | 694 MiB | `4.66e-09` | `6.73e-15` | 0 |
+| `size-factors` | 5 tissues, 1,998 samples | 0.56 s | 238 MiB | `2.62e-14` | `1.99e-14` | 0 |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | 2.46 s | 694 MiB | `1.19e-07` | `9.74e-15` | 0 |
+| `base-mean` | 5 tissues, 341,286 genes | 0.50 s | 695 MiB | `4.66e-09` | `6.73e-15` | 0 |
 
 The same run also reconstructed one full-blocked real contrast with
 split-estimated size factors and a numeric `perm_block + condition` design.
@@ -144,7 +146,7 @@ reference result shape much more closely:
 
 | output | contrast coverage | status |
 | --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness now matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value. Median abs diffs are `3.05e-14` for log2 fold change, `4.75e-12` for Wald statistic, `2.59e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `3.85e-12`, `3.74e-11`, `4.51e-11`, and `5.53e-05`, respectively. The harshest max abs diffs are `5.68e-04` for log2 fold change, `1.52e-02` for lfcSE, `7.17e-03` for Wald statistic, `1.40e-03` for p-value, and `9.95e-04` for adjusted p-value. Runtime was 138.5 s with 595 MiB peak RSS and zero swaps in the latest local run. |
+| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value. Median abs diffs are `3.05e-14` for log2 fold change, `4.75e-12` for Wald statistic, `2.59e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `3.85e-12`, `3.74e-11`, `4.51e-11`, and `5.53e-05`, respectively. The harshest max abs diffs are `5.68e-04` for log2 fold change, `1.52e-02` for lfcSE, `7.17e-03` for Wald statistic, `1.40e-03` for p-value, and `9.95e-04` for adjusted p-value. Runtime was 133.1 s with 596 MiB peak RSS and zero swaps. |
 
 That contrast is now useful as a hard regression target for the next numerical
 work: the remaining real-contrast differences are numeric tail magnitudes after

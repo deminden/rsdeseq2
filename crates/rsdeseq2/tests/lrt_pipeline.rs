@@ -221,6 +221,115 @@ fn fixed_dispersion_lrt_pipeline_expands_all_zero_rows() {
 }
 
 #[test]
+fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        5,
+        6,
+        vec![
+            0, 0, 0, 0, 0, 0, //
+            20, 22, 0, 0, 0, 0, //
+            12, 28, 14, 26, 11, 29, //
+            55, 105, 50, 110, 65, 95, //
+            120, 200, 115, 205, 125, 195,
+        ],
+        Some(
+            [
+                "zero",
+                "contrast_groups_zero",
+                "variable",
+                "high_up",
+                "stable",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        ),
+        None,
+    )
+    .unwrap();
+    let full = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "condition_D_vs_A".to_string(),
+        ]),
+    )
+    .unwrap();
+    let reduced = DesignMatrix::from_row_major(
+        6,
+        1,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec!["Intercept".to_string()]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "B", "B", "D", "D"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+    let dispersions = vec![0.2; counts.n_genes()];
+    let contrast = FactorLevelContrast {
+        factor: "condition",
+        numerator: "D",
+        denominator: "B",
+        reference: Some("A"),
+        sample_levels: &levels,
+    };
+
+    let (_coefficient_fit, coefficient_results) = builder
+        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &dispersions, 2)
+        .unwrap();
+    let (_contrast_fit, contrast_results) = builder
+        .fit_fixed_dispersion_lrt_factor_level_contrast(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            contrast,
+        )
+        .unwrap();
+
+    assert_eq!(
+        contrast_results.rows[1].gene.as_deref(),
+        Some("contrast_groups_zero")
+    );
+    assert_eq!(contrast_results.rows[1].log2_fold_change, Some(0.0));
+    assert_eq!(
+        contrast_results.rows[1].stat,
+        coefficient_results.rows[1].stat
+    );
+    assert_eq!(
+        contrast_results.rows[1].pvalue,
+        coefficient_results.rows[1].pvalue
+    );
+    assert_eq!(
+        contrast_results.rows[1].padj,
+        coefficient_results.rows[1].padj
+    );
+    assert_eq!(
+        contrast_results.metadata.result_name.as_deref(),
+        Some("condition_D_vs_B")
+    );
+    assert_eq!(
+        contrast_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition D vs B")
+    );
+}
+
+#[test]
 fn fixed_dispersion_lrt_pipeline_validates_inputs() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let full =

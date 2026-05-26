@@ -121,13 +121,13 @@ pub use crate::options::{
     TestType,
 };
 pub use crate::results::{
-    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_results,
-    build_wald_contrast_results, build_wald_results, build_wald_results_from_wald,
-    default_cooks_cutoff, deseq2_result_core_column_names, recompute_padj, resolve_cooks_cutoff,
-    rsdeseq2_result_diagnostic_column_names, DeseqResultColumn, DeseqResultColumnMetadata,
-    DeseqResultColumnValues, DeseqResultRow, DeseqResults, DeseqResultsDataFrame,
-    DeseqResultsMetadata, DeseqResultsTableMetadata, DeseqResultsTableMetadataEntry,
-    DESEQ2_RESULT_CORE_COLUMNS, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
+    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_contrast_results,
+    build_lrt_results, build_wald_contrast_results, build_wald_results,
+    build_wald_results_from_wald, default_cooks_cutoff, deseq2_result_core_column_names,
+    recompute_padj, resolve_cooks_cutoff, rsdeseq2_result_diagnostic_column_names,
+    DeseqResultColumn, DeseqResultColumnMetadata, DeseqResultColumnValues, DeseqResultRow,
+    DeseqResults, DeseqResultsDataFrame, DeseqResultsMetadata, DeseqResultsTableMetadata,
+    DeseqResultsTableMetadataEntry, DESEQ2_RESULT_CORE_COLUMNS, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
 };
 pub use crate::transform::{
     fast_vst_eligible_count, fast_vst_subset, fast_vst_subset_indices, fast_vst_subset_matrix_rows,

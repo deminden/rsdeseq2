@@ -709,16 +709,20 @@ expanded factors:  condition, B, A -> conditionB - conditionA
 ```
 
 Explicit list values are supported for the positive and negative lists,
-matching DESeq2's `listValues` shape after names have been resolved. The
+matching DESeq2's `listValues` shape after names have been resolved: the first
+value must be greater than zero and the second value must be less than zero. The
 factor-level helper covers common DESeq2 coefficient-name shapes:
 `factor_level_vs_reference`, the reversed reference comparison with sign flip,
-two non-reference levels when an explicit reference level is supplied, and
-expanded no-intercept coefficients such as `conditionB - conditionA`. It also
-uses a minimal R-like `make.names` pass for common non-syntactic level names.
+two non-reference levels when an explicit reference level is supplied or can be
+inferred from shared coefficient suffixes, and expanded no-intercept
+coefficients such as `conditionB - conditionA`. It also uses a minimal R-like
+`make.names` pass for common non-syntactic level names.
 When named contrast specifications are run through the supplied-dispersion or
 native linear-mu/GLM-mu Wald builders, the result-table metadata preserves a
 stable result name and comparison label for coefficient, list, and factor-level
-contrast requests.
+contrast requests. Coefficient-list comparison labels follow DESeq2's
+`cleanContrast` shape for two-sided, positive-only, and negative-only list
+contrasts.
 
 This is still a coefficient-name resolver over an already-built design matrix.
 Full DESeq2 `results(contrast=...)` compatibility still needs colData/formula
@@ -794,9 +798,9 @@ DESeq2-style comparison-aware column descriptions, p-value adjustment method,
 and independent-filtering metadata when present. The table metadata also
 exposes scalar key/value entries and the resolved effect-size and
 test-statistic description labels: Wald contrast tables prefer the comparison
-label when present, while LRT tables keep the reported full-model coefficient
-as the effect label and use the model comparison for statistic and p-value
-labels. `DeseqResults::data_frame()`
+label when present, while LRT tables use the reported full-model coefficient
+or contrast as the effect label and keep the model comparison for statistic
+and p-value labels. `DeseqResults::data_frame()`
 assembles the same rows into a typed data-frame view for wrappers and file
 writers: gene identifiers are kept as row names, numeric and logical columns
 are separate typed vectors, and each column carries the DESeq2-style metadata
@@ -990,18 +994,36 @@ parametric/local/mean-trend, deterministic-prior branches.
 `DeseqBuilder::fit()` and `DeseqBuilder::fit_with_results()` now expose the
 implemented GLM-mu Wald branch as a limited top-level workflow and report the
 last design coefficient by default, matching DESeq2's default result-coefficient
-shape. `fit_contrast()`, `fit_contrast_spec()`, and
+shape. `fit_with_results_name()` exposes the selected-coefficient path by
+design coefficient name, separate from contrast handling. `fit_contrast()`,
+`fit_contrast_spec()`, and
 `fit_factor_level_contrast()` expose fit-only top-level Wald contrast helpers;
 `fit_with_results_contrast()`, `fit_with_results_contrast_spec()`, and
 `fit_with_results_factor_level_contrast()` expose the same branch with result
 rows for primitive numeric, named/list, and caller-supplied factor-level Wald
-contrasts. The corresponding `*_with_cooks_replacement()` helpers expose the limited
+contrasts. Compatibility-named parametric Wald helpers expose the same
+contrast shapes while pinning the dispersion trend to the parametric branch.
+The corresponding `*_with_cooks_replacement()` helpers expose the limited
 replacement-refit workflow when callers supply replacement options. LRT
 remains available through `DeseqBuilder::fit_lrt()`,
+`DeseqBuilder::fit_lrt_name()`,
+`DeseqBuilder::fit_lrt_contrast()`,
+`DeseqBuilder::fit_lrt_contrast_spec()`,
+`DeseqBuilder::fit_lrt_factor_level_contrast()`,
 `DeseqBuilder::fit_lrt_with_results()`,
-`DeseqBuilder::fit_lrt_with_results_with_cooks_replacement()`, and the
-branch-specific `fit_lrt_*` entry points because callers must provide a reduced
-design.
+`DeseqBuilder::fit_lrt_with_results_name()`,
+`DeseqBuilder::fit_lrt_with_results_contrast()`,
+`DeseqBuilder::fit_lrt_with_results_contrast_spec()`,
+`DeseqBuilder::fit_lrt_with_results_factor_level_contrast()`,
+`DeseqBuilder::fit_lrt_with_results_with_cooks_replacement()`,
+`DeseqBuilder::fit_lrt_with_results_name_with_cooks_replacement()`,
+`DeseqBuilder::fit_lrt_with_results_factor_level_contrast_with_cooks_replacement()`,
+and the
+branch-specific `fit_lrt_*` entry points because callers must provide a
+reduced design. LRT contrast result tables report the requested full-model
+effect size, but keep the full-vs-reduced LRT statistic and p-value; when
+DESeq2's numeric or character/factor-level `contrastAllZero` rule applies,
+only the reported `log2FoldChange` is zeroed for LRT rows.
 Gene/sample normalization factors are supported in this subset by following
 DESeq2's `linearModelMuNormalized`: projected normalized counts are multiplied
 by `getSizeOrNormFactors`, and moments starts use
@@ -1012,7 +1034,18 @@ with the full design driving dispersion estimation. It then fits full and
 reduced fixed-dispersion GLMs using the final MAP dispersions and stores the
 same full/reduced diagnostics as the supplied-dispersion LRT path. Linear-mu
 and GLM-mu branches are available with parametric, local, or mean trends; observation
-weights are limited to the GLM-mu branch.
+weights are limited to the GLM-mu branch. Both native branches can report
+numeric, named/list, or caller-supplied factor-level full-model effect sizes
+without changing the likelihood-ratio test itself. The compatibility-named
+parametric LRT entry points provide the same contrast routes while pinning the
+dispersion trend to the parametric branch regardless of the builder's
+configured `fit_type`.
+
+The supplied-dispersion LRT path mirrors the implemented contrast result
+surface for numeric, named/list, and caller-supplied factor-level full-model
+effect sizes. Factor-level LRT contrasts use caller-provided sample levels for
+DESeq2-style character `contrastAllZero` cleanup, again zeroing only the
+reported LFC while preserving the likelihood-ratio statistic and p-values.
 
 The LRT path accepts full and reduced design matrices, fits both models on the
 non-all-zero subset, and computes:
@@ -1021,6 +1054,11 @@ non-all-zero subset, and computes:
 stat_i = 2 * (logLik_full_i - logLik_reduced_i)
 pvalue_i = pchisq(stat_i, df = ncol(full) - ncol(reduced), lower.tail = FALSE)
 ```
+
+For LRT result tables, selected coefficients and primitive numeric or named
+full-model contrasts affect only the reported `log2FoldChange` and `lfcSE`
+columns. The `stat`, `pvalue`, and `padj` columns remain tied to the same
+full-vs-reduced likelihood-ratio test.
 
 `DeseqFit` stores the full-model GLM diagnostics through the standard beta,
 standard-error, covariance, convergence, iteration, log-likelihood,
@@ -1186,8 +1224,9 @@ Result assembly validates base means before building Wald or LRT result rows,
 so invalid upstream metadata is reported before adjusted p-values or
 diagnostic columns are emitted.
 Precomputed Wald/LRT outputs are also checked for finite statistics, bounded
-p-values, valid t degrees of freedom, and aligned reduced-model convergence
-flags before result tables are built.
+p-values, valid t degrees of freedom, finite contrast estimates and standard
+errors, and aligned reduced-model convergence flags before result tables are
+built.
 Later mutable result-table operations reuse the same p-value contract before
 recomputing BH adjustments, and Cook's filtering rejects non-finite `maxCooks`
 diagnostics before masking p-values.

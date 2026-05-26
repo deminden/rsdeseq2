@@ -70,7 +70,20 @@ fn contrast_specs_expose_stable_result_metadata_labels() {
     assert_eq!(list.result_name(), "contrast");
     assert_eq!(
         list.comparison(),
-        "coefficient list contrast: condition_B_vs_A at 0.5 vs batch_Y_vs_X at -2"
+        "coefficient list contrast: 0.5 condition_B_vs_A vs 2 batch_Y_vs_X"
+    );
+
+    let positive_only = ContrastSpec::list(vec!["condition_B_vs_A".into()], Vec::new());
+    assert_eq!(
+        positive_only.comparison(),
+        "coefficient list contrast: condition_B_vs_A effect"
+    );
+
+    let negative_only =
+        ContrastSpec::list_with_values(Vec::new(), vec!["batch_Y_vs_X".into()], 0.5, -0.5);
+    assert_eq!(
+        negative_only.comparison(),
+        "coefficient list contrast: -0.5 batch_Y_vs_X effect"
     );
 }
 
@@ -118,6 +131,40 @@ fn list_contrast_resolves_like_deseq2_name_lists() {
 }
 
 #[test]
+fn list_contrast_requires_deseq2_style_signed_list_values() {
+    let design = named_design();
+    let positive_zero = ContrastSpec::list_with_values(
+        vec!["condition_B_vs_A".into()],
+        vec!["batch_Y_vs_X".into()],
+        0.0,
+        -1.0,
+    );
+    let positive_negative = ContrastSpec::list_with_values(
+        vec!["condition_B_vs_A".into()],
+        vec!["batch_Y_vs_X".into()],
+        -1.0,
+        -1.0,
+    );
+    let negative_zero = ContrastSpec::list_with_values(
+        vec!["condition_B_vs_A".into()],
+        vec!["batch_Y_vs_X".into()],
+        1.0,
+        0.0,
+    );
+    let negative_positive = ContrastSpec::list_with_values(
+        vec!["condition_B_vs_A".into()],
+        vec!["batch_Y_vs_X".into()],
+        1.0,
+        1.0,
+    );
+
+    assert!(resolve_contrast(&design, &positive_zero).is_err());
+    assert!(resolve_contrast(&design, &positive_negative).is_err());
+    assert!(resolve_contrast(&design, &negative_zero).is_err());
+    assert!(resolve_contrast(&design, &negative_positive).is_err());
+}
+
+#[test]
 fn factor_level_contrast_resolves_standard_reference_shapes() {
     let design = DesignMatrix::from_row_major(
         4,
@@ -147,6 +194,14 @@ fn factor_level_contrast_resolves_standard_reference_shapes() {
         .unwrap(),
         vec![0.0, -1.0, 1.0]
     );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "C", "B")).unwrap(),
+        vec![0.0, -1.0, 1.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "B", "C")).unwrap(),
+        vec![0.0, 1.0, -1.0]
+    );
 }
 
 #[test]
@@ -162,6 +217,30 @@ fn factor_level_contrast_resolves_expanded_shapes() {
     assert_eq!(
         resolve_contrast(&design, &ContrastSpec::factor_level("condition", "B", "A")).unwrap(),
         vec![-1.0, 1.0]
+    );
+}
+
+#[test]
+fn factor_level_contrast_infers_shared_reference_with_r_like_names() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B.1_vs_A.1".into(),
+            "condition_C.1_vs_A.1".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("condition", "C-1", "B-1")
+        )
+        .unwrap(),
+        vec![0.0, -1.0, 1.0]
     );
 }
 

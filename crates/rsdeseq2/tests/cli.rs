@@ -25,9 +25,9 @@ fn write_size_factor_fixture(path: &Path) {
         "\
 sample\tsize_factor
 sample1\t1
-sample2\t1
-sample3\t1
-sample4\t1
+sample3\t1.5
+sample4\t2
+sample2\t0.5
 ",
     )
     .unwrap();
@@ -61,12 +61,53 @@ gene4\t4
     .unwrap();
 }
 
+fn write_standard_contrast_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tcondition_B_vs_A
+sample3\t1\t1
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_sample_level_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tcondition
+sample3\tB
+sample1\tA
+sample4\tB
+sample2\tA
+",
+    )
+    .unwrap();
+}
+
 fn run_cli(args: &[&str]) {
     let status = Command::new(env!("CARGO_BIN_EXE_rsdeseq2"))
         .args(args)
         .status()
         .unwrap();
     assert!(status.success(), "CLI exited with status {status}");
+}
+
+fn run_cli_failure(args: &[&str]) {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsdeseq2"))
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "CLI unexpectedly succeeded with stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn assert_deseq_results_table(path: &Path) {
@@ -567,6 +608,87 @@ fn cli_wald_accepts_named_contrast() {
 }
 
 #[test]
+fn cli_wald_accepts_coefficient_name() {
+    let dir = temp_dir("wald-coefficient-name");
+    let output = dir.join("wald.tsv");
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "conditionB",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_list_contrast() {
+    let dir = temp_dir("wald-contrast-list");
+    let output = dir.join("wald.tsv");
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-positive",
+        "conditionB",
+        "--contrast-negative",
+        "(Intercept)",
+        "--contrast-positive-weight",
+        "1",
+        "--contrast-negative-weight=-0.5",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_factor_level_contrast() {
+    let dir = temp_dir("wald-contrast-factor");
+    let design = dir.join("design.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&design);
+    write_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "B",
+        "--contrast-denominator",
+        "A",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
 fn cli_wald_accepts_t_pvalue_options() {
     let dir = temp_dir("wald-t");
     let residual_output = dir.join("wald_t_residual.tsv");
@@ -782,6 +904,165 @@ fn cli_lrt_writes_deseq_results_table() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_coefficient_name() {
+    let dir = temp_dir("lrt-coefficient-name");
+    let output = dir.join("lrt.tsv");
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "conditionB",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_numeric_contrast() {
+    let dir = temp_dir("lrt-contrast");
+    let output = dir.join("lrt.tsv");
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast",
+        "0,1",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_named_contrast() {
+    let dir = temp_dir("lrt-contrast-name");
+    let output = dir.join("lrt.tsv");
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-name",
+        "conditionB",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_list_contrast() {
+    let dir = temp_dir("lrt-contrast-list");
+    let output = dir.join("lrt.tsv");
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-positive",
+        "conditionB",
+        "--contrast-negative",
+        "(Intercept)",
+        "--contrast-positive-weight",
+        "1",
+        "--contrast-negative-weight=-0.5",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_factor_level_contrast() {
+    let dir = temp_dir("lrt-contrast-factor");
+    let design = dir.join("design.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("lrt.tsv");
+    write_standard_contrast_design_fixture(&design);
+    write_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "B",
+        "--contrast-denominator",
+        "A",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_rejects_sample_levels_without_factor_level_contrast() {
+    let dir = temp_dir("lrt-sample-levels-without-factor");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("lrt.tsv");
+    write_sample_level_fixture(&levels);
+
+    run_cli_failure(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
 }
 
 #[test]

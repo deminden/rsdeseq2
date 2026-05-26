@@ -538,6 +538,58 @@ pub fn build_lrt_results(
     })
 }
 
+/// Build DESeq2-shaped LRT result rows with contrast effect-size columns.
+///
+/// The LRT statistic and p-value still come from the full-vs-reduced model
+/// comparison, while `log2FoldChange` and `lfcSE` report the caller-supplied
+/// full-model coefficient contrast. This mirrors the `results()` shape where
+/// an LRT result can display a requested effect size without changing the
+/// likelihood-ratio test itself.
+pub fn build_lrt_contrast_results(
+    base_mean: &[f64],
+    full_fit: &NbinomGlmFit,
+    lrt: &LrtOutput,
+    contrast: &WaldContrastOutput,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    let n_genes = full_fit.beta.n_rows();
+    validate_result_inputs(base_mean, full_fit, gene_names, dispersions)?;
+    validate_lrt_output(lrt, n_genes)?;
+    validate_wald_contrast_output(contrast, n_genes)?;
+    let padj = bh_adjust(&lrt.pvalue);
+
+    let mut rows = Vec::with_capacity(n_genes);
+    for gene in 0..n_genes {
+        rows.push(DeseqResultRow {
+            gene: gene_names.and_then(|names| names.get(gene)).cloned(),
+            base_mean: base_mean[gene],
+            log2_fold_change: contrast.log2_fold_change[gene],
+            lfc_se: contrast.lfc_se[gene],
+            stat: lrt.deviance[gene],
+            pvalue: lrt.pvalue[gene],
+            padj: padj[gene],
+            dispersion: dispersions
+                .and_then(|values| values.get(gene).copied())
+                .and_then(finite_option),
+            converged: full_fit.beta_converged.get(gene).copied(),
+            max_cooks: None,
+            cooks_outlier: None,
+            filtered: None,
+        });
+    }
+    Ok(DeseqResults {
+        rows,
+        metadata: DeseqResultsTableMetadata {
+            test_type: Some(TestType::Lrt),
+            result_name: Some("contrast".to_string()),
+            comparison: Some("primitive numeric contrast".to_string()),
+            ..DeseqResultsTableMetadata::default()
+        },
+        independent_filtering: None,
+    })
+}
+
 /// Resolve a Cook's cutoff option for a model with `m` samples and `p` columns.
 pub fn resolve_cooks_cutoff(
     cutoff: CooksCutoff,
@@ -876,6 +928,8 @@ fn validate_wald_contrast_output(
             contrast.lfc_se.len(),
         ));
     }
+    validate_optional_finite(&contrast.log2_fold_change, "Wald contrast estimate")?;
+    validate_optional_finite(&contrast.lfc_se, "Wald contrast SE")?;
     validate_wald_output(&contrast.wald, n_genes)
 }
 

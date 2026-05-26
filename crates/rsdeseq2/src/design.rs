@@ -67,6 +67,21 @@ impl DesignMatrix {
         self.coefficient_names.as_deref()
     }
 
+    /// Resolve a coefficient name to its zero-based column index.
+    pub fn coefficient_index(&self, name: &str) -> Result<usize, DeseqError> {
+        let names = self
+            .coefficient_names()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "coefficient names are required to resolve coefficient names".to_string(),
+            })?;
+        names
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: format!("coefficient '{name}' is not present in coefficient names"),
+            })
+    }
+
     /// Numerical rank using the default deterministic tolerance.
     pub fn rank(&self) -> Result<usize, DeseqError> {
         self.rank_with_tolerance(DEFAULT_RANK_TOLERANCE)

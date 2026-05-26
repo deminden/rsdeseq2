@@ -294,6 +294,25 @@ fn top_level_fit_with_results_returns_default_wald_results() {
 }
 
 #[test]
+fn top_level_fit_with_results_accepts_coefficient_name() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+
+    let (named_fit, named_results) = builder
+        .fit_with_results_name(&counts, &design, "condition_B_vs_A")
+        .unwrap();
+    let (indexed_fit, indexed_results) = builder.fit_wald_glm_mu(&counts, &design, 1).unwrap();
+
+    assert_eq!(named_fit.wald, indexed_fit.wald);
+    assert_wald_fit_state_matches(&named_fit, &indexed_fit, "named top-level Wald");
+    assert_eq!(named_results, indexed_results);
+    assert!(builder
+        .fit_with_results_name(&counts, &design, "missing")
+        .is_err());
+}
+
+#[test]
 fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
@@ -333,6 +352,39 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
     assert_eq!(
         top_level_output.results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
+    );
+}
+
+#[test]
+fn top_level_fit_with_results_cooks_replacement_accepts_coefficient_name() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder();
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+    };
+
+    let named_output = builder
+        .fit_with_results_name_with_cooks_replacement(
+            &counts,
+            &design,
+            "condition_B_vs_A",
+            &replacement_options,
+        )
+        .unwrap();
+    let indexed_output = builder
+        .fit_wald_glm_mu_with_cooks_replacement(&counts, &design, 1, &replacement_options)
+        .unwrap();
+
+    assert_eq!(named_output.refit_plan, indexed_output.refit_plan);
+    assert_eq!(named_output.results, indexed_output.results);
+    assert_wald_fit_state_matches(
+        &named_output.original_fit,
+        &indexed_output.original_fit,
+        "named top-level Wald replacement original",
     );
 }
 
@@ -885,6 +937,104 @@ fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         assert_eq!(named.pvalue, factor.pvalue);
         assert_eq!(named.padj, factor.padj);
     }
+}
+
+#[test]
+fn native_wald_parametric_contrast_helpers_ignore_builder_fit_type() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let mean_linear_builder = native_wald_builder().fit_type(FitType::Mean);
+    let parametric_linear_builder = mean_linear_builder.clone().fit_type(FitType::Parametric);
+    let mean_glm_builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+    let parametric_glm_builder = mean_glm_builder.clone().fit_type(FitType::Parametric);
+    let spec = ContrastSpec::coefficient_name("condition_B_vs_A");
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let factor_contrast = FactorLevelContrast::new("condition", "B", "A", &levels);
+
+    let (linear_parametric_fit, linear_parametric_results) = mean_linear_builder
+        .fit_wald_linear_mu_contrast_parametric(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    let (linear_expected_fit, linear_expected_results) = parametric_linear_builder
+        .fit_wald_linear_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &linear_parametric_fit,
+        &linear_expected_fit,
+        "linear-mu parametric Wald contrast",
+    );
+    assert_eq!(linear_parametric_results, linear_expected_results);
+
+    let (linear_named_fit, linear_named_results) = mean_linear_builder
+        .fit_wald_linear_mu_contrast_spec_parametric(&counts, &design, &spec)
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &linear_named_fit,
+        &linear_expected_fit,
+        "linear-mu named parametric Wald contrast",
+    );
+    assert_eq!(linear_named_results.rows, linear_expected_results.rows);
+    assert_eq!(
+        linear_named_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+
+    let (linear_factor_fit, linear_factor_results) = mean_linear_builder
+        .fit_wald_linear_mu_factor_level_contrast_parametric(&counts, &design, factor_contrast)
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &linear_factor_fit,
+        &linear_expected_fit,
+        "linear-mu factor parametric Wald contrast",
+    );
+    assert_eq!(linear_factor_results.rows, linear_expected_results.rows);
+    assert_eq!(
+        linear_factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+
+    let (glm_parametric_fit, glm_parametric_results) = mean_glm_builder
+        .fit_wald_glm_mu_contrast_parametric(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    let (glm_expected_fit, glm_expected_results) = parametric_glm_builder
+        .fit_wald_glm_mu_contrast(&counts, &design, &[0.0, 1.0])
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &glm_parametric_fit,
+        &glm_expected_fit,
+        "GLM-mu parametric Wald contrast",
+    );
+    assert_eq!(glm_parametric_results, glm_expected_results);
+
+    let (glm_named_fit, glm_named_results) = mean_glm_builder
+        .fit_wald_glm_mu_contrast_spec_parametric(&counts, &design, &spec)
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &glm_named_fit,
+        &glm_expected_fit,
+        "GLM-mu named parametric Wald contrast",
+    );
+    assert_eq!(glm_named_results.rows, glm_expected_results.rows);
+    assert_eq!(
+        glm_named_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+
+    let (glm_factor_fit, glm_factor_results) = mean_glm_builder
+        .fit_wald_glm_mu_factor_level_contrast_parametric(&counts, &design, factor_contrast)
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &glm_factor_fit,
+        &glm_expected_fit,
+        "GLM-mu factor parametric Wald contrast",
+    );
+    assert_eq!(glm_factor_results.rows, glm_expected_results.rows);
+    assert_eq!(
+        glm_factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
 }
 
 #[test]

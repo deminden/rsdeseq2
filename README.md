@@ -37,11 +37,12 @@ outputs against the Rust CLI for `size-factors`, `normalized-counts`, and
 | primitive | real-data coverage | harshest max diff | max RSS |
 | --- | ---: | ---: | ---: |
 | `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 238 MiB |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 693 MiB |
-| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 694 MiB |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 694 MiB |
+| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 695 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
-Methodology and synthetic benchmark results are in
+The latest sweep completed with zero swaps. Methodology and synthetic
+benchmark results are in
 [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Rust Usage

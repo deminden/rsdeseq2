@@ -439,6 +439,73 @@ fn fixed_dispersion_wald_contrast_spec_resolves_factor_level_shape() {
 }
 
 #[test]
+fn fixed_dispersion_wald_contrast_spec_infers_shared_reference_factor_levels() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        1,
+        6,
+        vec![10, 10, 20, 20, 40, 40],
+        Some(vec!["gene_a".into()]),
+        None,
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "condition_C_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering()
+        .irls_options(IrlsOptions {
+            ridge_lambda: 0.0,
+            ..IrlsOptions::default()
+        });
+
+    let (fit, results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_contrast_spec(
+            &counts,
+            &design,
+            &[0.05],
+            &ContrastSpec::factor_level("condition", "C", "B"),
+        )
+        .unwrap();
+    let (primitive_fit, _primitive_results) = builder
+        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.05], &[0.0, -1.0, 1.0])
+        .unwrap();
+
+    assert_wald_fit_intermediates_match(
+        &fit,
+        &primitive_fit,
+        "shared-reference factor-level contrast spec",
+    );
+    assert_relative_eq!(
+        results.rows[0].log2_fold_change.unwrap(),
+        2.0_f64.log2(),
+        epsilon = 1e-8
+    );
+    assert_eq!(
+        results.metadata.result_name.as_deref(),
+        Some("condition_C_vs_B")
+    );
+}
+
+#[test]
 fn fixed_dispersion_wald_contrast_spec_resolves_name_lists() {
     let counts = CountMatrix::from_row_major_u32_with_names(
         1,
@@ -498,7 +565,7 @@ fn fixed_dispersion_wald_contrast_spec_resolves_name_lists() {
     assert_eq!(results.metadata.result_name.as_deref(), Some("contrast"));
     assert_eq!(
         results.metadata.comparison.as_deref(),
-        Some("coefficient list contrast: condition_B_vs_A at 1 vs batch_Y_vs_X at -1")
+        Some("coefficient list contrast: condition_B_vs_A vs batch_Y_vs_X")
     );
 }
 
@@ -565,7 +632,7 @@ fn original_zero_zero_list_contrast_zeroes_lfc_like_numeric_contrast() {
     );
     assert_eq!(
         list_results.metadata.comparison.as_deref(),
-        Some("coefficient list contrast: condition_D_vs_A at 1 vs condition_B_vs_A at -1")
+        Some("coefficient list contrast: condition_D_vs_A vs condition_B_vs_A")
     );
     assert_eq!(
         list_fit.wald.as_ref().unwrap().stat,

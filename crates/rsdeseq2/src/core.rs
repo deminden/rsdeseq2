@@ -41,7 +41,7 @@ use crate::options::{
     TestType,
 };
 use crate::results::{
-    apply_cooks_cutoff, build_lrt_results, build_wald_contrast_results,
+    apply_cooks_cutoff, build_lrt_contrast_results, build_lrt_results, build_wald_contrast_results,
     build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
 use crate::transform::{
@@ -1801,6 +1801,81 @@ impl DeseqBuilder {
         self.attach_native_wald(counts, design, coefficient, fit)
     }
 
+    /// Run the parametric linear-mu native Wald path for a numeric contrast.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_wald_linear_mu_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, design)?;
+        self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+    }
+
+    /// Run the parametric linear-mu native Wald path for a named primitive contrast.
+    pub fn fit_wald_linear_mu_contrast_spec_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let (fit, mut results) =
+            self.fit_wald_linear_mu_contrast_parametric(counts, design, &numeric_contrast)?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the parametric linear-mu native Wald path for a factor-level contrast.
+    pub fn fit_wald_linear_mu_factor_level_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, design)?;
+        let (fit, mut results) = self.attach_native_wald_contrast(
+            counts,
+            design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
+    }
+
     /// Run the GLM-mu native dispersion path and then a Wald test.
     ///
     /// This mirrors `fit_wald_linear_mu` but uses the GLM-mu mean/dispersion
@@ -1920,6 +1995,90 @@ impl DeseqBuilder {
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
 
+    /// Run the linear-mu native LRT path and report a full-model numeric contrast.
+    ///
+    /// The likelihood-ratio statistic and p-values remain the full-vs-reduced
+    /// model comparison; the result table's effect-size columns come from the
+    /// supplied contrast over the full-model coefficients.
+    pub fn fit_lrt_linear_mu_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu(counts, full_design)?;
+        self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
+    }
+
+    /// Run the linear-mu native LRT path and report a named full-model contrast.
+    pub fn fit_lrt_linear_mu_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let (fit, mut results) = self.fit_lrt_linear_mu_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+        )?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the linear-mu native LRT path for a factor-level full-model contrast.
+    pub fn fit_lrt_linear_mu_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_linear_mu(counts, full_design)?;
+        let (fit, mut results) = self.attach_native_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
+    }
+
     /// Run the parametric linear-mu native dispersion path and then an LRT.
     ///
     /// This compatibility-named entry point keeps the original parametric-only
@@ -1933,6 +2092,89 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the parametric linear-mu native LRT path and report a numeric contrast.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_lrt_linear_mu_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
+        self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
+    }
+
+    /// Run the parametric linear-mu native LRT path and report a named contrast.
+    pub fn fit_lrt_linear_mu_contrast_spec_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let (fit, mut results) = self.fit_lrt_linear_mu_contrast_parametric(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+        )?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the parametric linear-mu native LRT path for a factor-level contrast.
+    pub fn fit_lrt_linear_mu_factor_level_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
+        let (fit, mut results) = self.attach_native_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
     }
 
     /// Run the implemented GLM-mu native dispersion path and then an LRT.
@@ -1950,6 +2192,91 @@ impl DeseqBuilder {
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
 
+    /// Run the GLM-mu native LRT path and report a full-model numeric contrast.
+    ///
+    /// The model comparison, deviance, and p-values come from the LRT. The
+    /// result table's effect-size columns use the supplied contrast over the
+    /// fitted full-model coefficients, matching DESeq2's result-table shape.
+    pub fn fit_lrt_glm_mu_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
+        self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
+    }
+
+    /// Run the GLM-mu native LRT path and report a named full-model contrast.
+    pub fn fit_lrt_glm_mu_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let (fit, mut results) =
+            self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, &numeric_contrast)?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the GLM-mu native LRT path for a factor-level full-model contrast.
+    ///
+    /// In addition to resolving the coefficient contrast, this applies
+    /// DESeq2-style character `contrastAllZero` handling using the supplied
+    /// per-sample factor levels. For LRT result tables, only the reported LFC
+    /// is zeroed; the full-vs-reduced statistic and p-values are preserved.
+    pub fn fit_lrt_glm_mu_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
+        let (fit, mut results) = self.attach_native_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
+    }
+
     /// Run the parametric GLM-mu native dispersion path and then an LRT.
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
@@ -1963,6 +2290,89 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
+    }
+
+    /// Run the parametric GLM-mu native LRT path and report a numeric contrast.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_lrt_glm_mu_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
+        self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
+    }
+
+    /// Run the parametric GLM-mu native LRT path and report a named contrast.
+    pub fn fit_lrt_glm_mu_contrast_spec_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let (fit, mut results) = self.fit_lrt_glm_mu_contrast_parametric(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+        )?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the parametric GLM-mu native LRT path for a factor-level contrast.
+    pub fn fit_lrt_glm_mu_factor_level_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
+        let (fit, mut results) = self.attach_native_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
     }
 
     /// Run the current GLM-mu native Wald path with limited Cook's replacement refit.
@@ -2276,6 +2686,155 @@ impl DeseqBuilder {
         })
     }
 
+    /// Run the current GLM-mu native LRT contrast path with limited Cook's replacement refit.
+    pub fn fit_lrt_glm_mu_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_lrt_glm_mu_contrast(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run native GLM-mu LRT replacement refit for a caller-supplied factor-level contrast.
+    pub fn fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder.fit_lrt_glm_mu_factor_level_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+        )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_lrt_glm_mu_factor_level_contrast(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run native GLM-mu LRT replacement refit for a named primitive contrast specification.
+    pub fn fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let mut output = self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            &numeric_contrast,
+            replacement_options,
+        )?;
+        apply_lrt_contrast_metadata_to_replacement_output(
+            &mut output,
+            contrast.result_name(),
+            contrast.comparison(),
+        );
+        Ok(output)
+    }
+
     /// Run the parametric GLM-mu native dispersion path and then a Wald test.
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
@@ -2289,6 +2848,81 @@ impl DeseqBuilder {
         validate_pipeline_wald_coefficient(design, coefficient)?;
         let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
         self.attach_native_wald(counts, design, coefficient, fit)
+    }
+
+    /// Run the parametric GLM-mu native Wald path for a numeric contrast.
+    ///
+    /// This compatibility-named entry point keeps parametric behavior even if
+    /// the builder's `fit_type` is set to another value.
+    pub fn fit_wald_glm_mu_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+    }
+
+    /// Run the parametric GLM-mu native Wald path for a named primitive contrast.
+    pub fn fit_wald_glm_mu_contrast_spec_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let (fit, mut results) =
+            self.fit_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run the parametric GLM-mu native Wald path for a factor-level contrast.
+    pub fn fit_wald_glm_mu_factor_level_contrast_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        let (fit, mut results) = self.attach_native_wald_contrast(
+            counts,
+            design,
+            &numeric_contrast,
+            Some(&contrast_all_zero),
+            fit,
+        )?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        Ok((fit, results))
     }
 
     fn attach_native_wald(
@@ -2408,6 +3042,100 @@ impl DeseqBuilder {
             dispersions,
             coefficient,
         })?;
+
+        fit.reduced_design = Some(reduced_design.clone());
+        fit.dispersion = Some(lrt_output.expanded_dispersions);
+        fit.cooks = Some(lrt_output.cooks.cooks);
+        fit.max_cooks = Some(lrt_output.cooks.max_cooks);
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        attach_glm_fit(&mut fit, lrt_output.full_fit);
+        fit.lrt = Some(lrt_output.lrt);
+        Ok((fit, lrt_output.results))
+    }
+
+    fn attach_native_lrt_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+        contrast_all_zero_override: Option<&[bool]>,
+        mut fit: DeseqFit,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let dispersions = fit
+            .dispersion
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "MAP dispersions are required before LRT fitting".to_string(),
+            })?;
+        let normalized = match fit.normalization_factors.as_ref() {
+            Some(normalization_factors) => {
+                normalized_counts_with_factors(counts, normalization_factors)?
+            }
+            None => normalized_counts(counts, &fit.size_factors)?,
+        };
+        let mut lrt_output = self.fixed_dispersion_lrt_components(LrtPipelineInput {
+            counts,
+            full_design,
+            reduced_design,
+            size_factors: &fit.size_factors,
+            normalization_factors: fit.normalization_factors.as_ref(),
+            observation_weights: fit.observation_weights.as_ref(),
+            normalized: &normalized,
+            base_mean: &fit.base_mean,
+            all_zero: &fit.all_zero,
+            dispersions,
+            coefficient: default_results_coefficient(full_design)?,
+        })?;
+        let contrast_output = wald_test_contrast_with_options(
+            &lrt_output.full_fit,
+            contrast,
+            &self.wald_test_options,
+        )?;
+        lrt_output.results = build_lrt_contrast_results(
+            &fit.base_mean,
+            &lrt_output.full_fit,
+            &lrt_output.lrt,
+            &contrast_output,
+            counts.gene_names(),
+            Some(&lrt_output.expanded_dispersions),
+        )?;
+        let contrast_all_zero = match contrast_all_zero_override {
+            Some(flags) => {
+                if flags.len() != counts.n_genes() {
+                    return Err(invalid_dimensions(
+                        "contrastAllZero rows",
+                        counts.n_genes(),
+                        flags.len(),
+                    ));
+                }
+                flags.to_vec()
+            }
+            None => contrast_all_zero_numeric(counts, full_design, contrast)?,
+        };
+        apply_contrast_all_zero_to_lrt_results(
+            &mut lrt_output.results,
+            &contrast_all_zero,
+            &fit.all_zero,
+        )?;
+        for (gene, all_zero) in fit.all_zero.iter().copied().enumerate() {
+            lrt_output.results.rows[gene].max_cooks = lrt_output.cooks.max_cooks[gene];
+            if all_zero {
+                lrt_output.results.rows[gene].converged = None;
+                lrt_output.results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
+        apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
 
         fit.reduced_design = Some(reduced_design.clone());
         fit.dispersion = Some(lrt_output.expanded_dispersions);
@@ -2615,6 +3343,216 @@ impl DeseqBuilder {
             dispersions,
             coefficient,
         })?;
+
+        let mut fit = Self::base_fit(
+            counts,
+            Some(full_design.clone()),
+            stages.into_base_fit_input(),
+        );
+        fit.reduced_design = Some(reduced_design.clone());
+        fit.dispersion = Some(lrt_output.expanded_dispersions);
+        fit.cooks = Some(lrt_output.cooks.cooks);
+        fit.max_cooks = Some(lrt_output.cooks.max_cooks);
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        attach_glm_fit(&mut fit, lrt_output.full_fit);
+        fit.lrt = Some(lrt_output.lrt);
+        Ok((fit, lrt_output.results))
+    }
+
+    /// Run a supplied-dispersion likelihood-ratio test and report a numeric contrast.
+    ///
+    /// This keeps the LRT model comparison unchanged while reporting contrast
+    /// estimates and standard errors from the full model in result rows.
+    pub fn fit_fixed_dispersion_lrt_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let stages = self.normalization_stages_for_design(counts, full_design)?;
+        let mut lrt_output = self.fixed_dispersion_lrt_components(LrtPipelineInput {
+            counts,
+            full_design,
+            reduced_design,
+            size_factors: &stages.size_factors,
+            normalization_factors: stages.normalization_factors.as_ref(),
+            observation_weights: stages.observation_weights.as_ref(),
+            normalized: &stages.normalized,
+            base_mean: &stages.base_mean,
+            all_zero: &stages.all_zero,
+            dispersions,
+            coefficient: default_results_coefficient(full_design)?,
+        })?;
+        let contrast_output = wald_test_contrast_with_options(
+            &lrt_output.full_fit,
+            contrast,
+            &self.wald_test_options,
+        )?;
+        lrt_output.results = build_lrt_contrast_results(
+            &stages.base_mean,
+            &lrt_output.full_fit,
+            &lrt_output.lrt,
+            &contrast_output,
+            counts.gene_names(),
+            Some(&lrt_output.expanded_dispersions),
+        )?;
+        let contrast_all_zero = contrast_all_zero_numeric(counts, full_design, contrast)?;
+        apply_contrast_all_zero_to_lrt_results(
+            &mut lrt_output.results,
+            &contrast_all_zero,
+            &stages.all_zero,
+        )?;
+        for (gene, all_zero) in stages.all_zero.iter().copied().enumerate() {
+            lrt_output.results.rows[gene].max_cooks = lrt_output.cooks.max_cooks[gene];
+            if all_zero {
+                lrt_output.results.rows[gene].converged = None;
+                lrt_output.results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
+        apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
+
+        let mut fit = Self::base_fit(
+            counts,
+            Some(full_design.clone()),
+            stages.into_base_fit_input(),
+        );
+        fit.reduced_design = Some(reduced_design.clone());
+        fit.dispersion = Some(lrt_output.expanded_dispersions);
+        fit.cooks = Some(lrt_output.cooks.cooks);
+        fit.max_cooks = Some(lrt_output.cooks.max_cooks);
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        attach_glm_fit(&mut fit, lrt_output.full_fit);
+        fit.lrt = Some(lrt_output.lrt);
+        Ok((fit, lrt_output.results))
+    }
+
+    /// Run a supplied-dispersion LRT and report a named full-model contrast.
+    pub fn fit_fixed_dispersion_lrt_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let (fit, mut results) = self.fit_fixed_dispersion_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            &numeric_contrast,
+        )?;
+        results.metadata.result_name = Some(contrast.result_name());
+        results.metadata.comparison = Some(contrast.comparison());
+        Ok((fit, results))
+    }
+
+    /// Run a supplied-dispersion LRT and report a factor-level full-model contrast.
+    ///
+    /// This resolves DESeq2-shaped coefficient names from the full design
+    /// matrix and applies character-style `contrastAllZero` handling from
+    /// caller-supplied sample levels. As in DESeq2 LRT result tables, the
+    /// all-zero cleanup only zeroes the displayed LFC; the model-comparison
+    /// statistic and p-values remain unchanged.
+    pub fn fit_fixed_dispersion_lrt_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let stages = self.normalization_stages_for_design(counts, full_design)?;
+        let mut lrt_output = self.fixed_dispersion_lrt_components(LrtPipelineInput {
+            counts,
+            full_design,
+            reduced_design,
+            size_factors: &stages.size_factors,
+            normalization_factors: stages.normalization_factors.as_ref(),
+            observation_weights: stages.observation_weights.as_ref(),
+            normalized: &stages.normalized,
+            base_mean: &stages.base_mean,
+            all_zero: &stages.all_zero,
+            dispersions,
+            coefficient: default_results_coefficient(full_design)?,
+        })?;
+        let contrast_output = wald_test_contrast_with_options(
+            &lrt_output.full_fit,
+            &numeric_contrast,
+            &self.wald_test_options,
+        )?;
+        lrt_output.results = build_lrt_contrast_results(
+            &stages.base_mean,
+            &lrt_output.full_fit,
+            &lrt_output.lrt,
+            &contrast_output,
+            counts.gene_names(),
+            Some(&lrt_output.expanded_dispersions),
+        )?;
+        apply_contrast_all_zero_to_lrt_results(
+            &mut lrt_output.results,
+            &contrast_all_zero,
+            &stages.all_zero,
+        )?;
+        for (gene, all_zero) in stages.all_zero.iter().copied().enumerate() {
+            lrt_output.results.rows[gene].max_cooks = lrt_output.cooks.max_cooks[gene];
+            if all_zero {
+                lrt_output.results.rows[gene].converged = None;
+                lrt_output.results.rows[gene].max_cooks = None;
+            }
+        }
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
+        apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
+        lrt_output.results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        lrt_output.results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
 
         let mut fit = Self::base_fit(
             counts,
@@ -3125,6 +4063,24 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level Wald workflow and report a named design coefficient.
+    pub fn fit_with_results_name(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = design.coefficient_index(coefficient_name)?;
+                self.fit_wald_glm_mu(counts, design, coefficient)
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit without a reduced design".to_string(),
+            }),
+        }
+    }
+
     /// Run the top-level Wald workflow with limited Cook's replacement refit.
     pub fn fit_with_results_with_cooks_replacement(
         &self,
@@ -3135,6 +4091,30 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
+                self.fit_wald_glm_mu_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient,
+                    replacement_options,
+                )
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit without a reduced design".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level named Wald workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = design.coefficient_index(coefficient_name)?;
                 self.fit_wald_glm_mu_with_cooks_replacement(
                     counts,
                     design,
@@ -3321,6 +4301,104 @@ impl DeseqBuilder {
         self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
 
+    /// Run the currently implemented top-level LRT workflow and report a named full-design coefficient.
+    pub fn fit_lrt_with_results_name(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let coefficient = full_design.coefficient_index(coefficient_name)?;
+        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named full-design coefficient.
+    pub fn fit_lrt_name(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
+    pub fn fit_lrt_with_results_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
+    pub fn fit_lrt_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named contrast.
+    pub fn fit_lrt_with_results_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
+    pub fn fit_lrt_with_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named contrast.
+    pub fn fit_lrt_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
+    pub fn fit_lrt_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_factor_level_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+        )
+        .map(|(fit, _results)| fit)
+    }
+
     /// Run the currently implemented top-level LRT workflow with limited Cook's replacement refit.
     pub fn fit_lrt_with_results_with_cooks_replacement(
         &self,
@@ -3335,6 +4413,79 @@ impl DeseqBuilder {
             full_design,
             reduced_design,
             coefficient,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level LRT replacement-refit workflow and report a named full-design coefficient.
+    pub fn fit_lrt_with_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let coefficient = full_design.coefficient_index(coefficient_name)?;
+        self.fit_lrt_glm_mu_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            coefficient,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level named LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level factor-level LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
             replacement_options,
         )
     }
@@ -3591,6 +4742,21 @@ fn apply_contrast_metadata_to_replacement_output(
     output.results.metadata.comparison = Some(comparison);
 }
 
+fn apply_lrt_contrast_metadata_to_replacement_output(
+    output: &mut CooksReplacementLrtOutput,
+    result_name: String,
+    comparison: String,
+) {
+    output.original_results.metadata.result_name = Some(result_name.clone());
+    output.original_results.metadata.comparison = Some(comparison.clone());
+    if let Some(refit_results) = &mut output.refit_results {
+        refit_results.metadata.result_name = Some(result_name.clone());
+        refit_results.metadata.comparison = Some(comparison.clone());
+    }
+    output.results.metadata.result_name = Some(result_name);
+    output.results.metadata.comparison = Some(comparison);
+}
+
 fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.log2_fold_change = Some(0.0);
     row.lfc_se = Some(0.0);
@@ -3709,6 +4875,30 @@ fn apply_contrast_all_zero_to_wald_contrast(
             contrast.log2_fold_change[gene] = Some(0.0);
             contrast.wald.stat[gene] = Some(0.0);
             contrast.wald.pvalue[gene] = Some(1.0);
+        }
+    }
+    Ok(())
+}
+
+fn apply_contrast_all_zero_to_lrt_results(
+    results: &mut DeseqResults,
+    contrast_all_zero: &[bool],
+    all_zero: &[bool],
+) -> Result<(), DeseqError> {
+    let n_genes = results.rows.len();
+    if contrast_all_zero.len() != n_genes {
+        return Err(invalid_dimensions(
+            "contrastAllZero rows",
+            n_genes,
+            contrast_all_zero.len(),
+        ));
+    }
+    if all_zero.len() != n_genes {
+        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
+    }
+    for gene in 0..n_genes {
+        if contrast_all_zero[gene] && !all_zero[gene] {
+            results.rows[gene].log2_fold_change = Some(0.0);
         }
     }
     Ok(())
