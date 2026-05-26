@@ -32,6 +32,18 @@ fn normalized_counts_and_base_mean() {
 }
 
 #[test]
+fn normalized_counts_reject_overflowed_tiny_size_factor_division() {
+    let counts = CountMatrix::from_row_major_u32(1, 1, vec![u32::MAX]).unwrap();
+    let err = normalized_counts(&counts, &[f64::MIN_POSITIVE]).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "normalized count" && index == Some(0)
+    ));
+}
+
+#[test]
 fn normalized_counts_with_gene_sample_factors_and_base_mean() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 30, 6, 12, 24]).unwrap();
     let normalization_factors =
@@ -43,6 +55,20 @@ fn normalized_counts_with_gene_sample_factors_and_base_mean() {
     let means = base_mean(&normalized).unwrap();
     assert_relative_eq!(means[0], 26.0 / 3.0, epsilon = 1e-12);
     assert_relative_eq!(means[1], 13.0 / 3.0, epsilon = 1e-12);
+}
+
+#[test]
+fn normalized_counts_with_factors_reject_overflowed_tiny_factor_division() {
+    let counts = CountMatrix::from_row_major_u32(1, 1, vec![u32::MAX]).unwrap();
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(1, 1, vec![f64::MIN_POSITIVE]).unwrap();
+    let err = normalized_counts_with_factors(&counts, &normalization_factors).unwrap_err();
+
+    assert!(matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index, .. }
+            if context == "normalization-factor normalized count" && index == Some(0)
+    ));
 }
 
 #[test]

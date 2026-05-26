@@ -3,6 +3,7 @@ use std::path::Path;
 use csv::{ReaderBuilder, WriterBuilder};
 
 use crate::core::CountMatrix;
+use crate::design::DesignMatrix;
 use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,
 };
@@ -57,6 +58,322 @@ pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, Dese
     )
 }
 
+/// Read a tab-delimited numeric design matrix with sample IDs in the first column.
+///
+/// The first column is treated as row labels and ignored by the primitive Rust
+/// core; remaining header fields become coefficient names. Rows must already be
+/// in the same sample order as the count matrix used by the caller.
+pub fn read_design_matrix_tsv(path: impl AsRef<Path>) -> Result<DesignMatrix, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() < 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "design matrix columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let coefficient_names = headers
+        .iter()
+        .skip(1)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    let n_coefficients = coefficient_names.len();
+    let mut values = Vec::new();
+    let mut n_samples = 0_usize;
+    for record in reader.records() {
+        let record = record?;
+        if record.len() != headers.len() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "design matrix record columns".to_string(),
+                expected: headers.len(),
+                actual: record.len(),
+            });
+        }
+        for (column, field) in record.iter().skip(1).enumerate() {
+            values.push(parse_finite_float_field(
+                field,
+                path_ref,
+                n_samples * n_coefficients + column,
+                "design matrix",
+            )?);
+        }
+        n_samples += 1;
+    }
+    if n_samples == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "design matrix rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    DesignMatrix::from_row_major(n_samples, n_coefficients, values, Some(coefficient_names))
+}
+
+/// Read a tab-delimited gene/sample normalization-factor matrix.
+///
+/// The file uses the same shape as `normalizationFactors(dds)`: a leading
+/// `gene` column followed by sample columns. Row and column labels are accepted
+/// for alignment by the caller; this primitive reader returns only the numeric
+/// matrix.
+pub fn read_normalization_factors_tsv(
+    path: impl AsRef<Path>,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() < 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "normalization factor columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let n_samples = headers.len() - 1;
+    let mut values = Vec::new();
+    let mut n_genes = 0_usize;
+    for record in reader.records() {
+        let record = record?;
+        if record.len() != headers.len() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "normalization factor record columns".to_string(),
+                expected: headers.len(),
+                actual: record.len(),
+            });
+        }
+        for (sample, field) in record.iter().skip(1).enumerate() {
+            values.push(parse_finite_float_field(
+                field,
+                path_ref,
+                n_genes * n_samples + sample,
+                "normalization factor matrix",
+            )?);
+        }
+        n_genes += 1;
+    }
+    if n_genes == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "normalization factor rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    let factors = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
+    validate_positive_finite_matrix("normalization factor matrix", &factors)?;
+    Ok(factors)
+}
+
+/// Read a tab-delimited gene/sample observation-weight matrix.
+///
+/// The file uses a leading `gene` column followed by sample columns, matching
+/// DESeq2's assay-shaped weight matrix. Row and column labels are accepted for
+/// alignment by the caller; this primitive reader returns only numeric weights
+/// in row-major order.
+pub fn read_observation_weights_tsv(
+    path: impl AsRef<Path>,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() < 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "observation weight columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let n_samples = headers.len() - 1;
+    let mut values = Vec::new();
+    let mut n_genes = 0_usize;
+    for record in reader.records() {
+        let record = record?;
+        if record.len() != headers.len() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "observation weight record columns".to_string(),
+                expected: headers.len(),
+                actual: record.len(),
+            });
+        }
+        for (sample, field) in record.iter().skip(1).enumerate() {
+            values.push(parse_finite_float_field(
+                field,
+                path_ref,
+                n_genes * n_samples + sample,
+                "observation weights",
+            )?);
+        }
+        n_genes += 1;
+    }
+    if n_genes == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "observation weight rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    let weights = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
+    validate_nonnegative_finite_values("observation weight input", weights.as_slice())?;
+    Ok(weights)
+}
+
+/// Read a tab-delimited sample-level size-factor table.
+///
+/// The file shape matches `write_size_factors_tsv`: a leading sample label
+/// column and one numeric `size_factor` column. Sample labels are accepted for
+/// alignment by the caller; this primitive reader returns only the numeric
+/// vector in file order.
+pub fn read_size_factors_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "size-factor columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let mut values = Vec::new();
+    for (idx, record) in reader.records().enumerate() {
+        let record = record?;
+        if record.len() != 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: "size-factor record columns".to_string(),
+                expected: 2,
+                actual: record.len(),
+            });
+        }
+        values.push(parse_finite_float_field(
+            record.get(1).unwrap_or_default(),
+            path_ref,
+            idx,
+            "size factors",
+        )?);
+    }
+    if values.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "size-factor rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    validate_positive_finite_values("size-factor input", &values)?;
+    Ok(values)
+}
+
+/// Read one supplied geometric mean per gene.
+///
+/// The file has a leading gene label column and one numeric value column.
+/// Labels are accepted for caller-side alignment; this primitive reader returns
+/// the values in file order. Values must be non-negative and finite, matching
+/// the size-factor estimator's supported geometric-mean domain.
+pub fn read_geometric_means_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "geometric-mean columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let mut values = Vec::new();
+    for (idx, record) in reader.records().enumerate() {
+        let record = record?;
+        if record.len() != 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: "geometric-mean record columns".to_string(),
+                expected: 2,
+                actual: record.len(),
+            });
+        }
+        values.push(parse_finite_float_field(
+            record.get(1).unwrap_or_default(),
+            path_ref,
+            idx,
+            "geometric means",
+        )?);
+    }
+    if values.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "geometric-mean rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    for (idx, value) in values.iter().copied().enumerate() {
+        if value < 0.0 {
+            return Err(DeseqError::InvalidSizeFactors {
+                reason: format!("geometric mean at index {idx} must be non-negative"),
+            });
+        }
+    }
+    Ok(values)
+}
+
+/// Read one finite numeric Wald t degrees-of-freedom value per gene.
+///
+/// The file has a leading gene label column and one numeric value column.
+/// Labels are accepted for caller-side alignment; this primitive reader returns
+/// the values in file order.
+pub fn read_wald_t_degrees_of_freedom_tsv(path: impl AsRef<Path>) -> Result<Vec<f64>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "Wald t degrees-of-freedom columns".to_string(),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let mut values = Vec::new();
+    for (idx, record) in reader.records().enumerate() {
+        let record = record?;
+        if record.len() != 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: "Wald t degrees-of-freedom record columns".to_string(),
+                expected: 2,
+                actual: record.len(),
+            });
+        }
+        values.push(parse_finite_float_field(
+            record.get(1).unwrap_or_default(),
+            path_ref,
+            idx,
+            "Wald t degrees of freedom",
+        )?);
+    }
+    if values.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: "Wald t degrees-of-freedom rows".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    Ok(values)
+}
+
 fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
     if let Ok(value) = field.parse::<u32>() {
         return Ok(value);
@@ -79,6 +396,27 @@ fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
         });
     }
     Ok(value as u32)
+}
+
+fn parse_finite_float_field(
+    field: &str,
+    path: &Path,
+    index: usize,
+    context: &str,
+) -> Result<f64, DeseqError> {
+    let value = field.parse::<f64>().map_err(|_| DeseqError::ParseFloat {
+        context: path.display().to_string(),
+        value: field.to_string(),
+    })?;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
 }
 
 /// Write a raw count matrix to a tab-delimited file.
@@ -803,6 +1141,254 @@ mod tests {
             parse_count_field("-1", path),
             Err(DeseqError::InvalidCounts { .. })
         ));
+    }
+
+    #[test]
+    fn read_design_matrix_tsv_reads_numeric_matrix_and_names() {
+        let path = unique_test_path("design.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "sample\tIntercept\tcondition_B_vs_A\n",
+                "s1\t1\t0\n",
+                "s2\t1\t0\n",
+                "s3\t1\t1\n",
+            ),
+        )
+        .unwrap();
+
+        let design = read_design_matrix_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(design.n_samples(), 3);
+        assert_eq!(design.n_coefficients(), 2);
+        assert_eq!(
+            design.coefficient_names().unwrap(),
+            &["Intercept".to_string(), "condition_B_vs_A".to_string()]
+        );
+        assert_eq!(design.matrix().as_slice(), &[1.0, 0.0, 1.0, 0.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn read_design_matrix_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_design_value.tsv");
+        fs::write(
+            &bad_value,
+            concat!("sample\tIntercept\tcondition_B_vs_A\n", "s1\t1\tNA\n",),
+        )
+        .unwrap();
+        assert!(matches!(
+            read_design_matrix_tsv(&bad_value),
+            Err(DeseqError::ParseFloat { .. })
+        ));
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_design_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("sample\tIntercept\tcondition_B_vs_A\n", "s1\t1\n",),
+        )
+        .unwrap();
+        assert!(read_design_matrix_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_normalization_factors_tsv_reads_positive_matrix() {
+        let path = unique_test_path("read_normalization_factors.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "gene\tsample_1\tsample_2\n",
+                "gene_a\t1\t2\n",
+                "gene_b\t0.5\t4\n",
+            ),
+        )
+        .unwrap();
+
+        let factors = read_normalization_factors_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(factors.n_rows(), 2);
+        assert_eq!(factors.n_cols(), 2);
+        assert_eq!(factors.as_slice(), &[1.0, 2.0, 0.5, 4.0]);
+    }
+
+    #[test]
+    fn read_normalization_factors_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_normalization_factor_value.tsv");
+        fs::write(
+            &bad_value,
+            concat!("gene\tsample_1\tsample_2\n", "gene_a\t1\t0\n",),
+        )
+        .unwrap();
+        assert!(matches!(
+            read_normalization_factors_tsv(&bad_value),
+            Err(DeseqError::InvalidSizeFactors { .. })
+        ));
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_normalization_factor_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("gene\tsample_1\tsample_2\n", "gene_a\t1\n",),
+        )
+        .unwrap();
+        assert!(read_normalization_factors_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_observation_weights_tsv_reads_nonnegative_matrix() {
+        let path = unique_test_path("read_observation_weights.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "gene\tsample_1\tsample_2\n",
+                "gene_a\t1\t0\n",
+                "gene_b\t0.5\t4\n",
+            ),
+        )
+        .unwrap();
+
+        let weights = read_observation_weights_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(weights.n_rows(), 2);
+        assert_eq!(weights.n_cols(), 2);
+        assert_eq!(weights.as_slice(), &[1.0, 0.0, 0.5, 4.0]);
+    }
+
+    #[test]
+    fn read_observation_weights_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_observation_weight_value.tsv");
+        fs::write(
+            &bad_value,
+            concat!("gene\tsample_1\tsample_2\n", "gene_a\t1\t-0.1\n",),
+        )
+        .unwrap();
+        assert!(matches!(
+            read_observation_weights_tsv(&bad_value),
+            Err(DeseqError::NonFiniteValue { .. })
+        ));
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_observation_weight_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("gene\tsample_1\tsample_2\n", "gene_a\t1\n",),
+        )
+        .unwrap();
+        assert!(read_observation_weights_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_size_factors_tsv_reads_positive_values() {
+        let path = unique_test_path("read_size_factors.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "sample\tsize_factor\n",
+                "sample_1\t1\n",
+                "sample_2\t0.5\n",
+                "sample_3\t2\n",
+            ),
+        )
+        .unwrap();
+
+        let size_factors = read_size_factors_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(size_factors, vec![1.0, 0.5, 2.0]);
+    }
+
+    #[test]
+    fn read_size_factors_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_size_factor_value.tsv");
+        fs::write(
+            &bad_value,
+            concat!("sample\tsize_factor\n", "sample_1\t0\n",),
+        )
+        .unwrap();
+        assert!(matches!(
+            read_size_factors_tsv(&bad_value),
+            Err(DeseqError::InvalidSizeFactors { .. })
+        ));
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_size_factor_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("sample\tsize_factor\n", "sample_1\t1\textra\n",),
+        )
+        .unwrap();
+        assert!(read_size_factors_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_geometric_means_tsv_reads_nonnegative_values() {
+        let path = unique_test_path("read_geometric_means.tsv");
+        fs::write(
+            &path,
+            concat!(
+                "gene\tgeo_mean\n",
+                "gene_1\t1\n",
+                "gene_2\t0\n",
+                "gene_3\t2.5\n",
+            ),
+        )
+        .unwrap();
+
+        let geometric_means = read_geometric_means_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(geometric_means, vec![1.0, 0.0, 2.5]);
+    }
+
+    #[test]
+    fn read_geometric_means_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_geometric_mean_value.tsv");
+        fs::write(&bad_value, concat!("gene\tgeo_mean\n", "gene_1\t-1\n")).unwrap();
+        assert!(matches!(
+            read_geometric_means_tsv(&bad_value),
+            Err(DeseqError::InvalidSizeFactors { .. })
+        ));
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_geometric_mean_shape.tsv");
+        fs::write(
+            &bad_shape,
+            concat!("gene\tgeo_mean\n", "gene_1\t1\textra\n"),
+        )
+        .unwrap();
+        assert!(read_geometric_means_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
+    }
+
+    #[test]
+    fn read_wald_t_degrees_of_freedom_tsv_reads_finite_values() {
+        let path = unique_test_path("read_wald_t_df.tsv");
+        fs::write(&path, concat!("gene\tdf\n", "gene_1\t4\n", "gene_2\t2.5\n")).unwrap();
+
+        let degrees_of_freedom = read_wald_t_degrees_of_freedom_tsv(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(degrees_of_freedom, vec![4.0, 2.5]);
+    }
+
+    #[test]
+    fn read_wald_t_degrees_of_freedom_tsv_validates_shape_and_values() {
+        let bad_value = unique_test_path("bad_wald_t_df_value.tsv");
+        fs::write(&bad_value, concat!("gene\tdf\n", "gene_1\tNA\n")).unwrap();
+        assert!(read_wald_t_degrees_of_freedom_tsv(&bad_value).is_err());
+        let _ = fs::remove_file(&bad_value);
+
+        let bad_shape = unique_test_path("bad_wald_t_df_shape.tsv");
+        fs::write(&bad_shape, concat!("gene\tdf\n", "gene_1\t4\textra\n")).unwrap();
+        assert!(read_wald_t_degrees_of_freedom_tsv(&bad_shape).is_err());
+        let _ = fs::remove_file(&bad_shape);
     }
 
     #[test]

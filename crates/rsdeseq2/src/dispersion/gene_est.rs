@@ -551,7 +551,8 @@ pub fn rough_dispersion_estimates(
             let term = checked_sub(relative_square, inv_fitted, sample, "rough dispersion term")?;
             checked_matrix_add_assign(&mut sum, term, sample, "rough dispersion row sum")?;
         }
-        estimates.push((sum / residual_df).max(0.0));
+        let average = checked_div(sum, residual_df, gene, "rough dispersion row mean")?;
+        estimates.push(average.max(0.0));
     }
     Ok(estimates)
 }
@@ -574,7 +575,12 @@ pub fn moments_dispersion_estimates(
         size_factors.iter().copied().map(f64::recip),
         "moments dispersion inverse size-factor sum",
     )?;
-    let xim = inverse_sum / size_factors.len() as f64;
+    let xim = checked_div(
+        inverse_sum,
+        size_factors.len() as f64,
+        0,
+        "moments dispersion inverse size-factor mean",
+    )?;
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }
 
@@ -701,7 +707,12 @@ fn normalization_factor_moments_xim(
     }
     let mut inverse_col_mean_sum = 0.0;
     for (sample, sum) in col_sums.iter().copied().enumerate() {
-        let col_mean = sum / n_rows_used as f64;
+        let col_mean = checked_div(
+            sum,
+            n_rows_used as f64,
+            sample,
+            "moments dispersion normalization-factor column mean",
+        )?;
         if !col_mean.is_finite() || col_mean <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
                 reason: format!(
@@ -716,7 +727,12 @@ fn normalization_factor_moments_xim(
             "moments dispersion inverse normalization-factor mean sum",
         )?;
     }
-    Ok(inverse_col_mean_sum / normalization_factors.n_cols() as f64)
+    checked_div(
+        inverse_col_mean_sum,
+        normalization_factors.n_cols() as f64,
+        0,
+        "moments dispersion inverse normalization-factor mean",
+    )
 }
 
 /// Combine rough and moments estimates using DESeq2's bounded start shape.
@@ -1077,12 +1093,17 @@ fn fit_dispersion_line_search_inner(
         };
 
         let theta_kappa = -dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
-        let theta_hat_kappa = -lp - effective_kappa * epsilon * dlp * dlp;
+        let theta_hat_kappa = checked_line_search_armijo_bound(lp, effective_kappa, epsilon, dlp)?;
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
             let lp_new = -theta_kappa;
-            last_change = lp_new - lp;
+            last_change = checked_sub(
+                lp_new,
+                lp,
+                0,
+                "dispersion line-search accepted objective change",
+            )?;
             lp = lp_new;
             if last_change < options.disp_tol {
                 break;
@@ -1142,12 +1163,44 @@ fn bounded_log_alpha_proposal(
             checked_add(log_alpha, movement, 0, "dispersion line-search proposal").ok()
         })?;
     let clamped = unclamped.clamp(lower, upper);
-    let effective_step = (clamped - log_alpha) / direction;
-    if effective_step.is_finite() && effective_step > 0.0 {
+    let effective_step = checked_sub(
+        clamped,
+        log_alpha,
+        0,
+        "dispersion line-search effective proposal movement",
+    )
+    .ok()
+    .and_then(|movement| {
+        checked_div(
+            movement,
+            direction,
+            0,
+            "dispersion line-search effective proposal step",
+        )
+        .ok()
+    })?;
+    if effective_step > 0.0 {
         Some((clamped, effective_step))
     } else {
         None
     }
+}
+
+fn checked_line_search_armijo_bound(
+    lp: f64,
+    effective_kappa: f64,
+    epsilon: f64,
+    dlp: f64,
+) -> Result<f64, DeseqError> {
+    let dlp_square = checked_mul(dlp, dlp, 0, "dispersion line-search Armijo slope square")?;
+    let scaled_slope = checked_mul(
+        effective_kappa,
+        epsilon,
+        0,
+        "dispersion line-search Armijo scale",
+    )
+    .and_then(|scale| checked_mul(scale, dlp_square, 0, "dispersion line-search Armijo scale"))?;
+    checked_sub(-lp, scaled_slope, 0, "dispersion line-search Armijo bound")
 }
 
 /// Fit a dispersion for one gene by DESeq2-style two-pass log-alpha grid search.
@@ -1312,10 +1365,12 @@ fn fit_dispersion_grid_inner(
     };
     let min_log = options.min_disp.ln();
     let max_log = max_disp.ln();
-    let coarse = linspace(min_log, max_log, options.grid_points);
+    let coarse = linspace(min_log, max_log, options.grid_points)?;
     let (best_log, _) = best_log_alpha(objective, &coarse)?;
-    let delta = coarse[1] - coarse[0];
-    let fine = linspace(best_log - delta, best_log + delta, options.grid_points);
+    let delta = checked_sub(coarse[1], coarse[0], 1, "dispersion grid step")?;
+    let fine_lower = checked_sub(best_log, delta, 0, "dispersion fine grid lower bound")?;
+    let fine_upper = checked_add(best_log, delta, 0, "dispersion fine grid upper bound")?;
+    let fine = linspace(fine_lower, fine_upper, options.grid_points)?;
     let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((
         best_fine_log.exp().clamp(options.min_disp, max_disp),
@@ -2283,9 +2338,39 @@ fn best_log_alpha(
     Ok((best_log, best_score))
 }
 
-fn linspace(start: f64, end: f64, len: usize) -> Vec<f64> {
-    let step = (end - start) / (len as f64 - 1.0);
-    (0..len).map(|idx| start + step * idx as f64).collect()
+fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
+    if len == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "dispersion grid points".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    if !start.is_finite() || !end.is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: "dispersion grid endpoint".to_string(),
+            index: None,
+            value: if start.is_finite() { end } else { start },
+        });
+    }
+    if len == 1 {
+        return Ok(vec![start]);
+    }
+    let span = checked_sub(end, start, 0, "dispersion grid span")?;
+    let step = span / (len as f64 - 1.0);
+    if !step.is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: "dispersion grid step".to_string(),
+            index: None,
+            value: step,
+        });
+    }
+    (0..len)
+        .map(|idx| {
+            let offset = checked_mul(step, idx as f64, idx, "dispersion grid offset")?;
+            checked_add(start, offset, idx, "dispersion grid value")
+        })
+        .collect()
 }
 
 fn compact_counts_rows(
@@ -2578,6 +2663,19 @@ fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64
 fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left - right;
     if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(index),
+            value,
+        })
+    }
+}
+
+fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left / right;
+    if left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite() {
         Ok(value)
     } else {
         Err(DeseqError::NonFiniteValue {
@@ -2883,6 +2981,67 @@ mod tests {
     #[test]
     fn bounded_log_alpha_proposal_rejects_overflowed_step() {
         assert!(bounded_log_alpha_proposal(0.0, f64::MAX, 2.0, -30.0, 10.0).is_none());
+    }
+
+    #[test]
+    fn bounded_log_alpha_proposal_rejects_overflowed_effective_step() {
+        assert!(
+            bounded_log_alpha_proposal(-f64::MAX, f64::MIN_POSITIVE, 1.0, -30.0, 10.0).is_none()
+        );
+    }
+
+    #[test]
+    fn line_search_armijo_bound_rejects_nonfinite_arithmetic() {
+        let err = checked_line_search_armijo_bound(0.0, 1.0, 1.0, f64::MAX).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "dispersion line-search Armijo slope square" && index == Some(0)
+        ));
+    }
+
+    #[test]
+    fn line_search_armijo_bound_matches_finite_formula() {
+        let observed = checked_line_search_armijo_bound(-10.0, 0.5, 1.0e-4, 2.0).unwrap();
+        let expected = 10.0 - 0.5 * 1.0e-4 * 4.0;
+
+        assert_relative_eq!(observed, expected, epsilon = 1e-15);
+    }
+
+    #[test]
+    fn dispersion_grid_linspace_rejects_nonfinite_arithmetic() {
+        let endpoint_err = linspace(f64::INFINITY, 1.0, 3).unwrap_err();
+        assert!(matches!(
+            endpoint_err,
+            DeseqError::NonFiniteValue { context, .. } if context == "dispersion grid endpoint"
+        ));
+
+        let span_err = linspace(-f64::MAX, f64::MAX, 3).unwrap_err();
+        assert!(matches!(
+            span_err,
+            DeseqError::NonFiniteValue { context, .. } if context == "dispersion grid span"
+        ));
+
+        assert_eq!(linspace(2.0, 2.0, 3).unwrap(), vec![2.0, 2.0, 2.0]);
+    }
+
+    #[test]
+    fn checked_div_rejects_nonfinite_dispersion_summaries() {
+        let zero_err = checked_div(1.0, 0.0, 7, "test dispersion division").unwrap_err();
+        assert!(matches!(
+            zero_err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "test dispersion division" && index == Some(7)
+        ));
+
+        let overflow_err =
+            checked_div(f64::MAX, f64::MIN_POSITIVE, 3, "test dispersion division").unwrap_err();
+        assert!(matches!(
+            overflow_err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "test dispersion division" && index == Some(3)
+        ));
     }
 
     #[test]

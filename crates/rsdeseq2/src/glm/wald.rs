@@ -420,12 +420,12 @@ pub fn wald_stat_and_pvalue_with_options(
             (default_stat, tail.two_sided(default_stat))
         }
         WaldAlternative::GreaterAbs => {
-            let q1 = (-abs_beta + threshold) / beta_se;
-            let q2 = (-abs_beta - threshold) / beta_se;
+            let q1 = checked_shifted_stat(-abs_beta, threshold, beta_se);
+            let q2 = checked_shifted_stat(-abs_beta, -threshold, beta_se);
             (
                 default_stat,
-                tail.lower(q1)
-                    .zip(tail.lower(q2))
+                q1.and_then(|q| tail.lower(q))
+                    .zip(q2.and_then(|q| tail.lower(q)))
                     .and_then(|(a, b)| clamp_probability(a + b)),
             )
         }
@@ -440,31 +440,45 @@ pub fn wald_stat_and_pvalue_with_options(
             (default_stat, pvalue)
         }
         WaldAlternative::GreaterAbs2014 => {
-            let shifted = (abs_beta - threshold) / beta_se;
+            let Some(shifted) = checked_shifted_stat(abs_beta, -threshold, beta_se) else {
+                return Ok(None);
+            };
             let stat = beta.signum() * shifted.max(0.0);
             let pvalue = tail
                 .upper(shifted)
-                .and_then(|pvalue| clamp_probability(2.0 * pvalue));
+                .and_then(|pvalue| checked_product2(2.0, pvalue).and_then(clamp_probability));
             (stat, pvalue)
         }
         WaldAlternative::LessAbs => {
-            let above = ((threshold - beta) / beta_se).max(0.0);
-            let below = ((beta + threshold) / beta_se).max(0.0);
-            let pvalue_above = tail.upper((threshold - beta) / beta_se);
-            let pvalue_below = tail.upper((beta + threshold) / beta_se);
+            let Some(above_shift) = checked_shifted_stat(threshold, -beta, beta_se) else {
+                return Ok(None);
+            };
+            let Some(below_shift) = checked_shifted_stat(beta, threshold, beta_se) else {
+                return Ok(None);
+            };
+            let above = above_shift.max(0.0);
+            let below = below_shift.max(0.0);
+            let pvalue_above = tail.upper(above_shift);
+            let pvalue_below = tail.upper(below_shift);
             (
                 above.min(below),
                 pvalue_above.zip(pvalue_below).map(|(a, b)| a.max(b)),
             )
         }
         WaldAlternative::Greater => {
-            let shifted = (beta - threshold) / beta_se;
+            let Some(shifted) = checked_shifted_stat(beta, -threshold, beta_se) else {
+                return Ok(None);
+            };
             (shifted.max(0.0), tail.upper(shifted))
         }
         WaldAlternative::Less => {
-            let shifted_stat = ((beta + threshold) / beta_se).min(0.0);
-            let shifted_pvalue = (-threshold - beta) / beta_se;
-            (shifted_stat, tail.upper(shifted_pvalue))
+            let Some(shifted_stat) = checked_shifted_stat(beta, threshold, beta_se) else {
+                return Ok(None);
+            };
+            let Some(shifted_pvalue) = checked_shifted_stat(-threshold, -beta, beta_se) else {
+                return Ok(None);
+            };
+            (shifted_stat.min(0.0), tail.upper(shifted_pvalue))
         }
     };
     Ok(Some((stat, pvalue)))
@@ -555,11 +569,8 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
         return Some(two_sided_normal_pvalue(abs_beta / beta_se));
     }
     let distribution = Normal::new(0.0, 1.0).ok()?;
-    let a = (abs_beta + threshold) / beta_se;
-    let b = (abs_beta - threshold) / beta_se;
-    if !a.is_finite() || !b.is_finite() {
-        return None;
-    }
+    let a = checked_shifted_stat(abs_beta, threshold, beta_se)?;
+    let b = checked_shifted_stat(abs_beta, -threshold, beta_se)?;
     let denominator = checked_sub(b, a)?;
     let scale = checked_div(2.0, denominator)?;
     let left_tail_a = distribution.sf(a);
@@ -585,9 +596,18 @@ fn checked_sub(left: f64, right: f64) -> Option<f64> {
     value.is_finite().then_some(value)
 }
 
+fn checked_add(left: f64, right: f64) -> Option<f64> {
+    let value = left + right;
+    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
+}
+
 fn checked_div(left: f64, right: f64) -> Option<f64> {
     let value = left / right;
     (left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite()).then_some(value)
+}
+
+fn checked_shifted_stat(left: f64, right: f64, beta_se: f64) -> Option<f64> {
+    checked_div(checked_add(left, right)?, beta_se)
 }
 
 fn checked_product2(left: f64, right: f64) -> Option<f64> {
@@ -665,5 +685,25 @@ impl WaldTail {
             Self::Normal => Some(two_sided_normal_pvalue(stat)),
             Self::T { degrees_of_freedom } => two_sided_t_pvalue(stat, degrees_of_freedom),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_shifted_stat_rejects_overflowed_threshold_sum() {
+        assert_eq!(checked_shifted_stat(f64::MAX, f64::MAX, 1.0), None);
+        assert_eq!(checked_shifted_stat(4.0, -1.0, 2.0), Some(1.5));
+    }
+
+    #[test]
+    fn thresholded_wald_returns_missing_for_overflowed_shift() {
+        let options =
+            WaldTestOptions::normal().with_lfc_threshold(f64::MAX, WaldAlternative::LessAbs);
+        let result = wald_stat_and_pvalue_with_options(-f64::MAX, 1.0, 0, &options, None).unwrap();
+
+        assert!(result.is_none());
     }
 }

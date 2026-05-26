@@ -737,7 +737,7 @@ fn robust_parametric_trend_rows(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean)?;
-        let residual = disp / fitted;
+        let residual = checked_div2(disp, fitted, "parametric dispersion residual filter")?;
         good.push(
             residual.is_finite()
                 && residual > options.min_residual
@@ -765,8 +765,22 @@ fn gamma_identity_irls(
         let candidate = weighted_gamma_identity_least_squares(means, disps, good, trend)?;
         let candidate = positive_step_halving(means, good, trend, candidate)?;
         let deviance = gamma_deviance(means, disps, good, candidate)?;
-        let converged =
-            ((deviance - old_deviance).abs() / (deviance.abs() + 0.1)) < options.glm_tol;
+        let deviance_change = checked_sub2(
+            deviance,
+            old_deviance,
+            "parametric dispersion gamma IRLS convergence",
+        )?
+        .abs();
+        let deviance_scale = checked_sum2(
+            deviance.abs(),
+            0.1,
+            "parametric dispersion gamma IRLS convergence",
+        )?;
+        let converged = checked_div2(
+            deviance_change,
+            deviance_scale,
+            "parametric dispersion gamma IRLS convergence",
+        )? < options.glm_tol;
         trend = candidate;
         if converged {
             return Ok(GammaIdentityFit {
@@ -810,14 +824,12 @@ fn weighted_gamma_identity_least_squares(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean)?;
-        let inv_fitted = fitted.recip();
-        let weight = inv_fitted * inv_fitted;
-        if !weight.is_finite() {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "parametric dispersion weighted least-squares produced non-finite weights"
-                    .to_string(),
-            });
-        }
+        let inv_fitted = checked_div2(1.0, fitted, PARAMETRIC_WLS_SUM_CONTEXT)?;
+        let weight = checked_product2(
+            inv_fitted,
+            inv_fitted,
+            "parametric dispersion weighted least-squares weights",
+        )?;
         let x = mean.recip();
         checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT)?;
         checked_add_assign(
@@ -855,8 +867,16 @@ fn weighted_gamma_identity_least_squares(
     let extra_pois_numerator =
         checked_product_difference(s00, t1, s01, t0, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
     let target = ParametricDispersionTrend {
-        asympt_disp: asympt_numerator / determinant,
-        extra_pois: extra_pois_numerator / determinant,
+        asympt_disp: checked_div2(
+            asympt_numerator,
+            determinant,
+            "parametric dispersion weighted least-squares coefficients",
+        )?,
+        extra_pois: checked_div2(
+            extra_pois_numerator,
+            determinant,
+            "parametric dispersion weighted least-squares coefficients",
+        )?,
     };
     if !target.asympt_disp.is_finite() || !target.extra_pois.is_finite() {
         return Err(DeseqError::InvalidDispersion {
@@ -890,6 +910,36 @@ fn checked_product2(left: f64, right: f64, context: &str) -> Result<f64, DeseqEr
 
 fn checked_product3(left: f64, middle: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
     checked_product2(checked_product2(left, middle, context)?, right, context)
+}
+
+fn checked_sum2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let sum = left + right;
+    if !left.is_finite() || !right.is_finite() || !sum.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    Ok(sum)
+}
+
+fn checked_sub2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let difference = left - right;
+    if !left.is_finite() || !right.is_finite() || !difference.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    Ok(difference)
+}
+
+fn checked_div2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
+    let quotient = left / right;
+    if !left.is_finite() || !right.is_finite() || right == 0.0 || !quotient.is_finite() {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} must remain finite"),
+        });
+    }
+    Ok(quotient)
 }
 
 fn checked_product_difference(
@@ -1269,7 +1319,7 @@ fn local_weighted_mean(
         }
         let next_total = checked_option_sum2(total_weight, weight)?;
         let delta = checked_option_sub2(ys[idx], mean)?;
-        let step = checked_option_product2(weight / next_total, delta)?;
+        let step = checked_option_product2(checked_option_div2(weight, next_total)?, delta)?;
         mean = checked_option_sum2(mean, step)?;
         total_weight = next_total;
     }
@@ -1289,6 +1339,12 @@ fn checked_option_product2(left: f64, right: f64) -> Option<f64> {
 fn checked_option_sub2(left: f64, right: f64) -> Option<f64> {
     let difference = left - right;
     (left.is_finite() && right.is_finite() && difference.is_finite()).then_some(difference)
+}
+
+fn checked_option_div2(left: f64, right: f64) -> Option<f64> {
+    let quotient = left / right;
+    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
+        .then_some(quotient)
 }
 
 fn checked_option_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
@@ -1354,15 +1410,14 @@ fn parametric_coefficient_change(
 ) -> Result<f64, DeseqError> {
     old.validate_fit()?;
     new.validate_fit()?;
-    let asympt_change = (new.asympt_disp / old.asympt_disp).ln();
-    let extra_pois_change = (new.extra_pois / old.extra_pois).ln();
-    let coefficient_change = asympt_change * asympt_change + extra_pois_change * extra_pois_change;
-    if !coefficient_change.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "parametric dispersion coefficient change must be finite".to_string(),
-        });
-    }
-    Ok(coefficient_change)
+    let context = "parametric dispersion coefficient change";
+    let asympt_change = checked_div2(new.asympt_disp, old.asympt_disp, context)?.ln();
+    let extra_pois_change = checked_div2(new.extra_pois, old.extra_pois, context)?.ln();
+    checked_sum2(
+        checked_product2(asympt_change, asympt_change, context)?,
+        checked_product2(extra_pois_change, extra_pois_change, context)?,
+        context,
+    )
 }
 
 fn validate_parametric_trend_inputs(
@@ -1510,7 +1565,7 @@ fn stable_mean(values: &[f64]) -> f64 {
 }
 
 fn stable_midpoint(left: f64, right: f64) -> f64 {
-    left + (right - left) / 2.0
+    left / 2.0 + right / 2.0
 }
 
 fn validate_positive_mean(mean: f64, index: Option<usize>) -> Result<(), DeseqError> {
@@ -1583,6 +1638,21 @@ mod tests {
     }
 
     #[test]
+    fn checked_div2_rejects_zero_and_nonfinite_quotients() {
+        let zero_err = checked_div2(1.0, 0.0, "test division").unwrap_err();
+        let overflow_err = checked_div2(f64::MAX, f64::MIN_POSITIVE, "test division").unwrap_err();
+
+        assert!(zero_err.to_string().contains("test division"));
+        assert!(overflow_err.to_string().contains("test division"));
+    }
+
+    #[test]
+    fn stable_midpoint_handles_opposite_extreme_endpoints() {
+        assert_eq!(stable_midpoint(-f64::MAX, f64::MAX), 0.0);
+        assert_eq!(stable_midpoint(f64::MAX, f64::MAX), f64::MAX);
+    }
+
+    #[test]
     fn parametric_work_helpers_validate_aligned_rows() {
         let trend = ParametricDispersionTrend {
             asympt_disp: 0.05,
@@ -1629,7 +1699,9 @@ mod tests {
 
         let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-        assert!(err.to_string().contains("non-finite weights"));
+        assert!(err
+            .to_string()
+            .contains("parametric dispersion weighted least-squares"));
     }
 
     #[test]

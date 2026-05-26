@@ -121,30 +121,43 @@ pub fn calculate_cooks_distance(
                 values.push(f64::NAN);
                 continue;
             }
-            let dispersion_mean = checked_mul(dispersion, mean, sample, "Cook's dispersion mean")?;
-            let variance = checked_mul(
-                mean,
-                checked_add(1.0, dispersion_mean, sample, "Cook's variance factor")?,
-                sample,
-                "Cook's variance",
-            )?;
+            let Ok(dispersion_mean) =
+                checked_mul(dispersion, mean, sample, "Cook's dispersion mean")
+            else {
+                values.push(f64::NAN);
+                continue;
+            };
+            let Ok(variance_factor) =
+                checked_add(1.0, dispersion_mean, sample, "Cook's variance factor")
+            else {
+                values.push(f64::NAN);
+                continue;
+            };
+            let Ok(variance) = checked_mul(mean, variance_factor, sample, "Cook's variance") else {
+                values.push(f64::NAN);
+                continue;
+            };
             let residual = f64::from(count_row[sample]) - mean;
             let one_minus_h = 1.0 - h;
-            let residual_sq = checked_mul(residual, residual, sample, "Cook's residual square")?;
+            let Ok(residual_sq) = checked_mul(residual, residual, sample, "Cook's residual square")
+            else {
+                values.push(f64::NAN);
+                continue;
+            };
             let pearson_sq = residual_sq / variance;
-            let denominator = checked_mul(
+            let Ok(denominator) = checked_mul(
                 one_minus_h,
                 one_minus_h,
                 sample,
                 "Cook's leverage denominator",
-            )?;
+            ) else {
+                values.push(f64::NAN);
+                continue;
+            };
             let value = pearson_sq / p * h / denominator;
             if !value.is_finite() {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "Cook's distance".to_string(),
-                    index: Some(sample),
-                    value,
-                });
+                values.push(f64::NAN);
+                continue;
             }
             values.push(value);
         }

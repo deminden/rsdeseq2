@@ -83,7 +83,15 @@ pub fn normalized_counts(
     let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
     for gene in 0..counts.n_genes() {
         for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
-            values.push(f64::from(count) / size_factors[sample]);
+            values.push(
+                checked_div2(f64::from(count), size_factors[sample]).ok_or_else(|| {
+                    DeseqError::NonFiniteValue {
+                        context: "normalized count".to_string(),
+                        index: Some(gene * counts.n_samples() + sample),
+                        value: f64::NAN,
+                    }
+                })?,
+            );
         }
     }
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
@@ -118,8 +126,19 @@ pub fn normalized_counts_with_factors(
     for gene in 0..counts.n_genes() {
         let count_row = counts.row_values(gene);
         let factor_row = normalization_factors.row(gene)?;
-        for (count, factor) in count_row.iter().copied().zip(factor_row.iter().copied()) {
-            values.push(f64::from(count) / factor);
+        for (sample, (count, factor)) in count_row
+            .iter()
+            .copied()
+            .zip(factor_row.iter().copied())
+            .enumerate()
+        {
+            values.push(checked_div2(f64::from(count), factor).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "normalization-factor normalized count".to_string(),
+                    index: Some(gene * counts.n_samples() + sample),
+                    value: f64::NAN,
+                }
+            })?);
         }
     }
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
@@ -263,8 +282,15 @@ fn checked_mean(values: &[f64]) -> Option<f64> {
     if scale == 0.0 {
         return Some(0.0);
     }
-    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale))?;
-    let mean = normalized_sum / values.len() as f64 * scale;
+    let normalized_sum = checked_sum(
+        values
+            .iter()
+            .copied()
+            .map(|value| checked_div2(value, scale))
+            .collect::<Option<Vec<_>>>()?,
+    )?;
+    let normalized_mean = checked_div2(normalized_sum, values.len() as f64)?;
+    let mean = checked_product2(normalized_mean, scale)?;
     mean.is_finite().then_some(mean)
 }
 
@@ -290,14 +316,13 @@ fn checked_weighted_values(
 ) -> Result<Vec<f64>, DeseqError> {
     let mut out = Vec::with_capacity(values.len());
     for (value, weight) in values.iter().copied().zip(weights.iter().copied()) {
-        let weighted = value * weight;
-        if !weighted.is_finite() {
+        let Some(weighted) = checked_product2(value, weight) else {
             return Err(DeseqError::NonFiniteValue {
                 context: context.to_string(),
                 index: Some(gene),
-                value: weighted,
+                value: f64::NAN,
             });
-        }
+        };
         out.push(weighted);
     }
     Ok(out)
@@ -306,7 +331,7 @@ fn checked_weighted_values(
 fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
     let mut scale = 0.0_f64;
     for value in values.iter().copied() {
-        let centered = value - mean;
+        let centered = checked_sub2(value, mean)?;
         if !centered.is_finite() {
             return None;
         }
@@ -317,11 +342,12 @@ fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
     }
     let mut normalized_sum_squares = 0.0;
     for value in values.iter().copied() {
-        let centered = (value - mean) / scale;
-        let square = centered * centered;
+        let centered = checked_div2(checked_sub2(value, mean)?, scale)?;
+        let square = checked_product2(centered, centered)?;
         normalized_sum_squares = checked_sum2(normalized_sum_squares, square)?;
     }
-    let normalized_variance = normalized_sum_squares / (values.len() as f64 - 1.0);
+    let denominator = checked_sub2(values.len() as f64, 1.0)?;
+    let normalized_variance = checked_div2(normalized_sum_squares, denominator)?;
     let scaled_deviation = checked_product2(normalized_variance.sqrt(), scale)?;
     let variance = checked_product2(scaled_deviation, scaled_deviation)?;
     variance.is_finite().then_some(variance)
@@ -336,9 +362,19 @@ fn checked_sum2(left: f64, right: f64) -> Option<f64> {
     (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
+fn checked_sub2(left: f64, right: f64) -> Option<f64> {
+    let difference = left - right;
+    (left.is_finite() && right.is_finite() && difference.is_finite()).then_some(difference)
+}
+
 fn checked_product2(left: f64, right: f64) -> Option<f64> {
     let product = left * right;
     (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
+}
+
+fn checked_div2(left: f64, right: f64) -> Option<f64> {
+    let quotient = left / right;
+    (left.is_finite() && right.is_finite() && quotient.is_finite()).then_some(quotient)
 }
 
 fn validate_weighted_base_inputs(
@@ -381,7 +417,13 @@ fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
                         value: f64::NAN,
                     },
                 )?;
-                Ok(sum / counts.n_samples() as f64)
+                checked_div2(sum, counts.n_samples() as f64).ok_or_else(|| {
+                    DeseqError::NonFiniteValue {
+                        context: "ratio geometric mean log mean".to_string(),
+                        index: Some(gene),
+                        value: f64::NAN,
+                    }
+                })
             }
         })
         .collect()
@@ -404,7 +446,13 @@ fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError>
                     index: Some(gene),
                     value: f64::NAN,
                 })?;
-                Ok(sum / counts.n_samples() as f64)
+                checked_div2(sum, counts.n_samples() as f64).ok_or_else(|| {
+                    DeseqError::NonFiniteValue {
+                        context: "poscounts geometric mean log mean".to_string(),
+                        index: Some(gene),
+                        value: f64::NAN,
+                    }
+                })
             }
         })
         .collect()
@@ -453,7 +501,15 @@ fn estimate_from_log_geo_means(
             let log_geo_mean = log_geo_means[*gene];
             let count = counts.row_values(*gene)[sample];
             if log_geo_mean.is_finite() && count > 0 {
-                log_ratios.push(f64::from(count).ln() - log_geo_mean);
+                log_ratios.push(
+                    checked_sub2(f64::from(count).ln(), log_geo_mean).ok_or_else(|| {
+                        DeseqError::NonFiniteValue {
+                            context: "size-factor log ratio".to_string(),
+                            index: Some(*gene),
+                            value: f64::NAN,
+                        }
+                    })?,
+                );
             }
         }
         if log_ratios.is_empty() {
@@ -500,7 +556,11 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),
         }
     })?;
-    let log_mean = log_sum / size_factors.len() as f64;
+    let log_mean = checked_div2(log_sum, size_factors.len() as f64).ok_or_else(|| {
+        DeseqError::InvalidSizeFactors {
+            reason: "cannot stabilize size factors to geometric mean one".to_string(),
+        }
+    })?;
     let scale = log_mean.exp();
     if !scale.is_finite() || scale <= 0.0 {
         return Err(DeseqError::InvalidSizeFactors {
@@ -508,7 +568,9 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
         });
     }
     for value in size_factors {
-        *value /= scale;
+        *value = checked_div2(*value, scale).ok_or_else(|| DeseqError::InvalidSizeFactors {
+            reason: "cannot stabilize size factors to geometric mean one".to_string(),
+        })?;
     }
     Ok(())
 }

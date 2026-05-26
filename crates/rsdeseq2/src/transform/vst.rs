@@ -314,16 +314,24 @@ pub fn vst_local(
             reason: "local VST integral must increase across scaling quantiles".to_string(),
         });
     }
-    let eta = (h2.log2() - h1.log2()) / (int_h2 - int_h1);
-    let xi = h1.log2() - eta * int_h1;
+    let log_delta = checked_sub(h2.log2(), h1.log2(), 0, "local VST scaling log delta")?;
+    let integral_delta = checked_sub(int_h2, int_h1, 0, "local VST scaling integral delta")?;
+    let eta = checked_div(log_delta, integral_delta, 0, "local VST scaling eta")?;
+    let eta_integral = checked_mul(eta, int_h1, 0, "local VST scaling eta integral")?;
+    let xi = checked_sub(h1.log2(), eta_integral, 0, "local VST scaling xi")?;
     let values = normalized_counts
         .as_slice()
         .iter()
         .copied()
         .map(|count| {
-            integral
-                .evaluate(count.asinh())
-                .map(|value| eta * value + xi)
+            integral.evaluate(count.asinh()).and_then(|value| {
+                checked_add(
+                    checked_mul(eta, value, 0, "local VST scaled value")?,
+                    xi,
+                    0,
+                    "local VST scaled value",
+                )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     RowMajorMatrix::from_row_major(
@@ -386,7 +394,13 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
     }
     let mut inverse_column_means = Vec::with_capacity(normalization_factors.n_cols());
     for (sample, sum) in log_col_sums.into_iter().enumerate() {
-        let column_geometric_mean = (sum / normalization_factors.n_rows() as f64).exp();
+        let log_mean = checked_div(
+            sum,
+            normalization_factors.n_rows() as f64,
+            sample,
+            "local VST normalization-factor log column mean",
+        )?;
+        let column_geometric_mean = log_mean.exp();
         if !column_geometric_mean.is_finite() || column_geometric_mean <= 0.0 {
             return Err(DeseqError::NonFiniteValue {
                 context: "local VST normalization-factor geometric mean".to_string(),
@@ -493,13 +507,42 @@ pub fn vst_mean_value(
             value: normalized_count,
         });
     }
-    let dispersion_count = mean_dispersion * normalized_count;
+    let dispersion_count = match checked_mul(
+        mean_dispersion,
+        normalized_count,
+        index,
+        "mean VST dispersion count",
+    ) {
+        Ok(value) => value,
+        Err(_) => return Ok(normalized_count.log2()),
+    };
     if dispersion_count.is_infinite() {
         return Ok(normalized_count.log2());
     }
+    let transformed_numerator = checked_sub(
+        checked_mul(
+            2.0,
+            dispersion_count.sqrt().asinh(),
+            index,
+            "mean VST numerator",
+        )?,
+        mean_dispersion.ln(),
+        index,
+        "mean VST numerator",
+    )?;
+    let transformed_numerator = checked_sub(
+        transformed_numerator,
+        4.0_f64.ln(),
+        index,
+        "mean VST numerator",
+    )?;
     finite_value(
-        (2.0 * dispersion_count.sqrt().asinh() - mean_dispersion.ln() - 4.0_f64.ln())
-            / std::f64::consts::LN_2,
+        checked_div(
+            transformed_numerator,
+            std::f64::consts::LN_2,
+            index,
+            "mean VST value",
+        )?,
         Some(index),
         "mean VST value",
     )
@@ -515,13 +558,35 @@ pub fn vst_parametric_value(
     validate_normalized_count(normalized_count, index)?;
     let alpha = trend.asympt_disp;
     let extra = trend.extra_pois;
-    let alpha_count = alpha * normalized_count;
+    let alpha_count =
+        match checked_mul(alpha, normalized_count, index, "parametric VST alpha count") {
+            Ok(value) => value,
+            Err(_) => return Ok(normalized_count.log2()),
+        };
     if alpha_count.is_infinite() {
         return Ok(normalized_count.log2());
     }
-    let numerator_root = alpha_count.sqrt() + (1.0 + extra + alpha_count).sqrt();
+    let root_term = checked_add(1.0, extra, index, "parametric VST root term")
+        .and_then(|value| checked_add(value, alpha_count, index, "parametric VST root term"))?;
+    let numerator_root = checked_add(
+        alpha_count.sqrt(),
+        root_term.sqrt(),
+        index,
+        "parametric VST numerator root",
+    )?;
+    let numerator = checked_sub(
+        checked_mul(2.0, numerator_root.ln(), index, "parametric VST numerator")?,
+        checked_mul(4.0, alpha, index, "parametric VST denominator")?.ln(),
+        index,
+        "parametric VST numerator",
+    )?;
     finite_value(
-        (2.0 * numerator_root.ln() - (4.0 * alpha).ln()) / std::f64::consts::LN_2,
+        checked_div(
+            numerator,
+            std::f64::consts::LN_2,
+            index,
+            "parametric VST value",
+        )?,
         Some(index),
         "parametric VST value",
     )
@@ -568,16 +633,28 @@ impl LocalVstIntegral {
         let mut y = Vec::with_capacity(grid.len() - 1);
         let mut cumulative = 0.0;
         for idx in 1..grid.len() {
-            let width = grid[idx] - grid[idx - 1];
+            let width = checked_sub(grid[idx], grid[idx - 1], idx, "local VST integration width")?;
             let height_sum = checked_add(
                 integrand[idx],
                 integrand[idx - 1],
                 idx,
                 "local VST integration height sum",
             )?;
-            let area = checked_mul(width, height_sum, idx, "local VST integration area")? / 2.0;
+            let area = checked_div(
+                checked_mul(width, height_sum, idx, "local VST integration area")?,
+                2.0,
+                idx,
+                "local VST integration area",
+            )?;
             cumulative = checked_add(cumulative, area, idx, "local VST integration cumulative")?;
-            x.push(((grid[idx] + grid[idx - 1]) / 2.0).asinh());
+            let midpoint_sum = checked_add(
+                grid[idx],
+                grid[idx - 1],
+                idx,
+                "local VST integration midpoint sum",
+            )?;
+            let midpoint = checked_div(midpoint_sum, 2.0, idx, "local VST integration midpoint")?;
+            x.push(midpoint.asinh());
             y.push(cumulative);
         }
         if x.is_empty() {
@@ -599,9 +676,15 @@ impl LocalVstIntegral {
             });
         }
         if target <= self.x[0] {
+            let fraction = checked_div(
+                target,
+                self.x[0],
+                0,
+                "local VST interpolation lower fraction",
+            )?;
             let value = checked_mul(
                 self.y[0],
-                target / self.x[0],
+                fraction,
                 0,
                 "local VST interpolation lower extrapolation",
             )?;
@@ -609,24 +692,65 @@ impl LocalVstIntegral {
         }
         let last = self.x.len() - 1;
         if target >= self.x[last] {
-            let slope = (self.y[last] - self.y[last - 1]) / (self.x[last] - self.x[last - 1]);
+            let y_delta = checked_sub(
+                self.y[last],
+                self.y[last - 1],
+                last,
+                "local VST interpolation upper y delta",
+            )?;
+            let x_delta = checked_sub(
+                self.x[last],
+                self.x[last - 1],
+                last,
+                "local VST interpolation upper x delta",
+            )?;
+            let slope = checked_div(
+                y_delta,
+                x_delta,
+                last,
+                "local VST interpolation upper slope",
+            )?;
+            let target_delta = checked_sub(
+                target,
+                self.x[last],
+                last,
+                "local VST interpolation upper target delta",
+            )?;
             let value = checked_interpolate(
                 self.y[last],
                 slope,
-                target - self.x[last],
+                target_delta,
                 "local VST interpolation upper extrapolation",
             )?;
             return Ok(value);
         }
         let upper = self.x.partition_point(|value| *value < target);
         let lower = upper - 1;
-        let fraction = (target - self.x[lower]) / (self.x[upper] - self.x[lower]);
-        checked_interpolate(
+        let target_delta = checked_sub(
+            target,
+            self.x[lower],
+            lower,
+            "local VST interpolation target delta",
+        )?;
+        let x_delta = checked_sub(
+            self.x[upper],
+            self.x[lower],
+            upper,
+            "local VST interpolation x delta",
+        )?;
+        let fraction = checked_div(
+            target_delta,
+            x_delta,
+            lower,
+            "local VST interpolation fraction",
+        )?;
+        let y_delta = checked_sub(
+            self.y[upper],
             self.y[lower],
-            fraction,
-            self.y[upper] - self.y[lower],
-            "local VST interpolation",
-        )
+            upper,
+            "local VST interpolation y delta",
+        )?;
+        checked_interpolate(self.y[lower], fraction, y_delta, "local VST interpolation")
     }
 }
 
@@ -742,13 +866,23 @@ fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
     checked_interpolate(
         sorted[lower_idx],
         fraction,
-        sorted[lower_idx + 1] - sorted[lower_idx],
+        checked_sub(
+            sorted[lower_idx + 1],
+            sorted[lower_idx],
+            lower_idx,
+            "local VST quantile interpolation delta",
+        )?,
         "local VST quantile interpolation",
     )
 }
 
 fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left + right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left - right;
     finite_value(value, Some(index), context)
 }
 
@@ -764,6 +898,11 @@ fn checked_add_assign(
 
 fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left * right;
+    finite_value(value, Some(index), context)
+}
+
+fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left / right;
     finite_value(value, Some(index), context)
 }
 
@@ -799,8 +938,17 @@ fn checked_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
     if scale == 0.0 {
         return Ok(0.0);
     }
-    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
-    let mean = normalized_sum / values.len() as f64 * scale;
+    let normalized_sum = checked_sum(
+        values
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, value)| checked_div(value, scale, idx, context))
+            .collect::<Result<Vec<_>, _>>()?,
+        context,
+    )?;
+    let normalized_mean = checked_div(normalized_sum, values.len() as f64, 0, context)?;
+    let mean = checked_mul(normalized_mean, scale, 0, context)?;
     finite_value(mean, None, context)
 }
 
@@ -832,9 +980,37 @@ mod tests {
     }
 
     #[test]
+    fn checked_local_vst_arithmetic_rejects_nonfinite_subtraction_and_division() {
+        let sub_err = checked_sub(f64::MAX, -f64::MAX, 0, "test subtraction").unwrap_err();
+        assert!(matches!(
+            sub_err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "test subtraction" && index == Some(0)
+        ));
+
+        let div_err = checked_div(1.0, 0.0, 1, "test division").unwrap_err();
+        assert!(matches!(
+            div_err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "test division" && index == Some(1)
+        ));
+    }
+
+    #[test]
     fn quantile_type7_keeps_large_equal_values_finite() {
         let value = quantile_type7(&[f64::MAX / 2.0, f64::MAX / 2.0], 0.5).unwrap();
 
         assert_eq!(value, f64::MAX / 2.0);
+    }
+
+    #[test]
+    fn quantile_type7_rejects_overflowed_delta() {
+        let err = quantile_type7(&[-f64::MAX, f64::MAX], 0.5).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "local VST quantile interpolation delta" && index == Some(0)
+        ));
     }
 }

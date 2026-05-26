@@ -374,6 +374,16 @@ fn wald_test_coefficient_can_use_one_sided_thresholds() {
         0.02275013194817921,
         epsilon = 1e-11
     );
+
+    let opposite_fit = toy_fit(vec![2.0], vec![0.5], 1, 1);
+    let opposite = wald_test_coefficient_with_options(
+        &opposite_fit,
+        0,
+        &WaldTestOptions::normal().with_lfc_threshold(1.0, WaldAlternative::Less),
+    )
+    .unwrap();
+    assert_eq!(opposite.stat[0], Some(0.0));
+    assert!(opposite.pvalue[0].unwrap() > 0.999);
 }
 
 #[test]

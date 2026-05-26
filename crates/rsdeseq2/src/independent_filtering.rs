@@ -230,9 +230,14 @@ pub fn default_theta(filter: &[f64]) -> Result<Vec<f64>, DeseqError> {
     }
     validate_filter(filter)?;
     let zero_count = filter.iter().filter(|value| **value == 0.0).count();
-    let lower = zero_count as f64 / filter.len() as f64;
+    let lower = checked_div(
+        zero_count as f64,
+        filter.len() as f64,
+        0,
+        "independent-filter default theta lower bound",
+    )?;
     let upper = if lower < 0.95 { 0.95 } else { 1.0 };
-    Ok(seq(lower, upper, 50))
+    seq(lower, upper, 50)
 }
 
 /// Compute filtered BH-adjusted p-values for each candidate cutoff.
@@ -317,8 +322,12 @@ pub fn select_filter_index_with_lowess(
         .iter()
         .copied()
         .zip(smooth.iter().copied())
-        .filter_map(|(count, fitted)| (count > 0).then_some(count as f64 - fitted))
-        .collect::<Vec<_>>();
+        .enumerate()
+        .filter(|(_, (count, _))| *count > 0)
+        .map(|(idx, (count, fitted))| {
+            checked_sub(count as f64, fitted, idx, "independent-filter residual")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let rmse = positive_residual_rmse(&positive_residuals)?;
     let max_fit = smooth.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let threshold = checked_sub(max_fit, rmse, 0, "independent-filter threshold")?;
@@ -380,7 +389,12 @@ pub fn lowess_fitted_values(
         .map(|idx| num_rejections[*idx] as f64)
         .collect::<Vec<_>>();
 
-    let delta = 0.01 * (sorted_x[n - 1] - sorted_x[0]);
+    let delta = checked_mul(
+        0.01,
+        checked_sub(sorted_x[n - 1], sorted_x[0], 0, "lowess delta range")?,
+        0,
+        "lowess delta",
+    )?;
     let fitted_sorted = lowess_sorted(&sorted_x, &sorted_y, span_fraction, 3, delta)?;
     let mut fitted = vec![0.0; n];
     for (sorted_idx, original_idx) in order.into_iter().enumerate() {
@@ -453,23 +467,67 @@ fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
     if sorted.len() == 1 {
         return Ok(sorted[0]);
     }
-    let h = 1.0 + (sorted.len() as f64 - 1.0) * probability;
+    let h = checked_add(
+        1.0,
+        checked_mul(
+            checked_sub(sorted.len() as f64, 1.0, 0, "quantile h span")?,
+            probability,
+            0,
+            "quantile h offset",
+        )?,
+        0,
+        "quantile h",
+    )?;
     let floor = h.floor();
     let lower_idx = floor as usize - 1;
-    let gamma = h - floor;
+    let gamma = checked_sub(h, floor, lower_idx, "quantile interpolation gamma")?;
     if lower_idx + 1 >= sorted.len() {
         Ok(sorted[sorted.len() - 1])
     } else {
-        Ok(sorted[lower_idx] + gamma * (sorted[lower_idx + 1] - sorted[lower_idx]))
+        checked_add(
+            sorted[lower_idx],
+            checked_mul(
+                gamma,
+                checked_sub(
+                    sorted[lower_idx + 1],
+                    sorted[lower_idx],
+                    lower_idx,
+                    "quantile interpolation delta",
+                )?,
+                lower_idx,
+                "quantile interpolation offset",
+            )?,
+            lower_idx,
+            "quantile interpolation",
+        )
     }
 }
 
-fn seq(start: f64, end: f64, len: usize) -> Vec<f64> {
+fn seq(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     if len == 1 {
-        return vec![start];
+        return Ok(vec![start]);
     }
-    let step = (end - start) / (len - 1) as f64;
-    (0..len).map(|idx| start + step * idx as f64).collect()
+    let step = checked_div(
+        checked_sub(end, start, 0, "independent-filter theta step span")?,
+        checked_sub(
+            len as f64,
+            1.0,
+            0,
+            "independent-filter theta step denominator",
+        )?,
+        0,
+        "independent-filter theta step",
+    )?;
+    (0..len)
+        .map(|idx| {
+            checked_add(
+                start,
+                checked_mul(step, idx as f64, idx, "independent-filter theta offset")?,
+                idx,
+                "independent-filter theta value",
+            )
+        })
+        .collect()
 }
 
 fn lowess_sorted(
@@ -501,17 +559,17 @@ fn lowess_sorted(
         let mean_absolute_residual =
             checked_scaled_mean(&residuals, "lowess mean absolute residual")?;
         let scale = six_mad(&residuals)?;
-        if scale < 1e-7 * mean_absolute_residual {
+        if scale < checked_mul(1e-7, mean_absolute_residual, 0, "lowess residual tolerance")? {
             break;
         }
         for (weight, residual) in robustness_weights.iter_mut().zip(residuals.iter().copied()) {
             let absolute = residual.abs();
-            if absolute <= 0.001 * scale {
+            if absolute <= checked_mul(0.001, scale, 0, "lowess robustness low cutoff")? {
                 *weight = 1.0;
-            } else if absolute >= 0.999 * scale {
+            } else if absolute >= checked_mul(0.999, scale, 0, "lowess robustness high cutoff")? {
                 *weight = 0.0;
             } else {
-                let ratio = absolute / scale;
+                let ratio = checked_div(absolute, scale, 0, "lowess robustness ratio")?;
                 let ratio_sq = checked_mul(ratio, ratio, 0, "lowess robustness ratio square")?;
                 let one_minus_ratio_sq =
                     checked_sub(1.0, ratio_sq, 0, "lowess robustness weight base")?;
@@ -542,8 +600,9 @@ fn lowess_delta_pass(
     let mut idx = 0_usize;
     loop {
         while n_right < n - 1 {
-            let left_radius = x[idx] - x[n_left];
-            let next_right_radius = x[n_right + 1] - x[idx];
+            let left_radius = checked_sub(x[idx], x[n_left], idx, "lowess left radius")?;
+            let next_right_radius =
+                checked_sub(x[n_right + 1], x[idx], idx, "lowess right radius")?;
             if left_radius > next_right_radius {
                 n_left += 1;
                 n_right += 1;
@@ -558,12 +617,18 @@ fn lowess_delta_pass(
 
         if let Some(last) = last_estimated {
             if last < idx - 1 {
-                let denominator = x[idx] - x[last];
+                let denominator =
+                    checked_sub(x[idx], x[last], idx, "lowess interpolation denominator")?;
                 for point in last + 1..idx {
                     fitted[point] = if denominator.abs() <= f64::EPSILON {
                         fitted[last]
                     } else {
-                        let fraction = (x[point] - x[last]) / denominator;
+                        let fraction = checked_div(
+                            checked_sub(x[point], x[last], point, "lowess interpolation x delta")?,
+                            denominator,
+                            point,
+                            "lowess interpolation fraction",
+                        )?;
                         checked_add(
                             checked_mul(
                                 fraction,
@@ -572,7 +637,12 @@ fn lowess_delta_pass(
                                 "lowess interpolation upper term",
                             )?,
                             checked_mul(
-                                1.0 - fraction,
+                                checked_sub(
+                                    1.0,
+                                    fraction,
+                                    point,
+                                    "lowess interpolation complement",
+                                )?,
                                 fitted[last],
                                 point,
                                 "lowess interpolation lower term",
@@ -585,7 +655,7 @@ fn lowess_delta_pass(
             }
         }
         let mut last = idx;
-        let cutoff = x[last] + delta.max(0.0);
+        let cutoff = checked_add(x[last], delta.max(0.0), last, "lowess delta cutoff")?;
         let mut next = last + 1;
         while next < n {
             if x[next] > cutoff {
@@ -615,23 +685,37 @@ fn lowest_at(
     robustness_weights: &[f64],
 ) -> Result<Option<f64>, DeseqError> {
     let target_x = x[idx];
-    let range = x[x.len() - 1] - x[0];
-    let bandwidth = (target_x - x[n_left]).max(x[n_right] - target_x);
-    let high = 0.999 * bandwidth;
-    let low = 0.001 * bandwidth;
+    let range = checked_sub(x[x.len() - 1], x[0], idx, "lowess x range")?;
+    let left_bandwidth = checked_sub(target_x, x[n_left], idx, "lowess left bandwidth")?;
+    let right_bandwidth = checked_sub(x[n_right], target_x, idx, "lowess right bandwidth")?;
+    let bandwidth = left_bandwidth.max(right_bandwidth);
+    let high = checked_mul(0.999, bandwidth, idx, "lowess high bandwidth")?;
+    let low = checked_mul(0.001, bandwidth, idx, "lowess low bandwidth")?;
     let mut weights = Vec::new();
     let mut sum_weights = 0.0;
     let mut point = n_left;
     while point < x.len() {
-        let distance = (x[point] - target_x).abs();
+        let distance = checked_sub(x[point], target_x, point, "lowess distance")?.abs();
         if distance <= high {
             let proximity = if distance <= low {
                 1.0
             } else {
-                let ratio = distance / bandwidth;
-                let ratio_cubed = ratio * ratio * ratio;
-                let one_minus_ratio_cubed = 1.0 - ratio_cubed;
-                one_minus_ratio_cubed * one_minus_ratio_cubed * one_minus_ratio_cubed
+                let ratio = checked_div(distance, bandwidth, point, "lowess distance ratio")?;
+                let ratio_sq = checked_mul(ratio, ratio, point, "lowess ratio square")?;
+                let ratio_cubed = checked_mul(ratio_sq, ratio, point, "lowess ratio cube")?;
+                let one_minus_ratio_cubed =
+                    checked_sub(1.0, ratio_cubed, point, "lowess tricube base")?;
+                checked_mul(
+                    checked_mul(
+                        one_minus_ratio_cubed,
+                        one_minus_ratio_cubed,
+                        point,
+                        "lowess tricube square",
+                    )?,
+                    one_minus_ratio_cubed,
+                    point,
+                    "lowess tricube proximity",
+                )?
             };
             let weight = checked_mul(
                 proximity,
@@ -651,7 +735,7 @@ fn lowest_at(
     }
 
     for (_, weight) in &mut weights {
-        *weight /= sum_weights;
+        *weight = checked_div(*weight, sum_weights, 0, "lowess normalized weight")?;
     }
 
     if bandwidth > 0.0 {
@@ -676,8 +760,13 @@ fn lowest_at(
                 "lowess variance",
             )?;
         }
-        if variance.sqrt() > 0.001 * range {
-            let slope_factor = (target_x - center) / variance;
+        if variance.sqrt() > checked_mul(0.001, range, idx, "lowess slope variance threshold")? {
+            let slope_factor = checked_div(
+                checked_sub(target_x, center, idx, "lowess slope target delta")?,
+                variance,
+                idx,
+                "lowess slope factor",
+            )?;
             for (point, weight) in &mut weights {
                 let centered = checked_sub(x[*point], center, *point, "lowess slope centered x")?;
                 let adjustment = checked_add(
@@ -753,14 +842,23 @@ fn positive_residual_rmse(residuals: &[f64]) -> Result<f64, DeseqError> {
     let scaled_squares = residuals
         .iter()
         .copied()
-        .map(|value| {
-            let scaled = value / scale;
-            scaled * scaled
+        .enumerate()
+        .map(|(idx, value)| {
+            let scaled = checked_div(value, scale, idx, "independent-filter RMSE scaled value")?;
+            checked_mul(scaled, scaled, idx, "independent-filter RMSE scaled square")
         })
-        .collect::<Vec<_>>();
-    let mean_square =
-        checked_sum(scaled_squares, "independent-filter RMSE sum")? / residuals.len() as f64;
-    finite_value(scale * mean_square.sqrt(), None, "independent-filter RMSE")
+        .collect::<Result<Vec<_>, _>>()?;
+    let mean_square = checked_div(
+        checked_sum(scaled_squares, "independent-filter RMSE sum")?,
+        residuals.len() as f64,
+        0,
+        "independent-filter RMSE mean square",
+    )?;
+    finite_value(
+        checked_mul(scale, mean_square.sqrt(), 0, "independent-filter RMSE")?,
+        None,
+        "independent-filter RMSE",
+    )
 }
 
 fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
@@ -778,8 +876,18 @@ fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     finite_value(value, Some(index), context)
 }
 
+fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+    let value = left / right;
+    finite_value(value, Some(index), context)
+}
+
 fn checked_midpoint(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    finite_value(left + (right - left) / 2.0, Some(index), context)
+    checked_add(
+        checked_div(left, 2.0, index, context)?,
+        checked_div(right, 2.0, index, context)?,
+        index,
+        context,
+    )
 }
 
 fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
@@ -809,9 +917,18 @@ fn checked_scaled_mean(values: &[f64], context: &str) -> Result<f64, DeseqError>
     if scale == 0.0 {
         return Ok(0.0);
     }
-    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
+    let normalized_sum = checked_sum(
+        values
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, value)| checked_div(value, scale, idx, context))
+            .collect::<Result<Vec<_>, _>>()?,
+        context,
+    )?;
+    let normalized_mean = checked_div(normalized_sum, values.len() as f64, 0, context)?;
     finite_value(
-        scale * (normalized_sum / values.len() as f64),
+        checked_mul(scale, normalized_mean, 0, context)?,
         None,
         context,
     )

@@ -356,9 +356,10 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
         );
     }
     for gene in output.refit_plan.new_all_zero_rows.iter().copied() {
-        assert_eq!(output.results.rows[gene].pvalue, None);
-        assert_eq!(output.results.rows[gene].stat, None);
-        assert_eq!(output.results.rows[gene].log2_fold_change, None);
+        assert_eq!(output.results.rows[gene].pvalue, Some(1.0));
+        assert_eq!(output.results.rows[gene].stat, Some(0.0));
+        assert_eq!(output.results.rows[gene].log2_fold_change, Some(0.0));
+        assert_eq!(output.results.rows[gene].lfc_se, Some(0.0));
         assert_eq!(output.results.rows[gene].dispersion, None);
     }
 }

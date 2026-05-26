@@ -17,6 +17,10 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add builder-owned observation weights, design-aware `weights_fail`
   fit-state metadata, and supplied-dispersion Wald/LRT weighted GLM wiring.
 - [x] Add builder-owned `geoMeans` and `controlGenes` options.
+- [x] Expose control-gene size-factor estimation through the native CLI
+  normalization path.
+- [x] Expose supplied geometric means through the native CLI normalization
+  path.
 - [x] Add builder-owned caller-supplied size factors for fixed-size-factor
   parity tests and external caller integration.
 - [x] Add hand tests for DESeq2 size-factor error cases.
@@ -108,6 +112,10 @@ reference; no DESeq2 source is vendored or translated line by line.
   weighted-count preprocessing.
 - [x] Add builder APIs for DESeq2-like `geoMeans` and `controlGenes`.
 - [x] Support both control-gene indices and logical masks in Rust API.
+- [x] Add CLI `--control-genes` coverage for size-factor estimation,
+  normalized counts, base means, VST, Wald, and LRT.
+- [x] Add CLI `--geometric-means` coverage for size-factor estimation,
+  normalized counts, base means, VST, Wald, and LRT.
 
 ## Phase 2: Fixed-Dispersion GLM
 
@@ -390,6 +398,7 @@ reference; no DESeq2 source is vendored or translated line by line.
   DESeq2's `contrastAllZeroCharacter` selected-sample rule.
 - [x] Native linear-mu and GLM-mu Wald contrast wrappers for primitive numeric,
   coefficient-name/list, and caller-supplied factor-level requests.
+- [x] Expose coefficient-name Wald contrasts through the native CLI.
 - [ ] Full DESeq2 contrast handling for `results(contrast=...)`, including
   colData/formula-aware factor-level semantics, complete coefficient-name
   cleanup, and contrast-aware Cook's/refit edge cases.

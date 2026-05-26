@@ -59,16 +59,17 @@ fn cooks_distance_matches_hand_formula_for_intercept_cell() {
 }
 
 #[test]
-fn cooks_distance_rejects_overflowed_variance() {
+fn cooks_distance_masks_overflowed_variance() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 6]).unwrap();
     let normalized = RowMajorMatrix::from_row_major(1, 3, vec![2.0_f64, 4.0_f64, 6.0_f64]).unwrap();
     let mu = RowMajorMatrix::from_row_major(1, 3, vec![2e154, 2e154, 2e154]).unwrap();
     let hat = RowMajorMatrix::from_row_major(1, 3, vec![0.1_f64, 0.1_f64, 0.1_f64]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    let err = calculate_cooks_distance(&counts, &normalized, &mu, &hat, &design).unwrap_err();
+    let output = calculate_cooks_distance(&counts, &normalized, &mu, &hat, &design).unwrap();
 
-    assert!(matches!(err, DeseqError::NonFiniteValue { .. }));
+    assert!(output.cooks.as_slice().iter().all(|value| value.is_nan()));
+    assert_eq!(output.max_cooks, vec![None]);
 }
 
 #[test]

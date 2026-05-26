@@ -86,7 +86,7 @@ impl Default for IrlsOptions {
             ridge_lambda: 1e-6 * inv_ln2 * inv_ln2,
             ridge_lambda_by_coefficient: None,
             solver: IrlsSolver::NormalEquations,
-            use_optim: false,
+            use_optim: true,
             force_optim: false,
             optim_maxit: 200,
             optim_tol: 1e-8,
@@ -281,11 +281,10 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             mu = fitted_mu(&x, &beta, nf, options.min_mu)?;
             dev = -2.0
                 * nbinom_log_likelihood_weighted(counts.row(gene)?, &mu, dispersion, weight_row)?;
-            let conv_test = (dev - dev_old).abs() / (dev.abs() + 0.1);
-            if !conv_test.is_finite() {
+            let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
                 iter = options.maxit;
                 break;
-            }
+            };
             if t > 0 && conv_test < options.beta_tol {
                 converged = true;
                 break;
@@ -603,12 +602,11 @@ fn minimize_beta_log2_newton(
         let mut step = options.initial_step;
         let mut accepted = None;
         while step >= options.min_step {
-            let candidate = parameters
-                .iter()
-                .copied()
-                .zip(direction.iter().copied())
-                .map(|(value, delta)| (value + step * delta).clamp(lower, upper))
-                .collect::<Vec<_>>();
+            let Some(candidate) = checked_candidate(&parameters, &direction, step, lower, upper)
+            else {
+                step *= 0.5;
+                continue;
+            };
             let Some(movement) = max_abs_difference(&parameters, &candidate) else {
                 step *= 0.5;
                 continue;
@@ -909,8 +907,8 @@ fn projected_gradient_norm(
             } else {
                 gradient
             };
-        let scaled = value / scale;
-        let term = scaled * scaled;
+        let scaled = checked_div2(value, scale)?;
+        let term = checked_product2(scaled, scaled)?;
         let next = sum + term;
         if !term.is_finite() || !next.is_finite() {
             return None;
@@ -947,7 +945,7 @@ fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
     }
     let mut sum = 0.0;
     for value in values.iter().copied() {
-        sum = checked_sum2(sum, value / scale)?;
+        sum = checked_sum2(sum, checked_div2(value, scale)?)?;
     }
     checked_product2(sum, scale)
 }
@@ -955,6 +953,12 @@ fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
 fn checked_product2(left: f64, right: f64) -> Option<f64> {
     let product = left * right;
     (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
+}
+
+fn checked_div2(left: f64, right: f64) -> Option<f64> {
+    let quotient = left / right;
+    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
+        .then_some(quotient)
 }
 
 fn checked_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
@@ -982,17 +986,55 @@ fn checked_product6(
     )
 }
 
+fn irls_deviance_convergence_stat(dev: f64, dev_old: f64) -> Option<f64> {
+    let delta = checked_sum2(dev, -dev_old)?.abs();
+    let scale = checked_sum2(dev.abs(), 0.1)?;
+    checked_div2(delta, scale)
+}
+
 fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
     checked_sum2(value, checked_product2(armijo, derivative)?)
+}
+
+fn checked_candidate(
+    parameters: &[f64],
+    direction: &[f64],
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<Vec<f64>> {
+    parameters
+        .iter()
+        .copied()
+        .zip(direction.iter().copied())
+        .map(|(value, delta)| checked_candidate_coordinate(value, delta, step, lower, upper))
+        .collect()
+}
+
+fn checked_candidate_coordinate(
+    value: f64,
+    delta: f64,
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<f64> {
+    if !value.is_finite()
+        || !delta.is_finite()
+        || !step.is_finite()
+        || !lower.is_finite()
+        || !upper.is_finite()
+    {
+        return None;
+    }
+    let displacement = checked_product2(step, delta)?;
+    let candidate = checked_sum2(value, displacement)?;
+    Some(candidate.clamp(lower, upper))
 }
 
 fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
     let mut max_difference = 0.0;
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let difference = (left - right).abs();
-        if !difference.is_finite() {
-            return None;
-        }
+        let difference = checked_sum2(left, -right)?.abs();
         max_difference = f64::max(max_difference, difference);
     }
     Some(max_difference)
@@ -1009,10 +1051,7 @@ fn actual_directional_derivative(
         .copied()
         .zip(candidate.iter().copied().zip(parameters.iter().copied()))
     {
-        let direction = candidate - parameter;
-        if !direction.is_finite() {
-            return None;
-        }
+        let direction = checked_sum2(candidate, -parameter)?;
         terms.push(checked_product2(gradient, direction)?);
     }
     checked_scaled_sum(&terms)
@@ -1150,12 +1189,32 @@ fn working_weights(
         .enumerate()
         .map(|(sample, value)| {
             validate_positive_finite(value, "mu", sample)?;
-            let working_weight = value / (1.0 + dispersion * value);
+            let disp_mu =
+                checked_product2(dispersion, value).ok_or(DeseqError::NonFiniteValue {
+                    context: "IRLS working weight dispersion mean product".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
+            let denominator = checked_sum2(1.0, disp_mu).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS working weight denominator".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })?;
+            let working_weight =
+                checked_div2(value, denominator).ok_or(DeseqError::NonFiniteValue {
+                    context: "IRLS working weight".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
             Ok(match weights {
                 Some(weights) => {
                     let weight = weights[sample];
                     validate_nonnegative_finite(weight, "weight", sample)?;
-                    weight * working_weight
+                    checked_product2(weight, working_weight).ok_or(DeseqError::NonFiniteValue {
+                        context: "IRLS weighted working weight".to_string(),
+                        index: Some(sample),
+                        value: f64::NAN,
+                    })?
                 }
                 None => working_weight,
             })
@@ -1172,7 +1231,26 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
         .map(|(sample, ((mu, factor), count))| {
             validate_positive_finite(mu, "mu", sample)?;
             validate_positive_finite(factor, "normalization factor", sample)?;
-            Ok((mu / factor).ln() + (count - mu) / mu)
+            let normalized_mu = checked_div2(mu, factor).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS working response normalized mean".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })?;
+            let residual = checked_sum2(count, -mu).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS working response residual".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })?;
+            let scaled_residual = checked_div2(residual, mu).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS working response scaled residual".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })?;
+            checked_sum2(normalized_mu.ln(), scaled_residual).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS working response".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })
         })
         .collect()
 }
@@ -1536,7 +1614,32 @@ mod tests {
             actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
             None
         );
+        assert_eq!(
+            checked_candidate_coordinate(0.0, f64::MAX, 2.0, -30.0, 30.0),
+            None
+        );
+        assert_eq!(
+            checked_candidate_coordinate(-f64::MAX, f64::MAX, 2.0, -30.0, 30.0),
+            None
+        );
+        assert_eq!(
+            checked_candidate_coordinate(29.0, 4.0, 1.0, -30.0, 30.0),
+            Some(30.0)
+        );
+        assert_eq!(checked_div2(1.0, 0.0), None);
+        assert_eq!(checked_div2(f64::NAN, 1.0), None);
+        assert_eq!(
+            actual_directional_derivative(&[-f64::MAX], &[f64::MAX], &[1.0]),
+            None
+        );
         assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
+    }
+
+    #[test]
+    fn irls_deviance_convergence_stat_rejects_nonfinite_arithmetic() {
+        assert_eq!(irls_deviance_convergence_stat(f64::MAX, -f64::MAX), None);
+        assert_eq!(irls_deviance_convergence_stat(f64::INFINITY, 1.0), None);
+        assert_eq!(irls_deviance_convergence_stat(0.0, 0.0), Some(0.0));
     }
 
     #[test]
@@ -1626,5 +1729,39 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn working_weights_reject_nonfinite_arithmetic() {
+        let err = working_weights(&[f64::MAX], 2.0, None).unwrap_err();
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "IRLS working weight dispersion mean product" && index == Some(0)
+        ));
+
+        let err = working_weights(&[f64::MAX], f64::MIN_POSITIVE, Some(&[10.0])).unwrap_err();
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "IRLS weighted working weight" && index == Some(0)
+        ));
+    }
+
+    #[test]
+    fn working_response_rejects_nonfinite_arithmetic() {
+        let err = working_response(&[f64::MAX], &[f64::MIN_POSITIVE], &[1.0]).unwrap_err();
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "IRLS working response normalized mean" && index == Some(0)
+        ));
+
+        let err = working_response(&[f64::MIN_POSITIVE], &[1.0], &[f64::MAX]).unwrap_err();
+        assert!(matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index, .. }
+                if context == "IRLS working response scaled residual" && index == Some(0)
+        ));
     }
 }

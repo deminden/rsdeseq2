@@ -106,12 +106,11 @@ where
         let mut step = options.initial_step;
         let mut accepted = None;
         while step >= options.min_step {
-            let candidate = parameters
-                .iter()
-                .copied()
-                .zip(direction.iter().copied())
-                .map(|(value, delta)| (value + step * delta).clamp(lower, upper))
-                .collect::<Vec<_>>();
+            let Some(candidate) = checked_candidate(&parameters, &direction, step, lower, upper)
+            else {
+                step *= 0.5;
+                continue;
+            };
             let Some(movement) = max_abs_difference(&parameters, &candidate) else {
                 step *= 0.5;
                 continue;
@@ -257,26 +256,17 @@ fn l2_norm(values: &[f64]) -> Option<f64> {
     }
     let mut sum = 0.0;
     for value in values.iter().copied() {
-        let scaled = value / scale;
-        let term = scaled * scaled;
-        let next = sum + term;
-        if !term.is_finite() || !next.is_finite() {
-            return None;
-        }
-        sum = next;
+        let scaled = checked_div2(value, scale)?;
+        let term = checked_product2(scaled, scaled)?;
+        sum = checked_sum2(sum, term)?;
     }
-    let norm = scale * sum.sqrt();
-    norm.is_finite().then_some(norm)
+    checked_product2(scale, sum.sqrt())
 }
 
 fn dot(left: &[f64], right: &[f64]) -> Option<f64> {
     let mut terms = Vec::with_capacity(left.len().min(right.len()));
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let term = left * right;
-        if !term.is_finite() {
-            return None;
-        }
-        terms.push(term);
+        terms.push(checked_product2(left, right)?);
     }
     scaled_sum(&terms)
 }
@@ -284,10 +274,7 @@ fn dot(left: &[f64], right: &[f64]) -> Option<f64> {
 fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
     let mut max_difference = 0.0;
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let difference = (left - right).abs();
-        if !difference.is_finite() {
-            return None;
-        }
+        let difference = checked_sum2(left, -right)?.abs();
         max_difference = f64::max(max_difference, difference);
     }
     Some(max_difference)
@@ -304,14 +291,45 @@ fn actual_directional_derivative(
         .copied()
         .zip(candidate.iter().copied().zip(parameters.iter().copied()))
     {
-        let direction = candidate - parameter;
-        let term = gradient * direction;
-        if !direction.is_finite() || !term.is_finite() {
-            return None;
-        }
-        terms.push(term);
+        let direction = checked_sum2(candidate, -parameter)?;
+        terms.push(checked_product2(gradient, direction)?);
     }
     scaled_sum(&terms)
+}
+
+fn checked_candidate(
+    parameters: &[f64],
+    direction: &[f64],
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<Vec<f64>> {
+    parameters
+        .iter()
+        .copied()
+        .zip(direction.iter().copied())
+        .map(|(value, delta)| checked_candidate_coordinate(value, delta, step, lower, upper))
+        .collect()
+}
+
+fn checked_candidate_coordinate(
+    value: f64,
+    delta: f64,
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<f64> {
+    if !value.is_finite()
+        || !delta.is_finite()
+        || !step.is_finite()
+        || !lower.is_finite()
+        || !upper.is_finite()
+    {
+        return None;
+    }
+    let displacement = checked_product2(step, delta)?;
+    let candidate = checked_sum2(value, displacement)?;
+    Some(candidate.clamp(lower, upper))
 }
 
 fn scaled_sum(values: &[f64]) -> Option<f64> {
@@ -327,25 +345,29 @@ fn scaled_sum(values: &[f64]) -> Option<f64> {
     }
     let mut sum = 0.0;
     for value in values.iter().copied() {
-        let next = sum + value / scale;
-        if !next.is_finite() {
-            return None;
-        }
-        sum = next;
+        sum = checked_sum2(sum, checked_div2(value, scale)?)?;
     }
-    let value = sum * scale;
-    value.is_finite().then_some(value)
+    checked_product2(sum, scale)
 }
 
 fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
-    let term = armijo * derivative;
-    let bound = value + term;
-    (value.is_finite()
-        && armijo.is_finite()
-        && derivative.is_finite()
-        && term.is_finite()
-        && bound.is_finite())
-    .then_some(bound)
+    checked_sum2(value, checked_product2(armijo, derivative)?)
+}
+
+fn checked_sum2(left: f64, right: f64) -> Option<f64> {
+    let sum = left + right;
+    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
+}
+
+fn checked_product2(left: f64, right: f64) -> Option<f64> {
+    let product = left * right;
+    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
+}
+
+fn checked_div2(left: f64, right: f64) -> Option<f64> {
+    let quotient = left / right;
+    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
+        .then_some(quotient)
 }
 
 #[cfg(test)]
@@ -416,7 +438,29 @@ mod tests {
             actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
             None
         );
+        assert_eq!(
+            actual_directional_derivative(&[-f64::MAX], &[f64::MAX], &[1.0]),
+            None
+        );
+        assert_eq!(
+            checked_candidate_coordinate(0.0, f64::MAX, 2.0, -10.0, 10.0),
+            None
+        );
+        assert_eq!(
+            checked_candidate_coordinate(-f64::MAX, f64::MAX, 2.0, -10.0, 10.0),
+            None
+        );
+        assert_eq!(
+            checked_candidate_coordinate(9.0, 10.0, 1.0, -10.0, 10.0),
+            Some(10.0)
+        );
+        assert_eq!(
+            checked_candidate_coordinate(9.0, 10.0, 1.0, f64::NAN, 10.0),
+            None
+        );
         assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
+        assert_eq!(checked_armijo_bound(1.0, f64::NAN, 1.0), None);
+        assert_eq!(checked_div2(1.0, 0.0), None);
     }
 
     #[test]

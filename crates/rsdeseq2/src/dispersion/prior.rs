@@ -175,7 +175,7 @@ pub fn estimate_low_df_prior_variance(
     let obs_density = histogram_density(&observed)?;
     let (base_samples, normal_samples) =
         low_df_quasi_samples(residual_degrees_of_freedom, LOW_DF_QUASI_SAMPLES)?;
-    let variance_grid = linspace(0.0, LOW_DF_VAR_MAX, LOW_DF_VAR_GRID_POINTS);
+    let variance_grid = linspace(0.0, LOW_DF_VAR_MAX, LOW_DF_VAR_GRID_POINTS)?;
     let kl_divergences = variance_grid
         .iter()
         .copied()
@@ -193,7 +193,7 @@ pub fn estimate_low_df_prior_variance(
             kl_divergence(&obs_density, &simulated_density)
         })
         .collect::<Result<Vec<_>, DeseqError>>()?;
-    let fine_grid = linspace(0.0, LOW_DF_VAR_MAX, LOW_DF_FINE_GRID_POINTS);
+    let fine_grid = linspace(0.0, LOW_DF_VAR_MAX, LOW_DF_FINE_GRID_POINTS)?;
     let argmin_kl = local_linear_smoothed_argmin(&variance_grid, &kl_divergences, &fine_grid)?;
     Ok(argmin_kl.max(0.25))
 }
@@ -287,10 +287,21 @@ fn histogram_density(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
             reason: "all low-df dispersion histogram values were outside bounds".to_string(),
         });
     }
-    Ok(counts
+    let density_denominator = checked_mul(
+        total as f64,
+        LOW_DF_HIST_WIDTH,
+        "low-df dispersion histogram density denominator",
+    )?;
+    counts
         .into_iter()
-        .map(|count| count as f64 / (total as f64 * LOW_DF_HIST_WIDTH))
-        .collect())
+        .map(|count| {
+            checked_div(
+                count as f64,
+                density_denominator,
+                "low-df dispersion histogram density",
+            )
+        })
+        .collect()
 }
 
 fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError> {
@@ -370,12 +381,38 @@ fn clamp_probability(value: f64) -> f64 {
     value.clamp(1e-12, 1.0 - 1e-12)
 }
 
-fn linspace(start: f64, end: f64, len: usize) -> Vec<f64> {
-    if len == 1 {
-        return vec![start];
+fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
+    if len == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "low-df prior variance grid".to_string(),
+            expected: 1,
+            actual: 0,
+        });
     }
-    let step = (end - start) / (len as f64 - 1.0);
-    (0..len).map(|idx| start + step * idx as f64).collect()
+    if !start.is_finite() || !end.is_finite() {
+        return Err(DeseqError::NonFiniteValue {
+            context: "low-df prior variance grid endpoint".to_string(),
+            index: None,
+            value: if start.is_finite() { end } else { start },
+        });
+    }
+    if len == 1 {
+        return Ok(vec![start]);
+    }
+    let span = checked_sub(end, start, "low-df prior variance grid span")?;
+    let step = checked_div(span, len as f64 - 1.0, "low-df prior variance grid step")?;
+    (0..len)
+        .map(|idx| {
+            let offset = checked_mul(step, idx as f64, "low-df prior variance grid offset")?;
+            checked_add(start, offset, "low-df prior variance grid value").map_err(|_| {
+                DeseqError::NonFiniteValue {
+                    context: "low-df prior variance grid value".to_string(),
+                    index: Some(idx),
+                    value: start + offset,
+                }
+            })
+        })
+        .collect()
 }
 
 fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<f64, DeseqError> {
@@ -407,7 +444,14 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         let mut sxx = 0.0;
         let mut sxy = 0.0;
         for (_, idx) in distances.iter().copied().take(span_points) {
-            let scaled = ((x[idx] - target).abs() / max_distance).min(1.0);
+            let distance =
+                checked_sub(x[idx], target, "low-df prior variance smoother distance")?.abs();
+            let scaled = checked_div(
+                distance,
+                max_distance,
+                "low-df prior variance smoother scaled distance",
+            )?
+            .min(1.0);
             let weight = tricube_weight(scaled)?;
             sw = checked_add(sw, weight, "low-df prior variance smoother weights")?;
             sx = checked_add(
@@ -558,7 +602,7 @@ fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> 
 
 fn checked_div(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
     let value = left / right;
-    if value.is_finite() {
+    if left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite() {
         Ok(value)
     } else {
         Err(DeseqError::NonFiniteValue {
@@ -607,6 +651,40 @@ mod tests {
             err,
             DeseqError::NonFiniteValue { context, .. }
                 if context == "low-df simulated residual scale"
+        ));
+    }
+
+    #[test]
+    fn low_df_linspace_rejects_nonfinite_grid_arithmetic() {
+        let endpoint_err = linspace(f64::INFINITY, 1.0, 3).unwrap_err();
+        assert!(matches!(
+            endpoint_err,
+            DeseqError::NonFiniteValue { context, .. }
+                if context == "low-df prior variance grid endpoint"
+        ));
+
+        let span_err = linspace(-f64::MAX, f64::MAX, 3).unwrap_err();
+        assert!(matches!(
+            span_err,
+            DeseqError::NonFiniteValue { context, .. }
+                if context == "low-df prior variance grid span"
+        ));
+
+        assert_eq!(linspace(2.0, 2.0, 3).unwrap(), vec![2.0, 2.0, 2.0]);
+    }
+
+    #[test]
+    fn checked_div_rejects_zero_and_nonfinite_prior_arithmetic() {
+        let zero_err = checked_div(1.0, 0.0, "test low-df division").unwrap_err();
+        assert!(matches!(
+            zero_err,
+            DeseqError::NonFiniteValue { context, .. } if context == "test low-df division"
+        ));
+
+        let nonfinite_err = checked_div(f64::NAN, 1.0, "test low-df division").unwrap_err();
+        assert!(matches!(
+            nonfinite_err,
+            DeseqError::NonFiniteValue { context, .. } if context == "test low-df division"
         ));
     }
 

@@ -3592,10 +3592,10 @@ fn apply_contrast_metadata_to_replacement_output(
 }
 
 fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
-    row.log2_fold_change = None;
-    row.lfc_se = None;
-    row.stat = None;
-    row.pvalue = None;
+    row.log2_fold_change = Some(0.0);
+    row.lfc_se = Some(0.0);
+    row.stat = Some(0.0);
+    row.pvalue = Some(1.0);
     row.padj = None;
     row.dispersion = None;
     row.converged = None;

@@ -51,7 +51,7 @@ pub fn median_finite(values: &[f64]) -> Option<f64> {
 }
 
 fn midpoint(left: f64, right: f64) -> Option<f64> {
-    let value = left + (right - left) / 2.0;
+    let value = left / 2.0 + right / 2.0;
     value.is_finite().then_some(value)
 }
 
@@ -73,6 +73,8 @@ mod tests {
     fn median_even_large_values_avoids_midpoint_overflow() {
         assert_eq!(median(&[f64::MAX, f64::MAX]).unwrap(), f64::MAX);
         assert_eq!(median_finite(&[f64::MAX, f64::MAX]), Some(f64::MAX));
+        assert_eq!(median(&[-f64::MAX, f64::MAX]).unwrap(), 0.0);
+        assert_eq!(median_finite(&[-f64::MAX, f64::MAX]), Some(0.0));
     }
 
     #[test]

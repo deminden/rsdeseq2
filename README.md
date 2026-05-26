@@ -22,16 +22,23 @@ Detailed status lives in
 [docs/deseq2-gap-analysis.md](docs/deseq2-gap-analysis.md) and
 [docs/compatibility.md](docs/compatibility.md).
 
-## Real-Data Benchmark
+## Real-Data Parity
 
 Current README benchmarks are shown only for primitives with matching reference
-outputs. On a real muscle raw-count matrix with 56,937 genes and 881 samples,
-five process-level CLI runs gave these medians:
+outputs. A fresh five-tissue publication-data sweep compared offline DESeq2
+outputs against the Rust CLI for `size-factors`, `normalized-counts`, and
+`base-mean`:
 
 | primitive | parity check | rsdeseq2 | DESeq2 reference | speedup | rsdeseq2 RSS | reference RSS |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `size-factors` | max diff `3.86e-14` | 1.15 s | 26.71 s | 23.2x | 199 MiB | 1.90 GiB |
 | `base-mean` | max diff `4.47e-07` | 1.38 s | 27.55 s | 20.0x | 581 MiB | 2.28 GiB |
+
+| primitive | real-data coverage | harshest max diff | max RSS |
+| --- | ---: | ---: | ---: |
+| `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 238 MiB |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 693 MiB |
+| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 694 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
 Methodology and synthetic benchmark results are in
@@ -74,8 +81,37 @@ cargo run -p rsdeseq2 -- size-factors \
 
 cargo run -p rsdeseq2 -- base-mean \
   --counts counts.tsv \
-  --method poscounts \
+  --size-factors size_factors.tsv \
   --output base_mean.tsv
+
+cargo run -p rsdeseq2 -- normalized-counts \
+  --counts counts.tsv \
+  --size-factors size_factors.tsv \
+  --output normalized_counts.tsv
+
+cargo run -p rsdeseq2 -- vst \
+  --counts counts.tsv \
+  --design design.tsv \
+  --blind=false \
+  --fit-type mean \
+  --output vst.tsv
+
+cargo run -p rsdeseq2 -- wald \
+  --counts counts.tsv \
+  --design design.tsv \
+  --normalization-factors normalization_factors.tsv \
+  --observation-weights observation_weights.tsv \
+  --fit-type parametric \
+  --coefficient 1 \
+  --output results.tsv
+
+cargo run -p rsdeseq2 -- lrt \
+  --counts counts.tsv \
+  --design design.tsv \
+  --reduced-design reduced_design.tsv \
+  --fit-type parametric \
+  --coefficient 1 \
+  --output lrt_results.tsv
 ```
 
 ## Development
