@@ -1,7 +1,17 @@
 use crate::core::CountMatrix;
+use crate::design::{
+    expanded_factor_design, expanded_formula_design, DesignMatrix, ExpandedAdditiveFactorDesign,
+    ExpandedFactorDesign, ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec,
+    ExpandedFactorSpec, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+};
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::glm::{
-    wald_test_coefficient, LrtOutput, NbinomGlmFit, WaldAlternative, WaldContrastOutput,
+    collapse_expanded_model_fit,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_weights, wald_test_coefficient,
+    wald_test_contrast, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
+    BetaPriorSizeFactorWeightInput, ExpandedModelBetaPriorDesignInput,
+    ExpandedModelBetaPriorGlmFit, LrtOutput, NbinomGlmFit, WaldAlternative, WaldContrastOutput,
     WaldOutput, WaldTestOptions,
 };
 use crate::independent_filtering::IndependentFilteringOutput;
@@ -207,6 +217,253 @@ pub struct DeseqResultsDataFrame {
     pub metadata: DeseqResultsMetadata,
 }
 
+/// Inputs for a primitive expanded beta-prior Wald fit-and-results workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedBetaPriorWaldResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Expanded and reported design surfaces plus coefficient collapse groups.
+    pub design: ExpandedModelBetaPriorDesignInput<'a>,
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for an expanded beta-prior Wald workflow with normalization factors.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedBetaPriorWaldNormalizedResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Expanded and reported design surfaces plus coefficient collapse groups.
+    pub design: ExpandedModelBetaPriorDesignInput<'a>,
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for a one-factor expanded beta-prior Wald workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFactorBetaPriorWaldResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Factor name used to build coefficient names.
+    pub factor: &'a str,
+    /// Per-sample factor levels in count-column order.
+    pub sample_levels: &'a [String],
+    /// Reference level for treatment-style reported coefficients.
+    pub reference: &'a str,
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for a one-factor expanded beta-prior Wald workflow with normalization factors.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFactorBetaPriorWaldNormalizedResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Factor name used to build coefficient names.
+    pub factor: &'a str,
+    /// Per-sample factor levels in count-column order.
+    pub sample_levels: &'a [String],
+    /// Reference level for treatment-style reported coefficients.
+    pub reference: &'a str,
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for an additive-factor expanded beta-prior Wald workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedAdditiveBetaPriorWaldResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Additive factor terms used to build expanded and reported designs.
+    pub factors: &'a [ExpandedFactorSpec<'a>],
+    /// Additive numeric covariates included unchanged in both design surfaces.
+    pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    /// Factor-by-factor interactions included after main effects.
+    pub interactions: &'a [ExpandedFactorInteractionSpec<'a>],
+    /// Factor-by-numeric interactions included after factor-by-factor interactions.
+    pub factor_numeric_interactions: &'a [ExpandedFactorNumericInteractionSpec<'a>],
+    /// Numeric-by-numeric interactions included after factor-by-numeric interactions.
+    pub numeric_interactions: &'a [ExpandedNumericInteractionSpec<'a>],
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for an additive-factor expanded beta-prior Wald workflow with normalization factors.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Additive factor terms used to build expanded and reported designs.
+    pub factors: &'a [ExpandedFactorSpec<'a>],
+    /// Additive numeric covariates included unchanged in both design surfaces.
+    pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    /// Factor-by-factor interactions included after main effects.
+    pub interactions: &'a [ExpandedFactorInteractionSpec<'a>],
+    /// Factor-by-numeric interactions included after factor-by-factor interactions.
+    pub factor_numeric_interactions: &'a [ExpandedFactorNumericInteractionSpec<'a>],
+    /// Numeric-by-numeric interactions included after factor-by-numeric interactions.
+    pub numeric_interactions: &'a [ExpandedNumericInteractionSpec<'a>],
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for a formula-driven expanded beta-prior Wald workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFormulaBetaPriorWaldResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Primitive formula parsed by [`expanded_formula_design`].
+    pub formula: &'a str,
+    /// Candidate factor metadata referenced by the formula.
+    pub factors: &'a [ExpandedFactorSpec<'a>],
+    /// Candidate numeric covariates referenced by the formula.
+    pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for a formula-driven expanded beta-prior Wald workflow with normalization factors.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Primitive formula parsed by [`expanded_formula_design`].
+    pub formula: &'a str,
+    /// Candidate factor metadata referenced by the formula.
+    pub factors: &'a [ExpandedFactorSpec<'a>],
+    /// Candidate numeric covariates referenced by the formula.
+    pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Expanded beta-prior fit plus DESeq2-shaped Wald result rows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedBetaPriorWaldResults {
+    /// Expanded-design beta-prior fit with collapsed standard-design prior fit.
+    pub fit: ExpandedModelBetaPriorGlmFit,
+    /// Wald result table built from the collapsed prior fit.
+    pub results: DeseqResults,
+}
+
+/// One-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFactorBetaPriorWaldResults {
+    /// Generated expanded/standard one-factor design surfaces.
+    pub design: ExpandedFactorDesign,
+    /// Expanded-design beta-prior fit with collapsed standard-design prior fit.
+    pub fit: ExpandedModelBetaPriorGlmFit,
+    /// Wald result table built from the collapsed prior fit.
+    pub results: DeseqResults,
+}
+
+/// Additive-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedAdditiveBetaPriorWaldResults {
+    /// Generated expanded/standard additive-factor design surfaces.
+    pub design: ExpandedAdditiveFactorDesign,
+    /// Expanded-design beta-prior fit with collapsed standard-design prior fit.
+    pub fit: ExpandedModelBetaPriorGlmFit,
+    /// Wald result table built from the collapsed prior fit.
+    pub results: DeseqResults,
+}
+
 /// One row of a future DESeq2-like results table.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeseqResultRow {
@@ -389,6 +646,634 @@ pub fn build_wald_results(
 ) -> Result<DeseqResults, DeseqError> {
     let wald = wald_test_coefficient(fit, coefficient)?;
     build_wald_results_from_wald(base_mean, fit, coefficient, gene_names, dispersions, &wald)
+}
+
+/// Collapse an expanded-model fit and build DESeq2-shaped Wald results.
+///
+/// This is a primitive result-table companion for the beta-prior expanded
+/// model workflow. It performs grouped coefficient/covariance collapse, then
+/// reports the requested standard-design coefficient with ordinary Wald
+/// statistics and BH adjustment.
+pub fn build_wald_results_from_expanded_model_fit(
+    base_mean: &[f64],
+    expanded_fit: &NbinomGlmFit,
+    standard_design: &DesignMatrix,
+    coefficient_groups: &[Vec<usize>],
+    coefficient: usize,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    let collapsed = collapse_expanded_model_fit(expanded_fit, standard_design, coefficient_groups)?;
+    build_wald_results(base_mean, &collapsed, coefficient, gene_names, dispersions)
+}
+
+/// Collapse an expanded-model fit and build DESeq2-shaped Wald contrast rows.
+///
+/// This is the contrast companion to
+/// [`build_wald_results_from_expanded_model_fit`]. The supplied contrast is on
+/// the collapsed standard-design coefficient scale; the helper propagates the
+/// expanded covariance through the grouped coefficient average before computing
+/// `c' beta` and `sqrt(c' Sigma c)`.
+pub fn build_wald_contrast_results_from_expanded_model_fit(
+    base_mean: &[f64],
+    expanded_fit: &NbinomGlmFit,
+    standard_design: &DesignMatrix,
+    coefficient_groups: &[Vec<usize>],
+    contrast: &[f64],
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    let collapsed = collapse_expanded_model_fit(expanded_fit, standard_design, coefficient_groups)?;
+    let contrast = wald_test_contrast(&collapsed, contrast)?;
+    build_wald_contrast_results(base_mean, &collapsed, &contrast, gene_names, dispersions)
+}
+
+/// Build DESeq2-shaped Wald rows from an expanded beta-prior refit output.
+///
+/// The helper reports the already-collapsed standard-design prior fit stored in
+/// [`ExpandedModelBetaPriorGlmFit`], so callers that use the expanded beta-prior
+/// workflow do not need to manually pass the collapsed fit to result assembly.
+pub fn build_wald_results_from_expanded_beta_prior_fit(
+    base_mean: &[f64],
+    fit: &ExpandedModelBetaPriorGlmFit,
+    coefficient: usize,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    build_wald_results(
+        base_mean,
+        &fit.prior_fit,
+        coefficient,
+        gene_names,
+        dispersions,
+    )
+}
+
+/// Build DESeq2-shaped Wald contrast rows from an expanded beta-prior refit output.
+///
+/// The supplied contrast is on the collapsed standard-design coefficient scale.
+pub fn build_wald_contrast_results_from_expanded_beta_prior_fit(
+    base_mean: &[f64],
+    fit: &ExpandedModelBetaPriorGlmFit,
+    contrast: &[f64],
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    let contrast = wald_test_contrast(&fit.prior_fit, contrast)?;
+    build_wald_contrast_results(
+        base_mean,
+        &fit.prior_fit,
+        &contrast,
+        gene_names,
+        dispersions,
+    )
+}
+
+/// Fit an expanded beta-prior model and assemble Wald rows for one coefficient.
+///
+/// This is a primitive all-Rust companion for callers that already provide the
+/// expanded design, standard design, and coefficient groups.
+pub fn fit_expanded_beta_prior_wald_results(
+    input: ExpandedBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
+    let fit = fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(
+        input.counts,
+        input.design,
+        BetaPriorSizeFactorWeightInput {
+            size_factors: input.size_factors,
+            weights: input.weights,
+        },
+        input.dispersions,
+        input.base_mean,
+        input.disp_fit,
+        input.options,
+    )?;
+    let results = build_wald_results_from_expanded_beta_prior_fit(
+        input.base_mean,
+        &fit,
+        coefficient,
+        input.gene_names,
+        Some(input.dispersions),
+    )?;
+    Ok(ExpandedBetaPriorWaldResults { fit, results })
+}
+
+/// Fit an expanded beta-prior model and assemble Wald rows for a numeric contrast.
+///
+/// The contrast is on the collapsed standard-design coefficient scale.
+pub fn fit_expanded_beta_prior_wald_contrast_results(
+    input: ExpandedBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
+    let fit = fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(
+        input.counts,
+        input.design,
+        BetaPriorSizeFactorWeightInput {
+            size_factors: input.size_factors,
+            weights: input.weights,
+        },
+        input.dispersions,
+        input.base_mean,
+        input.disp_fit,
+        input.options,
+    )?;
+    let results = build_wald_contrast_results_from_expanded_beta_prior_fit(
+        input.base_mean,
+        &fit,
+        contrast,
+        input.gene_names,
+        Some(input.dispersions),
+    )?;
+    Ok(ExpandedBetaPriorWaldResults { fit, results })
+}
+
+/// Fit an expanded beta-prior model with normalization factors and assemble Wald rows.
+pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+    input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
+    let fit =
+        fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+            input.counts,
+            input.design,
+            BetaPriorNormalizationFactorWeightInput {
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+            },
+            input.dispersions,
+            input.base_mean,
+            input.disp_fit,
+            input.options,
+        )?;
+    let results = build_wald_results_from_expanded_beta_prior_fit(
+        input.base_mean,
+        &fit,
+        coefficient,
+        input.gene_names,
+        Some(input.dispersions),
+    )?;
+    Ok(ExpandedBetaPriorWaldResults { fit, results })
+}
+
+/// Fit an expanded beta-prior model with normalization factors and assemble contrast rows.
+pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+    input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
+    let fit =
+        fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+            input.counts,
+            input.design,
+            BetaPriorNormalizationFactorWeightInput {
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+            },
+            input.dispersions,
+            input.base_mean,
+            input.disp_fit,
+            input.options,
+        )?;
+    let results = build_wald_contrast_results_from_expanded_beta_prior_fit(
+        input.base_mean,
+        &fit,
+        contrast,
+        input.gene_names,
+        Some(input.dispersions),
+    )?;
+    Ok(ExpandedBetaPriorWaldResults { fit, results })
+}
+
+/// Build a one-factor expanded design, fit the beta-prior model, and assemble Wald rows.
+pub fn fit_expanded_factor_beta_prior_wald_results(
+    input: ExpandedFactorBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedFactorBetaPriorWaldResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedFactorBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build a one-factor expanded design, fit the beta-prior model, and assemble contrast rows.
+pub fn fit_expanded_factor_beta_prior_wald_contrast_results(
+    input: ExpandedFactorBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedFactorBetaPriorWaldResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedFactorBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build a one-factor expanded design, use normalization factors, and assemble Wald rows.
+pub fn fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights(
+    input: ExpandedFactorBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedFactorBetaPriorWaldResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedFactorBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build a one-factor expanded design, use normalization factors, and assemble contrast rows.
+pub fn fit_expanded_factor_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+    input: ExpandedFactorBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedFactorBetaPriorWaldResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedFactorBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build an additive-factor expanded design, fit the beta-prior model, and assemble Wald rows.
+pub fn fit_expanded_additive_beta_prior_wald_results(
+    input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build an additive-factor expanded design, fit the beta-prior model, and assemble contrast rows.
+pub fn fit_expanded_additive_beta_prior_wald_contrast_results(
+    input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build an additive-factor expanded design, use normalization factors, and assemble Wald rows.
+pub fn fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights(
+    input: ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Build an additive-factor expanded design, use normalization factors, and assemble contrast rows.
+pub fn fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+    input: ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Parse a primitive formula, fit the expanded beta-prior model, and assemble Wald rows.
+pub fn fit_expanded_formula_beta_prior_wald_results(
+    input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Parse a primitive formula, fit the expanded beta-prior model, and assemble contrast rows.
+pub fn fit_expanded_formula_beta_prior_wald_contrast_results(
+    input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: input.counts,
+                design: design_input,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Parse a primitive formula, use normalization factors, and assemble Wald rows.
+pub fn fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights(
+    input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
+}
+
+/// Parse a primitive formula, use normalization factors, and assemble contrast rows.
+pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+    input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+) -> Result<ExpandedAdditiveBetaPriorWaldResults, DeseqError> {
+    let design = expanded_formula_design(input.formula, input.factors, input.numeric_covariates)?;
+    let fit_and_results = {
+        let design_input = ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        };
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: design_input,
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?
+    };
+    Ok(ExpandedAdditiveBetaPriorWaldResults {
+        design,
+        fit: fit_and_results.fit,
+        results: fit_and_results.results,
+    })
 }
 
 /// Build DESeq2-shaped Wald result rows from precomputed Wald statistics.

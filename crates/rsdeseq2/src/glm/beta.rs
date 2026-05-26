@@ -55,6 +55,30 @@ pub struct BetaPriorGlmFit {
     pub beta_prior_variance: Vec<f64>,
 }
 
+/// Expanded-model fixed-dispersion GLM output for a DESeq2-style beta-prior refit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedModelBetaPriorGlmFit {
+    /// First pass MLE GLM fit on the expanded design.
+    pub expanded_mle_fit: NbinomGlmFit,
+    /// Refit GLM on the expanded design using beta-prior variance as ridge.
+    pub expanded_prior_fit: NbinomGlmFit,
+    /// Prior fit collapsed onto the caller-supplied standard design surface.
+    pub prior_fit: NbinomGlmFit,
+    /// Log2-scale beta prior variances, one per expanded-design coefficient.
+    pub beta_prior_variance: Vec<f64>,
+}
+
+/// Expanded and reported design surfaces for a beta-prior expanded-model refit.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ExpandedModelBetaPriorDesignInput<'a> {
+    /// Design used for expanded-model fitting.
+    pub expanded_design: &'a DesignMatrix,
+    /// Reported standard design used after grouped coefficient collapse.
+    pub standard_design: &'a DesignMatrix,
+    /// Expanded coefficient columns averaged into each standard coefficient.
+    pub coefficient_groups: &'a [Vec<usize>],
+}
+
 /// Options for the two-stage beta-prior fixed-dispersion refit helper.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BetaPriorRefitOptions {
@@ -119,6 +143,175 @@ pub fn beta_prior_variance_to_ridge_lambda(
             Ok(variance.recip() * inv_ln2 * inv_ln2)
         })
         .collect()
+}
+
+/// Average expanded-model coefficients into standard model-term coefficients.
+///
+/// DESeq2's beta-prior workflow can fit an expanded model matrix and then
+/// collapse groups of expanded columns back to the reported standard
+/// coefficients. This primitive performs that numeric collapse for an existing
+/// log2-scale beta matrix: each output column is the per-gene average of the
+/// input columns listed in the corresponding group.
+pub fn average_expanded_model_coefficients(
+    expanded_beta: &RowMajorMatrix<f64>,
+    coefficient_groups: &[Vec<usize>],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    validate_expanded_coefficient_groups(
+        expanded_beta.n_cols(),
+        coefficient_groups,
+        "expanded beta coefficient groups",
+    )?;
+
+    let mut values = Vec::with_capacity(expanded_beta.n_rows() * coefficient_groups.len());
+    for gene in 0..expanded_beta.n_rows() {
+        let row = expanded_beta.row(gene)?;
+        for group in coefficient_groups {
+            let grouped = group.iter().map(|&column| row[column]).collect::<Vec<_>>();
+            values.push(checked_scaled_mean(&grouped).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "expanded beta coefficient average".to_string(),
+                    index: Some(gene),
+                    value: f64::NAN,
+                }
+            })?);
+        }
+    }
+
+    RowMajorMatrix::from_row_major(expanded_beta.n_rows(), coefficient_groups.len(), values)
+}
+
+/// Propagate expanded-model covariance through grouped coefficient averaging.
+///
+/// The input covariance matrix stores each gene's expanded-model coefficient
+/// covariance as one row-major `p x p` row. The output stores each gene's
+/// collapsed `q x q` covariance matrix, where `q = coefficient_groups.len()`
+/// and every output cell is `A Sigma A'` for the averaging matrix implied by
+/// `coefficient_groups`.
+pub fn average_expanded_model_covariances(
+    expanded_covariance: &RowMajorMatrix<f64>,
+    n_expanded_coefficients: usize,
+    coefficient_groups: &[Vec<usize>],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    validate_expanded_covariance_inputs(
+        expanded_covariance,
+        n_expanded_coefficients,
+        coefficient_groups,
+    )?;
+
+    let n_groups = coefficient_groups.len();
+    let mut values = Vec::with_capacity(expanded_covariance.n_rows() * n_groups * n_groups);
+    for gene in 0..expanded_covariance.n_rows() {
+        let covariance = expanded_covariance.row(gene)?;
+        for left_group in coefficient_groups {
+            for right_group in coefficient_groups {
+                values.push(average_covariance_block(
+                    covariance,
+                    n_expanded_coefficients,
+                    left_group,
+                    right_group,
+                    gene,
+                )?);
+            }
+        }
+    }
+
+    RowMajorMatrix::from_row_major(expanded_covariance.n_rows(), n_groups * n_groups, values)
+}
+
+/// Collapse an expanded-model GLM fit to a standard coefficient surface.
+///
+/// This keeps gene/sample diagnostics and fitted means from the expanded fit,
+/// replaces the reported model matrix with `standard_design`, averages beta
+/// coefficients by group, propagates covariance through the same averaging
+/// matrix, and recomputes standard errors from the collapsed covariance
+/// diagonal. It is a primitive building block for DESeq2's beta-prior expanded
+/// model workflow; callers remain responsible for constructing the expanded
+/// and standard design matrices from formula metadata.
+pub fn collapse_expanded_model_fit(
+    expanded_fit: &NbinomGlmFit,
+    standard_design: &DesignMatrix,
+    coefficient_groups: &[Vec<usize>],
+) -> Result<NbinomGlmFit, DeseqError> {
+    validate_expanded_fit_collapse_inputs(expanded_fit, standard_design, coefficient_groups)?;
+    let covariance =
+        expanded_fit
+            .beta_covariance
+            .as_ref()
+            .ok_or_else(|| DeseqError::UnsupportedFeature {
+                feature: "expanded model fit collapse requires beta covariance matrices"
+                    .to_string(),
+            })?;
+    let beta = average_expanded_model_coefficients(&expanded_fit.beta, coefficient_groups)?;
+    let beta_covariance = average_expanded_model_covariances(
+        covariance,
+        expanded_fit.beta.n_cols(),
+        coefficient_groups,
+    )?;
+    let beta_se = beta_se_from_covariance(&beta_covariance, beta.n_cols())?;
+
+    Ok(NbinomGlmFit {
+        log_like: expanded_fit.log_like.clone(),
+        beta_converged: expanded_fit.beta_converged.clone(),
+        beta,
+        beta_se,
+        beta_covariance: Some(beta_covariance),
+        mu: expanded_fit.mu.clone(),
+        beta_iter: expanded_fit.beta_iter.clone(),
+        model_matrix: standard_design.clone(),
+        n_terms: standard_design.n_coefficients(),
+        hat_diagonal: expanded_fit.hat_diagonal.clone(),
+    })
+}
+
+/// Build a numeric contrast vector from two expanded-model coefficient groups.
+///
+/// The returned vector has `+1 / n` weights across numerator columns and
+/// `-1 / m` weights across denominator columns, matching the averaging shape
+/// needed to compare collapsed expanded-model terms.
+pub fn expanded_model_group_contrast(
+    n_coefficients: usize,
+    numerator_columns: &[usize],
+    denominator_columns: &[usize],
+) -> Result<Vec<f64>, DeseqError> {
+    validate_expanded_contrast_group(
+        n_coefficients,
+        numerator_columns,
+        "expanded contrast numerator columns",
+    )?;
+    validate_expanded_contrast_group(
+        n_coefficients,
+        denominator_columns,
+        "expanded contrast denominator columns",
+    )?;
+    for &column in numerator_columns {
+        if denominator_columns.contains(&column) {
+            return Err(DeseqError::InvalidOptions {
+                reason: "expanded contrast numerator and denominator columns must be disjoint"
+                    .to_string(),
+            });
+        }
+    }
+
+    let numerator_weight = checked_div2(1.0, numerator_columns.len() as f64).ok_or_else(|| {
+        DeseqError::InvalidOptions {
+            reason: "expanded contrast numerator weight is non-finite".to_string(),
+        }
+    })?;
+    let denominator_weight =
+        checked_div2(-1.0, denominator_columns.len() as f64).ok_or_else(|| {
+            DeseqError::InvalidOptions {
+                reason: "expanded contrast denominator weight is non-finite".to_string(),
+            }
+        })?;
+
+    let mut contrast = vec![0.0; n_coefficients];
+    for &column in numerator_columns {
+        contrast[column] = numerator_weight;
+    }
+    for &column in denominator_columns {
+        contrast[column] = denominator_weight;
+    }
+    Ok(contrast)
 }
 
 /// Refit a fixed-dispersion GLM with supplied DESeq2-style beta prior variance.
@@ -233,6 +426,148 @@ pub fn fit_glms_with_estimated_beta_prior_variance(
 
     Ok(BetaPriorGlmFit {
         mle_fit,
+        prior_fit,
+        beta_prior_variance,
+    })
+}
+
+/// Run an expanded-design MLE fit, beta-prior refit, and standard-design collapse.
+///
+/// This helper covers the numeric core of DESeq2's expanded-model beta-prior
+/// path for callers that already constructed both model matrices and the
+/// mapping from expanded columns to reported standard coefficients.
+pub fn fit_expanded_glms_with_estimated_beta_prior_variance(
+    counts: &CountMatrix,
+    design: ExpandedModelBetaPriorDesignInput<'_>,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
+    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        BetaPriorNormalizationFactorWeightInput {
+            normalization_factors: &normalization_factors,
+            weights: None,
+        },
+        dispersions,
+        base_mean,
+        disp_fit,
+        options,
+    )
+}
+
+/// Run an expanded-design MLE fit, beta-prior refit, weights, and standard-design collapse.
+pub fn fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(
+    counts: &CountMatrix,
+    design: ExpandedModelBetaPriorDesignInput<'_>,
+    input: BetaPriorSizeFactorWeightInput<'_>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
+    let normalization_factors =
+        normalization_factors_from_size_factors(counts, input.size_factors)?;
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        BetaPriorNormalizationFactorWeightInput {
+            normalization_factors: &normalization_factors,
+            weights: input.weights,
+        },
+        dispersions,
+        base_mean,
+        disp_fit,
+        options,
+    )
+}
+
+/// Run an expanded-design MLE fit, beta-prior refit with offsets, and standard-design collapse.
+pub fn fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors(
+    counts: &CountMatrix,
+    design: ExpandedModelBetaPriorDesignInput<'_>,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+        counts,
+        design,
+        BetaPriorNormalizationFactorWeightInput {
+            normalization_factors,
+            weights: None,
+        },
+        dispersions,
+        base_mean,
+        disp_fit,
+        options,
+    )
+}
+
+/// Run an expanded-design MLE fit, beta-prior refit with offsets/weights, and collapse.
+pub fn fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
+    counts: &CountMatrix,
+    design: ExpandedModelBetaPriorDesignInput<'_>,
+    input: BetaPriorNormalizationFactorWeightInput<'_>,
+    dispersions: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    options: BetaPriorRefitOptions,
+) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
+    validate_expanded_coefficient_groups(
+        design.expanded_design.n_coefficients(),
+        design.coefficient_groups,
+        "expanded beta-prior coefficient groups",
+    )?;
+    if design.coefficient_groups.len() != design.standard_design.n_coefficients() {
+        return Err(invalid_dimensions(
+            "expanded beta-prior collapsed coefficient groups",
+            design.standard_design.n_coefficients(),
+            design.coefficient_groups.len(),
+        ));
+    }
+
+    let fit_options = options.fit_options;
+    let expanded_mle_fit = fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+        counts,
+        design.expanded_design,
+        input.normalization_factors,
+        dispersions,
+        input.weights,
+        fit_options.clone(),
+    )?;
+    let beta_prior_variance = estimate_beta_prior_variance(
+        &expanded_mle_fit.beta,
+        base_mean,
+        disp_fit,
+        design.expanded_design.coefficient_names(),
+        options.variance_options,
+    )?;
+    let expanded_prior_fit =
+        fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
+            counts,
+            design.expanded_design,
+            input.normalization_factors,
+            dispersions,
+            input.weights,
+            &beta_prior_variance,
+            fit_options,
+        )?;
+    let prior_fit = collapse_expanded_model_fit(
+        &expanded_prior_fit,
+        design.standard_design,
+        design.coefficient_groups,
+    )?;
+
+    Ok(ExpandedModelBetaPriorGlmFit {
+        expanded_mle_fit,
+        expanded_prior_fit,
         prior_fit,
         beta_prior_variance,
     })
@@ -733,6 +1068,241 @@ fn options_with_beta_prior_variance(
     }
     let ridge_lambda = beta_prior_variance_to_ridge_lambda(beta_prior_variance)?;
     Ok(options.ridge_lambda_by_coefficient(ridge_lambda))
+}
+
+fn validate_expanded_coefficient_groups(
+    n_coefficients: usize,
+    coefficient_groups: &[Vec<usize>],
+    context: &str,
+) -> Result<(), DeseqError> {
+    if coefficient_groups.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: context.to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    for (group_idx, group) in coefficient_groups.iter().enumerate() {
+        validate_expanded_contrast_group(
+            n_coefficients,
+            group,
+            &format!("{context} group {group_idx}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_expanded_covariance_inputs(
+    expanded_covariance: &RowMajorMatrix<f64>,
+    n_expanded_coefficients: usize,
+    coefficient_groups: &[Vec<usize>],
+) -> Result<(), DeseqError> {
+    if n_expanded_coefficients == 0 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "expanded covariance coefficient count".to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    let expected = n_expanded_coefficients
+        .checked_mul(n_expanded_coefficients)
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "expanded covariance columns".to_string(),
+            expected: usize::MAX,
+            actual: expanded_covariance.n_cols(),
+        })?;
+    if expanded_covariance.n_cols() != expected {
+        return Err(invalid_dimensions(
+            "expanded covariance columns",
+            expected,
+            expanded_covariance.n_cols(),
+        ));
+    }
+    validate_expanded_coefficient_groups(
+        n_expanded_coefficients,
+        coefficient_groups,
+        "expanded covariance coefficient groups",
+    )
+}
+
+fn validate_expanded_fit_collapse_inputs(
+    expanded_fit: &NbinomGlmFit,
+    standard_design: &DesignMatrix,
+    coefficient_groups: &[Vec<usize>],
+) -> Result<(), DeseqError> {
+    validate_expanded_coefficient_groups(
+        expanded_fit.beta.n_cols(),
+        coefficient_groups,
+        "expanded fit coefficient groups",
+    )?;
+    if standard_design.n_coefficients() != coefficient_groups.len() {
+        return Err(invalid_dimensions(
+            "standard design coefficients",
+            coefficient_groups.len(),
+            standard_design.n_coefficients(),
+        ));
+    }
+    if standard_design.n_samples() != expanded_fit.mu.n_cols() {
+        return Err(invalid_dimensions(
+            "standard design samples",
+            expanded_fit.mu.n_cols(),
+            standard_design.n_samples(),
+        ));
+    }
+    validate_expanded_fit_row_vector(
+        "expanded fit log-likelihood rows",
+        expanded_fit.beta.n_rows(),
+        expanded_fit.log_like.len(),
+    )?;
+    validate_expanded_fit_row_vector(
+        "expanded fit convergence rows",
+        expanded_fit.beta.n_rows(),
+        expanded_fit.beta_converged.len(),
+    )?;
+    validate_expanded_fit_row_vector(
+        "expanded fit beta-iteration rows",
+        expanded_fit.beta.n_rows(),
+        expanded_fit.beta_iter.len(),
+    )?;
+    if expanded_fit.beta_se.n_rows() != expanded_fit.beta.n_rows()
+        || expanded_fit.beta_se.n_cols() != expanded_fit.beta.n_cols()
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: "expanded fit beta SE matrix".to_string(),
+            expected: expanded_fit.beta.len(),
+            actual: expanded_fit.beta_se.len(),
+        });
+    }
+    if expanded_fit.mu.n_rows() != expanded_fit.beta.n_rows() {
+        return Err(invalid_dimensions(
+            "expanded fit fitted mean rows",
+            expanded_fit.beta.n_rows(),
+            expanded_fit.mu.n_rows(),
+        ));
+    }
+    if expanded_fit.hat_diagonal.n_rows() != expanded_fit.beta.n_rows()
+        || expanded_fit.hat_diagonal.n_cols() != expanded_fit.mu.n_cols()
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: "expanded fit hat diagonal matrix".to_string(),
+            expected: expanded_fit.beta.n_rows() * expanded_fit.mu.n_cols(),
+            actual: expanded_fit.hat_diagonal.len(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_expanded_fit_row_vector(
+    context: &str,
+    expected: usize,
+    actual: usize,
+) -> Result<(), DeseqError> {
+    if actual != expected {
+        return Err(invalid_dimensions(context, expected, actual));
+    }
+    Ok(())
+}
+
+fn validate_expanded_contrast_group(
+    n_coefficients: usize,
+    columns: &[usize],
+    context: &str,
+) -> Result<(), DeseqError> {
+    if columns.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: context.to_string(),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    let mut seen = vec![false; n_coefficients];
+    for &column in columns {
+        if column >= n_coefficients {
+            return Err(DeseqError::InvalidDimensions {
+                context: context.to_string(),
+                expected: n_coefficients.saturating_sub(1),
+                actual: column,
+            });
+        }
+        if seen[column] {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} contains duplicate column {column}"),
+            });
+        }
+        seen[column] = true;
+    }
+    Ok(())
+}
+
+fn average_covariance_block(
+    covariance: &[f64],
+    n_coefficients: usize,
+    left_group: &[usize],
+    right_group: &[usize],
+    gene: usize,
+) -> Result<f64, DeseqError> {
+    let terms = left_group
+        .iter()
+        .flat_map(|&left| {
+            right_group
+                .iter()
+                .map(move |&right| covariance[left * n_coefficients + right])
+        })
+        .collect::<Vec<_>>();
+    let sum = checked_scaled_sum(terms).ok_or_else(|| DeseqError::NonFiniteValue {
+        context: "expanded beta covariance average".to_string(),
+        index: Some(gene),
+        value: f64::NAN,
+    })?;
+    let denominator = left_group
+        .len()
+        .checked_mul(right_group.len())
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "expanded covariance average denominator".to_string(),
+            expected: usize::MAX,
+            actual: 0,
+        })?;
+    checked_div2(sum, denominator as f64).ok_or_else(|| DeseqError::NonFiniteValue {
+        context: "expanded beta covariance average".to_string(),
+        index: Some(gene),
+        value: f64::NAN,
+    })
+}
+
+fn beta_se_from_covariance(
+    covariance: &RowMajorMatrix<f64>,
+    n_coefficients: usize,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let expected_cols = n_coefficients.checked_mul(n_coefficients).ok_or_else(|| {
+        DeseqError::InvalidDimensions {
+            context: "collapsed covariance columns".to_string(),
+            expected: usize::MAX,
+            actual: covariance.n_cols(),
+        }
+    })?;
+    if covariance.n_cols() != expected_cols {
+        return Err(invalid_dimensions(
+            "collapsed covariance columns",
+            expected_cols,
+            covariance.n_cols(),
+        ));
+    }
+    let mut values = Vec::with_capacity(covariance.n_rows() * n_coefficients);
+    for gene in 0..covariance.n_rows() {
+        let row = covariance.row(gene)?;
+        for coefficient in 0..n_coefficients {
+            let variance = row[coefficient * n_coefficients + coefficient];
+            if !variance.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: "collapsed beta standard error".to_string(),
+                    index: Some(gene),
+                    value: variance,
+                });
+            }
+            values.push(variance.max(0.0).sqrt());
+        }
+    }
+    RowMajorMatrix::from_row_major(covariance.n_rows(), n_coefficients, values)
 }
 
 fn validate_beta_prior_inputs(

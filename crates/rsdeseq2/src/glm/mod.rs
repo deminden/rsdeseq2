@@ -10,7 +10,13 @@ pub mod wald;
 pub mod weights;
 
 pub use beta::{
-    beta_prior_variance_to_ridge_lambda, estimate_beta, estimate_beta_prior_variance,
+    average_expanded_model_coefficients, average_expanded_model_covariances,
+    beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
+    estimate_beta_prior_variance, expanded_model_group_contrast,
+    fit_expanded_glms_with_estimated_beta_prior_variance,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_weights,
     fit_glms_with_beta_prior_variance, fit_glms_with_beta_prior_variance_and_normalization_factors,
     fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
     fit_glms_with_beta_prior_variance_and_weights, fit_glms_with_estimated_beta_prior_variance,
@@ -21,7 +27,8 @@ pub use beta::{
     fit_intercept_only_fixed_dispersion_with_weights, match_upper_quantile_for_variance,
     match_weighted_upper_quantile_for_variance, BetaPriorGlmFit,
     BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
-    BetaPriorVarianceMethod, BetaPriorVarianceOptions,
+    BetaPriorVarianceMethod, BetaPriorVarianceOptions, ExpandedModelBetaPriorDesignInput,
+    ExpandedModelBetaPriorGlmFit,
 };
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{optim_fallback_rows, OptimFallbackRows};

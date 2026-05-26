@@ -168,9 +168,52 @@ reference; no DESeq2 source is vendored or translated line by line.
   beta-prior variances, with DESeq2's `1 / betaPriorVar / log(2)^2`
   natural-log ridge conversion, including size-factor, normalization-factor,
   and observation-weight fixed-dispersion GLM inputs.
-- [ ] Expanded model-matrix beta-prior averaging, high-level beta-prior
-  workflow plumbing, and DESeq2-style contrast numerator/denominator
-  construction.
+- [x] Primitive expanded model-matrix beta-prior coefficient averaging for
+  already-built expanded coefficient matrices.
+- [x] Primitive expanded model-matrix beta-prior covariance propagation through
+  the same coefficient-group averaging matrix.
+- [x] Primitive expanded model fit collapse into a standard GLM fit surface
+  with recomputed standard errors and standard-design metadata.
+- [x] Primitive Wald result-table assembly from collapsed expanded model fits.
+- [x] Primitive Wald contrast result-table assembly from collapsed expanded
+  model fits using standard-design numeric contrasts.
+- [x] Primitive DESeq2-style expanded-model contrast numerator/denominator
+  construction using averaged group weights.
+- [x] Primitive expanded-design beta-prior refit workflow: MLE fit, prior
+  variance estimation, prior refit, and collapse to a standard GLM surface.
+- [x] Primitive Wald coefficient and contrast result assembly directly from
+  expanded beta-prior refit outputs.
+- [x] Primitive expanded beta-prior fit-and-Wald-results workflow helpers for
+  selected coefficients and numeric contrasts.
+- [x] Size-factor, normalization-factor, and optional observation-weight inputs
+  for primitive expanded beta-prior fit-and-Wald-results workflows.
+- [x] Primitive one-factor expanded design construction from sample labels,
+  including expanded design, treatment-style reported design, and coefficient
+  groups.
+- [x] One-factor expanded beta-prior fit-and-Wald-results helpers that own
+  design construction before running coefficient or numeric-contrast workflows.
+- [x] Primitive additive expanded design construction for categorical factors
+  and numeric covariates in `~ factor1 + factor2 + numeric1 + ...` terms.
+- [x] Primitive factor-by-factor interaction construction for additive expanded
+  designs, including expanded all-level products, treatment-style
+  non-reference products, and collapse groups.
+- [x] Primitive factor-by-numeric and numeric-by-numeric interaction
+  construction for additive expanded designs, including treatment-style
+  factor-numeric products and one-to-one numeric interaction groups.
+- [x] Primitive formula-to-expanded-design parser for intercept-preserving
+  additive main effects, `1` intercept-only designs, pairwise interactions,
+  pairwise interactions without all lower-order main effects, pairwise `/`
+  nesting, pairwise `*` shorthand, and `0`/`-1` intercept removal.
+- [x] Primitive formula-to-expanded-design parser support for three-variable
+  `:`, `/`, and `*` terms, including treatment-style reported columns and
+  expanded-design product columns for factor and numeric combinations.
+- [x] Additive-factor expanded beta-prior fit-and-Wald-results helpers that own
+  design construction before running coefficient or numeric-contrast workflows.
+- [x] Formula-driven expanded beta-prior fit-and-Wald-results helpers for the
+  supported primitive formula subset.
+- [ ] Offsets, splines, transformed variables, arbitrary term subtraction,
+  nested terms beyond three variables, higher-order interactions beyond three
+  variables, and complete formula-aware expanded model matrix construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.

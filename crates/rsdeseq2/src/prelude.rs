@@ -15,7 +15,13 @@ pub use crate::core::{
     DeseqBuilder, DeseqFit, FastVstGlmMuMetadata, FastVstGlmMuOutput, VstFullDataReason,
     VstGlmMuMetadata, VstGlmMuOutput, VstTrendSource, DEFAULT_FAST_VST_NSUB,
 };
-pub use crate::design::DesignMatrix;
+pub use crate::design::{
+    expanded_additive_design, expanded_additive_design_with_all_interactions,
+    expanded_additive_design_with_interactions, expanded_additive_factor_design,
+    expanded_factor_design, expanded_formula_design, DesignMatrix, ExpandedAdditiveFactorDesign,
+    ExpandedFactorDesign, ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec,
+    ExpandedFactorSpec, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+};
 pub use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,
     Deseq2McolsDiagnosticsDataFrame, DiagnosticSummary,
@@ -61,8 +67,14 @@ pub use crate::dispersion::{
 };
 pub use crate::errors::DeseqError;
 pub use crate::glm::{
-    beta_prior_variance_to_ridge_lambda, estimate_beta, estimate_beta_prior_variance,
-    fit_fixed_dispersion_irls, fit_fixed_dispersion_irls_with_normalization_factors,
+    average_expanded_model_coefficients, average_expanded_model_covariances,
+    beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
+    estimate_beta_prior_variance, expanded_model_group_contrast,
+    fit_expanded_glms_with_estimated_beta_prior_variance,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
+    fit_expanded_glms_with_estimated_beta_prior_variance_and_weights, fit_fixed_dispersion_irls,
+    fit_fixed_dispersion_irls_with_normalization_factors,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
     fit_fixed_dispersion_irls_with_weights, fit_glms_with_beta_prior_variance,
     fit_glms_with_beta_prior_variance_and_normalization_factors,
@@ -81,10 +93,11 @@ pub use crate::glm::{
     wald_stat_and_pvalue_with_options, wald_test, wald_test_coefficient,
     wald_test_coefficient_with_options, wald_test_contrast, wald_test_contrast_with_options,
     BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
-    BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions, IrlsOptions,
-    IrlsSolver, LrtOutput, NbinomGlmFit, ObservationWeightOptions, ObservationWeights,
-    OptimFallbackRows, WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldOutput,
-    WaldPvalueType, WaldTestOptions,
+    BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
+    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, IrlsOptions, IrlsSolver,
+    LrtOutput, NbinomGlmFit, ObservationWeightOptions, ObservationWeights, OptimFallbackRows,
+    WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldOutput, WaldPvalueType,
+    WaldTestOptions,
 };
 pub use crate::independent_filtering::{
     apply_independent_filtering, default_theta, filtered_p_adjustments, lowess_fitted_values,
@@ -122,12 +135,37 @@ pub use crate::options::{
 };
 pub use crate::results::{
     apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_contrast_results,
-    build_lrt_results, build_wald_contrast_results, build_wald_results,
+    build_lrt_results, build_wald_contrast_results,
+    build_wald_contrast_results_from_expanded_beta_prior_fit,
+    build_wald_contrast_results_from_expanded_model_fit, build_wald_results,
+    build_wald_results_from_expanded_beta_prior_fit, build_wald_results_from_expanded_model_fit,
     build_wald_results_from_wald, default_cooks_cutoff, deseq2_result_core_column_names,
+    fit_expanded_additive_beta_prior_wald_contrast_results,
+    fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
+    fit_expanded_additive_beta_prior_wald_results,
+    fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights,
+    fit_expanded_beta_prior_wald_contrast_results,
+    fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
+    fit_expanded_beta_prior_wald_results,
+    fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights,
+    fit_expanded_factor_beta_prior_wald_contrast_results,
+    fit_expanded_factor_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
+    fit_expanded_factor_beta_prior_wald_results,
+    fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights,
+    fit_expanded_formula_beta_prior_wald_contrast_results,
+    fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
+    fit_expanded_formula_beta_prior_wald_results,
+    fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights,
     recompute_padj, resolve_cooks_cutoff, rsdeseq2_result_diagnostic_column_names,
     DeseqResultColumn, DeseqResultColumnMetadata, DeseqResultColumnValues, DeseqResultRow,
     DeseqResults, DeseqResultsDataFrame, DeseqResultsMetadata, DeseqResultsTableMetadata,
-    DeseqResultsTableMetadataEntry, DESEQ2_RESULT_CORE_COLUMNS, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
+    DeseqResultsTableMetadataEntry, ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
+    ExpandedAdditiveBetaPriorWaldResults, ExpandedAdditiveBetaPriorWaldResultsInput,
+    ExpandedBetaPriorWaldNormalizedResultsInput, ExpandedBetaPriorWaldResults,
+    ExpandedBetaPriorWaldResultsInput, ExpandedFactorBetaPriorWaldNormalizedResultsInput,
+    ExpandedFactorBetaPriorWaldResults, ExpandedFactorBetaPriorWaldResultsInput,
+    ExpandedFormulaBetaPriorWaldNormalizedResultsInput, ExpandedFormulaBetaPriorWaldResultsInput,
+    DESEQ2_RESULT_CORE_COLUMNS, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
 };
 pub use crate::transform::{
     fast_vst_eligible_count, fast_vst_subset, fast_vst_subset_indices, fast_vst_subset_matrix_rows,

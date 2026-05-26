@@ -16,7 +16,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
-| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles and log2-to-natural ridge conversion. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, and combined estimated-prior refit fixture checks; expanded-model averaging and high-level plumbing still need coverage. |
+| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only three-variable interactions, primitive expanded-design refits, grouped collapse, and Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs. One-factor and additive helpers now build the expanded design internally before running coefficient or contrast workflows. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, and Rust expanded-model workflow tests; splines, deeper nested terms, transformed variables, offsets, higher-order interactions beyond three variables, and full formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, and implemented local numerical-integration helpers. | Formula tests and stage-level dispatch tests; full Bioconductor object workflow remains future work. |
@@ -68,6 +68,45 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Primitive beta-prior fixed-dispersion GLM refits from supplied or estimated
   log2-scale beta-prior variances, including DESeq2's conversion to
   natural-log-scale ridge values before IRLS.
+- Primitive expanded-model beta-prior coefficient averaging, covariance
+  propagation, and averaged numerator/denominator contrast-vector construction
+  for already-built expanded coefficient matrices.
+- Primitive expanded-model fit collapse into a standard `NbinomGlmFit` surface
+  with collapsed betas, standard errors, covariance, and reported design.
+- Primitive expanded-design beta-prior refit workflow for already-built
+  matrices: expanded MLE fit, prior variance estimation, expanded prior refit,
+  and standard-surface collapse.
+- DESeq2-shaped Wald coefficient and numeric-contrast result assembly from
+  collapsed expanded-model fits.
+- DESeq2-shaped Wald coefficient and numeric-contrast result assembly directly
+  from expanded beta-prior refit outputs.
+- Primitive expanded beta-prior fit-and-Wald-results workflow helpers for
+  selected coefficients and numeric contrasts, including size-factor,
+  normalization-factor, and optional observation-weight inputs.
+- Primitive one-factor expanded design construction from sample labels, with
+  expanded intercept-plus-level columns, treatment-style reported design, and
+  coefficient groups.
+- One-factor expanded beta-prior fit-and-Wald-results helpers that build the
+  design internally, then run coefficient or numeric-contrast workflows with
+  size-factor, normalization-factor, and optional observation-weight inputs.
+- Primitive additive expanded design construction for categorical factors,
+  numeric covariates, factor-by-factor, factor-by-numeric, and
+  numeric-by-numeric interactions, with one expanded indicator per factor
+  level, treatment-style reported columns for non-reference factor levels,
+  unchanged numeric columns in both design surfaces, primitive pairwise
+  interaction products, and matching coefficient groups.
+- Primitive formula-to-expanded-design parsing for `1` intercept-only,
+  intercept-preserving `+`, `:`, `/`, `*` shorthand, and `0`/`-1` intercept
+  removal terms, including lower-order-omitted pairwise interactions and
+  three-variable interaction/nesting/star-expansion terms in the supported
+  formula subset.
+- Additive-factor expanded beta-prior fit-and-Wald-results helpers that build
+  the design internally, then run coefficient or numeric-contrast workflows
+  with size-factor, normalization-factor, and optional observation-weight
+  inputs.
+- Formula-driven expanded beta-prior fit-and-Wald-results helpers for the
+  supported primitive formula subset, using the same coefficient and
+  numeric-contrast result assembly paths.
 - DESeq2-style observation-weight preprocessing helper with row-max
   normalization, weighted design-rank checks, thresholded Cox-Reid sub-design
   checks, and `weights_fail` flags.
@@ -367,7 +406,9 @@ bounded fallback where DESeq2 is installed locally.
 ## Missing
 
 - Mature wrapper-facing interface around the Rust core.
-- R formula parsing in Rust.
+- Complete formula parsing in Rust, including transforms, offsets, splines,
+  arbitrary term subtraction, higher-order interactions beyond three variables,
+  and full nested-term expansion beyond the current three-variable subset.
 - Full DESeq2 dispersion estimation, including broader weighted dispersion
   edge-case parity, exact `locfit` local-trend numerical identity, glmGamPoi trend type,
   and production-ready end-to-end dispersion parity.

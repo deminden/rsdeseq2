@@ -125,3 +125,1102 @@ fn design_rank_validates_tolerance() {
     assert!(design.rank_with_tolerance(f64::NAN).is_err());
     assert!(design.rank_with_tolerance(-1.0).is_err());
 }
+
+#[test]
+fn expanded_factor_design_builds_expanded_and_standard_surfaces() {
+    let levels = ["A", "B", "A", "C"];
+    let expanded = expanded_factor_design("condition", &levels, "A").unwrap();
+
+    assert_eq!(
+        expanded.levels,
+        vec!["A".to_string(), "B".to_string(), "C".to_string()]
+    );
+    assert_eq!(
+        expanded.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "conditionC".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "condition_C_vs_A".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(expanded.coefficient_groups, vec![vec![0], vec![2], vec![3]]);
+}
+
+#[test]
+fn expanded_factor_design_validates_inputs() {
+    assert!(expanded_factor_design("", &["A", "B"], "A").is_err());
+    assert!(expanded_factor_design("condition", &["A", "B"], "").is_err());
+    assert!(expanded_factor_design("condition", &["A", ""], "A").is_err());
+    assert!(expanded_factor_design("condition", &["B", "C"], "A").is_err());
+    let empty: [&str; 0] = [];
+    assert!(expanded_factor_design("condition", &empty, "A").is_err());
+}
+
+#[test]
+fn expanded_additive_factor_design_builds_multiple_factor_surfaces() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+
+    let expanded = expanded_additive_factor_design(&factors).unwrap();
+
+    assert_eq!(
+        expanded.factor_levels,
+        vec![
+            vec!["A".to_string(), "B".to_string()],
+            vec!["X".to_string(), "Y".to_string()],
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "batchX".to_string(),
+            "batchY".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ]
+    );
+    assert_eq!(expanded.coefficient_groups, vec![vec![0], vec![2], vec![4]]);
+    assert!(expanded.numeric_covariates.is_empty());
+    assert!(expanded.interactions.is_empty());
+}
+
+#[test]
+fn expanded_additive_factor_design_validates_inputs() {
+    let condition = vec!["A".to_string(), "B".to_string()];
+    let short_batch = vec!["X".to_string()];
+    let duplicate = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+    ];
+    assert!(expanded_additive_factor_design(&[]).is_err());
+    assert!(expanded_additive_factor_design(&duplicate).is_err());
+
+    let misaligned = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &short_batch,
+            reference: "X",
+        },
+    ];
+    assert!(expanded_additive_factor_design(&misaligned).is_err());
+}
+
+#[test]
+fn expanded_additive_design_includes_numeric_covariates_unchanged() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let expanded = expanded_additive_design(&factors, &numeric).unwrap();
+
+    assert_eq!(
+        expanded.factor_levels,
+        vec![vec!["A".to_string(), "B".to_string()]]
+    );
+    assert_eq!(expanded.numeric_covariates, vec!["dose".to_string()]);
+    assert_eq!(
+        expanded.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "dose".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "dose".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ]
+    );
+    assert_eq!(expanded.coefficient_groups, vec![vec![0], vec![2], vec![3]]);
+}
+
+#[test]
+fn expanded_additive_design_with_interactions_builds_factor_pair_terms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let interactions = [ExpandedFactorInteractionSpec {
+        left_factor: "condition",
+        right_factor: "batch",
+    }];
+
+    let expanded =
+        expanded_additive_design_with_interactions(&factors, &[], &interactions).unwrap();
+
+    assert_eq!(
+        expanded.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "batchX".to_string(),
+            "batchY".to_string(),
+            "conditionA:batchX".to_string(),
+            "conditionA:batchY".to_string(),
+            "conditionB:batchX".to_string(),
+            "conditionB:batchY".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "batch_Y_vs_X".to_string(),
+            "condition_B_vs_A:batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 1.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        expanded.coefficient_groups,
+        vec![vec![0], vec![2], vec![4], vec![8]]
+    );
+    assert_eq!(expanded.interactions, vec!["condition:batch".to_string()]);
+}
+
+#[test]
+fn expanded_additive_design_with_all_interactions_builds_numeric_interactions() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let time = [1.0, 1.0, 2.0, 2.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric = [
+        ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "time",
+            values: &time,
+        },
+    ];
+    let factor_numeric = [ExpandedFactorNumericInteractionSpec {
+        factor: "condition",
+        numeric: "dose",
+    }];
+    let numeric_interactions = [ExpandedNumericInteractionSpec {
+        left_numeric: "dose",
+        right_numeric: "time",
+    }];
+
+    let expanded = expanded_additive_design_with_all_interactions(
+        &factors,
+        &numeric,
+        &[],
+        &factor_numeric,
+        &numeric_interactions,
+    )
+    .unwrap();
+
+    assert_eq!(
+        expanded.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "dose".to_string(),
+            "time".to_string(),
+            "conditionA:dose".to_string(),
+            "conditionB:dose".to_string(),
+            "dose:time".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.expanded_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 2.0, 0.0, 1.0, 2.0,
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "dose".to_string(),
+            "time".to_string(),
+            "condition_B_vs_A:dose".to_string(),
+            "dose:time".to_string(),
+        ]
+    );
+    assert_eq!(
+        expanded.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, 2.0, 0.0, 0.0, //
+            1.0, 1.0, 1.0, 2.0, 1.0, 2.0,
+        ]
+    );
+    assert_eq!(
+        expanded.coefficient_groups,
+        vec![vec![0], vec![2], vec![3], vec![4], vec![6], vec![7]]
+    );
+    assert_eq!(
+        expanded.factor_numeric_interactions,
+        vec!["condition:dose".to_string()]
+    );
+    assert_eq!(expanded.numeric_interactions, vec!["dose:time".to_string()]);
+}
+
+#[test]
+fn expanded_additive_design_with_interactions_validates_specs() {
+    let condition = vec!["A".to_string(), "B".to_string()];
+    let batch = vec!["X".to_string(), "Y".to_string()];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+
+    assert!(expanded_additive_design_with_interactions(
+        &factors,
+        &[],
+        &[ExpandedFactorInteractionSpec {
+            left_factor: "condition",
+            right_factor: "missing",
+        }]
+    )
+    .is_err());
+    assert!(expanded_additive_design_with_interactions(
+        &factors,
+        &[],
+        &[ExpandedFactorInteractionSpec {
+            left_factor: "condition",
+            right_factor: "condition",
+        }]
+    )
+    .is_err());
+    assert!(expanded_additive_design_with_interactions(
+        &factors,
+        &[],
+        &[
+            ExpandedFactorInteractionSpec {
+                left_factor: "condition",
+                right_factor: "batch",
+            },
+            ExpandedFactorInteractionSpec {
+                left_factor: "batch",
+                right_factor: "condition",
+            },
+        ]
+    )
+    .is_err());
+
+    let dose = [0.0, 1.0];
+    let time = [1.0, 2.0];
+    let numeric = [
+        ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "time",
+            values: &time,
+        },
+    ];
+    assert!(expanded_additive_design_with_all_interactions(
+        &factors,
+        &numeric,
+        &[],
+        &[ExpandedFactorNumericInteractionSpec {
+            factor: "condition",
+            numeric: "missing",
+        }],
+        &[],
+    )
+    .is_err());
+    assert!(expanded_additive_design_with_all_interactions(
+        &factors,
+        &numeric,
+        &[],
+        &[],
+        &[ExpandedNumericInteractionSpec {
+            left_numeric: "dose",
+            right_numeric: "dose",
+        }],
+    )
+    .is_err());
+    assert!(expanded_additive_design_with_all_interactions(
+        &factors,
+        &numeric,
+        &[],
+        &[],
+        &[
+            ExpandedNumericInteractionSpec {
+                left_numeric: "dose",
+                right_numeric: "time",
+            },
+            ExpandedNumericInteractionSpec {
+                left_numeric: "time",
+                right_numeric: "dose",
+            },
+        ],
+    )
+    .is_err());
+}
+
+#[test]
+fn expanded_additive_design_validates_numeric_covariates() {
+    let dose = [0.0, 1.0, 2.0];
+    let bad = [0.0, f64::NAN, 2.0];
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        }]
+    )
+    .is_ok());
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "",
+            values: &dose,
+        }]
+    )
+    .is_err());
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "dose",
+            values: &[],
+        }]
+    )
+    .is_err());
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "dose",
+            values: &bad,
+        }]
+    )
+    .is_err());
+    assert!(expanded_additive_design(
+        &[],
+        &[
+            ExpandedNumericSpec {
+                name: "dose",
+                values: &dose,
+            },
+            ExpandedNumericSpec {
+                name: "dose",
+                values: &dose,
+            },
+        ]
+    )
+    .is_err());
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "dose",
+            values: &[0.0, 1.0],
+        }]
+    )
+    .is_ok());
+    assert!(expanded_additive_design(
+        &[],
+        &[ExpandedNumericSpec {
+            name: "Intercept",
+            values: &dose,
+        }]
+    )
+    .is_err());
+}
+
+#[test]
+fn expanded_formula_design_builds_supported_pairwise_terms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let time = [1.0, 1.0, 2.0, 2.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric = [
+        ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "time",
+            values: &time,
+        },
+    ];
+
+    let parsed = expanded_formula_design(
+        "~ condition + dose + time + condition:dose + dose:time",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    let direct = expanded_additive_design_with_all_interactions(
+        &factors,
+        &numeric,
+        &[],
+        &[ExpandedFactorNumericInteractionSpec {
+            factor: "condition",
+            numeric: "dose",
+        }],
+        &[ExpandedNumericInteractionSpec {
+            left_numeric: "dose",
+            right_numeric: "time",
+        }],
+    )
+    .unwrap();
+
+    assert_eq!(parsed, direct);
+}
+
+#[test]
+fn expanded_formula_design_supports_intercept_only_formula() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let from_factor = expanded_formula_design("~ 1", &factors, &[]).unwrap();
+    assert_eq!(
+        from_factor.expanded_design.coefficient_names().unwrap(),
+        &["Intercept".to_string()]
+    );
+    assert_eq!(
+        from_factor.standard_design.coefficient_names().unwrap(),
+        &["Intercept".to_string()]
+    );
+    assert_eq!(from_factor.expanded_design.matrix().as_slice(), &[1.0; 4]);
+    assert_eq!(from_factor.standard_design.matrix().as_slice(), &[1.0; 4]);
+    assert_eq!(from_factor.coefficient_groups, vec![vec![0]]);
+
+    let from_numeric = expanded_formula_design("~ 1", &[], &numeric).unwrap();
+    assert_eq!(from_numeric, from_factor);
+
+    assert!(expanded_formula_design("~ 1", &[], &[]).is_err());
+    assert!(expanded_formula_design("~ 0", &factors, &[]).is_err());
+}
+
+#[test]
+fn expanded_formula_design_expands_star_terms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+
+    let parsed = expanded_formula_design("~ condition * batch", &factors, &[]).unwrap();
+    let direct = expanded_additive_design_with_all_interactions(
+        &factors,
+        &[],
+        &[ExpandedFactorInteractionSpec {
+            left_factor: "condition",
+            right_factor: "batch",
+        }],
+        &[],
+        &[],
+    )
+    .unwrap();
+
+    assert_eq!(parsed, direct);
+}
+
+#[test]
+fn expanded_formula_design_accepts_interactions_without_main_effects() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let interaction_only = expanded_formula_design("~ condition:batch", &factors, &[]).unwrap();
+    assert_eq!(
+        interaction_only
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "conditionA:batchX".to_string(),
+            "conditionA:batchY".to_string(),
+            "conditionB:batchX".to_string(),
+            "conditionB:batchY".to_string(),
+        ]
+    );
+    assert_eq!(
+        interaction_only.standard_design.matrix().as_slice(),
+        &[
+            1.0, 1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, 1.0, 0.0, //
+            1.0, 0.0, 0.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        interaction_only.coefficient_groups,
+        vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
+    );
+
+    let one_main = expanded_formula_design("~ condition + condition:batch", &factors, &[]).unwrap();
+    assert_eq!(
+        one_main.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "conditionA:batch_Y_vs_X".to_string(),
+            "conditionB:batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        one_main.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        one_main.coefficient_groups,
+        vec![vec![0], vec![2], vec![4], vec![6]]
+    );
+
+    let factor_numeric =
+        expanded_formula_design("~ condition + condition:dose", &factors, &numeric).unwrap();
+    assert_eq!(
+        factor_numeric.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "conditionA:dose".to_string(),
+            "conditionB:dose".to_string(),
+        ]
+    );
+    assert_eq!(
+        factor_numeric.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 1.0,
+        ]
+    );
+}
+
+#[test]
+fn expanded_formula_design_supports_intercept_removal() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+
+    let no_intercept = expanded_formula_design("~ 0 + condition + batch", &factors, &[]).unwrap();
+    assert_eq!(
+        no_intercept.standard_design.coefficient_names().unwrap(),
+        &[
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        no_intercept.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            0.0, 1.0, 0.0, //
+            0.0, 1.0, 1.0,
+        ]
+    );
+    assert_eq!(
+        no_intercept.coefficient_groups,
+        vec![vec![0], vec![1], vec![3]]
+    );
+
+    let minus_one = expanded_formula_design("~ condition - 1", &factors, &[]).unwrap();
+    assert_eq!(
+        minus_one.standard_design.coefficient_names().unwrap(),
+        &["conditionA".to_string(), "conditionB".to_string()]
+    );
+    assert_eq!(
+        minus_one.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, //
+            1.0, 0.0, //
+            0.0, 1.0, //
+            0.0, 1.0,
+        ]
+    );
+
+    let interaction_only = expanded_formula_design("~ 0 + condition:batch", &factors, &[]).unwrap();
+    assert_eq!(
+        interaction_only
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "conditionA:batchX".to_string(),
+            "conditionA:batchY".to_string(),
+            "conditionB:batchX".to_string(),
+            "conditionB:batchY".to_string(),
+        ]
+    );
+    assert_eq!(
+        interaction_only.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, //
+            0.0, 1.0, 0.0, 0.0, //
+            0.0, 0.0, 1.0, 0.0, //
+            0.0, 0.0, 0.0, 1.0,
+        ]
+    );
+}
+
+#[test]
+fn expanded_formula_design_supports_pairwise_nested_terms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let nested = expanded_formula_design("~ condition / batch", &factors, &[]).unwrap();
+    let expanded = expanded_formula_design("~ condition + condition:batch", &factors, &[]).unwrap();
+    assert_eq!(nested, expanded);
+    assert_eq!(
+        nested.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "conditionA:batch_Y_vs_X".to_string(),
+            "conditionB:batch_Y_vs_X".to_string(),
+        ]
+    );
+
+    let nested_numeric = expanded_formula_design("~ condition / dose", &factors, &numeric).unwrap();
+    let expanded_numeric =
+        expanded_formula_design("~ condition + condition:dose", &factors, &numeric).unwrap();
+    assert_eq!(nested_numeric, expanded_numeric);
+
+    let no_intercept = expanded_formula_design("~ 0 + condition / batch", &factors, &[]).unwrap();
+    assert_eq!(
+        no_intercept.standard_design.coefficient_names().unwrap(),
+        &[
+            "conditionA".to_string(),
+            "conditionB".to_string(),
+            "conditionA:batch_Y_vs_X".to_string(),
+            "conditionB:batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        no_intercept.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 0.0, //
+            0.0, 1.0, 0.0, 0.0, //
+            0.0, 1.0, 0.0, 1.0,
+        ]
+    );
+}
+
+#[test]
+fn expanded_formula_design_supports_three_way_terms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let dose = [0.0, 1.0, 2.0, 3.0];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let direct = expanded_formula_design(
+        "~ condition + batch + dose + condition:batch:dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        direct.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "batch_Y_vs_X".to_string(),
+            "dose".to_string(),
+            "condition_B_vs_A:batch_Y_vs_X:dose".to_string(),
+        ]
+    );
+    assert_eq!(
+        direct.standard_design.matrix().as_slice(),
+        &[
+            1.0, 0.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, 2.0, 0.0, //
+            1.0, 1.0, 1.0, 3.0, 3.0,
+        ]
+    );
+    assert_eq!(
+        direct.higher_order_interactions,
+        vec!["condition:batch:dose".to_string()]
+    );
+
+    let star = expanded_formula_design("~ condition * batch * dose", &factors, &numeric).unwrap();
+    assert!(star
+        .standard_design
+        .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose")
+        .is_ok());
+    assert_eq!(
+        star.higher_order_interactions,
+        vec!["condition:batch:dose".to_string()]
+    );
+
+    let nested = expanded_formula_design("~ condition / batch / dose", &factors, &numeric).unwrap();
+    let expanded_nested = expanded_formula_design(
+        "~ condition + condition:batch + condition:batch:dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(nested, expanded_nested);
+}
+
+#[test]
+fn expanded_formula_design_validates_unsupported_terms() {
+    let condition = vec!["A".to_string(), "B".to_string()];
+    let batch = vec!["X".to_string(), "Y".to_string()];
+    let dose = [0.0, 1.0];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    assert!(expanded_formula_design("condition + dose", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ I(dose^2)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ condition + missing", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ condition + condition", &factors, &numeric).is_err());
+    assert!(
+        expanded_formula_design("~ condition + condition:condition", &factors, &numeric).is_err()
+    );
+    assert!(
+        expanded_formula_design("~ condition * batch * dose * missing", &factors, &numeric)
+            .is_err()
+    );
+    assert!(expanded_formula_design("~ condition:batch:dose:missing", &factors, &numeric).is_err());
+}

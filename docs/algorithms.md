@@ -563,8 +563,67 @@ weight_i = 1 / (1 / baseMean_i + dispFit_i)
 ```
 
 Intercept columns named `Intercept` or `(Intercept)` receive the configured
-wide prior variance. The full high-level beta-prior refit and expanded
-model-matrix workflow are still tracked as future parity work.
+wide prior variance.
+
+The expanded-model beta-prior surface now has primitive helpers for the core
+coefficient and covariance arithmetic used after fitting an expanded model
+matrix. Given a log2-scale expanded beta matrix and groups of expanded columns,
+the collapse helper returns per-gene group averages:
+
+```text
+beta_collapsed_ij = mean(beta_expanded_i, columns(group_j))
+```
+
+For per-gene expanded covariance matrices, the covariance helper applies the
+same averaging matrix:
+
+```text
+Sigma_collapsed_i = A Sigma_expanded_i A'
+```
+
+The companion contrast helper builds averaged numerator-vs-denominator vectors
+with `+1 / n` weights over numerator columns and `-1 / m` weights over
+denominator columns. A fit-level collapse helper packages the same arithmetic
+back into an `NbinomGlmFit`: collapsed betas, propagated covariance, standard
+errors recomputed from the collapsed covariance diagonal, the caller-supplied
+standard design matrix, and the original fitted means and diagnostics.
+Result-table helpers can then build DESeq2-shaped Wald rows for a selected
+collapsed coefficient or for a caller-supplied numeric contrast on the
+collapsed standard-design coefficient scale.
+
+The expanded refit helper runs the same sequence end to end for primitive
+matrices: MLE fit on the expanded design, prior-variance estimation from the
+expanded MLE coefficients, ridge refit on the expanded design, and collapse
+onto the caller-supplied standard design. Result-table companions can consume
+that expanded beta-prior fit output directly for selected coefficients or
+numeric contrasts. A fit-and-results workflow helper combines those pieces for
+the common Wald coefficient or numeric-contrast path, including size-factor,
+normalization-factor, and optional observation-weight inputs. A primitive
+one-factor design helper builds the expanded intercept-plus-level-indicator
+matrix, the matching treatment-style reported design, and coefficient groups
+from caller-supplied sample labels. One-factor fit-and-results helpers now own
+that construction and pass the generated expanded design, standard design, and
+column groups into the same Wald coefficient or numeric-contrast workflows.
+For additive designs, a multi-term helper covers primitive
+`~ factor1 + factor2 + numeric1 + factor1:factor2 + factor1:numeric1 +
+numeric1:numeric2 + ...` construction: intercept, one expanded indicator per
+factor level, treatment-style reported columns for non-reference levels,
+numeric covariates included unchanged in both design surfaces, primitive
+pairwise interaction columns, and matching collapse groups. Additive
+fit-and-results helpers run the same coefficient and numeric-contrast
+workflows with size-factor, normalization-factor, and optional
+observation-weight inputs. A primitive formula helper now parses a
+DESeq2-style subset (`1` intercept-only, `+`, `:`, `/`, `*` shorthand, and
+`0`/`-1` intercept removal), including lower-order-omitted pairwise
+interactions and three-variable interaction/nesting/star-expansion terms. It
+builds expanded all-level interaction products and reported treatment-style
+columns according to the supported formula terms. Formula-driven
+fit-and-results helpers run the same expanded beta-prior Wald coefficient and
+numeric-contrast workflows from that parsed design. Splines, transformed
+variables, offsets, arbitrary term subtraction, interactions beyond three
+variables, deeper nesting, and complete formula semantics remain future work;
+the runtime numeric path is pure Rust and expects callers or wrappers to
+provide or derive unsupported design surfaces explicitly.
 
 `fit_glms_with_beta_prior_variance()` performs the primitive fixed-dispersion
 refit from a supplied `betaPriorVar` vector. Size-factor, normalization-factor,
@@ -581,8 +640,7 @@ lambda_natural_log = lambda_log2 / log(2)^2
 steps for fixed-dispersion matrices: first fit MLE betas, estimate the
 coefficient prior variances, and then refit with the converted per-coefficient
 ridge. Companion helpers cover the same estimated-prior workflow for
-normalization-factor offsets and optional observation weights. Expanded-model
-prior averaging remains separate future work.
+normalization-factor offsets and optional observation weights.
 
 ## Observation-Weight Preprocessing
 
