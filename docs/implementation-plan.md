@@ -494,6 +494,13 @@ reference; no DESeq2 source is vendored or translated line by line.
   cleanup.
 - [x] Reject standalone CLI sample-level contrast files unless they accompany
   a complete factor-level contrast request.
+- [x] Allow top-level builder LRT workflows to store a reduced design and route
+  `fit`, `fit_with_results`, named coefficients, numeric contrasts,
+  coefficient-name contrasts, and factor-level contrasts through implemented
+  GLM-mu LRT paths.
+- [x] Add typed top-level Cook's replacement-refit output for `test`-selected
+  Wald/LRT workflows, allowing stored-reduced-design LRT replacement refits
+  without changing the existing Wald-only return types.
 - [ ] Full DESeq2 contrast handling for `results(contrast=...)`, including
   colData/formula-aware factor-level semantics, complete coefficient-name
   cleanup, and contrast-aware Cook's/refit edge cases.
@@ -637,8 +644,39 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [ ] Full VST with automatic trend estimation, frozen dispersion-function
   reuse, fast-subset trend fitting, exact local `splinefun` parity, and object
   metadata.
-- [ ] rlog implementation. The transform namespace currently exports an
-  explicit `UnsupportedFeature` marker for callers that probe support.
+- [x] Low-level rlog sample-effect ridge-GLM primitive with explicit
+  dispersions and sample-effect prior variance.
+- [x] Low-level rlog sample-effect prior variance estimation from normalized
+  counts, `baseMean`, and `dispFit`.
+- [x] Low-level rlog convenience helpers that estimate the sample-effect prior
+  and fit with either size factors or normalization factors when earlier-stage
+  summaries are supplied.
+- [x] Fit-retaining low-level rlog helpers exposing the fitted
+  intercept-plus-sample-effect GLM for parity diagnostics and future frozen
+  transform reuse.
+- [x] Low-level frozen-intercept rlog helpers that reuse supplied log2
+  intercepts as gene-specific offsets and refit sample effects with size-factor
+  or normalization-factor offsets.
+- [x] Fit-state rlog dispatch from stored `baseMean`, `dispFit`, final
+  dispersions, and size-factor or normalization-factor offsets.
+- [x] Fit-state frozen-intercept rlog dispatch from stored final dispersions
+  and offsets, including all-zero row re-expansion with supplied intercepts.
+- [x] Fit-state and builder-level rlog all-zero row handling: fit compact
+  nonzero rows and re-expand all-zero rows as zero transform rows.
+- [x] Rlog output metadata with transformed shape, fitted intercept count,
+  estimated sample-effect prior variance, and offset-mode label.
+- [x] Builder-level `rlog_glm_mu` and `blind_rlog_glm_mu` helpers that compose
+  the implemented GLM-mu MAP dispersion path with fit-state rlog.
+- [x] Builder-level frozen-rlog reuse helpers for design-aware and blind GLM-mu
+  workflows, retaining the learned source rlog, frozen transform, fit state,
+  design mode, and trend-fit metadata.
+- [x] Fit-retaining builder rlog outputs for wrappers and parity diagnostics,
+  including design-mode and trend-fit metadata.
+- [x] Native CLI `rlog` command for blind, design-aware, and frozen-intercept
+  GLM-mu MAP dispersion workflows with size-factor or normalization-factor
+  offsets.
+- [ ] Full high-level rlog workflow wiring frozen intercept reuse into object
+  dispatch with complete object metadata.
 - [ ] Mature R package wrapper backed only by Rust, with no fallback to
   R/Bioconductor DESeq2.
 - [ ] Mature CLI.

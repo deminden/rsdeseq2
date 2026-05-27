@@ -1,14 +1,21 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::{
+    estimate_rlog_sample_prior_variance, estimate_rlog_sample_prior_variance_with_quantile,
     fast_vst_eligible_count, fast_vst_subset, fast_vst_subset_indices, fast_vst_subset_matrix_rows,
     fast_vst_subset_normalized_counts, local_vst_inverse_size_factor_mean,
     local_vst_inverse_size_factor_mean_from_normalization_factors, norm_transform,
-    norm_transform_value, rlog, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
+    norm_transform_value, rlog_beta_prior_variance, rlog_fit_with_normalization_factors,
+    rlog_fit_with_size_factors, rlog_frozen_with_normalization_factors,
+    rlog_frozen_with_size_factors, rlog_sample_design, rlog_sample_effect_design,
+    rlog_sample_effect_prior_variance, rlog_with_estimated_prior_and_normalization_factors,
+    rlog_with_estimated_prior_and_size_factors, rlog_with_normalization_factors,
+    rlog_with_size_factors, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
     vst_parametric_value, vst_with_dispersion_trend,
     vst_with_dispersion_trend_and_normalization_factors,
     vst_with_dispersion_trend_and_size_factors, CountMatrix, DeseqError, DispersionTrendFit,
-    LocalDispersionTrend, LocalDispersionTrendFit, MeanDispersionTrend, MeanDispersionTrendFit,
-    ParametricDispersionTrend, ParametricDispersionTrendFit, RowMajorMatrix,
+    IrlsOptions, LocalDispersionTrend, LocalDispersionTrendFit, MeanDispersionTrend,
+    MeanDispersionTrendFit, ParametricDispersionTrend, ParametricDispersionTrendFit,
+    RlogOffsetMode, RowMajorMatrix, RLOG_INTERCEPT_PRIOR_VARIANCE, RLOG_PRIOR_UPPER_QUANTILE,
 };
 
 fn expected_mean_vst(q: f64, alpha: f64) -> f64 {
@@ -63,10 +70,356 @@ fn norm_transform_rejects_negative_and_non_finite_counts() {
 }
 
 #[test]
-fn rlog_is_explicitly_unsupported_until_regularized_log_parity_lands() {
-    let err = rlog().unwrap_err();
+fn rlog_sample_design_and_prior_variance_match_sample_effect_shape() {
+    let design = rlog_sample_design(3).unwrap();
 
-    assert!(err.to_string().contains("regularized-log transformation"));
+    assert_eq!(
+        design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "sample_0".to_string(),
+            "sample_1".to_string(),
+            "sample_2".to_string(),
+        ]
+    );
+    assert_eq!(
+        design.matrix().as_slice(),
+        &[1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+    );
+
+    let prior = rlog_beta_prior_variance(3, 4.0).unwrap();
+    assert_eq!(prior, vec![RLOG_INTERCEPT_PRIOR_VARIANCE, 4.0, 4.0, 4.0]);
+    assert!(rlog_sample_design(0).is_err());
+    assert!(rlog_beta_prior_variance(3, 0.0).is_err());
+}
+
+#[test]
+fn rlog_sample_effect_design_and_prior_match_frozen_shape() {
+    let design = rlog_sample_effect_design(3).unwrap();
+
+    assert_eq!(
+        design.coefficient_names().unwrap(),
+        &[
+            "sample_0".to_string(),
+            "sample_1".to_string(),
+            "sample_2".to_string(),
+        ]
+    );
+    assert_eq!(
+        design.matrix().as_slice(),
+        &[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    );
+    assert_eq!(
+        rlog_sample_effect_prior_variance(3, 4.0).unwrap(),
+        vec![4.0; 3]
+    );
+    assert!(rlog_sample_effect_design(0).is_err());
+    assert!(rlog_sample_effect_prior_variance(3, f64::INFINITY).is_err());
+}
+
+#[test]
+fn rlog_sample_prior_variance_matches_weighted_log_fold_change_rule() {
+    let normalized =
+        RowMajorMatrix::from_row_major(2, 3, vec![10.0, 20.0, 40.0, 2.0, 8.0, 32.0]).unwrap();
+    let base_mean = [70.0_f64 / 3.0, 14.0];
+    let disp_fit = [0.1_f64, 0.25];
+    let mut log_fold_changes = Vec::new();
+    let mut weights = Vec::new();
+    for gene in 0..normalized.n_rows() {
+        let weight = 1.0 / (1.0 / base_mean[gene] + disp_fit[gene]);
+        let center = (base_mean[gene] + 0.5_f64).log2();
+        for sample in 0..normalized.n_cols() {
+            log_fold_changes
+                .push((normalized.get(gene, sample).unwrap() + 0.5_f64).log2() - center);
+            weights.push(weight);
+        }
+    }
+    let expected = rsdeseq2::prelude::match_weighted_upper_quantile_for_variance(
+        &log_fold_changes,
+        &weights,
+        RLOG_PRIOR_UPPER_QUANTILE,
+    )
+    .unwrap();
+
+    let observed = estimate_rlog_sample_prior_variance(&normalized, &base_mean, &disp_fit).unwrap();
+
+    assert_relative_eq!(observed, expected, epsilon = 1e-12);
+    assert_relative_eq!(
+        estimate_rlog_sample_prior_variance_with_quantile(&normalized, &base_mean, &disp_fit, 0.1)
+            .unwrap(),
+        rsdeseq2::prelude::match_weighted_upper_quantile_for_variance(
+            &log_fold_changes,
+            &weights,
+            0.1
+        )
+        .unwrap(),
+        epsilon = 1e-12
+    );
+    assert!(estimate_rlog_sample_prior_variance(&normalized, &[0.0, 14.0], &disp_fit).is_err());
+    assert!(
+        estimate_rlog_sample_prior_variance(&normalized, &base_mean, &[f64::NAN, 0.25]).is_err()
+    );
+}
+
+#[test]
+fn rlog_with_size_factors_returns_finite_sample_effect_transform() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let size_factors = [1.0, 2.0, 4.0];
+    let dispersions = [0.1, 0.2];
+
+    let transformed = rlog_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        4.0,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(transformed.n_rows(), counts.n_genes());
+    assert_eq!(transformed.n_cols(), counts.n_samples());
+    assert!(transformed.as_slice().iter().all(|value| value.is_finite()));
+    assert_relative_eq!(
+        transformed.get(0, 0).unwrap(),
+        transformed.get(0, 1).unwrap(),
+        epsilon = 1e-6
+    );
+    assert_relative_eq!(
+        transformed.get(0, 1).unwrap(),
+        transformed.get(0, 2).unwrap(),
+        epsilon = 1e-6
+    );
+}
+
+#[test]
+fn rlog_normalization_factor_path_matches_equivalent_size_factors() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let size_factors = [1.0, 2.0, 4.0];
+    let dispersions = [0.1, 0.2];
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
+
+    let size_factor_path = rlog_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        4.0,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+    let normalization_factor_path = rlog_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        4.0,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        size_factor_path.as_slice(),
+        normalization_factor_path.as_slice()
+    );
+}
+
+#[test]
+fn frozen_rlog_size_factor_path_matches_equivalent_normalization_factors() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let size_factors = [1.0, 2.0, 4.0];
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
+    let dispersions = [0.1, 0.2];
+    let frozen_intercept = [3.25, 2.5];
+
+    let size_factor_path = rlog_frozen_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        4.0,
+        &frozen_intercept,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+    let normalization_factor_path = rlog_frozen_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        4.0,
+        &frozen_intercept,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(size_factor_path.offset_mode, RlogOffsetMode::SizeFactors);
+    assert_eq!(
+        normalization_factor_path.offset_mode,
+        RlogOffsetMode::NormalizationFactors
+    );
+    assert_eq!(size_factor_path.intercept, frozen_intercept);
+    assert_eq!(normalization_factor_path.intercept, frozen_intercept);
+    assert_eq!(size_factor_path.metadata().intercept_len, counts.n_genes());
+    assert_eq!(
+        size_factor_path.transformed.as_slice(),
+        normalization_factor_path.transformed.as_slice()
+    );
+}
+
+#[test]
+fn frozen_rlog_validates_offsets_and_intercepts() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let size_factors = [1.0, 2.0, 4.0];
+    let dispersions = [0.1, 0.2];
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
+
+    assert!(rlog_frozen_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        4.0,
+        &[3.0],
+        IrlsOptions::default(),
+    )
+    .is_err());
+    assert!(rlog_frozen_with_size_factors(
+        &counts,
+        &[1.0, f64::NAN, 4.0],
+        &dispersions,
+        4.0,
+        &[3.0, 2.0],
+        IrlsOptions::default(),
+    )
+    .is_err());
+    assert!(rlog_frozen_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        0.0,
+        &[3.0, 2.0],
+        IrlsOptions::default(),
+    )
+    .is_err());
+    assert!(rlog_frozen_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        4.0,
+        &[f64::NAN, 2.0],
+        IrlsOptions::default(),
+    )
+    .is_err());
+}
+
+#[test]
+fn rlog_estimated_prior_size_factor_path_matches_manual_two_step_path() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let size_factors = [1.0, 2.0, 4.0];
+    let base_mean = [10.0, 5.0];
+    let disp_fit = [0.1, 0.2];
+    let dispersions = [0.12, 0.25];
+
+    let output = rlog_with_estimated_prior_and_size_factors(
+        &counts,
+        &size_factors,
+        &base_mean,
+        &disp_fit,
+        &dispersions,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert!(output.sample_prior_variance.is_finite());
+    assert!(output.sample_prior_variance > 0.0);
+    assert_eq!(output.offset_mode, RlogOffsetMode::SizeFactors);
+    assert_eq!(output.metadata().transformed_rows, counts.n_genes());
+    assert_eq!(output.metadata().transformed_cols, counts.n_samples());
+    assert_eq!(output.metadata().offset_mode, "sizeFactors");
+    let normalized = rsdeseq2::prelude::normalized_counts(&counts, &size_factors).unwrap();
+    let expected_prior =
+        estimate_rlog_sample_prior_variance(&normalized, &base_mean, &disp_fit).unwrap();
+    let expected = rlog_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        expected_prior,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+    let fit_output = rlog_fit_with_size_factors(
+        &counts,
+        &size_factors,
+        &dispersions,
+        expected_prior,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_relative_eq!(
+        output.sample_prior_variance,
+        expected_prior,
+        epsilon = 1e-12
+    );
+    assert_eq!(output.transformed.as_slice(), expected.as_slice());
+    assert_eq!(output.intercept, fit_output.intercept);
+    assert_eq!(output.intercept.len(), counts.n_genes());
+    assert_eq!(output.metadata().intercept_len, counts.n_genes());
+    assert_eq!(fit_output.fit.beta.n_cols(), counts.n_samples() + 1);
+}
+
+#[test]
+fn rlog_estimated_prior_normalization_factor_path_matches_manual_two_step_path() {
+    let counts = CountMatrix::from_row_major_u32(2, 3, vec![10, 20, 40, 0, 5, 50]).unwrap();
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 0.5, 1.0, 2.0]).unwrap();
+    let base_mean = [10.0, 10.0];
+    let disp_fit = [0.1, 0.2];
+    let dispersions = [0.12, 0.25];
+
+    let output = rlog_with_estimated_prior_and_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &base_mean,
+        &disp_fit,
+        &dispersions,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    let normalized =
+        rsdeseq2::prelude::normalized_counts_with_factors(&counts, &normalization_factors).unwrap();
+    let expected_prior =
+        estimate_rlog_sample_prior_variance(&normalized, &base_mean, &disp_fit).unwrap();
+    let expected = rlog_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        expected_prior,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+    let fit_output = rlog_fit_with_normalization_factors(
+        &counts,
+        &normalization_factors,
+        &dispersions,
+        expected_prior,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(output.offset_mode, RlogOffsetMode::NormalizationFactors);
+    assert_eq!(output.metadata().transformed_rows, counts.n_genes());
+    assert_eq!(output.metadata().transformed_cols, counts.n_samples());
+    assert_eq!(output.metadata().offset_mode, "normalizationFactors");
+    assert_relative_eq!(
+        output.sample_prior_variance,
+        expected_prior,
+        epsilon = 1e-12
+    );
+    assert_eq!(output.transformed.as_slice(), expected.as_slice());
+    assert_eq!(output.intercept, fit_output.intercept);
+    assert_eq!(output.intercept.len(), counts.n_genes());
+    assert_eq!(output.metadata().intercept_len, counts.n_genes());
+    assert_eq!(fit_output.fit.beta.n_cols(), counts.n_samples() + 1);
 }
 
 #[test]

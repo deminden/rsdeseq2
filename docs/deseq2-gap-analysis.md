@@ -14,13 +14,19 @@ explicit model matrices. It has substantial coverage for normalization,
 fixed-dispersion GLM primitives, parts of dispersion estimation, and selected
 Wald/LRT result paths.
 
-The current CLI is deliberately narrow:
+The current CLI is still deliberately narrower than the Rust API, but it now
+covers the main implemented primitive workflows:
 
 - `size-factors`
+- `normalized-counts`
 - `base-mean`
+- `vst`
+- `rlog`
+- `wald`
+- `lrt`
 
-The richer pipeline exists in the Rust API and tests, not yet as a mature user
-CLI.
+Broader object-style workflows and formula/metadata-aware behavior remain in
+the Rust API roadmap rather than mature CLI surface.
 
 ## Matched Or Partly Matched
 
@@ -44,7 +50,7 @@ and selected result/filtering/Cook's primitives.
 | Independent filtering | BaseMean-driven filtered BH and DESeq2-shaped lowess threshold selection. |
 | Dispersion gene estimates | Linear-mu and GLM-mu foundations, rough/moments starts, Cox-Reid, Armijo, grid fallback. |
 | Dispersion trends | Parametric, mean, and initial pure-Rust local trends. |
-| Transformations | `normTransform` plus mean-fit, parametric, and local VST primitives for normalized counts; VST dispatch from fitted dispersion trends. |
+| Transformations | `normTransform`, mean-fit, parametric, and local VST primitives, fit-state and builder-level VST dispatch, low-level rlog sample-effect fitting with retained GLM intermediates, frozen-intercept rlog primitives, rlog prior estimation, fit-state rlog and frozen-rlog reuse, builder-level design-aware/blind GLM-mu rlog and frozen-rlog helpers, and native CLI `vst`/`rlog` commands including frozen-intercept rlog input. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
 | Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including unweighted and weighted GLM-mu mean/local MAP/Wald/LRT anchors plus local Cox-Reid MAP/Wald/LRT anchors and compact result-row checks. |
@@ -106,7 +112,8 @@ Still missing:
 Still missing:
 
 - high-level VST object workflow and exact local `splinefun` parity,
-- rlog,
+- full high-level rlog object workflow wiring frozen intercept reuse into
+  object dispatch with complete object metadata,
 - lfcShrink-compatible hooks,
 - plotting helpers,
 - mature CLI commands for full differential expression.

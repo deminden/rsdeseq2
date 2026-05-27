@@ -10,7 +10,8 @@
 //! statistics, Cook's diagnostics and low-count heuristic helper, primitive
 //! outlier count replacement, limited GLM-mu native Wald/LRT replacement refit
 //! metadata, BH adjusted p-values, independent filtering, and an inspectable
-//! fit-state skeleton, plus implemented normTransform and VST helpers.
+//! fit-state skeleton, plus implemented normTransform, VST helpers, and a
+//! fit-state and builder-level rlog sample-effect ridge-GLM path.
 
 pub(crate) mod all_zero;
 pub mod bindings;

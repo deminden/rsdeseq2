@@ -455,6 +455,57 @@ pub fn read_labeled_geometric_means_tsv(
     Ok(values)
 }
 
+/// Read one finite numeric value per gene with labels preserved.
+pub fn read_labeled_gene_numeric_tsv(
+    path: impl AsRef<Path>,
+    context: &str,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
+    let path_ref = path.as_ref();
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path_ref)?;
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} columns"),
+            expected: 2,
+            actual: headers.len(),
+        });
+    }
+    let mut values = Vec::new();
+    for (idx, record) in reader.records().enumerate() {
+        let record = record?;
+        if record.len() != 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: format!("{context} record columns"),
+                expected: 2,
+                actual: record.len(),
+            });
+        }
+        let gene = record.get(0).unwrap_or_default();
+        if gene.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} gene names must not be empty"),
+            });
+        }
+        let value =
+            parse_finite_float_field(record.get(1).unwrap_or_default(), path_ref, idx, context)?;
+        values.push(GeneNumericValue {
+            gene: gene.to_string(),
+            value,
+        });
+    }
+    if values.is_empty() {
+        return Err(DeseqError::InvalidDimensions {
+            context: format!("{context} rows"),
+            expected: 1,
+            actual: 0,
+        });
+    }
+    Ok(values)
+}
+
 /// Read one finite numeric Wald t degrees-of-freedom value per gene.
 ///
 /// The file has a leading gene label column and one numeric value column.

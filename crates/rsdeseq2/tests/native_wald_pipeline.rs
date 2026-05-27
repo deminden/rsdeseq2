@@ -669,6 +669,52 @@ fn top_level_fit_keeps_lrt_explicit_until_reduced_design_is_supplied() {
 }
 
 #[test]
+fn top_level_fit_uses_stored_reduced_design_for_lrt() {
+    let counts = native_wald_counts_with_zero_row();
+    let full_design = two_group_design();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let builder = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone());
+
+    let top_level_fit = builder.fit(&counts, &full_design).unwrap();
+    let (expected_fit, _expected_results) = builder
+        .fit_lrt_glm_mu(&counts, &full_design, &reduced_design, 1)
+        .unwrap();
+
+    assert_eq!(builder.current_reduced_design(), Some(&reduced_design));
+    assert_eq!(top_level_fit.lrt, expected_fit.lrt);
+    assert_eq!(top_level_fit.reduced_design, expected_fit.reduced_design);
+    assert_wald_fit_state_matches(&top_level_fit, &expected_fit, "top-level LRT");
+    assert_matrix_close_or_nan(
+        top_level_fit.reduced_mu.as_ref().unwrap(),
+        expected_fit.reduced_mu.as_ref().unwrap(),
+        "top-level LRT reduced mu",
+    );
+}
+
+#[test]
+fn top_level_fit_with_results_name_uses_stored_reduced_design_for_lrt() {
+    let counts = native_wald_counts_with_zero_row();
+    let full_design = two_group_design();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let builder = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone());
+
+    let (top_level_fit, top_level_results) = builder
+        .fit_with_results_name(&counts, &full_design, "condition_B_vs_A")
+        .unwrap();
+    let (expected_fit, expected_results) = builder
+        .fit_lrt_glm_mu(&counts, &full_design, &reduced_design, 1)
+        .unwrap();
+
+    assert_eq!(top_level_fit.lrt, expected_fit.lrt);
+    assert_eq!(top_level_results, expected_results);
+    assert_eq!(top_level_results.metadata.test_type, Some(TestType::Lrt));
+}
+
+#[test]
 fn top_level_fit_with_results_contrast_keeps_lrt_explicit() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
@@ -700,6 +746,54 @@ fn top_level_fit_with_results_contrast_keeps_lrt_explicit() {
     assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
     assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
     assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
+}
+
+#[test]
+fn top_level_lrt_contrast_methods_use_stored_reduced_design() {
+    let counts = native_wald_counts_with_zero_row();
+    let full_design = two_group_design();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let builder = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone());
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (numeric_fit, numeric_results) = builder
+        .fit_with_results_contrast(&counts, &full_design, &[0.0, 1.0])
+        .unwrap();
+    let (spec_fit, spec_results) = builder
+        .fit_with_results_contrast_spec(
+            &counts,
+            &full_design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+        )
+        .unwrap();
+    let (factor_fit, factor_results) = builder
+        .fit_with_results_factor_level_contrast(
+            &counts,
+            &full_design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+    let (expected_fit, expected_results) = builder
+        .fit_lrt_glm_mu_contrast(&counts, &full_design, &reduced_design, &[0.0, 1.0])
+        .unwrap();
+
+    assert_eq!(numeric_fit.lrt, expected_fit.lrt);
+    assert_eq!(spec_fit.lrt, expected_fit.lrt);
+    assert_eq!(factor_fit.lrt, expected_fit.lrt);
+    assert_eq!(numeric_results, expected_results);
+    assert_eq!(
+        spec_results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
 }
 
 #[test]
@@ -753,6 +847,139 @@ fn top_level_fit_with_results_cooks_replacement_keeps_lrt_explicit() {
     ));
     assert!(matches!(spec_err, DeseqError::UnsupportedFeature { .. }));
     assert!(matches!(factor_err, DeseqError::UnsupportedFeature { .. }));
+}
+
+#[test]
+fn top_level_test_output_routes_lrt_cooks_replacement_with_stored_reduced_design() {
+    let counts = native_wald_counts_with_zero_row();
+    let full_design = two_group_design();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let options = CooksReplacementOptions::new(f64::MAX);
+    let builder = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone());
+
+    let top_level = builder
+        .fit_with_test_results_with_cooks_replacement(&counts, &full_design, &options)
+        .unwrap();
+    let expected = builder
+        .fit_lrt_with_results_with_cooks_replacement(
+            &counts,
+            &full_design,
+            &reduced_design,
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Lrt(output) = top_level else {
+        panic!("top-level test output should route to LRT");
+    };
+    assert_eq!(output.results, expected.results);
+    assert_eq!(output.refit_plan.n_refit, expected.refit_plan.n_refit);
+    assert!(output.original_fit.lrt.is_some());
+    assert_eq!(output.results.metadata.test_type, Some(TestType::Lrt));
+}
+
+#[test]
+fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
+    let counts = native_wald_counts_with_zero_row();
+    let full_design = two_group_design();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let options = CooksReplacementOptions::new(f64::MAX);
+    let builder = glm_mu_native_wald_builder()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone());
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let numeric = builder
+        .fit_with_test_results_contrast_with_cooks_replacement(
+            &counts,
+            &full_design,
+            &[0.0, 1.0],
+            &options,
+        )
+        .unwrap();
+    let spec = builder
+        .fit_with_test_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &full_design,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+            &options,
+        )
+        .unwrap();
+    let factor = builder
+        .fit_with_test_results_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &full_design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+            &options,
+        )
+        .unwrap();
+    let expected = builder
+        .fit_lrt_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &full_design,
+            &reduced_design,
+            &[0.0, 1.0],
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Lrt(numeric) = numeric else {
+        panic!("numeric contrast should route to LRT");
+    };
+    let CooksReplacementTestOutput::Lrt(spec) = spec else {
+        panic!("contrast spec should route to LRT");
+    };
+    let CooksReplacementTestOutput::Lrt(factor) = factor else {
+        panic!("factor contrast should route to LRT");
+    };
+
+    assert_eq!(numeric.results, expected.results);
+    assert_eq!(
+        spec.results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+    assert_eq!(
+        factor.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+}
+
+#[test]
+fn top_level_test_output_routes_wald_cooks_replacement() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let options = CooksReplacementOptions::new(f64::MAX);
+    let builder = glm_mu_native_wald_builder().test(TestType::Wald);
+
+    let top_level = builder
+        .fit_with_test_results_name_with_cooks_replacement(
+            &counts,
+            &design,
+            "condition_B_vs_A",
+            &options,
+        )
+        .unwrap();
+    let expected = builder
+        .fit_with_results_name_with_cooks_replacement(
+            &counts,
+            &design,
+            "condition_B_vs_A",
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Wald(output) = top_level else {
+        panic!("top-level test output should route to Wald");
+    };
+    assert_eq!(output.results, expected.results);
+    assert_eq!(output.refit_plan.n_refit, expected.refit_plan.n_refit);
+    assert!(output.original_fit.wald.is_some());
+    assert_eq!(output.results.metadata.test_type, Some(TestType::Wald));
 }
 
 #[test]
@@ -1945,6 +2172,405 @@ fn fitted_trend_state_drives_norm_and_vst_transforms() {
     assert_eq!(vst.n_rows(), counts.n_genes());
     assert!(vst.as_slice().iter().all(|value| value.is_finite()));
     assert_relative_eq!(norm.as_slice()[9], (20.0_f64 + 1.0).log2(), epsilon = 1e-12);
+}
+
+#[test]
+fn fitted_map_state_drives_rlog_transform() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+
+    let output = fit.rlog(&counts).unwrap();
+    let expected = rlog_with_estimated_prior_and_size_factors(
+        &counts,
+        &fit.size_factors,
+        &fit.base_mean,
+        fit.disp_fit.as_ref().unwrap(),
+        fit.dispersion.as_ref().unwrap(),
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(output.transformed.n_rows(), counts.n_genes());
+    assert_eq!(output.transformed.n_cols(), counts.n_samples());
+    assert!(output.sample_prior_variance.is_finite());
+    assert!(output.sample_prior_variance > 0.0);
+    assert_eq!(output.offset_mode, RlogOffsetMode::SizeFactors);
+    assert_eq!(output.metadata().transformed_rows, counts.n_genes());
+    assert_eq!(output.metadata().transformed_cols, counts.n_samples());
+    assert_eq!(output.metadata().intercept_len, counts.n_genes());
+    assert_eq!(output.metadata().offset_mode, "sizeFactors");
+    assert_relative_eq!(
+        output.sample_prior_variance,
+        expected.sample_prior_variance,
+        epsilon = 1e-12
+    );
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+    assert_eq!(output.intercept, expected.intercept);
+}
+
+#[test]
+fn fitted_map_state_drives_rlog_transform_with_normalization_factors() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let mut factor_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for gene in 0..counts.n_genes() {
+        for sample in 0..counts.n_samples() {
+            factor_values.push(0.8 + 0.05 * gene as f64 + 0.02 * sample as f64);
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), factor_values)
+            .unwrap();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .normalization_factors(normalization_factors.clone())
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+
+    let output = fit.rlog(&counts).unwrap();
+    let expected = rlog_with_estimated_prior_and_normalization_factors(
+        &counts,
+        fit.normalization_factors.as_ref().unwrap(),
+        &fit.base_mean,
+        fit.disp_fit.as_ref().unwrap(),
+        fit.dispersion.as_ref().unwrap(),
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(fit.normalization_factors, Some(normalization_factors));
+    assert!(output.sample_prior_variance.is_finite());
+    assert!(output.sample_prior_variance > 0.0);
+    assert_eq!(output.offset_mode, RlogOffsetMode::NormalizationFactors);
+    assert_eq!(output.metadata().transformed_rows, counts.n_genes());
+    assert_eq!(output.metadata().transformed_cols, counts.n_samples());
+    assert_eq!(output.metadata().intercept_len, counts.n_genes());
+    assert_eq!(output.metadata().offset_mode, "normalizationFactors");
+    assert_relative_eq!(
+        output.sample_prior_variance,
+        expected.sample_prior_variance,
+        epsilon = 1e-12
+    );
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+    assert_eq!(output.intercept, expected.intercept);
+}
+
+#[test]
+fn fitted_map_state_drives_frozen_rlog_transform() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let learned = fit.rlog(&counts).unwrap();
+
+    let output = fit
+        .frozen_rlog(&counts, &learned.intercept, learned.sample_prior_variance)
+        .unwrap();
+    let expected = rsdeseq2::prelude::rlog_frozen_with_size_factors(
+        &counts,
+        &fit.size_factors,
+        fit.dispersion.as_ref().unwrap(),
+        learned.sample_prior_variance,
+        &learned.intercept,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(output.offset_mode, RlogOffsetMode::SizeFactors);
+    assert_eq!(output.metadata().intercept_len, counts.n_genes());
+    assert_eq!(output.intercept, learned.intercept);
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+}
+
+#[test]
+fn fitted_map_state_drives_frozen_rlog_transform_with_normalization_factors() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let mut factor_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for gene in 0..counts.n_genes() {
+        for sample in 0..counts.n_samples() {
+            factor_values.push(0.8 + 0.05 * gene as f64 + 0.02 * sample as f64);
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), factor_values)
+            .unwrap();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .normalization_factors(normalization_factors)
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let learned = fit.rlog(&counts).unwrap();
+
+    let output = fit
+        .frozen_rlog(&counts, &learned.intercept, learned.sample_prior_variance)
+        .unwrap();
+    let expected = rsdeseq2::prelude::rlog_frozen_with_normalization_factors(
+        &counts,
+        fit.normalization_factors.as_ref().unwrap(),
+        fit.dispersion.as_ref().unwrap(),
+        learned.sample_prior_variance,
+        &learned.intercept,
+        IrlsOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(output.offset_mode, RlogOffsetMode::NormalizationFactors);
+    assert_eq!(output.intercept, learned.intercept);
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+}
+
+#[test]
+fn fitted_rlog_requires_map_dispersions_and_matching_counts() {
+    let counts = native_wald_counts_with_zero_row()
+        .select_rows(&[1, 2, 3, 4, 5, 6, 7])
+        .unwrap();
+    let design = two_group_design();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .fit_dispersion_trend_glm_mu(&counts, &design)
+        .unwrap();
+    let err = fit.rlog(&counts).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains("final dispersions are required before rlog"));
+
+    let wrong_counts = CountMatrix::from_row_major_u32(1, counts.n_samples(), vec![1; 8]).unwrap();
+    assert!(fit.rlog(&wrong_counts).is_err());
+}
+
+#[test]
+fn fitted_frozen_rlog_requires_final_dispersions_and_matching_inputs() {
+    let counts = native_wald_counts_with_zero_row()
+        .select_rows(&[1, 2, 3, 4, 5, 6, 7])
+        .unwrap();
+    let design = two_group_design();
+    let fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .fit_dispersion_trend_glm_mu(&counts, &design)
+        .unwrap();
+    let frozen_intercept = vec![1.0; counts.n_genes()];
+    let err = fit
+        .frozen_rlog(&counts, &frozen_intercept, 1.0)
+        .unwrap_err();
+    assert!(err
+        .to_string()
+        .contains("final dispersions are required before frozen rlog"));
+
+    let map_fit = glm_mu_native_wald_builder()
+        .fit_type(FitType::Mean)
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    assert!(map_fit.frozen_rlog(&counts, &[1.0; 2], 1.0).is_err());
+    assert!(map_fit
+        .frozen_rlog(&counts, &frozen_intercept, 0.0)
+        .is_err());
+}
+
+#[test]
+fn fitted_rlog_expands_all_zero_rows_as_zero_transform_rows() {
+    let counts = native_wald_counts_with_zero_row();
+    let compact_counts = counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+    let fit = builder
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let compact_fit = builder
+        .fit_map_dispersions_glm_mu(&compact_counts, &design)
+        .unwrap();
+
+    let output = fit.rlog(&counts).unwrap();
+    let compact_output = compact_fit.rlog(&compact_counts).unwrap();
+
+    assert_eq!(output.transformed.n_rows(), counts.n_genes());
+    assert_eq!(output.transformed.n_cols(), counts.n_samples());
+    assert_eq!(output.intercept.len(), counts.n_genes());
+    assert_eq!(output.intercept[0], 0.0);
+    assert!(output
+        .transformed
+        .row(0)
+        .unwrap()
+        .iter()
+        .all(|value| *value == 0.0));
+    assert_eq!(
+        output.sample_prior_variance,
+        compact_output.sample_prior_variance
+    );
+    for compact_gene in 0..compact_counts.n_genes() {
+        assert_eq!(
+            output.transformed.row(compact_gene + 1).unwrap(),
+            compact_output.transformed.row(compact_gene).unwrap()
+        );
+        assert_eq!(
+            output.intercept[compact_gene + 1],
+            compact_output.intercept[compact_gene]
+        );
+    }
+}
+
+#[test]
+fn fitted_frozen_rlog_expands_all_zero_rows_with_frozen_intercepts() {
+    let counts = native_wald_counts_with_zero_row();
+    let compact_counts = counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+    let fit = builder
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let compact_fit = builder
+        .fit_map_dispersions_glm_mu(&compact_counts, &design)
+        .unwrap();
+    let frozen_intercept = vec![0.75, 3.1, 2.9, 3.2, 4.0, 2.7, 3.4, 3.8];
+    let compact_intercept = frozen_intercept[1..].to_vec();
+
+    let output = fit.frozen_rlog(&counts, &frozen_intercept, 2.0).unwrap();
+    let compact_output = compact_fit
+        .frozen_rlog(&compact_counts, &compact_intercept, 2.0)
+        .unwrap();
+
+    assert_eq!(output.intercept, frozen_intercept);
+    assert!(output
+        .transformed
+        .row(0)
+        .unwrap()
+        .iter()
+        .all(|value| *value == frozen_intercept[0]));
+    for compact_gene in 0..compact_counts.n_genes() {
+        assert_eq!(
+            output.transformed.row(compact_gene + 1).unwrap(),
+            compact_output.transformed.row(compact_gene).unwrap()
+        );
+    }
+}
+
+#[test]
+fn builder_rlog_glm_mu_matches_manual_fit_state_transform() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+
+    let output = builder.rlog_glm_mu(&counts, &design).unwrap();
+    let diagnostic_output = builder.rlog_glm_mu_with_fit(&counts, &design).unwrap();
+    let fit = builder
+        .fit_map_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let expected = fit.rlog(&counts).unwrap();
+
+    assert_eq!(output.metadata(), expected.metadata());
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+    assert_eq!(diagnostic_output.rlog.metadata(), expected.metadata());
+    assert_eq!(diagnostic_output.design_mode, RlogDesignMode::DesignAware);
+    assert_eq!(diagnostic_output.metadata().design_mode, "designAware");
+    assert_eq!(diagnostic_output.metadata().fit_rows, counts.n_genes());
+    assert_eq!(diagnostic_output.metadata().fit_cols, counts.n_samples());
+    assert_eq!(diagnostic_output.metadata().trend_fit_type, Some("mean"));
+}
+
+#[test]
+fn builder_frozen_rlog_glm_mu_matches_manual_fit_state_reuse() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+
+    let output = builder
+        .frozen_rlog_glm_mu_with_fit(&counts, &design)
+        .unwrap();
+    let source = builder.rlog_glm_mu_with_fit(&counts, &design).unwrap();
+    let expected = source
+        .fit
+        .frozen_rlog(
+            &counts,
+            &source.rlog.intercept,
+            source.rlog.sample_prior_variance,
+        )
+        .unwrap();
+
+    assert_eq!(output.source_rlog.metadata(), source.rlog.metadata());
+    assert_eq!(
+        output.frozen_rlog.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+    assert_eq!(output.frozen_rlog.intercept, source.rlog.intercept);
+    assert_eq!(output.design_mode, RlogDesignMode::DesignAware);
+    assert_eq!(output.metadata().design_mode, "designAware");
+    assert_eq!(output.metadata().fit_rows, counts.n_genes());
+    assert_eq!(output.metadata().fit_cols, counts.n_samples());
+    assert_eq!(output.metadata().trend_fit_type, Some("mean"));
+}
+
+#[test]
+fn builder_blind_rlog_glm_mu_uses_intercept_only_design() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let blind_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+
+    let output = builder.blind_rlog_glm_mu(&counts).unwrap();
+    let diagnostic_output = builder.blind_rlog_glm_mu_with_fit(&counts).unwrap();
+    let expected = builder.rlog_glm_mu(&counts, &blind_design).unwrap();
+
+    assert_eq!(output.metadata(), expected.metadata());
+    assert_eq!(
+        output.transformed.as_slice(),
+        expected.transformed.as_slice()
+    );
+    assert_eq!(diagnostic_output.rlog.metadata(), expected.metadata());
+    assert_eq!(diagnostic_output.design_mode, RlogDesignMode::Blind);
+    assert_eq!(diagnostic_output.metadata().design_mode, "blind");
+    assert_eq!(diagnostic_output.fit.design, Some(blind_design));
+}
+
+#[test]
+fn builder_blind_frozen_rlog_glm_mu_uses_intercept_only_design() {
+    let full_counts = native_wald_counts_with_zero_row();
+    let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let blind_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
+
+    let output = builder.blind_frozen_rlog_glm_mu_with_fit(&counts).unwrap();
+    let expected = builder
+        .frozen_rlog_glm_mu_with_fit(&counts, &blind_design)
+        .unwrap();
+
+    assert_eq!(
+        output.source_rlog.metadata(),
+        expected.source_rlog.metadata()
+    );
+    assert_eq!(
+        output.frozen_rlog.transformed.as_slice(),
+        expected.frozen_rlog.transformed.as_slice()
+    );
+    assert_eq!(output.design_mode, RlogDesignMode::Blind);
+    assert_eq!(output.metadata().design_mode, "blind");
+    assert_eq!(output.fit.design, Some(blind_design));
 }
 
 #[test]

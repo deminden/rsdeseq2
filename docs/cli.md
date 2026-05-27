@@ -24,6 +24,12 @@ rsdeseq2 vst \
   --blind=false \
   --fit-type mean \
   --output vst.tsv
+rsdeseq2 rlog \
+  --counts counts.tsv \
+  --design design.tsv \
+  --blind=false \
+  --fit-type mean \
+  --output rlog.tsv
 rsdeseq2 wald \
   --counts counts.tsv \
   --design design.tsv \
@@ -65,9 +71,9 @@ s3	1	1
 ```
 
 `normalization_factors.tsv` is optional for `base-mean`, `normalized-counts`,
-`vst`, `wald`, and `lrt`. When supplied, it preempts estimated size factors and
-must have the same gene x sample shape as the count matrix. Rows and columns
-are aligned by gene and sample labels:
+`vst`, `rlog`, `wald`, and `lrt`. When supplied, it preempts estimated size
+factors and must have the same gene x sample shape as the count matrix. Rows
+and columns are aligned by gene and sample labels:
 
 ```text
 gene	s1	s2	s3
@@ -76,8 +82,9 @@ gene2	1.2	1.0	0.8
 ```
 
 `size_factors.tsv` is also optional for `base-mean`, `normalized-counts`, `vst`,
-`wald`, and `lrt`. It is a sample-level table with one positive finite factor per
-sample. Rows are aligned by sample label against the count-matrix columns:
+`rlog`, `wald`, and `lrt`. It is a sample-level table with one positive finite
+factor per sample. Rows are aligned by sample label against the count-matrix
+columns:
 
 ```text
 sample	size_factor
@@ -89,13 +96,13 @@ s3	1.2
 Supply either `--size-factors` or `--normalization-factors`, not both.
 
 `--control-genes` is optional for `size-factors`, `base-mean`,
-`normalized-counts`, `vst`, `wald`, and `lrt`. It accepts comma-delimited
+`normalized-counts`, `vst`, `rlog`, `wald`, and `lrt`. It accepts comma-delimited
 zero-based row indices and restricts size-factor estimation to those rows.
 It has no effect when `--size-factors` or `--normalization-factors` supplies
 the normalization directly.
 
 `geometric_means.tsv` is optional for `size-factors`, `base-mean`,
-`normalized-counts`, `vst`, `wald`, and `lrt`. It is a two-column gene/value
+`normalized-counts`, `vst`, `rlog`, `wald`, and `lrt`. It is a two-column gene/value
 table used for frozen size-factor estimation. Rows are aligned by gene label
 against the count-matrix rows:
 
@@ -110,9 +117,10 @@ The values must be finite and non-negative. As with `--control-genes`,
 `--geometric-means` only affects estimated size factors; directly supplied
 sample size factors or gene/sample normalization factors preempt estimation.
 
-`observation_weights.tsv` is optional for `base-mean`, `vst`, `wald`, and `lrt`. It
-uses the same gene x sample shape as the count matrix and accepts non-negative
-finite weights. Rows and columns are aligned by gene and sample labels:
+`observation_weights.tsv` is optional for `base-mean`, `vst`, `rlog`, `wald`,
+and `lrt`. It uses the same gene x sample shape as the count matrix and accepts
+non-negative finite weights. Rows and columns are aligned by gene and sample
+labels:
 
 ```text
 gene	s1	s2	s3
@@ -158,3 +166,12 @@ Both commands accept `--cooks-cutoff`, `--disable-cooks-cutoff`,
 Formula construction, wrapper metadata preservation, and unsupported fit types
 remain outside the CLI for now. The `lrt` command compares the full design
 against the supplied reduced numeric design matrix.
+
+The `rlog` command fits the implemented GLM-mu dispersion/MAP stages, estimates
+the rlog sample-effect prior from normalized counts, `baseMean`, and `dispFit`,
+then writes the transformed gene x sample matrix. It defaults to `--blind=true`
+with an intercept-only design; use `--blind=false --design design.tsv` for a
+design-aware dispersion workflow. Supplying `--frozen-intercept` with a
+two-column gene/value TSV and `--rlog-prior-variance` runs the frozen-intercept
+rlog transform after fitting the dispersion state, aligning intercept rows by
+gene label.

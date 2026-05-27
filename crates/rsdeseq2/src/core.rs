@@ -47,8 +47,12 @@ use crate::results::{
 use crate::transform::{
     fast_vst_eligible_count as count_fast_vst_eligible_rows,
     fast_vst_subset as build_fast_vst_subset, norm_transform,
+    rlog_frozen_with_normalization_factors, rlog_frozen_with_size_factors,
+    rlog_with_estimated_prior_and_normalization_factors,
+    rlog_with_estimated_prior_and_size_factors,
     vst_with_dispersion_trend_and_normalization_factors,
-    vst_with_dispersion_trend_and_size_factors, FastVstSubset,
+    vst_with_dispersion_trend_and_size_factors, FastVstSubset, RlogMetadata, RlogOffsetMode,
+    RlogOutput,
 };
 
 /// DESeq2's default number of genes used to fit the fast `vst()` trend.
@@ -371,6 +375,7 @@ pub struct DeseqBuilder {
     observation_weight_options: ObservationWeightOptions,
     execution_mode: ExecutionMode,
     threads: Option<usize>,
+    reduced_design: Option<DesignMatrix>,
     irls_options: IrlsOptions,
     gene_wise_dispersion_options: GeneWiseDispersionOptions,
     wald_test_options: WaldTestOptions,
@@ -443,6 +448,248 @@ impl DeseqFit {
     /// Short alias for [`DeseqFit::variance_stabilizing_transform`].
     pub fn vst(&self, counts: &CountMatrix) -> Result<RowMajorMatrix<f64>, DeseqError> {
         self.variance_stabilizing_transform(counts)
+    }
+
+    /// Apply the implemented regularized-log sample-effect transform.
+    ///
+    /// The fit must already contain fitted trend dispersions (`dispFit`) and
+    /// final gene-wise dispersions (`dispersion`). The rlog sample-effect prior
+    /// is estimated from this fit's normalized counts, `baseMean`, and
+    /// `dispFit`, then the sample-effect ridge GLM is fit with this fit's
+    /// size factors or normalization factors.
+    pub fn regularized_log_transform(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.regularized_log_transform_with_options(counts, IrlsOptions::default())
+    }
+
+    /// Apply the implemented regularized-log transform with explicit IRLS options.
+    pub fn regularized_log_transform_with_options(
+        &self,
+        counts: &CountMatrix,
+        options: IrlsOptions,
+    ) -> Result<RlogOutput, DeseqError> {
+        validate_fit_counts_shape(self, counts, "regularized-log transform")?;
+        if self.all_zero.len() != counts.n_genes() {
+            return Err(invalid_dimensions(
+                "rlog allZero rows",
+                counts.n_genes(),
+                self.all_zero.len(),
+            ));
+        }
+        let disp_fit = self
+            .disp_fit
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "fitted dispersion trend values are required before rlog".to_string(),
+            })?;
+        let dispersions =
+            self.dispersion
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "final dispersions are required before rlog".to_string(),
+                })?;
+        let nonzero_rows = nonzero_gene_indices(&self.all_zero);
+        if nonzero_rows.len() != counts.n_genes() {
+            if nonzero_rows.is_empty() {
+                let transformed =
+                    RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), 0.0)?;
+                let offset_mode = match &self.normalization_factors {
+                    Some(_) => RlogOffsetMode::NormalizationFactors,
+                    None => RlogOffsetMode::SizeFactors,
+                };
+                return Ok(RlogOutput {
+                    transformed,
+                    intercept: vec![0.0; counts.n_genes()],
+                    sample_prior_variance: 0.0,
+                    offset_mode,
+                });
+            }
+            let compact_counts = compact_counts(counts, &nonzero_rows)?;
+            let compact_base_mean = compact_f64_values(&self.base_mean, &nonzero_rows)?;
+            let compact_disp_fit = compact_f64_values(disp_fit, &nonzero_rows)?;
+            let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
+            let compact_output = match &self.normalization_factors {
+                Some(factors) => {
+                    let compact_factors = compact_matrix_rows(factors, &nonzero_rows)?;
+                    rlog_with_estimated_prior_and_normalization_factors(
+                        &compact_counts,
+                        &compact_factors,
+                        &compact_base_mean,
+                        &compact_disp_fit,
+                        &compact_dispersions,
+                        options,
+                    )?
+                }
+                None => rlog_with_estimated_prior_and_size_factors(
+                    &compact_counts,
+                    &self.size_factors,
+                    &compact_base_mean,
+                    &compact_disp_fit,
+                    &compact_dispersions,
+                    options,
+                )?,
+            };
+            return expand_rlog_output_with_all_zero_rows(
+                compact_output,
+                &self.all_zero,
+                counts.n_samples(),
+            );
+        }
+        match &self.normalization_factors {
+            Some(factors) => rlog_with_estimated_prior_and_normalization_factors(
+                counts,
+                factors,
+                &self.base_mean,
+                disp_fit,
+                dispersions,
+                options,
+            ),
+            None => rlog_with_estimated_prior_and_size_factors(
+                counts,
+                &self.size_factors,
+                &self.base_mean,
+                disp_fit,
+                dispersions,
+                options,
+            ),
+        }
+    }
+
+    /// Short alias for [`DeseqFit::regularized_log_transform`].
+    pub fn rlog(&self, counts: &CountMatrix) -> Result<RlogOutput, DeseqError> {
+        self.regularized_log_transform(counts)
+    }
+
+    /// Apply rlog with supplied frozen intercepts and sample-effect prior variance.
+    ///
+    /// This uses the fit state's final dispersions and size-factor or
+    /// normalization-factor offsets, while treating `frozen_intercept` as the
+    /// fixed log2 intercept surface. It is the fit-level building block for
+    /// frozen rlog reuse.
+    pub fn regularized_log_transform_with_frozen_intercept(
+        &self,
+        counts: &CountMatrix,
+        frozen_intercept: &[f64],
+        sample_prior_variance: f64,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.regularized_log_transform_with_frozen_intercept_and_options(
+            counts,
+            frozen_intercept,
+            sample_prior_variance,
+            IrlsOptions::default(),
+        )
+    }
+
+    /// Apply frozen-intercept rlog with explicit IRLS options.
+    pub fn regularized_log_transform_with_frozen_intercept_and_options(
+        &self,
+        counts: &CountMatrix,
+        frozen_intercept: &[f64],
+        sample_prior_variance: f64,
+        options: IrlsOptions,
+    ) -> Result<RlogOutput, DeseqError> {
+        validate_fit_counts_shape(self, counts, "frozen regularized-log transform")?;
+        if frozen_intercept.len() != counts.n_genes() {
+            return Err(invalid_dimensions(
+                "rlog frozen intercept rows",
+                counts.n_genes(),
+                frozen_intercept.len(),
+            ));
+        }
+        if self.all_zero.len() != counts.n_genes() {
+            return Err(invalid_dimensions(
+                "rlog allZero rows",
+                counts.n_genes(),
+                self.all_zero.len(),
+            ));
+        }
+        let dispersions =
+            self.dispersion
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidDispersion {
+                    reason: "final dispersions are required before frozen rlog".to_string(),
+                })?;
+        let nonzero_rows = nonzero_gene_indices(&self.all_zero);
+        if nonzero_rows.len() != counts.n_genes() {
+            if nonzero_rows.is_empty() {
+                let transformed =
+                    RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), 0.0)?;
+                let offset_mode = match &self.normalization_factors {
+                    Some(_) => RlogOffsetMode::NormalizationFactors,
+                    None => RlogOffsetMode::SizeFactors,
+                };
+                return Ok(RlogOutput {
+                    transformed,
+                    intercept: frozen_intercept.to_vec(),
+                    sample_prior_variance,
+                    offset_mode,
+                });
+            }
+            let compact_counts = compact_counts(counts, &nonzero_rows)?;
+            let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
+            let compact_intercept = compact_f64_values(frozen_intercept, &nonzero_rows)?;
+            let compact_output = match &self.normalization_factors {
+                Some(factors) => {
+                    let compact_factors = compact_matrix_rows(factors, &nonzero_rows)?;
+                    rlog_frozen_with_normalization_factors(
+                        &compact_counts,
+                        &compact_factors,
+                        &compact_dispersions,
+                        sample_prior_variance,
+                        &compact_intercept,
+                        options,
+                    )?
+                }
+                None => rlog_frozen_with_size_factors(
+                    &compact_counts,
+                    &self.size_factors,
+                    &compact_dispersions,
+                    sample_prior_variance,
+                    &compact_intercept,
+                    options,
+                )?,
+            };
+            return expand_frozen_rlog_output_with_all_zero_rows(
+                compact_output,
+                &self.all_zero,
+                counts.n_samples(),
+                frozen_intercept,
+            );
+        }
+        match &self.normalization_factors {
+            Some(factors) => rlog_frozen_with_normalization_factors(
+                counts,
+                factors,
+                dispersions,
+                sample_prior_variance,
+                frozen_intercept,
+                options,
+            ),
+            None => rlog_frozen_with_size_factors(
+                counts,
+                &self.size_factors,
+                dispersions,
+                sample_prior_variance,
+                frozen_intercept,
+                options,
+            ),
+        }
+    }
+
+    /// Short alias for [`DeseqFit::regularized_log_transform_with_frozen_intercept`].
+    pub fn frozen_rlog(
+        &self,
+        counts: &CountMatrix,
+        frozen_intercept: &[f64],
+        sample_prior_variance: f64,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.regularized_log_transform_with_frozen_intercept(
+            counts,
+            frozen_intercept,
+            sample_prior_variance,
+        )
     }
 
     /// Number of rows eligible for DESeq2's fast `vst()` subset.
@@ -643,6 +890,41 @@ pub struct CooksReplacementLrtOutput {
     pub results: DeseqResults,
 }
 
+/// Output from a top-level Cook's replacement-refit workflow selected by `test`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CooksReplacementTestOutput {
+    /// Wald replacement-refit output.
+    Wald(CooksReplacementWaldOutput),
+    /// LRT replacement-refit output.
+    Lrt(CooksReplacementLrtOutput),
+}
+
+impl CooksReplacementTestOutput {
+    /// Final merged result rows after replacement/refit.
+    pub fn results(&self) -> &DeseqResults {
+        match self {
+            Self::Wald(output) => &output.results,
+            Self::Lrt(output) => &output.results,
+        }
+    }
+
+    /// Original fit before replacement/refit.
+    pub fn original_fit(&self) -> &DeseqFit {
+        match self {
+            Self::Wald(output) => &output.original_fit,
+            Self::Lrt(output) => &output.original_fit,
+        }
+    }
+
+    /// Replacement/refit planning metadata.
+    pub fn refit_plan(&self) -> &CooksRefitPlan {
+        match self {
+            Self::Wald(output) => &output.refit_plan,
+            Self::Lrt(output) => &output.refit_plan,
+        }
+    }
+}
+
 /// Output from the current fast-VST GLM-mu helper.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FastVstGlmMuOutput {
@@ -686,6 +968,71 @@ pub struct VstGlmMuOutput {
     pub trend_source: VstTrendSource,
     /// Fast-VST subset diagnostics when the fast path was used.
     pub fast_subset: Option<FastVstSubset>,
+}
+
+/// Output from the GLM-mu rlog builder helper with retained fit state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RlogGlmMuOutput {
+    /// Regularized-log output matrix and prior metadata.
+    pub rlog: RlogOutput,
+    /// Fit state that supplied `baseMean`, `dispFit`, and final dispersions.
+    pub fit: DeseqFit,
+    /// Stable design mode used by the builder helper.
+    pub design_mode: RlogDesignMode,
+}
+
+/// Output from a builder-level frozen-rlog reuse workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrozenRlogGlmMuOutput {
+    /// Initial rlog fit that supplied frozen intercepts and prior variance.
+    pub source_rlog: RlogOutput,
+    /// Frozen-intercept rlog transform fit from the same dispersion state.
+    pub frozen_rlog: RlogOutput,
+    /// Fit state that supplied final dispersions and offsets.
+    pub fit: DeseqFit,
+    /// Stable design mode used by the builder helper.
+    pub design_mode: RlogDesignMode,
+}
+
+/// Metadata summary for the GLM-mu rlog builder helper.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RlogGlmMuMetadata {
+    /// Metadata from the rlog transform itself.
+    pub rlog: RlogMetadata,
+    /// Stable design mode label.
+    pub design_mode: &'static str,
+    /// Number of rows in the fit state that supplied dispersion inputs.
+    pub fit_rows: usize,
+    /// Number of samples in the fit state that supplied dispersion inputs.
+    pub fit_cols: usize,
+    /// Stable fit-type label for the fitted dispersion trend.
+    pub trend_fit_type: Option<&'static str>,
+}
+
+/// Metadata summary for a builder-level frozen-rlog reuse workflow.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrozenRlogGlmMuMetadata {
+    /// Metadata from the initial rlog fit.
+    pub source_rlog: RlogMetadata,
+    /// Metadata from the frozen-intercept transform.
+    pub frozen_rlog: RlogMetadata,
+    /// Stable design mode label.
+    pub design_mode: &'static str,
+    /// Number of rows in the fit state that supplied dispersion inputs.
+    pub fit_rows: usize,
+    /// Number of samples in the fit state that supplied dispersion inputs.
+    pub fit_cols: usize,
+    /// Stable fit-type label for the fitted dispersion trend.
+    pub trend_fit_type: Option<&'static str>,
+}
+
+/// Design mode used by a GLM-mu rlog builder helper.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RlogDesignMode {
+    /// Caller-supplied design-aware fit.
+    DesignAware,
+    /// Intercept-only blind fit.
+    Blind,
 }
 
 /// Metadata summary for the automatic GLM-mu VST helper.
@@ -798,6 +1145,51 @@ impl VstGlmMuOutput {
     }
 }
 
+impl RlogGlmMuOutput {
+    /// Metadata view for wrappers, diagnostics, and benchmark logs.
+    pub fn metadata(&self) -> RlogGlmMuMetadata {
+        RlogGlmMuMetadata {
+            rlog: self.rlog.metadata(),
+            design_mode: self.design_mode.as_str(),
+            fit_rows: self.fit.counts_summary.n_genes,
+            fit_cols: self.fit.counts_summary.n_samples,
+            trend_fit_type: self
+                .fit
+                .dispersion_trend
+                .as_ref()
+                .map(|trend| trend.fit_type_label()),
+        }
+    }
+}
+
+impl FrozenRlogGlmMuOutput {
+    /// Metadata view for wrappers, diagnostics, and benchmark logs.
+    pub fn metadata(&self) -> FrozenRlogGlmMuMetadata {
+        FrozenRlogGlmMuMetadata {
+            source_rlog: self.source_rlog.metadata(),
+            frozen_rlog: self.frozen_rlog.metadata(),
+            design_mode: self.design_mode.as_str(),
+            fit_rows: self.fit.counts_summary.n_genes,
+            fit_cols: self.fit.counts_summary.n_samples,
+            trend_fit_type: self
+                .fit
+                .dispersion_trend
+                .as_ref()
+                .map(|trend| trend.fit_type_label()),
+        }
+    }
+}
+
+impl RlogDesignMode {
+    /// Stable label for wrappers and benchmark logs.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::DesignAware => "designAware",
+            Self::Blind => "blind",
+        }
+    }
+}
+
 impl VstTrendSource {
     /// Stable DESeq2-shaped label for the automatic VST trend source.
     pub fn as_str(&self) -> &'static str {
@@ -864,6 +1256,7 @@ impl DeseqBuilder {
             observation_weight_options: ObservationWeightOptions::default(),
             execution_mode: ExecutionMode::default(),
             threads: None,
+            reduced_design: None,
             irls_options: IrlsOptions::default(),
             gene_wise_dispersion_options: GeneWiseDispersionOptions::default(),
             wald_test_options: WaldTestOptions::default(),
@@ -958,6 +1351,12 @@ impl DeseqBuilder {
     /// Set the desired worker thread count for future parallel stages.
     pub fn threads(mut self, threads: usize) -> Self {
         self.threads = Some(threads);
+        self
+    }
+
+    /// Store a reduced design matrix for top-level LRT workflows.
+    pub fn reduced_design(mut self, reduced_design: DesignMatrix) -> Self {
+        self.reduced_design = Some(reduced_design);
         self
     }
 
@@ -1071,6 +1470,11 @@ impl DeseqBuilder {
     /// Requested thread count.
     pub fn requested_threads(&self) -> Option<usize> {
         self.threads
+    }
+
+    /// Current reduced design for top-level LRT workflows, if supplied.
+    pub fn current_reduced_design(&self) -> Option<&DesignMatrix> {
+        self.reduced_design.as_ref()
     }
 
     /// Current IRLS options.
@@ -1576,6 +1980,148 @@ impl DeseqBuilder {
         counts: &CountMatrix,
     ) -> Result<VstGlmMuOutput, DeseqError> {
         self.blind_vst_glm_mu_auto(counts, DEFAULT_FAST_VST_NSUB)
+    }
+
+    /// Apply the implemented GLM-mu rlog workflow in one builder call.
+    ///
+    /// This fits GLM-mu gene-wise, trend, prior, and MAP dispersion stages
+    /// using the builder's current options, then applies the fit-state rlog
+    /// transform with default IRLS options.
+    pub fn rlog_glm_mu(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.rlog_glm_mu_with_fit(counts, design)
+            .map(|output| output.rlog)
+    }
+
+    /// Apply the implemented GLM-mu rlog workflow with explicit rlog IRLS options.
+    pub fn rlog_glm_mu_with_options(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
+            .map(|output| output.rlog)
+    }
+
+    /// Apply the implemented GLM-mu rlog workflow and retain the dispersion fit state.
+    pub fn rlog_glm_mu_with_fit(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<RlogGlmMuOutput, DeseqError> {
+        self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
+    }
+
+    /// Apply the implemented GLM-mu rlog workflow with explicit options and retained fit state.
+    pub fn rlog_glm_mu_with_fit_and_options(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<RlogGlmMuOutput, DeseqError> {
+        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
+        Ok(RlogGlmMuOutput {
+            rlog,
+            fit,
+            design_mode: RlogDesignMode::DesignAware,
+        })
+    }
+
+    /// Learn rlog intercepts and immediately run a frozen-intercept rlog reuse pass.
+    pub fn frozen_rlog_glm_mu_with_fit(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
+    }
+
+    /// Learn rlog intercepts and run frozen rlog with explicit IRLS options.
+    pub fn frozen_rlog_glm_mu_with_fit_and_options(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        let source = self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)?;
+        let frozen_rlog = source.fit.frozen_rlog(
+            counts,
+            &source.rlog.intercept,
+            source.rlog.sample_prior_variance,
+        )?;
+        Ok(FrozenRlogGlmMuOutput {
+            source_rlog: source.rlog,
+            frozen_rlog,
+            fit: source.fit,
+            design_mode: source.design_mode,
+        })
+    }
+
+    /// Apply the implemented GLM-mu rlog workflow with an intercept-only design.
+    ///
+    /// This mirrors the implemented part of DESeq2's `blind=TRUE` rlog shape:
+    /// dispersion fitting and rlog prior estimation ignore sample groups by
+    /// using a one-column all-ones design.
+    pub fn blind_rlog_glm_mu(&self, counts: &CountMatrix) -> Result<RlogOutput, DeseqError> {
+        self.blind_rlog_glm_mu_with_fit(counts)
+            .map(|output| output.rlog)
+    }
+
+    /// Apply blind GLM-mu rlog with explicit rlog IRLS options.
+    pub fn blind_rlog_glm_mu_with_options(
+        &self,
+        counts: &CountMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<RlogOutput, DeseqError> {
+        self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
+            .map(|output| output.rlog)
+    }
+
+    /// Apply blind GLM-mu rlog and retain the intercept-only dispersion fit state.
+    pub fn blind_rlog_glm_mu_with_fit(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<RlogGlmMuOutput, DeseqError> {
+        self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
+    }
+
+    /// Apply blind GLM-mu rlog with explicit options and retained fit state.
+    pub fn blind_rlog_glm_mu_with_fit_and_options(
+        &self,
+        counts: &CountMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<RlogGlmMuOutput, DeseqError> {
+        let design = DesignMatrix::intercept_only(counts.n_samples())?;
+        let mut output =
+            self.rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
+        output.design_mode = RlogDesignMode::Blind;
+        Ok(output)
+    }
+
+    /// Learn blind rlog intercepts and run a frozen-intercept rlog reuse pass.
+    pub fn blind_frozen_rlog_glm_mu_with_fit(
+        &self,
+        counts: &CountMatrix,
+    ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
+    }
+
+    /// Learn blind rlog intercepts and run frozen rlog with explicit IRLS options.
+    pub fn blind_frozen_rlog_glm_mu_with_fit_and_options(
+        &self,
+        counts: &CountMatrix,
+        rlog_irls_options: IrlsOptions,
+    ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        let design = DesignMatrix::intercept_only(counts.n_samples())?;
+        let mut output =
+            self.frozen_rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
+        output.design_mode = RlogDesignMode::Blind;
+        Ok(output)
     }
 
     /// Run linear-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
@@ -4037,8 +4583,8 @@ impl DeseqBuilder {
     ///
     /// For `test=Wald`, this follows the implemented GLM-mu native path and
     /// reports the last design coefficient, matching DESeq2's default
-    /// coefficient selection shape. `test=Lrt` remains explicit because callers
-    /// must supply a reduced design through `fit_lrt_*`.
+    /// coefficient selection shape. For `test=Lrt`, callers must first store a
+    /// reduced design with [`DeseqBuilder::reduced_design`].
     pub fn fit(&self, counts: &CountMatrix, design: &DesignMatrix) -> Result<DeseqFit, DeseqError> {
         self.fit_with_results(counts, design)
             .map(|(fit, _results)| fit)
@@ -4057,9 +4603,10 @@ impl DeseqBuilder {
                 let coefficient = default_results_coefficient(design)?;
                 self.fit_wald_glm_mu(counts, design, coefficient)
             }
-            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
-                feature: "top-level LRT fit without a reduced design".to_string(),
-            }),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results(counts, design, reduced_design)
+            }
         }
     }
 
@@ -4075,9 +4622,10 @@ impl DeseqBuilder {
                 let coefficient = design.coefficient_index(coefficient_name)?;
                 self.fit_wald_glm_mu(counts, design, coefficient)
             }
-            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
-                feature: "top-level LRT fit without a reduced design".to_string(),
-            }),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_name(counts, design, reduced_design, coefficient_name)
+            }
         }
     }
 
@@ -4128,6 +4676,67 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level workflow with limited Cook's replacement refit.
+    ///
+    /// Unlike [`Self::fit_with_results_with_cooks_replacement`], this method
+    /// returns an enum so `test=Lrt` can route through a stored reduced design.
+    pub fn fit_with_test_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_with_cooks_replacement(counts, design, replacement_options)
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the top-level named workflow with limited Cook's replacement refit.
+    ///
+    /// The returned enum keeps Wald and LRT replacement output types explicit
+    /// while allowing `test=Lrt` to use the builder's stored reduced design.
+    pub fn fit_with_test_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_name_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient_name,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_name_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    coefficient_name,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
     /// Run the currently implemented top-level Wald workflow for a numeric contrast.
     ///
     /// This is the primitive contrast companion to [`Self::fit_with_results`].
@@ -4142,9 +4751,10 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
             TestType::Wald => self.fit_wald_glm_mu_contrast(counts, design, contrast),
-            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
-                feature: "top-level LRT fit for a Wald contrast".to_string(),
-            }),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast(counts, design, reduced_design, contrast)
+            }
         }
     }
 
@@ -4180,6 +4790,37 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level numeric-contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
     /// Run the top-level Wald workflow for a named primitive contrast specification.
     pub fn fit_with_results_contrast_spec(
         &self,
@@ -4189,9 +4830,10 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
             TestType::Wald => self.fit_wald_glm_mu_contrast_spec(counts, design, contrast),
-            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
-                feature: "top-level LRT fit for a Wald contrast specification".to_string(),
-            }),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_spec(counts, design, reduced_design, contrast)
+            }
         }
     }
 
@@ -4228,6 +4870,37 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level named-contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
     /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
     pub fn fit_with_results_factor_level_contrast(
         &self,
@@ -4237,9 +4910,15 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
             TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
-            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
-                feature: "top-level LRT fit for a Wald factor-level contrast".to_string(),
-            }),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_factor_level_contrast(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                )
+            }
         }
     }
 
@@ -4273,6 +4952,37 @@ impl DeseqBuilder {
                 feature: "top-level LRT replacement refit for a Wald factor-level contrast"
                     .to_string(),
             }),
+        }
+    }
+
+    /// Run the top-level factor-level contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
         }
     }
 
@@ -4488,6 +5198,14 @@ impl DeseqBuilder {
             contrast,
             replacement_options,
         )
+    }
+
+    fn reduced_design_for_top_level_lrt(&self) -> Result<&DesignMatrix, DeseqError> {
+        self.reduced_design
+            .as_ref()
+            .ok_or_else(|| DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit without a reduced design".to_string(),
+            })
     }
 }
 
@@ -4782,6 +5500,130 @@ fn compact_matrix_rows(
         values.extend_from_slice(matrix.row(*row)?);
     }
     RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
+}
+
+fn compact_f64_values(values: &[f64], row_indices: &[usize]) -> Result<Vec<f64>, DeseqError> {
+    let mut compact = Vec::with_capacity(row_indices.len());
+    for row in row_indices {
+        let Some(value) = values.get(*row) else {
+            return Err(invalid_dimensions(
+                "compact vector rows",
+                row + 1,
+                values.len(),
+            ));
+        };
+        compact.push(*value);
+    }
+    Ok(compact)
+}
+
+fn expand_rlog_output_with_all_zero_rows(
+    compact_output: RlogOutput,
+    all_zero: &[bool],
+    n_samples: usize,
+) -> Result<RlogOutput, DeseqError> {
+    if compact_output.transformed.n_cols() != n_samples {
+        return Err(invalid_dimensions(
+            "expanded rlog columns",
+            n_samples,
+            compact_output.transformed.n_cols(),
+        ));
+    }
+    let mut values = vec![0.0; all_zero.len() * n_samples];
+    let mut compact_row = 0_usize;
+    for (gene, is_zero) in all_zero.iter().copied().enumerate() {
+        if is_zero {
+            continue;
+        }
+        let src = compact_output.transformed.row(compact_row)?;
+        let start = gene * n_samples;
+        values[start..start + n_samples].copy_from_slice(src);
+        compact_row += 1;
+    }
+    if compact_row != compact_output.transformed.n_rows() {
+        return Err(invalid_dimensions(
+            "expanded rlog non-zero rows",
+            compact_row,
+            compact_output.transformed.n_rows(),
+        ));
+    }
+    Ok(RlogOutput {
+        transformed: RowMajorMatrix::from_row_major(all_zero.len(), n_samples, values)?,
+        intercept: expand_rlog_intercepts_with_all_zero_rows(&compact_output, all_zero)?,
+        sample_prior_variance: compact_output.sample_prior_variance,
+        offset_mode: compact_output.offset_mode,
+    })
+}
+
+fn expand_rlog_intercepts_with_all_zero_rows(
+    compact_output: &RlogOutput,
+    all_zero: &[bool],
+) -> Result<Vec<f64>, DeseqError> {
+    let expected_nonzero = all_zero.iter().filter(|is_zero| !**is_zero).count();
+    if compact_output.intercept.len() != expected_nonzero {
+        return Err(invalid_dimensions(
+            "expanded rlog intercepts",
+            expected_nonzero,
+            compact_output.intercept.len(),
+        ));
+    }
+    let mut compact_row = 0usize;
+    let mut intercept = Vec::with_capacity(all_zero.len());
+    for is_zero in all_zero {
+        if *is_zero {
+            intercept.push(0.0);
+        } else {
+            intercept.push(compact_output.intercept[compact_row]);
+            compact_row += 1;
+        }
+    }
+    Ok(intercept)
+}
+
+fn expand_frozen_rlog_output_with_all_zero_rows(
+    compact_output: RlogOutput,
+    all_zero: &[bool],
+    n_samples: usize,
+    frozen_intercept: &[f64],
+) -> Result<RlogOutput, DeseqError> {
+    if frozen_intercept.len() != all_zero.len() {
+        return Err(invalid_dimensions(
+            "expanded frozen rlog intercepts",
+            all_zero.len(),
+            frozen_intercept.len(),
+        ));
+    }
+    if compact_output.transformed.n_cols() != n_samples {
+        return Err(invalid_dimensions(
+            "expanded frozen rlog columns",
+            n_samples,
+            compact_output.transformed.n_cols(),
+        ));
+    }
+    let mut values = Vec::with_capacity(all_zero.len() * n_samples);
+    let mut compact_row = 0usize;
+    for (gene, is_zero) in all_zero.iter().enumerate() {
+        if *is_zero {
+            values.extend(std::iter::repeat(frozen_intercept[gene]).take(n_samples));
+        } else {
+            let src = compact_output.transformed.row(compact_row)?;
+            values.extend_from_slice(src);
+            compact_row += 1;
+        }
+    }
+    if compact_row != compact_output.transformed.n_rows() {
+        return Err(invalid_dimensions(
+            "expanded frozen rlog non-zero rows",
+            compact_row,
+            compact_output.transformed.n_rows(),
+        ));
+    }
+    Ok(RlogOutput {
+        transformed: RowMajorMatrix::from_row_major(all_zero.len(), n_samples, values)?,
+        intercept: frozen_intercept.to_vec(),
+        sample_prior_variance: compact_output.sample_prior_variance,
+        offset_mode: compact_output.offset_mode,
+    })
 }
 
 fn all_zero_glm_fit(

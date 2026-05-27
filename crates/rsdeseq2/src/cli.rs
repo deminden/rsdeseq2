@@ -11,10 +11,11 @@ use crate::io::{
     align_design_matrix_to_samples, align_gene_numeric_values_to_genes,
     align_labeled_assay_matrix_to_counts, align_sample_levels_to_samples,
     align_sample_numeric_values_to_samples, read_count_matrix_tsv, read_labeled_design_matrix_tsv,
-    read_labeled_geometric_means_tsv, read_labeled_normalization_factors_tsv,
-    read_labeled_observation_weights_tsv, read_labeled_size_factors_tsv,
-    read_labeled_wald_t_degrees_of_freedom_tsv, read_sample_levels_tsv, write_base_mean_tsv,
-    write_deseq_results_tsv, write_normalized_counts_tsv, write_size_factors_tsv,
+    read_labeled_gene_numeric_tsv, read_labeled_geometric_means_tsv,
+    read_labeled_normalization_factors_tsv, read_labeled_observation_weights_tsv,
+    read_labeled_size_factors_tsv, read_labeled_wald_t_degrees_of_freedom_tsv,
+    read_sample_levels_tsv, write_base_mean_tsv, write_deseq_results_tsv,
+    write_normalized_counts_tsv, write_size_factors_tsv,
 };
 use crate::normalization::{
     base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
@@ -139,6 +140,48 @@ enum Commands {
         /// Fast-VST subset size.
         #[arg(long, default_value_t = 1000)]
         nsub: usize,
+        /// Output TSV path.
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Write a regularized-log count matrix.
+    Rlog {
+        /// Tab-delimited count matrix with gene IDs in the first column.
+        #[arg(long)]
+        counts: PathBuf,
+        /// Numeric design matrix TSV. Required with --blind false.
+        #[arg(long)]
+        design: Option<PathBuf>,
+        /// Ignore the design and use an intercept-only dispersion workflow.
+        #[arg(long, default_value_t = true, action = ArgAction::Set)]
+        blind: bool,
+        /// Optional gene x sample normalization-factor TSV.
+        #[arg(long)]
+        normalization_factors: Option<PathBuf>,
+        /// Optional sample-level size-factor TSV.
+        #[arg(long)]
+        size_factors: Option<PathBuf>,
+        /// Optional gene x sample observation-weight TSV for dispersion estimation.
+        #[arg(long)]
+        observation_weights: Option<PathBuf>,
+        /// Size-factor method.
+        #[arg(long, default_value = "ratio")]
+        method: SizeFactorMethodArg,
+        /// Optional gene x geometric-mean TSV used for frozen size-factor estimation.
+        #[arg(long)]
+        geometric_means: Option<PathBuf>,
+        /// Comma-delimited zero-based row indices used to estimate size factors.
+        #[arg(long, value_delimiter = ',')]
+        control_genes: Option<Vec<usize>>,
+        /// Dispersion trend fit type.
+        #[arg(long, default_value = "parametric")]
+        fit_type: FitTypeArg,
+        /// Optional gene x frozen rlog intercept TSV for a frozen-intercept transform.
+        #[arg(long)]
+        frozen_intercept: Option<PathBuf>,
+        /// Sample-effect prior variance to use with --frozen-intercept.
+        #[arg(long)]
+        rlog_prior_variance: Option<f64>,
         /// Output TSV path.
         #[arg(long)]
         output: PathBuf,
@@ -507,6 +550,78 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 })?;
                 let design = read_cli_design_matrix(design, &counts)?;
                 builder.vst_glm_mu_auto(&counts, &design, nsub)?.transformed
+            };
+            write_normalized_counts_tsv(
+                output,
+                counts.gene_names(),
+                counts.sample_names(),
+                &transformed,
+            )
+        }
+        Commands::Rlog {
+            counts,
+            design,
+            blind,
+            normalization_factors,
+            size_factors,
+            observation_weights,
+            method,
+            geometric_means,
+            control_genes,
+            fit_type,
+            frozen_intercept,
+            rlog_prior_variance,
+            output,
+        } => {
+            let counts = read_count_matrix_tsv(counts)?;
+            let mut builder = DeseqBuilder::new()
+                .size_factor_method(method.into())
+                .fit_type(fit_type.into());
+            builder = apply_cli_normalization_inputs(
+                builder,
+                &counts,
+                normalization_factors,
+                size_factors,
+            )?;
+            builder =
+                apply_cli_size_factor_controls(builder, &counts, geometric_means, control_genes)?;
+            if let Some(path) = observation_weights {
+                builder = builder.observation_weights(read_cli_observation_weights(path, &counts)?);
+            }
+            let frozen_intercept = read_cli_frozen_intercept(frozen_intercept, &counts)?;
+            let transformed = if blind {
+                if let Some(frozen_intercept) = frozen_intercept {
+                    let prior = required_cli_rlog_prior_variance(rlog_prior_variance)?;
+                    let fit = builder.fit_map_dispersions_glm_mu(
+                        &counts,
+                        &crate::design::DesignMatrix::intercept_only(counts.n_samples())?,
+                    )?;
+                    fit.frozen_rlog(&counts, &frozen_intercept, prior)?
+                        .transformed
+                } else {
+                    if rlog_prior_variance.is_some() {
+                        return Err(cli_rlog_prior_without_frozen_intercept());
+                    }
+                    builder.blind_rlog_glm_mu(&counts)?.transformed
+                }
+            } else {
+                let design = design.ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "rlog design path".to_string(),
+                    expected: 1,
+                    actual: 0,
+                })?;
+                let design = read_cli_design_matrix(design, &counts)?;
+                if let Some(frozen_intercept) = frozen_intercept {
+                    let prior = required_cli_rlog_prior_variance(rlog_prior_variance)?;
+                    let fit = builder.fit_map_dispersions_glm_mu(&counts, &design)?;
+                    fit.frozen_rlog(&counts, &frozen_intercept, prior)?
+                        .transformed
+                } else {
+                    if rlog_prior_variance.is_some() {
+                        return Err(cli_rlog_prior_without_frozen_intercept());
+                    }
+                    builder.rlog_glm_mu(&counts, &design)?.transformed
+                }
             };
             write_normalized_counts_tsv(
                 output,
@@ -1030,6 +1145,44 @@ fn read_cli_geometric_means(
         )
     })
     .transpose()
+}
+
+fn read_cli_frozen_intercept(
+    path: Option<PathBuf>,
+    counts: &crate::core::CountMatrix,
+) -> Result<Option<Vec<f64>>, DeseqError> {
+    path.map(|path| {
+        align_gene_numeric_values_to_genes(
+            &read_labeled_gene_numeric_tsv(path, "rlog frozen intercept")?,
+            counts
+                .gene_names()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "count gene names are required to align rlog frozen intercepts"
+                        .to_string(),
+                })?,
+            "rlog frozen intercept",
+        )
+    })
+    .transpose()
+}
+
+fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64, DeseqError> {
+    let value = value.ok_or_else(|| DeseqError::InvalidOptions {
+        reason: "--rlog-prior-variance is required with --frozen-intercept".to_string(),
+    })?;
+    if value.is_finite() && value > 0.0 {
+        Ok(value)
+    } else {
+        Err(DeseqError::InvalidOptions {
+            reason: "--rlog-prior-variance must be positive and finite".to_string(),
+        })
+    }
+}
+
+fn cli_rlog_prior_without_frozen_intercept() -> DeseqError {
+    DeseqError::InvalidOptions {
+        reason: "--rlog-prior-variance requires --frozen-intercept".to_string(),
+    }
 }
 
 fn read_cli_size_factors(

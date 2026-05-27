@@ -272,6 +272,69 @@ preserving gene and sample names, which mirrors the object subset passed to the
 fast-VST dispersion fit. Full fast-VST parity still requires object metadata
 and exact local interpolation semantics.
 
+## Regularized Log
+
+The Rust core includes a low-level regularized-log sample-effect primitive.
+`rlog_with_size_factors()` and `rlog_with_normalization_factors()` build the
+same foundational design shape used by DESeq2 rlog: one intercept plus one
+indicator column per sample. The intercept receives a wide log2-scale prior
+variance, while every sample effect receives a shared caller-supplied
+log2-scale prior variance. The implementation reuses the existing
+negative-binomial beta-prior GLM machinery and returns a genes x samples matrix
+assembled as:
+
+```text
+rlog_ij = intercept_i + sample_effect_ij
+```
+
+`estimate_rlog_sample_prior_variance()` implements the rlog-specific prior
+estimate from already-normalized counts, `baseMean`, and `dispFit`:
+
+```text
+logFoldChange_ij = log2(normalized_count_ij + 0.5) - log2(baseMean_i + 0.5)
+weight_i = 1 / (1 / baseMean_i + dispFit_i)
+```
+
+The flattened log-fold-change values and repeated row weights are matched to a
+zero-centered Normal using DESeq2's default weighted upper-tail quantile rule.
+`rlog_with_estimated_prior_and_size_factors()` and
+`rlog_with_estimated_prior_and_normalization_factors()` compose that
+prior-estimation step with the sample-effect fit when the caller already has
+`baseMean`, `dispFit`, and gene-wise dispersions from earlier stages.
+`rlog_fit_with_size_factors()` and `rlog_fit_with_normalization_factors()`
+retain the fitted intercept-plus-sample-effect GLM beside the transformed
+matrix, exposing the intermediate beta surface needed for stricter parity
+diagnostics and future frozen-rlog reuse.
+`rlog_frozen_with_size_factors()` and
+`rlog_frozen_with_normalization_factors()` provide the matching low-level
+frozen-intercept transform: caller-supplied log2 intercepts are converted to
+gene-specific offsets, only sample-effect coefficients are fit, and the output
+is assembled as the frozen intercept plus the fitted sample effect.
+`DeseqFit::regularized_log_transform()` and the short `rlog()` alias expose
+the same composition from stored fit state after the implemented dispersion
+MAP stages have produced `dispFit` and final dispersions.
+`DeseqFit::regularized_log_transform_with_frozen_intercept()` and the short
+`frozen_rlog()` alias expose frozen-intercept reuse from the same fit state,
+using stored final dispersions and offsets. For one-call Rust workflows,
+`DeseqBuilder::rlog_glm_mu()` first runs the implemented GLM-mu MAP dispersion
+stages and then applies fit-state rlog. `blind_rlog_glm_mu()` uses a named
+intercept-only design for the same implemented `blind=TRUE` shape used by the
+CLI. `frozen_rlog_glm_mu_with_fit()` and
+`blind_frozen_rlog_glm_mu_with_fit()` learn the rlog intercept/prior, then run
+a frozen-intercept reuse pass from the same dispersion fit. The `*_with_fit`
+variants return `RlogGlmMuOutput` or `FrozenRlogGlmMuOutput`, retaining the MAP
+dispersion fit state beside the rlog matrices for wrappers, diagnostics, and
+parity checks. Fit-state and builder-level rlog skip all-zero rows during the
+sample-effect fit and re-expand them as zero-valued transform rows. Fit-state
+frozen rlog uses the supplied frozen intercept for all-zero rows, so ordinary
+unfiltered count matrices remain accepted. `RlogOutput` includes the
+transformed matrix, fitted per-gene intercepts, estimated sample-effect prior
+variance, the offset source, and a compact metadata view for wrappers and
+benchmark logs.
+This is still not the full high-level DESeq2 `rlog()` object workflow. The
+low-level and builder-level frozen-intercept numeric surfaces are present,
+while full object dispatch and Bioconductor metadata remain future work.
+
 ## Gene-Wise Dispersion Objective
 
 The current gene-wise dispersion foundation follows DESeq2's fixed-mean

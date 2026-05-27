@@ -12,11 +12,12 @@ yet a drop-in replacement for full DESeq2 differential expression analysis.
 Implemented areas include size-factor estimation, normalized counts and base
 row metadata, fixed-dispersion NB GLM Wald/LRT primitives, native dispersion
 foundations, Cook's and independent-filtering helpers, beta-prior refit
-primitives, and `normTransform`/VST building blocks.
+primitives, and `normTransform`/VST/rlog building blocks.
 
 Still in progress: full `DESeq()` workflow parity, formula-aware high-level
 result handling, expanded-model beta-prior workflows, full glmGamPoi behavior,
-rlog, lfcShrink, plotting, and mature high-level interfaces.
+high-level rlog object semantics, lfcShrink, plotting, and mature high-level
+interfaces.
 
 Detailed status lives in
 [docs/deseq2-gap-analysis.md](docs/deseq2-gap-analysis.md) and
@@ -96,6 +97,13 @@ cargo run -p rsdeseq2 -- vst \
   --blind=false \
   --fit-type mean \
   --output vst.tsv
+
+cargo run -p rsdeseq2 -- rlog \
+  --counts counts.tsv \
+  --design design.tsv \
+  --blind=false \
+  --fit-type mean \
+  --output rlog.tsv
 
 cargo run -p rsdeseq2 -- wald \
   --counts counts.tsv \

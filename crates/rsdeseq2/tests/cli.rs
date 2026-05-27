@@ -61,6 +61,34 @@ gene4\t4
     .unwrap();
 }
 
+fn write_frozen_intercept_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+gene\tintercept
+gene3\t2.75
+gene1\t3.5
+gene4\t4.25
+gene2\t-0.5
+",
+    )
+    .unwrap();
+}
+
+fn write_unit_observation_weight_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+gene\tsample1\tsample2\tsample3\tsample4
+gene1\t1\t1\t1\t1
+gene2\t1\t1\t1\t1
+gene3\t1\t1\t1\t1
+gene4\t1\t1\t1\t1
+",
+    )
+    .unwrap();
+}
+
 fn write_standard_contrast_design_fixture(path: &Path) {
     fs::write(
         path,
@@ -463,6 +491,259 @@ fn cli_vst_runs_design_aware_mean_fit() {
     ]);
 
     assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_runs_blind_mean_fit() {
+    let dir = temp_dir("rlog-blind");
+    let output = dir.join("rlog.tsv");
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_runs_design_aware_mean_fit() {
+    let dir = temp_dir("rlog-design");
+    let output = dir.join("rlog.tsv");
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--blind=false",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_normalization_factors() {
+    let dir = temp_dir("rlog-nf");
+    let output = dir.join("rlog.tsv");
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--normalization-factors",
+        reference_data_path("normalization_factors.tsv")
+            .to_str()
+            .unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_size_factors() {
+    let dir = temp_dir("rlog-sf");
+    let size_factors = dir.join("size_factors.tsv");
+    let output = dir.join("rlog.tsv");
+    write_size_factor_fixture(&size_factors);
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--size-factors",
+        size_factors.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_control_genes() {
+    let dir = temp_dir("rlog-control");
+    let output = dir.join("rlog.tsv");
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--control-genes",
+        "0,2",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_geometric_means() {
+    let dir = temp_dir("rlog-geo");
+    let geometric_means = dir.join("geometric_means.tsv");
+    let output = dir.join("rlog.tsv");
+    write_geometric_mean_fixture(&geometric_means);
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--geometric-means",
+        geometric_means.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_observation_weights() {
+    let dir = temp_dir("rlog-weights");
+    let weights = dir.join("observation_weights.tsv");
+    let output = dir.join("rlog.tsv");
+    write_unit_observation_weight_fixture(&weights);
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--observation-weights",
+        weights.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_frozen_intercepts_in_blind_mode() {
+    let dir = temp_dir("rlog-frozen-blind");
+    let frozen_intercept = dir.join("frozen_intercept.tsv");
+    let output = dir.join("rlog.tsv");
+    write_frozen_intercept_fixture(&frozen_intercept);
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--frozen-intercept",
+        frozen_intercept.to_str().unwrap(),
+        "--rlog-prior-variance",
+        "2.5",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_accepts_frozen_intercepts_in_design_aware_mode() {
+    let dir = temp_dir("rlog-frozen-design");
+    let frozen_intercept = dir.join("frozen_intercept.tsv");
+    let output = dir.join("rlog.tsv");
+    write_frozen_intercept_fixture(&frozen_intercept);
+
+    run_cli(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--blind=false",
+        "--frozen-intercept",
+        frozen_intercept.to_str().unwrap(),
+        "--rlog-prior-variance",
+        "2.5",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_matrix_table(&output);
+}
+
+#[test]
+fn cli_rlog_frozen_intercepts_require_prior_variance() {
+    let dir = temp_dir("rlog-frozen-missing-prior");
+    let frozen_intercept = dir.join("frozen_intercept.tsv");
+    let output = dir.join("rlog.tsv");
+    write_frozen_intercept_fixture(&frozen_intercept);
+
+    run_cli_failure(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--frozen-intercept",
+        frozen_intercept.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_rlog_prior_variance_requires_frozen_intercepts() {
+    let dir = temp_dir("rlog-prior-without-frozen");
+    let output = dir.join("rlog.tsv");
+
+    run_cli_failure(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--rlog-prior-variance",
+        "2.5",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_rlog_requires_design_when_not_blind() {
+    let dir = temp_dir("rlog-missing-design");
+    let output = dir.join("rlog.tsv");
+
+    run_cli_failure(&[
+        "rlog",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--blind=false",
+        "--fit-type",
+        "mean",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
 }
 
 #[test]

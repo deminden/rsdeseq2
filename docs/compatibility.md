@@ -19,7 +19,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, and Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs. One-factor, additive, and formula helpers now build the expanded design internally before running coefficient or contrast workflows. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, and Rust expanded-model workflow tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
-| Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, and implemented local numerical-integration helpers. | Formula tests and stage-level dispatch tests; full Bioconductor object workflow remains future work. |
+| Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
 
 ## Implemented
 
@@ -289,6 +289,10 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
   including primitive numeric, named/list, and caller-supplied factor-level
   contrast routes.
+- Test-selected top-level Cook's replacement-refit helpers can return a typed
+  Wald-or-LRT enum, so `test=Lrt` can reuse a builder-stored reduced design for
+  default, named-coefficient, numeric-contrast, named-contrast, and factor-level
+  contrast replacement-refit workflows.
 - Base-mean independent filtering with filtered BH adjustment metadata and an
   R `stats::lowess`-shaped rejection-curve smoother for DESeq2's default
   threshold-selection grid, plus a paired `filterNumRej`-shaped
@@ -454,11 +458,25 @@ bounded fallback where DESeq2 is installed locally.
 - High-level R-style contrast handling beyond primitive coefficient-name
   resolution.
 - Full high-level VST object workflow, exact DESeq2 `splinefun` behavior for
-  local VST, rlog, and lfcShrink-compatible hooks. Mean-fit, parametric, local,
-  fast-subset selection/subsetting, automatic GLM-mu VST, blind automatic VST,
-  and fit-state VST helpers are available for normalized-count matrices and
-  implemented fitted trends. The transform namespace exports rlog as an
-  explicit unsupported marker until the regularized-log workflow is implemented.
+  local VST, full high-level rlog object workflow, and lfcShrink-compatible
+  hooks. Mean-fit, parametric, local, fast-subset selection/subsetting,
+  automatic GLM-mu VST, blind automatic VST, and fit-state VST helpers are
+  available for normalized-count matrices and implemented fitted trends.
+  Low-level rlog sample-effect ridge fitting is available when callers supply
+  dispersions, with helpers to estimate the sample-effect prior variance from
+  normalized counts, `baseMean`, and `dispFit`, or to estimate that prior and
+  fit in one call for size-factor and normalization-factor inputs. `DeseqFit`
+  can run the same rlog path after fitted trend dispersions and final
+  dispersions are available in stored fit state. Builder-level `rlog_glm_mu`
+  and `blind_rlog_glm_mu` helpers compose the implemented GLM-mu MAP
+  dispersion path with fit-state rlog, with `*_with_fit` variants that retain
+  the dispersion fit state for diagnostics. The native CLI exposes this path
+  through `rlog` for blind and design-aware GLM-mu MAP dispersion workflows.
+- Top-level builder Wald helpers route through the implemented GLM-mu path.
+  Top-level LRT helpers can now store a reduced design on the builder and route
+  default, named-coefficient, numeric-contrast, coefficient-name contrast, and
+  factor-level contrast result requests, including the typed top-level
+  replacement-refit helpers, through the implemented GLM-mu LRT path.
 
 ## Known Deviations
 
