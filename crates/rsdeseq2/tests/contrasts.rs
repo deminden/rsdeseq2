@@ -205,6 +205,105 @@ fn factor_level_contrast_resolves_standard_reference_shapes() {
 }
 
 #[test]
+fn original_results_condition_factor_contrast_shapes_are_preserved() {
+    let design = DesignMatrix::from_row_major(
+        12,
+        4,
+        vec![1.0; 48],
+        Some(vec![
+            "Intercept".into(),
+            "group_2_vs_1".into(),
+            "condition_2_vs_1".into(),
+            "condition_3_vs_1".into(),
+        ]),
+    )
+    .unwrap();
+
+    // Mirrors passable contrast expectations from DESeq2's test_results.R:
+    // condition 1 vs 3 = -condition_3_vs_1,
+    // condition 1 vs 2 = -condition_2_vs_1,
+    // condition 2 vs 3 = condition_2_vs_1 - condition_3_vs_1.
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "1", "3")).unwrap(),
+        vec![0.0, 0.0, 0.0, -1.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "1", "2")).unwrap(),
+        vec![0.0, 0.0, -1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "2", "3")).unwrap(),
+        vec![0.0, 0.0, 1.0, -1.0]
+    );
+
+    // Original DESeq2 test_results.R also exercises list contrasts:
+    // contrast=list("condition_3_vs_1", "condition_2_vs_1")
+    // and listValues=c(.5, -.5).
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::list(
+                vec!["condition_3_vs_1".into()],
+                vec!["condition_2_vs_1".into()],
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, -1.0, 1.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::list_with_values(
+                vec!["condition_3_vs_1".into()],
+                vec!["condition_2_vs_1".into()],
+                0.5,
+                -0.5,
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, -0.5, 0.5]
+    );
+}
+
+#[test]
+fn original_results_invalid_contrast_shapes_are_rejected() {
+    let design = DesignMatrix::from_row_major(
+        12,
+        4,
+        vec![1.0; 48],
+        Some(vec![
+            "Intercept".into(),
+            "group_2_vs_1".into(),
+            "condition_2_vs_1".into(),
+            "condition_3_vs_1".into(),
+        ]),
+    )
+    .unwrap();
+
+    // Passable primitive counterparts of DESeq2 test_results.R error checks:
+    // missing factor/coefficient names, same numerator/denominator levels,
+    // duplicated list entries, empty lists, and all-zero numeric contrasts.
+    assert!(resolve_contrast(&design, &ContrastSpec::factor_level("foo", "lo", "hi")).is_err());
+    assert!(resolve_contrast(&design, &ContrastSpec::factor_level("condition", "4", "1")).is_err());
+    assert!(resolve_contrast(&design, &ContrastSpec::factor_level("condition", "1", "1")).is_err());
+    assert!(resolve_contrast(
+        &design,
+        &ContrastSpec::list(vec!["condition_2_vs_1".into()], vec!["foo".into()])
+    )
+    .is_err());
+    assert!(resolve_contrast(
+        &design,
+        &ContrastSpec::list(
+            vec!["condition_2_vs_1".into()],
+            vec!["condition_2_vs_1".into()],
+        )
+    )
+    .is_err());
+    assert!(resolve_contrast(&design, &ContrastSpec::list(Vec::new(), Vec::new())).is_err());
+    assert!(resolve_contrast(&design, &ContrastSpec::Numeric(vec![0.0, 0.0, 0.0, 0.0])).is_err());
+}
+
+#[test]
 fn factor_level_contrast_resolves_expanded_shapes() {
     let design = DesignMatrix::from_row_major(
         4,
@@ -410,6 +509,21 @@ fn original_zero_zero_d_vs_b_contrast_shape_is_preserved() {
     assert_eq!(
         contrast_all_zero_numeric(&counts, &design, &[0.0, -1.0, 0.0, 1.0]).unwrap(),
         vec![true, true]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::list(
+                vec!["condition_D_vs_A".into()],
+                vec!["condition_B_vs_A".into()],
+            )
+        )
+        .unwrap(),
+        vec![0.0, -1.0, 0.0, 1.0]
+    );
+    assert_eq!(
+        contrast_all_zero_factor_levels(&counts, &levels, "D", "A").unwrap(),
+        vec![false, true]
     );
     assert_eq!(
         contrast_all_zero_numeric(&counts, &design, &[0.0, 0.0, 0.0, 1.0]).unwrap(),

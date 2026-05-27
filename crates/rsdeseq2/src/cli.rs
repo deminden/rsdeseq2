@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 use crate::contrasts::{ContrastSpec, FactorLevelContrast};
-use crate::cooks::CooksReplacementOptions;
-use crate::core::DeseqBuilder;
+use crate::cooks::{CooksRefitPlan, CooksReplacementOptions};
+use crate::core::{CooksReplacementLrtOutput, CooksReplacementWaldOutput, DeseqBuilder, DeseqFit};
 use crate::errors::DeseqError;
 use crate::glm::WaldAlternative;
 use crate::io::{
@@ -14,15 +14,21 @@ use crate::io::{
     read_labeled_gene_numeric_tsv, read_labeled_geometric_means_tsv,
     read_labeled_normalization_factors_tsv, read_labeled_observation_weights_tsv,
     read_labeled_size_factors_tsv, read_labeled_wald_t_degrees_of_freedom_tsv,
-    read_sample_levels_tsv, write_base_mean_tsv, write_deseq_results_tsv,
-    write_normalized_counts_tsv, write_size_factors_tsv,
+    read_sample_levels_tsv, write_base_mean_tsv, write_cooks_candidate_replacement_counts_tsv,
+    write_cooks_distance_matrix_tsv, write_cooks_outlier_cells_tsv,
+    write_cooks_replaced_counts_tsv, write_cooks_replacement_metadata_tsv,
+    write_cooks_replacement_row_metadata_tsv, write_deseq_result_column_metadata_tsv,
+    write_deseq_result_table_metadata_tsv, write_deseq_results_tsv,
+    write_independent_filter_lowess_tsv, write_independent_filter_metadata_tsv,
+    write_independent_filter_num_rej_tsv, write_normalized_counts_tsv, write_size_factors_tsv,
 };
+use crate::matrix::RowMajorMatrix;
 use crate::normalization::{
     base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
     normalized_counts_with_factors,
 };
 use crate::options::{CooksCutoff, FitType, SizeFactorMethod};
-use crate::results::resolve_cooks_cutoff;
+use crate::results::{resolve_cooks_cutoff, DeseqResults};
 
 /// Command-line arguments for the minimal `rsdeseq2` CLI.
 #[derive(Debug, Parser)]
@@ -284,6 +290,39 @@ enum Commands {
         /// Comma-delimited theta grid for independent filtering.
         #[arg(long, value_delimiter = ',')]
         independent_filtering_theta: Option<Vec<f64>>,
+        /// Optional result column metadata TSV output.
+        #[arg(long)]
+        result_column_metadata_output: Option<PathBuf>,
+        /// Optional result table metadata TSV output.
+        #[arg(long)]
+        result_table_metadata_output: Option<PathBuf>,
+        /// Optional independent-filtering scalar metadata TSV output.
+        #[arg(long)]
+        independent_filter_metadata_output: Option<PathBuf>,
+        /// Optional independent-filtering rejection-count curve TSV output.
+        #[arg(long)]
+        independent_filter_num_rej_output: Option<PathBuf>,
+        /// Optional independent-filtering lowess curve TSV output.
+        #[arg(long)]
+        independent_filter_lowess_output: Option<PathBuf>,
+        /// Optional Cook's distance matrix TSV output.
+        #[arg(long)]
+        cooks_distance_output: Option<PathBuf>,
+        /// Optional Cook's replacement scalar metadata TSV output.
+        #[arg(long)]
+        cooks_replacement_metadata_output: Option<PathBuf>,
+        /// Optional Cook's replacement row metadata TSV output.
+        #[arg(long)]
+        cooks_replacement_row_metadata_output: Option<PathBuf>,
+        /// Optional Cook's replaced-count assay TSV output.
+        #[arg(long)]
+        cooks_replaced_counts_output: Option<PathBuf>,
+        /// Optional Cook's candidate replacement-count assay TSV output.
+        #[arg(long)]
+        cooks_candidate_replacement_counts_output: Option<PathBuf>,
+        /// Optional Cook's outlier-cell logical assay TSV output.
+        #[arg(long)]
+        cooks_outlier_cells_output: Option<PathBuf>,
         /// Output TSV path.
         #[arg(long)]
         output: PathBuf,
@@ -374,6 +413,39 @@ enum Commands {
         /// Comma-delimited theta grid for independent filtering.
         #[arg(long, value_delimiter = ',')]
         independent_filtering_theta: Option<Vec<f64>>,
+        /// Optional result column metadata TSV output.
+        #[arg(long)]
+        result_column_metadata_output: Option<PathBuf>,
+        /// Optional result table metadata TSV output.
+        #[arg(long)]
+        result_table_metadata_output: Option<PathBuf>,
+        /// Optional independent-filtering scalar metadata TSV output.
+        #[arg(long)]
+        independent_filter_metadata_output: Option<PathBuf>,
+        /// Optional independent-filtering rejection-count curve TSV output.
+        #[arg(long)]
+        independent_filter_num_rej_output: Option<PathBuf>,
+        /// Optional independent-filtering lowess curve TSV output.
+        #[arg(long)]
+        independent_filter_lowess_output: Option<PathBuf>,
+        /// Optional Cook's distance matrix TSV output.
+        #[arg(long)]
+        cooks_distance_output: Option<PathBuf>,
+        /// Optional Cook's replacement scalar metadata TSV output.
+        #[arg(long)]
+        cooks_replacement_metadata_output: Option<PathBuf>,
+        /// Optional Cook's replacement row metadata TSV output.
+        #[arg(long)]
+        cooks_replacement_row_metadata_output: Option<PathBuf>,
+        /// Optional Cook's replaced-count assay TSV output.
+        #[arg(long)]
+        cooks_replaced_counts_output: Option<PathBuf>,
+        /// Optional Cook's candidate replacement-count assay TSV output.
+        #[arg(long)]
+        cooks_candidate_replacement_counts_output: Option<PathBuf>,
+        /// Optional Cook's outlier-cell logical assay TSV output.
+        #[arg(long)]
+        cooks_outlier_cells_output: Option<PathBuf>,
         /// Output TSV path.
         #[arg(long)]
         output: PathBuf,
@@ -401,6 +473,29 @@ enum WaldAlternativeArg {
     LessAbs,
     Greater,
     Less,
+}
+
+struct CliAnalysisOutput {
+    results: DeseqResults,
+    cooks: Option<RowMajorMatrix<f64>>,
+    refit_plan: Option<CooksRefitPlan>,
+}
+
+struct CliCooksOutputPaths {
+    cooks_distance: Option<PathBuf>,
+    replacement_metadata: Option<PathBuf>,
+    replacement_row_metadata: Option<PathBuf>,
+    replaced_counts: Option<PathBuf>,
+    candidate_replacement_counts: Option<PathBuf>,
+    outlier_cells: Option<PathBuf>,
+}
+
+struct CliResultSidecarPaths {
+    column_metadata: Option<PathBuf>,
+    table_metadata: Option<PathBuf>,
+    independent_filter_metadata: Option<PathBuf>,
+    independent_filter_num_rej: Option<PathBuf>,
+    independent_filter_lowess: Option<PathBuf>,
 }
 
 impl From<SizeFactorMethodArg> for SizeFactorMethod {
@@ -663,6 +758,17 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             disable_independent_filtering,
             independent_filtering_alpha,
             independent_filtering_theta,
+            result_column_metadata_output,
+            result_table_metadata_output,
+            independent_filter_metadata_output,
+            independent_filter_num_rej_output,
+            independent_filter_lowess_output,
+            cooks_distance_output,
+            cooks_replacement_metadata_output,
+            cooks_replacement_row_metadata_output,
+            cooks_replaced_counts_output,
+            cooks_candidate_replacement_counts_output,
+            cooks_outlier_cells_output,
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
@@ -721,36 +827,34 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 design.n_samples(),
                 design.n_coefficients(),
             )?;
-            let results = if let Some(contrast) = contrast {
+            let analysis = if let Some(contrast) = contrast {
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_wald_glm_mu_contrast_with_cooks_replacement(
+                    cli_wald_replacement_output(
+                        builder.fit_wald_glm_mu_contrast_with_cooks_replacement(
                             &counts,
                             &design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_wald_glm_mu_contrast(&counts, &design, &contrast)?
-                        .1
+                    cli_fit_output(builder.fit_wald_glm_mu_contrast(&counts, &design, &contrast)?)
                 }
             } else if let Some(contrast_name) = contrast_name {
                 let contrast = ContrastSpec::coefficient_name(contrast_name);
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_wald_replacement_output(
+                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?
-                        .1
+                    cli_fit_output(
+                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
+                    )
                 }
             } else if contrast_positive.is_some() || contrast_negative.is_some() {
                 let contrast = ContrastSpec::list_with_values(
@@ -760,18 +864,18 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     contrast_negative_weight,
                 );
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_wald_replacement_output(
+                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?
-                        .1
+                    cli_fit_output(
+                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
+                    )
                 }
             } else if contrast_factor.is_some()
                 || contrast_numerator.is_some()
@@ -797,32 +901,34 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     )?;
                     let contrast = cli_factor_level_contrast_with_samples(&contrast, &levels)?;
                     if let Some(cutoff) = cutoff {
-                        builder
-                            .fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                        cli_wald_replacement_output(
+                            builder.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
                                 &counts,
                                 &design,
                                 contrast,
                                 &CooksReplacementOptions::new(cutoff),
-                            )?
-                            .results
+                            )?,
+                        )
                     } else {
-                        builder
-                            .fit_wald_glm_mu_factor_level_contrast(&counts, &design, contrast)?
-                            .1
+                        cli_fit_output(
+                            builder.fit_wald_glm_mu_factor_level_contrast(
+                                &counts, &design, contrast,
+                            )?,
+                        )
                     }
                 } else if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_wald_replacement_output(
+                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?
-                        .1
+                    cli_fit_output(
+                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
+                    )
                 }
             } else {
                 let coefficient = match (coefficient, coefficient_name) {
@@ -832,19 +938,39 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     (Some(_), Some(_)) => unreachable!("checked above"),
                 };
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_wald_glm_mu_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            coefficient,
-                            &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                    cli_wald_replacement_output(builder.fit_wald_glm_mu_with_cooks_replacement(
+                        &counts,
+                        &design,
+                        coefficient,
+                        &CooksReplacementOptions::new(cutoff),
+                    )?)
                 } else {
-                    builder.fit_wald_glm_mu(&counts, &design, coefficient)?.1
+                    cli_fit_output(builder.fit_wald_glm_mu(&counts, &design, coefficient)?)
                 }
             };
-            write_deseq_results_tsv(output, &results)
+            let sidecars = CliCooksOutputPaths {
+                cooks_distance: cooks_distance_output,
+                replacement_metadata: cooks_replacement_metadata_output,
+                replacement_row_metadata: cooks_replacement_row_metadata_output,
+                replaced_counts: cooks_replaced_counts_output,
+                candidate_replacement_counts: cooks_candidate_replacement_counts_output,
+                outlier_cells: cooks_outlier_cells_output,
+            };
+            let result_sidecars = CliResultSidecarPaths {
+                column_metadata: result_column_metadata_output,
+                table_metadata: result_table_metadata_output,
+                independent_filter_metadata: independent_filter_metadata_output,
+                independent_filter_num_rej: independent_filter_num_rej_output,
+                independent_filter_lowess: independent_filter_lowess_output,
+            };
+            write_cli_cooks_outputs(
+                &sidecars,
+                counts.gene_names(),
+                counts.sample_names(),
+                &analysis,
+            )?;
+            write_cli_result_sidecars(&result_sidecars, &analysis.results)?;
+            write_deseq_results_tsv(output, &analysis.results)
         }
         Commands::Lrt {
             counts,
@@ -875,6 +1001,17 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             disable_independent_filtering,
             independent_filtering_alpha,
             independent_filtering_theta,
+            result_column_metadata_output,
+            result_table_metadata_output,
+            independent_filter_metadata_output,
+            independent_filter_num_rej_output,
+            independent_filter_lowess_output,
+            cooks_distance_output,
+            cooks_replacement_metadata_output,
+            cooks_replacement_row_metadata_output,
+            cooks_replaced_counts_output,
+            cooks_candidate_replacement_counts_output,
+            cooks_outlier_cells_output,
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
@@ -926,38 +1063,44 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 design.n_samples(),
                 design.n_coefficients(),
             )?;
-            let results = if let Some(contrast) = contrast {
+            let analysis = if let Some(contrast) = contrast {
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_lrt_glm_mu_contrast_with_cooks_replacement(
+                    cli_lrt_replacement_output(
+                        builder.fit_lrt_glm_mu_contrast_with_cooks_replacement(
                             &counts,
                             &design,
                             &reduced_design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_lrt_glm_mu_contrast(&counts, &design, &reduced_design, &contrast)?
-                        .1
+                    cli_fit_output(builder.fit_lrt_glm_mu_contrast(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        &contrast,
+                    )?)
                 }
             } else if let Some(contrast_name) = contrast_name {
                 let contrast = ContrastSpec::coefficient_name(contrast_name);
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_lrt_replacement_output(
+                        builder.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &reduced_design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec(&counts, &design, &reduced_design, &contrast)?
-                        .1
+                    cli_fit_output(builder.fit_lrt_glm_mu_contrast_spec(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        &contrast,
+                    )?)
                 }
             } else if contrast_positive.is_some() || contrast_negative.is_some() {
                 let contrast = ContrastSpec::list_with_values(
@@ -967,19 +1110,22 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     contrast_negative_weight,
                 );
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_lrt_replacement_output(
+                        builder.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &reduced_design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec(&counts, &design, &reduced_design, &contrast)?
-                        .1
+                    cli_fit_output(builder.fit_lrt_glm_mu_contrast_spec(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        &contrast,
+                    )?)
                 }
             } else if contrast_factor.is_some()
                 || contrast_numerator.is_some()
@@ -1005,39 +1151,40 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     )?;
                     let contrast = cli_factor_level_contrast_with_samples(&contrast, &levels)?;
                     if let Some(cutoff) = cutoff {
-                        builder
-                            .fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+                        cli_lrt_replacement_output(
+                            builder.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
                                 &counts,
                                 &design,
                                 &reduced_design,
                                 contrast,
                                 &CooksReplacementOptions::new(cutoff),
-                            )?
-                            .results
+                            )?,
+                        )
                     } else {
-                        builder
-                            .fit_lrt_glm_mu_factor_level_contrast(
-                                &counts,
-                                &design,
-                                &reduced_design,
-                                contrast,
-                            )?
-                            .1
+                        cli_fit_output(builder.fit_lrt_glm_mu_factor_level_contrast(
+                            &counts,
+                            &design,
+                            &reduced_design,
+                            contrast,
+                        )?)
                     }
                 } else if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                    cli_lrt_replacement_output(
+                        builder.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                             &counts,
                             &design,
                             &reduced_design,
                             &contrast,
                             &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                        )?,
+                    )
                 } else {
-                    builder
-                        .fit_lrt_glm_mu_contrast_spec(&counts, &design, &reduced_design, &contrast)?
-                        .1
+                    cli_fit_output(builder.fit_lrt_glm_mu_contrast_spec(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        &contrast,
+                    )?)
                 }
             } else {
                 let coefficient = match (coefficient, coefficient_name) {
@@ -1047,22 +1194,45 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                     _ => unreachable!("checked above"),
                 };
                 if let Some(cutoff) = cutoff {
-                    builder
-                        .fit_lrt_glm_mu_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &reduced_design,
-                            coefficient,
-                            &CooksReplacementOptions::new(cutoff),
-                        )?
-                        .results
+                    cli_lrt_replacement_output(builder.fit_lrt_glm_mu_with_cooks_replacement(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        coefficient,
+                        &CooksReplacementOptions::new(cutoff),
+                    )?)
                 } else {
-                    builder
-                        .fit_lrt_glm_mu(&counts, &design, &reduced_design, coefficient)?
-                        .1
+                    cli_fit_output(builder.fit_lrt_glm_mu(
+                        &counts,
+                        &design,
+                        &reduced_design,
+                        coefficient,
+                    )?)
                 }
             };
-            write_deseq_results_tsv(output, &results)
+            let sidecars = CliCooksOutputPaths {
+                cooks_distance: cooks_distance_output,
+                replacement_metadata: cooks_replacement_metadata_output,
+                replacement_row_metadata: cooks_replacement_row_metadata_output,
+                replaced_counts: cooks_replaced_counts_output,
+                candidate_replacement_counts: cooks_candidate_replacement_counts_output,
+                outlier_cells: cooks_outlier_cells_output,
+            };
+            let result_sidecars = CliResultSidecarPaths {
+                column_metadata: result_column_metadata_output,
+                table_metadata: result_table_metadata_output,
+                independent_filter_metadata: independent_filter_metadata_output,
+                independent_filter_num_rej: independent_filter_num_rej_output,
+                independent_filter_lowess: independent_filter_lowess_output,
+            };
+            write_cli_cooks_outputs(
+                &sidecars,
+                counts.gene_names(),
+                counts.sample_names(),
+                &analysis,
+            )?;
+            write_cli_result_sidecars(&result_sidecars, &analysis.results)?;
+            write_deseq_results_tsv(output, &analysis.results)
         }
     }
 }
@@ -1094,6 +1264,116 @@ fn cli_normalized_counts(
         )?;
         normalized_counts(counts, &size_factors)
     }
+}
+
+fn cli_fit_output((fit, results): (DeseqFit, DeseqResults)) -> CliAnalysisOutput {
+    CliAnalysisOutput {
+        results,
+        cooks: fit.cooks.clone(),
+        refit_plan: None,
+    }
+}
+
+fn cli_wald_replacement_output(output: CooksReplacementWaldOutput) -> CliAnalysisOutput {
+    CliAnalysisOutput {
+        results: output.results,
+        cooks: output.original_fit.cooks.clone(),
+        refit_plan: Some(output.refit_plan),
+    }
+}
+
+fn cli_lrt_replacement_output(output: CooksReplacementLrtOutput) -> CliAnalysisOutput {
+    CliAnalysisOutput {
+        results: output.results,
+        cooks: output.original_fit.cooks.clone(),
+        refit_plan: Some(output.refit_plan),
+    }
+}
+
+fn write_cli_cooks_outputs(
+    paths: &CliCooksOutputPaths,
+    gene_names: Option<&[String]>,
+    sample_names: Option<&[String]>,
+    analysis: &CliAnalysisOutput,
+) -> Result<(), DeseqError> {
+    if paths.cooks_distance.is_some() {
+        let cooks = analysis.cooks.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "Cook's diagnostic sidecar output requires a workflow that computes Cook's distances"
+                .to_string(),
+        })?;
+        if let Some(path) = &paths.cooks_distance {
+            write_cooks_distance_matrix_tsv(path, gene_names, sample_names, cooks)?;
+        }
+    }
+
+    if paths.replacement_metadata.is_some()
+        || paths.replacement_row_metadata.is_some()
+        || paths.replaced_counts.is_some()
+        || paths.candidate_replacement_counts.is_some()
+        || paths.outlier_cells.is_some()
+    {
+        let refit_plan =
+            analysis
+                .refit_plan
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason:
+                        "Cook's replacement sidecar output requires Cook's replacement/refit to run"
+                            .to_string(),
+                })?;
+        if let Some(path) = &paths.replacement_metadata {
+            write_cooks_replacement_metadata_tsv(path, refit_plan)?;
+        }
+        if let Some(path) = &paths.replacement_row_metadata {
+            write_cooks_replacement_row_metadata_tsv(path, refit_plan)?;
+        }
+        if let Some(path) = &paths.replaced_counts {
+            write_cooks_replaced_counts_tsv(path, refit_plan)?;
+        }
+        if let Some(path) = &paths.candidate_replacement_counts {
+            write_cooks_candidate_replacement_counts_tsv(path, refit_plan)?;
+        }
+        if let Some(path) = &paths.outlier_cells {
+            write_cooks_outlier_cells_tsv(path, refit_plan)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_cli_result_sidecars(
+    paths: &CliResultSidecarPaths,
+    results: &DeseqResults,
+) -> Result<(), DeseqError> {
+    if let Some(path) = &paths.column_metadata {
+        write_deseq_result_column_metadata_tsv(path, results)?;
+    }
+    if let Some(path) = &paths.table_metadata {
+        write_deseq_result_table_metadata_tsv(path, results)?;
+    }
+    if paths.independent_filter_metadata.is_some()
+        || paths.independent_filter_num_rej.is_some()
+        || paths.independent_filter_lowess.is_some()
+    {
+        let filtering =
+            results
+                .independent_filtering
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason:
+                        "independent-filtering sidecar output requires independent filtering to run"
+                            .to_string(),
+                })?;
+        if let Some(path) = &paths.independent_filter_metadata {
+            write_independent_filter_metadata_tsv(path, filtering)?;
+        }
+        if let Some(path) = &paths.independent_filter_num_rej {
+            write_independent_filter_num_rej_tsv(path, filtering)?;
+        }
+        if let Some(path) = &paths.independent_filter_lowess {
+            write_independent_filter_lowess_tsv(path, filtering)?;
+        }
+    }
+    Ok(())
 }
 
 fn apply_cli_normalization_inputs(

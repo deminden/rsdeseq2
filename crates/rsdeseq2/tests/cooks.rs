@@ -441,6 +441,30 @@ fn prepare_cooks_replacement_refit_identifies_refit_rows_and_base_metadata() {
     assert_relative_eq!(plan.replaced_base_mean[1], 0.0, epsilon = 1e-12);
     assert_eq!(plan.replaced_all_zero, vec![false, true, false]);
     assert_eq!(plan.post_refit_max_cooks, vec![None, None, None]);
+
+    let metadata = plan.metadata();
+    assert_eq!(metadata.n_refit, 2);
+    assert_eq!(metadata.n_refit_rows, 1);
+    assert_eq!(metadata.n_new_all_zero, 1);
+    assert_eq!(metadata.n_outlier_cells, 2);
+    assert_eq!(metadata.n_replaced_cells, 2);
+    assert_eq!(metadata.n_replaceable_samples, 4);
+    assert!(metadata.should_refit);
+    assert_eq!(
+        plan.scalar_metadata()
+            .into_iter()
+            .map(|entry| (entry.name, entry.value))
+            .collect::<Vec<_>>(),
+        vec![
+            ("nRefit".to_string(), "2".to_string()),
+            ("nRefitRows".to_string(), "1".to_string()),
+            ("nNewAllZero".to_string(), "1".to_string()),
+            ("nOutlierCells".to_string(), "2".to_string()),
+            ("nReplacedCells".to_string(), "2".to_string()),
+            ("nReplaceableSamples".to_string(), "4".to_string()),
+            ("shouldRefit".to_string(), "true".to_string()),
+        ]
+    );
 }
 
 #[test]

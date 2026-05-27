@@ -16,9 +16,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
-| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, and Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs. One-factor, additive, and formula helpers now build the expanded design internally before running coefficient or contrast workflows. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, and Rust expanded-model workflow tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
+| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, and supported-formula helpers can now build the expanded design internally for replacement-refit workflows too. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, and Rust expanded-model workflow tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
-| Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
+| Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
 
 ## Implemented
@@ -83,12 +83,27 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Primitive expanded beta-prior fit-and-Wald-results workflow helpers for
   selected coefficients and numeric contrasts, including size-factor,
   normalization-factor, and optional observation-weight inputs.
+- Primitive size-factor and normalization-factor expanded beta-prior Wald Cook's replacement-refit
+  helpers for selected coefficients and numeric contrasts. Cook's distances
+  are calculated on the collapsed reported design; replacement-count refits
+  reuse the original offsets and supplied dispersions.
 - Primitive one-factor expanded design construction from sample labels, with
   expanded intercept-plus-level columns, treatment-style reported design, and
   coefficient groups.
 - One-factor expanded beta-prior fit-and-Wald-results helpers that build the
   design internally, then run coefficient or numeric-contrast workflows with
   size-factor, normalization-factor, and optional observation-weight inputs.
+- One-factor expanded beta-prior Cook's replacement-refit helpers that build
+  the design internally, then run selected-coefficient or numeric-contrast
+  replacement workflows with size-factor or normalization-factor offsets.
+- Additive expanded beta-prior Cook's replacement-refit helpers that build the
+  design internally, then run selected-coefficient or numeric-contrast
+  replacement workflows with size-factor or normalization-factor offsets.
+- Formula-driven expanded beta-prior Cook's replacement-refit helpers for the
+  supported primitive formula subset, including `offset(numeric)` routing into
+  normalization-factor replacement workflows.
+- Primitive expanded beta-prior replacement refits preserve optional
+  observation weights when rerunning the replacement-count GLM.
 - Primitive additive expanded design construction for categorical factors,
   numeric covariates, factor-by-factor, factor-by-numeric, and
   numeric-by-numeric interactions, with one expanded indicator per factor
@@ -204,7 +219,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Top-level Wald result helpers can report the selected design coefficient by
   index or coefficient name.
 - DESeq2-style Wald t p-values with residual, scalar, or per-gene degrees of
-  freedom.
+  freedom for selected coefficients and primitive numeric contrasts, including
+  thresholded t-tail alternatives covered by passable original
+  `test_nbinomWald.R` cases.
 - Log2-scale beta covariance matrices exposed in `DeseqFit` for implemented GLM
   fits and primitive numeric Wald linear contrasts using `c' beta` and
   `sqrt(c' Sigma c)`.
@@ -271,21 +288,40 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   all-zero rows.
 - Cook's distance matrix for the supplied-dispersion and limited native Wald
   pipelines.
+- Cook's diagnostic TSV exports for the distance assay, row-level `maxCooks`
+  and robust dispersion, and sample-level `samplesForCooks` eligibility.
 - `maxCooks` over samples in model-matrix cells with at least three replicates.
 - Cook's cutoff p-value masking with BH recomputation for result rows.
 - Explicit primitive helper for DESeq2's two-group low-count Cook's heuristic:
   rows above cutoff are spared when at least three counts are larger than the
-  count in the sample with maximum Cook's distance. This helper is not applied
-  automatically because the Rust core does not own R formula/colData metadata.
+  count in the sample with maximum Cook's distance. Supplied-dispersion fixed
+  Wald/LRT and limited GLM-mu Wald/LRT factor-level result routes now apply
+  this automatically when the caller-supplied sample levels contain exactly
+  the requested numerator and denominator levels. The same gate is also used
+  after limited GLM-mu factor-level replacement refits. Broader formula-aware
+  automatic selection remains future wrapper work because the Rust core does
+  not own R formula/colData metadata.
 - Primitive Cook's outlier count replacement transform from `replaceOutliers`:
   trimmed normalized means, size-factor or normalization-factor rescaling,
   integer truncation, replaceable-sample masks, and per-gene `replace` flags.
 - Cook's replacement-refit planning metadata: replacement-count base metadata,
   `nrefit`, `refitReplace`, `newAllZero`, and DESeq2-style post-refit
   `maxCooks` masking over nonreplaceable samples.
-- Limited Cook's replacement-refit path for the implemented GLM-mu native Wald
-  and LRT branches, merging only `refitReplace` rows and preserving original
-  size factors.
+- Cook's replacement-refit plans expose a compact scalar metadata view for
+  `nRefit`, refit-row counts, new-all-zero rows, outlier/replaced cell counts,
+  replaceable sample counts, and the refit-branch decision, plus TSV export for
+  that key/value metadata.
+- Cook's replacement/refit plans can export replacement-count assays,
+  candidate replacement counts, outlier-cell logical masks, and row-level
+  replacement/refit metadata for wrapper and parity-table consumers.
+- Limited Cook's replacement-refit path for supplied-dispersion fixed Wald/LRT
+  coefficient, primitive contrast, named/list contrast, and caller-supplied
+  factor-level contrast rows, plus the implemented GLM-mu native Wald and LRT
+  branches, merging only `refitReplace` rows and preserving original size
+  factors.
+- Limited Cook's replacement-refit path for primitive expanded beta-prior Wald
+  selected-coefficient and numeric-contrast workflows using size-factor or
+  normalization-factor offsets.
 - Limited Cook's replacement-refit path for GLM-mu native Wald contrasts,
   including primitive numeric, named/list, and caller-supplied factor-level
   contrast routes.
@@ -440,8 +476,9 @@ bounded fallback where DESeq2 is installed locally.
   the displayed log2 fold change before restoring LRT statistics and p-values.
 - Automatic formula-aware application of the two-group low-count Cook's
   heuristic from high-level wrappers.
-- Full Cook's outlier replacement behavior for beta priors, Bioconductor assay
-  preservation, and all remaining DESeq2 edge cases.
+- Full Cook's outlier replacement behavior for high-level Bioconductor assay
+  attachment, high-level wrapper-object metadata, and all remaining DESeq2 edge
+  cases.
 - General Wald and LRT tests with native dispersion estimation beyond the
   current limited linear-mu/GLM-mu branches and without generated DESeq2
   references for all native LRT intermediates.

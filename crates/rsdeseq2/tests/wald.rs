@@ -406,6 +406,105 @@ fn wald_test_coefficient_can_use_t_lfc_threshold() {
 }
 
 #[test]
+fn original_use_t_threshold_alternatives_use_t_tails() {
+    let fit = toy_fit(vec![2.0, -2.0, 0.2, 2.0], vec![0.5, 0.5, 0.5, 0.5], 4, 1);
+    let df = 11.0;
+
+    let greater_abs_2014 = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_degrees_of_freedom(df)
+            .with_lfc_threshold(1.0, WaldAlternative::GreaterAbs2014),
+    )
+    .unwrap();
+    assert_relative_eq!(greater_abs_2014.stat[0].unwrap(), 2.0, epsilon = 1e-12);
+    assert_relative_eq!(
+        greater_abs_2014.pvalue[0].unwrap(),
+        two_sided_t_pvalue(2.0, df).unwrap(),
+        epsilon = 1e-15
+    );
+
+    let greater = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_degrees_of_freedom(df)
+            .with_lfc_threshold(1.0, WaldAlternative::Greater),
+    )
+    .unwrap();
+    assert_relative_eq!(greater.stat[0].unwrap(), 2.0, epsilon = 1e-12);
+    assert_relative_eq!(
+        greater.pvalue[0].unwrap(),
+        two_sided_t_pvalue(2.0, df).unwrap() / 2.0,
+        epsilon = 1e-15
+    );
+
+    let less = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_degrees_of_freedom(df).with_lfc_threshold(1.0, WaldAlternative::Less),
+    )
+    .unwrap();
+    assert_relative_eq!(less.stat[1].unwrap(), -2.0, epsilon = 1e-12);
+    assert_relative_eq!(
+        less.pvalue[1].unwrap(),
+        two_sided_t_pvalue(-2.0, df).unwrap() / 2.0,
+        epsilon = 1e-15
+    );
+
+    let less_abs = wald_test_coefficient_with_options(
+        &fit,
+        0,
+        &WaldTestOptions::t_degrees_of_freedom(df)
+            .with_lfc_threshold(1.0, WaldAlternative::LessAbs),
+    )
+    .unwrap();
+    assert_relative_eq!(less_abs.stat[2].unwrap(), 1.6, epsilon = 1e-12);
+    assert_relative_eq!(
+        less_abs.pvalue[2].unwrap(),
+        two_sided_t_pvalue(1.6, df).unwrap() / 2.0,
+        epsilon = 1e-15
+    );
+}
+
+#[test]
+fn original_use_t_novel_contrast_uses_t_tail() {
+    let mut fit = toy_fit(vec![0.0, 1.0, 3.0, 0.0, -1.0, 2.0], vec![0.5; 6], 2, 3);
+    fit.beta_covariance = Some(
+        RowMajorMatrix::from_row_major(
+            2,
+            9,
+            vec![
+                0.25, 0.02, 0.01, 0.02, 0.25, 0.03, 0.01, 0.03, 0.25, //
+                0.25, 0.00, 0.00, 0.00, 0.25, 0.00, 0.00, 0.00, 0.25,
+            ],
+        )
+        .unwrap(),
+    );
+
+    let contrast = vec![0.0, -1.0, 1.0];
+    let wald = wald_test_contrast_with_options(
+        &fit,
+        &contrast,
+        &WaldTestOptions::t_degrees_of_freedom(11.0),
+    )
+    .unwrap();
+
+    assert_relative_eq!(wald.log2_fold_change[0].unwrap(), 2.0, epsilon = 1e-12);
+    assert_relative_eq!(wald.lfc_se[0].unwrap(), (0.44_f64).sqrt(), epsilon = 1e-12);
+    assert_relative_eq!(
+        wald.wald.pvalue[0].unwrap(),
+        two_sided_t_pvalue(wald.wald.stat[0].unwrap(), 11.0).unwrap(),
+        epsilon = 1e-15
+    );
+    assert_relative_eq!(wald.log2_fold_change[1].unwrap(), 3.0, epsilon = 1e-12);
+    assert_relative_eq!(
+        wald.wald.pvalue[1].unwrap(),
+        two_sided_t_pvalue(wald.wald.stat[1].unwrap(), 11.0).unwrap(),
+        epsilon = 1e-15
+    );
+}
+
+#[test]
 fn wald_test_coefficient_rejects_invalid_threshold_options() {
     let fit = toy_fit(vec![2.0], vec![0.5], 1, 1);
     assert!(wald_test_coefficient_with_options(

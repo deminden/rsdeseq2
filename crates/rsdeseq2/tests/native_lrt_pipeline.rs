@@ -759,6 +759,76 @@ fn native_glm_mu_lrt_factor_level_contrast_uses_character_all_zero_cleanup() {
 }
 
 #[test]
+fn native_glm_mu_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        3,
+        6,
+        vec![
+            1, 20, 21, 20, 20, 20, //
+            10, 11, 12, 15, 16, 17, //
+            30, 32, 31, 50, 52, 51,
+        ],
+        Some(vec!["low_count".into(), "stable".into(), "up".into()]),
+        None,
+    )
+    .unwrap();
+    let full = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let reduced = DesignMatrix::from_row_major(
+        6,
+        1,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec!["Intercept".into()]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "A", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+    let (_numeric_fit, numeric_results) = builder
+        .clone()
+        .fit_lrt_with_results_contrast(&counts, &full, &reduced, &[0.0, 1.0])
+        .unwrap();
+    let (_fit, results) = builder
+        .fit_lrt_with_results_factor_level_contrast(
+            &counts,
+            &full,
+            &reduced,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+
+    assert_eq!(results.rows[0].gene.as_deref(), Some("low_count"));
+    assert!(results.rows[0].max_cooks.unwrap() > 0.0);
+    assert_eq!(numeric_results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(results.rows[0].cooks_outlier, Some(false));
+}
+
+#[test]
 fn top_level_lrt_contrast_spec_resolves_named_full_model_effect() {
     let counts = counts_with_zero_row();
     let full = full_design();

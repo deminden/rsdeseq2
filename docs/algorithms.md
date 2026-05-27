@@ -951,6 +951,21 @@ exports the same table with the first column named `row`, matching the
 `mcols(res)`-style column metadata with `name`, `type`, and `description`
 columns. `io::write_deseq_result_table_metadata_tsv()` exports table-level
 result metadata as `name`/`value` entries.
+Cook's replacement/refit plans expose a scalar metadata summary with refit
+counts, new-all-zero rows, outlier/replaced cell counts, replaceable sample
+counts, and the refit-branch decision; `io::write_cooks_replacement_metadata_tsv()`
+exports those entries as a `name`/`value` table.
+Cook's diagnostic outputs can also be exported directly:
+`io::write_cooks_distance_tsv()` writes the per-gene, per-sample Cook's
+distance assay with `NA` for missing values,
+`io::write_cooks_row_metadata_tsv()` writes `maxCooks` and robust dispersion,
+and `io::write_cooks_sample_metadata_tsv()` writes the sample eligibility mask
+used to record `maxCooks`.
+The same plan can export replacement-count assays through
+`io::write_cooks_replaced_counts_tsv()`,
+`io::write_cooks_candidate_replacement_counts_tsv()`, and
+`io::write_cooks_outlier_cells_tsv()`, plus row-level replacement/refit
+metadata through `io::write_cooks_replacement_row_metadata_tsv()`.
 `DeseqFit::deseq2_mcols_diagnostics()` provides a DESeq2-name-shaped view for
 implemented diagnostics such as `dispGeneEst`, `dispGeneIter`, `dispFit`,
 `dispersion`, `dispIter`, `dispOutlier`, `betaConv`, `fullBetaConv`,

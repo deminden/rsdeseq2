@@ -179,6 +179,24 @@ fn assert_size_factor_table(path: &Path) {
     assert_eq!(lines.count(), 4);
 }
 
+fn assert_tsv_starts_with(path: &Path, header: &str) {
+    let table = fs::read_to_string(path).unwrap();
+    assert!(
+        table.starts_with(header),
+        "unexpected TSV header for {}:\n{table}",
+        path.display()
+    );
+}
+
+fn assert_tsv_contains(path: &Path, needle: &str) {
+    let table = fs::read_to_string(path).unwrap();
+    assert!(
+        table.contains(needle),
+        "expected {} to contain {needle:?}, got:\n{table}",
+        path.display()
+    );
+}
+
 fn assert_matrix_table(path: &Path) {
     let table = fs::read_to_string(path).unwrap();
     let mut lines = table.lines();
@@ -819,6 +837,134 @@ fn cli_wald_writes_deseq_results_table() {
 }
 
 #[test]
+fn cli_wald_writes_result_and_cooks_sidecars() {
+    let dir = temp_dir("wald-sidecars");
+    let output = dir.join("wald.tsv");
+    let cooks = dir.join("cooks.tsv");
+    let column_metadata = dir.join("result_columns.tsv");
+    let table_metadata = dir.join("result_table_metadata.tsv");
+    let filter_metadata = dir.join("filter_metadata.tsv");
+    let filter_num_rej = dir.join("filter_num_rej.tsv");
+    let filter_lowess = dir.join("filter_lowess.tsv");
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient",
+        "1",
+        "--cooks-distance-output",
+        cooks.to_str().unwrap(),
+        "--result-column-metadata-output",
+        column_metadata.to_str().unwrap(),
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
+        "--independent-filter-metadata-output",
+        filter_metadata.to_str().unwrap(),
+        "--independent-filter-num-rej-output",
+        filter_num_rej.to_str().unwrap(),
+        "--independent-filter-lowess-output",
+        filter_lowess.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&cooks, "gene\tsample1\tsample2\tsample3\tsample4\n");
+    assert_tsv_contains(&cooks, "gene1\t");
+    assert_tsv_starts_with(&column_metadata, "name\ttype\tdescription\n");
+    assert_tsv_contains(&column_metadata, "baseMean\tresults\t");
+    assert_tsv_starts_with(&table_metadata, "name\tvalue\n");
+    assert_tsv_contains(&table_metadata, "testType\tWald\n");
+    assert_tsv_starts_with(&filter_metadata, "name\tvalue\n");
+    assert_tsv_contains(&filter_metadata, "alpha\t");
+    assert_tsv_starts_with(&filter_num_rej, "theta\tnumRej\n");
+    assert_tsv_starts_with(&filter_lowess, "x\ty\n");
+}
+
+#[test]
+fn cli_wald_writes_cooks_replacement_sidecars() {
+    let dir = temp_dir("wald-replacement-sidecars");
+    let output = dir.join("wald.tsv");
+    let replacement_metadata = dir.join("replacement_metadata.tsv");
+    let replacement_row_metadata = dir.join("replacement_rows.tsv");
+    let replaced_counts = dir.join("replaced_counts.tsv");
+    let candidate_counts = dir.join("candidate_counts.tsv");
+    let outlier_cells = dir.join("outlier_cells.tsv");
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient",
+        "1",
+        "--cooks-cutoff",
+        "0",
+        "--cooks-replacement-metadata-output",
+        replacement_metadata.to_str().unwrap(),
+        "--cooks-replacement-row-metadata-output",
+        replacement_row_metadata.to_str().unwrap(),
+        "--cooks-replaced-counts-output",
+        replaced_counts.to_str().unwrap(),
+        "--cooks-candidate-replacement-counts-output",
+        candidate_counts.to_str().unwrap(),
+        "--cooks-outlier-cells-output",
+        outlier_cells.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&replacement_metadata, "name\tvalue\n");
+    assert_tsv_contains(&replacement_metadata, "nRefit\t");
+    assert_tsv_starts_with(
+        &replacement_row_metadata,
+        "gene\treplace\trefitReplace\tnewAllZero\treplacedAllZero\t",
+    );
+    assert_tsv_starts_with(
+        &replaced_counts,
+        "gene\tsample1\tsample2\tsample3\tsample4\n",
+    );
+    assert_tsv_starts_with(
+        &candidate_counts,
+        "gene\tsample1\tsample2\tsample3\tsample4\n",
+    );
+    assert_tsv_starts_with(&outlier_cells, "gene\tsample1\tsample2\tsample3\tsample4\n");
+}
+
+#[test]
+fn cli_wald_rejects_replacement_sidecars_without_replacement_refit() {
+    let dir = temp_dir("wald-replacement-sidecars-disabled");
+    let output = dir.join("wald.tsv");
+    let replacement_metadata = dir.join("replacement_metadata.tsv");
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient",
+        "1",
+        "--disable-cooks-cutoff",
+        "--cooks-replacement-metadata-output",
+        replacement_metadata.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
 fn cli_wald_accepts_lfc_threshold_alternative() {
     let dir = temp_dir("wald-threshold");
     let output = dir.join("wald.tsv");
@@ -1185,6 +1331,45 @@ fn cli_lrt_writes_deseq_results_table() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_writes_result_and_cooks_sidecars() {
+    let dir = temp_dir("lrt-sidecars");
+    let output = dir.join("lrt.tsv");
+    let cooks = dir.join("cooks.tsv");
+    let column_metadata = dir.join("result_columns.tsv");
+    let table_metadata = dir.join("result_table_metadata.tsv");
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        reference_data_path("design_full.tsv").to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient",
+        "1",
+        "--cooks-distance-output",
+        cooks.to_str().unwrap(),
+        "--result-column-metadata-output",
+        column_metadata.to_str().unwrap(),
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&cooks, "gene\tsample1\tsample2\tsample3\tsample4\n");
+    assert_tsv_contains(&cooks, "gene1\t");
+    assert_tsv_starts_with(&column_metadata, "name\ttype\tdescription\n");
+    assert_tsv_contains(&column_metadata, "stat\tresults\t");
+    assert_tsv_starts_with(&table_metadata, "name\tvalue\n");
+    assert_tsv_contains(&table_metadata, "testType\tLRT\n");
 }
 
 #[test]

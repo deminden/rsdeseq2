@@ -15,7 +15,9 @@ fixed-dispersion GLM primitives, parts of dispersion estimation, and selected
 Wald/LRT result paths.
 
 The current CLI is still deliberately narrower than the Rust API, but it now
-covers the main implemented primitive workflows:
+covers the main implemented primitive workflows and can write result,
+independent-filtering, Cook's, and replacement/refit sidecar tables for the
+implemented Wald/LRT paths:
 
 - `size-factors`
 - `normalized-counts`
@@ -44,9 +46,9 @@ and selected result/filtering/Cook's primitives.
 | Base metadata | `baseMean`, `baseVar`, `allZero`, weighted base metadata. |
 | Observation weights | Row-max normalization, design checks, `weights_fail`, and implemented weighted fixed/native paths. |
 | Fixed-dispersion GLM | Intercept shortcut, IRLS, QR option, log likelihood, deviance, SEs, hats, beta-prior variance/refit primitives, Wald/LRT. |
-| Wald tests | Selected coefficients, fixed-dispersion primitive contrasts, native linear-mu/GLM-mu primitive contrasts, threshold alternatives, normal and t p-values. |
+| Wald tests | Selected coefficients, fixed-dispersion primitive contrasts, native linear-mu/GLM-mu primitive contrasts, threshold alternatives, normal and t p-values, including passable original t-tail contrast cases. |
 | LRT | Fixed-dispersion full vs reduced and limited native-dispersion branches. |
-| Cook's diagnostics | Cook's matrix, `maxCooks`, p-value masking, low-count heuristic primitive, replacement planning, limited Wald/LRT/contrast refit. |
+| Cook's diagnostics | Cook's matrix with diagnostic exports and CLI sidecars, `maxCooks`, p-value masking, low-count heuristic primitive, automatic two-level factor metadata gate for supplied-dispersion fixed and limited GLM-mu factor-level result routes plus limited GLM-mu replacement refits, replacement planning with scalar and row metadata plus assay exports, supplied-dispersion fixed Wald/LRT replacement refit, primitive expanded beta-prior Wald replacement refit, and limited native Wald/LRT/contrast refit. |
 | Independent filtering | BaseMean-driven filtered BH and DESeq2-shaped lowess threshold selection. |
 | Dispersion gene estimates | Linear-mu and GLM-mu foundations, rough/moments starts, Cox-Reid, Armijo, grid fallback. |
 | Dispersion trends | Parametric, mean, and initial pure-Rust local trends. |
@@ -81,7 +83,8 @@ Still missing:
 
 Still missing:
 
-- expanded model-matrix beta-prior averaging and high-level workflow plumbing,
+- higher-level beta-prior workflow plumbing around primitive expanded-model
+  averaging and replacement refits,
 - broader validation of the new bounded optim fallback against DESeq2 rows that
   actually require backup fitting,
 - complete weighted low-level `fitNbinomGLMs` behavior for rows DESeq2 marks
@@ -102,10 +105,15 @@ Still missing:
 
 Still missing:
 
-- full Cook's replacement-triggered refit for beta-prior and wrapper-object paths,
-- all beta-prior interactions,
-- full metadata preservation around replacement counts and final result tables,
-- automatic formula-aware low-count Cook's heuristic selection.
+- full Cook's replacement-triggered refit for wrapper-object paths,
+- complete Bioconductor assay and object metadata around beta-prior
+  replacement refits,
+- high-level metadata preservation around replacement counts and final result
+  tables beyond the implemented primitive replacement/refit metadata and assay
+  exports,
+- broader formula-aware low-count Cook's heuristic selection outside the
+  currently gated supplied-dispersion fixed and limited GLM-mu two-level
+  factor result/replacement-refit routes.
 
 ### Transformations And Secondary APIs
 

@@ -163,6 +163,20 @@ rows.
 Both commands accept `--cooks-cutoff`, `--disable-cooks-cutoff`,
 `--disable-independent-filtering`, `--independent-filtering-alpha`, and
 `--independent-filtering-theta` for DESeq2-style result filtering control.
+Result metadata sidecars are available with `--result-column-metadata-output`
+and `--result-table-metadata-output`. Independent-filtering sidecars are
+available with `--independent-filter-metadata-output`,
+`--independent-filter-num-rej-output`, and
+`--independent-filter-lowess-output`; these require independent filtering to
+be enabled.
+They can also write optional Cook's sidecar tables: `--cooks-distance-output`
+for the Cook's distance matrix, `--cooks-replacement-metadata-output` for
+replacement/refit scalar metadata, `--cooks-replacement-row-metadata-output`
+for row-level replacement/refit metadata, `--cooks-replaced-counts-output` for
+replacement counts, `--cooks-candidate-replacement-counts-output` for
+candidate replacement counts, and `--cooks-outlier-cells-output` for the
+logical outlier-cell assay. Replacement sidecars require Cook's cutoff to be
+enabled so the replacement/refit branch runs.
 Formula construction, wrapper metadata preservation, and unsupported fit types
 remain outside the CLI for now. The `lrt` command compares the full design
 against the supplied reduced numeric design matrix.

@@ -187,11 +187,17 @@ reference; no DESeq2 source is vendored or translated line by line.
   selected coefficients and numeric contrasts.
 - [x] Size-factor, normalization-factor, and optional observation-weight inputs
   for primitive expanded beta-prior fit-and-Wald-results workflows.
+- [x] Primitive size-factor and normalization-factor expanded beta-prior Wald
+  Cook's replacement-refit helpers for selected coefficients and numeric
+  contrasts.
 - [x] Primitive one-factor expanded design construction from sample labels,
   including expanded design, treatment-style reported design, and coefficient
   groups.
 - [x] One-factor expanded beta-prior fit-and-Wald-results helpers that own
   design construction before running coefficient or numeric-contrast workflows.
+- [x] One-factor expanded beta-prior Cook's replacement-refit helpers that own
+  design construction before running selected-coefficient or numeric-contrast
+  workflows with size-factor or normalization-factor offsets.
 - [x] Primitive additive expanded design construction for categorical factors
   and numeric covariates in `~ factor1 + factor2 + numeric1 + ...` terms.
 - [x] Primitive factor-by-factor interaction construction for additive expanded
@@ -227,16 +233,29 @@ reference; no DESeq2 source is vendored or translated line by line.
   vectors beside formula-expanded designs.
 - [x] Additive-factor expanded beta-prior fit-and-Wald-results helpers that own
   design construction before running coefficient or numeric-contrast workflows.
+- [x] Additive-factor expanded beta-prior Cook's replacement-refit helpers that
+  own design construction before running selected-coefficient or
+  numeric-contrast replacement workflows with size-factor or
+  normalization-factor offsets.
 - [x] Formula-driven expanded beta-prior fit-and-Wald-results helpers for the
   supported primitive formula subset.
+- [x] Formula-driven expanded beta-prior Cook's replacement-refit helpers for
+  the supported primitive formula subset.
 - [x] Wire primitive formula offsets into formula-driven expanded beta-prior
   Wald coefficient and contrast workflows through size-factor and
   normalization-factor GLM offsets.
+- [x] Wire primitive formula offsets into formula-driven expanded beta-prior
+  Cook's replacement-refit workflows through normalization-factor replacement
+  paths.
+- [x] Preserve optional observation weights through primitive expanded
+  beta-prior replacement-count refits.
 - [ ] Orthogonal `poly()`, splines, arbitrary R expression transforms, and
   complete formula-aware expanded model matrix construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.
+- [x] Original-test coverage for `useT=TRUE` threshold alternatives and novel
+  numeric contrasts using t-distribution tails.
 - [x] Selected-coefficient LFC-threshold Wald alternatives for the current
   primitive matrix result path.
 - [x] Public selected-coefficient Wald wrapper over the implemented
@@ -494,6 +513,11 @@ reference; no DESeq2 source is vendored or translated line by line.
   cleanup.
 - [x] Reject standalone CLI sample-level contrast files unless they accompany
   a complete factor-level contrast request.
+- [x] Add optional CLI Cook's sidecar outputs for native Wald/LRT: Cook's
+  distance matrices and replacement/refit metadata, replacement counts,
+  candidate counts, and outlier-cell masks.
+- [x] Add CLI result metadata and independent-filter sidecar exports for Wald
+  and LRT.
 - [x] Allow top-level builder LRT workflows to store a reduced design and route
   `fit`, `fit_with_results`, named coefficients, numeric contrasts,
   coefficient-name contrasts, and factor-level contrasts through implemented
@@ -505,6 +529,9 @@ reference; no DESeq2 source is vendored or translated line by line.
   colData/formula-aware factor-level semantics, complete coefficient-name
   cleanup, and contrast-aware Cook's/refit edge cases.
 - [x] Initial Cook's distance and `maxCooks` diagnostics.
+- [x] TSV exports for Cook's diagnostics: distance assay, row-level
+  `maxCooks` and robust dispersion, and sample-level `samplesForCooks`
+  eligibility.
 - [x] Cook's outlier p-value filtering.
 - [x] Explicit primitive helper for DESeq2's two-group low-count Cook's
   heuristic, to be called only when caller or future-wrapper formula metadata
@@ -514,6 +541,20 @@ reference; no DESeq2 source is vendored or translated line by line.
   replaceable-sample mask, and `replace` flags.
 - [x] Replacement-refit planning metadata: replacement-count base metadata,
   `nrefit`, `refitReplace`, `newAllZero`, and post-refit `maxCooks` masking.
+- [x] Compact scalar metadata summaries for Cook's replacement/refit plans:
+  refit counts, refit-row counts, new-all-zero rows, outlier/replaced cell
+  counts, replaceable samples, and the refit-branch decision.
+- [x] TSV exports for Cook's replacement/refit assays and row metadata:
+  replacement counts, candidate replacement counts, outlier-cell masks,
+  replacement flags, refit rows, replacement base metadata, and post-refit
+  `maxCooks`.
+- [x] Limited Cook's replacement-refit path for supplied-dispersion fixed
+  Wald/LRT: selected coefficients, primitive numeric/named contrasts, and
+  caller-supplied factor-level contrasts reuse supplied dispersions for
+  original and replacement-count refits.
+- [x] Limited Cook's replacement-refit path for primitive expanded beta-prior
+  Wald selected-coefficient and numeric-contrast workflows using size-factor
+  or normalization-factor offsets.
 - [x] Limited Cook's replacement-refit path for GLM-mu native Wald and LRT:
   original fit, replacement counts, replacement-count refit with original size
   factors, `refitReplace` merge, `newAllZero` result clearing, and final
@@ -527,9 +568,13 @@ reference; no DESeq2 source is vendored or translated line by line.
   LRT p-values.
 - [x] Top-level GLM-mu Wald/LRT result helpers for limited Cook's replacement
   refit, including default coefficient and primitive contrast result routes.
+- [x] Apply DESeq2's two-group low-count Cook's heuristic automatically for
+  supplied-dispersion fixed and limited GLM-mu factor-level result routes, plus
+  limited GLM-mu replacement-refit routes, when caller-supplied sample levels
+  prove the contrast is a single two-level condition.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
-  refit for beta priors, wrapper object metadata, and remaining contrast edge
-  cases.
+  refit for high-level wrapper object metadata, high-level Bioconductor assay
+  attachment, and remaining contrast edge cases.
 - [ ] Full formula-aware outlier handling and future wrapper integration
   without DESeq2 runtime fallback.
 - [x] Initial independent filtering.

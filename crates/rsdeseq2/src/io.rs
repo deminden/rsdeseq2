@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use csv::{ReaderBuilder, WriterBuilder};
 
+use crate::cooks::{CooksOutput, CooksRefitPlan};
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::diagnostics::{
@@ -1088,6 +1089,264 @@ pub fn write_base_metadata_tsv(
     Ok(())
 }
 
+/// Write the Cook's distance assay to a tab-delimited numeric matrix.
+///
+/// Missing/non-finite Cook's distances are written as `NA`, matching R-style
+/// diagnostic table exports.
+pub fn write_cooks_distance_matrix_tsv(
+    path: impl AsRef<Path>,
+    gene_names: Option<&[String]>,
+    sample_names: Option<&[String]>,
+    cooks: &RowMajorMatrix<f64>,
+) -> Result<(), DeseqError> {
+    write_optional_numeric_matrix_tsv(path, gene_names, sample_names, cooks)
+}
+
+/// Write the Cook's distance assay from a full Cook's diagnostic output.
+///
+/// Missing/non-finite Cook's distances are written as `NA`, matching R-style
+/// diagnostic table exports.
+pub fn write_cooks_distance_tsv(
+    path: impl AsRef<Path>,
+    gene_names: Option<&[String]>,
+    sample_names: Option<&[String]>,
+    cooks: &CooksOutput,
+) -> Result<(), DeseqError> {
+    write_optional_numeric_matrix_tsv(path, gene_names, sample_names, &cooks.cooks)
+}
+
+/// Write row-level Cook's diagnostic metadata to a tab-delimited table.
+pub fn write_cooks_row_metadata_tsv(
+    path: impl AsRef<Path>,
+    gene_names: Option<&[String]>,
+    cooks: &CooksOutput,
+) -> Result<(), DeseqError> {
+    validate_optional_names(
+        "Cook's row metadata gene names",
+        gene_names,
+        cooks.cooks.n_rows(),
+    )?;
+    if cooks.max_cooks.len() != cooks.cooks.n_rows() {
+        return Err(invalid_dimensions(
+            "Cook's row metadata maxCooks rows",
+            cooks.cooks.n_rows(),
+            cooks.max_cooks.len(),
+        ));
+    }
+    if cooks.robust_dispersion.len() != cooks.cooks.n_rows() {
+        return Err(invalid_dimensions(
+            "Cook's row metadata robust dispersion rows",
+            cooks.cooks.n_rows(),
+            cooks.robust_dispersion.len(),
+        ));
+    }
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(["gene", "maxCooks", "cooksRobustDispersion"])?;
+    for gene in 0..cooks.cooks.n_rows() {
+        writer.write_record([
+            matrix_row_name(gene_names, gene, "gene"),
+            format_optional_finite_or_na(cooks.max_cooks[gene]),
+            format_finite_or_na(cooks.robust_dispersion[gene]),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// Write sample-level Cook's diagnostic metadata to a tab-delimited table.
+pub fn write_cooks_sample_metadata_tsv(
+    path: impl AsRef<Path>,
+    sample_names: Option<&[String]>,
+    cooks: &CooksOutput,
+) -> Result<(), DeseqError> {
+    validate_optional_names(
+        "Cook's sample metadata sample names",
+        sample_names,
+        cooks.cooks.n_cols(),
+    )?;
+    if cooks.samples_for_cooks.len() != cooks.cooks.n_cols() {
+        return Err(invalid_dimensions(
+            "Cook's sample metadata samplesForCooks",
+            cooks.cooks.n_cols(),
+            cooks.samples_for_cooks.len(),
+        ));
+    }
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(["sample", "samplesForCooks"])?;
+    for sample in 0..cooks.cooks.n_cols() {
+        writer.write_record([
+            matrix_sample_name(sample_names, sample, "sample"),
+            format_r_logical(cooks.samples_for_cooks[sample]),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// Write Cook's replacement-count assay to a tab-delimited count matrix.
+pub fn write_cooks_replaced_counts_tsv(
+    path: impl AsRef<Path>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<(), DeseqError> {
+    write_count_matrix_tsv(path, &refit_plan.replacement.replaced_counts)
+}
+
+/// Write Cook's candidate replacement-count assay to a tab-delimited count matrix.
+pub fn write_cooks_candidate_replacement_counts_tsv(
+    path: impl AsRef<Path>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<(), DeseqError> {
+    write_count_matrix_tsv(path, &refit_plan.replacement.candidate_replacement_counts)
+}
+
+/// Write per-cell Cook's outlier flags to a tab-delimited logical matrix.
+pub fn write_cooks_outlier_cells_tsv(
+    path: impl AsRef<Path>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<(), DeseqError> {
+    write_logical_matrix_tsv(
+        path,
+        refit_plan.replacement.replaced_counts.gene_names(),
+        refit_plan.replacement.replaced_counts.sample_names(),
+        &refit_plan.replacement.outlier_cells,
+    )
+}
+
+/// Write row-level Cook's replacement/refit metadata to a tab-delimited table.
+pub fn write_cooks_replacement_row_metadata_tsv(
+    path: impl AsRef<Path>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<(), DeseqError> {
+    let n_rows = refit_plan.replacement.replaced_counts.n_genes();
+    validate_cooks_refit_plan_rows(refit_plan, n_rows)?;
+    let refit_rows = refit_plan
+        .refit_rows
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
+    let new_all_zero_rows = refit_plan
+        .new_all_zero_rows
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record([
+        "gene",
+        "replace",
+        "refitReplace",
+        "newAllZero",
+        "replacedAllZero",
+        "replacedBaseMean",
+        "replacedBaseVar",
+        "postRefitMaxCooks",
+    ])?;
+    for gene in 0..n_rows {
+        writer.write_record([
+            matrix_row_name(
+                refit_plan.replacement.replaced_counts.gene_names(),
+                gene,
+                "gene",
+            ),
+            format_optional_r_logical(refit_plan.replacement.replace[gene]),
+            format_r_logical(refit_rows.contains(&gene)),
+            format_r_logical(new_all_zero_rows.contains(&gene)),
+            format_r_logical(refit_plan.replaced_all_zero[gene]),
+            format_finite_or_na(refit_plan.replaced_base_mean[gene]),
+            format_finite_or_na(refit_plan.replaced_base_var[gene]),
+            format_optional_finite_or_na(refit_plan.post_refit_max_cooks[gene]),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn write_logical_matrix_tsv(
+    path: impl AsRef<Path>,
+    gene_names: Option<&[String]>,
+    sample_names: Option<&[String]>,
+    matrix: &RowMajorMatrix<bool>,
+) -> Result<(), DeseqError> {
+    validate_optional_names("logical matrix gene names", gene_names, matrix.n_rows())?;
+    validate_optional_names("logical matrix sample names", sample_names, matrix.n_cols())?;
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(matrix_header(sample_names, matrix.n_cols(), "sample"))?;
+    for gene in 0..matrix.n_rows() {
+        let mut record = Vec::with_capacity(matrix.n_cols() + 1);
+        record.push(matrix_row_name(gene_names, gene, "gene"));
+        record.extend(matrix.row(gene)?.iter().copied().map(format_r_logical));
+        writer.write_record(&record)?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn write_optional_numeric_matrix_tsv(
+    path: impl AsRef<Path>,
+    gene_names: Option<&[String]>,
+    sample_names: Option<&[String]>,
+    matrix: &RowMajorMatrix<f64>,
+) -> Result<(), DeseqError> {
+    validate_optional_names("numeric matrix gene names", gene_names, matrix.n_rows())?;
+    validate_optional_names("numeric matrix sample names", sample_names, matrix.n_cols())?;
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(matrix_header(sample_names, matrix.n_cols(), "sample"))?;
+    for gene in 0..matrix.n_rows() {
+        let mut record = Vec::with_capacity(matrix.n_cols() + 1);
+        record.push(matrix_row_name(gene_names, gene, "gene"));
+        record.extend(matrix.row(gene)?.iter().copied().map(format_finite_or_na));
+        writer.write_record(&record)?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn validate_cooks_refit_plan_rows(
+    refit_plan: &CooksRefitPlan,
+    expected_rows: usize,
+) -> Result<(), DeseqError> {
+    if refit_plan.replacement.replace.len() != expected_rows {
+        return Err(invalid_dimensions(
+            "Cook's replacement replace rows",
+            expected_rows,
+            refit_plan.replacement.replace.len(),
+        ));
+    }
+    if refit_plan.replaced_all_zero.len() != expected_rows {
+        return Err(invalid_dimensions(
+            "Cook's replacement all-zero rows",
+            expected_rows,
+            refit_plan.replaced_all_zero.len(),
+        ));
+    }
+    if refit_plan.replaced_base_mean.len() != expected_rows {
+        return Err(invalid_dimensions(
+            "Cook's replacement baseMean rows",
+            expected_rows,
+            refit_plan.replaced_base_mean.len(),
+        ));
+    }
+    if refit_plan.replaced_base_var.len() != expected_rows {
+        return Err(invalid_dimensions(
+            "Cook's replacement baseVar rows",
+            expected_rows,
+            refit_plan.replaced_base_var.len(),
+        ));
+    }
+    if refit_plan.post_refit_max_cooks.len() != expected_rows {
+        return Err(invalid_dimensions(
+            "Cook's replacement post-refit maxCooks rows",
+            expected_rows,
+            refit_plan.post_refit_max_cooks.len(),
+        ));
+    }
+    Ok(())
+}
+
 fn matrix_header(
     sample_names: Option<&[String]>,
     n_samples: usize,
@@ -1171,12 +1430,24 @@ fn format_finite_or_na(value: f64) -> String {
     }
 }
 
+fn format_optional_finite_or_na(value: Option<f64>) -> String {
+    value
+        .map(format_finite_or_na)
+        .unwrap_or_else(|| "NA".to_string())
+}
+
 fn format_r_logical(value: bool) -> String {
     if value {
         "TRUE".to_string()
     } else {
         "FALSE".to_string()
     }
+}
+
+fn format_optional_r_logical(value: Option<bool>) -> String {
+    value
+        .map(format_r_logical)
+        .unwrap_or_else(|| "NA".to_string())
 }
 
 /// Write an assembled DESeq2-shaped result table to a tab-delimited file.
@@ -1348,6 +1619,20 @@ pub fn write_deseq_result_table_metadata_tsv(
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["name", "value"])?;
     for entry in results.metadata.scalar_metadata() {
+        writer.write_record([entry.name, entry.value])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// Write Cook's replacement/refit scalar metadata to a tab-delimited key/value file.
+pub fn write_cooks_replacement_metadata_tsv(
+    path: impl AsRef<Path>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<(), DeseqError> {
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(["name", "value"])?;
+    for entry in refit_plan.scalar_metadata() {
         writer.write_record([entry.name, entry.value])?;
     }
     writer.flush()?;
@@ -2680,6 +2965,186 @@ mod tests {
                 "gene\tdispGeneEst\tdispGeneIter\tdispOutlier\tmaxCooks\n",
                 "gene_a\tNA\t0\tFALSE\tNA\n",
                 "gene_b\t0.2\t3\tTRUE\t4.5\n"
+            )
+        );
+    }
+
+    #[test]
+    fn write_cooks_diagnostics_tsv_writes_matrix_and_metadata() {
+        let cooks_path = unique_test_path("cooks_distance.tsv");
+        let row_path = unique_test_path("cooks_row_metadata.tsv");
+        let sample_path = unique_test_path("cooks_sample_metadata.tsv");
+        let gene_names = vec!["gene_a".to_string(), "gene_b".to_string()];
+        let sample_names = vec!["sample_1".to_string(), "sample_2".to_string()];
+        let cooks = CooksOutput {
+            cooks: RowMajorMatrix::from_row_major(2, 2, vec![0.5, f64::NAN, 2.0, 4.0]).unwrap(),
+            max_cooks: vec![None, Some(4.0)],
+            robust_dispersion: vec![0.04, 0.25],
+            samples_for_cooks: vec![true, false],
+        };
+
+        write_cooks_distance_tsv(&cooks_path, Some(&gene_names), Some(&sample_names), &cooks)
+            .unwrap();
+        write_cooks_row_metadata_tsv(&row_path, Some(&gene_names), &cooks).unwrap();
+        write_cooks_sample_metadata_tsv(&sample_path, Some(&sample_names), &cooks).unwrap();
+
+        let cooks_text = fs::read_to_string(&cooks_path).unwrap();
+        let row_text = fs::read_to_string(&row_path).unwrap();
+        let sample_text = fs::read_to_string(&sample_path).unwrap();
+        let _ = fs::remove_file(&cooks_path);
+        let _ = fs::remove_file(&row_path);
+        let _ = fs::remove_file(&sample_path);
+
+        assert_eq!(
+            cooks_text,
+            concat!(
+                "gene\tsample_1\tsample_2\n",
+                "gene_a\t0.5\tNA\n",
+                "gene_b\t2\t4\n",
+            )
+        );
+        assert_eq!(
+            row_text,
+            concat!(
+                "gene\tmaxCooks\tcooksRobustDispersion\n",
+                "gene_a\tNA\t0.04\n",
+                "gene_b\t4\t0.25\n",
+            )
+        );
+        assert_eq!(
+            sample_text,
+            concat!(
+                "sample\tsamplesForCooks\n",
+                "sample_1\tTRUE\n",
+                "sample_2\tFALSE\n",
+            )
+        );
+    }
+
+    #[test]
+    fn write_cooks_diagnostics_tsv_rejects_misaligned_metadata() {
+        let path = unique_test_path("bad_cooks_metadata.tsv");
+        let mut cooks = CooksOutput {
+            cooks: RowMajorMatrix::from_row_major(2, 2, vec![0.5, 1.0, 2.0, 4.0]).unwrap(),
+            max_cooks: vec![Some(1.0)],
+            robust_dispersion: vec![0.04, 0.25],
+            samples_for_cooks: vec![true, false],
+        };
+
+        assert!(write_cooks_row_metadata_tsv(&path, None, &cooks).is_err());
+        cooks.max_cooks = vec![Some(1.0), Some(4.0)];
+        cooks.robust_dispersion = vec![0.04];
+        assert!(write_cooks_row_metadata_tsv(&path, None, &cooks).is_err());
+        cooks.robust_dispersion = vec![0.04, 0.25];
+        cooks.samples_for_cooks = vec![true];
+        assert!(write_cooks_sample_metadata_tsv(&path, None, &cooks).is_err());
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn write_cooks_replacement_metadata_tsv_writes_scalar_summary() {
+        let path = unique_test_path("cooks_replacement_metadata.tsv");
+        let replaced_path = unique_test_path("cooks_replaced_counts.tsv");
+        let candidate_path = unique_test_path("cooks_candidate_counts.tsv");
+        let outlier_path = unique_test_path("cooks_outlier_cells.tsv");
+        let row_metadata_path = unique_test_path("cooks_replacement_row_metadata.tsv");
+        let counts = CountMatrix::from_row_major_u32(
+            2,
+            4,
+            vec![
+                10, 30, 20, 50, //
+                0, 0, 0, 0,
+            ],
+        )
+        .unwrap();
+        let size_factors = vec![1.0, 1.0, 1.0, 1.0];
+        let normalized = crate::normalization::normalized_counts(&counts, &size_factors).unwrap();
+        let cooks = RowMajorMatrix::from_row_major(
+            2,
+            4,
+            vec![
+                0.0, 9.0, 0.0, 0.0, //
+                8.0, 0.0, 0.0, 0.0,
+            ],
+        )
+        .unwrap();
+        let design = DesignMatrix::from_row_major(4, 1, vec![1.0, 1.0, 1.0, 1.0], None).unwrap();
+        let plan = crate::cooks::prepare_cooks_replacement_refit(
+            &counts,
+            &normalized,
+            &size_factors,
+            None,
+            &cooks,
+            &design,
+            &crate::cooks::CooksReplacementOptions {
+                trim: 0.25,
+                cooks_cutoff: 5.0,
+                min_replicates: 3,
+                which_samples: None,
+            },
+        )
+        .unwrap();
+
+        write_cooks_replacement_metadata_tsv(&path, &plan).unwrap();
+        write_cooks_replaced_counts_tsv(&replaced_path, &plan).unwrap();
+        write_cooks_candidate_replacement_counts_tsv(&candidate_path, &plan).unwrap();
+        write_cooks_outlier_cells_tsv(&outlier_path, &plan).unwrap();
+        write_cooks_replacement_row_metadata_tsv(&row_metadata_path, &plan).unwrap();
+
+        let text = fs::read_to_string(&path).unwrap();
+        let replaced = fs::read_to_string(&replaced_path).unwrap();
+        let candidate = fs::read_to_string(&candidate_path).unwrap();
+        let outlier = fs::read_to_string(&outlier_path).unwrap();
+        let row_metadata = fs::read_to_string(&row_metadata_path).unwrap();
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(&replaced_path);
+        let _ = fs::remove_file(&candidate_path);
+        let _ = fs::remove_file(&outlier_path);
+        let _ = fs::remove_file(&row_metadata_path);
+        assert_eq!(
+            text,
+            concat!(
+                "name\tvalue\n",
+                "nRefit\t2\n",
+                "nRefitRows\t1\n",
+                "nNewAllZero\t1\n",
+                "nOutlierCells\t2\n",
+                "nReplacedCells\t2\n",
+                "nReplaceableSamples\t4\n",
+                "shouldRefit\ttrue\n",
+            )
+        );
+        assert_eq!(
+            replaced,
+            concat!(
+                "gene\tsample1\tsample2\tsample3\tsample4\n",
+                "gene1\t10\t25\t20\t50\n",
+                "gene2\t0\t0\t0\t0\n",
+            )
+        );
+        assert_eq!(
+            candidate,
+            concat!(
+                "gene\tsample1\tsample2\tsample3\tsample4\n",
+                "gene1\t25\t25\t25\t25\n",
+                "gene2\t0\t0\t0\t0\n",
+            )
+        );
+        assert_eq!(
+            outlier,
+            concat!(
+                "gene\tsample1\tsample2\tsample3\tsample4\n",
+                "gene1\tFALSE\tTRUE\tFALSE\tFALSE\n",
+                "gene2\tTRUE\tFALSE\tFALSE\tFALSE\n",
+            )
+        );
+        assert_eq!(
+            row_metadata,
+            concat!(
+                "gene\treplace\trefitReplace\tnewAllZero\treplacedAllZero\t",
+                "replacedBaseMean\treplacedBaseVar\tpostRefitMaxCooks\n",
+                "gene1\tTRUE\tTRUE\tFALSE\tFALSE\t26.25\t289.58333333333337\tNA\n",
+                "gene2\tTRUE\tFALSE\tTRUE\tTRUE\t0\t0\tNA\n",
             )
         );
     }

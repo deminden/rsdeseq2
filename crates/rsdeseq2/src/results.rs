@@ -1,3 +1,7 @@
+use crate::cooks::{
+    calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
+    CooksReplacementOptions,
+};
 use crate::core::CountMatrix;
 use crate::design::{
     expanded_factor_design, expanded_formula_design_with_offsets, DesignMatrix,
@@ -18,6 +22,7 @@ use crate::glm::{
 use crate::independent_filtering::IndependentFilteringOutput;
 use crate::matrix::RowMajorMatrix;
 use crate::multiple_testing::bh_adjust;
+use crate::normalization::{normalized_counts, normalized_counts_with_factors};
 use crate::options::{CooksCutoff, TestType};
 use statrs::distribution::{ContinuousCDF, FisherSnedecor};
 
@@ -443,6 +448,21 @@ pub struct ExpandedBetaPriorWaldResults {
     pub results: DeseqResults,
 }
 
+/// Expanded beta-prior Wald result workflow with Cook's replacement-refit metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedBetaPriorWaldReplacementResults {
+    /// Original beta-prior fit and result rows before count replacement.
+    pub original: ExpandedBetaPriorWaldResults,
+    /// Cook's distances calculated from the original collapsed prior fit.
+    pub cooks: CooksOutput,
+    /// Count-replacement and refit plan derived from original Cook's distances.
+    pub refit_plan: CooksRefitPlan,
+    /// Optional beta-prior refit on replacement counts.
+    pub refit: Option<ExpandedBetaPriorWaldResults>,
+    /// Final merged result rows after replacement refit and Cook's filtering.
+    pub results: DeseqResults,
+}
+
 /// One-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedFactorBetaPriorWaldResults {
@@ -454,6 +474,15 @@ pub struct ExpandedFactorBetaPriorWaldResults {
     pub results: DeseqResults,
 }
 
+/// One-factor expanded beta-prior Wald replacement workflow with generated design metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFactorBetaPriorWaldReplacementResults {
+    /// Generated expanded/standard one-factor design surfaces.
+    pub design: ExpandedFactorDesign,
+    /// Replacement-refit workflow output for the generated design.
+    pub replacement: ExpandedBetaPriorWaldReplacementResults,
+}
+
 /// Additive-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedAdditiveBetaPriorWaldResults {
@@ -463,6 +492,15 @@ pub struct ExpandedAdditiveBetaPriorWaldResults {
     pub fit: ExpandedModelBetaPriorGlmFit,
     /// Wald result table built from the collapsed prior fit.
     pub results: DeseqResults,
+}
+
+/// Additive expanded beta-prior Wald replacement workflow with generated design metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedAdditiveBetaPriorWaldReplacementResults {
+    /// Generated expanded/standard additive-factor design surfaces.
+    pub design: ExpandedAdditiveFactorDesign,
+    /// Replacement-refit workflow output for the generated design.
+    pub replacement: ExpandedBetaPriorWaldReplacementResults,
 }
 
 /// One row of a future DESeq2-like results table.
@@ -789,6 +827,129 @@ pub fn fit_expanded_beta_prior_wald_contrast_results(
     Ok(ExpandedBetaPriorWaldResults { fit, results })
 }
 
+/// Fit an expanded beta-prior Wald coefficient workflow with Cook's replacement refit.
+///
+/// Cook's distances are calculated from the collapsed prior fit on the reported
+/// standard-design surface. Replacement counts are then refit through the same
+/// expanded beta-prior workflow with the original size factors and supplied
+/// dispersions.
+pub fn fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+    input: ExpandedBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedBetaPriorWaldReplacementResults, DeseqError> {
+    let original = fit_expanded_beta_prior_wald_results(input.clone(), coefficient)?;
+    let cooks = beta_prior_cooks_output(input.counts, input.size_factors, &original.fit)?;
+    let normalized = normalized_counts(input.counts, input.size_factors)?;
+    let refit_plan = prepare_cooks_replacement_refit(
+        input.counts,
+        &normalized,
+        input.size_factors,
+        None,
+        &cooks.cooks,
+        input.design.standard_design,
+        replacement_options,
+    )?;
+
+    let refit = if refit_plan.should_refit {
+        Some(fit_expanded_beta_prior_wald_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: &refit_plan.replacement.replaced_counts,
+                design: input.design,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: &refit_plan.replaced_base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+        )?)
+    } else {
+        None
+    };
+
+    let mut original_results = original.results.clone();
+    attach_cooks_to_results(&mut original_results, &cooks.max_cooks)?;
+    let mut results = merge_beta_prior_replacement_results(
+        &original_results,
+        refit.as_ref().map(|value| &value.results),
+        &refit_plan,
+    )?;
+    apply_cooks_cutoff(&mut results, Some(replacement_options.cooks_cutoff))?;
+
+    Ok(ExpandedBetaPriorWaldReplacementResults {
+        original: ExpandedBetaPriorWaldResults {
+            fit: original.fit,
+            results: original_results,
+        },
+        cooks,
+        refit_plan,
+        refit,
+        results,
+    })
+}
+
+/// Fit an expanded beta-prior Wald contrast workflow with Cook's replacement refit.
+pub fn fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
+    input: ExpandedBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedBetaPriorWaldReplacementResults, DeseqError> {
+    let original = fit_expanded_beta_prior_wald_contrast_results(input.clone(), contrast)?;
+    let cooks = beta_prior_cooks_output(input.counts, input.size_factors, &original.fit)?;
+    let normalized = normalized_counts(input.counts, input.size_factors)?;
+    let refit_plan = prepare_cooks_replacement_refit(
+        input.counts,
+        &normalized,
+        input.size_factors,
+        None,
+        &cooks.cooks,
+        input.design.standard_design,
+        replacement_options,
+    )?;
+
+    let refit = if refit_plan.should_refit {
+        Some(fit_expanded_beta_prior_wald_contrast_results(
+            ExpandedBetaPriorWaldResultsInput {
+                counts: &refit_plan.replacement.replaced_counts,
+                design: input.design,
+                size_factors: input.size_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: &refit_plan.replaced_base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+        )?)
+    } else {
+        None
+    };
+
+    let mut original_results = original.results.clone();
+    attach_cooks_to_results(&mut original_results, &cooks.max_cooks)?;
+    let mut results = merge_beta_prior_replacement_results(
+        &original_results,
+        refit.as_ref().map(|value| &value.results),
+        &refit_plan,
+    )?;
+    apply_cooks_cutoff(&mut results, Some(replacement_options.cooks_cutoff))?;
+
+    Ok(ExpandedBetaPriorWaldReplacementResults {
+        original: ExpandedBetaPriorWaldResults {
+            fit: original.fit,
+            results: original_results,
+        },
+        cooks,
+        refit_plan,
+        refit,
+        results,
+    })
+}
+
 /// Fit an expanded beta-prior model with normalization factors and assemble Wald rows.
 pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
     input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
@@ -843,6 +1004,145 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_
         Some(input.dispersions),
     )?;
     Ok(ExpandedBetaPriorWaldResults { fit, results })
+}
+
+/// Fit a normalization-factor expanded beta-prior Wald coefficient workflow with Cook's replacement refit.
+pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedBetaPriorWaldReplacementResults, DeseqError> {
+    let original = fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+        input.clone(),
+        coefficient,
+    )?;
+    let cooks = beta_prior_normalized_cooks_output(
+        input.counts,
+        input.normalization_factors,
+        &original.fit,
+    )?;
+    let normalized = normalized_counts_with_factors(input.counts, input.normalization_factors)?;
+    let replacement_size_factors = vec![1.0; input.counts.n_samples()];
+    let refit_plan = prepare_cooks_replacement_refit(
+        input.counts,
+        &normalized,
+        &replacement_size_factors,
+        Some(input.normalization_factors),
+        &cooks.cooks,
+        input.design.standard_design,
+        replacement_options,
+    )?;
+
+    let refit = if refit_plan.should_refit {
+        Some(
+            fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: &refit_plan.replacement.replaced_counts,
+                    design: input.design,
+                    normalization_factors: input.normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: &refit_plan.replaced_base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                coefficient,
+            )?,
+        )
+    } else {
+        None
+    };
+
+    let mut original_results = original.results.clone();
+    attach_cooks_to_results(&mut original_results, &cooks.max_cooks)?;
+    let mut results = merge_beta_prior_replacement_results(
+        &original_results,
+        refit.as_ref().map(|value| &value.results),
+        &refit_plan,
+    )?;
+    apply_cooks_cutoff(&mut results, Some(replacement_options.cooks_cutoff))?;
+
+    Ok(ExpandedBetaPriorWaldReplacementResults {
+        original: ExpandedBetaPriorWaldResults {
+            fit: original.fit,
+            results: original_results,
+        },
+        cooks,
+        refit_plan,
+        refit,
+        results,
+    })
+}
+
+/// Fit a normalization-factor expanded beta-prior Wald contrast workflow with Cook's replacement refit.
+pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedBetaPriorWaldReplacementResults, DeseqError> {
+    let original =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+            input.clone(),
+            contrast,
+        )?;
+    let cooks = beta_prior_normalized_cooks_output(
+        input.counts,
+        input.normalization_factors,
+        &original.fit,
+    )?;
+    let normalized = normalized_counts_with_factors(input.counts, input.normalization_factors)?;
+    let replacement_size_factors = vec![1.0; input.counts.n_samples()];
+    let refit_plan = prepare_cooks_replacement_refit(
+        input.counts,
+        &normalized,
+        &replacement_size_factors,
+        Some(input.normalization_factors),
+        &cooks.cooks,
+        input.design.standard_design,
+        replacement_options,
+    )?;
+
+    let refit = if refit_plan.should_refit {
+        Some(
+            fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: &refit_plan.replacement.replaced_counts,
+                    design: input.design,
+                    normalization_factors: input.normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: &refit_plan.replaced_base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                contrast,
+            )?,
+        )
+    } else {
+        None
+    };
+
+    let mut original_results = original.results.clone();
+    attach_cooks_to_results(&mut original_results, &cooks.max_cooks)?;
+    let mut results = merge_beta_prior_replacement_results(
+        &original_results,
+        refit.as_ref().map(|value| &value.results),
+        &refit_plan,
+    )?;
+    apply_cooks_cutoff(&mut results, Some(replacement_options.cooks_cutoff))?;
+
+    Ok(ExpandedBetaPriorWaldReplacementResults {
+        original: ExpandedBetaPriorWaldResults {
+            fit: original.fit,
+            results: original_results,
+        },
+        cooks,
+        refit_plan,
+        refit,
+        results,
+    })
 }
 
 /// Build a one-factor expanded design, fit the beta-prior model, and assemble Wald rows.
@@ -913,6 +1213,70 @@ pub fn fit_expanded_factor_beta_prior_wald_contrast_results(
     })
 }
 
+/// Build a one-factor expanded design and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_factor_beta_prior_wald_results_with_cooks_replacement(
+    input: ExpandedFactorBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedFactorBetaPriorWaldReplacementResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let replacement = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        coefficient,
+        replacement_options,
+    )?;
+    Ok(ExpandedFactorBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Build a one-factor expanded design and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_factor_beta_prior_wald_contrast_results_with_cooks_replacement(
+    input: ExpandedFactorBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedFactorBetaPriorWaldReplacementResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let replacement = fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        contrast,
+        replacement_options,
+    )?;
+    Ok(ExpandedFactorBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
 /// Build a one-factor expanded design, use normalization factors, and assemble Wald rows.
 pub fn fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights(
     input: ExpandedFactorBetaPriorWaldNormalizedResultsInput<'_>,
@@ -978,6 +1342,72 @@ pub fn fit_expanded_factor_beta_prior_wald_contrast_results_with_normalization_f
         design,
         fit: fit_and_results.fit,
         results: fit_and_results.results,
+    })
+}
+
+/// Build a one-factor expanded design, use normalization factors, and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedFactorBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedFactorBetaPriorWaldReplacementResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let replacement =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+            replacement_options,
+        )?;
+    Ok(ExpandedFactorBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Build a one-factor expanded design, use normalization factors, and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_factor_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedFactorBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedFactorBetaPriorWaldReplacementResults, DeseqError> {
+    let design = expanded_factor_design(input.factor, input.sample_levels, input.reference)?;
+    let replacement =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+            replacement_options,
+        )?;
+    Ok(ExpandedFactorBetaPriorWaldReplacementResults {
+        design,
+        replacement,
     })
 }
 
@@ -1061,6 +1491,82 @@ pub fn fit_expanded_additive_beta_prior_wald_contrast_results(
     })
 }
 
+/// Build an additive-factor expanded design and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_additive_beta_prior_wald_results_with_cooks_replacement(
+    input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let replacement = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        coefficient,
+        replacement_options,
+    )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Build an additive-factor expanded design and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_additive_beta_prior_wald_contrast_results_with_cooks_replacement(
+    input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let replacement = fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        contrast,
+        replacement_options,
+    )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
 /// Build an additive-factor expanded design, use normalization factors, and assemble Wald rows.
 pub fn fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights(
     input: ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'_>,
@@ -1138,6 +1644,84 @@ pub fn fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization
         design,
         fit: fit_and_results.fit,
         results: fit_and_results.results,
+    })
+}
+
+/// Build an additive-factor expanded design, use normalization factors, and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let replacement =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+            replacement_options,
+        )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Build an additive-factor expanded design, use normalization factors, and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let design = crate::design::expanded_additive_design_with_all_interactions(
+        input.factors,
+        input.numeric_covariates,
+        input.interactions,
+        input.factor_numeric_interactions,
+        input.numeric_interactions,
+    )?;
+    let replacement =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors: input.normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+            replacement_options,
+        )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
     })
 }
 
@@ -1275,6 +1859,136 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results(
     })
 }
 
+/// Parse a primitive formula and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_formula_beta_prior_wald_results_with_cooks_replacement(
+    input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_factors =
+        formula_size_factor_offsets(input.counts, input.size_factors, &formula_design.offsets)?;
+    if let Some(normalization_factors) = offset_factors.as_ref() {
+        let replacement =
+            fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: input.counts,
+                    design: ExpandedModelBetaPriorDesignInput {
+                        expanded_design: &design.expanded_design,
+                        standard_design: &design.standard_design,
+                        coefficient_groups: &design.coefficient_groups,
+                    },
+                    normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: input.base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                coefficient,
+                replacement_options,
+            )?;
+        return Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+            design,
+            replacement,
+        });
+    }
+    let replacement = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        coefficient,
+        replacement_options,
+    )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Parse a primitive formula and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_cooks_replacement(
+    input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_factors =
+        formula_size_factor_offsets(input.counts, input.size_factors, &formula_design.offsets)?;
+    if let Some(normalization_factors) = offset_factors.as_ref() {
+        let replacement =
+            fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+                ExpandedBetaPriorWaldNormalizedResultsInput {
+                    counts: input.counts,
+                    design: ExpandedModelBetaPriorDesignInput {
+                        expanded_design: &design.expanded_design,
+                        standard_design: &design.standard_design,
+                        coefficient_groups: &design.coefficient_groups,
+                    },
+                    normalization_factors,
+                    weights: input.weights,
+                    dispersions: input.dispersions,
+                    base_mean: input.base_mean,
+                    disp_fit: input.disp_fit,
+                    gene_names: input.gene_names,
+                    options: input.options,
+                },
+                contrast,
+                replacement_options,
+            )?;
+        return Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+            design,
+            replacement,
+        });
+    }
+    let replacement = fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: input.counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &design.expanded_design,
+                standard_design: &design.standard_design,
+                coefficient_groups: &design.coefficient_groups,
+            },
+            size_factors: input.size_factors,
+            weights: input.weights,
+            dispersions: input.dispersions,
+            base_mean: input.base_mean,
+            disp_fit: input.disp_fit,
+            gene_names: input.gene_names,
+            options: input.options,
+        },
+        contrast,
+        replacement_options,
+    )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
 /// Parse a primitive formula, use normalization factors, and assemble Wald rows.
 pub fn fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights(
     input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
@@ -1369,6 +2083,98 @@ pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_
     })
 }
 
+/// Parse a primitive formula, use normalization factors, and run coefficient beta-prior Wald replacement refit.
+pub fn fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
+    coefficient: usize,
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_normalization_factors = formula_normalization_factor_offsets(
+        input.counts,
+        input.normalization_factors,
+        &formula_design.offsets,
+    )?;
+    let normalization_factors = offset_normalization_factors
+        .as_ref()
+        .unwrap_or(input.normalization_factors);
+    let replacement =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            coefficient,
+            replacement_options,
+        )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
+/// Parse a primitive formula, use normalization factors, and run contrast beta-prior Wald replacement refit.
+pub fn fit_expanded_formula_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+    input: ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'_>,
+    contrast: &[f64],
+    replacement_options: &CooksReplacementOptions,
+) -> Result<ExpandedAdditiveBetaPriorWaldReplacementResults, DeseqError> {
+    let formula_design = expanded_formula_design_with_offsets(
+        input.formula,
+        input.factors,
+        input.numeric_covariates,
+    )?;
+    let design = formula_design.design;
+    let offset_normalization_factors = formula_normalization_factor_offsets(
+        input.counts,
+        input.normalization_factors,
+        &formula_design.offsets,
+    )?;
+    let normalization_factors = offset_normalization_factors
+        .as_ref()
+        .unwrap_or(input.normalization_factors);
+    let replacement =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: input.counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors,
+                weights: input.weights,
+                dispersions: input.dispersions,
+                base_mean: input.base_mean,
+                disp_fit: input.disp_fit,
+                gene_names: input.gene_names,
+                options: input.options,
+            },
+            contrast,
+            replacement_options,
+        )?;
+    Ok(ExpandedAdditiveBetaPriorWaldReplacementResults {
+        design,
+        replacement,
+    })
+}
+
 fn formula_size_factor_offsets(
     counts: &CountMatrix,
     size_factors: &[f64],
@@ -1451,6 +2257,134 @@ fn formula_normalization_factor_offsets(
 
 fn formula_offsets_are_active(offsets: &[f64]) -> bool {
     offsets.iter().any(|value| *value != 0.0)
+}
+
+fn beta_prior_cooks_output(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    fit: &ExpandedModelBetaPriorGlmFit,
+) -> Result<CooksOutput, DeseqError> {
+    let normalized = normalized_counts(counts, size_factors)?;
+    calculate_cooks_distance(
+        counts,
+        &normalized,
+        &fit.prior_fit.mu,
+        &fit.prior_fit.hat_diagonal,
+        &fit.prior_fit.model_matrix,
+    )
+}
+
+fn beta_prior_normalized_cooks_output(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    fit: &ExpandedModelBetaPriorGlmFit,
+) -> Result<CooksOutput, DeseqError> {
+    let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
+    calculate_cooks_distance(
+        counts,
+        &normalized,
+        &fit.prior_fit.mu,
+        &fit.prior_fit.hat_diagonal,
+        &fit.prior_fit.model_matrix,
+    )
+}
+
+fn attach_cooks_to_results(
+    results: &mut DeseqResults,
+    max_cooks: &[Option<f64>],
+) -> Result<(), DeseqError> {
+    if max_cooks.len() != results.rows.len() {
+        return Err(invalid_dimensions(
+            "Cook's result rows",
+            results.rows.len(),
+            max_cooks.len(),
+        ));
+    }
+    for (row, max_cook) in results.rows.iter_mut().zip(max_cooks.iter().copied()) {
+        row.max_cooks = max_cook;
+        row.cooks_outlier = None;
+    }
+    Ok(())
+}
+
+fn merge_beta_prior_replacement_results(
+    original_results: &DeseqResults,
+    refit_results: Option<&DeseqResults>,
+    refit_plan: &CooksRefitPlan,
+) -> Result<DeseqResults, DeseqError> {
+    if original_results.rows.len() != refit_plan.replacement.replace.len() {
+        return Err(invalid_dimensions(
+            "beta-prior replacement result rows",
+            refit_plan.replacement.replace.len(),
+            original_results.rows.len(),
+        ));
+    }
+    if let Some(refit_results) = refit_results {
+        if refit_results.rows.len() != original_results.rows.len() {
+            return Err(invalid_dimensions(
+                "beta-prior replacement refit result rows",
+                original_results.rows.len(),
+                refit_results.rows.len(),
+            ));
+        }
+    }
+    if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
+        return Err(invalid_dimensions(
+            "beta-prior replacement baseMean rows",
+            original_results.rows.len(),
+            refit_plan.replaced_base_mean.len(),
+        ));
+    }
+    if refit_plan.post_refit_max_cooks.len() != original_results.rows.len() {
+        return Err(invalid_dimensions(
+            "beta-prior replacement maxCooks rows",
+            original_results.rows.len(),
+            refit_plan.post_refit_max_cooks.len(),
+        ));
+    }
+
+    let mut merged = original_results.clone();
+    for (gene, row) in merged.rows.iter_mut().enumerate() {
+        row.base_mean = refit_plan.replaced_base_mean[gene];
+        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+            row.max_cooks = refit_plan.post_refit_max_cooks[gene];
+            row.cooks_outlier = None;
+            row.filtered = None;
+        }
+    }
+
+    if let Some(refit_results) = refit_results {
+        for gene in refit_plan.refit_rows.iter().copied() {
+            merged.rows[gene] = refit_results.rows[gene].clone();
+            merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
+            merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
+            merged.rows[gene].cooks_outlier = None;
+            merged.rows[gene].filtered = None;
+        }
+    }
+
+    for gene in refit_plan.new_all_zero_rows.iter().copied() {
+        clear_replacement_all_zero_result(&mut merged.rows[gene]);
+        merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
+        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+            merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
+        }
+    }
+
+    merged.independent_filtering = None;
+    Ok(merged)
+}
+
+fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
+    row.log2_fold_change = None;
+    row.lfc_se = None;
+    row.stat = None;
+    row.pvalue = None;
+    row.padj = None;
+    row.dispersion = None;
+    row.converged = None;
+    row.cooks_outlier = None;
+    row.filtered = None;
 }
 
 fn formula_offset_scales(offsets: &[f64], n_samples: usize) -> Result<Vec<f64>, DeseqError> {

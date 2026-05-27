@@ -330,6 +330,243 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
 }
 
 #[test]
+fn fixed_dispersion_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32(1, 6, vec![1, 20, 21, 20, 20, 20]).unwrap();
+    let full = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let reduced = DesignMatrix::from_row_major(
+        6,
+        1,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec!["Intercept".into()]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "A", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (_fit, results) = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_factor_level_contrast(
+            &counts,
+            &full,
+            &reduced,
+            &[0.1],
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+
+    assert!(results.rows[0].max_cooks.unwrap() > 0.0);
+    assert_eq!(results.rows[0].cooks_outlier, Some(false));
+    assert!(results.rows[0].pvalue.is_some());
+}
+
+fn replacement_lrt_fixture() -> (
+    CountMatrix,
+    DesignMatrix,
+    DesignMatrix,
+    Vec<f64>,
+    CooksReplacementOptions,
+) {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        8,
+        vec![
+            0, 20, 1, 19, 2, 18, 3, 17, //
+            12, 28, 10, 30, 14, 26, 11, 29,
+        ],
+    )
+    .unwrap();
+    let full = DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let reduced = DesignMatrix::from_row_major(
+        8,
+        1,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec!["Intercept".into()]),
+    )
+    .unwrap();
+    let options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
+    };
+    (counts, full, reduced, vec![0.1, 0.1], options)
+}
+
+#[test]
+fn fixed_dispersion_lrt_cooks_replacement_refits_marked_rows() {
+    let (counts, full, reduced, dispersions, options) = replacement_lrt_fixture();
+
+    let output = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_with_cooks_replacement(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            1,
+            &options,
+        )
+        .unwrap();
+
+    assert!(output.refit_plan.n_refit > 0);
+    assert!(output.refit_plan.should_refit);
+    assert!(output.refit_fit.is_some());
+    assert!(output.refit_results.is_some());
+
+    let refit_results = output.refit_results.as_ref().unwrap();
+    for gene in output.refit_plan.refit_rows.iter().copied() {
+        assert_eq!(
+            output.results.rows[gene].stat,
+            refit_results.rows[gene].stat
+        );
+        assert_eq!(
+            output.results.rows[gene].pvalue,
+            refit_results.rows[gene].pvalue
+        );
+        assert_eq!(
+            output.results.rows[gene].max_cooks,
+            output.refit_plan.post_refit_max_cooks[gene]
+        );
+    }
+}
+
+#[test]
+fn fixed_dispersion_lrt_contrast_replacement_preserves_metadata() {
+    let (counts, full, reduced, dispersions, options) = replacement_lrt_fixture();
+
+    let named = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            &ContrastSpec::coefficient_name("condition_B_vs_A"),
+            &options,
+        )
+        .unwrap();
+
+    assert!(named.refit_plan.n_refit > 0);
+    assert_eq!(
+        named.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        named.results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
+    );
+}
+
+#[test]
+fn fixed_dispersion_lrt_factor_level_replacement_preserves_metadata() {
+    let (counts, full, reduced, dispersions, options) = replacement_lrt_fixture();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let output = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+            &options,
+        )
+        .unwrap();
+
+    assert!(output.refit_plan.n_refit > 0);
+    assert_eq!(
+        output.results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition B vs A")
+    );
+}
+
+#[test]
+fn fixed_dispersion_lrt_replacement_skips_when_no_rows_are_marked() {
+    let (counts, full, reduced, dispersions, _options) = replacement_lrt_fixture();
+
+    let output = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_with_cooks_replacement(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            1,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+
+    assert_eq!(output.refit_plan.n_refit, 0);
+    assert!(!output.refit_plan.should_refit);
+    assert!(output.refit_fit.is_none());
+    assert!(output.refit_results.is_none());
+    assert_eq!(
+        output.results.rows.len(),
+        output.original_results.rows.len()
+    );
+    for (final_row, original_row) in output
+        .results
+        .rows
+        .iter()
+        .zip(&output.original_results.rows)
+    {
+        assert_eq!(final_row.log2_fold_change, original_row.log2_fold_change);
+        assert_eq!(final_row.stat, original_row.stat);
+        assert_eq!(final_row.pvalue, original_row.pvalue);
+        assert_eq!(final_row.max_cooks, original_row.max_cooks);
+        assert_eq!(final_row.cooks_outlier, Some(false));
+    }
+    assert_eq!(
+        output.refit_plan.replacement.replaced_counts.as_slice(),
+        counts.as_slice()
+    );
+}
+
+#[test]
 fn fixed_dispersion_lrt_pipeline_validates_inputs() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let full =

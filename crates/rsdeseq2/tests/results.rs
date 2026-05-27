@@ -864,6 +864,293 @@ fn fit_expanded_beta_prior_wald_results_runs_fit_and_result_workflow() {
 }
 
 #[test]
+fn fit_expanded_beta_prior_wald_results_with_cooks_replacement_refits_marked_rows() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let expanded_design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B".into(),
+            "batch_Y".into(),
+        ]),
+    )
+    .unwrap();
+    let standard_design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 2.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_or_batch".into()]),
+    )
+    .unwrap();
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let groups = [vec![0], vec![1, 2]];
+    let names = vec!["gene_a".to_string(), "gene_b".to_string()];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let design = ExpandedModelBetaPriorDesignInput {
+        expanded_design: &expanded_design,
+        standard_design: &standard_design,
+        coefficient_groups: &groups,
+    };
+    let input = ExpandedBetaPriorWaldResultsInput {
+        counts: &counts,
+        design,
+        size_factors: &size_factors,
+        weights: None,
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: Some(&names),
+        options,
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+
+    let output = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        input.clone(),
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    assert!(output.refit_plan.n_refit > 0);
+    assert!(output.refit_plan.should_refit);
+    assert!(output.refit.is_some());
+    assert_eq!(
+        output.refit_plan.replacement.replaced_counts.as_slice(),
+        &[10, 12, 41, 24, 30, 33, 40, 54]
+    );
+    for gene in output.refit_plan.refit_rows.iter().copied() {
+        let refit = output.refit.as_ref().unwrap();
+        assert_eq!(
+            output.results.rows[gene].log2_fold_change,
+            refit.results.rows[gene].log2_fold_change
+        );
+        assert_eq!(
+            output.results.rows[gene].base_mean,
+            output.refit_plan.replaced_base_mean[gene]
+        );
+    }
+
+    let contrast_output = fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
+        input,
+        &[0.0, 1.0],
+        &replacement_options,
+    )
+    .unwrap();
+    assert!(contrast_output.refit.is_some());
+    assert_eq!(
+        contrast_output.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
+fn fit_expanded_beta_prior_wald_results_with_cooks_replacement_skips_unmarked_rows() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 20, 24, 30, 33, 45, 54]).unwrap();
+    let expanded_design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B".into(),
+            "batch_Y".into(),
+        ]),
+    )
+    .unwrap();
+    let standard_design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 2.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_or_batch".into()]),
+    )
+    .unwrap();
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [16.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let groups = [vec![0], vec![1, 2]];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let input = ExpandedBetaPriorWaldResultsInput {
+        counts: &counts,
+        design: ExpandedModelBetaPriorDesignInput {
+            expanded_design: &expanded_design,
+            standard_design: &standard_design,
+            coefficient_groups: &groups,
+        },
+        size_factors: &size_factors,
+        weights: None,
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: None,
+        options,
+    };
+
+    let output = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        input,
+        1,
+        &CooksReplacementOptions::new(f64::MAX),
+    )
+    .unwrap();
+
+    assert_eq!(output.refit_plan.n_refit, 0);
+    assert!(!output.refit_plan.should_refit);
+    assert!(output.refit.is_none());
+    assert_eq!(output.refit_plan.replacement.replaced_counts, counts);
+    assert_eq!(output.results.rows[0].base_mean, base_mean[0]);
+}
+
+#[test]
+fn fit_expanded_beta_prior_wald_normalization_factor_cooks_replacement_refits_marked_rows() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let expanded_design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B".into(),
+            "batch_Y".into(),
+        ]),
+    )
+    .unwrap();
+    let standard_design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 2.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_or_batch".into()]),
+    )
+    .unwrap();
+    let normalization_factors = RowMajorMatrix::from_row_major(
+        2,
+        4,
+        vec![
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0,
+        ],
+    )
+    .unwrap();
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let groups = [vec![0], vec![1, 2]];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let input = ExpandedBetaPriorWaldNormalizedResultsInput {
+        counts: &counts,
+        design: ExpandedModelBetaPriorDesignInput {
+            expanded_design: &expanded_design,
+            standard_design: &standard_design,
+            coefficient_groups: &groups,
+        },
+        normalization_factors: &normalization_factors,
+        weights: None,
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: None,
+        options,
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+
+    let output =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            input.clone(),
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert!(output.refit_plan.should_refit);
+    assert!(output.refit.is_some());
+    assert_eq!(
+        output.refit_plan.replacement.replaced_counts.as_slice(),
+        &[10, 12, 41, 24, 30, 33, 40, 54]
+    );
+
+    let contrast_output =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            input,
+            &[0.0, 1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert!(contrast_output.refit.is_some());
+    assert_eq!(
+        contrast_output.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
 fn fit_expanded_beta_prior_wald_results_accepts_offsets_and_weights() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 20, 24, 30, 33, 45, 54]).unwrap();
@@ -995,6 +1282,115 @@ fn fit_expanded_beta_prior_wald_results_accepts_offsets_and_weights() {
 }
 
 #[test]
+fn fit_expanded_beta_prior_wald_cooks_replacement_carries_weights_into_refit() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let expanded_design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B".into(),
+            "batch_Y".into(),
+        ]),
+    )
+    .unwrap();
+    let standard_design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 2.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_or_batch".into()]),
+    )
+    .unwrap();
+    let weights = RowMajorMatrix::from_row_major(
+        2,
+        4,
+        vec![
+            1.0, 0.8, 0.25, 0.9, //
+            0.7, 1.0, 0.95, 0.85,
+        ],
+    )
+    .unwrap();
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let groups = [vec![0], vec![1, 2]];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let input = ExpandedBetaPriorWaldResultsInput {
+        counts: &counts,
+        design: ExpandedModelBetaPriorDesignInput {
+            expanded_design: &expanded_design,
+            standard_design: &standard_design,
+            coefficient_groups: &groups,
+        },
+        size_factors: &size_factors,
+        weights: Some(&weights),
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: None,
+        options,
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+
+    let output = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        input.clone(),
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+    assert!(output.refit.is_some());
+
+    let direct_refit = fit_expanded_beta_prior_wald_results(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: &output.refit_plan.replacement.replaced_counts,
+            design: input.design,
+            size_factors: &size_factors,
+            weights: Some(&weights),
+            dispersions: &dispersions,
+            base_mean: &output.refit_plan.replaced_base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: input.options,
+        },
+        1,
+    )
+    .unwrap();
+
+    assert_eq!(output.refit.as_ref().unwrap(), &direct_refit);
+    for gene in output.refit_plan.refit_rows.iter().copied() {
+        assert_eq!(
+            output.results.rows[gene].log2_fold_change,
+            direct_refit.results.rows[gene].log2_fold_change
+        );
+    }
+}
+
+#[test]
 fn fit_expanded_factor_beta_prior_wald_results_builds_design_and_matches_direct_workflow() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 20, 24, 30, 33, 45, 54]).unwrap();
@@ -1090,6 +1486,109 @@ fn fit_expanded_factor_beta_prior_wald_results_builds_design_and_matches_direct_
 
     assert_eq!(factor_contrast.fit, factor.fit);
     assert_eq!(factor_contrast.results, direct_contrast_results);
+}
+
+#[test]
+fn fit_expanded_factor_beta_prior_wald_replacement_builds_design_and_matches_direct_workflow() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let sample_levels = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+    let direct_design = expanded_factor_design("condition", &sample_levels, "A").unwrap();
+    let direct = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: &counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &direct_design.expanded_design,
+                standard_design: &direct_design.standard_design,
+                coefficient_groups: &direct_design.coefficient_groups,
+            },
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    let factor = fit_expanded_factor_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedFactorBetaPriorWaldResultsInput {
+            counts: &counts,
+            factor: "condition",
+            sample_levels: &sample_levels,
+            reference: "A",
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    assert_eq!(factor.design, direct_design);
+    assert_eq!(factor.replacement, direct);
+
+    let factor_contrast =
+        fit_expanded_factor_beta_prior_wald_contrast_results_with_cooks_replacement(
+            ExpandedFactorBetaPriorWaldResultsInput {
+                counts: &counts,
+                factor: "condition",
+                sample_levels: &sample_levels,
+                reference: "A",
+                size_factors: &size_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options,
+            },
+            &[0.0, 1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert!(factor_contrast.replacement.refit.is_some());
+    assert_eq!(
+        factor_contrast
+            .replacement
+            .results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some("contrast")
+    );
 }
 
 #[test]
@@ -1217,6 +1716,119 @@ fn fit_expanded_factor_beta_prior_wald_results_accepts_normalization_factors_and
 }
 
 #[test]
+fn fit_expanded_factor_beta_prior_wald_normalization_factor_replacement_matches_direct_workflow() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let sample_levels = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let normalization_factors = RowMajorMatrix::from_row_major(
+        2,
+        4,
+        vec![
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0,
+        ],
+    )
+    .unwrap();
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+    let direct_design = expanded_factor_design("condition", &sample_levels, "A").unwrap();
+    let direct =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &direct_design.expanded_design,
+                    standard_design: &direct_design.standard_design,
+                    coefficient_groups: &direct_design.coefficient_groups,
+                },
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options: options.clone(),
+            },
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    let factor =
+        fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedFactorBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                factor: "condition",
+                sample_levels: &sample_levels,
+                reference: "A",
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options: options.clone(),
+            },
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(factor.design, direct_design);
+    assert_eq!(factor.replacement, direct);
+
+    let factor_contrast =
+        fit_expanded_factor_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedFactorBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                factor: "condition",
+                sample_levels: &sample_levels,
+                reference: "A",
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options,
+            },
+            &[0.0, 1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert!(factor_contrast.replacement.refit.is_some());
+    assert_eq!(
+        factor_contrast
+            .replacement
+            .results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
 fn fit_expanded_additive_beta_prior_wald_results_builds_design_and_matches_direct_workflow() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 20, 24, 30, 33, 45, 54]).unwrap();
@@ -1334,6 +1946,125 @@ fn fit_expanded_additive_beta_prior_wald_results_builds_design_and_matches_direc
 
     assert_eq!(contrast.fit, additive.fit);
     assert_eq!(contrast.results, direct_contrast_results);
+}
+
+#[test]
+fn fit_expanded_additive_beta_prior_wald_replacement_builds_design_and_matches_direct_workflow() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+    let direct_design = expanded_additive_factor_design(&factors).unwrap();
+    let direct = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedBetaPriorWaldResultsInput {
+            counts: &counts,
+            design: ExpandedModelBetaPriorDesignInput {
+                expanded_design: &direct_design.expanded_design,
+                standard_design: &direct_design.standard_design,
+                coefficient_groups: &direct_design.coefficient_groups,
+            },
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    let additive = fit_expanded_additive_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedAdditiveBetaPriorWaldResultsInput {
+            counts: &counts,
+            factors: &factors,
+            numeric_covariates: &[],
+            interactions: &[],
+            factor_numeric_interactions: &[],
+            numeric_interactions: &[],
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    assert_eq!(additive.design, direct_design);
+    assert_eq!(additive.replacement, direct);
+
+    let contrast = fit_expanded_additive_beta_prior_wald_contrast_results_with_cooks_replacement(
+        ExpandedAdditiveBetaPriorWaldResultsInput {
+            counts: &counts,
+            factors: &factors,
+            numeric_covariates: &[],
+            interactions: &[],
+            factor_numeric_interactions: &[],
+            numeric_interactions: &[],
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options,
+        },
+        &[0.0, 1.0, -1.0],
+        &replacement_options,
+    )
+    .unwrap();
+    assert!(contrast.replacement.refit.is_some());
+    assert_eq!(
+        contrast.replacement.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
 }
 
 #[test]
@@ -1480,6 +2211,137 @@ fn fit_expanded_additive_beta_prior_wald_results_accepts_normalization_factors_a
 
     assert_eq!(contrast.fit, additive.fit);
     assert_eq!(contrast.results, direct_contrast_results);
+}
+
+#[test]
+fn fit_expanded_additive_beta_prior_wald_normalization_factor_replacement_matches_direct_workflow()
+{
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+        },
+    ];
+    let normalization_factors = RowMajorMatrix::from_row_major(
+        2,
+        4,
+        vec![
+            1.0, 1.0, 1.0, 1.0, //
+            1.0, 1.0, 1.0, 1.0,
+        ],
+    )
+    .unwrap();
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+    let direct_design = expanded_additive_factor_design(&factors).unwrap();
+    let direct =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &direct_design.expanded_design,
+                    standard_design: &direct_design.standard_design,
+                    coefficient_groups: &direct_design.coefficient_groups,
+                },
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options: options.clone(),
+            },
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    let additive =
+        fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedAdditiveBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                factors: &factors,
+                numeric_covariates: &[],
+                interactions: &[],
+                factor_numeric_interactions: &[],
+                numeric_interactions: &[],
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options: options.clone(),
+            },
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(additive.design, direct_design);
+    assert_eq!(additive.replacement, direct);
+
+    let contrast =
+        fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedAdditiveBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                factors: &factors,
+                numeric_covariates: &[],
+                interactions: &[],
+                factor_numeric_interactions: &[],
+                numeric_interactions: &[],
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options,
+            },
+            &[0.0, 1.0, -1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert!(contrast.replacement.refit.is_some());
+    assert_eq!(
+        contrast.replacement.results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
 }
 
 #[test]
@@ -1886,6 +2748,141 @@ fn fit_expanded_formula_beta_prior_wald_results_matches_additive_workflow() {
 }
 
 #[test]
+fn fit_expanded_formula_beta_prior_wald_replacement_matches_additive_workflow() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 0.0, 1.0];
+    let time = [1.0, 1.0, 2.0, 2.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric_covariates = [
+        ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "time",
+            values: &time,
+        },
+    ];
+    let factor_numeric = [ExpandedFactorNumericInteractionSpec {
+        factor: "condition",
+        numeric: "dose",
+    }];
+    let numeric_interactions = [ExpandedNumericInteractionSpec {
+        left_numeric: "dose",
+        right_numeric: "time",
+    }];
+    let size_factors = [1.0, 1.0, 1.0, 1.0];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+
+    let formula = fit_expanded_formula_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedFormulaBetaPriorWaldResultsInput {
+            counts: &counts,
+            formula: "~ condition + dose + time + condition:dose + dose:time",
+            factors: &factors,
+            numeric_covariates: &numeric_covariates,
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        4,
+        &replacement_options,
+    )
+    .unwrap();
+
+    let additive = fit_expanded_additive_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedAdditiveBetaPriorWaldResultsInput {
+            counts: &counts,
+            factors: &factors,
+            numeric_covariates: &numeric_covariates,
+            interactions: &[],
+            factor_numeric_interactions: &factor_numeric,
+            numeric_interactions: &numeric_interactions,
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        4,
+        &replacement_options,
+    )
+    .unwrap();
+
+    assert_eq!(formula.design, additive.design);
+    assert_eq!(formula.replacement, additive.replacement);
+
+    let formula_contrast =
+        fit_expanded_formula_beta_prior_wald_contrast_results_with_cooks_replacement(
+            ExpandedFormulaBetaPriorWaldResultsInput {
+                counts: &counts,
+                formula: "~ condition + dose + time + condition:dose + dose:time",
+                factors: &factors,
+                numeric_covariates: &numeric_covariates,
+                size_factors: &size_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options,
+            },
+            &[0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert_eq!(
+        formula_contrast
+            .replacement
+            .refit_plan
+            .replacement
+            .replaced_counts,
+        counts
+    );
+    assert_eq!(
+        formula_contrast
+            .replacement
+            .results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some("contrast")
+    );
+}
+
+#[test]
 fn fit_expanded_formula_beta_prior_wald_results_applies_formula_offsets() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 20, 24, 30, 33, 45, 54]).unwrap();
@@ -2018,6 +3015,130 @@ fn fit_expanded_formula_beta_prior_wald_results_applies_formula_offsets() {
 
     assert_eq!(formula_contrast.fit, direct_contrast.fit);
     assert_eq!(formula_contrast.results, direct_contrast.results);
+}
+
+#[test]
+fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
+    let counts =
+        CountMatrix::from_row_major_u32(2, 4, vec![10, 12, 120, 24, 30, 33, 45, 54]).unwrap();
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let exposure_offset = [0.0_f64, 0.1, 0.2, 0.3];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+    }];
+    let numeric_covariates = [ExpandedNumericSpec {
+        name: "exposure_offset",
+        values: &exposure_offset,
+    }];
+    let size_factors = [1.0, 1.1, 0.9, 1.2];
+    let dispersions = [0.05, 0.08];
+    let base_mean = [41.5, 40.5];
+    let disp_fit = [0.05, 0.08];
+    let options = BetaPriorRefitOptions {
+        fit_options: IrlsOptions::default(),
+        variance_options: BetaPriorVarianceOptions {
+            method: BetaPriorVarianceMethod::Quantile,
+            upper_quantile: 0.5,
+            ..BetaPriorVarianceOptions::default()
+        },
+    };
+    let replacement_options = CooksReplacementOptions {
+        trim: 0.2,
+        cooks_cutoff: 0.0,
+        min_replicates: 3,
+        which_samples: Some(vec![false, false, true, false]),
+    };
+
+    let formula = fit_expanded_formula_beta_prior_wald_results_with_cooks_replacement(
+        ExpandedFormulaBetaPriorWaldResultsInput {
+            counts: &counts,
+            formula: "~ condition + offset(exposure_offset)",
+            factors: &factors,
+            numeric_covariates: &numeric_covariates,
+            size_factors: &size_factors,
+            weights: None,
+            dispersions: &dispersions,
+            base_mean: &base_mean,
+            disp_fit: &disp_fit,
+            gene_names: None,
+            options: options.clone(),
+        },
+        1,
+        &replacement_options,
+    )
+    .unwrap();
+
+    let design = expanded_formula_design("~ condition", &factors, &[]).unwrap();
+    let mut normalization_values = Vec::new();
+    for _ in 0..counts.n_genes() {
+        for (sample, size_factor) in size_factors.iter().copied().enumerate() {
+            normalization_values.push(size_factor * exposure_offset[sample].exp());
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
+            .unwrap();
+    let direct =
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            ExpandedBetaPriorWaldNormalizedResultsInput {
+                counts: &counts,
+                design: ExpandedModelBetaPriorDesignInput {
+                    expanded_design: &design.expanded_design,
+                    standard_design: &design.standard_design,
+                    coefficient_groups: &design.coefficient_groups,
+                },
+                normalization_factors: &normalization_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options: options.clone(),
+            },
+            1,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(formula.design, design);
+    assert_eq!(formula.replacement, direct);
+
+    let formula_contrast =
+        fit_expanded_formula_beta_prior_wald_contrast_results_with_cooks_replacement(
+            ExpandedFormulaBetaPriorWaldResultsInput {
+                counts: &counts,
+                formula: "~ condition + offset(exposure_offset)",
+                factors: &factors,
+                numeric_covariates: &numeric_covariates,
+                size_factors: &size_factors,
+                weights: None,
+                dispersions: &dispersions,
+                base_mean: &base_mean,
+                disp_fit: &disp_fit,
+                gene_names: None,
+                options,
+            },
+            &[0.0, 1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    assert!(formula_contrast.replacement.refit.is_some());
+    assert_eq!(
+        formula_contrast
+            .replacement
+            .results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some("contrast")
+    );
 }
 
 #[test]

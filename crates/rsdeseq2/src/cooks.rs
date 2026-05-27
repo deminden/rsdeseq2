@@ -88,6 +88,101 @@ pub struct CooksRefitPlan {
     pub post_refit_max_cooks: Vec<Option<f64>>,
 }
 
+/// Compact metadata summary for a Cook's replacement/refit plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CooksReplacementMetadata {
+    /// Number of genes with `replace == TRUE`, matching `sum(replace, na.rm=TRUE)`.
+    pub n_refit: usize,
+    /// Number of replacement-marked genes refit by the GLM.
+    pub n_refit_rows: usize,
+    /// Number of replacement-marked genes that became all-zero.
+    pub n_new_all_zero: usize,
+    /// Number of finite Cook's outlier cells before sample eligibility filtering.
+    pub n_outlier_cells: usize,
+    /// Number of Cook's outlier cells in replaceable samples.
+    pub n_replaced_cells: usize,
+    /// Number of samples eligible for Cook's outlier replacement.
+    pub n_replaceable_samples: usize,
+    /// Whether DESeq2 would enter the replacement-refit branch.
+    pub should_refit: bool,
+}
+
+/// Name/value metadata entry for Cook's replacement/refit summaries.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CooksReplacementMetadataEntry {
+    pub name: String,
+    pub value: String,
+}
+
+impl CooksReplacementMetadata {
+    /// Return stable scalar metadata entries suitable for TSV/object metadata export.
+    pub fn scalar_metadata(&self) -> Vec<CooksReplacementMetadataEntry> {
+        vec![
+            CooksReplacementMetadataEntry::new("nRefit", self.n_refit),
+            CooksReplacementMetadataEntry::new("nRefitRows", self.n_refit_rows),
+            CooksReplacementMetadataEntry::new("nNewAllZero", self.n_new_all_zero),
+            CooksReplacementMetadataEntry::new("nOutlierCells", self.n_outlier_cells),
+            CooksReplacementMetadataEntry::new("nReplacedCells", self.n_replaced_cells),
+            CooksReplacementMetadataEntry::new("nReplaceableSamples", self.n_replaceable_samples),
+            CooksReplacementMetadataEntry::new("shouldRefit", self.should_refit),
+        ]
+    }
+}
+
+impl CooksReplacementMetadataEntry {
+    fn new(name: impl Into<String>, value: impl ToString) -> Self {
+        Self {
+            name: name.into(),
+            value: value.to_string(),
+        }
+    }
+}
+
+impl CooksRefitPlan {
+    /// Summarize the replacement/refit branch in a compact, object-friendly form.
+    pub fn metadata(&self) -> CooksReplacementMetadata {
+        let n_samples = self.replacement.outlier_cells.n_cols();
+        let mut n_outlier_cells = 0;
+        let mut n_replaced_cells = 0;
+        for (idx, is_outlier) in self
+            .replacement
+            .outlier_cells
+            .as_slice()
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            if !is_outlier {
+                continue;
+            }
+            n_outlier_cells += 1;
+            let sample = idx % n_samples;
+            if self.replacement.replaceable_samples[sample] {
+                n_replaced_cells += 1;
+            }
+        }
+        CooksReplacementMetadata {
+            n_refit: self.n_refit,
+            n_refit_rows: self.refit_rows.len(),
+            n_new_all_zero: self.new_all_zero_rows.len(),
+            n_outlier_cells,
+            n_replaced_cells,
+            n_replaceable_samples: self
+                .replacement
+                .replaceable_samples
+                .iter()
+                .filter(|value| **value)
+                .count(),
+            should_refit: self.should_refit,
+        }
+    }
+
+    /// Return stable scalar replacement/refit metadata entries.
+    pub fn scalar_metadata(&self) -> Vec<CooksReplacementMetadataEntry> {
+        self.metadata().scalar_metadata()
+    }
+}
+
 /// Calculate DESeq2-style Cook's distances.
 ///
 /// This mirrors the formula in DESeq2's `calculateCooksDistance`: Pearson

@@ -41,8 +41,9 @@ use crate::options::{
     TestType,
 };
 use crate::results::{
-    apply_cooks_cutoff, build_lrt_contrast_results, build_lrt_results, build_wald_contrast_results,
-    build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
+    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_contrast_results,
+    build_lrt_results, build_wald_contrast_results, build_wald_results_from_wald,
+    resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
 use crate::transform::{
     fast_vst_eligible_count as count_fast_vst_eligible_rows,
@@ -2505,7 +2506,11 @@ impl DeseqBuilder {
             contrast.numerator,
             contrast.denominator,
         )?;
-        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let fit = raw_builder.fit_map_dispersions_glm_mu(counts, design)?;
         let (fit, mut results) = self.attach_native_wald_contrast(
             counts,
             design,
@@ -2513,6 +2518,26 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        let cooks = fit
+            .cooks
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "Cook's distances are required before factor-level Cook's filtering"
+                    .to_string(),
+            })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            cooks,
+            contrast,
+        )?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         results.metadata.result_name = Some(format!(
             "{}_{}_vs_{}",
             contrast.factor, contrast.numerator, contrast.denominator
@@ -2803,7 +2828,11 @@ impl DeseqBuilder {
             contrast.numerator,
             contrast.denominator,
         )?;
-        let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let fit = raw_builder.fit_map_dispersions_glm_mu(counts, full_design)?;
         let (fit, mut results) = self.attach_native_lrt_contrast(
             counts,
             full_design,
@@ -2812,6 +2841,26 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        let cooks = fit
+            .cooks
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "Cook's distances are required before factor-level Cook's filtering"
+                    .to_string(),
+            })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            cooks,
+            contrast,
+        )?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         results.metadata.result_name = Some(format!(
             "{}_{}_vs_{}",
             contrast.factor, contrast.numerator, contrast.denominator
@@ -3135,7 +3184,20 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_cooks,
+            contrast,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -3343,7 +3405,20 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_cooks,
+            contrast,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -3771,6 +3846,160 @@ impl DeseqBuilder {
         Ok((fit, wald_output.results))
     }
 
+    /// Run the supplied-dispersion Wald coefficient path with Cook's replacement refit.
+    ///
+    /// This extends the replacement/refit machinery to the fixed-dispersion
+    /// core path. Dispersions remain caller-supplied for both the original fit
+    /// and the replacement-count refit; no native dispersion re-estimation or
+    /// beta-prior refit is performed here.
+    pub fn fit_fixed_dispersion_wald_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        coefficient: usize,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) =
+            raw_builder.fit_fixed_dispersion_wald(counts, design, dispersions, coefficient)?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_wald(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                dispersions,
+                coefficient,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run the supplied-dispersion Wald numeric-contrast path with Cook's replacement refit.
+    pub fn fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder.fit_fixed_dispersion_wald_contrast(
+            counts,
+            design,
+            dispersions,
+            contrast,
+        )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_wald_contrast(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                dispersions,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
+    /// Run supplied-dispersion Wald replacement refit for a named primitive contrast specification.
+    pub fn fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let numeric_contrast = resolve_contrast(design, contrast)?;
+        let mut output = self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
+            counts,
+            design,
+            dispersions,
+            &numeric_contrast,
+            replacement_options,
+        )?;
+        apply_contrast_metadata_to_replacement_output(
+            &mut output,
+            contrast.result_name(),
+            contrast.comparison(),
+        );
+        Ok(output)
+    }
+
     /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.
     ///
     /// This resolves coefficient names and DESeq2-style positive/negative
@@ -3829,7 +4058,11 @@ impl DeseqBuilder {
             contrast.denominator,
         )?;
         let stages = self.normalization_stages_for_design(counts, design)?;
-        let mut wald_output = self.fixed_dispersion_wald_contrast_components(
+        let result_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let mut wald_output = result_builder.fixed_dispersion_wald_contrast_components(
             FixedDispersionGlmInput {
                 counts,
                 design,
@@ -3843,6 +4076,22 @@ impl DeseqBuilder {
             &stages.base_mean,
             &numeric_contrast,
             Some(&contrast_all_zero),
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut wald_output.results,
+            cooks_cutoff,
+            counts,
+            &wald_output.cooks.cooks,
+            contrast,
+        )?;
+        apply_independent_filtering(
+            &mut wald_output.results,
+            &self.independent_filtering_options,
         )?;
         let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.dispersion = Some(wald_output.expanded_dispersions);
@@ -3859,6 +4108,92 @@ impl DeseqBuilder {
             contrast.factor, contrast.numerator, contrast.denominator
         ));
         Ok((fit, wald_output.results))
+    }
+
+    /// Run supplied-dispersion Wald replacement refit for a factor-level contrast.
+    pub fn fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder
+            .fit_fixed_dispersion_wald_factor_level_contrast(
+                counts,
+                design,
+                dispersions,
+                contrast,
+            )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_wald_factor_level_contrast(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                dispersions,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            design.n_samples(),
+            design.n_coefficients(),
+        )?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_cooks,
+            contrast,
+        )?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+
+        Ok(CooksReplacementWaldOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
     }
 
     /// Run a supplied-dispersion likelihood-ratio test pipeline.
@@ -3907,6 +4242,73 @@ impl DeseqBuilder {
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
+    }
+
+    /// Run the supplied-dispersion LRT path with Cook's replacement refit.
+    pub fn fit_fixed_dispersion_lrt_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        coefficient: usize,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder.fit_fixed_dispersion_lrt(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            coefficient,
+        )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_lrt(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                coefficient,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
     }
 
     /// Run a supplied-dispersion likelihood-ratio test and report a numeric contrast.
@@ -3988,6 +4390,73 @@ impl DeseqBuilder {
         Ok((fit, lrt_output.results))
     }
 
+    /// Run the supplied-dispersion LRT numeric-contrast path with Cook's replacement refit.
+    pub fn fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder.fit_fixed_dispersion_lrt_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            contrast,
+        )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_lrt_contrast(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
+    }
+
     /// Run a supplied-dispersion LRT and report a named full-model contrast.
     pub fn fit_fixed_dispersion_lrt_contrast_spec(
         &self,
@@ -4008,6 +4477,33 @@ impl DeseqBuilder {
         results.metadata.result_name = Some(contrast.result_name());
         results.metadata.comparison = Some(contrast.comparison());
         Ok((fit, results))
+    }
+
+    /// Run supplied-dispersion LRT replacement refit for a named primitive contrast specification.
+    pub fn fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let numeric_contrast = resolve_contrast(full_design, contrast)?;
+        let mut output = self.fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            &numeric_contrast,
+            replacement_options,
+        )?;
+        apply_lrt_contrast_metadata_to_replacement_output(
+            &mut output,
+            contrast.result_name(),
+            contrast.comparison(),
+        );
+        Ok(output)
     }
 
     /// Run a supplied-dispersion LRT and report a factor-level full-model contrast.
@@ -4089,7 +4585,13 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut lrt_output.results,
+            cooks_cutoff,
+            counts,
+            &lrt_output.cooks.cooks,
+            contrast,
+        )?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
         lrt_output.results.metadata.result_name = Some(format!(
             "{}_{}_vs_{}",
@@ -4117,6 +4619,95 @@ impl DeseqBuilder {
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
+    }
+
+    /// Run supplied-dispersion LRT replacement refit for a factor-level full-model contrast.
+    pub fn fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let raw_builder = self
+            .clone()
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        let (original_fit, original_results) = raw_builder
+            .fit_fixed_dispersion_lrt_factor_level_contrast(
+                counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                contrast,
+            )?;
+        let refit_plan = replacement_refit_plan_from_original(
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
+        )?;
+
+        let (refit_fit, refit_results) = if refit_plan.should_refit {
+            let mut refit_builder = raw_builder.clone();
+            refit_builder.size_factor_options.supplied_size_factors =
+                Some(original_fit.size_factors.clone());
+            let (fit, results) = refit_builder.fit_fixed_dispersion_lrt_factor_level_contrast(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                contrast,
+            )?;
+            (Some(fit), Some(results))
+        } else {
+            (None, None)
+        };
+
+        let mut results = merge_replacement_refit_results(
+            &original_results,
+            refit_results.as_ref(),
+            &refit_plan,
+        )?;
+        let cooks_cutoff = resolve_cooks_cutoff(
+            self.cooks_cutoff,
+            full_design.n_samples(),
+            full_design.n_coefficients(),
+        )?;
+        let original_cooks =
+            original_fit
+                .cooks
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "Cook's distances are required before replacement refit".to_string(),
+                })?;
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_cooks,
+            contrast,
+        )?;
+        apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
+        results.metadata.result_name = Some(format!(
+            "{}_{}_vs_{}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+        results.metadata.comparison = Some(format!(
+            "factor-level contrast: {} {} vs {}",
+            contrast.factor, contrast.numerator, contrast.denominator
+        ));
+
+        Ok(CooksReplacementLrtOutput {
+            original_fit,
+            original_results,
+            refit_plan,
+            refit_fit,
+            refit_results,
+            results,
+        })
     }
 
     fn normalization_stages(
@@ -5475,6 +6066,35 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
     output.results.metadata.comparison = Some(comparison);
 }
 
+fn apply_cooks_cutoff_for_factor_level_metadata(
+    results: &mut DeseqResults,
+    cutoff: Option<f64>,
+    counts: &CountMatrix,
+    cooks: &RowMajorMatrix<f64>,
+    contrast: FactorLevelContrast<'_>,
+) -> Result<(), DeseqError> {
+    if factor_level_contrast_is_single_two_level_condition(contrast) {
+        apply_cooks_cutoff_with_low_count_heuristic(results, cutoff, counts, cooks)
+    } else {
+        apply_cooks_cutoff(results, cutoff)
+    }
+}
+
+fn factor_level_contrast_is_single_two_level_condition(contrast: FactorLevelContrast<'_>) -> bool {
+    let mut saw_numerator = false;
+    let mut saw_denominator = false;
+    for level in contrast.sample_levels {
+        if level == contrast.numerator {
+            saw_numerator = true;
+        } else if level == contrast.denominator {
+            saw_denominator = true;
+        } else {
+            return false;
+        }
+    }
+    saw_numerator && saw_denominator
+}
+
 fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.log2_fold_change = Some(0.0);
     row.lfc_se = Some(0.0);
@@ -5792,7 +6412,14 @@ fn validate_pipeline_wald_coefficient(
 
 #[cfg(test)]
 mod tests {
-    use super::{full_deviance_from_log_like, CountMatrix};
+    use super::{
+        apply_cooks_cutoff_for_factor_level_metadata,
+        factor_level_contrast_is_single_two_level_condition, full_deviance_from_log_like,
+        CountMatrix,
+    };
+    use crate::contrasts::FactorLevelContrast;
+    use crate::matrix::RowMajorMatrix;
+    use crate::results::{DeseqResultRow, DeseqResults};
 
     #[test]
     fn count_matrix_rejects_bad_length() {
@@ -5825,5 +6452,89 @@ mod tests {
         assert!(full_deviance_from_log_like(f64::NAN).is_nan());
         assert!(full_deviance_from_log_like(f64::MAX).is_nan());
         assert!(full_deviance_from_log_like(-f64::MAX).is_nan());
+    }
+
+    #[test]
+    fn factor_level_low_count_heuristic_requires_exact_two_levels() {
+        let two_levels = ["A", "A", "B", "B"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        assert!(factor_level_contrast_is_single_two_level_condition(
+            FactorLevelContrast::new("condition", "B", "A", &two_levels)
+        ));
+
+        let missing_numerator = ["A", "A", "A"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        assert!(!factor_level_contrast_is_single_two_level_condition(
+            FactorLevelContrast::new("condition", "B", "A", &missing_numerator)
+        ));
+
+        let extra_level = ["A", "B", "C"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        assert!(!factor_level_contrast_is_single_two_level_condition(
+            FactorLevelContrast::new("condition", "B", "A", &extra_level)
+        ));
+    }
+
+    #[test]
+    fn factor_level_cooks_filter_uses_low_count_heuristic_only_for_two_levels() {
+        let counts = CountMatrix::from_row_major_u32(1, 4, vec![1, 10, 11, 12]).unwrap();
+        let cooks = RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap();
+        let two_levels = ["A", "A", "B", "B"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let mut two_level_results = one_cooks_result();
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut two_level_results,
+            Some(5.0),
+            &counts,
+            &cooks,
+            FactorLevelContrast::new("condition", "B", "A", &two_levels),
+        )
+        .unwrap();
+        assert_eq!(two_level_results.rows[0].pvalue, Some(0.01));
+        assert_eq!(two_level_results.rows[0].cooks_outlier, Some(false));
+
+        let extra_level = ["A", "A", "B", "C"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let mut extra_level_results = one_cooks_result();
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut extra_level_results,
+            Some(5.0),
+            &counts,
+            &cooks,
+            FactorLevelContrast::new("condition", "B", "A", &extra_level),
+        )
+        .unwrap();
+        assert_eq!(extra_level_results.rows[0].pvalue, None);
+        assert_eq!(extra_level_results.rows[0].cooks_outlier, Some(true));
+    }
+
+    fn one_cooks_result() -> DeseqResults {
+        DeseqResults {
+            rows: vec![DeseqResultRow {
+                gene: Some("gene1".to_string()),
+                base_mean: 1.0,
+                log2_fold_change: Some(0.0),
+                lfc_se: Some(1.0),
+                stat: Some(0.0),
+                pvalue: Some(0.01),
+                padj: Some(0.01),
+                dispersion: Some(0.1),
+                converged: Some(true),
+                max_cooks: Some(10.0),
+                cooks_outlier: None,
+                filtered: None,
+            }],
+            ..DeseqResults::default()
+        }
     }
 }
