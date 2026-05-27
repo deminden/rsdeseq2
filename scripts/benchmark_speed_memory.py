@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import math
 import random
 import statistics
 import subprocess
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -52,7 +54,8 @@ def write_counts(path: Path, genes: int, samples: int, seed: int) -> None:
 
 
 def count_matrix_shape(path: Path) -> tuple[int, int]:
-    with path.open(newline="") as handle:
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", newline="") as handle:
         header = handle.readline()
         if not header:
             raise ValueError(f"empty count table: {path}")
@@ -61,6 +64,16 @@ def count_matrix_shape(path: Path) -> tuple[int, int]:
             raise ValueError(f"count table must have at least two columns: {path}")
         rows = sum(1 for _ in handle)
     return rows, columns - 1
+
+
+def materialize_counts(path: Path, tmpdir: Path) -> Path:
+    """Return an uncompressed count matrix path usable by both CLIs."""
+    if path.suffix != ".gz":
+        return path
+    out = tmpdir / path.with_suffix("").name
+    with gzip.open(path, "rb") as src, out.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+    return out
 
 
 def parse_elapsed_seconds(value: str) -> float:
@@ -287,9 +300,10 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="rsdeseq2-bench-") as tmp:
         tmpdir = Path(tmp)
         if args.counts_file is not None:
-            counts = args.counts_file.resolve()
-            genes, samples = count_matrix_shape(counts)
-            datasets = [(counts.stem, counts, genes, samples)]
+            source_counts = args.counts_file.resolve()
+            genes, samples = count_matrix_shape(source_counts)
+            counts = materialize_counts(source_counts, tmpdir)
+            datasets = [(source_counts.stem, counts, genes, samples)]
         else:
             datasets = []
             for genes in parse_int_list(args.genes):

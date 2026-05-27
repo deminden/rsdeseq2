@@ -53,25 +53,26 @@ The full table is in `results/benchmarks/speed_memory_current_summary.tsv`.
 
 ## Real Dataset Run
 
-On 2026-05-24, a five-repeat run used a real `decor_method_study`
-`muscle_raw_counts.tsv` matrix with 56,937 genes and 881 samples. The source
-file stores some integer counts in scientific notation, so the CLI count reader
-accepts integer-valued numeric fields such as `1e+05`.
+On 2026-05-27, a three-repeat run used a real publication-data
+`muscle_raw_counts.tsv.gz` matrix with 73,321 genes and 818 samples. The
+benchmark runner materializes compressed `.tsv.gz` count inputs into its
+temporary directory before running either CLI, so both tools read the same
+uncompressed count table.
 
 Observed medians, with min-max elapsed ranges in parentheses:
 
 | operation | tool | elapsed | max RSS | max absolute difference |
 | --- | --- | ---: | ---: | ---: |
-| `size-factors` | `rsdeseq2` | 1.15 s (1.14-1.28) | 199 MiB | `3.86e-14` |
-| `size-factors` | DESeq2/R | 26.71 s (24.87-27.32) | 1.90 GiB | |
-| `base-mean` | `rsdeseq2` | 1.38 s (1.33-1.44) | 581 MiB | `4.47e-07` |
-| `base-mean` | DESeq2/R | 27.55 s (25.58-28.59) | 2.28 GiB | |
+| `size-factors` | `rsdeseq2` | 3.48 s (3.46-3.49) | 237 MiB | `3.15e-14` |
+| `size-factors` | DESeq2/R | 24.67 s (24.59-24.94) | 2.03 GiB | |
+| `base-mean` | `rsdeseq2` | 4.07 s (3.95-4.25) | 695 MiB | `5.47e-09` |
+| `base-mean` | DESeq2/R | 25.88 s (25.76-26.56) | 2.47 GiB | |
 
 The README reports this real-data table because both operations have matching
-reference outputs. The resulting primitive CLI speedups were 23.2x for size
-factors and 20.0x for base means. Peak RSS was about 9.8x lower for size
-factors and 4.0x lower for base means. The full table is in
-`results/benchmarks/real_muscle_speed_memory_current_summary.tsv`.
+reference outputs. The resulting primitive CLI speedups were 7.1x for size
+factors and 6.4x for base means. Peak RSS was about 8.7x lower for size
+factors and 3.6x lower for base means. The full table is in
+`results/benchmarks/real_muscle_speed_memory_2026-05-27_summary.tsv`.
 
 For a quick smoke run:
 
@@ -84,12 +85,13 @@ scripts/benchmark_rsdeseq2.sh \
 ```
 
 To benchmark an existing real count matrix instead of synthetic counts, pass a
-tab-delimited count table with gene IDs in the first column:
+plain or gzip-compressed tab-delimited count table with gene IDs in the first
+column:
 
 ```bash
 scripts/benchmark_rsdeseq2.sh \
   --rscript /home/den/miniforge3/envs/rnaseq451/bin/Rscript \
-  --counts-file /path/to/raw_counts.tsv \
+  --counts-file /path/to/raw_counts.tsv.gz \
   --repeats 3 \
   --output results/benchmarks/real_speed_memory.tsv
 ```
@@ -113,8 +115,9 @@ offline DESeq2 outputs from a fresh publication-data study. The script does not
 call R; it treats saved DESeq2 outputs as fixtures, derives full-tissue size
 factors from the reference normalized-count matrices, and compares only outputs
 where the current Rust CLI has matched inputs. The latest run used the current
-release binary and completed with zero swaps for every command. The full driver
-run took 312.05 seconds wall time, with 710,400 KiB peak RSS and zero swaps.
+release binary and completed with zero swaps for every command. The full fresh
+driver run took 319.78 seconds wall time, with 710,656 KiB peak RSS and zero
+swaps.
 
 Command shape:
 
@@ -128,7 +131,8 @@ python3 scripts/real_data_parity.py \
   --tissue heart \
   --tissue muscle \
   --contrast kidney:full_blocked_permutation:1 \
-  --output results/benchmarks/real_data_parity_2026-05-27.tsv
+  --contrast-size-factors estimate \
+  --output results/benchmarks/real_data_parity_2026-05-27_fresh.tsv
 ```
 
 Primitive parity results:
@@ -136,8 +140,8 @@ Primitive parity results:
 | output | coverage | median elapsed | max RSS | harshest max abs diff | harshest max rel diff | mismatches |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `size-factors` | 5 tissues, 1,998 samples | 1.55 s | 237 MiB | `2.62e-14` | `1.99e-14` | 0 |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | 7.06 s | 694 MiB | `1.19e-07` | `9.74e-15` | 0 |
-| `base-mean` | 5 tissues, 341,286 genes | 1.66 s | 694 MiB | `4.66e-09` | `6.73e-15` | 0 |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | 7.03 s | 693 MiB | `1.19e-07` | `9.74e-15` | 0 |
+| `base-mean` | 5 tissues, 341,286 genes | 1.64 s | 694 MiB | `4.66e-09` | `6.73e-15` | 0 |
 
 The same run also reconstructed one full-blocked real contrast with
 split-estimated size factors and a numeric `perm_block + condition` design.
@@ -147,7 +151,7 @@ reference result shape much more closely:
 
 | output | contrast coverage | status |
 | --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value. Median abs diffs are `3.05e-14` for log2 fold change, `1.73e-12` for lfcSE, `4.75e-12` for Wald statistic, `2.59e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `3.85e-12`, `1.57e-10`, `3.74e-11`, `4.51e-11`, and `5.53e-05`, respectively. The harshest max abs diffs are `5.68e-04` for log2 fold change, `1.52e-02` for lfcSE, `7.17e-03` for Wald statistic, `1.40e-03` for p-value, and `9.95e-04` for adjusted p-value. Runtime was 128.3 s with 596 MiB peak RSS and zero swaps. |
+| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value. Median abs diffs are `3.05e-14` for log2 fold change, `1.73e-12` for lfcSE, `4.75e-12` for Wald statistic, `2.59e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `3.85e-12`, `1.57e-10`, `3.74e-11`, `4.51e-11`, and `5.53e-05`, respectively. The harshest max abs diffs are `5.68e-04` for log2 fold change, `1.52e-02` for lfcSE, `7.17e-03` for Wald statistic, `1.40e-03` for p-value, and `9.95e-04` for adjusted p-value. Runtime was 134.0 s with 596 MiB peak RSS and zero swaps. |
 
 That contrast is now useful as a hard regression target for the next numerical
 work: the remaining real-contrast differences are numeric tail magnitudes after

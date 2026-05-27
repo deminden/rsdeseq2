@@ -25,21 +25,24 @@ Detailed status lives in
 
 ## Real-Data Parity
 
-Current README benchmarks are shown only for primitives with matching reference
-outputs. A fresh five-tissue publication-data sweep compared offline DESeq2
-outputs against the Rust CLI for `size-factors`, `normalized-counts`, and
-`base-mean`:
+Current README benchmarks are shown only for outputs with matching reference
+checks. A fresh real-data run compared `rsdeseq2` with DESeq2 1.46.0 on a
+73,321 gene x 818 sample count matrix:
 
 | primitive | parity check | rsdeseq2 | DESeq2 reference | speedup | rsdeseq2 RSS | reference RSS |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `size-factors` | max diff `3.86e-14` | 1.15 s | 26.71 s | 23.2x | 199 MiB | 1.90 GiB |
-| `base-mean` | max diff `4.47e-07` | 1.38 s | 27.55 s | 20.0x | 581 MiB | 2.28 GiB |
+| `size-factors` | max diff `3.15e-14` | 3.48 s | 24.67 s | 7.1x | 237 MiB | 2.03 GiB |
+| `base-mean` | max diff `5.47e-09` | 4.07 s | 25.88 s | 6.4x | 695 MiB | 2.47 GiB |
 
-| primitive | real-data coverage | harshest max diff | max RSS |
+A five-tissue saved-reference sweep also matches offline DESeq2 outputs for
+implemented primitive outputs:
+
+| output | real-data coverage | harshest max diff | max RSS |
 | --- | ---: | ---: | ---: |
-| `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 238 MiB |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 694 MiB |
-| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 695 MiB |
+| `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 237 MiB |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 693 MiB |
+| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 694 MiB |
+| `wald_results` | 65,580 genes, 78 samples | median LFC diff `3.05e-14`; max LFC diff `5.68e-04` | 596 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
 The latest sweep completed with zero swaps. Methodology and synthetic

@@ -158,11 +158,17 @@ operations. They are not claims about full `DESeq()` speed, because full DESeq2
 workflow parity is not implemented yet.
 
 The latest local runs use `/usr/bin/time -v` with repeated process-level runs.
-On the 56,937 gene x 881 sample real count matrix, five-repeat medians were:
+On the 73,321 gene x 818 sample real count matrix, three-repeat medians were:
 
-- `size-factors`: `rsdeseq2` 1.15 s and 199 MiB RSS versus DESeq2/R 26.71 s
-  and 1.90 GiB RSS, max absolute difference `3.86e-14`.
-- `base-mean`: `rsdeseq2` 1.38 s and 581 MiB RSS versus DESeq2/R 27.55 s and
-  2.28 GiB RSS, max absolute difference `4.47e-07`.
+- `size-factors`: `rsdeseq2` 3.48 s and 237 MiB RSS versus DESeq2/R 24.67 s
+  and 2.03 GiB RSS, max absolute difference `3.15e-14`.
+- `base-mean`: `rsdeseq2` 4.07 s and 695 MiB RSS versus DESeq2/R 25.88 s and
+  2.47 GiB RSS, max absolute difference `5.47e-09`.
+
+The five-tissue saved-reference parity sweep also completed with zero swaps:
+size factors matched to `2.62e-14`, normalized counts to `1.19e-07`, and base
+means to `4.66e-09` max absolute difference. The current hard real Wald
+contrast has matching missingness and tight medians, while the remaining tail
+differences are concentrated in standard errors and derived Wald statistics.
 
 See [benchmarks.md](benchmarks.md) for running time/RAM benchmarks.
