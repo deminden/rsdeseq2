@@ -150,6 +150,16 @@ impl DesignMatrix {
         self.matrix.n_cols()
     }
 
+    /// Reusable sample-index span.
+    pub fn sample_indices(&self) -> core::range::Range<usize> {
+        self.matrix.row_indices()
+    }
+
+    /// Reusable coefficient-index span.
+    pub fn coefficient_indices(&self) -> core::range::Range<usize> {
+        self.matrix.col_indices()
+    }
+
     /// Matrix values.
     pub fn matrix(&self) -> &RowMajorMatrix<f64> {
         &self.matrix

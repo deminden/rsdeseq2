@@ -113,7 +113,7 @@ fn normalize_weight_rows(weights: &RowMajorMatrix<f64>) -> Result<RowMajorMatrix
             max_weight = max_weight.max(weight);
         }
         if max_weight == 0.0 {
-            normalized.extend(std::iter::repeat(0.0).take(weights.n_cols()));
+            normalized.extend(std::iter::repeat_n(0.0, weights.n_cols()));
         } else {
             normalized.extend(row.iter().map(|weight| *weight / max_weight));
         }

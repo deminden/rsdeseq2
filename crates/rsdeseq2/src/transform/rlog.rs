@@ -453,7 +453,7 @@ pub fn rlog_beta_prior_variance(
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
     let mut beta_prior_variance = Vec::with_capacity(n_samples + 1);
     beta_prior_variance.push(RLOG_INTERCEPT_PRIOR_VARIANCE);
-    beta_prior_variance.extend(std::iter::repeat(sample_prior_variance).take(n_samples));
+    beta_prior_variance.extend(std::iter::repeat_n(sample_prior_variance, n_samples));
     Ok(beta_prior_variance)
 }
 
@@ -468,9 +468,7 @@ pub fn rlog_sample_effect_prior_variance(
         });
     }
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
-    Ok(std::iter::repeat(sample_prior_variance)
-        .take(n_samples)
-        .collect())
+    Ok(std::iter::repeat_n(sample_prior_variance, n_samples).collect())
 }
 
 fn rlog_transform_from_fit(

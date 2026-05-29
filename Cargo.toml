@@ -6,7 +6,7 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/deminden/rsdeseq2"
-rust-version = "1.76"
+rust-version = "1.96"
 
 [workspace.dependencies]
 approx = "0.5"

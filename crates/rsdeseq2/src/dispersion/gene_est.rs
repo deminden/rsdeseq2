@@ -1113,7 +1113,7 @@ fn fit_dispersion_line_search_inner(
             }
             dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
             kappa = (effective_kappa * 1.1).min(options.kappa_0);
-            if iter_accept % 5 == 0 {
+            if iter_accept.is_multiple_of(5) {
                 kappa /= 2.0;
             }
         } else {

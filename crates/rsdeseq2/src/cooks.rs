@@ -832,7 +832,7 @@ fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
     }
     values.sort_by(f64::total_cmp);
     if trim >= 0.5 {
-        return if values.len() % 2 == 0 {
+        return if values.len().is_multiple_of(2) {
             let upper = values.len() / 2;
             0.5 * (values[upper - 1] + values[upper])
         } else {

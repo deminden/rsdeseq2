@@ -128,6 +128,8 @@ cargo run -p rsdeseq2 -- lrt \
 
 ## Development
 
+Requires current stable Rust, tracked in `Cargo.toml` via `rust-version`.
+
 ```bash
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings

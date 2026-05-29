@@ -67,6 +67,22 @@ impl<T> RowMajorMatrix<T> {
         self.values.len()
     }
 
+    /// Reusable row-index span.
+    pub fn row_indices(&self) -> core::range::Range<usize> {
+        core::range::Range {
+            start: 0,
+            end: self.n_rows,
+        }
+    }
+
+    /// Reusable column-index span.
+    pub fn col_indices(&self) -> core::range::Range<usize> {
+        core::range::Range {
+            start: 0,
+            end: self.n_cols,
+        }
+    }
+
     /// Whether the matrix has no stored values.
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
@@ -131,5 +147,27 @@ impl RowMajorMatrix<f64> {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RowMajorMatrix;
+
+    #[test]
+    fn matrix_index_spans_are_copy_and_reusable() {
+        let matrix = RowMajorMatrix::from_row_major(2, 3, vec![1, 2, 3, 4, 5, 6]).unwrap();
+        let rows = matrix.row_indices();
+        let cols = matrix.col_indices();
+
+        let first_rows = rows.into_iter().collect::<Vec<_>>();
+        let second_rows = rows.into_iter().collect::<Vec<_>>();
+        let first_cols = cols.into_iter().collect::<Vec<_>>();
+        let second_cols = cols.into_iter().collect::<Vec<_>>();
+
+        assert_eq!(first_rows, vec![0, 1]);
+        assert_eq!(second_rows, first_rows);
+        assert_eq!(first_cols, vec![0, 1, 2]);
+        assert_eq!(second_cols, first_cols);
     }
 }

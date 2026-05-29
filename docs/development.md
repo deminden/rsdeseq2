@@ -14,6 +14,9 @@ scripts for parity fixtures, docs, CI, validation outputs, and an experimental
 R package scaffold. R/DESeq2 is used only as an external reference generator
 for tests.
 
+The workspace tracks current stable Rust in `Cargo.toml` through
+`rust-version`; local development and CI should use that toolchain or newer.
+
 ## Commands
 
 ```bash

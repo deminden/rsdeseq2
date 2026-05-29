@@ -1539,7 +1539,7 @@ fn trimmed_mean(values: &[f64], trim: f64) -> Result<f64, DeseqError> {
     sorted.sort_by(|left, right| left.total_cmp(right));
     if trim == 0.5 {
         let mid = sorted.len() / 2;
-        return if sorted.len() % 2 == 0 {
+        return if sorted.len().is_multiple_of(2) {
             Ok(stable_midpoint(sorted[mid - 1], sorted[mid]))
         } else {
             Ok(sorted[mid])

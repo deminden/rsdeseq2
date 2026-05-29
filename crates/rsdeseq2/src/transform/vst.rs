@@ -782,7 +782,7 @@ fn round_half_to_even(value: f64) -> f64 {
     let floor = value.floor();
     let fraction = value - floor;
     if (fraction - 0.5).abs() < f64::EPSILON {
-        if (floor as u64) % 2 == 0 {
+        if (floor as u64).is_multiple_of(2) {
             floor
         } else {
             floor + 1.0

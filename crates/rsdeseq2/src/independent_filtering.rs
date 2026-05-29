@@ -803,7 +803,7 @@ fn six_mad(residuals: &[f64]) -> Result<f64, DeseqError> {
     }
     let mut sorted = residuals.to_vec();
     sorted.sort_by(f64::total_cmp);
-    let median = if sorted.len() % 2 == 0 {
+    let median = if sorted.len().is_multiple_of(2) {
         let upper = sorted.len() / 2;
         checked_midpoint(sorted[upper - 1], sorted[upper], upper, "lowess MAD median")?
     } else {

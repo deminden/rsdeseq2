@@ -162,6 +162,22 @@ impl CountMatrix {
         self.n_samples
     }
 
+    /// Reusable gene-index span.
+    pub fn gene_indices(&self) -> core::range::Range<usize> {
+        core::range::Range {
+            start: 0,
+            end: self.n_genes,
+        }
+    }
+
+    /// Reusable sample-index span.
+    pub fn sample_indices(&self) -> core::range::Range<usize> {
+        core::range::Range {
+            start: 0,
+            end: self.n_samples,
+        }
+    }
+
     /// Count values in row-major order.
     pub fn as_slice(&self) -> &[u32] {
         &self.counts
@@ -191,7 +207,8 @@ impl CountMatrix {
 
     /// Per-gene all-zero flags.
     pub fn all_zero_flags(&self) -> Vec<bool> {
-        (0..self.n_genes)
+        self.gene_indices()
+            .into_iter()
             .map(|gene| self.row_values(gene).iter().all(|count| *count == 0))
             .collect()
     }
@@ -208,7 +225,9 @@ impl CountMatrix {
 
     /// Return a basic summary used by fit-state output.
     pub fn summary(&self) -> CountsSummary {
-        let all_zero_genes = (0..self.n_genes)
+        let all_zero_genes = self
+            .gene_indices()
+            .into_iter()
             .filter(|gene| self.row_values(*gene).iter().all(|count| *count == 0))
             .count();
         CountsSummary {
@@ -6224,7 +6243,7 @@ fn expand_frozen_rlog_output_with_all_zero_rows(
     let mut compact_row = 0usize;
     for (gene, is_zero) in all_zero.iter().enumerate() {
         if *is_zero {
-            values.extend(std::iter::repeat(frozen_intercept[gene]).take(n_samples));
+            values.extend(std::iter::repeat_n(frozen_intercept[gene], n_samples));
         } else {
             let src = compact_output.transformed.row(compact_row)?;
             values.extend_from_slice(src);
@@ -6437,6 +6456,23 @@ mod tests {
     fn count_matrix_accepts_u64_when_values_fit() {
         let counts = CountMatrix::from_row_major_u64(1, 3, vec![1, 2, 3]).unwrap();
         assert_eq!(counts.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn count_matrix_index_spans_are_copy_and_reusable() {
+        let counts = CountMatrix::from_row_major_u32(2, 3, vec![1, 2, 3, 4, 5, 6]).unwrap();
+        let genes = counts.gene_indices();
+        let samples = counts.sample_indices();
+
+        let first_genes = genes.into_iter().collect::<Vec<_>>();
+        let second_genes = genes.into_iter().collect::<Vec<_>>();
+        let first_samples = samples.into_iter().collect::<Vec<_>>();
+        let second_samples = samples.into_iter().collect::<Vec<_>>();
+
+        assert_eq!(first_genes, vec![0, 1]);
+        assert_eq!(second_genes, first_genes);
+        assert_eq!(first_samples, vec![0, 1, 2]);
+        assert_eq!(second_samples, first_samples);
     }
 
     #[test]
