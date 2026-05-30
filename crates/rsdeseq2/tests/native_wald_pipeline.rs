@@ -13,6 +13,18 @@ fn two_group_design() -> DesignMatrix {
     .unwrap()
 }
 
+fn two_group_design_with_r_cleaned_coefficient() -> DesignMatrix {
+    DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition.B.1".into()]),
+    )
+    .unwrap()
+}
+
 fn native_wald_counts_with_zero_row() -> CountMatrix {
     CountMatrix::from_row_major_u32_with_names(
         8,
@@ -310,6 +322,22 @@ fn top_level_fit_with_results_accepts_coefficient_name() {
     assert!(builder
         .fit_with_results_name(&counts, &design, "missing")
         .is_err());
+}
+
+#[test]
+fn top_level_fit_with_results_accepts_r_cleaned_coefficient_name_alias() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design_with_r_cleaned_coefficient();
+    let builder = glm_mu_native_wald_builder();
+
+    let (named_fit, named_results) = builder
+        .fit_with_results_name(&counts, &design, "condition-B 1")
+        .unwrap();
+    let (indexed_fit, indexed_results) = builder.fit_wald_glm_mu(&counts, &design, 1).unwrap();
+
+    assert_eq!(named_fit.wald, indexed_fit.wald);
+    assert_wald_fit_state_matches(&named_fit, &indexed_fit, "R-cleaned named top-level Wald");
+    assert_eq!(named_results, indexed_results);
 }
 
 #[test]

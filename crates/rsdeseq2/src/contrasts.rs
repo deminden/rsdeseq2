@@ -204,7 +204,7 @@ pub fn resolve_contrast(
         ContrastSpec::Numeric(values) => validate_numeric_contrast(values, design.n_coefficients()),
         ContrastSpec::CoefficientName(name) => {
             let names = coefficient_names(design)?;
-            let index = find_coefficient(names, name)?;
+            let index = resolve_coefficient_name(names, name)?;
             let mut values = vec![0.0; design.n_coefficients()];
             values[index] = 1.0;
             Ok(values)
@@ -228,6 +228,19 @@ pub fn resolve_contrast(
             reference,
         } => resolve_factor_level_contrast(design, factor, numerator, denominator, reference),
     }
+}
+
+/// Resolve a design coefficient name with the same DESeq2-style aliases used by
+/// named primitive contrasts.
+///
+/// Exact coefficient names win first. If no exact name exists, the resolver
+/// accepts R-cleaned aliases, including the `Intercept`/`(Intercept)` spelling
+/// pair, and reports ambiguous aliases instead of choosing arbitrarily.
+pub fn resolve_coefficient_index(
+    design: &DesignMatrix,
+    coefficient_name: &str,
+) -> Result<usize, DeseqError> {
+    resolve_coefficient_name(coefficient_names(design)?, coefficient_name)
 }
 
 /// Identify rows where every sample involved in a numeric contrast has zero counts.
@@ -472,25 +485,24 @@ fn resolve_list_contrast(
 ) -> Result<Vec<f64>, DeseqError> {
     validate_list_values(positive, negative, positive_weight, negative_weight)?;
     let names = coefficient_names(design)?;
-    let positive_set = positive.iter().collect::<HashSet<_>>();
-    let negative_set = negative.iter().collect::<HashSet<_>>();
-    if positive_set.intersection(&negative_set).next().is_some() {
+    let positive_indices = resolve_coefficient_name_list(names, positive)?;
+    let negative_indices = resolve_coefficient_name_list(names, negative)?;
+    if positive_indices
+        .iter()
+        .any(|index| negative_indices.contains(index))
+    {
         return Err(DeseqError::InvalidOptions {
             reason: "contrast list entries must not appear in both numerator and denominator"
                 .to_string(),
         });
     }
-    for name in positive.iter().chain(negative.iter()) {
-        find_coefficient(names, name)?;
-    }
 
     let mut values = vec![0.0; design.n_coefficients()];
-    for (index, name) in names.iter().enumerate() {
-        if positive_set.contains(name) {
-            values[index] = positive_weight;
-        } else if negative_set.contains(name) {
-            values[index] = negative_weight;
-        }
+    for index in positive_indices {
+        values[index] = positive_weight;
+    }
+    for index in negative_indices {
+        values[index] = negative_weight;
     }
     validate_numeric_contrast(&values, design.n_coefficients())
 }
@@ -596,6 +608,61 @@ fn find_coefficient(names: &[String], wanted: &str) -> Result<usize, DeseqError>
         })
 }
 
+fn resolve_coefficient_name(names: &[String], wanted: &str) -> Result<usize, DeseqError> {
+    if let Ok(index) = find_coefficient(names, wanted) {
+        return Ok(index);
+    }
+    let candidates = coefficient_name_candidates(wanted)
+        .into_iter()
+        .filter(|candidate| candidate != wanted)
+        .collect::<Vec<_>>();
+    let matches = candidates
+        .iter()
+        .filter_map(|candidate| names.iter().position(|name| name == candidate))
+        .collect::<HashSet<_>>();
+    match matches.len() {
+        0 => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "coefficient '{wanted}' is not present in coefficient names or R-cleaned aliases"
+            ),
+        }),
+        1 => Ok(*matches.iter().next().unwrap()),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!("coefficient '{wanted}' resolves ambiguously after R-style cleanup"),
+        }),
+    }
+}
+
+fn resolve_coefficient_name_list(
+    names: &[String],
+    wanted: &[String],
+) -> Result<Vec<usize>, DeseqError> {
+    let mut indices = Vec::with_capacity(wanted.len());
+    let mut seen = HashSet::with_capacity(wanted.len());
+    for name in wanted {
+        let index = resolve_coefficient_name(names, name)?;
+        if !seen.insert(index) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "contrast list contains duplicate coefficient '{name}' after R-style cleanup"
+                ),
+            });
+        }
+        indices.push(index);
+    }
+    Ok(indices)
+}
+
+fn coefficient_name_candidates(name: &str) -> Vec<String> {
+    let mut candidates = candidate_names(name);
+    if name == "(Intercept)" {
+        push_unique_candidate(&mut candidates, "Intercept".to_string());
+    } else if name == "Intercept" {
+        push_unique_candidate(&mut candidates, "(Intercept)".to_string());
+    }
+    candidates
+}
+
 fn list_contrast_comparison(
     positive: &[String],
     negative: &[String],
@@ -678,15 +745,45 @@ fn standard_coefficients_for_level(
 }
 
 fn standard_coefficient_prefixes(factor: &str, level: &str) -> Vec<String> {
-    candidate_names(&format!("{factor}_{level}_vs_"))
+    let raw = format!("{factor}_{level}_vs_");
+    let mut candidates = candidate_names(&raw);
+    push_unique_candidate(
+        &mut candidates,
+        format!(
+            "{}_{}_vs_",
+            r_like_make_name(factor),
+            r_like_make_name(level)
+        ),
+    );
+    candidates
 }
 
 fn standard_coefficient_names(factor: &str, level: &str, reference: &str) -> Vec<String> {
-    candidate_names(&format!("{factor}_{level}_vs_{reference}"))
+    standard_coefficient_candidates(factor, level, reference)
 }
 
 fn expanded_coefficient_names(factor: &str, level: &str) -> Vec<String> {
-    candidate_names(&format!("{factor}{level}"))
+    let mut candidates = candidate_names(&format!("{factor}{level}"));
+    push_unique_candidate(
+        &mut candidates,
+        format!("{}{}", r_like_make_name(factor), r_like_make_name(level)),
+    );
+    candidates
+}
+
+fn standard_coefficient_candidates(factor: &str, level: &str, reference: &str) -> Vec<String> {
+    let raw = format!("{factor}_{level}_vs_{reference}");
+    let mut candidates = candidate_names(&raw);
+    push_unique_candidate(
+        &mut candidates,
+        format!(
+            "{}_{}_vs_{}",
+            r_like_make_name(factor),
+            r_like_make_name(level),
+            r_like_make_name(reference)
+        ),
+    );
+    candidates
 }
 
 fn candidate_names(raw: &str) -> Vec<String> {
@@ -695,6 +792,12 @@ fn candidate_names(raw: &str) -> Vec<String> {
         vec![raw.to_string()]
     } else {
         vec![raw.to_string(), made]
+    }
+}
+
+fn push_unique_candidate(candidates: &mut Vec<String>, candidate: String) {
+    if !candidates.iter().any(|existing| existing == &candidate) {
+        candidates.push(candidate);
     }
 }
 
@@ -718,5 +821,32 @@ fn r_like_make_name(raw: &str) -> String {
     if invalid_start {
         out.insert(0, 'X');
     }
+    if is_r_reserved_word(&out) {
+        out.push('.');
+    }
     out
+}
+
+fn is_r_reserved_word(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "else"
+            | "repeat"
+            | "while"
+            | "function"
+            | "for"
+            | "in"
+            | "next"
+            | "break"
+            | "TRUE"
+            | "FALSE"
+            | "NULL"
+            | "Inf"
+            | "NaN"
+            | "NA"
+            | "NA_integer_"
+            | "NA_real_"
+            | "NA_complex_"
+            | "NA_character_"
+    )
 }

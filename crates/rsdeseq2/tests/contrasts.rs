@@ -49,6 +49,60 @@ fn coefficient_name_contrast_resolves_to_unit_vector() {
 }
 
 #[test]
+fn coefficient_name_contrast_resolves_r_cleaned_aliases() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "(Intercept)".into(),
+            "if.".into(),
+            "condition.B.1".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::coefficient_name("Intercept")).unwrap(),
+        vec![1.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::coefficient_name("if")).unwrap(),
+        vec![0.0, 1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::coefficient_name("condition-B 1")).unwrap(),
+        vec![0.0, 0.0, 1.0]
+    );
+}
+
+#[test]
+fn coefficient_name_contrast_prefers_exact_name_over_cleaned_alias() {
+    let design =
+        DesignMatrix::from_row_major(4, 2, vec![1.0; 8], Some(vec!["a-b".into(), "a.b".into()]))
+            .unwrap();
+
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::coefficient_name("a-b")).unwrap(),
+        vec![1.0, 0.0]
+    );
+}
+
+#[test]
+fn coefficient_name_contrast_rejects_ambiguous_r_cleaned_aliases() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![1.0; 8],
+        Some(vec![".Intercept.".into(), "Intercept".into()]),
+    )
+    .unwrap();
+
+    assert!(resolve_contrast(&design, &ContrastSpec::coefficient_name("(Intercept)")).is_err());
+    assert!(resolve_coefficient_index(&design, "(Intercept)").is_err());
+}
+
+#[test]
 fn contrast_specs_expose_stable_result_metadata_labels() {
     let coefficient = ContrastSpec::coefficient_name("condition_B_vs_A");
     assert_eq!(coefficient.result_name(), "condition_B_vs_A");
@@ -128,6 +182,33 @@ fn list_contrast_resolves_like_deseq2_name_lists() {
 
     let empty = ContrastSpec::list(Vec::new(), Vec::new());
     assert!(resolve_contrast(&design, &empty).is_err());
+}
+
+#[test]
+fn list_contrast_resolves_r_cleaned_coefficient_aliases() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "(Intercept)".into(),
+            "if.".into(),
+            "condition.B.1".into(),
+        ]),
+    )
+    .unwrap();
+    let contrast = ContrastSpec::list(vec!["if".into()], vec!["condition-B 1".into()]);
+
+    assert_eq!(
+        resolve_contrast(&design, &contrast).unwrap(),
+        vec![0.0, 1.0, -1.0]
+    );
+
+    let duplicated = ContrastSpec::list(vec!["if".into(), "if.".into()], Vec::new());
+    assert!(resolve_contrast(&design, &duplicated).is_err());
+
+    let overlap = ContrastSpec::list(vec!["Intercept".into()], vec!["(Intercept)".into()]);
+    assert!(resolve_contrast(&design, &overlap).is_err());
 }
 
 #[test]
@@ -360,6 +441,38 @@ fn factor_level_contrast_uses_r_like_make_names_for_candidates() {
         )
         .unwrap(),
         vec![0.0, 1.0]
+    );
+}
+
+#[test]
+fn factor_level_contrast_uses_r_reserved_word_make_names_for_candidates() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "Intercept".into(),
+            "condition_if._vs_TRUE.".into(),
+            "condition_function._vs_TRUE.".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("condition", "if", "TRUE")
+        )
+        .unwrap(),
+        vec![0.0, 1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("condition", "function", "if")
+        )
+        .unwrap(),
+        vec![0.0, -1.0, 1.0]
     );
 }
 

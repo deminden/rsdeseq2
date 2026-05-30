@@ -16,6 +16,8 @@ for tests.
 
 The workspace tracks current stable Rust in `Cargo.toml` through
 `rust-version`; local development and CI should use that toolchain or newer.
+Public slice-like APIs prefer `RangeBounds` where range inputs are accepted, so
+callers can use both legacy range syntax and the newer `core::range` types.
 
 ## Commands
 

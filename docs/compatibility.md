@@ -16,7 +16,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
-| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, and supported-formula helpers can now build the expanded design internally for replacement-refit workflows too. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, and Rust expanded-model workflow tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
+| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, and supported-formula helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, and CLI smoke tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
@@ -216,8 +216,8 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   optionally weighted, deterministic-prior MAP dispersion subsets with
   parametric, local, or mean dispersion trends.
 - Default coefficient-level Wald statistic and standard-Normal p-value.
-- Top-level Wald result helpers can report the selected design coefficient by
-  index or coefficient name.
+- Top-level Wald result helpers and CLI commands can report the selected design
+  coefficient by index or coefficient name.
 - DESeq2-style Wald t p-values with residual, scalar, or per-gene degrees of
   freedom for selected coefficients and primitive numeric contrasts, including
   thresholded t-tail alternatives covered by passable original
@@ -230,10 +230,16 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Primitive coefficient-name, positive/negative coefficient-list, and common
   factor-level contrast resolution against design coefficient names, with
   stable result-table names and comparison labels for named contrast specs.
-  Non-reference factor-level comparisons can infer a shared reference from
-  coefficient names such as `B_vs_A` and `C_vs_A`. Coefficient-list contrast
-  weights follow DESeq2 `listValues` sign validation, and list comparison
-  labels follow DESeq2's two-sided and one-sided naming shape.
+  Coefficient-name and list contrasts resolve exact names first, then
+  R-cleaned aliases and intercept aliases; top-level named coefficient result
+  helpers share the same alias resolution. Non-reference factor-level
+  comparisons can infer a shared reference from coefficient names such as
+  `B_vs_A` and `C_vs_A`. Factor-level coefficient candidates include R-style
+  whole-name and component-wise `make.names` cleanup for non-syntactic and
+  reserved factor or level names.
+  Coefficient-list contrast weights follow DESeq2 `listValues` sign
+  validation, and list comparison labels follow DESeq2's two-sided and
+  one-sided naming shape.
 - Native linear-mu and GLM-mu Wald contrast entry points reuse the implemented
   MAP dispersion paths, then run numeric, named/list, or caller-supplied
   factor-level contrast result assembly. Compatibility-named parametric-only

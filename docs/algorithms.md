@@ -1148,7 +1148,8 @@ parametric/local/mean-trend, deterministic-prior branches.
 implemented GLM-mu Wald branch as a limited top-level workflow and report the
 last design coefficient by default, matching DESeq2's default result-coefficient
 shape. `fit_with_results_name()` exposes the selected-coefficient path by
-design coefficient name, separate from contrast handling. `fit_contrast()`,
+design coefficient name, using the same exact-first R-cleaned aliases as named
+primitive contrasts. `fit_contrast()`,
 `fit_contrast_spec()`, and
 `fit_factor_level_contrast()` expose fit-only top-level Wald contrast helpers;
 `fit_with_results_contrast()`, `fit_with_results_contrast_spec()`, and

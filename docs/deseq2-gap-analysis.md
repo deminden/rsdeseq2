@@ -96,7 +96,8 @@ Still missing:
 
 - full `results(contrast=...)` semantics,
 - formula/metadata-aware factor-level handling,
-- complete coefficient-name cleanup,
+- remaining coefficient-name cleanup beyond the implemented R-style aliases
+  for primitive coefficient-name, list, and factor-level candidates,
 - complete formula-aware contrast Cook's/refit behavior,
 - full Bioconductor result-object metadata and formula-aware result metadata
   beyond the typed primitive table view.

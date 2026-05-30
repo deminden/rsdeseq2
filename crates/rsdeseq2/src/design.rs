@@ -160,6 +160,17 @@ impl DesignMatrix {
         self.matrix.col_indices()
     }
 
+    /// Return a contiguous sample-row block in row-major order.
+    ///
+    /// The range accepts both legacy range syntax (`1..3`) and the newer
+    /// `core::range` types.
+    pub fn sample_rows<R: core::ops::RangeBounds<usize>>(
+        &self,
+        samples: R,
+    ) -> Result<&[f64], DeseqError> {
+        self.matrix.rows(samples)
+    }
+
     /// Matrix values.
     pub fn matrix(&self) -> &RowMajorMatrix<f64> {
         &self.matrix

@@ -103,6 +103,113 @@ sample2\t1\t0
     .unwrap();
 }
 
+fn write_additive_contrast_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tcondition_B_vs_A\tbatch_Y_vs_X
+sample3\t1\t1\t1
+sample1\t1\t0\t0
+sample4\t1\t1\t0
+sample2\t1\t0\t1
+",
+    )
+    .unwrap();
+}
+
+fn write_mismatched_standard_contrast_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tcondition_B_vs_A
+sample3\t1\t0
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t1
+",
+    )
+    .unwrap();
+}
+
+fn write_expanded_factor_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tconditionA\tconditionB
+sample3\t1\t0\t1
+sample1\t1\t1\t0
+sample4\t1\t0\t1
+sample2\t1\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_gene_numeric_fixture(path: &Path, column: &str, values: &[f64]) {
+    let genes = ["gene1", "gene2", "gene3", "gene4"];
+    let mut text = format!("gene\t{column}\n");
+    for (gene, value) in genes.iter().zip(values.iter()) {
+        text.push_str(&format!("{gene}\t{value}\n"));
+    }
+    fs::write(path, text).unwrap();
+}
+
+fn write_reserved_contrast_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tcondition_if._vs_TRUE.
+sample3\t1\t1
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_reserved_coefficient_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tif.
+sample3\t1\t1
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_ambiguous_coefficient_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\t.Intercept.\tIntercept
+sample3\t1\t1
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_intercept_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept
+sample3\t1
+sample1\t1
+sample4\t1
+sample2\t1
+",
+    )
+    .unwrap();
+}
+
 fn write_sample_level_fixture(path: &Path) {
     fs::write(
         path,
@@ -112,6 +219,34 @@ sample3\tB
 sample1\tA
 sample4\tB
 sample2\tA
+",
+    )
+    .unwrap();
+}
+
+fn write_batch_sample_level_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tbatch
+sample3\tY
+sample1\tX
+sample4\tX
+sample2\tY
+",
+    )
+    .unwrap();
+}
+
+fn write_reserved_sample_level_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tcondition
+sample3\tif
+sample1\tTRUE
+sample4\tif
+sample2\tTRUE
 ",
     )
     .unwrap();
@@ -1013,6 +1148,1247 @@ fn cli_wald_accepts_numeric_contrast() {
 }
 
 #[test]
+fn cli_wald_accepts_expanded_beta_prior_coefficient_workflow() {
+    let dir = temp_dir("wald-beta-prior-expanded");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_expanded_beta_prior_contrast_workflow() {
+    let dir = temp_dir("wald-beta-prior-expanded-contrast");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--contrast-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_expanded_beta_prior_normalization_factors() {
+    let dir = temp_dir("wald-beta-prior-expanded-nf");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[12.375, 2.5, 60.9375, 7.03125]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--normalization-factors",
+        reference_data_path("normalization_factors.tsv")
+            .to_str()
+            .unwrap(),
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_expanded_beta_prior_writes_cooks_replacement_sidecars() {
+    let dir = temp_dir("wald-beta-prior-expanded-replacement");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    let replacement_metadata = dir.join("replacement_metadata.tsv");
+    let replacement_row_metadata = dir.join("replacement_rows.tsv");
+    let replaced_counts = dir.join("replaced_counts.tsv");
+    let candidate_counts = dir.join("candidate_counts.tsv");
+    let outlier_cells = dir.join("outlier_cells.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--cooks-cutoff",
+        "0.1",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--cooks-replacement-metadata-output",
+        replacement_metadata.to_str().unwrap(),
+        "--cooks-replacement-row-metadata-output",
+        replacement_row_metadata.to_str().unwrap(),
+        "--cooks-replaced-counts-output",
+        replaced_counts.to_str().unwrap(),
+        "--cooks-candidate-replacement-counts-output",
+        candidate_counts.to_str().unwrap(),
+        "--cooks-outlier-cells-output",
+        outlier_cells.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&replacement_metadata, "name\tvalue\n");
+    assert_tsv_contains(&replacement_metadata, "nRefit\t");
+    assert_tsv_starts_with(
+        &replacement_row_metadata,
+        "gene\treplace\trefitReplace\tnewAllZero\treplacedAllZero\t",
+    );
+    assert_matrix_table(&replaced_counts);
+    assert_matrix_table(&candidate_counts);
+    assert_tsv_starts_with(&outlier_cells, "gene\tsample1\tsample2\tsample3\tsample4\n");
+}
+
+#[test]
+fn cli_wald_accepts_factor_expanded_beta_prior_coefficient_workflow() {
+    let dir = temp_dir("wald-beta-prior-factor");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_factor_expanded_beta_prior_contrast_workflow() {
+    let dir = temp_dir("wald-beta-prior-factor-contrast");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--contrast-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_factor_expanded_beta_prior_normalization_factors() {
+    let dir = temp_dir("wald-beta-prior-factor-nf");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[12.375, 2.5, 60.9375, 7.03125]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--normalization-factors",
+        reference_data_path("normalization_factors.tsv")
+            .to_str()
+            .unwrap(),
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_factor_beta_prior_writes_cooks_replacement_sidecars() {
+    let dir = temp_dir("wald-beta-prior-factor-replacement");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    let replacement_metadata = dir.join("replacement_metadata.tsv");
+    let replacement_row_metadata = dir.join("replacement_rows.tsv");
+    let replaced_counts = dir.join("replaced_counts.tsv");
+    let candidate_counts = dir.join("candidate_counts.tsv");
+    let outlier_cells = dir.join("outlier_cells.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--cooks-cutoff",
+        "0.1",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--cooks-replacement-metadata-output",
+        replacement_metadata.to_str().unwrap(),
+        "--cooks-replacement-row-metadata-output",
+        replacement_row_metadata.to_str().unwrap(),
+        "--cooks-replaced-counts-output",
+        replaced_counts.to_str().unwrap(),
+        "--cooks-candidate-replacement-counts-output",
+        candidate_counts.to_str().unwrap(),
+        "--cooks-outlier-cells-output",
+        outlier_cells.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&replacement_metadata, "name\tvalue\n");
+    assert_tsv_contains(&replacement_metadata, "nRefit\t");
+    assert_tsv_starts_with(
+        &replacement_row_metadata,
+        "gene\treplace\trefitReplace\tnewAllZero\treplacedAllZero\t",
+    );
+    assert_matrix_table(&replaced_counts);
+    assert_matrix_table(&candidate_counts);
+    assert_tsv_starts_with(&outlier_cells, "gene\tsample1\tsample2\tsample3\tsample4\n");
+}
+
+#[test]
+fn cli_wald_accepts_additive_expanded_beta_prior_coefficient_workflow() {
+    let dir = temp_dir("wald-beta-prior-additive");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_additive_expanded_beta_prior_normalization_factors() {
+    let dir = temp_dir("wald-beta-prior-additive-nf");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[12.375, 2.5, 60.9375, 7.03125]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--normalization-factors",
+        reference_data_path("normalization_factors.tsv")
+            .to_str()
+            .unwrap(),
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--contrast-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_additive_expanded_beta_prior_observation_weights() {
+    let dir = temp_dir("wald-beta-prior-additive-weights");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--observation-weights",
+        reference_data_path("observation_weights.tsv")
+            .to_str()
+            .unwrap(),
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_additive_expanded_beta_prior_list_contrast() {
+    let dir = temp_dir("wald-beta-prior-additive-list");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--contrast-positive",
+        "condition_B_vs_A,batch_Y_vs_X",
+        "--contrast-negative-weight",
+        "-0.5",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_additive_beta_prior_writes_cooks_replacement_sidecars() {
+    let dir = temp_dir("wald-beta-prior-additive-replacement");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    let replacement_metadata = dir.join("replacement_metadata.tsv");
+    let replacement_row_metadata = dir.join("replacement_rows.tsv");
+    let replaced_counts = dir.join("replaced_counts.tsv");
+    let candidate_counts = dir.join("candidate_counts.tsv");
+    let outlier_cells = dir.join("outlier_cells.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--cooks-cutoff",
+        "0.1",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--cooks-replacement-metadata-output",
+        replacement_metadata.to_str().unwrap(),
+        "--cooks-replacement-row-metadata-output",
+        replacement_row_metadata.to_str().unwrap(),
+        "--cooks-replaced-counts-output",
+        replaced_counts.to_str().unwrap(),
+        "--cooks-candidate-replacement-counts-output",
+        candidate_counts.to_str().unwrap(),
+        "--cooks-outlier-cells-output",
+        outlier_cells.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_starts_with(&replacement_metadata, "name\tvalue\n");
+    assert_tsv_contains(&replacement_metadata, "nRefit\t");
+    assert_tsv_starts_with(
+        &replacement_row_metadata,
+        "gene\treplace\trefitReplace\tnewAllZero\treplacedAllZero\t",
+    );
+    assert_matrix_table(&replaced_counts);
+    assert_matrix_table(&candidate_counts);
+    assert_tsv_starts_with(&outlier_cells, "gene\tsample1\tsample2\tsample3\tsample4\n");
+}
+
+#[test]
+fn cli_wald_rejects_additive_beta_prior_when_reported_design_disagrees() {
+    let dir = temp_dir("wald-beta-prior-additive-design-mismatch");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_additive_beta_prior_mismatched_factor_lists() {
+    let dir = temp_dir("wald-beta-prior-additive-list-mismatch");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_factor_beta_prior_when_reported_design_disagrees() {
+    let dir = temp_dir("wald-beta-prior-factor-design-mismatch");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_mismatched_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_incomplete_expanded_beta_prior_inputs() {
+    let dir = temp_dir("wald-beta-prior-expanded-incomplete");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_incomplete_factor_beta_prior_inputs() {
+    let dir = temp_dir("wald-beta-prior-factor-incomplete");
+    let standard = dir.join("standard.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_incomplete_additive_beta_prior_inputs() {
+    let dir = temp_dir("wald-beta-prior-additive-incomplete");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_mixed_beta_prior_matrix_and_factor_inputs() {
+    let dir = temp_dir("wald-beta-prior-mixed-inputs");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let levels = dir.join("levels.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_sample_level_fixture(&levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        levels.to_str().unwrap(),
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_mixed_beta_prior_matrix_and_additive_inputs() {
+    let dir = temp_dir("wald-beta-prior-matrix-additive-inputs");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_mixed_beta_prior_factor_and_additive_inputs() {
+    let dir = temp_dir("wald-beta-prior-factor-additive-inputs");
+    let standard = dir.join("standard.tsv");
+    let condition_levels = dir.join("condition.tsv");
+    let batch_levels = dir.join("batch.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_additive_contrast_design_fixture(&standard);
+    write_sample_level_fixture(&condition_levels);
+    write_batch_sample_level_fixture(&batch_levels);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+    let sample_levels = format!("{},{}", condition_levels.display(), batch_levels.display());
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-factor",
+        "condition",
+        "--beta-prior-reference",
+        "A",
+        "--beta-prior-sample-levels",
+        condition_levels.to_str().unwrap(),
+        "--beta-prior-additive-factors",
+        "condition,batch",
+        "--beta-prior-additive-references",
+        "A,X",
+        "--beta-prior-additive-sample-levels",
+        &sample_levels,
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "batch_Y_vs_X",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_factor_level_contrast_for_beta_prior_cli() {
+    let dir = temp_dir("wald-beta-prior-factor-level-contrast");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "B",
+        "--contrast-denominator",
+        "A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_expanded_beta_prior_group_index_outside_expanded_design() {
+    let dir = temp_dir("wald-beta-prior-expanded-bad-group");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|5",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_duplicate_expanded_beta_prior_group_indices() {
+    let dir = temp_dir("wald-beta-prior-expanded-duplicate-group");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|0",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
+fn cli_wald_rejects_expanded_beta_prior_group_count_mismatch() {
+    let dir = temp_dir("wald-beta-prior-expanded-group-count");
+    let standard = dir.join("standard.tsv");
+    let expanded = dir.join("expanded.tsv");
+    let dispersions = dir.join("dispersions.tsv");
+    let base_mean = dir.join("base_mean.tsv");
+    let disp_fit = dir.join("disp_fit.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&standard);
+    write_expanded_factor_design_fixture(&expanded);
+    write_gene_numeric_fixture(&dispersions, "dispersion", &[0.08, 0.12, 0.05, 0.2]);
+    write_gene_numeric_fixture(&base_mean, "baseMean", &[16.5, 3.0, 97.5, 7.5]);
+    write_gene_numeric_fixture(&disp_fit, "dispFit", &[0.08, 0.12, 0.05, 0.2]);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        standard.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--disable-cooks-cutoff",
+        "--beta-prior-expanded-design",
+        expanded.to_str().unwrap(),
+        "--beta-prior-coefficient-groups",
+        "0|1|2",
+        "--beta-prior-dispersions",
+        dispersions.to_str().unwrap(),
+        "--beta-prior-base-mean",
+        base_mean.to_str().unwrap(),
+        "--beta-prior-disp-fit",
+        disp_fit.to_str().unwrap(),
+        "--coefficient-name",
+        "condition_B_vs_A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
 fn cli_wald_accepts_named_contrast() {
     let dir = temp_dir("wald-contrast-name");
     let output = dir.join("wald.tsv");
@@ -1027,6 +2403,30 @@ fn cli_wald_accepts_named_contrast() {
         "mean",
         "--contrast-name",
         "conditionB",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_r_cleaned_named_contrast_alias() {
+    let dir = temp_dir("wald-contrast-name-cleaned");
+    let design = dir.join("design.tsv");
+    let output = dir.join("wald.tsv");
+    write_reserved_coefficient_design_fixture(&design);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-name",
+        "if",
         "--output",
         output.to_str().unwrap(),
     ]);
@@ -1054,6 +2454,52 @@ fn cli_wald_accepts_coefficient_name() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_r_cleaned_coefficient_name_alias() {
+    let dir = temp_dir("wald-coefficient-name-cleaned");
+    let design = dir.join("design.tsv");
+    let output = dir.join("wald.tsv");
+    write_reserved_coefficient_design_fixture(&design);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "if",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_rejects_ambiguous_r_cleaned_coefficient_name_alias() {
+    let dir = temp_dir("wald-coefficient-name-ambiguous");
+    let design = dir.join("design.tsv");
+    let output = dir.join("wald.tsv");
+    write_ambiguous_coefficient_design_fixture(&design);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "(Intercept)",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
 }
 
 #[test]
@@ -1106,6 +2552,38 @@ fn cli_wald_accepts_factor_level_contrast() {
         "B",
         "--contrast-denominator",
         "A",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_factor_level_contrast_with_r_cleaned_level_names() {
+    let dir = temp_dir("wald-contrast-factor-cleaned");
+    let design = dir.join("design.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("wald.tsv");
+    write_reserved_contrast_design_fixture(&design);
+    write_reserved_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "if",
+        "--contrast-denominator",
+        "TRUE",
         "--contrast-sample-levels",
         levels.to_str().unwrap(),
         "--output",
@@ -1397,6 +2875,60 @@ fn cli_lrt_accepts_coefficient_name() {
 }
 
 #[test]
+fn cli_lrt_accepts_r_cleaned_coefficient_name_alias() {
+    let dir = temp_dir("lrt-coefficient-name-cleaned");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let output = dir.join("lrt.tsv");
+    write_reserved_coefficient_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reduced_design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "if",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_rejects_ambiguous_r_cleaned_coefficient_name_alias() {
+    let dir = temp_dir("lrt-coefficient-name-ambiguous");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let output = dir.join("lrt.tsv");
+    write_ambiguous_coefficient_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+
+    run_cli_failure(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reduced_design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--coefficient-name",
+        "(Intercept)",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
 fn cli_lrt_accepts_numeric_contrast() {
     let dir = temp_dir("lrt-contrast");
     let output = dir.join("lrt.tsv");
@@ -1437,6 +2969,34 @@ fn cli_lrt_accepts_named_contrast() {
         "mean",
         "--contrast-name",
         "conditionB",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_r_cleaned_named_contrast_alias() {
+    let dir = temp_dir("lrt-contrast-name-cleaned");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let output = dir.join("lrt.tsv");
+    write_reserved_coefficient_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reduced_design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-name",
+        "if",
         "--output",
         output.to_str().unwrap(),
     ]);
@@ -1498,6 +3058,42 @@ fn cli_lrt_accepts_factor_level_contrast() {
         "B",
         "--contrast-denominator",
         "A",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_factor_level_contrast_with_r_cleaned_level_names() {
+    let dir = temp_dir("lrt-contrast-factor-cleaned");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("lrt.tsv");
+    write_reserved_contrast_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+    write_reserved_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reduced_design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "if",
+        "--contrast-denominator",
+        "TRUE",
         "--contrast-sample-levels",
         levels.to_str().unwrap(),
         "--output",

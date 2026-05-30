@@ -1,4 +1,5 @@
 use rsdeseq2::prelude::*;
+use std::assert_matches;
 
 #[test]
 fn intercept_only_design_has_named_all_ones_column() {
@@ -55,6 +56,35 @@ fn design_matrix_resolves_coefficient_names() {
 
     let unnamed = DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], None).unwrap();
     assert!(unnamed.coefficient_index("Intercept").is_err());
+}
+
+#[test]
+fn design_matrix_sample_rows_accept_legacy_and_new_ranges() {
+    let design = DesignMatrix::from_row_major(
+        3,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 2.0,
+        ],
+        Some(vec!["Intercept".into(), "dose".into()]),
+    )
+    .unwrap();
+
+    assert_eq!(design.sample_rows(1..3).unwrap(), &[1.0, 1.0, 1.0, 2.0]);
+    assert_eq!(
+        design
+            .sample_rows(core::range::Range { start: 0, end: 2 })
+            .unwrap(),
+        &[1.0, 0.0, 1.0, 1.0]
+    );
+    assert_matches!(
+        design
+            .sample_rows(core::range::Range { start: 0, end: 4 })
+            .unwrap_err(),
+        DeseqError::InvalidDimensions { .. }
+    );
 }
 
 #[test]

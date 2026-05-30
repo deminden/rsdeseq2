@@ -13,6 +13,18 @@ fn full_design() -> DesignMatrix {
     .unwrap()
 }
 
+fn full_design_with_r_cleaned_coefficient() -> DesignMatrix {
+    DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition.B.1".into()]),
+    )
+    .unwrap()
+}
+
 fn reduced_design() -> DesignMatrix {
     DesignMatrix::from_row_major(
         8,
@@ -1139,6 +1151,24 @@ fn top_level_fit_lrt_with_results_accepts_coefficient_name() {
     assert!(builder
         .fit_lrt_with_results_name(&counts, &full, &reduced, "missing")
         .is_err());
+}
+
+#[test]
+fn top_level_fit_lrt_with_results_accepts_r_cleaned_coefficient_name_alias() {
+    let counts = counts_with_zero_row();
+    let full = full_design_with_r_cleaned_coefficient();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder();
+
+    let (named_fit, named_results) = builder
+        .fit_lrt_with_results_name(&counts, &full, &reduced, "condition-B 1")
+        .unwrap();
+    let (indexed_fit, indexed_results) =
+        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+
+    assert_eq!(named_fit.lrt, indexed_fit.lrt);
+    assert_lrt_fit_state_matches(&named_fit, &indexed_fit, "R-cleaned named LRT");
+    assert_eq!(named_results, indexed_results);
 }
 
 #[test]

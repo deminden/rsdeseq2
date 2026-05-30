@@ -3,8 +3,8 @@ use crate::all_zero::{
     expand_matrix_with_nan_rows, mask_all_zero_values_with_nan_rows, nonzero_gene_indices,
 };
 use crate::contrasts::{
-    contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_contrast, ContrastSpec,
-    FactorLevelContrast,
+    contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_coefficient_index,
+    resolve_contrast, ContrastSpec, FactorLevelContrast,
 };
 use crate::cooks::{
     calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
@@ -30,7 +30,7 @@ use crate::glm::{
     ObservationWeightOptions, WaldAlternative, WaldContrastOutput, WaldOutput, WaldTestOptions,
 };
 use crate::independent_filtering::{apply_independent_filtering, IndependentFilteringOptions};
-use crate::matrix::RowMajorMatrix;
+use crate::matrix::{normalize_index_range, RowMajorMatrix};
 use crate::normalization::{
     base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
     estimate_size_factors_with_options, normalized_counts, normalized_counts_with_factors,
@@ -193,6 +193,34 @@ impl CountMatrix {
             });
         }
         Ok(self.row_values(gene))
+    }
+
+    /// Return a contiguous block of gene rows in row-major order.
+    ///
+    /// The range accepts both legacy range syntax (`1..3`) and the newer
+    /// `core::range` types. The returned slice contains
+    /// `n_genes_in_range * n_samples` counts.
+    pub fn gene_rows<R: core::ops::RangeBounds<usize>>(
+        &self,
+        genes: R,
+    ) -> Result<&[u32], DeseqError> {
+        let (start_gene, end_gene) = normalize_index_range(genes, self.n_genes, "gene range")?;
+        let start = start_gene.checked_mul(self.n_samples).ok_or_else(|| {
+            DeseqError::InvalidDimensions {
+                context: "gene range start overflow".to_string(),
+                expected: self.counts.len(),
+                actual: usize::MAX,
+            }
+        })?;
+        let end =
+            end_gene
+                .checked_mul(self.n_samples)
+                .ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "gene range end overflow".to_string(),
+                    expected: self.counts.len(),
+                    actual: usize::MAX,
+                })?;
+        Ok(&self.counts[start..end])
     }
 
     pub(crate) fn row_values(&self, gene: usize) -> &[u32] {
@@ -5229,7 +5257,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
             TestType::Wald => {
-                let coefficient = design.coefficient_index(coefficient_name)?;
+                let coefficient = resolve_coefficient_index(design, coefficient_name)?;
                 self.fit_wald_glm_mu(counts, design, coefficient)
             }
             TestType::Lrt => {
@@ -5272,7 +5300,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         match self.test {
             TestType::Wald => {
-                let coefficient = design.coefficient_index(coefficient_name)?;
+                let coefficient = resolve_coefficient_index(design, coefficient_name)?;
                 self.fit_wald_glm_mu_with_cooks_replacement(
                     counts,
                     design,
@@ -5629,7 +5657,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let coefficient = full_design.coefficient_index(coefficient_name)?;
+        let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
         self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
 
@@ -5746,7 +5774,7 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let coefficient = full_design.coefficient_index(coefficient_name)?;
+        let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
         self.fit_lrt_glm_mu_with_cooks_replacement(
             counts,
             full_design,
@@ -6437,8 +6465,10 @@ mod tests {
         CountMatrix,
     };
     use crate::contrasts::FactorLevelContrast;
+    use crate::errors::DeseqError;
     use crate::matrix::RowMajorMatrix;
     use crate::results::{DeseqResultRow, DeseqResults};
+    use std::assert_matches;
 
     #[test]
     fn count_matrix_rejects_bad_length() {
@@ -6473,6 +6503,43 @@ mod tests {
         assert_eq!(second_genes, first_genes);
         assert_eq!(first_samples, vec![0, 1, 2]);
         assert_eq!(second_samples, first_samples);
+    }
+
+    #[test]
+    fn count_matrix_gene_rows_accept_legacy_and_new_ranges() {
+        let counts = CountMatrix::from_row_major_u32(3, 2, vec![1, 2, 3, 4, 5, 6]).unwrap();
+
+        assert_eq!(counts.gene_rows(1..3).unwrap(), &[3, 4, 5, 6]);
+        assert_eq!(
+            counts
+                .gene_rows(core::range::Range { start: 0, end: 2 })
+                .unwrap(),
+            &[1, 2, 3, 4]
+        );
+        assert_eq!(
+            counts
+                .gene_rows(core::range::RangeFrom { start: 2 })
+                .unwrap(),
+            &[5, 6]
+        );
+    }
+
+    #[test]
+    fn count_matrix_gene_rows_reports_range_errors_with_debuggable_match() {
+        let counts = CountMatrix::from_row_major_u32(2, 2, vec![1, 2, 3, 4]).unwrap();
+        let start = 2;
+        let end = 1;
+
+        assert_matches!(
+            counts.gene_rows(start..end).unwrap_err(),
+            DeseqError::InvalidDimensions { .. }
+        );
+        assert_matches!(
+            counts
+                .gene_rows(core::range::Range { start: 0, end: 3 })
+                .unwrap_err(),
+            DeseqError::InvalidDimensions { .. }
+        );
     }
 
     #[test]

@@ -131,7 +131,8 @@ gene2	0.5	1.0	1.0
 The `wald` and `lrt` commands use the implemented GLM-mu native dispersion,
 MAP, Cook's cutoff, replacement/refit, independent-filtering, and result-table
 assembly path. `wald` and `lrt` can report a design coefficient by zero-based
-`--coefficient` or by `--coefficient-name`. They can also report a
+`--coefficient` or by `--coefficient-name`; coefficient-name selection uses
+exact design names first, then R-cleaned aliases and intercept aliases. They can also report a
 design-column contrast through `--contrast-name`, a positive/negative coefficient
 list through `--contrast-positive` and `--contrast-negative`, a factor-level
 contrast through `--contrast-factor`, `--contrast-numerator`, and
@@ -143,15 +144,41 @@ the full-vs-reduced likelihood-ratio test. List contrasts can use
 default `1` and `-1` weights; matching DESeq2 `listValues`, the positive
 weight must be greater than zero and the negative weight must be less than
 zero. Factor-level contrasts resolve against existing
-design coefficient names, with optional `--contrast-reference`; common
-non-reference comparisons can also infer a shared reference from coefficient
-names such as `condition_B_vs_A` and `condition_C_vs_A`. Supplying
+design coefficient names, with optional `--contrast-reference`. Named and list
+contrasts resolve exact design coefficient names first, then R-cleaned aliases
+and intercept aliases. Factor-level candidate names include R-style whole-name
+and component-wise cleanup for non-syntactic or reserved factor/level labels.
+Common non-reference comparisons can also infer a shared reference from
+coefficient names such as `condition_B_vs_A` and `condition_C_vs_A`. Supplying
 `--contrast-sample-levels` as a two-column sample/level TSV additionally
 enables DESeq2-style factor-level all-zero contrast handling and must be paired
 with a factor-level contrast request; sample rows are aligned by label against
 the count-matrix columns. For LRT result tables, this cleanup zeroes only the
-displayed log2 fold change and keeps the
-full-vs-reduced statistic and p-values. The CLI still does not parse formulas.
+displayed log2 fold change.
+
+The `wald` command can also run the supplied-dispersion expanded beta-prior
+Wald workflow when callers provide `--beta-prior-expanded-design`,
+`--beta-prior-coefficient-groups`, `--beta-prior-dispersions`,
+`--beta-prior-base-mean`, and `--beta-prior-disp-fit`. The ordinary `--design`
+argument is the reported standard design, while `--beta-prior-expanded-design`
+is the expanded model matrix. Coefficient groups use `|` between reported
+columns and `,` between expanded columns, for example `0|2` or `0|1,2`.
+This beta-prior path supports selected coefficients, named coefficients,
+numeric contrasts, named contrasts, and positive/negative coefficient-list
+contrasts, including runs with gene/sample normalization factors and optional
+Cook's replacement/refit sidecars. As a more categorical shortcut, callers can provide
+`--beta-prior-factor`, `--beta-prior-reference`, and
+`--beta-prior-sample-levels` instead of the expanded design and coefficient
+groups; the CLI then builds the one-factor expanded and reported designs from
+the aligned sample levels while preserving the same normalization-factor and
+replacement-sidecar behavior.
+For additive categorical designs, callers can instead provide comma-delimited
+`--beta-prior-additive-factors`, matching `--beta-prior-additive-references`,
+and matching `--beta-prior-additive-sample-levels` TSV paths. The CLI builds
+the multi-factor expanded and reported designs internally, verifies the
+reported design matches `--design`, and uses the same coefficient, contrast,
+normalization-factor, and replacement-sidecar behavior.
+The CLI still does not parse formulas.
 It also accepts thresholded p-values through
 `--lfc-threshold` and `--alternative`, with alternatives `greater-abs`,
 `greater-abs-upshot`, `greater-abs2014`, `less-abs`, `greater`, and `less`.

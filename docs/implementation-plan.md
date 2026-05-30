@@ -190,6 +190,16 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Primitive size-factor and normalization-factor expanded beta-prior Wald
   Cook's replacement-refit helpers for selected coefficients and numeric
   contrasts.
+- [x] Native CLI access to the primitive supplied-dispersion expanded
+  beta-prior Wald workflow for selected coefficients and primitive contrasts,
+  including normalization-factor offsets and Cook's replacement sidecars.
+- [x] Native CLI access to one-factor expanded beta-prior Wald workflows built
+  from aligned sample-level labels and a reference level, including
+  normalization-factor offsets and Cook's replacement sidecars.
+- [x] Native CLI access to additive categorical expanded beta-prior Wald
+  workflows built from multiple aligned sample-level label files and reference
+  levels, including normalization-factor offsets and Cook's replacement
+  sidecars.
 - [x] Primitive one-factor expanded design construction from sample labels,
   including expanded design, treatment-style reported design, and coefficient
   groups.
@@ -488,10 +498,19 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Character/factor-level `contrastAllZero` behavior for primitive
   factor-level Wald contrasts with caller-supplied sample levels, matching
   DESeq2's `contrastAllZeroCharacter` selected-sample rule.
+- [x] R-style coefficient-name cleanup for primitive factor-level contrast
+  candidates, including whole-name and component-wise `make.names` handling
+  for non-syntactic and reserved factor or level names.
+- [x] R-style cleaned aliases for primitive coefficient-name and
+  positive/negative coefficient-list contrasts, including intercept aliases,
+  reserved-word cleanup, duplicate-list rejection after alias resolution, and
+  exact-name precedence over cleaned aliases.
 - [x] Native linear-mu and GLM-mu Wald contrast wrappers for primitive numeric,
   coefficient-name/list, and caller-supplied factor-level requests.
-- [x] Add design coefficient-name selection for top-level Wald result helpers
-  and the native CLI, separate from contrast semantics.
+- [x] Add design coefficient-name selection for top-level Wald/LRT result
+  helpers and the native CLI, sharing exact-first R-cleaned alias resolution
+  with named primitive contrasts while remaining separate from contrast
+  semantics.
 - [x] Expose coefficient-name Wald contrasts through the native CLI.
 - [x] Expose positive/negative coefficient-list Wald contrasts through the
   native CLI.
