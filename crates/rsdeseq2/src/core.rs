@@ -357,12 +357,16 @@ pub struct DeseqFit {
     pub disp_outlier: Option<Vec<bool>>,
     /// Dispersion prior variance.
     pub disp_prior_var: Option<f64>,
+    /// Robust variance of log-dispersion estimates used for MAP outlier checks.
+    pub var_log_disp_estimates: Option<f64>,
     /// Dispersion convergence flags.
     pub dispersion_converged: Option<Vec<bool>>,
     /// GLM beta estimates.
     pub beta: Option<RowMajorMatrix<f64>>,
     /// GLM beta standard errors.
     pub beta_se: Option<RowMajorMatrix<f64>>,
+    /// Fallback optimizer starting beta values on log2 scale.
+    pub beta_optim_start: Option<RowMajorMatrix<f64>>,
     /// Per-gene GLM beta covariance matrices on log2 scale.
     ///
     /// Stored as genes x `(n_coefficients * n_coefficients)`, with each gene
@@ -372,6 +376,14 @@ pub struct DeseqFit {
     pub beta_converged: Option<Vec<bool>>,
     /// GLM beta iteration counts.
     pub beta_iter: Option<Vec<usize>>,
+    /// Rust fallback-optimizer iterations for rows routed after IRLS.
+    pub beta_optim_iter: Option<Vec<f64>>,
+    /// Rust fallback-optimizer objective at the starting parameter vector.
+    pub beta_optim_start_objective: Option<Vec<f64>>,
+    /// Final Rust fallback-optimizer objective for rows routed after IRLS.
+    pub beta_optim_objective: Option<Vec<f64>>,
+    /// Projected gradient norm at the final Rust fallback-optimizer parameters.
+    pub beta_optim_gradient_norm: Option<Vec<f64>>,
     /// Per-gene fitted-model log likelihoods from the full GLM.
     pub log_like: Option<Vec<f64>>,
     /// Per-gene full-model deviance, matching DESeq2's `-2 * logLike` field.
@@ -1812,6 +1824,16 @@ impl DeseqBuilder {
         Ok(fit)
     }
 
+    fn attach_existing_dispersion_trend(
+        &self,
+        mut fit: DeseqFit,
+        trend: &DispersionTrendFit,
+    ) -> Result<DeseqFit, DeseqError> {
+        fit.disp_fit = Some(trend.evaluate_many_allow_missing(&fit.base_mean)?);
+        fit.dispersion_trend = Some(trend.clone());
+        Ok(fit)
+    }
+
     /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
     ///
     /// `Parametric`, `Local`, and `Mean` are currently implemented.
@@ -2230,11 +2252,41 @@ impl DeseqBuilder {
         self.attach_map_dispersions(counts, design, fit)
     }
 
+    fn fit_map_dispersions_glm_mu_with_dispersion_function(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        trend: &DispersionTrendFit,
+        disp_prior_var: f64,
+        var_log_disp_estimates: f64,
+    ) -> Result<DeseqFit, DeseqError> {
+        let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
+        let fit = self.attach_existing_dispersion_trend(fit, trend)?;
+        self.attach_map_dispersions_with_prior_values(
+            counts,
+            design,
+            fit,
+            Some(disp_prior_var),
+            Some(var_log_disp_estimates),
+        )
+    }
+
     fn attach_map_dispersions(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
+        fit: DeseqFit,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.attach_map_dispersions_with_prior_values(counts, design, fit, None, None)
+    }
+
+    fn attach_map_dispersions_with_prior_values(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
         mut fit: DeseqFit,
+        supplied_disp_prior_var: Option<f64>,
+        supplied_var_log_disp_estimates: Option<f64>,
     ) -> Result<DeseqFit, DeseqError> {
         let disp_gene_est =
             fit.disp_gene_est
@@ -2254,13 +2306,31 @@ impl DeseqBuilder {
             .ok_or_else(|| DeseqError::InvalidDispersion {
                 reason: "fitted means are required before MAP fitting".to_string(),
             })?;
-        let prior_variance = estimate_dispersion_prior_variance(
-            disp_gene_est,
-            disp_fit,
-            self.gene_wise_dispersion_options.min_disp,
-            design.n_samples(),
-            design.n_coefficients(),
-        )?;
+        let prior_variance = match (supplied_disp_prior_var, supplied_var_log_disp_estimates) {
+            (Some(disp_prior_var), Some(var_log_disp_estimates)) => {
+                crate::dispersion::DispersionPriorVarianceOutput {
+                    disp_prior_var,
+                    var_log_disp_estimates,
+                    expected_log_dispersion_variance: f64::NAN,
+                    residual_degrees_of_freedom: design.n_samples() - design.n_coefficients(),
+                    above_min_disp: Vec::new(),
+                }
+            }
+            (None, None) => estimate_dispersion_prior_variance(
+                disp_gene_est,
+                disp_fit,
+                self.gene_wise_dispersion_options.min_disp,
+                design.n_samples(),
+                design.n_coefficients(),
+            )?,
+            _ => {
+                return Err(DeseqError::InvalidOptions {
+                    reason:
+                        "dispersion prior variance and log-dispersion variance must be supplied together"
+                            .to_string(),
+                })
+            }
+        };
         let map = estimate_map_dispersions(
             MapDispersionInput {
                 counts,
@@ -2276,6 +2346,7 @@ impl DeseqBuilder {
             MapDispersionOptions::from(self.gene_wise_dispersion_options),
         )?;
         fit.disp_prior_var = Some(prior_variance.disp_prior_var);
+        fit.var_log_disp_estimates = Some(prior_variance.var_log_disp_estimates);
         fit.disp_map = Some(map.disp_map);
         fit.disp_iter = Some(map.disp_iter);
         fit.disp_outlier = Some(map.disp_outlier);
@@ -3067,10 +3138,20 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_wald_glm_mu(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let (fit, results) = refit_builder.attach_native_wald(
                 &refit_plan.replacement.replaced_counts,
                 design,
                 coefficient,
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -3130,10 +3211,21 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_wald_glm_mu_contrast(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let (fit, results) = refit_builder.attach_native_wald_contrast(
                 &refit_plan.replacement.replaced_counts,
                 design,
                 contrast,
+                None,
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -3211,10 +3303,41 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_wald_glm_mu_factor_level_contrast(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
                 &refit_plan.replacement.replaced_counts,
                 design,
-                contrast,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let contrast_spec = match contrast.reference {
+                Some(reference) => ContrastSpec::factor_level_with_reference(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                    reference,
+                ),
+                None => ContrastSpec::factor_level(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                ),
+            };
+            let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+            let contrast_all_zero = contrast_all_zero_factor_levels(
+                &refit_plan.replacement.replaced_counts,
+                contrast.sample_levels,
+                contrast.numerator,
+                contrast.denominator,
+            )?;
+            let (fit, results) = refit_builder.attach_native_wald_contrast(
+                &refit_plan.replacement.replaced_counts,
+                design,
+                &numeric_contrast,
+                Some(&contrast_all_zero),
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -3307,11 +3430,21 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_lrt_glm_mu(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let (fit, results) = refit_builder.attach_native_lrt(
                 &refit_plan.replacement.replaced_counts,
                 full_design,
                 reduced_design,
                 coefficient,
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -3367,11 +3500,22 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_lrt_glm_mu_contrast(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let (fit, results) = refit_builder.attach_native_lrt_contrast(
                 &refit_plan.replacement.replaced_counts,
                 full_design,
                 reduced_design,
                 contrast,
+                None,
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -3431,11 +3575,42 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_lrt_glm_mu_factor_level_contrast(
+            let (trend, disp_prior_var, var_log_disp_estimates) =
+                replacement_dispersion_inputs(&original_fit)?;
+            let fit = refit_builder.fit_map_dispersions_glm_mu_with_dispersion_function(
+                &refit_plan.replacement.replaced_counts,
+                full_design,
+                trend,
+                disp_prior_var,
+                var_log_disp_estimates,
+            )?;
+            let contrast_spec = match contrast.reference {
+                Some(reference) => ContrastSpec::factor_level_with_reference(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                    reference,
+                ),
+                None => ContrastSpec::factor_level(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                ),
+            };
+            let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
+            let contrast_all_zero = contrast_all_zero_factor_levels(
+                &refit_plan.replacement.replaced_counts,
+                contrast.sample_levels,
+                contrast.numerator,
+                contrast.denominator,
+            )?;
+            let (fit, results) = refit_builder.attach_native_lrt_contrast(
                 &refit_plan.replacement.replaced_counts,
                 full_design,
                 reduced_design,
-                contrast,
+                &numeric_contrast,
+                Some(&contrast_all_zero),
+                fit,
             )?;
             (Some(fit), Some(results))
         } else {
@@ -5195,12 +5370,18 @@ impl DeseqBuilder {
             disp_iter: None,
             disp_outlier: None,
             disp_prior_var: None,
+            var_log_disp_estimates: None,
             dispersion_converged: None,
             beta: None,
             beta_se: None,
+            beta_optim_start: None,
             beta_covariance: None,
             beta_converged: None,
             beta_iter: None,
+            beta_optim_iter: None,
+            beta_optim_start_objective: None,
+            beta_optim_objective: None,
+            beta_optim_gradient_norm: None,
             log_like: None,
             full_deviance: None,
             reduced_log_like: None,
@@ -6083,6 +6264,34 @@ fn replacement_refit_plan_from_original(
     )
 }
 
+fn replacement_dispersion_inputs(
+    original_fit: &DeseqFit,
+) -> Result<(&DispersionTrendFit, f64, f64), DeseqError> {
+    let trend =
+        original_fit
+            .dispersion_trend
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "original dispersion function is required before replacement refit"
+                    .to_string(),
+            })?;
+    let disp_prior_var =
+        original_fit
+            .disp_prior_var
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "original dispersion prior variance is required before replacement refit"
+                    .to_string(),
+            })?;
+    let var_log_disp_estimates =
+        original_fit
+            .var_log_disp_estimates
+            .ok_or_else(|| DeseqError::InvalidDispersion {
+                reason: "original log-dispersion variance is required before replacement refit"
+                    .to_string(),
+            })?;
+    Ok((trend, disp_prior_var, var_log_disp_estimates))
+}
+
 fn apply_contrast_metadata_to_replacement_output(
     output: &mut CooksReplacementWaldOutput,
     result_name: String,
@@ -6302,6 +6511,11 @@ fn all_zero_glm_fit(
         beta_converged: vec![false; counts.n_genes()],
         beta: RowMajorMatrix::from_elem(counts.n_genes(), design.n_coefficients(), f64::NAN)?,
         beta_se: RowMajorMatrix::from_elem(counts.n_genes(), design.n_coefficients(), f64::NAN)?,
+        beta_optim_start: RowMajorMatrix::from_elem(
+            counts.n_genes(),
+            design.n_coefficients(),
+            f64::NAN,
+        )?,
         beta_covariance: Some(RowMajorMatrix::from_elem(
             counts.n_genes(),
             design.n_coefficients() * design.n_coefficients(),
@@ -6309,6 +6523,10 @@ fn all_zero_glm_fit(
         )?),
         mu: RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), f64::NAN)?,
         beta_iter: vec![0; counts.n_genes()],
+        beta_optim_iter: vec![f64::NAN; counts.n_genes()],
+        beta_optim_start_objective: vec![f64::NAN; counts.n_genes()],
+        beta_optim_objective: vec![f64::NAN; counts.n_genes()],
+        beta_optim_gradient_norm: vec![f64::NAN; counts.n_genes()],
         model_matrix: design.clone(),
         n_terms: design.n_coefficients(),
         hat_diagonal: RowMajorMatrix::from_elem(counts.n_genes(), counts.n_samples(), f64::NAN)?,
@@ -6328,6 +6546,7 @@ fn expand_glm_fit(
         )?,
         beta: expand_matrix_with_nan_rows(&compact_fit.beta, all_zero)?,
         beta_se: expand_matrix_with_nan_rows(&compact_fit.beta_se, all_zero)?,
+        beta_optim_start: expand_matrix_with_nan_rows(&compact_fit.beta_optim_start, all_zero)?,
         beta_covariance: compact_fit
             .beta_covariance
             .as_ref()
@@ -6335,6 +6554,19 @@ fn expand_glm_fit(
             .transpose()?,
         mu: expand_matrix_with_nan_rows(&compact_fit.mu, all_zero)?,
         beta_iter: expand_gene_values_with_fill_rows(&compact_fit.beta_iter, all_zero, 0)?,
+        beta_optim_iter: expand_gene_values_with_nan_rows(&compact_fit.beta_optim_iter, all_zero)?,
+        beta_optim_start_objective: expand_gene_values_with_nan_rows(
+            &compact_fit.beta_optim_start_objective,
+            all_zero,
+        )?,
+        beta_optim_objective: expand_gene_values_with_nan_rows(
+            &compact_fit.beta_optim_objective,
+            all_zero,
+        )?,
+        beta_optim_gradient_norm: expand_gene_values_with_nan_rows(
+            &compact_fit.beta_optim_gradient_norm,
+            all_zero,
+        )?,
         model_matrix: compact_fit.model_matrix,
         n_terms: compact_fit.n_terms,
         hat_diagonal: expand_matrix_with_nan_rows(&compact_fit.hat_diagonal, all_zero)?,
@@ -6421,9 +6653,14 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
         .collect();
     fit.beta = Some(glm_fit.beta);
     fit.beta_se = Some(glm_fit.beta_se);
+    fit.beta_optim_start = Some(glm_fit.beta_optim_start);
     fit.beta_covariance = glm_fit.beta_covariance;
     fit.beta_converged = Some(glm_fit.beta_converged);
     fit.beta_iter = Some(glm_fit.beta_iter);
+    fit.beta_optim_iter = Some(glm_fit.beta_optim_iter);
+    fit.beta_optim_start_objective = Some(glm_fit.beta_optim_start_objective);
+    fit.beta_optim_objective = Some(glm_fit.beta_optim_objective);
+    fit.beta_optim_gradient_norm = Some(glm_fit.beta_optim_gradient_norm);
     fit.log_like = Some(glm_fit.log_like);
     fit.full_deviance = Some(full_deviance);
     fit.mu = Some(glm_fit.mu);

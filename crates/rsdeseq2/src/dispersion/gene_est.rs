@@ -1427,8 +1427,16 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu * alpha;
-        let term = ln_gamma(y + inv_alpha) - ln_gamma(inv_alpha) + y * log_alpha
-            - (y + inv_alpha) * mu_alpha.ln_1p();
+        let mu_plus_inv_alpha = checked_add(
+            mu,
+            inv_alpha,
+            sample,
+            "dispersion objective mean plus inverse alpha",
+        )?;
+        let term = ln_gamma(y + inv_alpha)
+            - ln_gamma(inv_alpha)
+            - y * mu_plus_inv_alpha.ln()
+            - inv_alpha * mu_alpha.ln_1p();
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "dispersion objective likelihood term".to_string(),

@@ -757,9 +757,9 @@ fixed-mean dispersion objective, MAP objective, and final Wald GLM. The
 high-level native linear-mu dispersion pipeline still rejects observation
 weights because DESeq2 switches away from `linearMu` when weights are present.
 
-The default Rust solver preserves the original normal-equations path for
-current `useQR=FALSE` references. `IrlsSolver::Qr` follows DESeq2's `useQR=TRUE`
-update by solving the augmented least-squares system:
+The default Rust solver follows DESeq2's `useQR=TRUE` update by solving the
+augmented least-squares system. `IrlsSolver::NormalEquations` remains available
+for older fixed-dispersion `useQR=FALSE` references:
 
 ```text
 A = [sqrt(W) X; sqrt(ridge)]
@@ -781,10 +781,18 @@ abs(dev - dev_old) / (abs(dev) + 0.1) < betaTol
 After IRLS, Rust applies the same row-routing predicate DESeq2 uses before its
 optim backup: non-finite beta rows, non-positive coefficient variances, and,
 when `IrlsOptions.use_optim` is enabled, non-converged rows are fallback
-candidates. Routed rows are refit with a bounded pure-Rust optimizer on the
-log2 coefficient scale, using the same `[-30, 30]` coefficient bounds and
-normal-prior penalty shape as DESeq2's backup path. The refit stores optimized
-betas even when the optimizer does not declare convergence, recomputes fitted
+candidates. Routed rows are refit with a mature pure-Rust L-BFGS-B port on the
+log2 coefficient scale, using the same `[-30, 30]` coefficient bounds,
+100-iteration default, five correction pairs, and normal-prior penalty shape as
+DESeq2's backup path. The primary optimizer uses the analytic beta gradient
+from the implemented negative-binomial objective. Rows that leave L-BFGS-B with
+a rough projected-gradient tail receive a deterministic bounded
+projected-gradient polish pass, and failed high-gradient excursions fall back to
+the optimizer start instead of storing an unstable move. The `factr=1e7`
+objective-reduction stop is only accepted once the projected-gradient norm is
+also small, which prevents premature stops on real fallback rows. The refit
+stores optimized betas even when the optimizer does not declare convergence,
+recomputes fitted
 means, standard errors, coefficient covariance, and row log likelihoods, and
 sets `beta_converged` from the optimizer convergence flag. `force_optim` sends
 every row through the bounded refit after IRLS.
@@ -968,15 +976,29 @@ The same plan can export replacement-count assays through
 metadata through `io::write_cooks_replacement_row_metadata_tsv()`.
 `DeseqFit::deseq2_mcols_diagnostics()` provides a DESeq2-name-shaped view for
 implemented diagnostics such as `dispGeneEst`, `dispGeneIter`, `dispFit`,
-`dispersion`, `dispIter`, `dispOutlier`, `betaConv`, `fullBetaConv`,
-`reducedBetaConv`, `betaIter`, `deviance`, and `maxCooks`. The diagnostics
-view also reports the present column names in stable stage order for wrappers
-and parity-table exporters, and can assemble those fields into a typed
-diagnostic data-frame view. `io::write_deseq_mcols_diagnostics_tsv()` exports
-the same fields with a leading `gene` column and R-style `NA` values. Matrix
-diagnostics such as fitted means and full/reduced hat diagonals remain on
-`DeseqFit`; they are not flattened into the `mcols(dds)`-style row-metadata
-view.
+`dispMAP`, `dispersion`, `dispIter`, `dispOutlier`, `betaConv`, `fullBetaConv`,
+`reducedBetaConv`, `betaIter`, `deviance`, and `maxCooks`. For Rust-side
+fallback debugging, the same view also includes `rustBetaOptimIter` and
+`rustBetaOptimStartObjective`/`rustBetaOptimObjective` plus
+`rustBetaOptimGradientNorm` when GLM fitting state is present. The diagnostics
+view reports the present column names in stable stage order for wrappers and
+parity-table exporters, and can assemble those fields into a typed diagnostic
+data-frame view.
+`io::write_deseq_mcols_diagnostics_tsv()` exports the same fields with a
+leading `gene` column and R-style `NA` values. Matrix diagnostics such as
+fitted means and full/reduced hat diagonals remain on `DeseqFit`; they are not
+flattened into the `mcols(dds)`-style row-metadata view.
+The native Wald and LRT CLI commands can export the same row diagnostics with
+`--fit-diagnostics-output`; replacement/refit runs can also export the refit
+branch with `--refit-diagnostics-output`. They can also export full-model beta
+and beta standard-error matrices with `--fit-beta-output`,
+`--fit-beta-se-output`, `--fit-beta-optim-start-output`,
+`--refit-beta-output`, `--refit-beta-se-output`, and
+`--refit-beta-optim-start-output`. These sidecars are intended for
+stage-by-stage parity checks, especially when result-table differences need to
+be traced back to `dispGeneEst`, `dispFit`, `dispMAP`, final dispersion
+estimates, beta estimates, beta optimizer starts, beta standard errors,
+iteration/convergence fields, deviance, or Cook's summaries.
 Full Bioconductor result objects, formula-aware contrast metadata, and complete
 wrapper metadata preservation are future work.
 
@@ -1051,13 +1073,14 @@ missing for every gene.
 The first end-to-end replacement-refit paths are implemented for the current
 GLM-mu native Wald, Wald contrast, and LRT branches. They run the original fit
 with Cook's filtering and independent filtering disabled, prepare replacement
-counts from the original Cook's distances, refit the implemented GLM-mu
-dispersion/MAP path on the replacement counts while preserving the original
-size factors, then rerun the relevant Wald, Wald contrast, or LRT test, merge
-only `refitReplace` rows into the result table, clear result fields for
-`newAllZero` rows, and finally apply the caller's Cook's cutoff and independent
-filtering to the merged result rows. Top-level GLM-mu result helpers expose this
-limited replacement-refit path for the default Wald/LRT coefficient and
+counts from the original Cook's distances, estimate gene-wise dispersions on
+the replacement counts, reuse the original dispersion function and dispersion
+prior variance for MAP shrinkage, then rerun the relevant Wald, Wald contrast,
+or LRT test, merge only `refitReplace` rows into the result table, clear result
+fields for `newAllZero` rows, and finally apply the caller's Cook's cutoff and
+independent filtering to the merged result rows. Top-level GLM-mu result
+helpers expose this limited replacement-refit path for the default Wald/LRT
+coefficient and
 primitive numeric, named/list, and caller-supplied factor-level Wald contrasts.
 
 Automatic R formula/colData dispatch for the two-group low-count heuristic,
@@ -1344,10 +1367,10 @@ on reject:
 
 The shared bounded optimizer and the GLM beta fallback reject non-finite norm,
 dot-product, movement, directional-derivative, and objective-building
-accumulations. Overflow in optimizer control quantities now produces a
-non-converged optimizer result for the affected row; overflow while building the
-beta objective, gradient, Hessian, or ridge penalty is converted into the same
-large finite penalty used for invalid fitted means. Fitted-mean reconstruction
+accumulations. Overflow in optimizer control quantities now
+produces a non-converged optimizer result for the affected row; overflow while
+building the beta objective, gradient, Hessian, or ridge penalty is converted
+into the same large finite penalty used for invalid fitted means. Fitted-mean reconstruction
 uses checked row-wise linear predictors so overflow is reported on the affected
 sample before exponentiation.
 The intercept-only fixed-dispersion shortcut also checks normalized mean,

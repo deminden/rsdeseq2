@@ -343,6 +343,157 @@ def compare_results(got: Path, expected: Path) -> dict[str, float | int]:
     return out
 
 
+def append_result_diagnostics(
+    diagnostics: list[dict[str, object]],
+    contrast: str,
+    got: Path,
+    expected: Path,
+    replacement_rows: Path | None,
+    fit_diagnostics: Path | None,
+    refit_diagnostics: Path | None,
+    fit_beta: Path | None,
+    fit_beta_se: Path | None,
+    fit_beta_optim_start: Path | None,
+    refit_beta: Path | None,
+    refit_beta_se: Path | None,
+    refit_beta_optim_start: Path | None,
+    coefficient_index: int,
+    limit: int,
+) -> None:
+    if limit <= 0:
+        return
+    columns = ["baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj"]
+    expected_by_gene: dict[str, dict[str, str]] = {}
+    with open_text(expected) as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            expected_by_gene[row["gene"]] = row
+    replacement_by_gene: dict[str, dict[str, str]] = {}
+    if replacement_rows is not None and replacement_rows.exists():
+        with replacement_rows.open(newline="") as fh:
+            for row in csv.DictReader(fh, delimiter="\t"):
+                replacement_by_gene[row["gene"]] = row
+    fit_by_gene = read_optional_gene_rows(fit_diagnostics)
+    refit_by_gene = read_optional_gene_rows(refit_diagnostics)
+    fit_beta_by_gene = read_optional_gene_matrix_column(fit_beta, coefficient_index)
+    fit_beta_se_by_gene = read_optional_gene_matrix_column(fit_beta_se, coefficient_index)
+    fit_beta_optim_start_by_gene = read_optional_gene_matrix_column(fit_beta_optim_start, coefficient_index)
+    refit_beta_by_gene = read_optional_gene_matrix_column(refit_beta, coefficient_index)
+    refit_beta_se_by_gene = read_optional_gene_matrix_column(refit_beta_se, coefficient_index)
+    refit_beta_optim_start_by_gene = read_optional_gene_matrix_column(
+        refit_beta_optim_start, coefficient_index
+    )
+    rows: list[tuple[float, dict[str, object], dict[str, float]]] = []
+    with got.open(newline="") as fh:
+        for got_row in csv.DictReader(fh, delimiter="\t"):
+            gene = got_row["gene"]
+            exp_row = expected_by_gene[gene]
+            diffs = {
+                col: finite_abs_diff(parse_float(got_row[col]), parse_float(exp_row[col]))
+                for col in columns
+            }
+            finite_diffs = [value for value in diffs.values() if math.isfinite(value)]
+            max_diff = max(finite_diffs) if finite_diffs else math.inf
+            worst_column = max(columns, key=lambda col: diffs[col])
+            replacement = replacement_by_gene.get(gene, {})
+            fit = fit_by_gene.get(gene, {})
+            refit = refit_by_gene.get(gene, {})
+            rows.append((
+                max_diff,
+                {
+                    "contrast": contrast,
+                    "gene": gene,
+                    "worst_column": worst_column,
+                    "max_abs": max_diff,
+                    **{f"{col}_abs": diffs[col] for col in columns},
+                    **{f"rust_{col}": got_row[col] for col in columns},
+                    **{f"ref_{col}": exp_row[col] for col in columns},
+                    "replace": replacement.get("replace", ""),
+                    "refitReplace": replacement.get("refitReplace", ""),
+                    "newAllZero": replacement.get("newAllZero", ""),
+                    "postRefitMaxCooks": replacement.get("postRefitMaxCooks", ""),
+                    "dispGeneEst": fit.get("dispGeneEst", ""),
+                    "dispGeneIter": fit.get("dispGeneIter", ""),
+                    "dispFit": fit.get("dispFit", ""),
+                    "dispMAP": fit.get("dispMAP", ""),
+                    "dispersion": fit.get("dispersion", ""),
+                    "dispIter": fit.get("dispIter", ""),
+                    "dispOutlier": fit.get("dispOutlier", ""),
+                    "betaConv": fit.get("betaConv", ""),
+                    "fullBetaConv": fit.get("fullBetaConv", ""),
+                    "reducedBetaConv": fit.get("reducedBetaConv", ""),
+                    "betaIter": fit.get("betaIter", ""),
+                    "rustBetaOptimIter": fit.get("rustBetaOptimIter", ""),
+                    "rustBetaOptimStartObjective": fit.get("rustBetaOptimStartObjective", ""),
+                    "rustBetaOptimObjective": fit.get("rustBetaOptimObjective", ""),
+                    "rustBetaOptimGradientNorm": fit.get("rustBetaOptimGradientNorm", ""),
+                    "reducedBetaIter": fit.get("reducedBetaIter", ""),
+                    "deviance": fit.get("deviance", ""),
+                    "maxCooks": fit.get("maxCooks", ""),
+                    "refitDispGeneEst": refit.get("dispGeneEst", ""),
+                    "refitDispGeneIter": refit.get("dispGeneIter", ""),
+                    "refitDispFit": refit.get("dispFit", ""),
+                    "refitDispMAP": refit.get("dispMAP", ""),
+                    "refitDispersion": refit.get("dispersion", ""),
+                    "refitDispIter": refit.get("dispIter", ""),
+                    "refitDispOutlier": refit.get("dispOutlier", ""),
+                    "refitBetaConv": refit.get("betaConv", ""),
+                    "refitFullBetaConv": refit.get("fullBetaConv", ""),
+                    "refitReducedBetaConv": refit.get("reducedBetaConv", ""),
+                    "refitBetaIter": refit.get("betaIter", ""),
+                    "refitRustBetaOptimIter": refit.get("rustBetaOptimIter", ""),
+                    "refitRustBetaOptimStartObjective": refit.get("rustBetaOptimStartObjective", ""),
+                    "refitRustBetaOptimObjective": refit.get("rustBetaOptimObjective", ""),
+                    "refitRustBetaOptimGradientNorm": refit.get("rustBetaOptimGradientNorm", ""),
+                    "refitReducedBetaIter": refit.get("reducedBetaIter", ""),
+                    "refitDeviance": refit.get("deviance", ""),
+                    "refitMaxCooks": refit.get("maxCooks", ""),
+                    "fitBeta": fit_beta_by_gene.get(gene, ""),
+                    "fitBetaSE": fit_beta_se_by_gene.get(gene, ""),
+                    "fitBetaOptimStart": fit_beta_optim_start_by_gene.get(gene, ""),
+                    "refitBeta": refit_beta_by_gene.get(gene, ""),
+                    "refitBetaSE": refit_beta_se_by_gene.get(gene, ""),
+                    "refitBetaOptimStart": refit_beta_optim_start_by_gene.get(gene, ""),
+                },
+                diffs,
+            ))
+    selected: dict[tuple[str, str], dict[str, object]] = {}
+    for _, row, _ in sorted(rows, key=lambda item: item[0], reverse=True)[:limit]:
+        selected[(str(row["contrast"]), str(row["gene"]))] = row
+    for column in columns:
+        column_rows = sorted(
+            rows,
+            key=lambda item: item[2][column] if math.isfinite(item[2][column]) else math.inf,
+            reverse=True,
+        )
+        for _, row, _ in column_rows[:limit]:
+            selected[(str(row["contrast"]), str(row["gene"]))] = row
+    diagnostics.extend(selected.values())
+
+
+def read_optional_gene_rows(path: Path | None) -> dict[str, dict[str, str]]:
+    rows: dict[str, dict[str, str]] = {}
+    if path is None or not path.exists():
+        return rows
+    with path.open(newline="") as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            rows[row["gene"]] = row
+    return rows
+
+
+def read_optional_gene_matrix_column(path: Path | None, column_index: int) -> dict[str, str]:
+    rows: dict[str, str] = {}
+    if path is None or not path.exists():
+        return rows
+    value_index = column_index + 1
+    with path.open(newline="") as fh:
+        for row in csv.reader(fh, delimiter="\t"):
+            if not row or row[0] == "gene":
+                continue
+            if value_index < len(row):
+                rows[row[0]] = row[value_index]
+    return rows
+
+
 def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
     if not rows:
         return
@@ -423,7 +574,14 @@ def primitive_run(args, binary: Path, tissue: str, tmp: Path, rows: list[dict[st
     })
 
 
-def contrast_run(args, binary: Path, spec: str, tmp: Path, rows: list[dict[str, object]]) -> None:
+def contrast_run(
+    args,
+    binary: Path,
+    spec: str,
+    tmp: Path,
+    rows: list[dict[str, object]],
+    diagnostics: list[dict[str, object]],
+) -> None:
     parts = spec.split(":")
     if len(parts) != 3:
         raise ValueError("--contrast must be tissue:null_type:rep")
@@ -440,6 +598,16 @@ def contrast_run(args, binary: Path, spec: str, tmp: Path, rows: list[dict[str, 
     counts_path = tmp / f"{stem}_counts.tsv"
     design_path = tmp / f"{stem}_design.tsv"
     got = tmp / f"{stem}_wald.tsv"
+    replacement_rows = tmp / f"{stem}_replacement_rows.tsv"
+    replacement_meta = tmp / f"{stem}_replacement_meta.tsv"
+    fit_diagnostics = tmp / f"{stem}_fit_diagnostics.tsv"
+    refit_diagnostics = tmp / f"{stem}_refit_diagnostics.tsv"
+    fit_beta = tmp / f"{stem}_fit_beta.tsv"
+    fit_beta_se = tmp / f"{stem}_fit_beta_se.tsv"
+    fit_beta_optim_start = tmp / f"{stem}_fit_beta_optim_start.tsv"
+    refit_beta = tmp / f"{stem}_refit_beta.tsv"
+    refit_beta_se = tmp / f"{stem}_refit_beta_se.tsv"
+    refit_beta_optim_start = tmp / f"{stem}_refit_beta_optim_start.tsv"
     expected_genes = read_result_genes(expected)
     write_retained_counts_for_genes(raw, counts_path, samples, expected_genes)
     write_design(design_path, samples, columns, matrix)
@@ -457,6 +625,29 @@ def contrast_run(args, binary: Path, spec: str, tmp: Path, rows: list[dict[str, 
         "--output",
         str(got),
     ]
+    if args.diagnostics_output is not None:
+        cmd.extend([
+            "--cooks-replacement-row-metadata-output",
+            str(replacement_rows),
+            "--cooks-replacement-metadata-output",
+            str(replacement_meta),
+            "--fit-diagnostics-output",
+            str(fit_diagnostics),
+            "--refit-diagnostics-output",
+            str(refit_diagnostics),
+            "--fit-beta-output",
+            str(fit_beta),
+            "--fit-beta-se-output",
+            str(fit_beta_se),
+            "--fit-beta-optim-start-output",
+            str(fit_beta_optim_start),
+            "--refit-beta-output",
+            str(refit_beta),
+            "--refit-beta-se-output",
+            str(refit_beta_se),
+            "--refit-beta-optim-start-output",
+            str(refit_beta_optim_start),
+        ])
     if args.contrast_size_factors == "full":
         size_path = tmp / f"{stem}_size_factors.tsv"
         write_size_factors(size_path, infer_size_factors(raw, norm), samples)
@@ -465,6 +656,23 @@ def contrast_run(args, binary: Path, spec: str, tmp: Path, rows: list[dict[str, 
         raise ValueError(f"unknown contrast size-factor mode: {args.contrast_size_factors}")
     stats = run_timed(cmd)
     cmp = compare_results(got, expected)
+    append_result_diagnostics(
+        diagnostics,
+        stem,
+        got,
+        expected,
+        replacement_rows if args.diagnostics_output is not None else None,
+        fit_diagnostics if args.diagnostics_output is not None else None,
+        refit_diagnostics if args.diagnostics_output is not None else None,
+        fit_beta if args.diagnostics_output is not None else None,
+        fit_beta_se if args.diagnostics_output is not None else None,
+        fit_beta_optim_start if args.diagnostics_output is not None else None,
+        refit_beta if args.diagnostics_output is not None else None,
+        refit_beta_se if args.diagnostics_output is not None else None,
+        refit_beta_optim_start if args.diagnostics_output is not None else None,
+        len(columns) - 1,
+        args.diagnostics_limit,
+    )
     rows.append({
         "contrast": stem,
         "output": "wald_results",
@@ -487,6 +695,8 @@ def main() -> None:
     parser.add_argument("--contrast-size-factors", choices=["estimate", "full"], default="estimate")
     parser.add_argument("--fit-type", default="parametric")
     parser.add_argument("--output", type=Path, default=Path("results/benchmarks/real_data_parity.tsv"))
+    parser.add_argument("--diagnostics-output", type=Path)
+    parser.add_argument("--diagnostics-limit", type=int, default=100)
     parser.add_argument("--keep-workdir", action="store_true")
     args = parser.parse_args()
 
@@ -497,14 +707,18 @@ def main() -> None:
         else:
             raise SystemExit(f"missing binary: {args.binary}")
     rows: list[dict[str, object]] = []
+    diagnostics: list[dict[str, object]] = []
     tmp = Path(tempfile.mkdtemp(prefix="rsdeseq2-real-parity-"))
     try:
         for tissue in args.tissue:
             primitive_run(args, args.binary, tissue, tmp, rows)
         for spec in args.contrast:
-            contrast_run(args, args.binary, spec, tmp, rows)
+            contrast_run(args, args.binary, spec, tmp, rows, diagnostics)
         write_summary(args.output, rows)
         print(f"wrote {args.output}")
+        if args.diagnostics_output is not None:
+            write_summary(args.diagnostics_output, diagnostics)
+            print(f"wrote {args.diagnostics_output}")
     finally:
         if args.keep_workdir:
             print(f"kept workdir {tmp}")

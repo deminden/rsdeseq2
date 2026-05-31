@@ -359,6 +359,16 @@ impl DispersionTrendFit {
         }
     }
 
+    /// Evaluate the fitted trend for all finite positive means, returning
+    /// `NaN` for missing rows.
+    pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+        match self {
+            Self::Parametric(fit) => fit.trend.evaluate_many_allow_missing(means),
+            Self::Local(fit) => fit.trend.evaluate_many_allow_missing(means),
+            Self::Mean(fit) => fit.trend.evaluate_many_allow_missing(means),
+        }
+    }
+
     /// Rows retained by the selected trend fit rule.
     ///
     /// For `fitType="mean"`, this is the preliminary viability mask using

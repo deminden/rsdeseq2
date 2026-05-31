@@ -57,7 +57,7 @@ use crate::design::DesignMatrix;
 use crate::matrix::RowMajorMatrix;
 
 /// Negative-binomial GLM fit output matching DESeq2 low-level result fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct NbinomGlmFit {
     /// Per-gene log likelihood.
     pub log_like: Vec<f64>,
@@ -67,6 +67,10 @@ pub struct NbinomGlmFit {
     pub beta: RowMajorMatrix<f64>,
     /// Beta standard errors on log2 scale.
     pub beta_se: RowMajorMatrix<f64>,
+    /// Fallback optimizer starting beta values on log2 scale.
+    ///
+    /// Rows/coefficients that did not enter the fallback optimizer are `NaN`.
+    pub beta_optim_start: RowMajorMatrix<f64>,
     /// Per-gene beta covariance matrices on log2 scale.
     ///
     /// Stored as genes x `(n_terms * n_terms)`, with each gene row containing a
@@ -76,12 +80,86 @@ pub struct NbinomGlmFit {
     pub mu: RowMajorMatrix<f64>,
     /// Per-gene beta iteration counts.
     pub beta_iter: Vec<usize>,
+    /// Rust fallback-optimizer iterations for rows routed after IRLS.
+    ///
+    /// Rows that did not enter the fallback optimizer are `NaN` so diagnostic
+    /// TSV exports can preserve the full gene shape without implying an
+    /// optimizer result.
+    pub beta_optim_iter: Vec<f64>,
+    /// Rust fallback-optimizer objective at the starting parameter vector.
+    ///
+    /// Rows that did not enter the fallback optimizer are `NaN`.
+    pub beta_optim_start_objective: Vec<f64>,
+    /// Final Rust fallback-optimizer objective for rows routed after IRLS.
+    ///
+    /// Rows that did not enter the fallback optimizer are `NaN`.
+    pub beta_optim_objective: Vec<f64>,
+    /// Projected gradient norm at the final Rust fallback-optimizer parameters.
+    ///
+    /// Rows that did not enter the fallback optimizer are `NaN`.
+    pub beta_optim_gradient_norm: Vec<f64>,
     /// Model matrix used for fitting.
     pub model_matrix: DesignMatrix,
     /// Number of model terms.
     pub n_terms: usize,
     /// Hat diagonal matrix.
     pub hat_diagonal: RowMajorMatrix<f64>,
+}
+
+impl PartialEq for NbinomGlmFit {
+    fn eq(&self, other: &Self) -> bool {
+        nan_equal_vec(&self.log_like, &other.log_like)
+            && self.beta_converged == other.beta_converged
+            && nan_equal_matrix(&self.beta, &other.beta)
+            && nan_equal_matrix(&self.beta_se, &other.beta_se)
+            && nan_equal_matrix(&self.beta_optim_start, &other.beta_optim_start)
+            && nan_equal_optional_matrix(&self.beta_covariance, &other.beta_covariance)
+            && nan_equal_matrix(&self.mu, &other.mu)
+            && self.beta_iter == other.beta_iter
+            && nan_equal_vec(&self.beta_optim_iter, &other.beta_optim_iter)
+            && nan_equal_vec(
+                &self.beta_optim_start_objective,
+                &other.beta_optim_start_objective,
+            )
+            && nan_equal_vec(&self.beta_optim_objective, &other.beta_optim_objective)
+            && nan_equal_vec(
+                &self.beta_optim_gradient_norm,
+                &other.beta_optim_gradient_norm,
+            )
+            && self.model_matrix == other.model_matrix
+            && self.n_terms == other.n_terms
+            && nan_equal_matrix(&self.hat_diagonal, &other.hat_diagonal)
+    }
+}
+
+fn nan_equal_optional_matrix(
+    left: &Option<RowMajorMatrix<f64>>,
+    right: &Option<RowMajorMatrix<f64>>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => nan_equal_matrix(left, right),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn nan_equal_matrix(left: &RowMajorMatrix<f64>, right: &RowMajorMatrix<f64>) -> bool {
+    left.n_rows() == right.n_rows()
+        && left.n_cols() == right.n_cols()
+        && nan_equal_vec(left.as_slice(), right.as_slice())
+}
+
+fn nan_equal_vec(left: &[f64], right: &[f64]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .copied()
+            .zip(right.iter().copied())
+            .all(nan_equal_f64)
+}
+
+fn nan_equal_f64((left, right): (f64, f64)) -> bool {
+    left == right || (left.is_nan() && right.is_nan())
 }
 
 /// Future Wald-test output.

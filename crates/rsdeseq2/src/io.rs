@@ -1335,7 +1335,7 @@ fn write_logical_matrix_tsv(
     Ok(())
 }
 
-fn write_optional_numeric_matrix_tsv(
+pub fn write_optional_numeric_matrix_tsv(
     path: impl AsRef<Path>,
     gene_names: Option<&[String]>,
     sample_names: Option<&[String]>,
@@ -3001,7 +3001,12 @@ mod tests {
         let diagnostics = Deseq2McolsDiagnostics {
             disp_gene_est: Some(vec![f64::NAN, 0.2]),
             disp_gene_iter: Some(vec![0, 3]),
+            disp_map: Some(vec![f64::NAN, 0.25]),
             disp_outlier: Some(vec![false, true]),
+            beta_optim_iter: Some(vec![f64::NAN, 8.0]),
+            beta_optim_start_objective: Some(vec![f64::NAN, 12.5]),
+            beta_optim_objective: Some(vec![f64::NAN, 4.25]),
+            beta_optim_gradient_norm: Some(vec![f64::NAN, 1e-9]),
             max_cooks: Some(vec![None, Some(4.5)]),
             ..Deseq2McolsDiagnostics::default()
         };
@@ -3013,9 +3018,11 @@ mod tests {
         assert_eq!(
             text,
             concat!(
-                "gene\tdispGeneEst\tdispGeneIter\tdispOutlier\tmaxCooks\n",
-                "gene_a\tNA\t0\tFALSE\tNA\n",
-                "gene_b\t0.2\t3\tTRUE\t4.5\n"
+                "gene\tdispGeneEst\tdispGeneIter\tdispMAP\tdispOutlier\t",
+                "rustBetaOptimIter\trustBetaOptimStartObjective\t",
+                "rustBetaOptimObjective\trustBetaOptimGradientNorm\tmaxCooks\n",
+                "gene_a\tNA\t0\tNA\tFALSE\tNA\tNA\tNA\tNA\tNA\n",
+                "gene_b\t0.2\t3\t0.25\tTRUE\t8\t12.5\t4.25\t0.000000001\t4.5\n"
             )
         );
     }

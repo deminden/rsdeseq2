@@ -56,6 +56,8 @@ pub struct Deseq2McolsDiagnostics {
     pub disp_gene_iter: Option<Vec<usize>>,
     /// DESeq2 `dispFit` fitted dispersion trend column.
     pub disp_fit: Option<Vec<f64>>,
+    /// DESeq2 `dispMAP` MAP dispersion column before outlier replacement.
+    pub disp_map: Option<Vec<f64>>,
     /// DESeq2 `dispersion` final dispersion column.
     pub dispersion: Option<Vec<f64>>,
     /// DESeq2 `dispIter` MAP dispersion iteration column.
@@ -72,6 +74,14 @@ pub struct Deseq2McolsDiagnostics {
     pub reduced_beta_conv: Option<Vec<bool>>,
     /// DESeq2 `betaIter` column for the full model.
     pub beta_iter: Option<Vec<usize>>,
+    /// Rust fallback-optimizer iterations for rows routed after IRLS.
+    pub beta_optim_iter: Option<Vec<f64>>,
+    /// Rust fallback-optimizer objective at the starting parameter vector.
+    pub beta_optim_start_objective: Option<Vec<f64>>,
+    /// Final Rust fallback-optimizer objective for rows routed after IRLS.
+    pub beta_optim_objective: Option<Vec<f64>>,
+    /// Projected gradient norm at the final Rust fallback-optimizer parameters.
+    pub beta_optim_gradient_norm: Option<Vec<f64>>,
     /// Reduced-model beta iterations retained for Rust/R parity diagnostics.
     pub reduced_beta_iter: Option<Vec<usize>>,
     /// DESeq2 `deviance` column, equal to `-2 * full logLike`.
@@ -96,6 +106,9 @@ impl Deseq2McolsDiagnostics {
         if self.disp_fit.is_some() {
             names.push("dispFit");
         }
+        if self.disp_map.is_some() {
+            names.push("dispMAP");
+        }
         if self.dispersion.is_some() {
             names.push("dispersion");
         }
@@ -116,6 +129,18 @@ impl Deseq2McolsDiagnostics {
         }
         if self.beta_iter.is_some() {
             names.push("betaIter");
+        }
+        if self.beta_optim_iter.is_some() {
+            names.push("rustBetaOptimIter");
+        }
+        if self.beta_optim_start_objective.is_some() {
+            names.push("rustBetaOptimStartObjective");
+        }
+        if self.beta_optim_objective.is_some() {
+            names.push("rustBetaOptimObjective");
+        }
+        if self.beta_optim_gradient_norm.is_some() {
+            names.push("rustBetaOptimGradientNorm");
         }
         if self.reduced_beta_iter.is_some() {
             names.push("reducedBetaIter");
@@ -141,6 +166,9 @@ impl Deseq2McolsDiagnostics {
         if let Some(values) = &self.disp_fit {
             columns.push(numeric_diagnostic_column("dispFit", values));
         }
+        if let Some(values) = &self.disp_map {
+            columns.push(numeric_diagnostic_column("dispMAP", values));
+        }
         if let Some(values) = &self.dispersion {
             columns.push(numeric_diagnostic_column("dispersion", values));
         }
@@ -161,6 +189,24 @@ impl Deseq2McolsDiagnostics {
         }
         if let Some(values) = &self.beta_iter {
             columns.push(integer_diagnostic_column("betaIter", values));
+        }
+        if let Some(values) = &self.beta_optim_iter {
+            columns.push(numeric_diagnostic_column("rustBetaOptimIter", values));
+        }
+        if let Some(values) = &self.beta_optim_start_objective {
+            columns.push(numeric_diagnostic_column(
+                "rustBetaOptimStartObjective",
+                values,
+            ));
+        }
+        if let Some(values) = &self.beta_optim_objective {
+            columns.push(numeric_diagnostic_column("rustBetaOptimObjective", values));
+        }
+        if let Some(values) = &self.beta_optim_gradient_norm {
+            columns.push(numeric_diagnostic_column(
+                "rustBetaOptimGradientNorm",
+                values,
+            ));
         }
         if let Some(values) = &self.reduced_beta_iter {
             columns.push(integer_diagnostic_column("reducedBetaIter", values));
@@ -215,6 +261,7 @@ impl DeseqFit {
             disp_gene_est: self.disp_gene_est.clone(),
             disp_gene_iter: self.disp_gene_iter.clone(),
             disp_fit: self.disp_fit.clone(),
+            disp_map: self.disp_map.clone(),
             dispersion: self.dispersion.clone(),
             disp_iter: self.disp_iter.clone(),
             disp_outlier: self.disp_outlier.clone(),
@@ -226,6 +273,10 @@ impl DeseqFit {
                 .clone()
                 .or_else(|| self.lrt.as_ref().map(|lrt| lrt.reduced_converged.clone())),
             beta_iter: self.beta_iter.clone(),
+            beta_optim_iter: self.beta_optim_iter.clone(),
+            beta_optim_start_objective: self.beta_optim_start_objective.clone(),
+            beta_optim_objective: self.beta_optim_objective.clone(),
+            beta_optim_gradient_norm: self.beta_optim_gradient_norm.clone(),
             reduced_beta_iter: self.reduced_beta_iter.clone(),
             deviance: self.full_deviance.clone(),
             max_cooks: self.max_cooks.clone(),

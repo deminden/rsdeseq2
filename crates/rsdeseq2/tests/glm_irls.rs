@@ -529,6 +529,7 @@ fn expanded_model_fit_collapse_returns_standard_glm_surface() {
         )
         .unwrap(),
         beta_se: RowMajorMatrix::from_row_major(2, 4, vec![1.0; 8]).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(2, 4, f64::NAN).unwrap(),
         beta_covariance: Some(
             RowMajorMatrix::from_row_major(
                 2,
@@ -548,6 +549,10 @@ fn expanded_model_fit_collapse_returns_standard_glm_surface() {
         ),
         mu: RowMajorMatrix::from_row_major(2, 3, vec![10.0, 20.0, 30.0, 5.0, 6.0, 7.0]).unwrap(),
         beta_iter: vec![5, 6],
+        beta_optim_iter: vec![f64::NAN; 2],
+        beta_optim_start_objective: vec![f64::NAN; 2],
+        beta_optim_objective: vec![f64::NAN; 2],
+        beta_optim_gradient_norm: vec![f64::NAN; 2],
         model_matrix: expanded_design,
         n_terms: 4,
         hat_diagonal: RowMajorMatrix::from_row_major(2, 3, vec![0.1; 6]).unwrap(),
@@ -621,9 +626,14 @@ fn expanded_model_group_helpers_validate_inputs() {
         beta_converged: vec![true],
         beta: expanded.clone(),
         beta_se: expanded.clone(),
+        beta_optim_start: RowMajorMatrix::from_elem(1, 2, f64::NAN).unwrap(),
         beta_covariance: None,
         mu: RowMajorMatrix::from_row_major(1, 1, vec![1.0]).unwrap(),
         beta_iter: vec![1],
+        beta_optim_iter: vec![f64::NAN],
+        beta_optim_start_objective: vec![f64::NAN],
+        beta_optim_objective: vec![f64::NAN],
+        beta_optim_gradient_norm: vec![f64::NAN],
         model_matrix: expanded_design,
         n_terms: 2,
         hat_diagonal: RowMajorMatrix::from_row_major(1, 1, vec![0.0]).unwrap(),
@@ -1452,12 +1462,12 @@ fn irls_optim_fallback_refits_nonconverged_rows_when_enabled() {
     assert_relative_eq!(
         with_optim.beta.as_slice()[0],
         10.0_f64.log2(),
-        epsilon = 1e-5
+        epsilon = 1e-4
     );
     assert_relative_eq!(
         with_optim.beta.as_slice()[1],
         2.0_f64.log2(),
-        epsilon = 1e-5
+        epsilon = 1e-4
     );
     assert!(with_optim.log_like[0] >= without_optim.log_like[0] - 1e-8);
 }

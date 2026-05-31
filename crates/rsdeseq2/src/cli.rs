@@ -25,10 +25,11 @@ use crate::io::{
     write_cooks_candidate_replacement_counts_tsv, write_cooks_distance_matrix_tsv,
     write_cooks_outlier_cells_tsv, write_cooks_replaced_counts_tsv,
     write_cooks_replacement_metadata_tsv, write_cooks_replacement_row_metadata_tsv,
-    write_deseq_result_column_metadata_tsv, write_deseq_result_table_metadata_tsv,
-    write_deseq_results_tsv, write_independent_filter_lowess_tsv,
-    write_independent_filter_metadata_tsv, write_independent_filter_num_rej_tsv,
-    write_normalized_counts_tsv, write_size_factors_tsv,
+    write_deseq_mcols_diagnostics_tsv, write_deseq_result_column_metadata_tsv,
+    write_deseq_result_table_metadata_tsv, write_deseq_results_tsv,
+    write_independent_filter_lowess_tsv, write_independent_filter_metadata_tsv,
+    write_independent_filter_num_rej_tsv, write_normalized_counts_tsv,
+    write_optional_numeric_matrix_tsv, write_size_factors_tsv,
 };
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{
@@ -384,6 +385,30 @@ enum Commands {
         /// Optional independent-filtering lowess curve TSV output.
         #[arg(long)]
         independent_filter_lowess_output: Option<PathBuf>,
+        /// Optional DESeq2-shaped fit diagnostics TSV for the original fit.
+        #[arg(long)]
+        fit_diagnostics_output: Option<PathBuf>,
+        /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
+        #[arg(long)]
+        refit_diagnostics_output: Option<PathBuf>,
+        /// Optional GLM beta matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_output: Option<PathBuf>,
+        /// Optional GLM beta standard-error matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_se_output: Option<PathBuf>,
+        /// Optional fallback optimizer start beta matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_optim_start_output: Option<PathBuf>,
+        /// Optional GLM beta matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_output: Option<PathBuf>,
+        /// Optional GLM beta standard-error matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_se_output: Option<PathBuf>,
+        /// Optional fallback optimizer start beta matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_optim_start_output: Option<PathBuf>,
         /// Optional Cook's distance matrix TSV output.
         #[arg(long)]
         cooks_distance_output: Option<PathBuf>,
@@ -507,6 +532,30 @@ enum Commands {
         /// Optional independent-filtering lowess curve TSV output.
         #[arg(long)]
         independent_filter_lowess_output: Option<PathBuf>,
+        /// Optional DESeq2-shaped fit diagnostics TSV for the original fit.
+        #[arg(long)]
+        fit_diagnostics_output: Option<PathBuf>,
+        /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
+        #[arg(long)]
+        refit_diagnostics_output: Option<PathBuf>,
+        /// Optional GLM beta matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_output: Option<PathBuf>,
+        /// Optional GLM beta standard-error matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_se_output: Option<PathBuf>,
+        /// Optional fallback optimizer start beta matrix TSV for the original fit.
+        #[arg(long)]
+        fit_beta_optim_start_output: Option<PathBuf>,
+        /// Optional GLM beta matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_output: Option<PathBuf>,
+        /// Optional GLM beta standard-error matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_se_output: Option<PathBuf>,
+        /// Optional fallback optimizer start beta matrix TSV for the replacement refit.
+        #[arg(long)]
+        refit_beta_optim_start_output: Option<PathBuf>,
         /// Optional Cook's distance matrix TSV output.
         #[arg(long)]
         cooks_distance_output: Option<PathBuf>,
@@ -556,6 +605,8 @@ enum WaldAlternativeArg {
 
 struct CliAnalysisOutput {
     results: DeseqResults,
+    fit: Option<DeseqFit>,
+    refit: Option<DeseqFit>,
     cooks: Option<RowMajorMatrix<f64>>,
     refit_plan: Option<CooksRefitPlan>,
 }
@@ -575,6 +626,14 @@ struct CliResultSidecarPaths {
     independent_filter_metadata: Option<PathBuf>,
     independent_filter_num_rej: Option<PathBuf>,
     independent_filter_lowess: Option<PathBuf>,
+    fit_diagnostics: Option<PathBuf>,
+    refit_diagnostics: Option<PathBuf>,
+    fit_beta: Option<PathBuf>,
+    fit_beta_se: Option<PathBuf>,
+    fit_beta_optim_start: Option<PathBuf>,
+    refit_beta: Option<PathBuf>,
+    refit_beta_se: Option<PathBuf>,
+    refit_beta_optim_start: Option<PathBuf>,
 }
 
 impl From<SizeFactorMethodArg> for SizeFactorMethod {
@@ -855,6 +914,14 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             independent_filter_metadata_output,
             independent_filter_num_rej_output,
             independent_filter_lowess_output,
+            fit_diagnostics_output,
+            refit_diagnostics_output,
+            fit_beta_output,
+            fit_beta_se_output,
+            fit_beta_optim_start_output,
+            refit_beta_output,
+            refit_beta_se_output,
+            refit_beta_optim_start_output,
             cooks_distance_output,
             cooks_replacement_metadata_output,
             cooks_replacement_row_metadata_output,
@@ -1252,6 +1319,14 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 independent_filter_metadata: independent_filter_metadata_output,
                 independent_filter_num_rej: independent_filter_num_rej_output,
                 independent_filter_lowess: independent_filter_lowess_output,
+                fit_diagnostics: fit_diagnostics_output,
+                refit_diagnostics: refit_diagnostics_output,
+                fit_beta: fit_beta_output,
+                fit_beta_se: fit_beta_se_output,
+                fit_beta_optim_start: fit_beta_optim_start_output,
+                refit_beta: refit_beta_output,
+                refit_beta_se: refit_beta_se_output,
+                refit_beta_optim_start: refit_beta_optim_start_output,
             };
             write_cli_cooks_outputs(
                 &sidecars,
@@ -1259,7 +1334,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 counts.sample_names(),
                 &analysis,
             )?;
-            write_cli_result_sidecars(&result_sidecars, &analysis.results)?;
+            write_cli_result_sidecars(&result_sidecars, counts.gene_names(), &analysis)?;
             write_deseq_results_tsv(output, &analysis.results)
         }
         Commands::Lrt {
@@ -1296,6 +1371,14 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             independent_filter_metadata_output,
             independent_filter_num_rej_output,
             independent_filter_lowess_output,
+            fit_diagnostics_output,
+            refit_diagnostics_output,
+            fit_beta_output,
+            fit_beta_se_output,
+            fit_beta_optim_start_output,
+            refit_beta_output,
+            refit_beta_se_output,
+            refit_beta_optim_start_output,
             cooks_distance_output,
             cooks_replacement_metadata_output,
             cooks_replacement_row_metadata_output,
@@ -1514,6 +1597,14 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 independent_filter_metadata: independent_filter_metadata_output,
                 independent_filter_num_rej: independent_filter_num_rej_output,
                 independent_filter_lowess: independent_filter_lowess_output,
+                fit_diagnostics: fit_diagnostics_output,
+                refit_diagnostics: refit_diagnostics_output,
+                fit_beta: fit_beta_output,
+                fit_beta_se: fit_beta_se_output,
+                fit_beta_optim_start: fit_beta_optim_start_output,
+                refit_beta: refit_beta_output,
+                refit_beta_se: refit_beta_se_output,
+                refit_beta_optim_start: refit_beta_optim_start_output,
             };
             write_cli_cooks_outputs(
                 &sidecars,
@@ -1521,7 +1612,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 counts.sample_names(),
                 &analysis,
             )?;
-            write_cli_result_sidecars(&result_sidecars, &analysis.results)?;
+            write_cli_result_sidecars(&result_sidecars, counts.gene_names(), &analysis)?;
             write_deseq_results_tsv(output, &analysis.results)
         }
     }
@@ -1557,25 +1648,34 @@ fn cli_normalized_counts(
 }
 
 fn cli_fit_output((fit, results): (DeseqFit, DeseqResults)) -> CliAnalysisOutput {
+    let cooks = fit.cooks.clone();
     CliAnalysisOutput {
         results,
-        cooks: fit.cooks.clone(),
+        fit: Some(fit),
+        refit: None,
+        cooks,
         refit_plan: None,
     }
 }
 
 fn cli_wald_replacement_output(output: CooksReplacementWaldOutput) -> CliAnalysisOutput {
+    let cooks = output.original_fit.cooks.clone();
     CliAnalysisOutput {
         results: output.results,
-        cooks: output.original_fit.cooks.clone(),
+        fit: Some(output.original_fit),
+        refit: output.refit_fit,
+        cooks,
         refit_plan: Some(output.refit_plan),
     }
 }
 
 fn cli_lrt_replacement_output(output: CooksReplacementLrtOutput) -> CliAnalysisOutput {
+    let cooks = output.original_fit.cooks.clone();
     CliAnalysisOutput {
         results: output.results,
-        cooks: output.original_fit.cooks.clone(),
+        fit: Some(output.original_fit),
+        refit: output.refit_fit,
+        cooks,
         refit_plan: Some(output.refit_plan),
     }
 }
@@ -1583,6 +1683,8 @@ fn cli_lrt_replacement_output(output: CooksReplacementLrtOutput) -> CliAnalysisO
 fn cli_expanded_beta_prior_output(output: ExpandedBetaPriorWaldResults) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
+        fit: None,
+        refit: None,
         cooks: None,
         refit_plan: None,
     }
@@ -1593,6 +1695,8 @@ fn cli_expanded_beta_prior_replacement_output(
 ) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
+        fit: None,
+        refit: None,
         cooks: Some(output.cooks.cooks),
         refit_plan: Some(output.refit_plan),
     }
@@ -1601,6 +1705,8 @@ fn cli_expanded_beta_prior_replacement_output(
 fn cli_factor_beta_prior_output(output: ExpandedFactorBetaPriorWaldResults) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
+        fit: None,
+        refit: None,
         cooks: None,
         refit_plan: None,
     }
@@ -1617,6 +1723,8 @@ fn cli_additive_beta_prior_output(
 ) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
+        fit: None,
+        refit: None,
         cooks: None,
         refit_plan: None,
     }
@@ -2341,8 +2449,10 @@ fn write_cli_cooks_outputs(
 
 fn write_cli_result_sidecars(
     paths: &CliResultSidecarPaths,
-    results: &DeseqResults,
+    gene_names: Option<&[String]>,
+    analysis: &CliAnalysisOutput,
 ) -> Result<(), DeseqError> {
+    let results = &analysis.results;
     if let Some(path) = &paths.column_metadata {
         write_deseq_result_column_metadata_tsv(path, results)?;
     }
@@ -2372,7 +2482,137 @@ fn write_cli_result_sidecars(
             write_independent_filter_lowess_tsv(path, filtering)?;
         }
     }
+    if let Some(path) = &paths.fit_diagnostics {
+        let fit = analysis
+            .fit
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "fit diagnostics sidecar output requires a native fit workflow".to_string(),
+            })?;
+        write_deseq_mcols_diagnostics_tsv(path, gene_names, &fit.deseq2_mcols_diagnostics())?;
+    }
+    if let Some(path) = &paths.refit_diagnostics {
+        let refit = analysis
+            .refit
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "replacement refit diagnostics sidecar output requires rows to be refit"
+                    .to_string(),
+            })?;
+        write_deseq_mcols_diagnostics_tsv(path, gene_names, &refit.deseq2_mcols_diagnostics())?;
+    }
+    if let Some(path) = &paths.fit_beta {
+        let fit = require_cli_fit(analysis, "fit beta sidecar output")?;
+        let beta = fit
+            .beta
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "fit beta sidecar output requires GLM beta estimates".to_string(),
+            })?;
+        write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(fit), beta)?;
+    }
+    if let Some(path) = &paths.fit_beta_se {
+        let fit = require_cli_fit(analysis, "fit beta standard-error sidecar output")?;
+        let beta_se = fit
+            .beta_se
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "fit beta standard-error sidecar output requires GLM beta standard errors"
+                    .to_string(),
+            })?;
+        write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(fit), beta_se)?;
+    }
+    if let Some(path) = &paths.fit_beta_optim_start {
+        let fit = require_cli_fit(analysis, "fit optimizer-start beta sidecar output")?;
+        let beta_optim_start =
+            fit.beta_optim_start
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason:
+                        "fit optimizer-start beta sidecar output requires GLM fallback diagnostics"
+                            .to_string(),
+                })?;
+        write_optional_numeric_matrix_tsv(
+            path,
+            gene_names,
+            fit_coefficient_names(fit),
+            beta_optim_start,
+        )?;
+    }
+    if let Some(path) = &paths.refit_beta {
+        let refit = require_cli_refit(analysis, "replacement refit beta sidecar output")?;
+        let beta = refit
+            .beta
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "replacement refit beta sidecar output requires GLM beta estimates"
+                    .to_string(),
+            })?;
+        write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(refit), beta)?;
+    }
+    if let Some(path) = &paths.refit_beta_se {
+        let refit = require_cli_refit(
+            analysis,
+            "replacement refit beta standard-error sidecar output",
+        )?;
+        let beta_se = refit.beta_se.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason:
+                "replacement refit beta standard-error sidecar output requires GLM beta standard errors"
+                    .to_string(),
+        })?;
+        write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(refit), beta_se)?;
+    }
+    if let Some(path) = &paths.refit_beta_optim_start {
+        let refit = require_cli_refit(
+            analysis,
+            "replacement refit optimizer-start beta sidecar output",
+        )?;
+        let beta_optim_start =
+            refit
+                .beta_optim_start
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "replacement refit optimizer-start beta sidecar output requires GLM fallback diagnostics"
+                        .to_string(),
+                })?;
+        write_optional_numeric_matrix_tsv(
+            path,
+            gene_names,
+            fit_coefficient_names(refit),
+            beta_optim_start,
+        )?;
+    }
     Ok(())
+}
+
+fn require_cli_fit<'a>(
+    analysis: &'a CliAnalysisOutput,
+    context: &str,
+) -> Result<&'a DeseqFit, DeseqError> {
+    analysis
+        .fit
+        .as_ref()
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!("{context} requires a native fit workflow"),
+        })
+}
+
+fn require_cli_refit<'a>(
+    analysis: &'a CliAnalysisOutput,
+    context: &str,
+) -> Result<&'a DeseqFit, DeseqError> {
+    analysis
+        .refit
+        .as_ref()
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!("{context} requires rows to be refit"),
+        })
+}
+
+fn fit_coefficient_names(fit: &DeseqFit) -> Option<&[String]> {
+    fit.design
+        .as_ref()
+        .and_then(|design| design.coefficient_names())
 }
 
 fn apply_cli_normalization_inputs(
@@ -2670,4 +2910,150 @@ fn default_cli_coefficient(design: &crate::design::DesignMatrix) -> Result<usize
             expected: 1,
             actual: 0,
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+    use crate::core::CountsSummary;
+
+    #[test]
+    fn write_cli_result_sidecars_exports_fit_diagnostics() {
+        let path = temp_tsv_path("fit_diagnostics");
+        let paths = CliResultSidecarPaths {
+            column_metadata: None,
+            table_metadata: None,
+            independent_filter_metadata: None,
+            independent_filter_num_rej: None,
+            independent_filter_lowess: None,
+            fit_diagnostics: Some(path.clone()),
+            refit_diagnostics: None,
+            fit_beta: None,
+            fit_beta_se: None,
+            fit_beta_optim_start: None,
+            refit_beta: None,
+            refit_beta_se: None,
+            refit_beta_optim_start: None,
+        };
+        let analysis = CliAnalysisOutput {
+            results: DeseqResults::default(),
+            fit: Some(one_gene_fit(0.2)),
+            refit: None,
+            cooks: None,
+            refit_plan: None,
+        };
+        let gene_names = vec!["geneA".to_string()];
+
+        write_cli_result_sidecars(&paths, Some(&gene_names), &analysis).unwrap();
+
+        let got = fs::read_to_string(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        assert!(got.starts_with("gene\tdispGeneEst\tdispFit\tdispersion\n"));
+        assert!(got.contains("geneA\t0.2\t0.1\t0.2\n"));
+    }
+
+    #[test]
+    fn write_cli_result_sidecars_rejects_missing_refit_diagnostics() {
+        let path = temp_tsv_path("missing_refit_diagnostics");
+        let paths = CliResultSidecarPaths {
+            column_metadata: None,
+            table_metadata: None,
+            independent_filter_metadata: None,
+            independent_filter_num_rej: None,
+            independent_filter_lowess: None,
+            fit_diagnostics: None,
+            refit_diagnostics: Some(path),
+            fit_beta: None,
+            fit_beta_se: None,
+            fit_beta_optim_start: None,
+            refit_beta: None,
+            refit_beta_se: None,
+            refit_beta_optim_start: None,
+        };
+        let analysis = CliAnalysisOutput {
+            results: DeseqResults::default(),
+            fit: Some(one_gene_fit(0.2)),
+            refit: None,
+            cooks: None,
+            refit_plan: None,
+        };
+
+        let err = write_cli_result_sidecars(&paths, None, &analysis).unwrap_err();
+
+        assert!(matches!(
+            err,
+            DeseqError::InvalidOptions { reason }
+                if reason.contains("replacement refit diagnostics sidecar output requires rows to be refit")
+        ));
+    }
+
+    fn one_gene_fit(dispersion: f64) -> DeseqFit {
+        DeseqFit {
+            counts_summary: CountsSummary {
+                n_genes: 1,
+                n_samples: 2,
+                all_zero_genes: 0,
+            },
+            design: None,
+            reduced_design: None,
+            size_factors: vec![1.0, 1.0],
+            normalization_factors: None,
+            observation_weights: None,
+            weights_fail: None,
+            weights_design_rank: None,
+            base_mean: vec![1.0],
+            base_var: vec![0.0],
+            all_zero: vec![false],
+            disp_gene_est: Some(vec![dispersion]),
+            disp_gene_iter: None,
+            disp_fit: Some(vec![0.1]),
+            dispersion_trend: None,
+            disp_map: None,
+            dispersion: Some(vec![dispersion]),
+            disp_iter: None,
+            disp_outlier: None,
+            disp_prior_var: None,
+            var_log_disp_estimates: None,
+            dispersion_converged: None,
+            beta: None,
+            beta_se: None,
+            beta_optim_start: None,
+            beta_covariance: None,
+            beta_converged: None,
+            beta_iter: None,
+            beta_optim_iter: None,
+            beta_optim_start_objective: None,
+            beta_optim_objective: None,
+            beta_optim_gradient_norm: None,
+            log_like: None,
+            full_deviance: None,
+            reduced_log_like: None,
+            reduced_beta_converged: None,
+            reduced_beta_iter: None,
+            reduced_mu: None,
+            reduced_hat_diagonal: None,
+            mu: None,
+            cooks: None,
+            max_cooks: None,
+            hat_diagonal: None,
+            wald: None,
+            lrt: None,
+        }
+    }
+
+    fn temp_tsv_path(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "rsdeseq2_cli_{name}_{}_{}.tsv",
+            std::process::id(),
+            nonce
+        ))
+    }
 }

@@ -42,7 +42,7 @@ implemented primitive outputs:
 | `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 237 MiB |
 | `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 693 MiB |
 | `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 694 MiB |
-| `wald_results` | 65,580 genes, 78 samples | median LFC diff `3.05e-14`; max LFC diff `5.68e-04` | 596 MiB |
+| `wald_results` | 65,580 genes, 78 samples | median LFC diff `1.04e-13`; max lfcSE diff `3.27e-04`; max p-value diff `4.79e-05` | 610 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
 The latest sweep completed with zero swaps. Methodology and synthetic

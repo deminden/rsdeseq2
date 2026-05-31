@@ -1,3 +1,4 @@
+use lbfgsb_rs_pure::{IterationControl, Status, LBFGSB};
 use nalgebra::{DMatrix, DVector};
 
 use crate::core::CountMatrix;
@@ -9,7 +10,9 @@ use crate::glm::nb::{
     nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted, nbinom_log_pmf,
 };
 use crate::glm::NbinomGlmFit;
-use crate::math::optim::{BoundedOptimizationOutput, BoundedOptimizerOptions};
+use crate::math::optim::{
+    minimize_bounded_projected_gradient, BoundedOptimizationOutput, BoundedOptimizerOptions,
+};
 use crate::matrix::RowMajorMatrix;
 
 /// Fit a fixed-dispersion negative-binomial GLM with DESeq2-style dispatch.
@@ -39,9 +42,9 @@ pub enum IrlsSolver {
     ///
     /// This preserves the initial Rust behavior and is useful for existing
     /// `useQR=FALSE` DESeq2 references.
-    #[default]
     NormalEquations,
     /// Solve DESeq2's augmented QR problem `[sqrt(W) X; sqrt(ridge)] beta`.
+    #[default]
     Qr,
 }
 
@@ -85,11 +88,11 @@ impl Default for IrlsOptions {
             max_beta_abs: 30.0,
             ridge_lambda: 1e-6 * inv_ln2 * inv_ln2,
             ridge_lambda_by_coefficient: None,
-            solver: IrlsSolver::NormalEquations,
+            solver: IrlsSolver::Qr,
             use_optim: true,
             force_optim: false,
-            optim_maxit: 200,
-            optim_tol: 1e-8,
+            optim_maxit: 100,
+            optim_tol: 0.0,
         }
     }
 }
@@ -148,8 +151,8 @@ fn is_intercept_only_design(design: &DesignMatrix) -> bool {
 /// This implements the standard-design-matrix branch of DESeq2's `fitBeta`
 /// loop. The weighted least-squares update can use either the direct normal
 /// equations branch or DESeq2's augmented QR branch. Observation weights are
-/// supported, and fallback rows can be refit with bounded pure-Rust
-/// optimization. Explicit contrast testing is layered on top of the stored
+/// supported, and fallback rows can be refit with bounded limited-memory
+/// BFGS-style pure-Rust optimization. Explicit contrast testing is layered on top of the stored
 /// beta covariance matrices.
 pub fn fit_fixed_dispersion_irls(
     counts: &CountMatrix,
@@ -231,11 +234,16 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;
     let mut beta_values = Vec::with_capacity(counts.n_genes() * p);
     let mut beta_var_values = Vec::with_capacity(counts.n_genes() * p);
+    let mut beta_optim_start_values = vec![f64::NAN; counts.n_genes() * p];
     let mut beta_covariance_values = Vec::with_capacity(counts.n_genes() * p * p);
     let mut mu_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
     let mut hat_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
     let mut beta_iter = Vec::with_capacity(counts.n_genes());
     let mut beta_converged = Vec::with_capacity(counts.n_genes());
+    let mut beta_optim_iter = vec![f64::NAN; counts.n_genes()];
+    let mut beta_optim_start_objective = vec![f64::NAN; counts.n_genes()];
+    let mut beta_optim_objective = vec![f64::NAN; counts.n_genes()];
+    let mut beta_optim_gradient_norm = vec![f64::NAN; counts.n_genes()];
 
     for (gene, dispersion) in dispersions.iter().copied().enumerate() {
         if counts.is_all_zero_gene(gene)? {
@@ -352,11 +360,16 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
             &fallback_rows.rows,
             &mut beta_values,
             &mut beta_var_values,
+            &mut beta_optim_start_values,
             &mut beta_covariance_values,
             &mut mu_values,
             &mut hat_values,
             &mut beta_converged,
             &mut optim_log_like,
+            &mut beta_optim_iter,
+            &mut beta_optim_start_objective,
+            &mut beta_optim_objective,
+            &mut beta_optim_gradient_norm,
             OptimFallbackInput {
                 counts,
                 x: &x,
@@ -370,6 +383,8 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     }
     let beta = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values)?;
     let beta_se = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_var_values)?;
+    let beta_optim_start =
+        RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_optim_start_values)?;
     let beta_covariance =
         RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values)?;
     let mu = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), mu_values)?;
@@ -387,9 +402,14 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
         beta_converged,
         beta,
         beta_se,
+        beta_optim_start,
         beta_covariance: Some(beta_covariance),
         mu,
         beta_iter,
+        beta_optim_iter,
+        beta_optim_start_objective,
+        beta_optim_objective,
+        beta_optim_gradient_norm,
         model_matrix: design.clone(),
         n_terms: p,
         hat_diagonal,
@@ -411,11 +431,16 @@ fn refit_optim_fallback_rows(
     rows: &[usize],
     beta_values: &mut [f64],
     beta_var_values: &mut [f64],
+    beta_optim_start_values: &mut [f64],
     beta_covariance_values: &mut [f64],
     mu_values: &mut [f64],
     hat_values: &mut [f64],
     beta_converged: &mut [bool],
     optim_log_like: &mut [Option<f64>],
+    beta_optim_iter: &mut [f64],
+    beta_optim_start_objective: &mut [f64],
+    beta_optim_objective: &mut [f64],
+    beta_optim_gradient_norm: &mut [f64],
     input: OptimFallbackInput<'_>,
 ) -> Result<(), DeseqError> {
     let p = input.x.ncols();
@@ -440,7 +465,18 @@ fn refit_optim_fallback_rows(
             weights: weight_row,
             ridge_lambda: input.ridge_lambda,
         };
+        let (start_objective, _, _) =
+            beta_log2_objective_gradient_hessian(&beta_input, &beta_start)?;
         let output = optimize_beta_log2(beta_input, &beta_start, input.options)?;
+        let (_, final_gradient, _) =
+            beta_log2_objective_gradient_hessian(&beta_input, &output.parameters)?;
+        let final_gradient_norm = projected_gradient_norm(
+            &output.parameters,
+            &final_gradient,
+            -input.options.max_beta_abs,
+            input.options.max_beta_abs,
+        )
+        .unwrap_or(f64::NAN);
 
         let mu_unfloored = fitted_mu_log2_unfloored(input.x, &output.parameters, nf)?;
         let mu_for_inference = mu_unfloored
@@ -458,6 +494,7 @@ fn refit_optim_fallback_rows(
         };
 
         for (col, value) in output.parameters.iter().copied().enumerate() {
+            beta_optim_start_values[gene * p + col] = beta_start[col];
             beta_values[gene * p + col] = value;
             let covariance_value = beta_covariance[col * p + col];
             beta_var_values[gene * p + col] = checked_log2_standard_error(
@@ -480,6 +517,10 @@ fn refit_optim_fallback_rows(
             hat_values[gene * n + sample] = value;
         }
         beta_converged[gene] = output.converged;
+        beta_optim_iter[gene] = output.iterations as f64;
+        beta_optim_start_objective[gene] = start_objective;
+        beta_optim_objective[gene] = output.value;
+        beta_optim_gradient_norm[gene] = final_gradient_norm;
         optim_log_like[gene] = Some(nbinom_log_likelihood_weighted(
             counts_row,
             &mu_for_inference,
@@ -532,140 +573,135 @@ fn optimize_beta_log2(
     start: &[f64],
     options: &IrlsOptions,
 ) -> Result<BoundedOptimizationOutput, DeseqError> {
-    let optimizer_options = BoundedOptimizerOptions {
-        maxit: options.optim_maxit,
-        gradient_tol: options.optim_tol,
-        ..BoundedOptimizerOptions::default()
-    };
-    minimize_beta_log2_newton(
+    minimize_beta_log2_lbfgsb(
         input,
         start,
         -options.max_beta_abs,
         options.max_beta_abs,
-        optimizer_options,
+        options.optim_maxit,
+        options.optim_tol,
     )
 }
 
-fn minimize_beta_log2_newton(
+fn minimize_beta_log2_lbfgsb(
     input: BetaOptimInput<'_>,
     start: &[f64],
     lower: f64,
     upper: f64,
-    options: BoundedOptimizerOptions,
+    maxit: usize,
+    gradient_tol: f64,
 ) -> Result<BoundedOptimizationOutput, DeseqError> {
     let mut parameters = start
         .iter()
         .copied()
         .map(|value| value.clamp(lower, upper))
         .collect::<Vec<_>>();
-    let (mut value, mut gradient, mut hessian) =
-        beta_log2_objective_gradient_hessian(&input, &parameters)?;
-
-    for iter in 0..options.maxit {
-        let Some(gradient_norm) = projected_gradient_norm(&parameters, &gradient, lower, upper)
-        else {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: false,
-                iterations: iter,
-            });
-        };
-        if gradient_norm <= options.gradient_tol {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: true,
-                iterations: iter,
-            });
+    let start_parameters = parameters.clone();
+    let lower_bounds = vec![lower; parameters.len()];
+    let upper_bounds = vec![upper; parameters.len()];
+    let mut deferred_error = None;
+    let mut objective_and_gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
+        Ok(value_gradient) => value_gradient,
+        Err(error) => {
+            deferred_error.get_or_insert(error);
+            let (_, gradient, _) = beta_optim_penalty(beta.len());
+            (1.0e300, gradient)
         }
-
-        let direction =
-            bounded_beta_descent_direction(&parameters, &hessian, &gradient, lower, upper);
-        let Some(directional_derivative) = checked_dot(&gradient, &direction) else {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: false,
-                iterations: iter,
-            });
-        };
-        if directional_derivative >= 0.0 {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: false,
-                iterations: iter,
-            });
-        }
-
-        let mut step = options.initial_step;
-        let mut accepted = None;
-        while step >= options.min_step {
-            let Some(candidate) = checked_candidate(&parameters, &direction, step, lower, upper)
-            else {
-                step *= 0.5;
-                continue;
-            };
-            let Some(movement) = max_abs_difference(&parameters, &candidate) else {
-                step *= 0.5;
-                continue;
-            };
-            if movement <= options.step_tol {
-                return Ok(BoundedOptimizationOutput {
-                    parameters,
-                    value,
-                    converged: true,
-                    iterations: iter + 1,
-                });
-            }
-            let Some(actual_directional_derivative) =
-                actual_directional_derivative(&parameters, &candidate, &gradient)
-            else {
-                step *= 0.5;
-                continue;
-            };
-            if actual_directional_derivative >= 0.0 {
-                step *= 0.5;
-                continue;
-            }
-            let (candidate_value, candidate_gradient, candidate_hessian) =
-                beta_log2_objective_gradient_hessian(&input, &candidate)?;
-            if checked_armijo_bound(value, options.armijo, actual_directional_derivative)
-                .is_some_and(|bound| candidate_value <= bound)
-            {
-                accepted = Some((
-                    candidate,
-                    candidate_value,
-                    candidate_gradient,
-                    candidate_hessian,
-                ));
-                break;
-            }
-            step *= 0.5;
-        }
-
-        let Some((candidate, candidate_value, candidate_gradient, candidate_hessian)) = accepted
-        else {
-            return Ok(BoundedOptimizationOutput {
-                parameters,
-                value,
-                converged: false,
-                iterations: iter + 1,
-            });
-        };
-        parameters = candidate;
-        value = candidate_value;
-        gradient = candidate_gradient;
-        hessian = candidate_hessian;
+    };
+    let start_value = beta_log2_objective(&input, &parameters)?;
+    let mut previous_value = Some(start_value);
+    let mut solver = LBFGSB::new(5).with_max_iter(maxit).with_pgtol(gradient_tol);
+    let solution = solver
+        .minimize_with_callback(
+            &mut parameters,
+            &lower_bounds,
+            &upper_bounds,
+            &mut objective_and_gradient,
+            &mut |info, _| {
+                let Some(previous) = previous_value.replace(info.f) else {
+                    return IterationControl::Continue;
+                };
+                if info.proj_grad_norm <= 1.0e-5 && lbfgsb_factr_converged(previous, info.f) {
+                    IterationControl::StopConverged
+                } else {
+                    IterationControl::Continue
+                }
+            },
+        )
+        .map_err(|message| DeseqError::UnsupportedFeature {
+            feature: format!("optim fallback L-BFGS-B failed: {message}"),
+        })?;
+    if let Some(error) = deferred_error {
+        return Err(error);
     }
-
+    let (_, final_gradient) = beta_log2_value_gradient(&input, &solution.x)?;
+    let final_gradient_norm = projected_gradient_norm(&solution.x, &final_gradient, lower, upper);
+    let converged_by_gradient = final_gradient_norm
+        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4) && solution.f.is_finite());
+    let converged = solution.status == Status::Converged || converged_by_gradient;
+    if let Some(polish) = polish_beta_log2(
+        input,
+        &solution.x,
+        lower,
+        upper,
+        maxit,
+        gradient_tol,
+        converged,
+        final_gradient_norm,
+    )? {
+        if polish.value.is_finite() && polish.value <= solution.f.min(start_value) {
+            return Ok(polish);
+        }
+    }
+    if !converged && final_gradient_norm.is_some_and(|norm| norm > 0.1) {
+        return Ok(BoundedOptimizationOutput {
+            parameters: start_parameters,
+            value: start_value,
+            converged: false,
+            iterations: solution.iterations,
+        });
+    }
     Ok(BoundedOptimizationOutput {
-        parameters,
-        value,
-        converged: false,
-        iterations: options.maxit,
+        parameters: solution.x,
+        value: solution.f,
+        converged,
+        iterations: solution.iterations,
     })
+}
+
+fn polish_beta_log2(
+    input: BetaOptimInput<'_>,
+    start: &[f64],
+    lower: f64,
+    upper: f64,
+    maxit: usize,
+    gradient_tol: f64,
+    converged: bool,
+    gradient_norm: Option<f64>,
+) -> Result<Option<BoundedOptimizationOutput>, DeseqError> {
+    if converged && !gradient_norm.is_some_and(|norm| norm > 1.0e-4) {
+        return Ok(None);
+    }
+    let options = BoundedOptimizerOptions {
+        maxit,
+        gradient_tol: gradient_tol.max(1.0e-8),
+        step_tol: 1.0e-10,
+        initial_step: 1.0,
+        min_step: 1.0e-12,
+        armijo: 1.0e-4,
+    };
+    minimize_bounded_projected_gradient(start, lower, upper, options, |beta| {
+        beta_log2_value_gradient(&input, beta)
+    })
+    .map(Some)
+}
+
+fn beta_log2_value_gradient(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+) -> Result<(f64, Vec<f64>), DeseqError> {
+    let (value, gradient, _) = beta_log2_objective_gradient_hessian(input, beta)?;
+    Ok((value, gradient))
 }
 
 fn beta_log2_objective_gradient_hessian(
@@ -829,51 +865,55 @@ fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
     (1.0e300, vec![0.0; p], DMatrix::identity(p, p))
 }
 
-fn newton_direction(hessian: &DMatrix<f64>, gradient: &[f64]) -> Option<Vec<f64>> {
-    let rhs = DVector::from_iterator(gradient.len(), gradient.iter().map(|value| -*value));
-    hessian
-        .clone()
-        .lu()
-        .solve(&rhs)
-        .map(|values| values.iter().copied().collect())
-}
-
-fn bounded_beta_descent_direction(
-    parameters: &[f64],
-    hessian: &DMatrix<f64>,
-    gradient: &[f64],
-    lower: f64,
-    upper: f64,
-) -> Vec<f64> {
-    if let Some(direction) = newton_direction(hessian, gradient) {
-        if checked_dot(gradient, &direction)
-            .is_some_and(|directional_derivative| directional_derivative < 0.0)
-            && direction.iter().all(|value| value.is_finite())
-        {
-            return direction;
-        }
+fn lbfgsb_factr_converged(previous: f64, next: f64) -> bool {
+    const R_LBFGSB_FACTR: f64 = 1.0e7;
+    if !previous.is_finite() || !next.is_finite() {
+        return false;
     }
-    projected_beta_descent_direction(parameters, gradient, lower, upper)
+    let tolerance = R_LBFGSB_FACTR * f64::EPSILON * previous.abs().max(next.abs()).max(1.0);
+    (previous - next).abs() <= tolerance
 }
 
-fn projected_beta_descent_direction(
-    parameters: &[f64],
-    gradient: &[f64],
+fn beta_log2_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
+    beta_log2_objective_gradient_hessian(input, beta).map(|(objective, _, _)| objective)
+}
+
+#[cfg(test)]
+fn beta_log2_numeric_gradient(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
     lower: f64,
     upper: f64,
-) -> Vec<f64> {
-    parameters
-        .iter()
-        .copied()
-        .zip(gradient.iter().copied())
-        .map(|(parameter, gradient)| {
-            if (parameter <= lower && gradient > 0.0) || (parameter >= upper && gradient < 0.0) {
-                0.0
-            } else {
-                -gradient
-            }
-        })
-        .collect()
+) -> Result<Vec<f64>, DeseqError> {
+    const R_OPTIM_NDEPS: f64 = 1.0e-3;
+    let mut gradient = Vec::with_capacity(beta.len());
+    for col in 0..beta.len() {
+        let forward = (beta[col] + R_OPTIM_NDEPS).min(upper);
+        let forward_eps = forward - beta[col];
+        let backward = (beta[col] - R_OPTIM_NDEPS).max(lower);
+        let backward_eps = beta[col] - backward;
+        let denominator = forward_eps + backward_eps;
+        if !denominator.is_finite() || denominator <= 0.0 {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: "optim fallback finite-difference gradient at degenerate bounds"
+                    .to_string(),
+            });
+        }
+        let mut forward_beta = beta.to_vec();
+        forward_beta[col] = forward;
+        let mut backward_beta = beta.to_vec();
+        backward_beta[col] = backward;
+        let forward_value = beta_log2_objective(input, &forward_beta)?;
+        let backward_value = beta_log2_objective(input, &backward_beta)?;
+        let Some(difference) = checked_sum2(forward_value, -backward_value) else {
+            return Ok(vec![0.0; beta.len()]);
+        };
+        let Some(value) = checked_div2(difference, denominator) else {
+            return Ok(vec![0.0; beta.len()]);
+        };
+        gradient.push(value);
+    }
+    Ok(gradient)
 }
 
 fn projected_gradient_norm(
@@ -917,14 +957,6 @@ fn projected_gradient_norm(
     }
     let norm = scale * sum.sqrt();
     norm.is_finite().then_some(norm)
-}
-
-fn checked_dot(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut terms = Vec::with_capacity(left.len().min(right.len()));
-    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        terms.push(checked_product2(left, right)?);
-    }
-    checked_scaled_sum(&terms)
 }
 
 fn checked_sum2(left: f64, right: f64) -> Option<f64> {
@@ -990,71 +1022,6 @@ fn irls_deviance_convergence_stat(dev: f64, dev_old: f64) -> Option<f64> {
     let delta = checked_sum2(dev, -dev_old)?.abs();
     let scale = checked_sum2(dev.abs(), 0.1)?;
     checked_div2(delta, scale)
-}
-
-fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
-    checked_sum2(value, checked_product2(armijo, derivative)?)
-}
-
-fn checked_candidate(
-    parameters: &[f64],
-    direction: &[f64],
-    step: f64,
-    lower: f64,
-    upper: f64,
-) -> Option<Vec<f64>> {
-    parameters
-        .iter()
-        .copied()
-        .zip(direction.iter().copied())
-        .map(|(value, delta)| checked_candidate_coordinate(value, delta, step, lower, upper))
-        .collect()
-}
-
-fn checked_candidate_coordinate(
-    value: f64,
-    delta: f64,
-    step: f64,
-    lower: f64,
-    upper: f64,
-) -> Option<f64> {
-    if !value.is_finite()
-        || !delta.is_finite()
-        || !step.is_finite()
-        || !lower.is_finite()
-        || !upper.is_finite()
-    {
-        return None;
-    }
-    let displacement = checked_product2(step, delta)?;
-    let candidate = checked_sum2(value, displacement)?;
-    Some(candidate.clamp(lower, upper))
-}
-
-fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut max_difference = 0.0;
-    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let difference = checked_sum2(left, -right)?.abs();
-        max_difference = f64::max(max_difference, difference);
-    }
-    Some(max_difference)
-}
-
-fn actual_directional_derivative(
-    parameters: &[f64],
-    candidate: &[f64],
-    gradient: &[f64],
-) -> Option<f64> {
-    let mut terms = Vec::with_capacity(gradient.len().min(candidate.len()).min(parameters.len()));
-    for (gradient, (candidate, parameter)) in gradient
-        .iter()
-        .copied()
-        .zip(candidate.iter().copied().zip(parameters.iter().copied()))
-    {
-        let direction = checked_sum2(candidate, -parameter)?;
-        terms.push(checked_product2(gradient, direction)?);
-    }
-    checked_scaled_sum(&terms)
 }
 
 fn initial_beta(x: &DMatrix<f64>, y: &[f64], nf: &[f64]) -> Result<DVector<f64>, DeseqError> {
@@ -1462,7 +1429,7 @@ fn validate_nf_irls_inputs(
         || options.maxit == 0
         || options.optim_maxit == 0
         || !options.optim_tol.is_finite()
-        || options.optim_tol <= 0.0
+        || options.optim_tol < 0.0
         || !options.min_mu.is_finite()
         || options.min_mu <= 0.0
         || !options.max_beta_abs.is_finite()
@@ -1543,14 +1510,6 @@ mod tests {
     use approx::assert_relative_eq;
 
     #[test]
-    fn bounded_beta_descent_direction_uses_newton_when_it_descends() {
-        let hessian = DMatrix::from_row_slice(1, 1, &[2.0]);
-        let direction = bounded_beta_descent_direction(&[0.0], &hessian, &[4.0], -30.0, 30.0);
-
-        assert_relative_eq!(direction[0], -2.0, epsilon = 1e-12);
-    }
-
-    #[test]
     fn log2_output_scaling_rejects_nonfinite_values() {
         assert!(matches!(
             checked_log2_scale(f64::MAX, 0, "test beta scale"),
@@ -1565,26 +1524,35 @@ mod tests {
     }
 
     #[test]
-    fn bounded_beta_descent_direction_falls_back_when_newton_is_not_descent() {
-        let hessian = DMatrix::from_row_slice(1, 1, &[-2.0]);
-        let direction = bounded_beta_descent_direction(&[0.0], &hessian, &[4.0], -30.0, 30.0);
+    fn beta_numeric_gradient_uses_r_optim_bounded_difference() {
+        let x = DMatrix::from_row_slice(2, 1, &[1.0, 1.0]);
+        let counts = [1_u32, 8_u32];
+        let nf = [1.0, 1.5];
+        let ridge_lambda = [0.25];
+        let input = BetaOptimInput {
+            x: &x,
+            counts: &counts,
+            nf: &nf,
+            dispersion: 0.3,
+            weights: None,
+            ridge_lambda: &ridge_lambda,
+        };
+        let beta = [30.0];
+        let gradient = beta_log2_numeric_gradient(&input, &beta, -30.0, 30.0).unwrap();
+        let forward_value = beta_log2_objective(&input, &[30.0]).unwrap();
+        let backward_value = beta_log2_objective(&input, &[29.999]).unwrap();
 
-        assert_relative_eq!(direction[0], -4.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            gradient[0],
+            (forward_value - backward_value) / 0.001,
+            epsilon = 1e-5
+        );
     }
 
     #[test]
-    fn bounded_beta_descent_direction_projects_active_bounds() {
-        let hessian = DMatrix::from_row_slice(1, 1, &[-2.0]);
-        let direction = bounded_beta_descent_direction(&[-30.0], &hessian, &[4.0], -30.0, 30.0);
-
-        assert_relative_eq!(direction[0], 0.0, epsilon = 1e-12);
-    }
-
-    #[test]
-    fn actual_directional_derivative_uses_clamped_candidate_movement() {
-        let derivative = actual_directional_derivative(&[29.0], &[30.0], &[-4.0]).unwrap();
-
-        assert_relative_eq!(derivative, -4.0, epsilon = 1e-12);
+    fn lbfgsb_factr_convergence_matches_r_default_scale() {
+        assert!(lbfgsb_factr_converged(10.0, 10.0 + 1.0e-9));
+        assert!(!lbfgsb_factr_converged(10.0, 10.0 + 1.0e-6));
     }
 
     #[test]
@@ -1599,40 +1567,8 @@ mod tests {
             projected_gradient_norm(&[0.0, 0.0], &[f64::MAX, f64::MAX], -30.0, 30.0),
             None
         );
-        assert_eq!(
-            checked_dot(&[f64::MAX, f64::MAX], &[1.0, -1.0]).unwrap(),
-            0.0
-        );
-        assert_eq!(
-            actual_directional_derivative(&[0.0, 0.0], &[1.0, 1.0], &[f64::MAX, -f64::MAX])
-                .unwrap(),
-            0.0
-        );
-        assert_eq!(checked_dot(&[f64::MAX], &[2.0]), None);
-        assert_eq!(max_abs_difference(&[-f64::MAX], &[f64::MAX]), None);
-        assert_eq!(
-            actual_directional_derivative(&[0.0], &[2.0], &[f64::MAX]),
-            None
-        );
-        assert_eq!(
-            checked_candidate_coordinate(0.0, f64::MAX, 2.0, -30.0, 30.0),
-            None
-        );
-        assert_eq!(
-            checked_candidate_coordinate(-f64::MAX, f64::MAX, 2.0, -30.0, 30.0),
-            None
-        );
-        assert_eq!(
-            checked_candidate_coordinate(29.0, 4.0, 1.0, -30.0, 30.0),
-            Some(30.0)
-        );
         assert_eq!(checked_div2(1.0, 0.0), None);
         assert_eq!(checked_div2(f64::NAN, 1.0), None);
-        assert_eq!(
-            actual_directional_derivative(&[-f64::MAX], &[f64::MAX], &[1.0]),
-            None
-        );
-        assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
     }
 
     #[test]

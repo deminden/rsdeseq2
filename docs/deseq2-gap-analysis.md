@@ -85,8 +85,8 @@ Still missing:
 
 - higher-level beta-prior workflow plumbing around primitive expanded-model
   averaging and replacement refits,
-- broader validation of the new bounded optim fallback against DESeq2 rows that
-  actually require backup fitting,
+- broader validation of the bounded limited-memory BFGS-style optim fallback
+  against DESeq2 rows that actually require backup fitting,
 - complete weighted low-level `fitNbinomGLMs` behavior for rows DESeq2 marks
   `weightsFail` but still fits when called directly.
 

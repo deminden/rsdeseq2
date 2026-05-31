@@ -135,6 +135,15 @@ python3 scripts/real_data_parity.py \
   --output results/benchmarks/real_data_parity_2026-05-27_fresh.tsv
 ```
 
+Add `--diagnostics-output <path>` to the real-data parity script when working
+on numerical parity. For contrast runs this also asks the CLI for Cook's
+replacement row metadata plus original-fit and replacement-refit diagnostic
+sidecars, then joins the relevant `dispGeneEst`, `dispFit`, `dispMAP`,
+`dispersion`, dispersion/beta iteration and convergence fields, deviance,
+Cook's summaries, Rust fallback-optimizer iteration, start/final objective,
+and projected-gradient fields, beta, and beta standard-error values onto the
+largest result-table differences.
+
 Primitive parity results:
 
 | output | coverage | median elapsed | max RSS | harshest max abs diff | harshest max rel diff | mismatches |
@@ -151,10 +160,18 @@ reference result shape much more closely:
 
 | output | contrast coverage | status |
 | --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value. Median abs diffs are `3.05e-14` for log2 fold change, `1.73e-12` for lfcSE, `4.75e-12` for Wald statistic, `2.59e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `3.85e-12`, `1.57e-10`, `3.74e-11`, `4.51e-11`, and `5.53e-05`, respectively. The harshest max abs diffs are `5.68e-04` for log2 fold change, `1.52e-02` for lfcSE, `7.17e-03` for Wald statistic, `1.40e-03` for p-value, and `9.95e-04` for adjusted p-value. Runtime was 134.0 s with 596 MiB peak RSS and zero swaps. |
+| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Median abs diffs are `1.04e-13` for log2 fold change, `5.70e-12` for lfcSE, `1.75e-11` for Wald statistic, `6.49e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `1.31e-11`, `6.51e-10`, `1.29e-10`, `5.31e-11`, and `9.60e-11`, respectively. The harshest max abs diffs are `5.67e-04` for log2 fold change, `3.27e-04` for lfcSE, `9.21e-04` for Wald statistic, `4.79e-05` for p-value, and `4.50e-05` for adjusted p-value. Runtime was 128.0 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
 
 That contrast is now useful as a hard regression target for the next numerical
-work: the remaining real-contrast differences are numeric tail magnitudes after
-replacement/refit, especially standard errors and Wald statistics for a small
-number of low-information rows. The benchmark harness uses the split-level
-size-factor path that matches the saved contrast.
+work: after aligning replacement/refit dispersion-function reuse with DESeq2,
+the largest remaining real-contrast differences are split between two tails.
+The largest log2-fold-change and Wald-statistic rows are non-replaced
+dispersion-outlier rows that route through the pure-Rust L-BFGS-B beta
+optimizer (`betaIter=100`). In the latest focused run the hardest row used 79
+fallback/polish iterations and reduced its selected-coefficient objective from
+`690.9302` to `481.4264`, leaving an analytic projected-gradient norm of
+`1.29e-06`. The L-BFGS-B path is followed by a bounded projected-gradient polish
+for rough exits; without that polish, a small number of real fallback rows
+stopped with much wider log2-fold-change tails. The largest standard-error rows
+converge quickly but have very large MAP dispersions. The benchmark harness
+uses the split-level size-factor path that matches the saved contrast.

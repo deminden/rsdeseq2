@@ -139,8 +139,10 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   labels and implemented dispersion-stage aliases, including `dispGeneEst`,
   `dispFit`, `dispersion`, `dispIter`, and `dispOutlier`, plus stable present
   column names, typed data-frame assembly, and TSV export for table exporters.
-  Full/reduced fitted-mean and hat-diagonal matrices remain explicit
-  `DeseqFit` fields rather than `mcols`-style vector columns.
+  CLI parity sidecars can also export full-model beta and beta standard-error
+  matrices for original and replacement-refit branches. Full/reduced
+  fitted-mean and hat-diagonal matrices remain explicit `DeseqFit` fields
+  rather than `mcols`-style vector columns.
 - Initial linear-mu gene-wise dispersion estimator with rough and moments
   dispersion starts.
 - Initial GLM-mu gene-wise dispersion estimator with rough/moments
@@ -364,12 +366,14 @@ normalized counts and rescaled by size factors or normalization factors, while
 only replaceable outlier cells are written into the transformed count matrix.
 The refit-planning helper follows `refitWithoutOutliers` bookkeeping for
 `replace`, `newAllZero`, `refitReplace`, and the post-refit `maxCooks` rule,
-and the limited GLM-mu native Wald replacement-refit path reruns the implemented
-dispersion/MAP/Wald stages on replacement counts with original size factors.
+and the limited GLM-mu native Wald replacement-refit path estimates gene-wise
+dispersions on replacement counts, reuses the original dispersion function and
+dispersion prior variance for MAP shrinkage, and reruns Wald testing with
+original size factors.
 The limited GLM-mu native LRT replacement-refit path uses the same replacement
-bookkeeping and reruns the implemented dispersion/MAP/LRT stages with original
-size factors before merging refit rows. This is not yet a full Bioconductor
-`refitWithoutOutliers` implementation.
+bookkeeping and replacement-count size-factor preservation before merging refit
+rows. This is not yet a full Bioconductor `refitWithoutOutliers`
+implementation.
 The limited native Wald pipeline follows the high-level DESeq2
 stage order in `DESeq`: size factors, dispersion estimation, then
 `nbinomWaldTest`, but only for the currently implemented linear-mu no-weight
@@ -425,11 +429,12 @@ pipeline intentionally remains no-weight because DESeq2 switches away from the
 linear-mu branch when weights are present.
 
 The R reference generator writes both full DESeq2 outputs and narrower
-fixed-dispersion references. The latter use `DESeq2:::fitNbinomGLMs` with
-caller-supplied dispersions, default `1e-6` beta ridge, `useQR=FALSE`, and
-`useOptim=FALSE`; these are the current apples-to-apples references for the
-Rust fixed-dispersion Wald/LRT implementation. That default reference set now
-includes fixed-dispersion beta, SE, Wald/LRT statistics, log likelihoods,
+fixed-dispersion references. Some legacy fixed-dispersion references use
+`DESeq2:::fitNbinomGLMs` with caller-supplied dispersions, default `1e-6` beta
+ridge, `useQR=FALSE`, and `useOptim=FALSE`; Rust keeps
+`IrlsSolver::NormalEquations` for those checks while the default builder path
+uses the DESeq2-style augmented QR solver. That reference set now includes
+fixed-dispersion beta, SE, Wald/LRT statistics, log likelihoods,
 fitted means, hat diagonals, and Cook's distances. It also writes weighted base
 metadata using `getBaseMeansAndVariances` and `getAndCheckWeights`, weighted
 fixed-dispersion Wald/LRT references with `weightsFail` rows expanded as
@@ -451,8 +456,8 @@ weighted MAP/Wald/LRT intermediates plus compact result rows, including
 Wald fitted means and hat diagonals, LRT full/reduced likelihoods, deviances,
 convergence, and `weightsFail` row expansion.
 
-The fixed-dispersion IRLS path now includes a bounded pure-Rust optim fallback
-for routed rows. The current checked reference fixtures still use
+The fixed-dispersion IRLS path now includes a bounded limited-memory BFGS-style
+pure-Rust optim fallback for routed rows. The current checked reference fixtures still use
 `useOptim=FALSE`; the reference generator also has an optional
 `forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
 bounded fallback where DESeq2 is installed locally.
