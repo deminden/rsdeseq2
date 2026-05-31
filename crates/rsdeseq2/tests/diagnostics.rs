@@ -213,6 +213,7 @@ fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
         fit.disp_gene_est.as_ref(),
     );
     assert_optional_float_vec_eq_with_nan(diagnostics.disp_fit.as_ref(), fit.disp_fit.as_ref());
+    assert_optional_float_vec_eq_with_nan(diagnostics.disp_map.as_ref(), fit.disp_map.as_ref());
     assert_optional_float_vec_eq_with_nan(diagnostics.dispersion.as_ref(), fit.dispersion.as_ref());
     assert_eq!(diagnostics.disp_iter.as_ref(), fit.disp_iter.as_ref());
     assert_eq!(diagnostics.disp_outlier.as_ref(), fit.disp_outlier.as_ref());
@@ -227,6 +228,7 @@ fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
             "dispGeneEst",
             "dispGeneIter",
             "dispFit",
+            "dispMAP",
             "dispersion",
             "dispIter",
             "dispOutlier",
@@ -248,7 +250,7 @@ fn deseq2_mcols_diagnostics_include_map_dispersion_columns() {
             if values.len() == counts.n_genes()
     ));
     assert!(matches!(
-        &frame.columns[5].values,
+        &frame.columns[6].values,
         Deseq2McolsDiagnosticValues::Logical(values)
             if values == fit.disp_outlier.as_ref().unwrap()
     ));
@@ -277,6 +279,22 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
     assert_eq!(diagnostics.full_beta_conv, None);
     assert_eq!(diagnostics.reduced_beta_conv, None);
     assert_eq!(diagnostics.beta_iter.as_ref(), fit.beta_iter.as_ref());
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_iter.as_ref(),
+        fit.beta_optim_iter.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_start_objective.as_ref(),
+        fit.beta_optim_start_objective.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_objective.as_ref(),
+        fit.beta_optim_objective.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_gradient_norm.as_ref(),
+        fit.beta_optim_gradient_norm.as_ref(),
+    );
     assert_eq!(diagnostics.reduced_beta_iter, None);
     assert_eq!(diagnostics.deviance.as_ref(), fit.full_deviance.as_ref());
     assert_eq!(diagnostics.max_cooks.as_ref(), fit.max_cooks.as_ref());
@@ -292,7 +310,17 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
     );
     assert_eq!(
         diagnostics.present_column_names(),
-        vec!["dispersion", "betaConv", "betaIter", "deviance", "maxCooks",]
+        vec![
+            "dispersion",
+            "betaConv",
+            "betaIter",
+            "rustBetaOptimIter",
+            "rustBetaOptimStartObjective",
+            "rustBetaOptimObjective",
+            "rustBetaOptimGradientNorm",
+            "deviance",
+            "maxCooks",
+        ]
     );
     let frame = diagnostics.data_frame();
     assert_diagnostics_frame_excludes_matrix_state(&frame);
@@ -305,7 +333,7 @@ fn deseq2_mcols_diagnostics_use_wald_beta_conv_shape() {
         diagnostics.present_column_names()
     );
     assert!(matches!(
-        &frame.columns[4].values,
+        &frame.columns[8].values,
         Deseq2McolsDiagnosticValues::OptionalNumeric(values)
             if values == fit.max_cooks.as_ref().unwrap()
     ));
@@ -346,6 +374,22 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
         fit.reduced_beta_converged.as_ref()
     );
     assert_eq!(diagnostics.beta_iter.as_ref(), fit.beta_iter.as_ref());
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_iter.as_ref(),
+        fit.beta_optim_iter.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_start_objective.as_ref(),
+        fit.beta_optim_start_objective.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_objective.as_ref(),
+        fit.beta_optim_objective.as_ref(),
+    );
+    assert_optional_float_vec_eq_with_nan(
+        diagnostics.beta_optim_gradient_norm.as_ref(),
+        fit.beta_optim_gradient_norm.as_ref(),
+    );
     assert_eq!(
         diagnostics.reduced_beta_iter.as_ref(),
         fit.reduced_beta_iter.as_ref()
@@ -396,6 +440,10 @@ fn deseq2_mcols_diagnostics_use_lrt_full_and_reduced_shapes() {
             "fullBetaConv",
             "reducedBetaConv",
             "betaIter",
+            "rustBetaOptimIter",
+            "rustBetaOptimStartObjective",
+            "rustBetaOptimObjective",
+            "rustBetaOptimGradientNorm",
             "reducedBetaIter",
             "deviance",
             "maxCooks",

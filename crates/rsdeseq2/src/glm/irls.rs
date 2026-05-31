@@ -689,6 +689,9 @@ fn polish_beta_log2(
     if polish.converged && !polish.gradient_norm.is_some_and(|norm| norm > 1.0e-4) {
         return Ok(None);
     }
+    if let Some(output) = polish_beta_log2_newton(input, start, polish)? {
+        return Ok(Some(output));
+    }
     let options = BoundedOptimizerOptions {
         maxit: polish.maxit,
         gradient_tol: polish.gradient_tol.max(1.0e-8),
@@ -701,6 +704,137 @@ fn polish_beta_log2(
         beta_log2_value_gradient(&input, beta)
     })
     .map(Some)
+}
+
+fn polish_beta_log2_newton(
+    input: BetaOptimInput<'_>,
+    start: &[f64],
+    polish: BetaPolishInput,
+) -> Result<Option<BoundedOptimizationOutput>, DeseqError> {
+    let mut beta = start
+        .iter()
+        .copied()
+        .map(|value| value.clamp(polish.lower, polish.upper))
+        .collect::<Vec<_>>();
+    let gradient_tol = polish.gradient_tol.max(1.0e-8);
+    let mut value = beta_log2_objective(&input, &beta)?;
+    if !value.is_finite() {
+        return Ok(None);
+    }
+
+    for iter in 0..polish.maxit {
+        let (_, gradient, hessian) = beta_log2_objective_gradient_hessian(&input, &beta)?;
+        let Some(gradient_norm) =
+            projected_gradient_norm(&beta, &gradient, polish.lower, polish.upper)
+        else {
+            return Ok(None);
+        };
+        if gradient_norm <= gradient_tol {
+            return Ok(Some(BoundedOptimizationOutput {
+                parameters: beta,
+                value,
+                converged: true,
+                iterations: iter,
+            }));
+        }
+        let gradient_vector = DVector::from_vec(gradient.clone());
+        let Some(newton_step) = hessian.lu().solve(&gradient_vector) else {
+            return Ok(None);
+        };
+        let direction = newton_step.iter().map(|value| -*value).collect::<Vec<_>>();
+        let Some(directional_derivative) = dot_checked(&gradient, &direction) else {
+            return Ok(None);
+        };
+        if directional_derivative >= 0.0 {
+            return Ok(None);
+        }
+
+        let mut step = 1.0;
+        let mut accepted = None;
+        while step >= 1.0e-12 {
+            let Some(candidate) =
+                bounded_step_candidate(&beta, &direction, step, polish.lower, polish.upper)
+            else {
+                step *= 0.5;
+                continue;
+            };
+            let Some(movement) = max_abs_difference_checked(&beta, &candidate) else {
+                step *= 0.5;
+                continue;
+            };
+            if movement <= 1.0e-10 {
+                return Ok(Some(BoundedOptimizationOutput {
+                    parameters: beta,
+                    value,
+                    converged: true,
+                    iterations: iter + 1,
+                }));
+            }
+            let Some(scaled_derivative) = checked_product3(1.0e-4, directional_derivative, step)
+            else {
+                step *= 0.5;
+                continue;
+            };
+            let candidate_value = beta_log2_objective(&input, &candidate)?;
+            let Some(armijo_bound) = checked_sum2(value, scaled_derivative) else {
+                step *= 0.5;
+                continue;
+            };
+            if candidate_value.is_finite() && candidate_value <= armijo_bound {
+                accepted = Some((candidate, candidate_value));
+                break;
+            }
+            step *= 0.5;
+        }
+
+        let Some((candidate, candidate_value)) = accepted else {
+            return Ok(None);
+        };
+        beta = candidate;
+        value = candidate_value;
+    }
+
+    let (_, gradient, _) = beta_log2_objective_gradient_hessian(&input, &beta)?;
+    let converged = projected_gradient_norm(&beta, &gradient, polish.lower, polish.upper)
+        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4));
+    Ok(Some(BoundedOptimizationOutput {
+        parameters: beta,
+        value,
+        converged,
+        iterations: polish.maxit,
+    }))
+}
+
+fn bounded_step_candidate(
+    beta: &[f64],
+    direction: &[f64],
+    step: f64,
+    lower: f64,
+    upper: f64,
+) -> Option<Vec<f64>> {
+    beta.iter()
+        .copied()
+        .zip(direction.iter().copied())
+        .map(|(value, delta)| {
+            checked_sum2(value, checked_product2(step, delta)?).map(|next| next.clamp(lower, upper))
+        })
+        .collect()
+}
+
+fn max_abs_difference_checked(left: &[f64], right: &[f64]) -> Option<f64> {
+    let mut max_difference = 0.0_f64;
+    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
+        max_difference = max_difference.max(checked_sum2(left, -right)?.abs());
+    }
+    Some(max_difference)
+}
+
+fn dot_checked(left: &[f64], right: &[f64]) -> Option<f64> {
+    let mut sum = 0.0;
+    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
+        sum = checked_sum2(sum, checked_product2(left, right)?)?;
+    }
+    Some(sum)
 }
 
 fn beta_log2_value_gradient(
