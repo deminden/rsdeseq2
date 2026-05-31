@@ -374,10 +374,15 @@ fn toy_fit(beta: Vec<f64>, beta_se: Vec<f64>, beta_converged: Vec<bool>) -> Nbin
         beta_converged,
         beta: RowMajorMatrix::from_row_major(n_genes, 1, beta).unwrap(),
         beta_se: RowMajorMatrix::from_row_major(n_genes, 1, beta_se).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(n_genes, 1, f64::NAN).unwrap(),
         beta_covariance: None,
         mu: RowMajorMatrix::from_row_major(n_genes, n_samples, vec![1.0; n_genes * n_samples])
             .unwrap(),
         beta_iter: vec![1; n_genes],
+        beta_optim_iter: vec![f64::NAN; n_genes],
+        beta_optim_start_objective: vec![f64::NAN; n_genes],
+        beta_optim_objective: vec![f64::NAN; n_genes],
+        beta_optim_gradient_norm: vec![f64::NAN; n_genes],
         model_matrix: DesignMatrix::from_row_major(n_samples, 1, vec![1.0, 1.0], None).unwrap(),
         n_terms: 1,
         hat_diagonal: RowMajorMatrix::from_row_major(

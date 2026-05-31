@@ -9,10 +9,15 @@ fn toy_fit(beta: Vec<f64>, beta_se: Vec<f64>, beta_converged: Vec<bool>) -> Nbin
         beta_converged,
         beta: RowMajorMatrix::from_row_major(n_genes, 1, beta).unwrap(),
         beta_se: RowMajorMatrix::from_row_major(n_genes, 1, beta_se).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(n_genes, 1, f64::NAN).unwrap(),
         beta_covariance: None,
         mu: RowMajorMatrix::from_row_major(n_genes, n_samples, vec![1.0; n_genes * n_samples])
             .unwrap(),
         beta_iter: vec![1; n_genes],
+        beta_optim_iter: vec![f64::NAN; n_genes],
+        beta_optim_start_objective: vec![f64::NAN; n_genes],
+        beta_optim_objective: vec![f64::NAN; n_genes],
+        beta_optim_gradient_norm: vec![f64::NAN; n_genes],
         model_matrix: DesignMatrix::from_row_major(
             n_samples,
             1,
@@ -513,6 +518,7 @@ fn build_wald_results_from_expanded_model_fit_reports_collapsed_coefficients() {
         )
         .unwrap(),
         beta_se: RowMajorMatrix::from_row_major(2, 4, vec![1.0; 8]).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(2, 4, f64::NAN).unwrap(),
         beta_covariance: Some(
             RowMajorMatrix::from_row_major(
                 2,
@@ -532,6 +538,10 @@ fn build_wald_results_from_expanded_model_fit_reports_collapsed_coefficients() {
         ),
         mu: RowMajorMatrix::from_row_major(2, 2, vec![10.0, 20.0, 5.0, 6.0]).unwrap(),
         beta_iter: vec![5, 6],
+        beta_optim_iter: vec![f64::NAN; 2],
+        beta_optim_start_objective: vec![f64::NAN; 2],
+        beta_optim_objective: vec![f64::NAN; 2],
+        beta_optim_gradient_norm: vec![f64::NAN; 2],
         model_matrix: expanded_design,
         n_terms: 4,
         hat_diagonal: RowMajorMatrix::from_row_major(2, 2, vec![0.1; 4]).unwrap(),
@@ -607,6 +617,7 @@ fn build_wald_contrast_results_from_expanded_model_fit_reports_collapsed_contras
         )
         .unwrap(),
         beta_se: RowMajorMatrix::from_row_major(2, 3, vec![1.0; 6]).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(2, 3, f64::NAN).unwrap(),
         beta_covariance: Some(
             RowMajorMatrix::from_row_major(
                 2,
@@ -624,6 +635,10 @@ fn build_wald_contrast_results_from_expanded_model_fit_reports_collapsed_contras
         ),
         mu: RowMajorMatrix::from_row_major(2, 2, vec![10.0, 20.0, 5.0, 6.0]).unwrap(),
         beta_iter: vec![5, 6],
+        beta_optim_iter: vec![f64::NAN; 2],
+        beta_optim_start_objective: vec![f64::NAN; 2],
+        beta_optim_objective: vec![f64::NAN; 2],
+        beta_optim_gradient_norm: vec![f64::NAN; 2],
         model_matrix: expanded_design,
         n_terms: 3,
         hat_diagonal: RowMajorMatrix::from_row_major(2, 2, vec![0.1; 4]).unwrap(),
@@ -679,6 +694,7 @@ fn build_wald_results_from_expanded_beta_prior_fit_uses_collapsed_prior_fit() {
         beta_converged: vec![true, false],
         beta: RowMajorMatrix::from_row_major(2, 2, vec![4.0, 2.0, 6.0, -1.0]).unwrap(),
         beta_se: RowMajorMatrix::from_row_major(2, 2, vec![0.5, 0.25, 0.75, 0.5]).unwrap(),
+        beta_optim_start: RowMajorMatrix::from_elem(2, 2, f64::NAN).unwrap(),
         beta_covariance: Some(
             RowMajorMatrix::from_row_major(
                 2,
@@ -694,6 +710,10 @@ fn build_wald_results_from_expanded_beta_prior_fit_uses_collapsed_prior_fit() {
         ),
         mu: RowMajorMatrix::from_row_major(2, 2, vec![10.0, 20.0, 5.0, 6.0]).unwrap(),
         beta_iter: vec![5, 6],
+        beta_optim_iter: vec![f64::NAN; 2],
+        beta_optim_start_objective: vec![f64::NAN; 2],
+        beta_optim_objective: vec![f64::NAN; 2],
+        beta_optim_gradient_norm: vec![f64::NAN; 2],
         model_matrix: standard_design,
         n_terms: 2,
         hat_diagonal: RowMajorMatrix::from_row_major(2, 2, vec![0.1; 4]).unwrap(),
