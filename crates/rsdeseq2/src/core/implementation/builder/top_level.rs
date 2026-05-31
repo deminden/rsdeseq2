@@ -1,0 +1,630 @@
+impl DeseqBuilder {
+    /// Run the currently implemented DESeq-like workflow.
+    ///
+    /// For `test=Wald`, this follows the implemented GLM-mu native path and
+    /// reports the last design coefficient, matching DESeq2's default
+    /// coefficient selection shape. For `test=Lrt`, callers must first store a
+    /// reduced design with [`DeseqBuilder::reduced_design`].
+    pub fn fit(&self, counts: &CountMatrix, design: &DesignMatrix) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results(counts, design)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented DESeq-like workflow and return result rows.
+    ///
+    /// This is the result-table-producing companion to [`DeseqBuilder::fit`].
+    pub fn fit_with_results(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = default_results_coefficient(design)?;
+                self.fit_wald_glm_mu(counts, design, coefficient)
+            }
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results(counts, design, reduced_design)
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow and report a named design coefficient.
+    pub fn fit_with_results_name(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = resolve_coefficient_index(design, coefficient_name)?;
+                self.fit_wald_glm_mu(counts, design, coefficient)
+            }
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_name(counts, design, reduced_design, coefficient_name)
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = default_results_coefficient(design)?;
+                self.fit_wald_glm_mu_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient,
+                    replacement_options,
+                )
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit without a reduced design".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level named Wald workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => {
+                let coefficient = resolve_coefficient_index(design, coefficient_name)?;
+                self.fit_wald_glm_mu_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient,
+                    replacement_options,
+                )
+            }
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit without a reduced design".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level workflow with limited Cook's replacement refit.
+    ///
+    /// Unlike [`Self::fit_with_results_with_cooks_replacement`], this method
+    /// returns an enum so `test=Lrt` can route through a stored reduced design.
+    pub fn fit_with_test_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_with_cooks_replacement(counts, design, replacement_options)
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the top-level named workflow with limited Cook's replacement refit.
+    ///
+    /// The returned enum keeps Wald and LRT replacement output types explicit
+    /// while allowing `test=Lrt` to use the builder's stored reduced design.
+    pub fn fit_with_test_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_name_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient_name,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_name_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    coefficient_name,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the currently implemented top-level Wald workflow for a numeric contrast.
+    ///
+    /// This is the primitive contrast companion to [`Self::fit_with_results`].
+    /// It follows the implemented GLM-mu native Wald path when `test=Wald`.
+    /// Top-level LRT remains explicit because a contrast is not an LRT reduced
+    /// model.
+    pub fn fit_with_results_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast(counts, design, contrast),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast(counts, design, reduced_design, contrast)
+            }
+        }
+    }
+
+    /// Run the currently implemented top-level Wald workflow for a numeric contrast.
+    pub fn fit_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_contrast(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald contrast".to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level numeric-contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow for a named primitive contrast specification.
+    pub fn fit_with_results_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_spec(counts, design, contrast),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_spec(counts, design, reduced_design, contrast)
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow for a named primitive contrast specification.
+    pub fn fit_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_contrast_spec(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level named Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald contrast specification"
+                    .to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level named-contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    pub fn fit_with_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_factor_level_contrast(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                )
+            }
+        }
+    }
+
+    /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    pub fn fit_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_with_results_factor_level_contrast(counts, design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the top-level factor-level Wald contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                counts,
+                design,
+                contrast,
+                replacement_options,
+            ),
+            TestType::Lrt => Err(DeseqError::UnsupportedFeature {
+                feature: "top-level LRT replacement refit for a Wald factor-level contrast"
+                    .to_string(),
+            }),
+        }
+    }
+
+    /// Run the top-level factor-level contrast workflow with limited Cook's replacement refit.
+    pub fn fit_with_test_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => self
+                .fit_with_results_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Wald),
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run the currently implemented top-level LRT workflow with a reduced design.
+    ///
+    /// This follows the implemented GLM-mu native LRT path and reports the last
+    /// full-design coefficient by default.
+    pub fn fit_lrt(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results(counts, full_design, reduced_design)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and return result rows.
+    pub fn fit_lrt_with_results(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let coefficient = default_results_coefficient(full_design)?;
+        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named full-design coefficient.
+    pub fn fit_lrt_with_results_name(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
+        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named full-design coefficient.
+    pub fn fit_lrt_name(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
+    pub fn fit_lrt_with_results_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
+    pub fn fit_lrt_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named contrast.
+    pub fn fit_lrt_with_results_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
+    pub fn fit_lrt_with_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        self.fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+    }
+
+    /// Run the currently implemented top-level LRT workflow and report a named contrast.
+    pub fn fit_lrt_contrast_spec(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast)
+            .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
+    pub fn fit_lrt_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.fit_lrt_with_results_factor_level_contrast(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+        )
+        .map(|(fit, _results)| fit)
+    }
+
+    /// Run the currently implemented top-level LRT workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let coefficient = default_results_coefficient(full_design)?;
+        self.fit_lrt_glm_mu_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            coefficient,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level LRT replacement-refit workflow and report a named full-design coefficient.
+    pub fn fit_lrt_with_results_name_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        coefficient_name: &str,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
+        self.fit_lrt_glm_mu_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            coefficient,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &[f64],
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level named LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ContrastSpec,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+            replacement_options,
+        )
+    }
+
+    /// Run the currently implemented top-level factor-level LRT contrast workflow with limited Cook's replacement refit.
+    pub fn fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: FactorLevelContrast<'_>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+            counts,
+            full_design,
+            reduced_design,
+            contrast,
+            replacement_options,
+        )
+    }
+
+    fn reduced_design_for_top_level_lrt(&self) -> Result<&DesignMatrix, DeseqError> {
+        self.reduced_design
+            .as_ref()
+            .ok_or_else(|| DeseqError::UnsupportedFeature {
+                feature: "top-level LRT fit without a reduced design".to_string(),
+            })
+    }
+}
