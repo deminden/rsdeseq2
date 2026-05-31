@@ -45,7 +45,13 @@ implemented primitive outputs:
 | `wald_results` | 65,580 genes, 78 samples | median LFC diff `1.04e-13`; max lfcSE diff `3.27e-04`; max p-value diff `4.79e-05` | 610 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
-The latest sweep completed with zero swaps. Methodology and synthetic
+The latest sweep completed with zero swaps. The local dispersion trend now uses
+a pure-Rust locfit-compatible backend; on the same real-data fixture its 64,344
+finite fitted values match DESeq2 with median relative error `4.04e-10`, p99
+`2.80e-09`, and max `3.19e-09`. Existing committed GLM-mu local
+MAP/Wald/LRT fixture metrics were already at machine precision and remain
+unchanged.
+Methodology and synthetic
 benchmark results are in
 [docs/benchmarks.md](docs/benchmarks.md).
 

@@ -611,11 +611,12 @@ impl LocalVstIntegral {
             let value = (max_asinh * step as f64 / (grid_len as f64 - 1.0)).sinh();
             grid.push(value);
         }
+        let dispersions = trend.evaluate_many_allow_missing(&grid)?;
         let integrand = grid
             .iter()
             .copied()
-            .map(|q| {
-                let dispersion = trend.evaluate(q)?;
+            .zip(dispersions)
+            .map(|(q, dispersion)| {
                 let dispersion_q = checked_mul(dispersion, q, 0, "local VST dispersion q")?;
                 let dispersion_q2 = checked_mul(dispersion_q, q, 0, "local VST dispersion q2")?;
                 let poisson_q = checked_mul(inverse_size_factor_mean, q, 0, "local VST Poisson q")?;

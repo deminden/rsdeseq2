@@ -639,6 +639,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcompat-locfit"
+version = "0.1.0"
+source = "git+https://github.com/deminden/rcompat-locfit?rev=11fe81b5c0992b537ec2247fcbb54a82d6bc4867#11fe81b5c0992b537ec2247fcbb54a82d6bc4867"
+
+[[package]]
 name = "regex"
 version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -678,6 +683,7 @@ dependencies = [
  "lbfgsb-rs-pure",
  "nalgebra",
  "rayon",
+ "rcompat-locfit",
  "serde",
  "serde_json",
  "statrs",

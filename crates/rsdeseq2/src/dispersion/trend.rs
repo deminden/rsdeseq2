@@ -1,5 +1,6 @@
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::options::FitType;
+use rcompat_locfit::{Kernel, LocalFit, LocalRegressionConfig, PredictionMethod};
 
 const PARAMETRIC_WLS_SUM_CONTEXT: &str = "parametric dispersion weighted least-squares sums";
 const PARAMETRIC_WLS_DETERMINANT_CONTEXT: &str =
@@ -231,7 +232,7 @@ pub struct MeanDispersionTrendFit {
 ///
 /// DESeq2 uses the R `locfit` package for `fitType="local"`. This pure-Rust
 /// representation keeps the same fitted rows and base-mean weights, then
-/// evaluates a deterministic adaptive local polynomial smoother.
+/// evaluates a locfit-compatible local polynomial smoother.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LocalDispersionTrend {
     /// DESeq2 minimum dispersion used for the all-near-minimum fallback.
@@ -260,14 +261,13 @@ impl LocalDispersionTrend {
         if self.log_means.is_empty() {
             return Ok(self.min_disp);
         }
-        let predicted = local_polynomial_predict(
-            mean.ln(),
-            &self.log_means,
-            &self.log_disps,
-            &self.weights,
-            self.span,
-            self.degree,
-        )?;
+        if self.log_means.len() == 1 {
+            return self.single_row_dispersion();
+        }
+        let predicted = self
+            .rcompat_fit()?
+            .predict_one(mean.ln())
+            .map_err(rcompat_local_dispersion_error)?;
         let dispersion = predicted.exp();
         if !dispersion.is_finite() || dispersion <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
@@ -281,17 +281,66 @@ impl LocalDispersionTrend {
     /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
     pub fn evaluate_many_allow_missing(&self, means: &[f64]) -> Result<Vec<f64>, DeseqError> {
         self.validate_fit()?;
+        if self.log_means.is_empty() {
+            return Ok(means
+                .iter()
+                .copied()
+                .map(|mean| {
+                    if mean.is_finite() && mean > 0.0 {
+                        self.min_disp
+                    } else {
+                        f64::NAN
+                    }
+                })
+                .collect());
+        }
+        if self.log_means.len() == 1 {
+            let dispersion = self.single_row_dispersion()?;
+            return Ok(means
+                .iter()
+                .copied()
+                .map(|mean| {
+                    if mean.is_finite() && mean > 0.0 {
+                        dispersion
+                    } else {
+                        f64::NAN
+                    }
+                })
+                .collect());
+        }
+        let trend = self.rcompat_fit()?;
         means
             .iter()
             .copied()
             .map(|mean| {
                 if mean.is_finite() && mean > 0.0 {
-                    self.evaluate_validated(mean)
+                    let predicted = trend
+                        .predict_one(mean.ln())
+                        .map_err(rcompat_local_dispersion_error)?;
+                    let dispersion = predicted.exp();
+                    if !dispersion.is_finite() || dispersion <= 0.0 {
+                        return Err(DeseqError::InvalidDispersion {
+                            reason: "local dispersion trend produced a non-finite or non-positive fitted value"
+                                .to_string(),
+                        });
+                    }
+                    Ok(dispersion)
                 } else {
                     Ok(f64::NAN)
                 }
             })
             .collect()
+    }
+
+    fn single_row_dispersion(&self) -> Result<f64, DeseqError> {
+        let dispersion = self.log_disps[0].exp();
+        if !dispersion.is_finite() || dispersion <= 0.0 {
+            return Err(DeseqError::InvalidDispersion {
+                reason: "local dispersion trend produced a non-finite or non-positive fitted value"
+                    .to_string(),
+            });
+        }
+        Ok(dispersion)
     }
 
     fn validate_fit(&self) -> Result<(), DeseqError> {
@@ -311,6 +360,33 @@ impl LocalDispersionTrend {
             validate_local_trend_fit_rows(&self.log_means, &self.log_disps, &self.weights)?;
         }
         Ok(())
+    }
+
+    fn rcompat_fit(&self) -> Result<LocalFit, DeseqError> {
+        let degree = self.degree.min(self.log_means.len().saturating_sub(1));
+        let min_points = (degree + 1).min(self.log_means.len()).max(1);
+        let prediction_method = if self.span == LocalDispersionTrendOptions::default().span
+            && self.degree == LocalDispersionTrendOptions::default().degree
+            && self.log_means.len() >= 100
+        {
+            PredictionMethod::LocfitHermiteApprox
+        } else {
+            PredictionMethod::Direct
+        };
+        LocalFit::fit(
+            &self.log_means,
+            &self.log_disps,
+            Some(&self.weights),
+            LocalRegressionConfig {
+                alpha: self.span,
+                degree,
+                kernel: Kernel::Tricube,
+                min_points,
+                allow_degree_downgrade: true,
+                prediction_method,
+            },
+        )
+        .map_err(rcompat_local_dispersion_error)
     }
 }
 
@@ -541,7 +617,7 @@ pub fn fit_mean_dispersion_trend(
 /// DESeq2 fits local regression on `log(dispersion)` versus `log(mean)` after
 /// selecting rows with `dispGeneEst >= 10 * minDisp`, using base means as
 /// weights. This implementation keeps that data contract and evaluates a
-/// deterministic adaptive local polynomial smoother in Rust.
+/// pure-Rust locfit-compatible local polynomial smoother.
 pub fn fit_local_dispersion_trend(
     base_mean: &[f64],
     disp_gene_est: &[f64],
@@ -952,6 +1028,12 @@ fn checked_div2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError>
     Ok(quotient)
 }
 
+fn rcompat_local_dispersion_error(error: rcompat_locfit::LocfitError) -> DeseqError {
+    DeseqError::InvalidDispersion {
+        reason: format!("local dispersion locfit-compatible smoother failed: {error}"),
+    }
+}
+
 fn checked_product_difference(
     left_a: f64,
     left_b: f64,
@@ -1092,57 +1174,6 @@ fn validate_parametric_good_rows(
     Ok(())
 }
 
-fn local_polynomial_predict(
-    x0: f64,
-    xs: &[f64],
-    ys: &[f64],
-    weights: &[f64],
-    span: f64,
-    degree: usize,
-) -> Result<f64, DeseqError> {
-    debug_assert_eq!(xs.len(), ys.len());
-    debug_assert_eq!(xs.len(), weights.len());
-    debug_assert!(!xs.is_empty());
-    if xs.is_empty() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "no local dispersion fit rows are available".to_string(),
-        });
-    }
-    if xs.len() == 1 {
-        return ys
-            .first()
-            .copied()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "single-row local dispersion trend value must be finite".to_string(),
-            });
-    }
-
-    let degree = degree.min(2).min(xs.len().saturating_sub(1));
-    let window = adaptive_nearest_window(x0, xs, span, degree + 1);
-    let bandwidth = local_window_bandwidth(x0, xs, window);
-    for local_degree in (0..=degree).rev() {
-        if let Some(beta0) =
-            local_polynomial_intercept(x0, xs, ys, weights, window, bandwidth, local_degree)
-        {
-            if beta0.is_finite() {
-                return Ok(beta0);
-            }
-        }
-    }
-
-    if let Some(beta0) = local_weighted_mean(x0, xs, ys, weights, window, bandwidth) {
-        return Ok(beta0);
-    }
-    xs.iter()
-        .copied()
-        .zip(ys.iter().copied())
-        .min_by(|(left_x, _), (right_x, _)| (left_x - x0).abs().total_cmp(&(right_x - x0).abs()))
-        .map(|(_, y)| y)
-        .ok_or_else(|| DeseqError::InvalidDispersion {
-            reason: "local dispersion trend has zero usable neighborhood weight".to_string(),
-        })
-}
-
 fn validate_local_trend_fit_rows(
     xs: &[f64],
     ys: &[f64],
@@ -1214,204 +1245,6 @@ fn validate_local_trend_shape(span: f64, degree: usize) -> Result<(), DeseqError
         });
     }
     Ok(())
-}
-
-fn adaptive_nearest_window(x0: f64, xs: &[f64], span: f64, min_neighbors: usize) -> (usize, usize) {
-    let neighbors =
-        ((xs.len() as f64 * span).ceil() as usize).clamp(min_neighbors.max(1), xs.len());
-    let insertion = xs.partition_point(|x| *x < x0);
-    let mut start = insertion;
-    let mut end = insertion;
-    while end - start < neighbors {
-        if start == 0 {
-            end = (start + neighbors).min(xs.len());
-            break;
-        }
-        if end == xs.len() {
-            start = end.saturating_sub(neighbors);
-            break;
-        }
-        let left_distance = (xs[start - 1] - x0).abs();
-        let right_distance = (xs[end] - x0).abs();
-        if left_distance <= right_distance {
-            start -= 1;
-        } else {
-            end += 1;
-        }
-    }
-    (start, end)
-}
-
-fn local_window_bandwidth(x0: f64, xs: &[f64], window: (usize, usize)) -> f64 {
-    let mut bandwidth = 0.0_f64;
-    for x in xs[window.0..window.1].iter().copied() {
-        bandwidth = bandwidth.max((x - x0).abs());
-    }
-    bandwidth
-}
-
-fn tricube_weight(distance: f64, bandwidth: f64) -> f64 {
-    if bandwidth <= f64::EPSILON {
-        if distance <= f64::EPSILON {
-            1.0
-        } else {
-            0.0
-        }
-    } else if distance <= bandwidth {
-        let scaled = distance / bandwidth;
-        let scaled_cubed = scaled * scaled * scaled;
-        let one_minus_scaled_cubed = 1.0 - scaled_cubed;
-        one_minus_scaled_cubed * one_minus_scaled_cubed * one_minus_scaled_cubed
-    } else {
-        0.0
-    }
-}
-
-fn local_polynomial_intercept(
-    x0: f64,
-    xs: &[f64],
-    ys: &[f64],
-    weights: &[f64],
-    window: (usize, usize),
-    bandwidth: f64,
-    degree: usize,
-) -> Option<f64> {
-    if degree == 0 {
-        return local_weighted_mean(x0, xs, ys, weights, window, bandwidth);
-    }
-
-    let size = degree + 1;
-    let mut lhs = [[0.0; 3]; 3];
-    let mut rhs = [0.0; 3];
-    for idx in window.0..window.1 {
-        let x = xs[idx];
-        let y = ys[idx];
-        let weight = weights[idx] * tricube_weight((x - x0).abs(), bandwidth);
-        if weight <= 0.0 {
-            continue;
-        }
-        let dx = x - x0;
-        let dx2 = checked_option_product2(dx, dx)?;
-        let dx3 = checked_option_product2(dx2, dx)?;
-        let dx4 = checked_option_product2(dx2, dx2)?;
-        let powers = [1.0, dx, dx2, dx3, dx4];
-        for row in 0..size {
-            rhs[row] =
-                checked_option_sum2(rhs[row], checked_option_product3(weight, powers[row], y)?)?;
-            for col in 0..size {
-                lhs[row][col] = checked_option_sum2(
-                    lhs[row][col],
-                    checked_option_product2(weight, powers[row + col])?,
-                )?;
-            }
-        }
-    }
-    solve_small_linear_system(lhs, rhs, size).map(|beta| beta[0])
-}
-
-fn local_weighted_mean(
-    x0: f64,
-    xs: &[f64],
-    ys: &[f64],
-    weights: &[f64],
-    window: (usize, usize),
-    bandwidth: f64,
-) -> Option<f64> {
-    let mut total_weight = 0.0;
-    let mut mean = 0.0;
-    for idx in window.0..window.1 {
-        let weight = checked_option_product2(
-            weights[idx],
-            tricube_weight((xs[idx] - x0).abs(), bandwidth),
-        )?;
-        if weight <= 0.0 {
-            continue;
-        }
-        let next_total = checked_option_sum2(total_weight, weight)?;
-        let delta = checked_option_sub2(ys[idx], mean)?;
-        let step = checked_option_product2(checked_option_div2(weight, next_total)?, delta)?;
-        mean = checked_option_sum2(mean, step)?;
-        total_weight = next_total;
-    }
-    (total_weight > 0.0 && mean.is_finite()).then_some(mean)
-}
-
-fn checked_option_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
-}
-
-fn checked_option_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_option_sub2(left: f64, right: f64) -> Option<f64> {
-    let difference = left - right;
-    (left.is_finite() && right.is_finite() && difference.is_finite()).then_some(difference)
-}
-
-fn checked_option_div2(left: f64, right: f64) -> Option<f64> {
-    let quotient = left / right;
-    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
-        .then_some(quotient)
-}
-
-fn checked_option_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
-    checked_option_product2(checked_option_product2(left, middle)?, right)
-}
-
-fn solve_small_linear_system(
-    mut lhs: [[f64; 3]; 3],
-    mut rhs: [f64; 3],
-    size: usize,
-) -> Option<[f64; 3]> {
-    for pivot in 0..size {
-        let mut pivot_row = pivot;
-        for row in (pivot + 1)..size {
-            if lhs[row][pivot].abs() > lhs[pivot_row][pivot].abs() {
-                pivot_row = row;
-            }
-        }
-        if !lhs[pivot_row][pivot].is_finite() || lhs[pivot_row][pivot].abs() <= 1e-12 {
-            return None;
-        }
-        if pivot_row != pivot {
-            lhs.swap(pivot, pivot_row);
-            rhs.swap(pivot, pivot_row);
-        }
-        let pivot_value = lhs[pivot][pivot];
-        for value in lhs[pivot].iter_mut().take(size).skip(pivot) {
-            *value /= pivot_value;
-            if !value.is_finite() {
-                return None;
-            }
-        }
-        rhs[pivot] /= pivot_value;
-        if !rhs[pivot].is_finite() {
-            return None;
-        }
-        let pivot_values = lhs[pivot];
-        for row in 0..size {
-            if row == pivot {
-                continue;
-            }
-            let factor = lhs[row][pivot];
-            if factor == 0.0 {
-                continue;
-            }
-            for (col, pivot_entry) in pivot_values.iter().enumerate().take(size).skip(pivot) {
-                let product = checked_option_product2(factor, *pivot_entry)?;
-                lhs[row][col] = checked_option_sub2(lhs[row][col], product)?;
-            }
-            let rhs_product = checked_option_product2(factor, rhs[pivot])?;
-            rhs[row] = checked_option_sub2(rhs[row], rhs_product)?;
-        }
-    }
-    rhs.iter()
-        .take(size)
-        .all(|value| value.is_finite())
-        .then_some(rhs)
 }
 
 fn parametric_coefficient_change(
@@ -1812,38 +1645,5 @@ mod tests {
         let expected = 2.0 * 2.0_f64.ln().powi(2);
 
         assert_relative_eq!(observed, expected, epsilon = 1e-15);
-    }
-
-    #[test]
-    fn small_linear_solver_rejects_nonfinite_solution() {
-        let lhs = [[1.0, 0.0, 0.0], [0.0; 3], [0.0; 3]];
-        let rhs = [f64::INFINITY, 0.0, 0.0];
-
-        assert!(solve_small_linear_system(lhs, rhs, 1).is_none());
-    }
-
-    #[test]
-    fn local_weighted_mean_rejects_nonfinite_online_update() {
-        let xs = [0.0, 0.0];
-        let ys = [f64::MAX, -f64::MAX];
-        let weights = [1.0, 1.0];
-
-        assert!(local_weighted_mean(0.0, &xs, &ys, &weights, (0, 2), 1.0).is_none());
-    }
-
-    #[test]
-    fn small_linear_solver_rejects_nonfinite_pivot_row_normalization() {
-        let lhs = [[2.0e-12, f64::MAX, 0.0], [0.0; 3], [0.0; 3]];
-        let rhs = [1.0, 0.0, 0.0];
-
-        assert!(solve_small_linear_system(lhs, rhs, 2).is_none());
-    }
-
-    #[test]
-    fn small_linear_solver_rejects_nonfinite_elimination_update() {
-        let lhs = [[1.0, f64::MAX, 0.0], [1.0, -f64::MAX, 0.0], [0.0; 3]];
-        let rhs = [1.0, 2.0, 0.0];
-
-        assert!(solve_small_linear_system(lhs, rhs, 2).is_none());
     }
 }

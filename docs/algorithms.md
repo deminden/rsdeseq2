@@ -450,20 +450,30 @@ uses stable averaging so very large finite dispersion estimates do not overflow
 before division. An offline DESeq2 fixture checks the separate viability and
 mean-inclusion thresholds plus the constant fitted value.
 
-The local trend type has an initial pure-Rust implementation. It follows
+The local trend type has a pure-Rust locfit-compatible implementation. It follows
 DESeq2's local-fit data contract by fitting on `log(dispGeneEst)` versus
 `log(baseMean)`, retaining rows with `dispGeneEst >= 10 * minDisp`, weighting
 rows by `baseMean`, and returning `minDisp` when all estimates are near the
-minimum. Instead of calling R's `locfit`, Rust evaluates a deterministic
-adaptive local polynomial smoother with the DESeq2-style default span. A small
+minimum. Instead of calling R's `locfit`, Rust uses a pure-Rust compatibility
+backend for tricube local polynomial fits. The default DESeq2-sized path uses
+the backend's locfit-style Hermite evaluation grid; smaller or custom-span
+local trends use the same backend's direct local prediction path. A small
 offline DESeq2 local-trend fixture checks the fitted shape, with a second
 fixture covering mixed rows above and below the `10 * minDisp` fit threshold
 and another fixture checking predictions at means outside the original fit
-rows. Fitted rows are sorted once on log mean; each prediction uses the
-adaptive nearest-neighbor window directly rather than allocating and sorting a
-full distance vector per gene. Rank-degenerate local neighborhoods, including
-duplicated base means, fall back through lower polynomial degrees before using
-a stable weighted constant fit. Manually constructed local trends reuse the
+rows. The real-data local trend fixture currently checks 64,344 finite fitted
+values with median relative error `4.04e-10`, p99 `2.80e-09`, and max
+`3.19e-09` against DESeq2 1.46.0. Compared with the previous in-repo smoother,
+that real-data fixture moved from median relative error `7.99e-03`, p99
+`2.00e-01`, and max `4.28e-01` to the near-exact values above. On the committed
+small local-trend fixtures, the fitted-shape max absolute error improved from
+`3.29e-04` to `9.62e-05`, and the mixed-threshold max absolute error improved
+from `3.87e-02` to `1.98e-03`. The small out-of-fit prediction fixture moved
+from max absolute error `5.76e-05` to `2.56e-04`; this remains inside its
+`2e-3` DESeq2 reference tolerance, but it is not counted as an improvement.
+The committed GLM-mu local MAP/Wald/LRT fixtures were already at machine
+precision and are unchanged by this smoother swap.
+Manually constructed local trends reuse the
 builder shape checks for span and polynomial degree, then validate finite log
 dispersions, positive finite local weights, and a consistent empty state for the
 minimum-dispersion floor branch before prediction. Batch trend evaluation
@@ -471,8 +481,8 @@ prevalidates the fitted trend once before expanding finite positive rows and
 missing `NaN` rows, so malformed manual trend state is reported even when every
 requested mean is missing. A separate offline fixture covers DESeq2's
 all-near-minimum local floor branch, where the helper returns the
-minimum-dispersion vector directly rather than a prediction function. Exact
-`locfit` numerical identity and glmGamPoi trend support remain future work.
+minimum-dispersion vector directly rather than a prediction function. Broader
+synthetic locfit edge cases and glmGamPoi trend support remain future work.
 
 ## Dispersion Prior Variance
 
@@ -1473,8 +1483,8 @@ references, including compact result-table and BH-adjusted p-value checks for
 the matched result rows. The unweighted and weighted GLM-mu Cox-Reid
 local-trend branches have MAP/Wald/LRT anchors, including fitted means, hat
 diagonals, log-likelihoods, deviances, convergence, and compact result rows.
-Broader full parity still requires exact local
-`locfit` identity, glmGamPoi trend support, and remaining edge-case coverage.
+Broader full parity still requires glmGamPoi trend support and remaining
+weighted-dispersion and synthetic smoother edge-case coverage.
 The local smoother now treats a single usable local-fit row as a constant
 log-dispersion trend, matching the generated tiny GLM-mu local fixture instead
 of failing on zero tricube neighborhood weight.

@@ -17,7 +17,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, and supported-formula helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, and CLI smoke tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
-| Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, initial local-trend fixtures including a single-usable-row edge case, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
+| Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, pure-Rust locfit-compatible local trend fixtures including a single-usable-row edge case and real-data fitted-value parity, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
 
@@ -202,10 +202,17 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   fast-VST trend fitting is still held back until the weight preprocessing
   semantics are wired without double-normalizing rows. The blind automatic
   helper uses a named intercept-only design for the same decision.
-- Initial pure-Rust local dispersion trend fitting with DESeq2's
+- Pure-Rust locfit-compatible local dispersion trend fitting with DESeq2's
   `dispGeneEst >= 10 * minDisp` local-fit rule, base-mean weights,
-  all-near-minimum floor behavior, builder dispatch, and a small offline
-  local-trend reference check.
+  all-near-minimum floor behavior, builder dispatch, offline local-trend
+  reference checks, and real-data fitted-value parity at median relative error
+  `4.04e-10`, p99 `2.80e-09`, max `3.19e-09`. Against the previous
+  in-repo smoother, the committed fitted-shape local fixture improved from max
+  absolute error `3.29e-04` to `9.62e-05`, and the mixed-threshold fixture
+  improved from `3.87e-02` to `1.98e-03`; the small out-of-fit prediction
+  fixture changed from `5.76e-05` to `2.56e-04` while remaining inside the
+  existing `2e-3` tolerance. Downstream committed GLM-mu local MAP/Wald/LRT
+  fixture metrics were already at machine precision and did not move.
 - Deterministic dispersion prior variance estimation, including R-compatible
   MAD scaling, `trigamma((m - p) / 2)` sampling-variance subtraction for
   residual degrees of freedom above 3, saturated designs, low-df histogram/KL
@@ -468,7 +475,7 @@ bounded fallback where DESeq2 is installed locally.
 - Complete formula parsing in Rust, including orthogonal `poly()`, arbitrary R
   expressions, splines, and full R-compatible formula semantics.
 - Full DESeq2 dispersion estimation, including broader weighted dispersion
-  edge-case parity, exact `locfit` local-trend numerical identity, glmGamPoi trend type,
+  edge-case parity, broader synthetic `locfit` edge-case parity, glmGamPoi trend type,
   and production-ready end-to-end dispersion parity.
 - High-level propagation of observation-weight `weights_fail` flags through
   complete DESeq2-like builder and future wrapper workflows.

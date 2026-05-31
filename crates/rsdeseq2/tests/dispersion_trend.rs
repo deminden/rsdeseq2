@@ -514,7 +514,7 @@ fn local_dispersion_trend_keeps_large_weighted_constant_fit_finite() {
 }
 
 #[test]
-fn local_dispersion_trend_uses_nearest_fallback_when_manual_weights_overflow() {
+fn local_dispersion_trend_rejects_overflowing_manual_weights() {
     let log_mean = 10.0_f64.ln();
     let trend = LocalDispersionTrend {
         min_disp: 1e-8,
@@ -525,7 +525,7 @@ fn local_dispersion_trend_uses_nearest_fallback_when_manual_weights_overflow() {
         weights: vec![f64::MAX, f64::MAX, f64::MAX],
     };
 
-    assert_relative_eq!(trend.evaluate(10.0).unwrap(), 0.1, epsilon = 1e-12);
+    assert!(trend.evaluate(10.0).is_err());
 }
 
 #[test]

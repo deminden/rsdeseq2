@@ -370,12 +370,12 @@ reference; no DESeq2 source is vendored or translated line by line.
   shared `100 * minDisp` viability gate, `10 * minDisp` filtered trimmed mean,
   constant fitted trend expansion, `FitType::Mean` builder dispatch, and
   offline DESeq2 reference coverage.
-- [x] Initial local dispersion trend:
+- [x] Pure-Rust locfit-compatible local dispersion trend:
   `10 * minDisp` fit rule, base-mean weights, all-near-minimum floor behavior,
-  pure-Rust adaptive local polynomial smoothing, `FitType::Local` builder
-  dispatch, optional DESeq2 local-trend reference check, and explicit
-  all-near-minimum local floor, mixed-threshold, and out-of-sample prediction
-  fixtures.
+  compatibility local polynomial smoothing, `FitType::Local` builder dispatch,
+  optional DESeq2 local-trend reference check, real-data fitted-value parity,
+  and explicit all-near-minimum local floor, mixed-threshold, and out-of-sample
+  prediction fixtures.
 - [x] Default `fit_dispersion_trend` dispatcher for implemented `FitType`
   values: parametric, local, and mean.
 - [x] Dispersion prior variance branches:
@@ -395,8 +395,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Second derivative of the Cox-Reid-adjusted profile likelihood.
 - [x] DESeq2-style weighted Cox-Reid threshold-subset objective, first
   derivative, and second derivative.
-- [x] Initial local dispersion trend type.
-- [ ] glmGamPoi dispersion trend type and exact local `locfit` edge-case parity.
+- [x] Pure-Rust locfit-compatible local dispersion trend type.
+- [ ] glmGamPoi dispersion trend type and broader synthetic `locfit` edge-case parity.
 - [x] DESeq2-shaped prior variance branch for residual df 1 through 3.
 - [x] Public `estimate_dispersion_prior` stage wrapper over the implemented
   prior-variance estimator.
@@ -636,13 +636,13 @@ reference; no DESeq2 source is vendored or translated line by line.
   the current mean-trend branch.
 - [x] Default DESeq2-internal native weighted GLM-mu Wald/LRT reference checks
   for the current mean-trend branch.
-- [ ] Full LRT parity with native dispersion reference outputs, exact local
-  `locfit` behavior, glmGamPoi trends, optim fallback, and remaining edge
+- [ ] Full LRT parity with native dispersion reference outputs, broader
+  synthetic `locfit` edge cases, glmGamPoi trends, optim fallback, and remaining edge
   cases.
 
 ## Phase 6: Secondary Features
 
-- [x] Initial local dispersion trend.
+- [x] Pure-Rust locfit-compatible local dispersion trend.
 - [x] Mean fit type.
 - [ ] glmGamPoi-like mode if feasible.
 - [x] `normTransform` log2 normalized-count-plus-one transform.

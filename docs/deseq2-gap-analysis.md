@@ -51,7 +51,7 @@ and selected result/filtering/Cook's primitives.
 | Cook's diagnostics | Cook's matrix with diagnostic exports and CLI sidecars, `maxCooks`, p-value masking, low-count heuristic primitive, automatic two-level factor metadata gate for supplied-dispersion fixed and limited GLM-mu factor-level result routes plus limited GLM-mu replacement refits, replacement planning with scalar and row metadata plus assay exports, supplied-dispersion fixed Wald/LRT replacement refit, primitive expanded beta-prior Wald replacement refit, and limited native Wald/LRT/contrast refit. |
 | Independent filtering | BaseMean-driven filtered BH and DESeq2-shaped lowess threshold selection. |
 | Dispersion gene estimates | Linear-mu and GLM-mu foundations, rough/moments starts, Cox-Reid, Armijo, grid fallback. |
-| Dispersion trends | Parametric, mean, and initial pure-Rust local trends. |
+| Dispersion trends | Parametric, mean, and pure-Rust locfit-compatible local trends. |
 | Transformations | `normTransform`, mean-fit, parametric, and local VST primitives, fit-state and builder-level VST dispatch, low-level rlog sample-effect fitting with retained GLM intermediates, frozen-intercept rlog primitives, rlog prior estimation, fit-state rlog and frozen-rlog reuse, builder-level design-aware/blind GLM-mu rlog and frozen-rlog helpers, and native CLI `vst`/`rlog` commands including frozen-intercept rlog input. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
@@ -70,7 +70,7 @@ cover only selected fixed-dispersion and limited native-dispersion branches.
 
 Still missing:
 
-- exact local `locfit` edge-case parity,
+- broader synthetic `locfit` edge-case parity,
 - glmGamPoi trend and MAP behavior,
 - exact seeded Monte Carlo/loess numerical identity for low-df dispersion prior
   variance,
@@ -78,6 +78,12 @@ Still missing:
   weighted GLM-mu mean/local fixtures,
 - broader stage-by-stage native LRT references,
 - more edge cases around convergence, skipped rows, and replacement refits.
+
+The locfit-compatible local smoother mainly improves local `dispFit` parity.
+On the current real-data local-trend fixture, median relative error improved
+from `7.99e-03` to `4.04e-10`, p99 from `2.00e-01` to `2.80e-09`, and max from
+`4.28e-01` to `3.19e-09`. The committed downstream GLM-mu local MAP/Wald/LRT
+fixtures were already at machine precision, so those metrics are unchanged.
 
 ### Full GLM Fitting
 
