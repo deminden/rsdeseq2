@@ -462,12 +462,15 @@ offline DESeq2 local-trend fixture checks the fitted shape, with a second
 fixture covering mixed rows above and below the `10 * minDisp` fit threshold
 and another fixture checking predictions at means outside the original fit
 rows. The real-data local trend fixture currently checks 64,344 finite fitted
-values with median relative error `4.04e-10`, p99 `2.80e-09`, and max
-`3.19e-09` against DESeq2 1.46.0. Compared with the previous in-repo smoother,
+values with median relative error `3.74e-13`, p99 `5.85e-12`, and max
+`1.47e-11` against DESeq2 1.46.0. Compared with the previous in-repo smoother,
 that real-data fixture moved from median relative error `7.99e-03`, p99
-`2.00e-01`, and max `4.28e-01` to the near-exact values above. On the committed
-small local-trend fixtures, the fitted-shape max absolute error improved from
-`3.29e-04` to `9.62e-05`, and the mixed-threshold max absolute error improved
+`2.00e-01`, and max `4.28e-01` to the near-exact values above. The newest
+locfit-compatible backend revision tightened the same real-data fixture from
+median relative error `4.04e-10`, p99 `2.80e-09`, and max `3.19e-09` to the
+current values. On the committed small local-trend fixtures, the fitted-shape
+max absolute error improved from `3.29e-04` to `9.62e-05`, and the
+mixed-threshold max absolute error improved
 from `3.87e-02` to `1.98e-03`. The small out-of-fit prediction fixture moved
 from max absolute error `5.76e-05` to `2.56e-04`; this remains inside its
 `2e-3` DESeq2 reference tolerance, but it is not counted as an improvement.

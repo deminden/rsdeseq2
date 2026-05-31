@@ -81,8 +81,8 @@ Still missing:
 
 The locfit-compatible local smoother mainly improves local `dispFit` parity.
 On the current real-data local-trend fixture, median relative error improved
-from `7.99e-03` to `4.04e-10`, p99 from `2.00e-01` to `2.80e-09`, and max from
-`4.28e-01` to `3.19e-09`. The committed downstream GLM-mu local MAP/Wald/LRT
+from `7.99e-03` to `3.74e-13`, p99 from `2.00e-01` to `5.85e-12`, and max from
+`4.28e-01` to `1.47e-11`. The committed downstream GLM-mu local MAP/Wald/LRT
 fixtures were already at machine precision, so those metrics are unchanged.
 
 ### Full GLM Fitting

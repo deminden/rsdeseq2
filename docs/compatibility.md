@@ -206,7 +206,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   `dispGeneEst >= 10 * minDisp` local-fit rule, base-mean weights,
   all-near-minimum floor behavior, builder dispatch, offline local-trend
   reference checks, and real-data fitted-value parity at median relative error
-  `4.04e-10`, p99 `2.80e-09`, max `3.19e-09`. Against the previous
+  `3.74e-13`, p99 `5.85e-12`, max `1.47e-11`. Against the previous
   in-repo smoother, the committed fitted-shape local fixture improved from max
   absolute error `3.29e-04` to `9.62e-05`, and the mixed-threshold fixture
   improved from `3.87e-02` to `1.98e-03`; the small out-of-fit prediction

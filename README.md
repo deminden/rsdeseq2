@@ -47,8 +47,8 @@ implemented primitive outputs:
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
 The latest sweep completed with zero swaps. The local dispersion trend now uses
 a pure-Rust locfit-compatible backend; on the same real-data fixture its 64,344
-finite fitted values match DESeq2 with median relative error `4.04e-10`, p99
-`2.80e-09`, and max `3.19e-09`. Existing committed GLM-mu local
+finite fitted values match DESeq2 with median relative error `3.74e-13`, p99
+`5.85e-12`, and max `1.47e-11`. Existing committed GLM-mu local
 MAP/Wald/LRT fixture metrics were already at machine precision and remain
 unchanged.
 Methodology and synthetic

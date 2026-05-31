@@ -1,5 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rsdeseq2::prelude::*;
+use std::hint::black_box;
 
 fn initial_pipeline_bench(c: &mut Criterion) {
     let n_genes = 2_000;
