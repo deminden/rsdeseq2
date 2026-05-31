@@ -642,12 +642,14 @@ fn minimize_beta_log2_lbfgsb(
     if let Some(polish) = polish_beta_log2(
         input,
         &solution.x,
-        lower,
-        upper,
-        maxit,
-        gradient_tol,
-        converged,
-        final_gradient_norm,
+        BetaPolishInput {
+            lower,
+            upper,
+            maxit,
+            gradient_tol,
+            converged,
+            gradient_norm: final_gradient_norm,
+        },
     )? {
         if polish.value.is_finite() && polish.value <= solution.f.min(start_value) {
             return Ok(polish);
@@ -669,28 +671,33 @@ fn minimize_beta_log2_lbfgsb(
     })
 }
 
-fn polish_beta_log2(
-    input: BetaOptimInput<'_>,
-    start: &[f64],
+#[derive(Clone, Copy)]
+struct BetaPolishInput {
     lower: f64,
     upper: f64,
     maxit: usize,
     gradient_tol: f64,
     converged: bool,
     gradient_norm: Option<f64>,
+}
+
+fn polish_beta_log2(
+    input: BetaOptimInput<'_>,
+    start: &[f64],
+    polish: BetaPolishInput,
 ) -> Result<Option<BoundedOptimizationOutput>, DeseqError> {
-    if converged && !gradient_norm.is_some_and(|norm| norm > 1.0e-4) {
+    if polish.converged && !polish.gradient_norm.is_some_and(|norm| norm > 1.0e-4) {
         return Ok(None);
     }
     let options = BoundedOptimizerOptions {
-        maxit,
-        gradient_tol: gradient_tol.max(1.0e-8),
+        maxit: polish.maxit,
+        gradient_tol: polish.gradient_tol.max(1.0e-8),
         step_tol: 1.0e-10,
         initial_step: 1.0,
         min_step: 1.0e-12,
         armijo: 1.0e-4,
     };
-    minimize_bounded_projected_gradient(start, lower, upper, options, |beta| {
+    minimize_bounded_projected_gradient(start, polish.lower, polish.upper, options, |beta| {
         beta_log2_value_gradient(&input, beta)
     })
     .map(Some)
