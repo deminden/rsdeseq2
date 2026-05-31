@@ -17,11 +17,7 @@ r-pkg/*/src/*.so
 r-pkg/*/src/*.dll
 r-pkg/*/src/*.dylib
 r-pkg/*/src/symbols.rds
-results/parity/*.tsv
-results/parity/*.csv
-results/parity/*.rds
-results/benchmarks/*.tsv
-results/benchmarks/*.json
+results/
 __pycache__/
 .pytest_cache/
 .mypy_cache/
