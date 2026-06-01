@@ -2,6 +2,10 @@
 
 This crate contains the Rust numerical core for `rsdeseq2`.
 
+Project source and status docs live on GitHub:
+[repository][repo], [gap analysis][gap-analysis],
+[compatibility notes][compatibility], and [benchmarks][benchmarks].
+
 The current API implements count matrix storage, design matrix validation,
 size-factor estimation and caller-supplied size factors, normalized counts,
 base means, BH adjusted p-values, fixed-dispersion NB GLM fitting for the
@@ -34,3 +38,8 @@ let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16])?;
 let fit = DeseqBuilder::new().fit_size_factors_and_base_means(&counts)?;
 # Ok::<(), DeseqError>(())
 ```
+
+[repo]: https://github.com/deminden/rsdeseq2
+[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
+[compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
+[benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md

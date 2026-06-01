@@ -24,8 +24,8 @@ high-level rlog object semantics, lfcShrink, plotting, and mature high-level
 interfaces.
 
 Detailed status lives in
-[docs/deseq2-gap-analysis.md](docs/deseq2-gap-analysis.md) and
-[docs/compatibility.md](docs/compatibility.md).
+[docs/deseq2-gap-analysis.md][gap-analysis] and
+[docs/compatibility.md][compatibility].
 
 ## Real-Data Parity
 
@@ -57,7 +57,7 @@ MAP/Wald/LRT fixture metrics were already at machine precision and remain
 unchanged.
 Methodology and synthetic
 benchmark results are in
-[docs/benchmarks.md](docs/benchmarks.md).
+[docs/benchmarks.md][benchmarks].
 
 ## Rust Usage
 
@@ -160,3 +160,7 @@ Run speed/RAM benchmarks for current apples-to-apples primitives:
 ```bash
 scripts/benchmark_rsdeseq2.sh
 ```
+
+[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
+[compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
+[benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md

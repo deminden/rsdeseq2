@@ -160,7 +160,7 @@ reference result shape much more closely:
 
 | output | contrast coverage | status |
 | --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Median abs diffs are `1.39e-14` for log2 fold change, `7.55e-13` for lfcSE, `2.33e-12` for Wald statistic, `1.57e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `1.81e-12`, `8.89e-11`, `1.77e-11`, `4.52e-11`, and `8.48e-11`, respectively. The harshest max abs diffs are `5.86e-04` for log2 fold change, `3.27e-04` for lfcSE, `9.52e-04` for Wald statistic, `7.69e-05` for p-value, and `7.93e-05` for adjusted p-value. Runtime was 133.8 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
+| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Mean abs diffs are `2.21e-08` for log2 fold change, `3.07e-08` for lfcSE, `3.31e-08` for Wald statistic, `5.77e-09` for p-value, and `2.67e-08` for adjusted p-value. Median abs diffs are `1.39e-14`, `7.55e-13`, `2.33e-12`, `1.57e-12`, and `0`, respectively. P99 abs diffs are `1.81e-12`, `8.89e-11`, `1.77e-11`, `4.52e-11`, and `8.48e-11`, respectively. The harshest max abs diffs are `5.86e-04`, `3.27e-04`, `9.52e-04`, `7.69e-05`, and `7.93e-05`, respectively. Runtime was 130.2 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
 
 That contrast is now useful as a hard regression target for the next numerical
 work: after aligning replacement/refit dispersion-function reuse with DESeq2,
@@ -175,5 +175,9 @@ median and p99 differences tightened substantially for log2 fold change,
 lfcSE, Wald statistic, p-value, and adjusted p-value, while the harshest single
 log2-fold-change, Wald-statistic, p-value, and adjusted-p-value rows moved
 slightly wider. The largest standard-error rows converge quickly but have very
-large MAP dispersions. The benchmark harness uses the split-level size-factor
-path that matches the saved contrast.
+large MAP dispersions. Updating the pure-Rust L-BFGS-B backend from `0.1.1` to
+`0.1.2` produced no numerical change on this real contrast: mean, median, p99,
+and maximum absolute differences were identical for every affected Wald result
+metric. Runtime moved from 129.0 s to 130.2 s in the control rerun, peak RSS
+from 611 MiB to 610 MiB, and both runs reported zero swaps. The benchmark
+harness uses the split-level size-factor path that matches the saved contrast.

@@ -466,7 +466,10 @@ convergence, and `weightsFail` row expansion.
 The fixed-dispersion IRLS path now includes a bounded limited-memory BFGS-style
 pure-Rust optim fallback for routed rows. It follows DESeq2's objective-only
 `optim(..., method="L-BFGS-B")` shape with R-style finite differences and no
-extra post-polish. The current checked reference fixtures still use
+extra post-polish. Updating the backend from `0.1.1` to `0.1.2` did not change
+mean, median, p99, or maximum real-data Wald result differences on the current
+focused contrast, so it is a maintenance update rather than a parity-changing
+one. The current checked reference fixtures still use
 `useOptim=FALSE`; the reference generator also has an optional
 `forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
 bounded fallback where DESeq2 is installed locally.

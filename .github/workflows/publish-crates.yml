@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: publish-crate-${{ github.ref }}
@@ -16,6 +17,9 @@ jobs:
   publish:
     name: Publish rsdeseq2 to crates.io
     runs-on: ubuntu-latest
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/rsdeseq2
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -41,10 +45,22 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      - name: Pin crate README links to release tag
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          readme = Path("crates/rsdeseq2/README.md")
+          text = readme.read_text()
+          readme.write_text(text.replace("/blob/main/", f"/blob/{tag}/"))
+          PY
+
       - name: Package
-        run: cargo package -p rsdeseq2 --locked
+        run: cargo package -p rsdeseq2 --locked --allow-dirty
 
       - name: Publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p rsdeseq2 --locked --token "$CARGO_REGISTRY_TOKEN"
+        run: cargo publish -p rsdeseq2 --locked --allow-dirty --token "$CARGO_REGISTRY_TOKEN"

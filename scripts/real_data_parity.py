@@ -337,6 +337,7 @@ def compare_results(got: Path, expected: Path) -> dict[str, float | int]:
     for col in columns:
         diffs = sorted(diffs_by_column[col])
         out[f"{col}_max_abs"] = max_by_column[col]
+        out[f"{col}_mean_abs"] = sum(diffs) / len(diffs) if diffs else math.nan
         out[f"{col}_median_abs"] = diffs[len(diffs) // 2] if diffs else math.nan
         out[f"{col}_p99_abs"] = diffs[min(len(diffs) - 1, int(0.99 * len(diffs)))] if diffs else math.nan
         out[f"{col}_mismatched"] = mismatch_by_column[col]
