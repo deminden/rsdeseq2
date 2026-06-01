@@ -651,13 +651,15 @@ dependencies = [
 
 [[package]]
 name = "rcompat-lbfgsb"
-version = "0.1.0"
-source = "git+https://github.com/deminden/rcompat-lbfgsb?rev=b3654162c4b24697e73456ce177e480e1610fc37#b3654162c4b24697e73456ce177e480e1610fc37"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7057e633c817da86a6d44ab6ab6f0d74220b9eae33195122d4b58784710d3fee"
 
 [[package]]
 name = "rcompat-locfit"
-version = "0.1.2"
-source = "git+https://github.com/deminden/rcompat-locfit?rev=0f0b8246e261a57bf074915bc2709c564ca253a0#0f0b8246e261a57bf074915bc2709c564ca253a0"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ba535d2bde677e1138fd05984087731d4bf88ca579ed5e7309b2a64f22d731e"
 
 [[package]]
 name = "regex"

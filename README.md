@@ -1,8 +1,12 @@
 # rsdeseq2
 
-`rsdeseq2` is an experimental Rust toolkit for DESeq2-compatible workflow
+`rsdeseq2` is a Rust toolkit for DESeq2-compatible workflow
 primitives. It focuses on deterministic, inspectable building blocks for
 normalization, dispersion experiments, GLM tests, and result-table assembly.
+
+`rsdeseq2` does not contain or reuse DESeq2 implementation code. It implements
+the same documented and observed behavior independently, with parity checked
+against reference outputs.
 
 Use it today as a Rust crate or narrow CLI for validated primitives. It is not
 yet a drop-in replacement for full DESeq2 differential expression analysis.
@@ -45,7 +49,7 @@ implemented primitive outputs:
 | `wald_results` | 65,580 genes, 78 samples | median LFC diff `1.39e-14`; max lfcSE diff `3.27e-04`; max p-value diff `7.69e-05` | 610 MiB |
 
 These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
-The latest sweep completed with zero swaps. The local dispersion trend now uses
+The local dispersion trend now uses
 a pure-Rust locfit-compatible backend; on the same real-data fixture its 64,344
 finite fitted values match DESeq2 with median relative error `3.74e-13`, p99
 `5.85e-12`, and max `1.47e-11`. Existing committed GLM-mu local

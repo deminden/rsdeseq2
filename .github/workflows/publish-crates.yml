@@ -1,0 +1,50 @@
+name: Publish crate
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-crate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish rsdeseq2 to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check tag matches crate version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          crate_version="$(
+            cargo metadata --locked --no-deps --format-version 1 \
+              | python3 -c 'import json, sys; data = json.load(sys.stdin); print(next(package["version"] for package in data["packages"] if package["name"] == "rsdeseq2"))'
+          )"
+          if [ "$tag_version" != "$crate_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match rsdeseq2 crate version $crate_version" >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Package
+        run: cargo package -p rsdeseq2 --locked
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p rsdeseq2 --locked --token "$CARGO_REGISTRY_TOKEN"
