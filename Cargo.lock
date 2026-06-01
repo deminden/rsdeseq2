@@ -383,12 +383,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lbfgsb-rs-pure"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30928f5ee13b22849e0370b237f672ba7b25c491f50a3d1fc8c468e465dfec84"
-
-[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -656,6 +650,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcompat-lbfgsb"
+version = "0.1.0"
+source = "git+https://github.com/deminden/rcompat-lbfgsb?rev=b3654162c4b24697e73456ce177e480e1610fc37#b3654162c4b24697e73456ce177e480e1610fc37"
+
+[[package]]
 name = "rcompat-locfit"
 version = "0.1.2"
 source = "git+https://github.com/deminden/rcompat-locfit?rev=0f0b8246e261a57bf074915bc2709c564ca253a0#0f0b8246e261a57bf074915bc2709c564ca253a0"
@@ -697,9 +696,9 @@ dependencies = [
  "clap",
  "criterion",
  "csv",
- "lbfgsb-rs-pure",
  "nalgebra",
  "rayon",
+ "rcompat-lbfgsb",
  "rcompat-locfit",
  "serde",
  "serde_json",

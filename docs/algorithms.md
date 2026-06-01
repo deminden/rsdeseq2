@@ -797,15 +797,12 @@ when `IrlsOptions.use_optim` is enabled, non-converged rows are fallback
 candidates. Routed rows are refit with a mature pure-Rust L-BFGS-B port on the
 log2 coefficient scale, using the same `[-30, 30]` coefficient bounds,
 100-iteration default, five correction pairs, and normal-prior penalty shape as
-DESeq2's backup path. The primary optimizer uses the analytic beta gradient
-from the implemented negative-binomial objective. Rows that leave L-BFGS-B with
-a rough projected-gradient tail receive a deterministic bounded
-projected-gradient polish pass, and failed high-gradient excursions fall back to
-the optimizer start instead of storing an unstable move. The `factr=1e7`
-objective-reduction stop is only accepted once the projected-gradient norm is
-also small, which prevents premature stops on real fallback rows. The refit
-stores optimized betas even when the optimizer does not declare convergence,
-recomputes fitted
+DESeq2's backup path. The optimizer now uses the same R-compatible wrapper
+shape as DESeq2's `optim(..., method="L-BFGS-B")` fallback: objective-only calls
+with R-style finite-difference gradients, default `factr=1e7`, `pgtol=0`, and
+no extra post-optimizer polish. Failed high-gradient excursions still fall back
+to the optimizer start instead of storing an unstable move. The refit stores
+optimized betas even when the optimizer does not declare convergence, recomputes fitted
 means, standard errors, coefficient covariance, and row log likelihoods, and
 sets `beta_converged` from the optimizer convergence flag. `force_optim` sends
 every row through the bounded refit after IRLS.

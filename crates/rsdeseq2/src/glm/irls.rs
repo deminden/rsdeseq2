@@ -1,5 +1,6 @@
-use lbfgsb_rs_pure::{IterationControl, Status, LBFGSB};
 use nalgebra::{DMatrix, DVector};
+use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use std::cell::RefCell;
 
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
@@ -10,9 +11,7 @@ use crate::glm::nb::{
     nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted, nbinom_log_pmf,
 };
 use crate::glm::NbinomGlmFit;
-use crate::math::optim::{
-    minimize_bounded_projected_gradient, BoundedOptimizationOutput, BoundedOptimizerOptions,
-};
+use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
 
 /// Fit a fixed-dispersion negative-binomial GLM with DESeq2-style dispatch.
@@ -591,250 +590,58 @@ fn minimize_beta_log2_lbfgsb(
     maxit: usize,
     gradient_tol: f64,
 ) -> Result<BoundedOptimizationOutput, DeseqError> {
-    let mut parameters = start
+    let parameters = start
         .iter()
         .copied()
         .map(|value| value.clamp(lower, upper))
         .collect::<Vec<_>>();
     let start_parameters = parameters.clone();
-    let lower_bounds = vec![lower; parameters.len()];
-    let upper_bounds = vec![upper; parameters.len()];
-    let mut deferred_error = None;
-    let mut objective_and_gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
-        Ok(value_gradient) => value_gradient,
+    let deferred_error = RefCell::new(None);
+    let mut objective = |beta: &[f64]| match beta_log2_objective(&input, beta) {
+        Ok(value) => value,
         Err(error) => {
-            deferred_error.get_or_insert(error);
-            let (_, gradient, _) = beta_optim_penalty(beta.len());
-            (1.0e300, gradient)
+            deferred_error.borrow_mut().get_or_insert(error);
+            1.0e300
         }
     };
     let start_value = beta_log2_objective(&input, &parameters)?;
-    let mut previous_value = Some(start_value);
-    let mut solver = LBFGSB::new(5).with_max_iter(maxit).with_pgtol(gradient_tol);
-    let solution = solver
-        .minimize_with_callback(
-            &mut parameters,
-            &lower_bounds,
-            &upper_bounds,
-            &mut objective_and_gradient,
-            &mut |info, _| {
-                let Some(previous) = previous_value.replace(info.f) else {
-                    return IterationControl::Continue;
-                };
-                if info.proj_grad_norm <= 1.0e-5 && lbfgsb_factr_converged(previous, info.f) {
-                    IterationControl::StopConverged
-                } else {
-                    IterationControl::Continue
-                }
-            },
-        )
-        .map_err(|message| DeseqError::UnsupportedFeature {
-            feature: format!("optim fallback L-BFGS-B failed: {message}"),
+    let bounds = Bounds::new(vec![lower; parameters.len()], vec![upper; parameters.len()])
+        .map_err(|error| DeseqError::UnsupportedFeature {
+            feature: format!("optim fallback L-BFGS-B bounds failed: {error}"),
         })?;
-    if let Some(error) = deferred_error {
+    let mut control = OptimControl::default_for_dimension(parameters.len());
+    control.maxit = maxit;
+    control.factr = 1.0e7;
+    control.pgtol = gradient_tol;
+    control.lmm = 5;
+    let solution = optim_lbfgsb(parameters, bounds, &mut objective, control).map_err(|error| {
+        DeseqError::UnsupportedFeature {
+            feature: format!("optim fallback L-BFGS-B failed: {error}"),
+        }
+    })?;
+    if let Some(error) = deferred_error.into_inner() {
         return Err(error);
     }
-    let (_, final_gradient) = beta_log2_value_gradient(&input, &solution.x)?;
-    let final_gradient_norm = projected_gradient_norm(&solution.x, &final_gradient, lower, upper);
+    let (_, final_gradient) = beta_log2_value_gradient(&input, &solution.par)?;
+    let final_gradient_norm = projected_gradient_norm(&solution.par, &final_gradient, lower, upper);
     let converged_by_gradient = final_gradient_norm
-        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4) && solution.f.is_finite());
-    let converged = solution.status == Status::Converged || converged_by_gradient;
-    if let Some(polish) = polish_beta_log2(
-        input,
-        &solution.x,
-        BetaPolishInput {
-            lower,
-            upper,
-            maxit,
-            gradient_tol,
-            converged,
-            gradient_norm: final_gradient_norm,
-        },
-    )? {
-        if polish.value.is_finite() && polish.value <= solution.f.min(start_value) {
-            return Ok(polish);
-        }
-    }
+        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4) && solution.value.is_finite());
+    let converged = solution.is_success() || converged_by_gradient;
+    let iterations = solution.gradient_count();
     if !converged && final_gradient_norm.is_some_and(|norm| norm > 0.1) {
         return Ok(BoundedOptimizationOutput {
             parameters: start_parameters,
             value: start_value,
             converged: false,
-            iterations: solution.iterations,
+            iterations,
         });
     }
     Ok(BoundedOptimizationOutput {
-        parameters: solution.x,
-        value: solution.f,
+        parameters: solution.par,
+        value: solution.value,
         converged,
-        iterations: solution.iterations,
+        iterations,
     })
-}
-
-#[derive(Clone, Copy)]
-struct BetaPolishInput {
-    lower: f64,
-    upper: f64,
-    maxit: usize,
-    gradient_tol: f64,
-    converged: bool,
-    gradient_norm: Option<f64>,
-}
-
-fn polish_beta_log2(
-    input: BetaOptimInput<'_>,
-    start: &[f64],
-    polish: BetaPolishInput,
-) -> Result<Option<BoundedOptimizationOutput>, DeseqError> {
-    if polish.converged && !polish.gradient_norm.is_some_and(|norm| norm > 1.0e-4) {
-        return Ok(None);
-    }
-    if let Some(output) = polish_beta_log2_newton(input, start, polish)? {
-        return Ok(Some(output));
-    }
-    let options = BoundedOptimizerOptions {
-        maxit: polish.maxit,
-        gradient_tol: polish.gradient_tol.max(1.0e-8),
-        step_tol: 1.0e-10,
-        initial_step: 1.0,
-        min_step: 1.0e-12,
-        armijo: 1.0e-4,
-    };
-    minimize_bounded_projected_gradient(start, polish.lower, polish.upper, options, |beta| {
-        beta_log2_value_gradient(&input, beta)
-    })
-    .map(Some)
-}
-
-fn polish_beta_log2_newton(
-    input: BetaOptimInput<'_>,
-    start: &[f64],
-    polish: BetaPolishInput,
-) -> Result<Option<BoundedOptimizationOutput>, DeseqError> {
-    let mut beta = start
-        .iter()
-        .copied()
-        .map(|value| value.clamp(polish.lower, polish.upper))
-        .collect::<Vec<_>>();
-    let gradient_tol = polish.gradient_tol.max(1.0e-8);
-    let mut value = beta_log2_objective(&input, &beta)?;
-    if !value.is_finite() {
-        return Ok(None);
-    }
-
-    for iter in 0..polish.maxit {
-        let (_, gradient, hessian) = beta_log2_objective_gradient_hessian(&input, &beta)?;
-        let Some(gradient_norm) =
-            projected_gradient_norm(&beta, &gradient, polish.lower, polish.upper)
-        else {
-            return Ok(None);
-        };
-        if gradient_norm <= gradient_tol {
-            return Ok(Some(BoundedOptimizationOutput {
-                parameters: beta,
-                value,
-                converged: true,
-                iterations: iter,
-            }));
-        }
-        let gradient_vector = DVector::from_vec(gradient.clone());
-        let Some(newton_step) = hessian.lu().solve(&gradient_vector) else {
-            return Ok(None);
-        };
-        let direction = newton_step.iter().map(|value| -*value).collect::<Vec<_>>();
-        let Some(directional_derivative) = dot_checked(&gradient, &direction) else {
-            return Ok(None);
-        };
-        if directional_derivative >= 0.0 {
-            return Ok(None);
-        }
-
-        let mut step = 1.0;
-        let mut accepted = None;
-        while step >= 1.0e-12 {
-            let Some(candidate) =
-                bounded_step_candidate(&beta, &direction, step, polish.lower, polish.upper)
-            else {
-                step *= 0.5;
-                continue;
-            };
-            let Some(movement) = max_abs_difference_checked(&beta, &candidate) else {
-                step *= 0.5;
-                continue;
-            };
-            if movement <= 1.0e-10 {
-                return Ok(Some(BoundedOptimizationOutput {
-                    parameters: beta,
-                    value,
-                    converged: true,
-                    iterations: iter + 1,
-                }));
-            }
-            let Some(scaled_derivative) = checked_product3(1.0e-4, directional_derivative, step)
-            else {
-                step *= 0.5;
-                continue;
-            };
-            let candidate_value = beta_log2_objective(&input, &candidate)?;
-            let Some(armijo_bound) = checked_sum2(value, scaled_derivative) else {
-                step *= 0.5;
-                continue;
-            };
-            if candidate_value.is_finite() && candidate_value <= armijo_bound {
-                accepted = Some((candidate, candidate_value));
-                break;
-            }
-            step *= 0.5;
-        }
-
-        let Some((candidate, candidate_value)) = accepted else {
-            return Ok(None);
-        };
-        beta = candidate;
-        value = candidate_value;
-    }
-
-    let (_, gradient, _) = beta_log2_objective_gradient_hessian(&input, &beta)?;
-    let converged = projected_gradient_norm(&beta, &gradient, polish.lower, polish.upper)
-        .is_some_and(|norm| norm <= gradient_tol.max(1.0e-4));
-    Ok(Some(BoundedOptimizationOutput {
-        parameters: beta,
-        value,
-        converged,
-        iterations: polish.maxit,
-    }))
-}
-
-fn bounded_step_candidate(
-    beta: &[f64],
-    direction: &[f64],
-    step: f64,
-    lower: f64,
-    upper: f64,
-) -> Option<Vec<f64>> {
-    beta.iter()
-        .copied()
-        .zip(direction.iter().copied())
-        .map(|(value, delta)| {
-            checked_sum2(value, checked_product2(step, delta)?).map(|next| next.clamp(lower, upper))
-        })
-        .collect()
-}
-
-fn max_abs_difference_checked(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut max_difference = 0.0_f64;
-    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        max_difference = max_difference.max(checked_sum2(left, -right)?.abs());
-    }
-    Some(max_difference)
-}
-
-fn dot_checked(left: &[f64], right: &[f64]) -> Option<f64> {
-    let mut sum = 0.0;
-    for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        sum = checked_sum2(sum, checked_product2(left, right)?)?;
-    }
-    Some(sum)
 }
 
 fn beta_log2_value_gradient(
@@ -1004,15 +811,6 @@ fn beta_log2_objective_gradient_hessian(
 
 fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
     (1.0e300, vec![0.0; p], DMatrix::identity(p, p))
-}
-
-fn lbfgsb_factr_converged(previous: f64, next: f64) -> bool {
-    const R_LBFGSB_FACTR: f64 = 1.0e7;
-    if !previous.is_finite() || !next.is_finite() {
-        return false;
-    }
-    let tolerance = R_LBFGSB_FACTR * f64::EPSILON * previous.abs().max(next.abs()).max(1.0);
-    (previous - next).abs() <= tolerance
 }
 
 fn beta_log2_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
@@ -1688,12 +1486,6 @@ mod tests {
             (forward_value - backward_value) / 0.001,
             epsilon = 1e-5
         );
-    }
-
-    #[test]
-    fn lbfgsb_factr_convergence_matches_r_default_scale() {
-        assert!(lbfgsb_factr_converged(10.0, 10.0 + 1.0e-9));
-        assert!(!lbfgsb_factr_converged(10.0, 10.0 + 1.0e-6));
     }
 
     #[test]

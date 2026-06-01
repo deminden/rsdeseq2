@@ -160,18 +160,20 @@ reference result shape much more closely:
 
 | output | contrast coverage | status |
 | --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Median abs diffs are `1.04e-13` for log2 fold change, `5.70e-12` for lfcSE, `1.75e-11` for Wald statistic, `6.49e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `1.31e-11`, `6.51e-10`, `1.29e-10`, `5.31e-11`, and `9.60e-11`, respectively. The harshest max abs diffs are `5.67e-04` for log2 fold change, `3.27e-04` for lfcSE, `9.21e-04` for Wald statistic, `4.79e-05` for p-value, and `4.50e-05` for adjusted p-value. Runtime was 128.0 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
+| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Median abs diffs are `1.39e-14` for log2 fold change, `7.55e-13` for lfcSE, `2.33e-12` for Wald statistic, `1.57e-12` for p-value, and `0` for adjusted p-value. P99 abs diffs are `1.81e-12`, `8.89e-11`, `1.77e-11`, `4.52e-11`, and `8.48e-11`, respectively. The harshest max abs diffs are `5.86e-04` for log2 fold change, `3.27e-04` for lfcSE, `9.52e-04` for Wald statistic, `7.69e-05` for p-value, and `7.93e-05` for adjusted p-value. Runtime was 133.8 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
 
 That contrast is now useful as a hard regression target for the next numerical
 work: after aligning replacement/refit dispersion-function reuse with DESeq2,
 the largest remaining real-contrast differences are split between two tails.
 The largest log2-fold-change and Wald-statistic rows are non-replaced
-dispersion-outlier rows that route through the pure-Rust L-BFGS-B beta
-optimizer (`betaIter=100`). In the latest focused run the hardest row used 79
-fallback/polish iterations and reduced its selected-coefficient objective from
-`690.9302` to `481.4264`, leaving an analytic projected-gradient norm of
-`1.29e-06`. The L-BFGS-B path is followed by a bounded projected-gradient polish
-for rough exits; without that polish, a small number of real fallback rows
-stopped with much wider log2-fold-change tails. The largest standard-error rows
-converge quickly but have very large MAP dispersions. The benchmark harness
-uses the split-level size-factor path that matches the saved contrast.
+dispersion-outlier rows that route through the pure-Rust R-compatible
+L-BFGS-B beta fallback (`betaIter=100`). The current focused run uses the same
+objective-only finite-difference wrapper shape as DESeq2's
+`optim(..., method="L-BFGS-B")` call, without an extra post-optimizer polish.
+Compared with the previous committed optimizer on the same real-data split,
+median and p99 differences tightened substantially for log2 fold change,
+lfcSE, Wald statistic, p-value, and adjusted p-value, while the harshest single
+log2-fold-change, Wald-statistic, p-value, and adjusted-p-value rows moved
+slightly wider. The largest standard-error rows converge quickly but have very
+large MAP dispersions. The benchmark harness uses the split-level size-factor
+path that matches the saved contrast.

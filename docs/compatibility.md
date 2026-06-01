@@ -464,7 +464,9 @@ Wald fitted means and hat diagonals, LRT full/reduced likelihoods, deviances,
 convergence, and `weightsFail` row expansion.
 
 The fixed-dispersion IRLS path now includes a bounded limited-memory BFGS-style
-pure-Rust optim fallback for routed rows. The current checked reference fixtures still use
+pure-Rust optim fallback for routed rows. It follows DESeq2's objective-only
+`optim(..., method="L-BFGS-B")` shape with R-style finite differences and no
+extra post-polish. The current checked reference fixtures still use
 `useOptim=FALSE`; the reference generator also has an optional
 `forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
 bounded fallback where DESeq2 is installed locally.

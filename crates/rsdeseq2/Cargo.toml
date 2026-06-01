@@ -31,9 +31,9 @@ harness = false
 [dependencies]
 clap.workspace = true
 csv.workspace = true
-lbfgsb-rs-pure.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
+rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true
 serde_json.workspace = true

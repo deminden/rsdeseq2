@@ -292,9 +292,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add bounded mature L-BFGS-B pure-Rust optim fallback refits for routed
   fixed-dispersion IRLS rows, including optimized betas, SE/covariance, fitted
   means, and row log likelihoods.
-- [x] Add deterministic bounded projected-gradient polish and high-gradient
-  failure guarding for difficult fallback rows while keeping the primary beta
-  fallback optimizer pure Rust.
+- [x] Replace the earlier post-optimizer polish with the R-compatible
+  objective-only finite-difference L-BFGS-B fallback shape used by DESeq2.
 - [x] Add optional DESeq2 reference-generation and skip-safe Rust test hooks
   for fixed-dispersion force-optim fallback rows.
 - [x] DESeq2-style Cook's distance matrix for the supplied-dispersion Wald
