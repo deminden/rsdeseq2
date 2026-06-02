@@ -466,10 +466,17 @@ convergence, and `weightsFail` row expansion.
 The fixed-dispersion IRLS path now includes a bounded limited-memory BFGS-style
 pure-Rust optim fallback for routed rows. It follows DESeq2's objective-only
 `optim(..., method="L-BFGS-B")` shape with R-style finite differences and no
-extra post-polish. Updating the backend from `0.1.1` to `0.1.2` did not change
-mean, median, p99, or maximum real-data Wald result differences on the current
-focused contrast, so it is a maintenance update rather than a parity-changing
-one. The current checked reference fixtures still use
+extra post-polish. The current real-data focused contrast has zero missingness
+mismatches for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and
+adjusted p-value. Mean absolute differences are `2.17e-08` for log2 fold
+change, `1.57e-10` for lfcSE, `3.19e-08` for Wald statistic, `3.64e-09` for
+p-value, and `2.12e-08` for adjusted p-value. The harshest max absolute
+differences are `7.70e-04`, `8.26e-07`, `1.25e-03`, `6.50e-05`, and
+`4.50e-05`, respectively. The largest previous non-optimizer lfcSE tail was
+caused by clamping the MAP dispersion start to `maxDisp`; the line search now
+preserves high starts and only clamps final stored dispersions, reducing
+`lfcSE_max_abs` by about 396x on that contrast. The current checked reference
+fixtures still use
 `useOptim=FALSE`; the reference generator also has an optional
 `forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
 bounded fallback where DESeq2 is installed locally.

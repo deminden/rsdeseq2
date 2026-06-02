@@ -323,7 +323,7 @@ fn fit_dispersion_line_search_inner(
     }
 
     let min_log_alpha = (options.min_disp / 10.0).ln();
-    let mut log_alpha = initial_dispersion.clamp(options.min_disp, max_disp).ln();
+    let mut log_alpha = initial_dispersion.max(options.min_disp).ln();
     let objective = DispersionObjectiveInput {
         counts,
         mu,
@@ -345,7 +345,7 @@ fn fit_dispersion_line_search_inner(
 
     for _ in 0..options.maxit {
         iter += 1;
-        if !dlp.is_finite() || dlp.abs() <= f64::EPSILON || !kappa.is_finite() || kappa <= 0.0 {
+        if !dlp.is_finite() || !kappa.is_finite() || kappa <= 0.0 {
             break;
         }
 
@@ -360,7 +360,7 @@ fn fit_dispersion_line_search_inner(
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            let lp_new = -theta_kappa;
+            let lp_new = dispersion_log_posterior_objective(objective, log_alpha)?;
             last_change = checked_sub(
                 lp_new,
                 lp,

@@ -7,9 +7,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::glm::beta::fit_intercept_only_fixed_dispersion;
 use crate::glm::fallback::optim_fallback_rows;
-use crate::glm::nb::{
-    nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted, nbinom_log_pmf,
-};
+use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted};
 use crate::glm::NbinomGlmFit;
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
@@ -540,7 +538,7 @@ fn optim_start_beta_log2(
     if current_beta_log2
         .iter()
         .copied()
-        .all(|value| value.is_finite() && value.abs() < bound)
+        .all(|value| value.is_finite() && value.abs() <= bound)
     {
         return Ok(current_beta_log2
             .iter()
@@ -609,11 +607,7 @@ fn minimize_beta_log2_lbfgsb(
         .map_err(|error| DeseqError::UnsupportedFeature {
             feature: format!("optim fallback L-BFGS-B bounds failed: {error}"),
         })?;
-    let mut control = OptimControl::default_for_dimension(parameters.len());
-    control.maxit = maxit;
-    control.factr = 1.0e7;
-    control.pgtol = gradient_tol;
-    control.lmm = 5;
+    let control = optim_fallback_control(parameters.len(), maxit, gradient_tol);
     let solution = optim_lbfgsb(parameters, bounds, &mut objective, control).map_err(|error| {
         DeseqError::UnsupportedFeature {
             feature: format!("optim fallback L-BFGS-B failed: {error}"),
@@ -642,6 +636,15 @@ fn minimize_beta_log2_lbfgsb(
         converged,
         iterations,
     })
+}
+
+fn optim_fallback_control(dimension: usize, maxit: usize, gradient_tol: f64) -> OptimControl {
+    let mut control = OptimControl::default_for_dimension(dimension);
+    control.maxit = maxit;
+    control.factr = 1.0e7;
+    control.pgtol = gradient_tol;
+    control.lmm = 5;
+    control
 }
 
 fn beta_log2_value_gradient(
@@ -685,7 +688,7 @@ fn beta_log2_objective_gradient_hessian(
     }
     validate_positive_finite(input.dispersion, "dispersion", 0)?;
 
-    let mut log_like = 0.0;
+    let mut objective = 0.0;
     let mut gradient = vec![0.0; p];
     let mut hessian = DMatrix::zeros(p, p);
     let ln2 = std::f64::consts::LN_2;
@@ -708,14 +711,18 @@ fn beta_log2_objective_gradient_hessian(
         if !mu.is_finite() || mu <= 0.0 {
             return Ok(beta_optim_penalty(p));
         }
-        let log_pmf = nbinom_log_pmf(input.counts[sample], mu, input.dispersion)?;
-        let Some(weighted_log_pmf) = checked_product2(weight, log_pmf) else {
+        let objective_term =
+            match beta_log2_nb_objective_term(input.counts[sample], mu, input.dispersion) {
+                Some(value) => value,
+                None => return Ok(beta_optim_penalty(p)),
+            };
+        let Some(weighted_objective_term) = checked_product2(weight, objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(next_log_like) = checked_sum2(log_like, weighted_log_pmf) else {
+        let Some(next_objective) = checked_sum2(objective, weighted_objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
-        log_like = next_log_like;
+        objective = next_objective;
         let Some(disp_mu) = checked_product2(input.dispersion, mu) else {
             return Ok(beta_optim_penalty(p));
         };
@@ -778,7 +785,6 @@ fn beta_log2_objective_gradient_hessian(
         }
     }
 
-    let mut objective = -log_like;
     if !objective.is_finite() {
         return Ok(beta_optim_penalty(p));
     }
@@ -807,6 +813,22 @@ fn beta_log2_objective_gradient_hessian(
         hessian[(col, col)] = next_hessian;
     }
     Ok((objective, gradient, hessian))
+}
+
+fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f64> {
+    validate_positive_finite(mu, "optim fallback mean", 0).ok()?;
+    validate_positive_finite(dispersion, "dispersion", 0).ok()?;
+    let count = f64::from(count);
+    let size = dispersion.recip();
+    if !size.is_finite() || size <= 0.0 {
+        return None;
+    }
+    let size_plus_mu = checked_sum2(size, mu)?;
+    let count_plus_size = checked_sum2(count, size)?;
+    let first = checked_product2(count_plus_size, size_plus_mu.ln())?;
+    let second = checked_product2(size, size.ln())?;
+    let third = checked_product2(count, mu.ln())?;
+    checked_sum2(checked_sum2(first, -second)?, -third)
 }
 
 fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
@@ -1206,7 +1228,9 @@ fn solve_weighted_least_squares_qr(
     }
     let (q, r) = augmented_x.qr().unpack();
     let rhs = q.transpose() * augmented_z;
-    r.lu().solve(&rhs)
+    let r_econ = r.view((0, 0), (p, p)).into_owned();
+    let rhs_econ = rhs.rows(0, p).into_owned();
+    r_econ.lu().solve(&rhs_econ)
 }
 
 fn covariance_and_hat_diagonal(
@@ -1447,6 +1471,8 @@ fn checked_log2_covariance(value: f64, index: usize, context: &str) -> Result<f6
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use serde::Deserialize;
+    use std::{env, fs, path::PathBuf};
 
     #[test]
     fn log2_output_scaling_rejects_nonfinite_values() {
@@ -1460,6 +1486,92 @@ mod tests {
             Err(DeseqError::NonFiniteValue { context, index, .. })
                 if context == "test covariance scale" && index == Some(1)
         ));
+    }
+
+    #[test]
+    fn optim_start_keeps_finite_beta_on_bounds() {
+        let x = DMatrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1.0]);
+        let counts = [1_u32, 2_u32];
+        let nf = [1.0, 1.0];
+
+        let start = optim_start_beta_log2(&[30.0, -30.0], &x, &counts, &nf, 30.0).unwrap();
+
+        assert_eq!(start, vec![30.0, -30.0]);
+    }
+
+    #[test]
+    fn optim_fallback_control_matches_r_optim_lbfgsb_defaults() {
+        let options = IrlsOptions::default();
+        assert_eq!(options.max_beta_abs, 30.0);
+        let control = optim_fallback_control(3, 100, 0.0);
+
+        assert_eq!(control.maxit, 100);
+        assert_eq!(control.factr, 1.0e7);
+        assert_eq!(control.pgtol, 0.0);
+        assert_eq!(control.lmm, 5);
+        assert_eq!(control.fnscale, 1.0);
+        assert_eq!(control.parscale, vec![1.0; 3]);
+        assert_eq!(control.ndeps, vec![1.0e-3; 3]);
+    }
+
+    #[test]
+    fn beta_objective_uses_log2_mu_and_nb_kernel_without_gamma_constants() {
+        let x = DMatrix::from_row_slice(1, 1, &[1.0]);
+        let counts = [3_u32];
+        let nf = [2.0];
+        let ridge_lambda = [0.0];
+        let input = BetaOptimInput {
+            x: &x,
+            counts: &counts,
+            nf: &nf,
+            dispersion: 0.5,
+            weights: None,
+            ridge_lambda: &ridge_lambda,
+        };
+
+        let (objective, gradient, hessian) =
+            beta_log2_objective_gradient_hessian(&input, &[1.0]).unwrap();
+        let size = 2.0_f64;
+        let mu = 4.0_f64;
+        let expected = (3.0 + size) * (size + mu).ln() - size * size.ln() - 3.0 * mu.ln();
+        let expected_gradient = std::f64::consts::LN_2 * (mu - 3.0) / (1.0 + 0.5 * mu);
+        let expected_hessian =
+            std::f64::consts::LN_2.powi(2) * mu * (1.0 + 0.5 * 3.0) / (1.0 + 0.5 * mu).powi(2);
+
+        assert_relative_eq!(objective, expected, epsilon = 1e-12);
+        assert_relative_eq!(gradient[0], expected_gradient, epsilon = 1e-12);
+        assert_relative_eq!(hessian[(0, 0)], expected_hessian, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn beta_objective_converts_natural_log_ridge_to_log2_penalty() {
+        let x = DMatrix::from_row_slice(1, 1, &[0.0]);
+        let counts = [0_u32];
+        let nf = [1.0];
+        let natural_log_ridge = 2.5;
+        let ridge_lambda = [natural_log_ridge];
+        let input = BetaOptimInput {
+            x: &x,
+            counts: &counts,
+            nf: &nf,
+            dispersion: 0.5,
+            weights: None,
+            ridge_lambda: &ridge_lambda,
+        };
+
+        let beta = [3.0];
+        let (objective, gradient, hessian) =
+            beta_log2_objective_gradient_hessian(&input, &beta).unwrap();
+        let base = beta_log2_nb_objective_term(0, 1.0, 0.5).unwrap();
+        let ridge_log2 = natural_log_ridge * std::f64::consts::LN_2.powi(2);
+
+        assert_relative_eq!(
+            objective,
+            base + 0.5 * ridge_log2 * beta[0] * beta[0],
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(gradient[0], ridge_log2 * beta[0], epsilon = 1e-12);
+        assert_relative_eq!(hessian[(0, 0)], ridge_log2, epsilon = 1e-12);
     }
 
     #[test]
@@ -1486,6 +1598,78 @@ mod tests {
             (forward_value - backward_value) / 0.001,
             epsilon = 1e-5
         );
+    }
+
+    #[test]
+    fn optim_fallback_replays_objective_only_r_optim_hard_real_case_when_available() {
+        let Some(fixture) = optional_hard_real_r_optim_fixture() else {
+            return;
+        };
+        let contrast = fixture
+            .contrasts
+            .iter()
+            .find(|contrast| contrast.contrast == "heart_blocked_permutation_rep01")
+            .unwrap_or_else(|| fixture.contrasts.first().expect("hard fixture contrast"));
+        let case = contrast
+            .cases
+            .iter()
+            .find(|case| case.case_kind == "actual_or_rough_optimizer_row")
+            .unwrap_or_else(|| contrast.cases.first().expect("hard fixture case"));
+        assert_eq!(case.lower, vec![-30.0; contrast.coefficients]);
+        assert_eq!(case.upper, vec![30.0; contrast.coefficients]);
+        assert_eq!(case.control.maxit, 100);
+        assert_eq!(case.control.factr, 1.0e7);
+        assert_eq!(case.control.pgtol, 0.0);
+        assert_eq!(case.control.lmm, 5);
+        assert_eq!(case.control.ndeps, vec![1.0e-3; contrast.coefficients]);
+
+        let design_values = contrast
+            .design
+            .iter()
+            .flat_map(|row| row.iter().copied())
+            .collect::<Vec<_>>();
+        let x = DMatrix::from_row_slice(contrast.samples, contrast.coefficients, &design_values);
+        let counts = case
+            .counts
+            .iter()
+            .copied()
+            .map(|value| {
+                assert!(value.fract() == 0.0 && value >= 0.0 && value <= f64::from(u32::MAX));
+                value as u32
+            })
+            .collect::<Vec<_>>();
+        let ridge_lambda = vec![0.0; contrast.coefficients];
+        let input = BetaOptimInput {
+            x: &x,
+            counts: &counts,
+            nf: &contrast.size_factors,
+            dispersion: case.dispersion,
+            weights: None,
+            ridge_lambda: &ridge_lambda,
+        };
+
+        let output = minimize_beta_log2_lbfgsb(
+            input,
+            &case.initial_par,
+            case.lower[0],
+            case.upper[0],
+            case.control.maxit,
+            case.control.pgtol,
+        )
+        .unwrap();
+
+        assert!(output.converged, "{}", case.fixture);
+        assert!(
+            output.iterations.abs_diff(case.result.counts.gradient) <= 4,
+            "{} optimizer count drift: actual={} expected={}",
+            case.fixture,
+            output.iterations,
+            case.result.counts.gradient
+        );
+        assert_relative_eq!(output.value, case.result.value, epsilon = 5e-6);
+        for (actual, expected) in output.parameters.iter().zip(case.result.par.iter()) {
+            assert_relative_eq!(*actual, *expected, epsilon = 2e-3);
+        }
     }
 
     #[test]
@@ -1632,5 +1816,82 @@ mod tests {
             DeseqError::NonFiniteValue { context, index, .. }
                 if context == "IRLS working response scaled residual" && index == Some(0)
         ));
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimFixture {
+        contrasts: Vec<HardROptimContrast>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimContrast {
+        contrast: String,
+        samples: usize,
+        coefficients: usize,
+        design: Vec<Vec<f64>>,
+        size_factors: Vec<f64>,
+        cases: Vec<HardROptimCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimCase {
+        fixture: String,
+        case_kind: String,
+        dispersion: f64,
+        counts: Vec<f64>,
+        initial_par: Vec<f64>,
+        lower: Vec<f64>,
+        upper: Vec<f64>,
+        control: HardROptimControl,
+        result: HardROptimResult,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimControl {
+        maxit: usize,
+        ndeps: Vec<f64>,
+        factr: f64,
+        pgtol: f64,
+        lmm: usize,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimResult {
+        par: Vec<f64>,
+        value: f64,
+        counts: HardROptimCounts,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct HardROptimCounts {
+        gradient: usize,
+    }
+
+    fn optional_hard_real_r_optim_fixture() -> Option<HardROptimFixture> {
+        let mut candidates = Vec::new();
+        if let Some(path) = env::var_os("RSDESEQ2_RCOMPAT_HARD_OPTIM_FIXTURE") {
+            candidates.push(PathBuf::from(path));
+        }
+        candidates.push(PathBuf::from(
+            "/home/den/bio/rcompat-lbfgsb/fixtures/deseq_hard_real_subset/optim_cases.json",
+        ));
+        candidates.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../rcompat-lbfgsb/fixtures/deseq_hard_real_subset/optim_cases.json"),
+        );
+
+        for path in candidates {
+            if path.exists() {
+                let text = fs::read_to_string(&path)
+                    .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+                return Some(serde_json::from_str(&text).unwrap_or_else(|error| {
+                    panic!("failed to parse {}: {error}", path.display())
+                }));
+            }
+        }
+        eprintln!(
+            "skipping hard real L-BFGS-B replay; set RSDESEQ2_RCOMPAT_HARD_OPTIM_FIXTURE or keep the rcompat-lbfgsb fixture bundle available"
+        );
+        None
     }
 }

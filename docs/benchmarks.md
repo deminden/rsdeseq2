@@ -144,9 +144,9 @@ Cook's summaries, Rust fallback-optimizer iteration, start/final objective,
 and projected-gradient fields, beta, and beta standard-error values onto the
 largest result-table differences.
 
-Primitive parity results:
+Primitive parity results at floating-point parity:
 
-| output | coverage | median elapsed | max RSS | harshest max abs diff | harshest max rel diff | mismatches |
+| output | coverage | median elapsed | max RSS | max abs diff | max rel diff | mismatches |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `size-factors` | 5 tissues, 1,998 samples | 1.55 s | 237 MiB | `2.62e-14` | `1.99e-14` | 0 |
 | `normalized-counts` | 5 tissues, 138,321,118 cells | 7.03 s | 693 MiB | `1.19e-07` | `9.74e-15` | 0 |
@@ -158,26 +158,22 @@ The CLI Wald path now applies the implemented Cook's outlier replacement/refit
 stage before final Cook's masking and independent filtering, matching the saved
 reference result shape much more closely:
 
-| output | contrast coverage | status |
-| --- | ---: | --- |
-| `wald_results` | 65,580 genes, 78 retained samples | Missingness matches the saved reference for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and adjusted p-value when size factors are estimated on the retained split. Mean abs diffs are `2.21e-08` for log2 fold change, `3.07e-08` for lfcSE, `3.31e-08` for Wald statistic, `5.77e-09` for p-value, and `2.67e-08` for adjusted p-value. Median abs diffs are `1.39e-14`, `7.55e-13`, `2.33e-12`, `1.57e-12`, and `0`, respectively. P99 abs diffs are `1.81e-12`, `8.89e-11`, `1.77e-11`, `4.52e-11`, and `8.48e-11`, respectively. The harshest max abs diffs are `5.86e-04`, `3.27e-04`, `9.52e-04`, `7.69e-05`, and `7.93e-05`, respectively. Runtime was 130.2 s with 610 MiB peak RSS and zero swaps in the latest focused rerun. |
+| metric | mean abs diff | median abs diff | p99 abs diff | max abs diff | mismatches |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `baseMean` | `1.13e-12` | `8.88e-16` | `6.82e-12` | `6.52e-09` | 0 |
+| `log2FoldChange` | `2.17e-08` | `3.77e-14` | `3.33e-12` | `7.70e-04` | 0 |
+| `lfcSE` | `1.57e-10` | `2.33e-12` | `1.66e-10` | `8.26e-07` | 0 |
+| `stat` | `3.19e-08` | `6.07e-12` | `3.44e-11` | `1.25e-03` | 0 |
+| `pvalue` | `3.64e-09` | `3.03e-12` | `4.20e-11` | `6.50e-05` | 0 |
+| `padj` | `2.12e-08` | `0` | `7.87e-11` | `4.50e-05` | 0 |
 
-That contrast is now useful as a hard regression target for the next numerical
-work: after aligning replacement/refit dispersion-function reuse with DESeq2,
-the largest remaining real-contrast differences are split between two tails.
-The largest log2-fold-change and Wald-statistic rows are non-replaced
-dispersion-outlier rows that route through the pure-Rust R-compatible
-L-BFGS-B beta fallback (`betaIter=100`). The current focused run uses the same
-objective-only finite-difference wrapper shape as DESeq2's
-`optim(..., method="L-BFGS-B")` call, without an extra post-optimizer polish.
-Compared with the previous committed optimizer on the same real-data split,
-median and p99 differences tightened substantially for log2 fold change,
-lfcSE, Wald statistic, p-value, and adjusted p-value, while the harshest single
-log2-fold-change, Wald-statistic, p-value, and adjusted-p-value rows moved
-slightly wider. The largest standard-error rows converge quickly but have very
-large MAP dispersions. Updating the pure-Rust L-BFGS-B backend from `0.1.1` to
-`0.1.2` produced no numerical change on this real contrast: mean, median, p99,
-and maximum absolute differences were identical for every affected Wald result
-metric. Runtime moved from 129.0 s to 130.2 s in the control rerun, peak RSS
-from 611 MiB to 610 MiB, and both runs reported zero swaps. The benchmark
-harness uses the split-level size-factor path that matches the saved contrast.
+The current focused Wald run used
+`results/benchmarks/real_data_parity_non_lbfgsb_start_probe.tsv`, covered
+65,580 genes and 78 retained samples, took 151.0 s, reached 610 MiB peak RSS,
+and reported zero swaps. The largest previous non-optimizer standard-error
+tail was caused by pre-clamping the MAP dispersion starting value to
+`maxDisp`; preserving starts above `maxDisp` and clamping only final stored
+dispersions reduced `lfcSE_max_abs` from `3.27e-04` to `8.26e-07` and
+`lfcSE_mean_abs` from `3.06e-08` to `1.57e-10` on this contrast. Remaining
+maximum differences are now dominated by other hard rows, including beta
+fallback/statistic tails.

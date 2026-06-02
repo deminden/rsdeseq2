@@ -39,16 +39,31 @@ checks. A fresh real-data run compared `rsdeseq2` with DESeq2 1.46.0 on a
 | `base-mean` | max diff `5.47e-09` | 4.07 s | 25.88 s | 6.4x | 695 MiB | 2.47 GiB |
 
 A five-tissue saved-reference sweep also matches offline DESeq2 outputs for
-implemented primitive outputs:
+implemented primitive outputs. These rows are at floating-point parity for the
+reported primitive:
 
-| output | real-data coverage | harshest max diff | max RSS |
-| --- | ---: | ---: | ---: |
-| `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | 237 MiB |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | 693 MiB |
-| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | 694 MiB |
-| `wald_results` | 65,580 genes, 78 samples | median LFC diff `1.39e-14`; max lfcSE diff `3.27e-04`; max p-value diff `7.69e-05` | 610 MiB |
+| output | real-data coverage | max abs diff | max rel diff | mismatches | max RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `size-factors` | 5 tissues, 1,998 samples | `2.62e-14` | `1.99e-14` | 0 | 237 MiB |
+| `normalized-counts` | 5 tissues, 138,321,118 cells | `1.19e-07` | `9.74e-15` | 0 | 693 MiB |
+| `base-mean` | 5 tissues, 341,286 genes | `4.66e-09` | `6.73e-15` | 0 | 694 MiB |
 
-These are validated primitive CLI paths, not full-workflow `DESeq()` timings.
+The current hard real-data Wald contrast is much tighter after the MAP
+dispersion start fix, but still has visible tail differences in beta-fallback
+and statistic rows:
+
+| metric | mean abs diff | median abs diff | p99 abs diff | max abs diff | mismatches |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `baseMean` | `1.13e-12` | `8.88e-16` | `6.82e-12` | `6.52e-09` | 0 |
+| `log2FoldChange` | `2.17e-08` | `3.77e-14` | `3.33e-12` | `7.70e-04` | 0 |
+| `lfcSE` | `1.57e-10` | `2.33e-12` | `1.66e-10` | `8.26e-07` | 0 |
+| `stat` | `3.19e-08` | `6.07e-12` | `3.44e-11` | `1.25e-03` | 0 |
+| `pvalue` | `3.64e-09` | `3.03e-12` | `4.20e-11` | `6.50e-05` | 0 |
+| `padj` | `2.12e-08` | `0` | `7.87e-11` | `4.50e-05` | 0 |
+
+That focused contrast covers 65,580 genes and 78 retained samples; the latest
+run took 151.0 s with 610 MiB peak RSS and zero swaps. These are validated
+primitive CLI paths, not full-workflow `DESeq()` timings.
 The local dispersion trend now uses
 a pure-Rust locfit-compatible backend; on the same real-data fixture its 64,344
 finite fitted values match DESeq2 with median relative error `3.74e-13`, p99

@@ -432,7 +432,7 @@ fn mu_alpha_terms(
             &format!("{context} mean curvature term"),
         )?;
         MuAlphaTerms {
-            log1p: mu_alpha.ln_1p(),
+            log1p: (1.0 + mu_alpha).ln(),
             ratio,
             alpha_over_one_plus,
             mu_squared_alpha_over_one_plus_squared,

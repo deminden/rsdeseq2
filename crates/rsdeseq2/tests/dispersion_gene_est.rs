@@ -628,6 +628,46 @@ fn line_search_with_prior_moves_toward_prior_mean() {
 }
 
 #[test]
+fn line_search_preserves_high_initial_value_before_final_cap() {
+    let counts = [0, 0, 0, 0];
+    let mu = [0.5, 0.5, 0.5, 0.5];
+    let options = GeneWiseDispersionOptions {
+        max_disp: Some(1.0),
+        maxit: 1,
+        use_cox_reid: false,
+        ..GeneWiseDispersionOptions::default()
+    };
+    let initial_dispersion = 5.0_f64;
+    let prior = DispersionPrior::new(initial_dispersion.ln(), 0.5).unwrap();
+
+    let output = fit_dispersion_line_search_no_cr_with_prior(
+        &counts,
+        &mu,
+        initial_dispersion,
+        options,
+        counts.len(),
+        prior,
+    )
+    .unwrap();
+    let expected_initial = dispersion_log_posterior_with_prior(
+        &counts,
+        &mu,
+        None,
+        initial_dispersion.ln(),
+        false,
+        Some(prior),
+    )
+    .unwrap();
+    let clamped_initial =
+        dispersion_log_posterior_with_prior(&counts, &mu, None, 1.0_f64.ln(), false, Some(prior))
+            .unwrap();
+
+    assert_relative_eq!(output.initial_lp, expected_initial, epsilon = 1e-12);
+    assert!((output.initial_lp - clamped_initial).abs() > 1e-3);
+    assert!(output.dispersion <= 1.0);
+}
+
+#[test]
 fn weighted_line_search_and_grid_with_prior_return_finite_estimates() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];

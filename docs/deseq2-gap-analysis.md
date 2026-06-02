@@ -84,6 +84,11 @@ On the current real-data local-trend fixture, median relative error improved
 from `7.99e-03` to `3.74e-13`, p99 from `2.00e-01` to `5.85e-12`, and max from
 `4.28e-01` to `1.47e-11`. The committed downstream GLM-mu local MAP/Wald/LRT
 fixtures were already at machine precision, so those metrics are unchanged.
+For the current hard real-data Wald contrast, preserving MAP dispersion
+line-search starts above `maxDisp` reduced the non-optimizer lfcSE tail:
+`lfcSE_max_abs` moved from `3.27e-04` to `8.26e-07`, while `lfcSE_mean_abs`
+moved from `3.06e-08` to `1.57e-10`. Final MAP dispersions are still bounded
+before storage, matching the reference workflow shape.
 
 ### Full GLM Fitting
 
