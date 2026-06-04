@@ -4,12 +4,25 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build, for example v0.2.2"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: >-
+    ${{
+      github.event_name == 'workflow_dispatch' && inputs.tag ||
+      github.ref_name
+    }}
+
 concurrency:
-  group: release-binaries-${{ github.ref }}
+  group: release-binaries-${{ env.RELEASE_TAG }}
   cancel-in-progress: false
 
 jobs:
@@ -48,6 +61,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -56,13 +71,13 @@ jobs:
       - name: Check tag matches crate version
         shell: bash
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
+          tag_version="${RELEASE_TAG#v}"
           crate_version="$(
             cargo metadata --locked --no-deps --format-version 1 \
               | python3 -c 'import json, sys; data = json.load(sys.stdin); print(next(package["version"] for package in data["packages"] if package["name"] == "rsdeseq2"))'
           )"
           if [ "$tag_version" != "$crate_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match rsdeseq2 crate version $crate_version" >&2
+            echo "Tag $RELEASE_TAG does not match rsdeseq2 crate version $crate_version" >&2
             exit 1
           fi
 
@@ -72,7 +87,7 @@ jobs:
       - name: Stage files
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
           mkdir -p "dist/${package_dir}"
           cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${package_dir}/"
@@ -82,7 +97,7 @@ jobs:
         if: matrix.archive_ext == 'tar.gz'
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
           tar -C dist -czf "dist/${package_dir}.tar.gz" "${package_dir}"
 
@@ -90,14 +105,14 @@ jobs:
         if: matrix.archive_ext == 'zip'
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $version = $env:RELEASE_TAG -replace '^v', ''
           $packageDir = "rsdeseq2-$version-${{ matrix.asset_suffix }}"
           Compress-Archive -Path "dist/$packageDir/*" -DestinationPath "dist/$packageDir.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rsdeseq2-${{ github.ref_name }}-${{ matrix.asset_suffix }}
+          name: rsdeseq2-${{ env.RELEASE_TAG }}-${{ matrix.asset_suffix }}
           path: dist/*.${{ matrix.archive_ext }}
           if-no-files-found: error
 
@@ -121,7 +136,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --generate-notes
           fi
-          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          gh release upload "$RELEASE_TAG" dist/* --clobber
