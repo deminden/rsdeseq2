@@ -54,7 +54,7 @@ reference; no DESeq2 source is vendored or translated line by line.
   `weightsFail` row expansion.
 - [x] Add primitive result-table column schema helpers for Rust APIs.
 - [x] Remove current Python wrapper scaffold from the active workspace.
-- [x] Restore the experimental R package scaffold and R CI surface.
+- [x] Restore the R package access layer and R CI surface.
 - [ ] Mature the R package wrapper after core parity improves. Mature wrapper
   paths must call the Rust implementation and must not fall back to
   R/Bioconductor DESeq2 for runtime computation.
@@ -546,9 +546,13 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Add typed top-level Cook's replacement-refit output for `test`-selected
   Wald/LRT workflows, allowing stored-reduced-design LRT replacement refits
   without changing the existing Wald-only return types.
-- [ ] Full DESeq2 contrast handling for `results(contrast=...)`, including
-  colData/formula-aware factor-level semantics, complete coefficient-name
-  cleanup, and contrast-aware Cook's/refit edge cases.
+- [x] DESeq2 contrast handling for `results(contrast=...)` on primitive Rust,
+  CLI, and R wrapper already-fitted result routes, including character,
+  list/listValues, numeric, factor-level reference inference from fitted
+  metadata, contrast-specific all-zero behavior, and `contrast` precedence over
+  `name`.
+- [ ] Broader high-level Bioconductor object plumbing and remaining
+  contrast-aware Cook's/refit edge cases.
 - [x] Initial Cook's distance and `maxCooks` diagnostics.
 - [x] TSV exports for Cook's diagnostics: distance assay, row-level
   `maxCooks` and robust dispersion, and sample-level `samplesForCooks`

@@ -282,6 +282,66 @@ impl DeseqBuilder {
         Ok((fit, results))
     }
 
+    /// Run a supplied-dispersion LRT for a DESeq2 `results(contrast=...)` request.
+    ///
+    /// Character triplet contrasts require one sample level per count-matrix
+    /// column so the Rust core can apply DESeq2's character contrast all-zero
+    /// handling. List and numeric contrasts ignore `sample_levels` and use the
+    /// numeric all-zero rule. As in DESeq2 LRT result tables, the selected
+    /// contrast controls the reported LFC and SE while the statistic and
+    /// p-value remain the LRT model-comparison values.
+    pub fn fit_fixed_dispersion_lrt_results_contrast<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_fixed_dispersion_lrt_factor_level_contrast(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    contrast,
+                )
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_fixed_dispersion_lrt_contrast_spec(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    &contrast_spec,
+                )
+            }
+        }
+    }
+
     /// Run supplied-dispersion LRT replacement refit for a named primitive contrast specification.
     pub fn fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
         &self,
@@ -307,6 +367,63 @@ impl DeseqBuilder {
             contrast.comparison(),
         );
         Ok(output)
+    }
+
+    /// Run supplied-dispersion LRT replacement refit for a DESeq2 `results(contrast=...)` request.
+    #[allow(clippy::too_many_arguments)]
+    pub fn fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    contrast,
+                    replacement_options,
+                )
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    &contrast_spec,
+                    replacement_options,
+                )
+            }
+        }
     }
 
     /// Run a supplied-dispersion LRT and report a factor-level full-model contrast.

@@ -2562,6 +2562,32 @@ fn cli_wald_accepts_factor_level_contrast() {
 }
 
 #[test]
+fn cli_wald_rejects_factor_level_contrast_without_sample_levels() {
+    let dir = temp_dir("wald-contrast-factor-missing-levels");
+    let design = dir.join("design.tsv");
+    let output = dir.join("wald.tsv");
+    write_standard_contrast_design_fixture(&design);
+
+    run_cli_failure(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "B",
+        "--contrast-denominator",
+        "A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+}
+
+#[test]
 fn cli_wald_accepts_factor_level_contrast_with_r_cleaned_level_names() {
     let dir = temp_dir("wald-contrast-factor-cleaned");
     let design = dir.join("design.tsv");
@@ -3065,6 +3091,34 @@ fn cli_lrt_accepts_factor_level_contrast() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_rejects_factor_level_contrast_without_sample_levels() {
+    let dir = temp_dir("lrt-contrast-factor-missing-levels");
+    let design = dir.join("design.tsv");
+    let output = dir.join("lrt.tsv");
+    write_standard_contrast_design_fixture(&design);
+
+    run_cli_failure(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reference_data_path("design_reduced.tsv").to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "condition",
+        "--contrast-numerator",
+        "B",
+        "--contrast-denominator",
+        "A",
+        "--output",
+        output.to_str().unwrap(),
+    ]);
 }
 
 #[test]

@@ -382,6 +382,86 @@ fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
 }
 
 #[test]
+fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
+    let counts = counts_with_zero_row();
+    let full = full_design();
+    let reduced = reduced_design();
+    let builder = native_lrt_builder();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"];
+
+    let (coefficient_fit, _coefficient_results) =
+        builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
+    let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
+
+    let (_character_fit, character_results) = builder
+        .fit_lrt_with_results_contrast_request(
+            &counts,
+            &full,
+            &reduced,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+        )
+        .unwrap();
+    let (_fixed_character_fit, fixed_character_results) = builder
+        .fit_fixed_dispersion_lrt_results_contrast(
+            &counts,
+            &full,
+            &reduced,
+            &final_dispersions,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+        )
+        .unwrap();
+    let (_list_fit, list_results) = builder
+        .fit_lrt_with_results_contrast_request(
+            &counts,
+            &full,
+            &reduced,
+            &ResultsContrast::list(vec!["condition_B_vs_A".into()], vec![]),
+            Option::<&[&str]>::None,
+        )
+        .unwrap();
+    let (_numeric_fit, numeric_results) = builder
+        .clone()
+        .test(TestType::Lrt)
+        .reduced_design(reduced.clone())
+        .fit_with_results_contrast_request(
+            &counts,
+            &full,
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
+            Option::<&[&str]>::None,
+        )
+        .unwrap();
+
+    assert_eq!(character_results.rows, fixed_character_results.rows);
+    assert_eq!(character_results.rows, list_results.rows);
+    assert_eq!(character_results.rows, numeric_results.rows);
+    assert_eq!(
+        character_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        list_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        numeric_results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+    let missing_levels = builder.fit_lrt_with_results_contrast_request(
+        &counts,
+        &full,
+        &reduced,
+        &ResultsContrast::character("condition", "B", "A"),
+        Option::<&[&str]>::None,
+    );
+    assert!(matches!(
+        missing_levels,
+        Err(DeseqError::InvalidOptions { .. })
+    ));
+}
+
+#[test]
 fn native_linear_mu_lrt_contrast_matches_fixed_pipeline_when_reusing_final_dispersions() {
     let counts = counts_with_zero_row();
     let full = full_design();

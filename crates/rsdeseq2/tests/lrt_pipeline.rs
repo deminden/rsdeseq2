@@ -511,8 +511,22 @@ fn fixed_dispersion_lrt_factor_level_replacement_preserves_metadata() {
             &options,
         )
         .unwrap();
+    let request = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement(
+            &counts,
+            &full,
+            &reduced,
+            &dispersions,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+            &options,
+        )
+        .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
+    assert_eq!(request.results, output.results);
     assert_eq!(
         output.results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")

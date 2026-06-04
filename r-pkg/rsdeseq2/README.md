@@ -1,4 +1,4 @@
-# rsdeseq2 R Package Scaffold
+# rsdeseq2 R Package
 
 This package is the R-first access layer for `rsdeseq2`.
 
@@ -10,6 +10,13 @@ Currently implemented primitive matrix helpers:
 - `baseMetadataRust()`
 - `applyCooksCutoffRust()`
 - `resultsTableRust()`
+- `waldFitRust()`
+- `lrtFitRust()`
+- `nbinomWaldTestRust()`
+- `nbinomLRTRust()`
+- `resultsNames()`
+- `resultsNamesRust()`
+- `resolveResultsContrastRust()`
 - `applyIndependentFilteringRust()`
 - `rsdeseq2DiagnosticSchemaRust()`
 - `deseq2McolsDiagnosticsRust()`
@@ -27,8 +34,29 @@ the same pattern for primitive normalization summaries.
 Cook's masking while R retains BH adjustment and output assembly.
 `resultsTableRust()` assembles already-computed primitive vectors into a
 DESeq2-shaped result data frame and computes BH-adjusted p-values when needed.
+`waldFitRust()` packages primitive Wald beta/covariance outputs.
+`nbinomWaldTestRust()` currently accepts those same already-computed primitive
+Wald inputs, or a list-like primitive object, and returns the same fit object.
+`lrtFitRust()` and `nbinomLRTRust()` do the corresponding primitive packaging
+for already-computed LRT statistics: `results()` reports the selected
+coefficient or contrast LFC/SE while preserving the LRT statistic and p-value.
+`results()` can report selected coefficients or DESeq2-style
+`contrast = ...` requests from primitive Wald or LRT fit objects, or from
+list-like objects containing the same primitive fields. It also recognizes
+already-fitted DESeq2-shaped list/S4 metadata with coefficient columns and
+matching `SE_` columns in `mcols`. These routes include
+`lfcThreshold`/`altHypothesis` Wald p-values with Normal or supplied t tails.
+When fitted `factorLevels` or factor-valued `colData` metadata is available,
+character triplet contrasts use the first factor level as the reference unless
+`reference` is supplied explicitly.
+Character, list, and numeric contrast forms are resolved by
+`resolveResultsContrastRust()` with matching all-zero handling metadata.
+Named coefficient results do not apply contrast all-zero handling.
+`resultsNames()` exposes coefficient names from primitive Wald/LRT fit objects,
+list-like primitive objects, fitted-object metadata, beta matrices, or validated
+character vectors for the same contrast-resolution workflow.
+`resultsNamesRust()` is the same primitive helper under the Rust-suffixed name.
 `applyIndependentFilteringRust()` applies baseMean-driven filtered BH
 adjustment to primitive result tables and records filtering metadata as an
 attribute.
-DESeqDataSet integration and full DESeq2-style result generation remain
-unsupported and return clear errors.
+DESeqDataSet fitting integration remains unsupported and returns clear errors.

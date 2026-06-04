@@ -298,6 +298,12 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   p-value, and adjusted p-value remain the model-comparison outputs. The same
   LFC-only cleanup is available for character/factor-level LRT contrasts when
   the caller supplies sample levels.
+- R-wrapper primitive and already-fitted-object `results()` routes support
+  DESeq2-style character triplet, coefficient-list/listValues, and numeric
+  `contrast = ...` forms for Wald and LRT fits. Character triplets use supplied
+  `reference` metadata or infer the first factor level from primitive
+  `factorLevels` / factor-valued `colData`; `contrast` takes precedence over
+  `name`, matching DESeq2.
 - All-zero row expansion for the supplied-dispersion Wald/LRT pipelines and
   limited native Wald/LRT paths, using missing numeric outputs for skipped
   all-zero rows.
@@ -496,14 +502,13 @@ bounded fallback where DESeq2 is installed locally.
   internal function is called directly.
 - Broader DESeq2 parity fixtures for unstable or non-converged rows routed
   through the bounded optim fallback.
-- Full DESeq2 `results(contrast=...)` colData/formula-aware factor-level
-  semantics, complete coefficient-name cleanup, and remaining contrast-aware
-  Cook's/refit edge cases. Primitive numeric and named/list Wald contrasts are
-  implemented with replacement refit; LRT can report primitive numeric and
-  named full-model contrasts, including the limited replacement-refit path,
-  while preserving the full-vs-reduced LRT statistic and p-values. LRT
-  contrast all-zero cleanup follows DESeq2's split behavior by zeroing only
-  the displayed log2 fold change before restoring LRT statistics and p-values.
+- DESeq2-style `results(contrast=...)` semantics are implemented for primitive
+  Rust, CLI, and R wrapper already-fitted result routes: character triplets,
+  coefficient-list/listValues, numeric contrasts, factor-level reference
+  inference from fitted metadata where available, contrast-specific all-zero
+  behavior, and `contrast` precedence over `name`. Remaining contrast work is
+  high-level Bioconductor object plumbing and broader contrast-aware
+  Cook's/refit edge cases.
 - Automatic formula-aware application of the two-group low-count Cook's
   heuristic from high-level wrappers.
 - Full Cook's outlier replacement behavior for high-level Bioconductor assay
@@ -522,8 +527,9 @@ bounded fallback where DESeq2 is installed locally.
   metadata entries.
   Shared internal all-zero row expansion helpers exist for compact GLM outputs
   and full-length masked vectors.
-- High-level R-style contrast handling beyond primitive coefficient-name
-  resolution.
+- High-level R-style contrast handling for arbitrary unfitted `DESeqDataSet`
+  objects beyond the implemented primitive and already-fitted-object
+  `results()` routes.
 - Full high-level VST object workflow, exact DESeq2 `splinefun` behavior for
   local VST, full high-level rlog object workflow, and lfcShrink-compatible
   hooks. Mean-fit, parametric, local, fast-subset selection/subsetting,

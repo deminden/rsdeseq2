@@ -880,10 +880,13 @@ contrast requests. Coefficient-list comparison labels follow DESeq2's
 `cleanContrast` shape for two-sided, positive-only, and negative-only list
 contrasts.
 
-This is still a coefficient-name resolver over an already-built design matrix.
-Full DESeq2 `results(contrast=...)` compatibility still needs colData/formula
-ownership, all coefficient cleanup rules, and contrast-aware Cook's/refit
-edge-case handling.
+The core resolver operates over an already-built design matrix, while the R
+wrapper can use fitted `factorLevels` or factor-valued `colData` to infer the
+reference level for character triplet contrasts. Primitive Rust, CLI, and R
+already-fitted result routes now cover DESeq2-style character, list/listValues,
+and numeric `results(contrast=...)` semantics, including `contrast` taking
+precedence over `name`. Remaining work is high-level Bioconductor object
+mutation/plumbing and broader contrast-aware Cook's/refit edge-case handling.
 
 For primitive numeric contrasts with both positive and negative coefficients,
 the supplied-dispersion and native linear-mu/GLM-mu Wald contrast pipelines
@@ -900,8 +903,9 @@ For factor-level contrasts, a separate primitive helper mirrors DESeq2's
 column. Samples whose level is either the numerator or denominator are selected;
 genes with zero raw counts across all selected samples get the same
 `log2FoldChange = 0`, `stat = 0`, and `pvalue = 1` override in the
-factor-level Wald contrast builder. R still owns formula parsing and colData
-factor validation.
+factor-level Wald contrast builder. The R wrapper can derive the reference from
+fitted factor metadata for already-fitted result objects; full high-level
+`DESeqDataSet` mutation remains an interface boundary.
 
 ## Wald LFC Thresholds
 
@@ -925,9 +929,9 @@ matching DESeq2's current guard.
 
 The helper operates on an `NbinomGlmFit` and a selected coefficient index. The
 builder pipelines wrap it with result-table assembly, Cook's filtering, and
-independent filtering. Primitive numeric contrasts have their own result-row
-builder and supplied-dispersion Wald pipeline, but full Bioconductor result
-metadata remains future work.
+independent filtering. Primitive numeric and DESeq2-style results contrasts
+have result-row builders and supplied/native Wald pipeline routes. Full
+Bioconductor result-object metadata remains interface work.
 
 ## Result Rows
 
@@ -1497,9 +1501,11 @@ This mirrors the shape of DESeq2's `nbinomWaldTest` and `nbinomLRT` when
 dispersion estimates already exist. The native Wald path now supplies those
 estimates from the limited linear-mu or GLM-mu parametric/local/mean MAP
 subsets.
-Cook's outlier replacement/refitting, beta priors, exact R `lowess` parity,
-and full contrast result-table handling are not implemented. Shared internal
-helpers skip all-zero rows during GLM fitting and expand compact outputs back
-to full gene order with `NaN` internal numeric values and `None` result-table
-values, matching the intent of DESeq2's `buildMatrixWithNARows` and
+Cook's outlier replacement/refitting, beta priors, exact R `lowess` parity, and
+contrast result-table handling are available on the implemented workflow
+surfaces described above, with remaining gaps concentrated in high-level
+Bioconductor object attachment and edge-case coverage. Shared internal helpers
+skip all-zero rows during GLM fitting and expand compact outputs back to full
+gene order with `NaN` internal numeric values and `None` result-table values,
+matching the intent of DESeq2's `buildMatrixWithNARows` and
 `buildDataFrameWithNARows` helpers without copying their implementation.

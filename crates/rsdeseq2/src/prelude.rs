@@ -2,7 +2,8 @@
 
 pub use crate::contrasts::{
     contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_coefficient_index,
-    resolve_contrast, ContrastSpec, FactorLevelContrast,
+    resolve_contrast, resolve_results_contrast, ContrastSpec, FactorLevelContrast,
+    ResolvedResultsContrast, ResultsContrast, ResultsContrastAllZero,
 };
 pub use crate::cooks::{
     calculate_cooks_distance, max_cooks_after_replacement_refit, prepare_cooks_replacement_refit,

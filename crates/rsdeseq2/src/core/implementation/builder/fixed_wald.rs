@@ -73,6 +73,68 @@ impl DeseqBuilder {
         Ok((fit, wald_output.results))
     }
 
+    /// Run a supplied-dispersion Wald pipeline for a DESeq2 `results(contrast=...)` request.
+    ///
+    /// Character triplet contrasts require one sample level per count-matrix
+    /// column so the Rust core can apply DESeq2's character contrast all-zero
+    /// handling. List and numeric contrasts ignore `sample_levels` and use the
+    /// numeric all-zero rule.
+    pub fn fit_fixed_dispersion_wald_results_contrast<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let resolved = resolve_results_contrast(design, contrast)?;
+        let contrast_all_zero = match &resolved.all_zero {
+            ResultsContrastAllZero::Character {
+                numerator,
+                denominator,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                Some(contrast_all_zero_factor_levels(
+                    counts,
+                    levels,
+                    numerator,
+                    denominator,
+                )?)
+            }
+            ResultsContrastAllZero::Numeric => None,
+        };
+
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let wald_output = self.fixed_dispersion_wald_contrast_components(
+            FixedDispersionGlmInput {
+                counts,
+                design,
+                size_factors: &stages.size_factors,
+                normalization_factors: stages.normalization_factors.as_ref(),
+                observation_weights: stages.observation_weights.as_ref(),
+                all_zero: &stages.all_zero,
+                dispersions,
+            },
+            &stages.normalized,
+            &stages.base_mean,
+            &resolved.numeric,
+            contrast_all_zero.as_deref(),
+        )?;
+        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        fit.dispersion = Some(wald_output.expanded_dispersions);
+        fit.cooks = Some(wald_output.cooks.cooks);
+        fit.max_cooks = Some(wald_output.cooks.max_cooks);
+        attach_glm_fit(&mut fit, wald_output.glm_fit);
+        fit.wald = Some(wald_output.wald_contrast.wald);
+        let mut results = wald_output.results;
+        results.metadata.result_name = Some(resolved.result_name);
+        results.metadata.comparison = Some(resolved.comparison);
+        Ok((fit, results))
+    }
+
     /// Run the supplied-dispersion Wald coefficient path with Cook's replacement refit.
     ///
     /// This extends the replacement/refit machinery to the fixed-dispersion
@@ -225,6 +287,59 @@ impl DeseqBuilder {
             contrast.comparison(),
         );
         Ok(output)
+    }
+
+    /// Run supplied-dispersion Wald replacement refit for a DESeq2 `results(contrast=...)` request.
+    pub fn fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    dispersions,
+                    contrast,
+                    replacement_options,
+                )
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    dispersions,
+                    &contrast_spec,
+                    replacement_options,
+                )
+            }
+        }
     }
 
     /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.

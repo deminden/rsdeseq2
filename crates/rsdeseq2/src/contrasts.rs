@@ -64,6 +64,67 @@ pub struct FactorLevelContrast<'a> {
     pub sample_levels: &'a [String],
 }
 
+/// DESeq2 `results(contrast=...)` request shape.
+///
+/// This keeps the user-facing contrast form separate from the already-resolved
+/// primitive [`ContrastSpec`]. In DESeq2, character triplet contrasts use
+/// factor-level `contrastAllZero` handling, while list and numeric contrasts
+/// use numeric-model-matrix handling. Preserving the source shape lets pipeline
+/// callers choose the matching all-zero rule after resolving coefficient names.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResultsContrast {
+    /// `contrast = c(factor, numerator, denominator)`.
+    Character {
+        /// Factor or variable name.
+        factor: String,
+        /// Numerator level.
+        numerator: String,
+        /// Denominator level.
+        denominator: String,
+        /// Optional reference/base level, supplied by formula-aware callers.
+        reference: Option<String>,
+    },
+    /// `contrast = list(numeratorNames, denominatorNames)`.
+    List {
+        /// Coefficients receiving `list_values[0]`.
+        positive: Vec<String>,
+        /// Coefficients receiving `list_values[1]`.
+        negative: Vec<String>,
+        /// DESeq2 `listValues`, conventionally `c(1, -1)`.
+        list_values: [f64; 2],
+    },
+    /// Numeric contrast with one value per `resultsNames(object)`.
+    Numeric(Vec<f64>),
+}
+
+/// Which DESeq2 all-zero contrast rule applies after resolving a contrast.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResultsContrastAllZero {
+    /// Use `contrastAllZeroCharacter`: inspect samples in the two factor levels.
+    Character {
+        /// Numerator level.
+        numerator: String,
+        /// Denominator level.
+        denominator: String,
+    },
+    /// Use `contrastAllZeroNumeric`: inspect samples selected by model matrix
+    /// columns with non-zero numeric contrast coefficients.
+    Numeric,
+}
+
+/// Resolved `results(contrast=...)` information.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedResultsContrast {
+    /// Primitive numeric contrast vector.
+    pub numeric: Vec<f64>,
+    /// Metadata-compatible result name.
+    pub result_name: String,
+    /// Metadata-compatible comparison label.
+    pub comparison: String,
+    /// Matching DESeq2 all-zero handling rule.
+    pub all_zero: ResultsContrastAllZero,
+}
+
 impl<'a> FactorLevelContrast<'a> {
     /// Build a factor-level contrast without an explicit reference level.
     pub fn new(
@@ -95,6 +156,89 @@ impl<'a> FactorLevelContrast<'a> {
             denominator,
             reference: Some(reference),
             sample_levels,
+        }
+    }
+}
+
+impl ResultsContrast {
+    /// Build `contrast = c(factor, numerator, denominator)`.
+    pub fn character(
+        factor: impl Into<String>,
+        numerator: impl Into<String>,
+        denominator: impl Into<String>,
+    ) -> Self {
+        Self::Character {
+            factor: factor.into(),
+            numerator: numerator.into(),
+            denominator: denominator.into(),
+            reference: None,
+        }
+    }
+
+    /// Build a character triplet contrast with an explicit reference/base level.
+    pub fn character_with_reference(
+        factor: impl Into<String>,
+        numerator: impl Into<String>,
+        denominator: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        Self::Character {
+            factor: factor.into(),
+            numerator: numerator.into(),
+            denominator: denominator.into(),
+            reference: Some(reference.into()),
+        }
+    }
+
+    /// Build `contrast = list(positive, negative)` with `listValues = c(1, -1)`.
+    pub fn list(positive: Vec<String>, negative: Vec<String>) -> Self {
+        Self::list_with_values(positive, negative, 1.0, -1.0)
+    }
+
+    /// Build a list contrast with explicit DESeq2 `listValues`.
+    pub fn list_with_values(
+        positive: Vec<String>,
+        negative: Vec<String>,
+        positive_weight: f64,
+        negative_weight: f64,
+    ) -> Self {
+        Self::List {
+            positive,
+            negative,
+            list_values: [positive_weight, negative_weight],
+        }
+    }
+
+    /// Build a numeric contrast vector.
+    pub fn numeric(values: Vec<f64>) -> Self {
+        Self::Numeric(values)
+    }
+
+    /// Convert to the lower-level primitive contrast specification.
+    pub fn as_contrast_spec(&self) -> ContrastSpec {
+        match self {
+            Self::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => ContrastSpec::FactorLevel {
+                factor: factor.clone(),
+                numerator: numerator.clone(),
+                denominator: denominator.clone(),
+                reference: reference.clone(),
+            },
+            Self::List {
+                positive,
+                negative,
+                list_values,
+            } => ContrastSpec::List {
+                positive: positive.clone(),
+                negative: negative.clone(),
+                positive_weight: list_values[0],
+                negative_weight: list_values[1],
+            },
+            Self::Numeric(values) => ContrastSpec::Numeric(values.clone()),
         }
     }
 }
@@ -193,6 +337,35 @@ impl ContrastSpec {
             } => format!("factor-level contrast: {factor} {numerator} vs {denominator}"),
         }
     }
+}
+
+/// Resolve a DESeq2 `results(contrast=...)` request into the primitive numeric
+/// vector plus the all-zero rule implied by the original contrast form.
+pub fn resolve_results_contrast(
+    design: &DesignMatrix,
+    contrast: &ResultsContrast,
+) -> Result<ResolvedResultsContrast, DeseqError> {
+    let spec = contrast.as_contrast_spec();
+    let numeric = resolve_contrast(design, &spec)?;
+    let all_zero = match contrast {
+        ResultsContrast::Character {
+            numerator,
+            denominator,
+            ..
+        } => ResultsContrastAllZero::Character {
+            numerator: numerator.clone(),
+            denominator: denominator.clone(),
+        },
+        ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+            ResultsContrastAllZero::Numeric
+        }
+    };
+    Ok(ResolvedResultsContrast {
+        numeric,
+        result_name: spec.result_name(),
+        comparison: spec.comparison(),
+        all_zero,
+    })
 }
 
 /// Resolve a primitive contrast specification into a numeric contrast vector.
@@ -355,13 +528,28 @@ pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
             sample_levels.len(),
         ));
     }
+    let mut numerator_count = 0usize;
+    let mut denominator_count = 0usize;
     let selected_samples = sample_levels
         .iter()
         .map(|level| {
             let level = level.as_ref();
+            if level == numerator {
+                numerator_count += 1;
+            }
+            if level == denominator {
+                denominator_count += 1;
+            }
             level == numerator || level == denominator
         })
         .collect::<Vec<_>>();
+    if numerator_count == 0 || denominator_count == 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "contrastAllZero sample levels must contain numerator level '{numerator}' and denominator level '{denominator}'"
+            ),
+        });
+    }
     let selected_count = selected_samples
         .iter()
         .filter(|selected| **selected)
@@ -449,7 +637,7 @@ fn resolve_factor_level_contrast(
     }
 
     if let Some((numerator_index, denominator_index)) =
-        find_shared_reference_standard_coefficients(names, factor, numerator, denominator)
+        find_shared_reference_standard_coefficients(names, factor, numerator, denominator)?
     {
         let mut values = vec![0.0; design.n_coefficients()];
         values[numerator_index] = 1.0;
@@ -641,14 +829,9 @@ fn resolve_coefficient_name_list(
     let mut seen = HashSet::with_capacity(wanted.len());
     for name in wanted {
         let index = resolve_coefficient_name(names, name)?;
-        if !seen.insert(index) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "contrast list contains duplicate coefficient '{name}' after R-style cleanup"
-                ),
-            });
+        if seen.insert(index) {
+            indices.push(index);
         }
-        indices.push(index);
     }
     Ok(indices)
 }
@@ -715,17 +898,28 @@ fn find_shared_reference_standard_coefficients(
     factor: &str,
     numerator: &str,
     denominator: &str,
-) -> Option<(usize, usize)> {
+) -> Result<Option<(usize, usize)>, DeseqError> {
     let numerator_pairs = standard_coefficients_for_level(names, factor, numerator);
     let denominator_pairs = standard_coefficients_for_level(names, factor, denominator);
-    numerator_pairs
-        .iter()
-        .find_map(|(numerator_index, numerator_reference)| {
-            denominator_pairs
-                .iter()
-                .find(|(_, denominator_reference)| denominator_reference == numerator_reference)
-                .map(|(denominator_index, _)| (*numerator_index, *denominator_index))
-        })
+    let mut shared = Vec::new();
+    for (numerator_index, numerator_reference) in numerator_pairs.iter() {
+        for (denominator_index, denominator_reference) in denominator_pairs.iter() {
+            if numerator_reference == denominator_reference {
+                shared.push((*numerator_index, *denominator_index));
+            }
+        }
+    }
+    shared.sort_unstable();
+    shared.dedup();
+    match shared.as_slice() {
+        [] => Ok(None),
+        [(numerator_index, denominator_index)] => Ok(Some((*numerator_index, *denominator_index))),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "factor-level contrast {factor}: {numerator} vs {denominator} resolves ambiguously through shared-reference coefficient names"
+            ),
+        }),
+    }
 }
 
 fn standard_coefficients_for_level(
@@ -747,10 +941,19 @@ fn standard_coefficients_for_level(
 fn standard_coefficient_prefixes(factor: &str, level: &str) -> Vec<String> {
     let raw = format!("{factor}_{level}_vs_");
     let mut candidates = candidate_names(&raw);
+    candidates.extend(candidate_names(&format!("{factor}{level}_vs_")));
     push_unique_candidate(
         &mut candidates,
         format!(
             "{}_{}_vs_",
+            r_like_make_name(factor),
+            r_like_make_name(level)
+        ),
+    );
+    push_unique_candidate(
+        &mut candidates,
+        format!(
+            "{}{}_vs_",
             r_like_make_name(factor),
             r_like_make_name(level)
         ),
@@ -774,10 +977,20 @@ fn expanded_coefficient_names(factor: &str, level: &str) -> Vec<String> {
 fn standard_coefficient_candidates(factor: &str, level: &str, reference: &str) -> Vec<String> {
     let raw = format!("{factor}_{level}_vs_{reference}");
     let mut candidates = candidate_names(&raw);
+    candidates.extend(candidate_names(&format!("{factor}{level}_vs_{reference}")));
     push_unique_candidate(
         &mut candidates,
         format!(
             "{}_{}_vs_{}",
+            r_like_make_name(factor),
+            r_like_make_name(level),
+            r_like_make_name(reference)
+        ),
+    );
+    push_unique_candidate(
+        &mut candidates,
+        format!(
+            "{}{}_vs_{}",
             r_like_make_name(factor),
             r_like_make_name(level),
             r_like_make_name(reference)

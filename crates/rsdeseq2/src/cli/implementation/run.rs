@@ -570,52 +570,67 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 || contrast_reference.is_some()
                 || contrast_sample_levels.is_some()
             {
-                let contrast = cli_factor_level_contrast(
-                    contrast_factor,
-                    contrast_numerator,
-                    contrast_denominator,
-                    contrast_reference.as_deref(),
+                let factor_inputs = usize::from(contrast_factor.is_some())
+                    + usize::from(contrast_numerator.is_some())
+                    + usize::from(contrast_denominator.is_some());
+                let factor = contrast_factor.ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "factor-level contrast inputs".to_string(),
+                    expected: 3,
+                    actual: factor_inputs,
+                })?;
+                let numerator = contrast_numerator.ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "factor-level contrast inputs".to_string(),
+                    expected: 3,
+                    actual: factor_inputs,
+                })?;
+                let denominator =
+                    contrast_denominator.ok_or_else(|| DeseqError::InvalidDimensions {
+                        context: "factor-level contrast inputs".to_string(),
+                        expected: 3,
+                        actual: factor_inputs,
+                    })?;
+                let path = contrast_sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "factor-level results contrast requires --contrast-sample-levels"
+                        .to_string(),
+                })?;
+                let levels = align_sample_levels_to_samples(
+                    &read_sample_levels_tsv(path)?,
+                    counts
+                        .sample_names()
+                        .ok_or_else(|| DeseqError::InvalidOptions {
+                            reason: "count sample names are required to align sample levels"
+                                .to_string(),
+                        })?,
                 )?;
-                if let Some(path) = contrast_sample_levels {
-                    let levels = align_sample_levels_to_samples(
-                        &read_sample_levels_tsv(path)?,
-                        counts
-                            .sample_names()
-                            .ok_or_else(|| DeseqError::InvalidOptions {
-                                reason: "count sample names are required to align sample levels"
-                                    .to_string(),
-                            })?,
-                    )?;
-                    let contrast = cli_factor_level_contrast_with_samples(&contrast, &levels)?;
-                    if let Some(cutoff) = cutoff {
-                        cli_wald_replacement_output(
-                            builder.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
-                                &counts,
-                                &design,
-                                contrast,
-                                &CooksReplacementOptions::new(cutoff),
-                            )?,
-                        )
-                    } else {
-                        cli_fit_output(
-                            builder.fit_wald_glm_mu_factor_level_contrast(
-                                &counts, &design, contrast,
-                            )?,
-                        )
-                    }
-                } else if let Some(cutoff) = cutoff {
-                    cli_wald_replacement_output(
-                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                let contrast = match contrast_reference {
+                    Some(reference) => ResultsContrast::character_with_reference(
+                        factor,
+                        numerator,
+                        denominator,
+                        reference,
+                    ),
+                    None => ResultsContrast::character(factor, numerator, denominator),
+                };
+                if let Some(cutoff) = cutoff {
+                    let output = builder
+                        .fit_with_test_results_contrast_request_with_cooks_replacement(
                             &counts,
                             &design,
                             &contrast,
+                            Some(&levels),
                             &CooksReplacementOptions::new(cutoff),
-                        )?,
-                    )
+                        )?;
+                    let CooksReplacementTestOutput::Wald(output) = output else {
+                        unreachable!("Wald CLI branch should route to Wald");
+                    };
+                    cli_wald_replacement_output(output)
                 } else {
-                    cli_fit_output(
-                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
-                    )
+                    cli_fit_output(builder.fit_with_results_contrast_request(
+                        &counts,
+                        &design,
+                        &contrast,
+                        Some(&levels),
+                    )?)
                 }
             } else {
                 let coefficient = match (coefficient, coefficient_name) {
@@ -836,57 +851,70 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
                 || contrast_reference.is_some()
                 || contrast_sample_levels.is_some()
             {
-                let contrast = cli_factor_level_contrast(
-                    contrast_factor,
-                    contrast_numerator,
-                    contrast_denominator,
-                    contrast_reference.as_deref(),
+                let factor_inputs = usize::from(contrast_factor.is_some())
+                    + usize::from(contrast_numerator.is_some())
+                    + usize::from(contrast_denominator.is_some());
+                let factor = contrast_factor.ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "factor-level contrast inputs".to_string(),
+                    expected: 3,
+                    actual: factor_inputs,
+                })?;
+                let numerator = contrast_numerator.ok_or_else(|| DeseqError::InvalidDimensions {
+                    context: "factor-level contrast inputs".to_string(),
+                    expected: 3,
+                    actual: factor_inputs,
+                })?;
+                let denominator =
+                    contrast_denominator.ok_or_else(|| DeseqError::InvalidDimensions {
+                        context: "factor-level contrast inputs".to_string(),
+                        expected: 3,
+                        actual: factor_inputs,
+                    })?;
+                let path = contrast_sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "factor-level results contrast requires --contrast-sample-levels"
+                        .to_string(),
+                })?;
+                let levels = align_sample_levels_to_samples(
+                    &read_sample_levels_tsv(path)?,
+                    counts
+                        .sample_names()
+                        .ok_or_else(|| DeseqError::InvalidOptions {
+                            reason: "count sample names are required to align sample levels"
+                                .to_string(),
+                        })?,
                 )?;
-                if let Some(path) = contrast_sample_levels {
-                    let levels = align_sample_levels_to_samples(
-                        &read_sample_levels_tsv(path)?,
-                        counts
-                            .sample_names()
-                            .ok_or_else(|| DeseqError::InvalidOptions {
-                                reason: "count sample names are required to align sample levels"
-                                    .to_string(),
-                            })?,
-                    )?;
-                    let contrast = cli_factor_level_contrast_with_samples(&contrast, &levels)?;
-                    if let Some(cutoff) = cutoff {
-                        cli_lrt_replacement_output(
-                            builder.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
-                                &counts,
-                                &design,
-                                &reduced_design,
-                                contrast,
-                                &CooksReplacementOptions::new(cutoff),
-                            )?,
-                        )
-                    } else {
-                        cli_fit_output(builder.fit_lrt_glm_mu_factor_level_contrast(
+                let contrast = match contrast_reference {
+                    Some(reference) => ResultsContrast::character_with_reference(
+                        factor,
+                        numerator,
+                        denominator,
+                        reference,
+                    ),
+                    None => ResultsContrast::character(factor, numerator, denominator),
+                };
+                if let Some(cutoff) = cutoff {
+                    let output = builder
+                        .clone()
+                        .test(TestType::Lrt)
+                        .reduced_design(reduced_design.clone())
+                        .fit_with_test_results_contrast_request_with_cooks_replacement(
                             &counts,
                             &design,
-                            &reduced_design,
-                            contrast,
-                        )?)
-                    }
-                } else if let Some(cutoff) = cutoff {
-                    cli_lrt_replacement_output(
-                        builder.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &reduced_design,
                             &contrast,
+                            Some(&levels),
                             &CooksReplacementOptions::new(cutoff),
-                        )?,
-                    )
+                        )?;
+                    let CooksReplacementTestOutput::Lrt(output) = output else {
+                        unreachable!("LRT CLI branch should route to LRT");
+                    };
+                    cli_lrt_replacement_output(output)
                 } else {
-                    cli_fit_output(builder.fit_lrt_glm_mu_contrast_spec(
+                    cli_fit_output(builder.fit_lrt_with_results_contrast_request(
                         &counts,
                         &design,
                         &reduced_design,
                         &contrast,
+                        Some(&levels),
                     )?)
                 }
             } else {

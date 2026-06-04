@@ -3,16 +3,15 @@
 ## Repository Structure
 
 - `crates/rsdeseq2`: Rust numerical core and minimal CLI.
-- `r-pkg/rsdeseq2`: experimental R package scaffold and R CI surface.
+- `r-pkg/rsdeseq2`: R access layer and R CI surface.
 - `scripts`: reference generation and future benchmark scripts.
 - `docs`: algorithms, compatibility, reproducibility, and release notes.
 - `results/parity`: generated DESeq2 reference outputs.
 - `results/benchmarks`: benchmark outputs.
 
-The current implementation is Rust-first: a Rust core, minimal Rust CLI,
-scripts for parity fixtures, docs, CI, validation outputs, and an experimental
-R package scaffold. R/DESeq2 is used only as an external reference generator
-for tests.
+The current implementation is Rust-first: a Rust core, CLI, R access layer,
+scripts for parity fixtures, docs, CI, and validation outputs. R/DESeq2 is used
+as an external reference generator for tests.
 
 The workspace tracks current stable Rust in `Cargo.toml` through
 `rust-version`; local development and CI should use that toolchain or newer.

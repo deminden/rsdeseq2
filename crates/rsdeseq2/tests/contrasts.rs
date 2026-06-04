@@ -205,7 +205,10 @@ fn list_contrast_resolves_r_cleaned_coefficient_aliases() {
     );
 
     let duplicated = ContrastSpec::list(vec!["if".into(), "if.".into()], Vec::new());
-    assert!(resolve_contrast(&design, &duplicated).is_err());
+    assert_eq!(
+        resolve_contrast(&design, &duplicated).unwrap(),
+        vec![0.0, 1.0, 0.0]
+    );
 
     let overlap = ContrastSpec::list(vec!["Intercept".into()], vec!["(Intercept)".into()]);
     assert!(resolve_contrast(&design, &overlap).is_err());
@@ -385,6 +388,70 @@ fn original_results_invalid_contrast_shapes_are_rejected() {
 }
 
 #[test]
+fn results_contrast_character_preserves_character_all_zero_semantics() {
+    let design = DesignMatrix::from_row_major(
+        12,
+        4,
+        vec![1.0; 48],
+        Some(vec![
+            "Intercept".into(),
+            "group_2_vs_1".into(),
+            "condition_2_vs_1".into(),
+            "condition_3_vs_1".into(),
+        ]),
+    )
+    .unwrap();
+
+    let resolved =
+        resolve_results_contrast(&design, &ResultsContrast::character("condition", "1", "3"))
+            .unwrap();
+
+    assert_eq!(resolved.numeric, vec![0.0, 0.0, 0.0, -1.0]);
+    assert_eq!(resolved.result_name, "condition_1_vs_3");
+    assert_eq!(
+        resolved.comparison,
+        "factor-level contrast: condition 1 vs 3"
+    );
+    assert_eq!(
+        resolved.all_zero,
+        ResultsContrastAllZero::Character {
+            numerator: "1".into(),
+            denominator: "3".into(),
+        }
+    );
+}
+
+#[test]
+fn results_contrast_list_and_numeric_use_numeric_all_zero_semantics() {
+    let design = named_design();
+
+    let list = resolve_results_contrast(
+        &design,
+        &ResultsContrast::list_with_values(
+            vec!["condition_B_vs_A".into()],
+            vec!["batch_Y_vs_X".into()],
+            0.5,
+            -0.5,
+        ),
+    )
+    .unwrap();
+    assert_eq!(list.numeric, vec![0.0, 0.5, -0.5]);
+    assert_eq!(list.result_name, "contrast");
+    assert_eq!(
+        list.comparison,
+        "coefficient list contrast: 0.5 condition_B_vs_A vs 0.5 batch_Y_vs_X"
+    );
+    assert_eq!(list.all_zero, ResultsContrastAllZero::Numeric);
+
+    let numeric =
+        resolve_results_contrast(&design, &ResultsContrast::numeric(vec![0.0, 1.0, -1.0])).unwrap();
+    assert_eq!(numeric.numeric, vec![0.0, 1.0, -1.0]);
+    assert_eq!(numeric.result_name, "contrast");
+    assert_eq!(numeric.comparison, "primitive numeric contrast");
+    assert_eq!(numeric.all_zero, ResultsContrastAllZero::Numeric);
+}
+
+#[test]
 fn factor_level_contrast_resolves_expanded_shapes() {
     let design = DesignMatrix::from_row_major(
         4,
@@ -422,6 +489,50 @@ fn factor_level_contrast_infers_shared_reference_with_r_like_names() {
         .unwrap(),
         vec![0.0, -1.0, 1.0]
     );
+}
+
+#[test]
+fn factor_level_contrast_infers_shared_reference_without_factor_level_separator() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "Intercept".into(),
+            "conditionB_vs_A".into(),
+            "conditionC_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "C", "B")).unwrap(),
+        vec![0.0, -1.0, 1.0]
+    );
+    assert_eq!(
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "B", "A")).unwrap(),
+        vec![0.0, 1.0, 0.0]
+    );
+}
+
+#[test]
+fn factor_level_contrast_rejects_ambiguous_shared_reference_names() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        4,
+        vec![1.0; 16],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "conditionB_vs_A".into(),
+            "condition_C_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+
+    let err =
+        resolve_contrast(&design, &ContrastSpec::factor_level("condition", "C", "B")).unwrap_err();
+    assert!(err.to_string().contains("resolves ambiguously"));
 }
 
 #[test]
@@ -650,4 +761,6 @@ fn contrast_all_zero_factor_levels_validates_inputs() {
     assert!(contrast_all_zero_factor_levels(&counts, &["A"], "B", "A").is_err());
     assert!(contrast_all_zero_factor_levels(&counts, &["A", "B"], "A", "A").is_err());
     assert!(contrast_all_zero_factor_levels(&counts, &["A", "B"], "", "A").is_err());
+    assert!(contrast_all_zero_factor_levels(&counts, &["A", "A"], "B", "A").is_err());
+    assert!(contrast_all_zero_factor_levels(&counts, &["B", "B"], "B", "A").is_err());
 }

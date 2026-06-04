@@ -244,54 +244,6 @@ fn apply_cli_wald_t_options(
     }
 }
 
-fn cli_factor_level_contrast(
-    factor: Option<String>,
-    numerator: Option<String>,
-    denominator: Option<String>,
-    reference: Option<&str>,
-) -> Result<ContrastSpec, DeseqError> {
-    let supplied = usize::from(factor.is_some())
-        + usize::from(numerator.is_some())
-        + usize::from(denominator.is_some());
-    let (Some(factor), Some(numerator), Some(denominator)) = (factor, numerator, denominator)
-    else {
-        return Err(DeseqError::InvalidDimensions {
-            context: "factor-level contrast inputs".to_string(),
-            expected: 3,
-            actual: supplied,
-        });
-    };
-    Ok(match reference {
-        Some(reference) => {
-            ContrastSpec::factor_level_with_reference(factor, numerator, denominator, reference)
-        }
-        None => ContrastSpec::factor_level(factor, numerator, denominator),
-    })
-}
-
-fn cli_factor_level_contrast_with_samples<'a>(
-    contrast: &'a ContrastSpec,
-    sample_levels: &'a [String],
-) -> Result<FactorLevelContrast<'a>, DeseqError> {
-    match contrast {
-        ContrastSpec::FactorLevel {
-            factor,
-            numerator,
-            denominator,
-            reference,
-        } => Ok(FactorLevelContrast {
-            factor,
-            numerator,
-            denominator,
-            reference: reference.as_deref(),
-            sample_levels,
-        }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: "sample levels require a factor-level contrast".to_string(),
-        }),
-    }
-}
-
 fn read_cli_design_matrix(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,

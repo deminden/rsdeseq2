@@ -4,7 +4,8 @@ use crate::all_zero::{
 };
 use crate::contrasts::{
     contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_coefficient_index,
-    resolve_contrast, ContrastSpec, FactorLevelContrast,
+    resolve_contrast, resolve_results_contrast, ContrastSpec, FactorLevelContrast, ResultsContrast,
+    ResultsContrastAllZero,
 };
 use crate::cooks::{
     calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,

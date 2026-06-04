@@ -716,6 +716,15 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
             &replacement_options,
         )
         .unwrap();
+    let request_output = builder
+        .fit_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            &design,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+            &replacement_options,
+        )
+        .unwrap();
     let (expected_fit, _expected_results) = builder
         .fit_wald_glm_mu_contrast_spec(
             &counts,
@@ -723,9 +732,13 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
             &ContrastSpec::coefficient_name("condition_B_vs_A"),
         )
         .unwrap();
+    let CooksReplacementTestOutput::Wald(request_output) = request_output else {
+        panic!("results contrast request should route to Wald");
+    };
 
     assert_eq!(named_output.refit_plan.n_refit, 0);
     assert_eq!(factor_output.refit_plan.n_refit, 0);
+    assert_eq!(request_output.refit_plan.n_refit, 0);
     assert_wald_fit_state_matches(
         &named_output.original_fit,
         &expected_fit,
@@ -744,6 +757,7 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
         factor_output.results.metadata.comparison.as_deref(),
         Some("factor-level contrast: condition B vs A")
     );
+    assert_eq!(request_output.results, factor_output.results);
 }
 
 #[test]
@@ -1008,6 +1022,15 @@ fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
             &options,
         )
         .unwrap();
+    let request = builder
+        .fit_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            &full_design,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+            &options,
+        )
+        .unwrap();
     let expected = builder
         .fit_lrt_with_results_contrast_with_cooks_replacement(
             &counts,
@@ -1027,8 +1050,12 @@ fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
     let CooksReplacementTestOutput::Lrt(factor) = factor else {
         panic!("factor contrast should route to LRT");
     };
+    let CooksReplacementTestOutput::Lrt(request) = request else {
+        panic!("results contrast request should route to LRT");
+    };
 
     assert_eq!(numeric.results, expected.results);
+    assert_eq!(request.results, factor.results);
     assert_eq!(
         spec.results.metadata.comparison.as_deref(),
         Some("coefficient condition_B_vs_A")
@@ -1254,6 +1281,96 @@ fn native_linear_mu_wald_contrast_specs_set_metadata_and_factor_levels() {
         assert_eq!(named.pvalue, factor.pvalue);
         assert_eq!(named.padj, factor.padj);
     }
+}
+
+#[test]
+fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+    let builder = glm_mu_native_wald_builder().disable_independent_filtering();
+    let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    let (factor_fit, factor_results) = builder
+        .clone()
+        .fit_with_results_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("condition", "B", "A", &levels),
+        )
+        .unwrap();
+    let (character_fit, character_results) = builder
+        .clone()
+        .fit_with_results_contrast_request(
+            &counts,
+            &design,
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+        )
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &character_fit,
+        &factor_fit,
+        "top-level results character contrast request",
+    );
+    assert_eq!(character_results, factor_results);
+
+    let (_numeric_fit, numeric_results) = builder
+        .clone()
+        .fit_with_results_contrast_request(
+            &counts,
+            &design,
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
+            None::<&[String]>,
+        )
+        .unwrap();
+    assert_eq!(
+        numeric_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        numeric_results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+
+    let (_list_fit, list_results) = builder
+        .fit_with_results_contrast_request(
+            &counts,
+            &design,
+            &ResultsContrast::list(vec!["condition_B_vs_A".into()], Vec::new()),
+            None::<&[String]>,
+        )
+        .unwrap();
+    assert_eq!(
+        list_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        list_results.metadata.comparison.as_deref(),
+        Some("coefficient list contrast: condition_B_vs_A effect")
+    );
+}
+
+#[test]
+fn top_level_results_character_contrast_request_requires_sample_levels() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = two_group_design();
+
+    let err = glm_mu_native_wald_builder()
+        .disable_independent_filtering()
+        .fit_with_results_contrast_request(
+            &counts,
+            &design,
+            &ResultsContrast::character("condition", "B", "A"),
+            None::<&[String]>,
+        )
+        .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("requires sample levels for contrastAllZero"));
 }
 
 #[test]

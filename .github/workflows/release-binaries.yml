@@ -1,0 +1,127 @@
+name: Release binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-binaries-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_suffix }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_suffix: linux-x86_64
+            binary_name: rsdeseq2
+            archive_ext: tar.gz
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            asset_suffix: linux-aarch64
+            binary_name: rsdeseq2
+            archive_ext: tar.gz
+          - os: macos-15
+            target: x86_64-apple-darwin
+            asset_suffix: macos-x86_64
+            binary_name: rsdeseq2
+            archive_ext: tar.gz
+          - os: macos-15-arm64
+            target: aarch64-apple-darwin
+            asset_suffix: macos-aarch64
+            binary_name: rsdeseq2
+            archive_ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_suffix: windows-x86_64
+            binary_name: rsdeseq2.exe
+            archive_ext: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Check tag matches crate version
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          crate_version="$(
+            cargo metadata --locked --no-deps --format-version 1 \
+              | python3 -c 'import json, sys; data = json.load(sys.stdin); print(next(package["version"] for package in data["packages"] if package["name"] == "rsdeseq2"))'
+          )"
+          if [ "$tag_version" != "$crate_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match rsdeseq2 crate version $crate_version" >&2
+            exit 1
+          fi
+
+      - name: Build
+        run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
+
+      - name: Stage files
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
+          mkdir -p "dist/${package_dir}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${package_dir}/"
+          cp README.md LICENSE "dist/${package_dir}/"
+
+      - name: Package tarball
+        if: matrix.archive_ext == 'tar.gz'
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
+          tar -C dist -czf "dist/${package_dir}.tar.gz" "${package_dir}"
+
+      - name: Package zip
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $packageDir = "rsdeseq2-$version-${{ matrix.asset_suffix }}"
+          Compress-Archive -Path "dist/$packageDir/*" -DestinationPath "dist/$packageDir.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsdeseq2-${{ github.ref_name }}-${{ matrix.asset_suffix }}
+          path: dist/*.${{ matrix.archive_ext }}
+          if-no-files-found: error
+
+  release:
+    name: Upload GitHub release assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber

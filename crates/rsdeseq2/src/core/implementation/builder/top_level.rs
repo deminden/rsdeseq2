@@ -257,6 +257,50 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run the top-level workflow for a DESeq2 `results(contrast=...)` request.
+    ///
+    /// Character triplet contrasts require one sample level per count-matrix
+    /// column so the Rust core can apply DESeq2's character contrast all-zero
+    /// handling. List and numeric contrasts ignore `sample_levels` and use the
+    /// numeric all-zero rule.
+    pub fn fit_with_results_contrast_request<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_with_results_factor_level_contrast(counts, design, contrast)
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_with_results_contrast_spec(counts, design, &contrast_spec)
+            }
+        }
+    }
+
     /// Run the top-level Wald workflow for a named primitive contrast specification.
     pub fn fit_contrast_spec(
         &self,
@@ -314,6 +358,73 @@ impl DeseqBuilder {
                     design,
                     reduced_design,
                     contrast,
+                    replacement_options,
+                )
+                .map(CooksReplacementTestOutput::Lrt)
+            }
+        }
+    }
+
+    /// Run a DESeq2 `results(contrast=...)` request with limited Cook's replacement refit.
+    pub fn fit_with_test_results_contrast_request_with_cooks_replacement<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self.test {
+            TestType::Wald => match contrast {
+                ResultsContrast::Character {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference,
+                } => {
+                    let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                        reason:
+                            "character results contrast requires sample levels for contrastAllZero"
+                                .to_string(),
+                    })?;
+                    let levels = levels
+                        .iter()
+                        .map(|level| level.as_ref().to_string())
+                        .collect::<Vec<_>>();
+                    let contrast = FactorLevelContrast {
+                        factor,
+                        numerator,
+                        denominator,
+                        reference: reference.as_deref(),
+                        sample_levels: &levels,
+                    };
+                    self.fit_with_results_factor_level_contrast_with_cooks_replacement(
+                        counts,
+                        design,
+                        contrast,
+                        replacement_options,
+                    )
+                    .map(CooksReplacementTestOutput::Wald)
+                }
+                ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                    let contrast_spec = contrast.as_contrast_spec();
+                    self.fit_with_results_contrast_spec_with_cooks_replacement(
+                        counts,
+                        design,
+                        &contrast_spec,
+                        replacement_options,
+                    )
+                    .map(CooksReplacementTestOutput::Wald)
+                }
+            },
+            TestType::Lrt => {
+                let reduced_design = self.reduced_design_for_top_level_lrt()?;
+                self.fit_lrt_with_results_contrast_request_with_cooks_replacement(
+                    counts,
+                    design,
+                    reduced_design,
+                    contrast,
+                    sample_levels,
                     replacement_options,
                 )
                 .map(CooksReplacementTestOutput::Lrt)
@@ -500,6 +611,56 @@ impl DeseqBuilder {
         self.fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
     }
 
+    /// Run the top-level LRT workflow for a DESeq2 `results(contrast=...)` request.
+    pub fn fit_lrt_with_results_contrast_request<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_lrt_with_results_factor_level_contrast(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_lrt_with_results_contrast_spec(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    &contrast_spec,
+                )
+            }
+        }
+    }
+
     /// Run the currently implemented top-level LRT workflow and report a named contrast.
     pub fn fit_lrt_contrast_spec(
         &self,
@@ -618,6 +779,59 @@ impl DeseqBuilder {
             contrast,
             replacement_options,
         )
+    }
+
+    /// Run the currently implemented top-level LRT replacement-refit workflow for a DESeq2 `results(contrast=...)` request.
+    pub fn fit_lrt_with_results_contrast_request_with_cooks_replacement<S: AsRef<str>>(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        contrast: &ResultsContrast,
+        sample_levels: Option<&[S]>,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        match contrast {
+            ResultsContrast::Character {
+                factor,
+                numerator,
+                denominator,
+                reference,
+            } => {
+                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "character results contrast requires sample levels for contrastAllZero"
+                        .to_string(),
+                })?;
+                let levels = levels
+                    .iter()
+                    .map(|level| level.as_ref().to_string())
+                    .collect::<Vec<_>>();
+                let contrast = FactorLevelContrast {
+                    factor,
+                    numerator,
+                    denominator,
+                    reference: reference.as_deref(),
+                    sample_levels: &levels,
+                };
+                self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                let contrast_spec = contrast.as_contrast_spec();
+                self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    &contrast_spec,
+                    replacement_options,
+                )
+            }
+        }
     }
 
     fn reduced_design_for_top_level_lrt(&self) -> Result<&DesignMatrix, DeseqError> {

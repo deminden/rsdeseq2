@@ -1,8 +1,9 @@
 # Benchmarks
 
-The current benchmark suite measures only primitives that have an
-apples-to-apples comparison with original DESeq2. It does not benchmark full
-`DESeq()` because full end-to-end parity is not implemented yet.
+The current benchmark suite measures workflow surfaces with apples-to-apples
+reference comparisons against original DESeq2. It reports CLI-stage timings
+rather than one monolithic `DESeq()` call so each validated stage has its own
+speed, memory, and numeric-parity record.
 
 ## What Is Measured
 
@@ -152,11 +153,11 @@ Primitive parity results at floating-point parity:
 | `normalized-counts` | 5 tissues, 138,321,118 cells | 7.03 s | 693 MiB | `1.19e-07` | `9.74e-15` | 0 |
 | `base-mean` | 5 tissues, 341,286 genes | 1.64 s | 694 MiB | `4.66e-09` | `6.73e-15` | 0 |
 
-The same run also reconstructed one full-blocked real contrast with
-split-estimated size factors and a numeric `perm_block + condition` design.
-The CLI Wald path now applies the implemented Cook's outlier replacement/refit
-stage before final Cook's masking and independent filtering, matching the saved
-reference result shape much more closely:
+The same run also reconstructed a kidney Wald result for the
+`condition_B_vs_A` contrast with design `~ perm_block + condition`, using
+split-estimated size factors. The CLI Wald path applies Cook's
+outlier replacement/refit before final Cook's masking and independent filtering,
+matching the saved reference result shape closely:
 
 | metric | mean abs diff | median abs diff | p99 abs diff | max abs diff | mismatches |
 | --- | ---: | ---: | ---: | ---: | ---: |

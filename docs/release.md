@@ -39,6 +39,12 @@ Crates.io publishing is handled by `.github/workflows/publish-crates.yml`.
 Configure the repository secret `CARGO_REGISTRY_TOKEN` with a crates.io API
 token that can publish `rsdeseq2`.
 
+GitHub Release binaries are handled by
+`.github/workflows/release-binaries.yml`. The workflow builds `rsdeseq2` for
+Linux x86_64, Linux aarch64, macOS x86_64, macOS aarch64, and Windows x86_64,
+packages each binary with the README and license, and uploads the archives to
+the matching GitHub release.
+
 To release version `X.Y.Z`:
 
 1. Set `crates/rsdeseq2/Cargo.toml` to `version = "X.Y.Z"`.
@@ -50,3 +56,5 @@ The GitHub Actions publish job runs formatting, clippy, the full workspace test
 suite, and `cargo package -p rsdeseq2 --locked` before calling
 `cargo publish`. It refuses to publish if the pushed tag version does not match
 the crate version.
+The binary release job performs the same tag/version check before building and
+attaching release assets.

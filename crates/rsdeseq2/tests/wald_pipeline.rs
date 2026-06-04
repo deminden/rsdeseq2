@@ -874,6 +874,128 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_character_contrast_all_ze
 }
 
 #[test]
+fn fixed_dispersion_wald_results_contrast_routes_deseq2_contrast_forms() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        6,
+        vec![
+            0, 0, 0, 0, 50, 60, //
+            10, 12, 30, 36, 50, 60,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "condition_C_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "B", "B", "C", "C"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+
+    let (_fit, character_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_results_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+        )
+        .unwrap();
+    assert_eq!(character_results.rows[0].log2_fold_change, Some(0.0));
+    assert_eq!(character_results.rows[0].pvalue, Some(1.0));
+    assert_eq!(
+        character_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+
+    let (_fit, numeric_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_results_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::numeric(vec![0.0, 1.0, 0.0]),
+            None::<&[String]>,
+        )
+        .unwrap();
+    assert!(numeric_results.rows[0].pvalue.is_some());
+    assert_ne!(numeric_results.rows[0].pvalue, Some(1.0));
+
+    let (_fit, list_results) = builder
+        .fit_fixed_dispersion_wald_results_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::list(
+                vec!["condition_C_vs_A".into()],
+                vec!["condition_B_vs_A".into()],
+            ),
+            None::<&[String]>,
+        )
+        .unwrap();
+    assert_eq!(
+        list_results.metadata.result_name.as_deref(),
+        Some("contrast")
+    );
+    assert_eq!(
+        list_results.metadata.comparison.as_deref(),
+        Some("coefficient list contrast: condition_C_vs_A vs condition_B_vs_A")
+    );
+}
+
+#[test]
+fn fixed_dispersion_wald_results_character_contrast_requires_sample_levels() {
+    let counts = CountMatrix::from_row_major_u32(1, 2, vec![1, 2]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        2,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+
+    let err = DeseqBuilder::new()
+        .size_factors(vec![1.0; 2])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_wald_results_contrast(
+            &counts,
+            &design,
+            &[0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            None::<&[String]>,
+        )
+        .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("requires sample levels for contrastAllZero"));
+}
+
+#[test]
 fn fixed_dispersion_wald_factor_level_contrast_applies_low_count_cooks_gate() {
     let counts = CountMatrix::from_row_major_u32(1, 6, vec![1, 20, 21, 20, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(
@@ -1474,8 +1596,21 @@ fn fixed_dispersion_wald_factor_level_cooks_replacement_preserves_metadata() {
             &options,
         )
         .unwrap();
+    let request = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+            &options,
+        )
+        .unwrap();
 
     assert!(output.refit_plan.n_refit > 0);
+    assert_eq!(request.results, output.results);
     assert_eq!(
         output.results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")

@@ -4,10 +4,13 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 use crate::contrasts::{
-    resolve_coefficient_index, resolve_contrast, ContrastSpec, FactorLevelContrast,
+    resolve_coefficient_index, resolve_contrast, ContrastSpec, ResultsContrast,
 };
 use crate::cooks::{CooksRefitPlan, CooksReplacementOptions};
-use crate::core::{CooksReplacementLrtOutput, CooksReplacementWaldOutput, DeseqBuilder, DeseqFit};
+use crate::core::{
+    CooksReplacementLrtOutput, CooksReplacementTestOutput, CooksReplacementWaldOutput,
+    DeseqBuilder, DeseqFit,
+};
 use crate::design::{
     expanded_additive_design, expanded_additive_factor_design, expanded_factor_design,
     ExpandedFactorSpec, ExpandedNumericSpec,
@@ -36,7 +39,7 @@ use crate::normalization::{
     base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
     normalized_counts_with_factors,
 };
-use crate::options::{CooksCutoff, FitType, SizeFactorMethod};
+use crate::options::{CooksCutoff, FitType, SizeFactorMethod, TestType};
 use crate::results::{
     fit_expanded_additive_beta_prior_wald_contrast_results,
     fit_expanded_additive_beta_prior_wald_contrast_results_with_cooks_replacement,
@@ -337,7 +340,7 @@ enum Commands {
         /// Optional reference level for a coefficient-name factor-level contrast.
         #[arg(long)]
         contrast_reference: Option<String>,
-        /// Optional sample x level TSV for DESeq2-style factor-level all-zero contrast handling.
+        /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
         #[arg(long)]
         contrast_sample_levels: Option<PathBuf>,
         /// Non-negative log2 fold-change threshold for Wald p-values.
@@ -499,7 +502,7 @@ enum Commands {
         /// Optional reference level for a coefficient-name factor-level contrast.
         #[arg(long)]
         contrast_reference: Option<String>,
-        /// Optional sample x level TSV for DESeq2-style factor-level all-zero contrast handling.
+        /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
         #[arg(long)]
         contrast_sample_levels: Option<PathBuf>,
         /// Disable Cook's distance p-value filtering and replacement/refit.
