@@ -98,7 +98,8 @@ nbinomLRTRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
 \item{method}{Size-factor method, either \code{"ratio"} or \code{"poscounts"}.}
 \item{geoMeans}{Optional supplied geometric means, one per gene.}
 \item{controlGenes}{Optional control-gene subset, as logical, numeric, or row-name values.}
-\item{native}{Whether to try the registered native \code{.Call} bridge before falling back to R.}
+\item{native}{Whether to use the registered native \code{.Call} bridge when
+available.}
 \item{sizeFactors}{Positive numeric size factors, one per sample.}
 \item{normalizationFactors}{Positive numeric matrix with the same dimensions as \code{counts}.}
 \item{weights}{Optional finite non-negative observation-weight matrix.}
@@ -143,6 +144,8 @@ Wald tests.}
 primitive Wald p-values.}
 \item{degreesOfFreedom}{Scalar or per-gene t degrees of freedom when
 \code{useT = TRUE}.}
+\item{independentFiltering}{Whether \code{results()} applies the implemented
+independent-filtering helper to primitive result objects.}
 \item{results}{Primitive result data frame containing at least
 \code{baseMean}, \code{pvalue}, and \code{padj}.}
 \item{alpha}{Target FDR threshold for independent-filter rejection counting.}

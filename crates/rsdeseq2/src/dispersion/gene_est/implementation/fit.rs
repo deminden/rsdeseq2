@@ -349,18 +349,41 @@ fn fit_dispersion_line_search_inner(
             break;
         }
 
-        let Some((proposed_log_alpha, effective_kappa)) =
-            bounded_log_alpha_proposal(log_alpha, dlp, kappa, -30.0, 10.0)
-        else {
+        // Keep the proposal and Armijo arithmetic in DESeq2's source order.
+        // One-ULP differences here can flip near-flat high-dispersion rows.
+        let mut proposed_log_alpha = log_alpha + kappa * dlp;
+        if !proposed_log_alpha.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion line-search proposal".to_string(),
+                index: Some(0),
+                value: proposed_log_alpha,
+            });
+        }
+        if proposed_log_alpha < -30.0 {
+            kappa = (-30.0 - log_alpha) / dlp;
+            proposed_log_alpha = log_alpha + kappa * dlp;
+        }
+        if proposed_log_alpha > 10.0 {
+            kappa = (10.0 - log_alpha) / dlp;
+            proposed_log_alpha = log_alpha + kappa * dlp;
+        }
+        if !kappa.is_finite() || kappa <= 0.0 || !proposed_log_alpha.is_finite() {
             break;
-        };
+        }
 
         let theta_kappa = -dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
-        let theta_hat_kappa = checked_line_search_armijo_bound(lp, effective_kappa, epsilon, dlp)?;
+        let theta_hat_kappa = -lp - kappa * epsilon * dlp * dlp;
+        if !theta_hat_kappa.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "dispersion line-search Armijo bound".to_string(),
+                index: Some(0),
+                value: theta_hat_kappa,
+            });
+        }
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            let lp_new = dispersion_log_posterior_objective(objective, log_alpha)?;
+            let lp_new = dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
             last_change = checked_sub(
                 lp_new,
                 lp,
@@ -375,12 +398,12 @@ fn fit_dispersion_line_search_inner(
                 break;
             }
             dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
-            kappa = (effective_kappa * 1.1).min(options.kappa_0);
+            kappa = (kappa * 1.1).min(options.kappa_0);
             if iter_accept.is_multiple_of(5) {
                 kappa /= 2.0;
             }
         } else {
-            kappa = effective_kappa / 2.0;
+            kappa /= 2.0;
         }
     }
 
@@ -402,6 +425,7 @@ fn fit_dispersion_line_search_inner(
     })
 }
 
+#[cfg(test)]
 fn bounded_log_alpha_proposal(
     log_alpha: f64,
     direction: f64,
@@ -424,8 +448,11 @@ fn bounded_log_alpha_proposal(
         .ok()
         .and_then(|movement| {
             checked_add(log_alpha, movement, 0, "dispersion line-search proposal").ok()
-        })?;
+    })?;
     let clamped = unclamped.clamp(lower, upper);
+    if clamped == unclamped {
+        return Some((unclamped, step));
+    }
     let effective_step = checked_sub(
         clamped,
         log_alpha,
@@ -449,20 +476,26 @@ fn bounded_log_alpha_proposal(
     }
 }
 
+#[cfg(test)]
 fn checked_line_search_armijo_bound(
     lp: f64,
     effective_kappa: f64,
     epsilon: f64,
     dlp: f64,
 ) -> Result<f64, DeseqError> {
-    let dlp_square = checked_mul(dlp, dlp, 0, "dispersion line-search Armijo slope square")?;
-    let scaled_slope = checked_mul(
+    let scaled_direction = checked_mul(
         effective_kappa,
         epsilon,
         0,
         "dispersion line-search Armijo scale",
+    )?;
+    let scaled_slope = checked_mul(
+        scaled_direction,
+        dlp,
+        0,
+        "dispersion line-search Armijo scale",
     )
-    .and_then(|scale| checked_mul(scale, dlp_square, 0, "dispersion line-search Armijo scale"))?;
+    .and_then(|scale| checked_mul(scale, dlp, 0, "dispersion line-search Armijo scale"))?;
     checked_sub(-lp, scaled_slope, 0, "dispersion line-search Armijo bound")
 }
 

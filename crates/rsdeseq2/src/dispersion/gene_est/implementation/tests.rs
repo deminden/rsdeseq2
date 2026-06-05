@@ -45,7 +45,7 @@ mod tests {
         assert!(matches!(
             err,
             DeseqError::NonFiniteValue { context, index, .. }
-                if context == "dispersion line-search Armijo slope square" && index == Some(0)
+                if context == "dispersion line-search Armijo scale" && index == Some(0)
         ));
     }
 
@@ -150,6 +150,53 @@ mod tests {
 
         assert!(derivative.is_finite());
         assert!(second_derivative.is_finite());
+    }
+
+    #[test]
+    fn dispersion_digamma_matches_r_positive_path() {
+        let cases = [
+            (5.845_272_899_427_574, 1.677_662_134_240_236_7),
+            (6.845_272_899_427_574, 1.848_740_545_326_557_3),
+            (15.845_272_899_427_574, 2.730_984_286_464_481_8),
+            (100_005.845_272_899_43, 11.512_978_916_274_841),
+            (0.125, -8.388_492_663_295_855),
+            (0.5, -1.963_510_026_021_423),
+            (1.0, -0.577_215_664_901_532_3),
+            (8.75, 2.110_823_820_758_861_7),
+            (9.0, 2.140_641_477_955_61),
+            (100_000_000.0, 18.420_680_738_952_367),
+            (1.0e18, 41.446_531_673_892_82),
+        ];
+
+        for (x, expected) in cases {
+            assert_relative_eq!(
+                dispersion_digamma(x),
+                expected,
+                epsilon = 2e-15,
+                max_relative = 2e-15
+            );
+        }
+    }
+
+    #[test]
+    fn dispersion_lgamma_matches_r_stirling_thresholds() {
+        let cases = [
+            (10.5, 13.940_625_219_403_763),
+            (11.0, 15.104_412_573_075_52),
+            (100.0, 359.134_205_369_575_4),
+            (4_934_721.0, 71_118_238.355_323_93),
+            (100_000_000.0, 1_742_068_066.103_834_9),
+            (1.0e18, 4.044_653_167_389_282e19),
+        ];
+
+        for (x, expected) in cases {
+            assert_relative_eq!(
+                dispersion_lgamma(x),
+                expected,
+                epsilon = 1e-12,
+                max_relative = 1e-15
+            );
+        }
     }
 
     #[test]

@@ -13,7 +13,10 @@ get_arg <- function(name, default = NULL) {
   args[hit[length(hit)] + 1]
 }
 
-study_root <- get_arg("--study-root", "/home/den/bio/rsfgsea/results/decor_method_study")
+study_root <- get_arg("--study-root", Sys.getenv("RSDESEQ2_REAL_DATA_ROOT", unset = NA_character_))
+if (is.na(study_root) || !nzchar(study_root)) {
+  stop("provide --study-root or set RSDESEQ2_REAL_DATA_ROOT", call. = FALSE)
+}
 out_dir <- get_arg("--output-dir", "results/fixtures/real_optimizer_locfit_2026-05-31")
 tissue <- get_arg("--tissue", "kidney")
 null_type <- get_arg("--null-type", "full_blocked_permutation")

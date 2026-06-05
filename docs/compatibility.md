@@ -487,14 +487,26 @@ fixtures still use
 `forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
 bounded fallback where DESeq2 is installed locally.
 
+`scripts/analyze_parity_mismatch_sources.py` joins the current real-data
+diagnostics with offline optimizer fixture summaries to separate first-stage
+beta differences from downstream statistic and adjusted-p-value amplification.
+On the current hard contrast, the largest local tail rows are optimizer-beta
+target rows: for the worst row, Rust differs from the offline DESeq2 optimizer
+target by the full `7.70e-04` log2-fold-change gap, while the saved reference is
+within `4.66e-08` of that target. The next most useful parity work is therefore
+the exact L-BFGS-B wrapper/Fortran behavior for routed beta rows. The secondary
+non-optimizer target is now isolated to MAP dispersion line-search sensitivity
+in a small set of high-dispersion rows; adjusted-p-value maxima mostly reflect
+Benjamini-Hochberg propagation from upstream p-value tail rows.
+
 ## Missing
 
 - Mature wrapper-facing interface around the Rust core.
 - Complete formula parsing in Rust, including orthogonal `poly()`, arbitrary R
   expressions, splines, and full R-compatible formula semantics.
 - Full DESeq2 dispersion estimation, including broader weighted dispersion
-  edge-case parity, broader synthetic `locfit` edge-case parity, glmGamPoi trend type,
-  and production-ready end-to-end dispersion parity.
+  edge-case parity, broader synthetic `locfit` edge-case parity, glmGamPoi trend
+  type, and end-to-end dispersion parity across more designs.
 - High-level propagation of observation-weight `weights_fail` flags through
   complete DESeq2-like builder and future wrapper workflows.
 - Direct weighted low-level `fitNbinomGLMs` parity for rows that DESeq2 marks
@@ -599,6 +611,26 @@ should therefore compare rough/moments starts, objective values, prior
 objective values, trend coefficients, `dispFit`, `dispPriorVar`, `dispMAP`,
 `dispOutlier`, line-search diagnostics including `last_dlp`/`last_d2lp`, and
 grid fallback behavior before full result-table comparison.
+
+The current hard no-optimizer standard-error tail has been isolated with
+`scripts/generate_se_covariance_hard_fixtures.R`. When DESeq2's final MAP
+dispersions are supplied to the fixed-dispersion GLM, `betaSE` matches at
+machine precision (`1.44e-15` max absolute difference on the 48-row focused
+fixture). A compact tracked regression,
+`hard_high_dispersion_fixed_dispersions_match_deseq2_se_covariance`, replays
+`JUN`, `ANKLE2`, and `ASAP3` from that fixture with final dispersions injected
+and checks beta, `betaSE`, fitted means, and hat diagonals at tight tolerances.
+The remaining tail is therefore MAP dispersion line-search sensitivity. Initial
+MAP derivatives already match tightly (`2.96e-14` max absolute difference),
+accepted-step counts match on all focused rows, and DESeq2-shaped plain
+NB-likelihood accumulation, a large-positive Stirling log-gamma branch, and an
+R-shaped positive digamma path for likelihood derivatives reduce the median
+focused `dispMAP` difference to `4.72e-16` and the maximum to `2.31e-07`. The
+MAP posterior uses plain source-order addition for DESeq2-like Armijo boundary
+behavior; this drops the focused line-search iteration-count mismatches from
+13/48 to 4/48 while keeping accepted-step counts matched for all focused rows.
+The remaining differences are in final near-boundary Armijo history and final
+`log(alpha)`, not covariance code.
 
 Rust `controlGenes` can be provided as zero-based indices or a logical mask.
 DESeq2 numeric control genes are one-based because they are R indices.

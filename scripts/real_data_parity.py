@@ -30,12 +30,7 @@ from typing import Iterable
 import numpy as np
 
 
-DEFAULT_STUDY_ROOT = Path(
-    os.environ.get(
-        "RSDESEQ2_REAL_DATA_ROOT",
-        "/home/den/bio/decor_method_study",
-    )
-)
+DEFAULT_STUDY_ROOT = os.environ.get("RSDESEQ2_REAL_DATA_ROOT")
 
 
 @dataclass
@@ -700,6 +695,10 @@ def main() -> None:
     parser.add_argument("--diagnostics-limit", type=int, default=100)
     parser.add_argument("--keep-workdir", action="store_true")
     args = parser.parse_args()
+
+    if args.study_root is None:
+        raise SystemExit("provide --study-root or set RSDESEQ2_REAL_DATA_ROOT")
+    args.study_root = Path(args.study_root)
 
     if not args.binary.exists():
         resolved = shutil.which(str(args.binary))

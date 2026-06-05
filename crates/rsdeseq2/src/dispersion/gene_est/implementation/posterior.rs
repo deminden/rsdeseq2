@@ -117,31 +117,31 @@ fn dispersion_log_posterior_objective(
         log_alpha,
         input.weights,
     )?;
-    let posterior = if input.use_cox_reid {
+    let mut posterior = likelihood;
+    if input.use_cox_reid {
         let Some(design) = input.design else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "Cox-Reid dispersion objective requires a design matrix".to_string(),
             });
         };
-        checked_scaled_sum(
-            &[
-                likelihood,
-                cox_reid_adjustment_weighted_with_threshold(
-                    design,
-                    input.mu,
-                    log_alpha,
-                    input.weights,
-                    input.weight_threshold,
-                )?,
-            ],
+        posterior = checked_add(
+            posterior,
+            cox_reid_adjustment_weighted_with_threshold(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+            )?,
+            0,
             "dispersion log posterior Cox-Reid sum",
-        )?
-    } else {
-        likelihood
-    };
+        )?;
+    }
     if let Some(prior) = input.prior {
-        checked_scaled_sum(
-            &[posterior, dispersion_prior_log_density(log_alpha, prior)?],
+        checked_add(
+            posterior,
+            dispersion_prior_log_density(log_alpha, prior)?,
+            0,
             "dispersion log posterior prior sum",
         )
     } else {
@@ -221,31 +221,31 @@ fn dispersion_log_posterior_derivative_objective(
         log_alpha,
         input.weights,
     )?;
-    let derivative = if input.use_cox_reid {
+    let mut derivative = likelihood;
+    if input.use_cox_reid {
         let Some(design) = input.design else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "Cox-Reid dispersion derivative requires a design matrix".to_string(),
             });
         };
-        checked_scaled_sum(
-            &[
-                likelihood,
-                cox_reid_adjustment_derivative_weighted_with_threshold(
-                    design,
-                    input.mu,
-                    log_alpha,
-                    input.weights,
-                    input.weight_threshold,
-                )?,
-            ],
+        derivative = checked_add(
+            derivative,
+            cox_reid_adjustment_derivative_weighted_with_threshold(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+            )?,
+            0,
             "dispersion log posterior derivative Cox-Reid sum",
-        )?
-    } else {
-        likelihood
-    };
+        )?;
+    }
     if let Some(prior) = input.prior {
-        checked_scaled_sum(
-            &[derivative, dispersion_prior_derivative(log_alpha, prior)?],
+        checked_add(
+            derivative,
+            dispersion_prior_derivative(log_alpha, prior)?,
+            0,
             "dispersion log posterior derivative prior sum",
         )
     } else {

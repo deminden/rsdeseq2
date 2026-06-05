@@ -30,21 +30,54 @@ Detailed status lives in
 ## Real-Data Parity
 
 README benchmarks are shown only for outputs with matching DESeq2 1.46.0
-reference checks. The real-data parity sweep uses five publication-data tissues
-for normalization outputs and one kidney Wald contrast for the full result-table
-path.
+reference checks. The real-data parity sweep uses GTEx tissue count matrices:
+five tissues for normalization outputs, plus one kidney null-split condition
+contrast for the full Wald result-table path. DESeq2 reference outputs are
+generated offline and read back as fixtures.
 
-| workflow | reference case | coverage | runtime / peak RSS | precision |
-| --- | --- | ---: | ---: | --- |
-| `size-factors` | five tissues | 1,998 samples | 1.55 s / 237 MiB | max abs `2.62e-14`, max rel `1.99e-14`, 0 mismatches |
-| `normalized-counts` | five tissues | 138,321,118 count cells | 7.03 s / 693 MiB | max abs `1.19e-07`, max rel `9.74e-15`, 0 mismatches |
-| `base-mean` | five tissues | 341,286 genes | 1.64 s / 694 MiB | max abs `4.66e-09`, max rel `6.73e-15`, 0 mismatches |
-| `wald-results` | kidney Wald contrast `condition_B_vs_A` with design `~ perm_block + condition` | 65,580 genes, 78 samples | 151.0 s / 610 MiB | largest max abs `1.25e-03` (`stat`), 0 mismatches |
-| `local-dispersion-trend` | publication-data local trend fixture | 64,344 finite fitted values | fixture check | median rel `3.74e-13`, p99 rel `5.85e-12`, max rel `1.47e-11` |
+| workflow | reference case | coverage | runtime / peak RSS |
+| --- | --- | ---: | ---: |
+| `size-factors` | five tissues | 1,998 samples | 1.55 s / 237 MiB |
+| `normalized-counts` | five tissues | 138,321,118 count cells | 7.03 s / 693 MiB |
+| `base-mean` | five tissues | 341,286 genes | 1.64 s / 694 MiB |
+| `wald-results` | kidney Wald contrast `condition_B_vs_A`, design `~ perm_block + condition` | 65,580 genes, 78 samples | 151.0 s / 610 MiB |
+| `local-dispersion-trend` | GTEx local trend fixture | 64,344 finite fitted values | fixture check |
 
 The Wald result row includes Cook's outlier replacement/refit, final Cook's
 masking, and independent filtering; the full per-column Wald precision table is
 in [docs/benchmarks.md][benchmarks].
+
+Full-run normalization outputs:
+
+| workflow | max abs diff | max rel diff | mismatches |
+| --- | ---: | ---: | ---: |
+| `size-factors` | `2.62e-14` | `1.99e-14` | 0 |
+| `normalized-counts` | `1.19e-07` | `9.74e-15` | 0 |
+| `base-mean` | `4.66e-09` | `6.73e-15` | 0 |
+
+Local dispersion trend fixture:
+
+| median rel diff | p99 rel diff | max rel diff |
+| ---: | ---: | ---: |
+| `3.74e-13` | `5.85e-12` | `1.47e-11` |
+
+Remaining full Wald-result numeric tails:
+
+| metric | mean abs | median abs | p99 abs |
+| --- | ---: | ---: | ---: |
+| `log2FoldChange` | `2.17e-08` | `3.77e-14` | `3.33e-12` |
+| `lfcSE` | `1.57e-10` | `2.33e-12` | `1.66e-10` |
+| `stat` | `3.19e-08` | `6.07e-12` | `3.44e-11` |
+| `pvalue` | `3.64e-09` | `3.03e-12` | `4.20e-11` |
+| `padj` | `2.12e-08` | `0` | `7.87e-11` |
+
+| metric | p99.9 abs | max abs |
+| --- | ---: | ---: |
+| `log2FoldChange` | `7.70e-04` | `7.70e-04` |
+| `lfcSE` | `8.26e-07` | `8.26e-07` |
+| `stat` | `1.25e-03` | `1.25e-03` |
+| `pvalue` | `6.50e-05` | `6.50e-05` |
+| `padj` | `4.50e-05` | `4.50e-05` |
 
 ## Rust Usage
 

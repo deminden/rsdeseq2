@@ -3,20 +3,18 @@
 No production release should claim DESeq2 parity until stage-by-stage reference
 tests cover the implemented statistical pipeline.
 
-## First WIP Commit Checklist
+## Pre-Release Checklist
 
-The first public commit may be published as an experimental foundation if it is
-clearly labeled work in progress and does not claim DESeq2 compatibility beyond
-the tested primitive stages.
+Before preparing a release commit:
 
-Before the first commit:
-
-- Keep the local DESeq2 inspection clone under ignored `external/`.
-- Keep Rust `target/`, generated archives/native objects,
-  and generated parity/benchmark outputs out of git.
-- Keep the README warning that the package is not production-ready.
-- Run Rust formatting, linting, and tests.
-- Review staged files for accidental large artifacts or generated references.
+- Keep local DESeq2 inspection clones under ignored `external/`.
+- Keep Rust `target/`, generated archives/native objects, and generated
+  parity/benchmark outputs out of git.
+- Keep the README scoped to validated workflows and avoid claiming full DESeq2
+  workflow parity.
+- Run Rust formatting, linting, tests, package checks, and R wrapper checks.
+- Review staged files for accidental large artifacts or generated local
+  references.
 
 Before any release:
 
