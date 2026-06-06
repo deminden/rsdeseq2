@@ -33,12 +33,12 @@ jobs:
             asset_suffix: linux-aarch64
             binary_name: rsdeseq2
             archive_ext: tar.gz
-          - os: macos-15
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             asset_suffix: macos-x86_64
             binary_name: rsdeseq2
             archive_ext: tar.gz
-          - os: macos-15-arm64
+          - os: macos-15
             target: aarch64-apple-darwin
             asset_suffix: macos-aarch64
             binary_name: rsdeseq2
