@@ -1473,6 +1473,40 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
         ]
     );
 
+    let named_transforms = expanded_formula_design_with_offsets_from_model_frame(
+        "~ condition + I(x=dose + 1) + log(x=dose, base=2) + scale(x=dose, center=FALSE, scale=FALSE) + poly(x=dose, degree=2) + offset(I(x=offset_log + dose))",
+        &model_frame,
+    )
+    .unwrap();
+    assert_eq!(named_transforms.offsets, vec![1.1, 2.2, 4.3],);
+    assert_eq!(
+        named_transforms
+            .design
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "dose_plus_1".to_string(),
+            "dose_log_base_2".to_string(),
+            "dose_identity".to_string(),
+            "poly(dose, 2)1".to_string(),
+            "poly(dose, 2)2".to_string(),
+        ]
+    );
+    for (sample, dose) in [1.0_f64, 2.0, 4.0].iter().copied().enumerate() {
+        let row = named_transforms
+            .design
+            .standard_design
+            .matrix()
+            .row(sample)
+            .unwrap();
+        assert_eq!(row[2], dose + 1.0);
+        assert!((row[3] - dose.log2()).abs() < 1e-12);
+        assert_eq!(row[4], dose);
+    }
+
     let duplicate = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -2737,6 +2771,7 @@ fn expanded_formula_design_supports_numeric_binary_arithmetic_transform() {
     ];
     let dose = [1.0_f64, 2.0, 4.0, 8.0];
     let time = [1.0_f64, 2.0, 3.0, 4.0];
+    let dose_over_time = [1.0_f64, 1.0, 4.0 / 3.0, 2.0];
     let factors = [ExpandedFactorSpec {
         factor: "condition",
         sample_levels: &condition,
@@ -2751,6 +2786,10 @@ fn expanded_formula_design_supports_numeric_binary_arithmetic_transform() {
         ExpandedNumericSpec {
             name: "time",
             values: &time,
+        },
+        ExpandedNumericSpec {
+            name: "dose/time",
+            values: &dose_over_time,
         },
     ];
 
@@ -2784,6 +2823,28 @@ fn expanded_formula_design_supports_numeric_binary_arithmetic_transform() {
         .standard_design
         .coefficient_index("condition_B_vs_A:dose_plus_time")
         .is_ok());
+
+    let named_x = expanded_formula_design(
+        "~ I(x=dose) + I(x=dose + 1) + I(x=`dose/time`)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        named_x.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_identity".to_string(),
+            "dose_plus_1".to_string(),
+            "dose/time_identity".to_string(),
+        ]
+    );
+    for (sample, dose_value) in dose.iter().copied().enumerate() {
+        let row = named_x.standard_design.matrix().row(sample).unwrap();
+        assert_eq!(row[1], dose_value);
+        assert_eq!(row[2], dose_value + 1.0);
+        assert_eq!(row[3], numeric[2].values[sample]);
+    }
 
     let removed = expanded_formula_design(
         "~ condition + I(dose + time) - I(dose + time)",
@@ -2872,6 +2933,41 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
         .coefficient_index("condition_B_vs_A:dose_log2")
         .is_ok());
 
+    let named_function_args = expanded_formula_design(
+        "~ log(x=dose) + log(dose, base=2) + log(x=dose, base=10) + log(dose, 4) + log2(x=dose) + sqrt(x=dose)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        named_function_args
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_log".to_string(),
+            "dose_log_base_2".to_string(),
+            "dose_log_base_10".to_string(),
+            "dose_log_base_4".to_string(),
+            "dose_log2".to_string(),
+            "dose_sqrt".to_string(),
+        ]
+    );
+    for (sample, value) in dose.iter().copied().enumerate() {
+        let row = named_function_args
+            .standard_design
+            .matrix()
+            .row(sample)
+            .unwrap();
+        assert_eq!(row[1], value.ln());
+        assert!((row[2] - value.log2()).abs() < 1e-12);
+        assert!((row[3] - value.log10()).abs() < 1e-12);
+        assert!((row[4] - value.log(4.0)).abs() < 1e-12);
+        assert_eq!(row[5], value.log2());
+        assert_eq!(row[6], value.sqrt());
+    }
+
     let removed =
         expanded_formula_design("~ condition + sqrt(dose) - sqrt(dose)", &factors, &numeric)
             .unwrap();
@@ -2934,6 +3030,35 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
             .unwrap();
         assert_eq!(row[1], value);
         assert!((row[2] - value / rms).abs() < 1e-12);
+    }
+
+    let named_x_scaled_options = expanded_formula_design(
+        "~ scale(x=dose) + scale(x=dose, center=FALSE, scale=FALSE) + scale(center=FALSE, x=dose, scale=TRUE)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        named_x_scaled_options
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_scale".to_string(),
+            "dose_identity".to_string(),
+            "dose_scale_uncentered".to_string(),
+        ]
+    );
+    for (sample, value) in dose.iter().copied().enumerate() {
+        let row = named_x_scaled_options
+            .standard_design
+            .matrix()
+            .row(sample)
+            .unwrap();
+        assert!((row[1] - ((value - mean) / sd)).abs() < 1e-12);
+        assert_eq!(row[2], value);
+        assert!((row[3] - value / rms).abs() < 1e-12);
     }
 
     let scaled_constants = expanded_formula_design(
@@ -3028,6 +3153,54 @@ fn expanded_formula_design_transform_parser_handles_nested_parentheses_and_quote
         let row = design.standard_design.matrix().row(sample).unwrap();
         assert_eq!(row[1], value.log2());
         assert_eq!(row[2], value + 1.0);
+    }
+
+    let literal_log = [1.0_f64, 3.0, 5.0, 7.0];
+    let literal_poly = [2.0_f64, 4.0, 6.0, 8.0];
+    let literal_identity = [0.5_f64, 1.5, 2.5, 3.5];
+    let equals_name = [1.0_f64, 2.0, 3.0, 4.0];
+    let literal_numeric = [
+        ExpandedNumericSpec {
+            name: "log2(dose)",
+            values: &literal_log,
+        },
+        ExpandedNumericSpec {
+            name: "poly(dose, 2)",
+            values: &literal_poly,
+        },
+        ExpandedNumericSpec {
+            name: "I(dose + 1)",
+            values: &literal_identity,
+        },
+        ExpandedNumericSpec {
+            name: "dose=a",
+            values: &equals_name,
+        },
+    ];
+    let literal = expanded_formula_design(
+        "~ `log2(dose)` + `poly(dose, 2)` + `I(dose + 1)` + log2(`dose=a`) + scale(`dose=a`, FALSE, FALSE)",
+        &factors,
+        &literal_numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        literal.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "log2(dose)".to_string(),
+            "poly(dose, 2)".to_string(),
+            "I(dose + 1)".to_string(),
+            "dose=a_log2".to_string(),
+            "dose=a_identity".to_string(),
+        ]
+    );
+    for sample in 0..literal_log.len() {
+        let row = literal.standard_design.matrix().row(sample).unwrap();
+        assert_eq!(row[1], literal_log[sample]);
+        assert_eq!(row[2], literal_poly[sample]);
+        assert_eq!(row[3], literal_identity[sample]);
+        assert_eq!(row[4], equals_name[sample].log2());
+        assert_eq!(row[5], equals_name[sample]);
     }
 }
 
@@ -3126,6 +3299,10 @@ fn expanded_formula_design_supports_raw_polynomial_transforms() {
         ]
     );
 
+    let named_x =
+        expanded_formula_design("~ poly(x=dose, degree=2, raw=TRUE)", &factors, &numeric).unwrap();
+    assert_eq!(named_x, named_order);
+
     let removed = expanded_formula_design(
         "~ condition + poly(dose, 2, raw=TRUE) - poly(dose, 2, raw=TRUE)",
         &factors,
@@ -3134,6 +3311,130 @@ fn expanded_formula_design_supports_raw_polynomial_transforms() {
     .unwrap();
     let expected = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
     assert_eq!(removed, expected);
+}
+
+#[test]
+fn expanded_formula_design_supports_orthogonal_polynomial_transforms() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0_f64, 1.0, 2.0, 3.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+        levels: None,
+    }];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let design =
+        expanded_formula_design("~ condition + poly(dose, 3)", &factors, &numeric).unwrap();
+    assert_eq!(
+        design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "condition_B_vs_A".to_string(),
+            "poly(dose, 3)1".to_string(),
+            "poly(dose, 3)2".to_string(),
+            "poly(dose, 3)3".to_string(),
+        ]
+    );
+    let expected = [
+        -0.6708203932499369,
+        0.5,
+        -0.22360679774997888,
+        -0.22360679774997896,
+        -0.5,
+        0.6708203932499369,
+        0.22360679774997896,
+        -0.5,
+        -0.6708203932499369,
+        0.6708203932499369,
+        0.5,
+        0.22360679774997896,
+    ];
+    for (row_idx, row) in design
+        .standard_design
+        .matrix()
+        .as_slice()
+        .chunks_exact(5)
+        .enumerate()
+    {
+        for (observed, expected) in row[2..].iter().zip(&expected[row_idx * 3..row_idx * 3 + 3]) {
+            assert!((observed - expected).abs() < 1e-12);
+        }
+    }
+
+    let raw_false =
+        expanded_formula_design("~ poly(dose, degree=2, raw=FALSE)", &factors, &numeric).unwrap();
+    let default = expanded_formula_design("~ poly(dose, degree=2)", &factors, &numeric).unwrap();
+    assert_eq!(raw_false, default);
+
+    let named_x = expanded_formula_design("~ poly(x=dose, degree=2)", &factors, &numeric).unwrap();
+    assert_eq!(named_x, default);
+    let reordered_named =
+        expanded_formula_design("~ poly(degree=2, x=dose)", &factors, &numeric).unwrap();
+    assert_eq!(reordered_named, default);
+    let simple =
+        expanded_formula_design("~ poly(dose, 2, simple=TRUE)", &factors, &numeric).unwrap();
+    assert_eq!(simple, default);
+
+    let interaction = expanded_formula_design(
+        "~ condition + poly(dose, 2) + condition:poly(dose, 2)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert!(interaction
+        .standard_design
+        .coefficient_index("condition_B_vs_A:poly(dose, 2)1")
+        .is_ok());
+    assert!(interaction
+        .standard_design
+        .coefficient_index("condition_B_vs_A:poly(dose, 2)2")
+        .is_ok());
+
+    let removed = expanded_formula_design(
+        "~ condition + poly(dose, 2) - poly(dose, 2)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    let expected_removed = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
+    assert_eq!(removed, expected_removed);
+
+    let repeated_dose = [0.0_f64, 0.0, 1.0, 2.0];
+    let repeated_numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &repeated_dose,
+    }];
+    let repeated = expanded_formula_design("~ poly(dose, 2)", &[], &repeated_numeric).unwrap();
+    let repeated_expected = [
+        -0.45226701686664544,
+        0.21320071635561041,
+        -0.45226701686664544,
+        0.21320071635561041,
+        0.15075567228888181,
+        -0.8528028654224417,
+        0.753778361444409,
+        0.4264014327112208,
+    ];
+    for (observed, expected) in repeated
+        .standard_design
+        .matrix()
+        .as_slice()
+        .chunks_exact(3)
+        .flat_map(|row| row[1..].iter())
+        .zip(repeated_expected)
+    {
+        assert!((observed - expected).abs() < 1e-12);
+    }
 }
 
 #[test]
@@ -3220,7 +3521,7 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
     ];
 
     let transformed = expanded_formula_design_with_offsets(
-        "~ condition + offset(log2(dose)) + offset(I(dose + `exposure value`))",
+        "~ condition + offset(log2(dose)) + offset(I(x=dose + `exposure value`))",
         &factors,
         &numeric,
     )
@@ -3246,6 +3547,20 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
     )
     .unwrap();
     assert_eq!(scaled.offsets, dose);
+
+    let named_transform_offsets = expanded_formula_design_with_offsets(
+        "~ offset(log(x=dose, base=2)) + offset(scale(x=`exposure value`, center=FALSE, scale=FALSE))",
+        &[],
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        named_transform_offsets.offsets,
+        dose.iter()
+            .zip(exposure.iter())
+            .map(|(dose, exposure)| dose.log2() + exposure)
+            .collect::<Vec<_>>()
+    );
 
     assert!(expanded_formula_design_with_offsets(
         "~ offset(poly(dose, 2, raw=TRUE))",
@@ -3314,6 +3629,7 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ I(dose^x)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose^32)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose + missing)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ I(y=dose)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose / 0)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(1 / dose)", &factors, &numeric).is_err());
     assert!(
@@ -3321,6 +3637,12 @@ fn expanded_formula_design_validates_unsupported_terms() {
     );
     assert!(expanded_formula_design("~ log(missing)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ log(dose + 1)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ log(dose, base=1)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ log(dose, base=-2)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ log(dose, base=maybe)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ log(x=dose, x=dose)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ log2(dose, base=2)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ sqrt(dose, extra=1)", &factors, &numeric).is_err());
     assert!(expanded_formula_design(
         "~ log1p(dose)",
         &factors,
@@ -3339,6 +3661,17 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ scale(dose, scale=-1)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, raw=TRUE)", &factors, &numeric).is_err());
     assert!(expanded_formula_design(
+        "~ scale(dose, center=FALSE, center=TRUE)",
+        &factors,
+        &numeric
+    )
+    .is_err());
+    assert!(
+        expanded_formula_design("~ scale(dose, scale=FALSE, scale=TRUE)", &factors, &numeric)
+            .is_err()
+    );
+    assert!(expanded_formula_design("~ scale(x=dose, x=dose)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design(
         "~ scale(dose)",
         &factors,
         &[ExpandedNumericSpec {
@@ -3347,10 +3680,31 @@ fn expanded_formula_design_validates_unsupported_terms() {
         }]
     )
     .is_err());
-    assert!(expanded_formula_design("~ poly(dose, 2)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design(
+        "~ poly(dose, 2)",
+        &factors,
+        &[ExpandedNumericSpec {
+            name: "dose",
+            values: &[0.0, 0.0],
+        }]
+    )
+    .is_err());
     assert!(expanded_formula_design("~ poly(dose, x, raw=TRUE)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ poly(dose, 32, raw=TRUE)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ poly(missing, 2, raw=TRUE)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ poly(dose, 2, coefs=1)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ poly(dose, 2, simple=maybe)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ poly(dose, 2, raw=maybe)", &factors, &numeric).is_err());
+    assert!(
+        expanded_formula_design("~ poly(x=dose, x=dose, degree=2)", &factors, &numeric).is_err()
+    );
+    assert!(
+        expanded_formula_design("~ poly(dose, degree=2, degree=3)", &factors, &numeric).is_err()
+    );
+    assert!(
+        expanded_formula_design("~ poly(dose, 2, raw=TRUE, raw=FALSE)", &factors, &numeric)
+            .is_err()
+    );
     assert!(
         expanded_formula_design_with_offsets("~ condition - offset(dose)", &factors, &numeric)
             .is_err()

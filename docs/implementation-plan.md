@@ -241,12 +241,20 @@ reference; no DESeq2 source is vendored or translated line by line.
   matching subtraction.
 - [x] Primitive `I(numeric^k)` formula transforms for finite integer powers,
   materialized as derived numeric covariates in formula-expanded designs.
+- [x] Primitive `I(x=numeric)` named-argument identity/arithmetic transform
+  routing for supported `I()` formula expressions.
 - [x] Primitive raw polynomial formula transforms
   `poly(numeric, degree, raw=TRUE)`, materialized as derived numeric
   covariates in formula-expanded designs.
+- [x] Primitive default orthogonal polynomial formula transforms
+  `poly(numeric, degree)` and `poly(numeric, degree, raw=FALSE)`,
+  materialized as orthonormal derived numeric covariates in formula-expanded
+  designs, including positional or named `x`, `degree`, `raw`, and `simple`
+  arguments.
 - [x] Primitive common numeric function transforms in formulas: `log`,
   `log2`, `log10`, `log1p`, `sqrt`, and `scale` of supplied numeric covariates,
-  including named or positional `center`/`scale` arguments for `scale()`.
+  including named `x` for scalar transforms, scalar `log()` `base` arguments,
+  and named or positional `center`/`scale` arguments for `scale()`.
 - [x] Primitive `offset(numeric)` and single-vector supported transform offset
   formula extraction, such as `offset(log2(numeric))` and
   `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors
@@ -276,8 +284,8 @@ reference; no DESeq2 source is vendored or translated line by line.
   paths.
 - [x] Preserve optional observation weights through primitive expanded
   beta-prior replacement-count refits.
-- [ ] Orthogonal `poly()`, splines, arbitrary R expression transforms, and
-  complete formula-aware expanded model matrix construction.
+- [ ] Splines, arbitrary R expression transforms, and complete formula-aware
+  expanded model matrix construction.
 - [x] Default Wald statistic/p-value for a selected coefficient.
 - [x] t-distribution Wald p-values for `useT=TRUE`, including residual,
   scalar, and per-gene degrees of freedom.

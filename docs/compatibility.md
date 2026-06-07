@@ -16,7 +16,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
-| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, owned model-frame formula inputs with factor reference inference/override, builder-stored model-frame formula design helpers, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, supported-formula, and owned-model-frame helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, model-frame wrapper tests, and CLI smoke tests; orthogonal `poly()`, splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
+| Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw and orthogonal polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, owned model-frame formula inputs with factor reference inference/override, builder-stored model-frame formula design helpers, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, supported-formula, and owned-model-frame helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, model-frame wrapper tests, and CLI smoke tests; splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, pure-Rust locfit-compatible local trend fixtures including a single-usable-row edge case and real-data fitted-value parity, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, R-cleaned coefficient/list/factor-level aliases, R-cleaned factor-level result names, explicit and builder-stored owned-model-frame character contrast resolution for supported fixed/native Wald/LRT routes, top-level formula-built Wald designs and LRT full/reduced designs for supported model-frame formulas, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected formula-built and explicit-design replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
@@ -116,15 +116,17 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   pairwise interactions and higher-order interaction/nesting/star-expansion
   terms, primitive `- term` subtraction, additive parenthesized groups, plain
   numeric identity transforms
-  such as `I(dose)` and signed identities such as `I(-dose)`, simple scalar
-  arithmetic transforms such as `I(dose + 1)`, `I(dose / 2)`, and
-  `I(1 - dose)`, simple two-covariate
+  such as `I(dose)` and `I(x=dose)` and signed identities such as `I(-dose)`,
+  simple scalar arithmetic transforms such as `I(dose + 1)`, `I(dose / 2)`,
+  and `I(1 - dose)`, simple two-covariate
   arithmetic transforms such as `I(dose + time)`, integer numeric power
-  transforms such as `I(dose^2)`, raw polynomial transforms
-  `poly(numeric, degree, raw=TRUE)`,
+  transforms such as `I(dose^2)`, raw and default orthogonal polynomial
+  transforms `poly(numeric, degree, raw=TRUE)` and `poly(numeric, degree)`,
+  including positional or named `x`, `degree`, `raw`, and `simple` arguments,
   common numeric function transforms `log(numeric)`, `log2(numeric)`,
-  `log10(numeric)`, `log1p(numeric)`, `sqrt(numeric)`, and `scale(numeric)`
-  with R-style named or positional `center`/`scale` arguments, and
+  `log10(numeric)`, `log1p(numeric)`, and `sqrt(numeric)`, including named
+  `x` and scalar `log()` `base` arguments, `scale(numeric)` with R-style named
+  `x` plus named or positional `center`/`scale` arguments, and
   `offset(numeric)` plus single-vector supported transform offsets such as
   `offset(log2(numeric))` or `offset(I(numeric + other_numeric))` into
   per-sample log-offset vectors in the supported formula subset. Primitive `.`
@@ -544,8 +546,9 @@ Benjamini-Hochberg propagation from upstream p-value tail rows.
 ## Missing
 
 - Mature wrapper-facing interface around the Rust core.
-- Complete formula parsing in Rust, including orthogonal `poly()`, arbitrary R
-  expressions, splines, and full R-compatible formula semantics.
+- Complete formula parsing in Rust, including arbitrary R expressions, splines,
+  and full R-compatible formula semantics beyond the supported native formula
+  subset.
 - Full DESeq2 dispersion estimation, including broader weighted dispersion
   edge-case parity, broader synthetic `locfit` edge-case parity, glmGamPoi trend
   type, and end-to-end dispersion parity across more designs.

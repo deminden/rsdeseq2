@@ -12,8 +12,9 @@
 /// interactions can contain two or more variables. Primitive `- term`
 /// subtraction is supported for the same term subset. Plain `I(numeric)` and
 /// signed `I(-numeric)` terms, simple `I(numeric op scalar)` arithmetic, and
-/// integer numeric power
-/// transforms are materialized as derived numeric covariates. Supported
+/// integer numeric power transforms, raw polynomial transforms, and default
+/// orthogonal polynomial transforms are materialized as derived numeric
+/// covariates. Supported
 /// parenthesized formula powers such as `(condition + batch + dose)^2` expand
 /// into main effects plus interactions up to the requested order; `.^k` uses
 /// the supplied factors and numeric covariates as the base variable set.
@@ -620,10 +621,29 @@ const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 8] = [
 ];
 
 fn next_formula_numeric_transform(rhs: &str) -> Option<(usize, FormulaNumericTransform)> {
-    FORMULA_NUMERIC_TRANSFORMS
-        .iter()
-        .filter_map(|transform| rhs.find(transform.prefix).map(|idx| (idx, *transform)))
-        .min_by_key(|(idx, _)| *idx)
+    let mut in_backticks = false;
+    let mut idx = 0_usize;
+    while idx < rhs.len() {
+        let character = rhs[idx..]
+            .chars()
+            .next()
+            .expect("idx is inside rhs char boundary");
+        if character == '`' {
+            in_backticks = !in_backticks;
+            idx += character.len_utf8();
+            continue;
+        }
+        if !in_backticks {
+            if let Some(transform) = FORMULA_NUMERIC_TRANSFORMS
+                .iter()
+                .find(|transform| rhs[idx..].starts_with(transform.prefix))
+            {
+                return Some((idx, *transform));
+            }
+        }
+        idx += character.len_utf8();
+    }
+    None
 }
 
 fn formula_numeric_transform_term(
@@ -637,7 +657,7 @@ fn formula_numeric_transform_term(
                 formula_numeric_identity_or_power_term(expression, numeric_covariates)?;
             Ok((formula_variable_term(&name), vec![(name, values)]))
         }
-        "poly" => formula_numeric_raw_poly_term(expression, numeric_covariates),
+        "poly" => formula_numeric_poly_term(expression, numeric_covariates),
         "scale" => {
             let (name, values) = formula_numeric_scale_term(expression, numeric_covariates)?;
             Ok((formula_variable_term(&name), vec![(name, values)]))
@@ -655,7 +675,8 @@ fn formula_numeric_function_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
-    let numeric_name = formula_variable_name(expression)?;
+    let (numeric_text, base) = formula_numeric_function_arguments(transform, expression)?;
+    let numeric_name = formula_variable_name(numeric_text.trim())?;
     let covariate = numeric_covariates
         .iter()
         .find(|candidate| candidate.name == numeric_name)
@@ -666,7 +687,11 @@ fn formula_numeric_function_term(
         })?;
     let mut values = Vec::with_capacity(covariate.values.len());
     for (idx, value) in covariate.values.iter().copied().enumerate() {
-        let transformed = (transform.apply)(value);
+        let transformed = if let Some(base) = base {
+            value.log(base)
+        } else {
+            (transform.apply)(value)
+        };
         if !transformed.is_finite() {
             return Err(DeseqError::InvalidOptions {
                 reason: format!(
@@ -677,7 +702,102 @@ fn formula_numeric_function_term(
         }
         values.push(transformed);
     }
-    Ok((format!("{}_{}", numeric_name, transform.label), values))
+    let name = if let Some(base) = base {
+        format!("{numeric_name}_log_base_{}", formula_numeric_label(base))
+    } else {
+        format!("{}_{}", numeric_name, transform.label)
+    };
+    Ok((name, values))
+}
+
+fn formula_numeric_function_arguments(
+    transform: FormulaNumericTransform,
+    expression: &str,
+) -> Result<(String, Option<f64>), DeseqError> {
+    let arguments = split_formula_transform_arguments(expression)?;
+    let mut numeric_text = None;
+    let mut base = None;
+    let mut positional_idx = 0_usize;
+    for argument in &arguments {
+        let trimmed = argument.trim();
+        if let Some((key, value)) = split_formula_named_argument(trimmed) {
+            match key.as_str() {
+                "x" => {
+                    reject_duplicate_formula_transform_argument(
+                        numeric_text.is_some(),
+                        transform.label,
+                        "x",
+                        expression,
+                    )?;
+                    numeric_text = Some(value.to_string());
+                    continue;
+                }
+                "base" if transform.label == "log" => {
+                    reject_duplicate_formula_transform_argument(
+                        base.is_some(),
+                        transform.label,
+                        "base",
+                        expression,
+                    )?;
+                    base = Some(parse_formula_log_base(value, expression)?);
+                    continue;
+                }
+                _ => {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!(
+                            "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                            transform.label
+                        ),
+                    });
+                }
+            }
+        }
+        match positional_idx {
+            0 if numeric_text.is_none() => {
+                numeric_text = Some(trimmed.to_string());
+                positional_idx += 1;
+                continue;
+            }
+            1 if transform.label == "log" && base.is_none() => {
+                base = Some(parse_formula_log_base(trimmed, expression)?);
+                positional_idx += 1;
+                continue;
+            }
+            _ => {}
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                transform.label
+            ),
+        });
+    }
+    let Some(numeric_text) = numeric_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{}({expression})' must provide a numeric covariate",
+                transform.label
+            ),
+        });
+    };
+    Ok((numeric_text, base))
+}
+
+fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqError> {
+    let value = strip_formula_outer_parentheses(value.trim())?;
+    let parsed = value.parse::<f64>().map_err(|_| DeseqError::InvalidOptions {
+        reason: format!("formula transform 'log({expression})' base must be finite and positive"),
+    })?;
+    if !parsed.is_finite() || parsed <= 0.0 || parsed == 1.0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula transform 'log({expression})' base must be finite and positive"),
+        });
+    }
+    Ok(parsed)
+}
+
+fn formula_numeric_label(value: f64) -> String {
+    value.to_string().replace('.', "_")
 }
 
 fn formula_numeric_scale_term(
@@ -685,36 +805,99 @@ fn formula_numeric_scale_term(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
     let arguments = split_formula_transform_arguments(expression)?;
-    let Some(numeric_name) = arguments.first().map(|value| value.trim()) else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'scale({expression})' must provide a numeric covariate"
-            ),
-        });
-    };
-    let numeric_name = formula_variable_name(numeric_name)?;
+    let mut numeric_text = None;
     let mut center = FormulaScaleOption::Auto;
     let mut scale = FormulaScaleOption::Auto;
-    for (argument_idx, argument) in arguments.iter().skip(1).enumerate() {
+    let mut center_seen = false;
+    let mut scale_seen = false;
+    let mut positional_idx = 0_usize;
+    for argument in &arguments {
+        let trimmed = argument.trim();
         let normalized = argument
             .split_whitespace()
             .collect::<String>()
             .to_ascii_lowercase();
         if let Some(value) = normalized.strip_prefix("center=") {
+            reject_duplicate_formula_transform_argument(
+                center_seen,
+                "scale",
+                "center",
+                expression,
+            )?;
+            center_seen = true;
             center = parse_formula_scale_option(value, "center", expression)?;
             continue;
         }
         if let Some(value) = normalized.strip_prefix("scale=") {
+            reject_duplicate_formula_transform_argument(
+                scale_seen,
+                "scale",
+                "scale",
+                expression,
+            )?;
+            scale_seen = true;
             scale = parse_formula_scale_option(value, "scale", expression)?;
             continue;
         }
-        match argument_idx {
-            0 => {
-                center = parse_formula_scale_option(&normalized, "center", expression)?;
+        if let Some((key, value)) = split_formula_named_argument(trimmed) {
+            match key.as_str() {
+                "x" => {
+                    reject_duplicate_formula_transform_argument(
+                        numeric_text.is_some(),
+                        "scale",
+                        "x",
+                        expression,
+                    )?;
+                    numeric_text = Some(value.to_string());
+                    continue;
+                }
+                "center" => {
+                    reject_duplicate_formula_transform_argument(
+                        center_seen,
+                        "scale",
+                        "center",
+                        expression,
+                    )?;
+                    center_seen = true;
+                    center = parse_formula_scale_option(value, "center", expression)?;
+                    continue;
+                }
+                "scale" => {
+                    reject_duplicate_formula_transform_argument(
+                        scale_seen,
+                        "scale",
+                        "scale",
+                        expression,
+                    )?;
+                    scale_seen = true;
+                    scale = parse_formula_scale_option(value, "scale", expression)?;
+                    continue;
+                }
+                _ => {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!(
+                            "formula transform 'scale({expression})' has unsupported argument '{argument}'"
+                        ),
+                    });
+                }
+            }
+        }
+        match positional_idx {
+            0 if numeric_text.is_none() => {
+                numeric_text = Some(trimmed.to_string());
+                positional_idx += 1;
                 continue;
             }
-            1 => {
+            1 if !center_seen => {
+                center_seen = true;
+                center = parse_formula_scale_option(&normalized, "center", expression)?;
+                positional_idx += 1;
+                continue;
+            }
+            2 if !scale_seen => {
+                scale_seen = true;
                 scale = parse_formula_scale_option(&normalized, "scale", expression)?;
+                positional_idx += 1;
                 continue;
             }
             _ => {}
@@ -725,6 +908,14 @@ fn formula_numeric_scale_term(
             ),
         });
     }
+    let Some(numeric_text) = numeric_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'scale({expression})' must provide a numeric covariate"
+            ),
+        });
+    };
+    let numeric_name = formula_variable_name(numeric_text.trim())?;
     let covariate = numeric_covariates
         .iter()
         .find(|candidate| candidate.name == numeric_name)
@@ -825,7 +1016,7 @@ fn parse_formula_scale_option(
     expression: &str,
 ) -> Result<FormulaScaleOption, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
-    match value {
+    match value.to_ascii_lowercase().as_str() {
         "true" | "t" => Ok(FormulaScaleOption::Auto),
         "false" | "f" => Ok(FormulaScaleOption::Disabled),
         _ => {
@@ -848,36 +1039,108 @@ fn parse_formula_scale_option(
     }
 }
 
-fn formula_numeric_raw_poly_term(
+fn formula_numeric_poly_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<FormulaNumericTransformExpansion, DeseqError> {
     let arguments = split_formula_transform_arguments(expression)?;
-    if arguments.len() < 3 {
+    if arguments.len() < 2 {
         return Err(DeseqError::InvalidOptions {
             reason: format!(
-                "formula transform 'poly({expression})' must provide numeric, degree, and raw=TRUE"
+                "formula transform 'poly({expression})' must provide numeric and degree"
             ),
         });
     }
-    let numeric_name = formula_variable_name(arguments[0].trim())?;
+    let mut numeric_text = None;
     let mut degree_text = None;
-    let mut has_raw_true = false;
-    for (idx, argument) in arguments.iter().enumerate().skip(1) {
+    let mut raw = false;
+    let mut raw_seen = false;
+    let mut simple_seen = false;
+    let mut positional_idx = 0_usize;
+    for argument in &arguments {
+        let trimmed = argument.trim();
         let normalized = argument
             .split_whitespace()
             .collect::<String>()
             .to_ascii_lowercase();
         if normalized == "raw=true" || normalized == "raw=t" {
-            has_raw_true = true;
+            reject_duplicate_formula_poly_argument(raw_seen, "raw", expression)?;
+            raw_seen = true;
+            raw = true;
+            continue;
+        }
+        if normalized == "raw=false" || normalized == "raw=f" {
+            reject_duplicate_formula_poly_argument(raw_seen, "raw", expression)?;
+            raw_seen = true;
+            raw = false;
+            continue;
+        }
+        if normalized == "simple=true"
+            || normalized == "simple=t"
+            || normalized == "simple=false"
+            || normalized == "simple=f"
+        {
+            reject_duplicate_formula_poly_argument(simple_seen, "simple", expression)?;
+            simple_seen = true;
             continue;
         }
         if let Some(named_degree) = normalized.strip_prefix("degree=") {
+            reject_duplicate_formula_poly_argument(degree_text.is_some(), "degree", expression)?;
             degree_text = Some(named_degree.to_string());
             continue;
         }
-        if idx == 1 && degree_text.is_none() {
-            degree_text = Some(argument.trim().to_string());
+        if let Some((key, value)) = split_formula_named_argument(trimmed) {
+            match key.as_str() {
+                "x" => {
+                    reject_duplicate_formula_poly_argument(numeric_text.is_some(), "x", expression)?;
+                    numeric_text = Some(value.to_string());
+                    continue;
+                }
+                "degree" => {
+                    reject_duplicate_formula_poly_argument(
+                        degree_text.is_some(),
+                        "degree",
+                        expression,
+                    )?;
+                    degree_text = Some(value.to_string());
+                    continue;
+                }
+                "raw" => {
+                    reject_duplicate_formula_poly_argument(raw_seen, "raw", expression)?;
+                    raw_seen = true;
+                    raw = parse_formula_bool_option(value, "raw", expression)?;
+                    continue;
+                }
+                "simple" => {
+                    reject_duplicate_formula_poly_argument(simple_seen, "simple", expression)?;
+                    simple_seen = true;
+                    parse_formula_bool_option(value, "simple", expression)?;
+                    continue;
+                }
+                _ => {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!(
+                            "formula transform 'poly({expression})' has unsupported argument '{argument}'"
+                        ),
+                    });
+                }
+            }
+        }
+        match positional_idx {
+            0 if numeric_text.is_none() => {
+                numeric_text = Some(trimmed.to_string());
+                positional_idx += 1;
+                continue;
+            }
+            1 if degree_text.is_none() => {
+                degree_text = Some(trimmed.to_string());
+                positional_idx += 1;
+                continue;
+            }
+            _ => {}
+        }
+        if positional_idx < 2 {
+            positional_idx += 1;
             continue;
         }
         return Err(DeseqError::InvalidOptions {
@@ -891,19 +1154,22 @@ fn formula_numeric_raw_poly_term(
             reason: format!("formula transform 'poly({expression})' must provide a degree"),
         });
     };
+    let Some(numeric_text) = numeric_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'poly({expression})' must provide a numeric covariate"
+            ),
+        });
+    };
+    let numeric_name = formula_variable_name(numeric_text.trim())?;
     let degree = degree_text
         .parse::<i32>()
         .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula raw polynomial degree '{degree_text}' must be an integer"),
+            reason: format!("formula polynomial degree '{degree_text}' must be an integer"),
         })?;
     if !(1..=16).contains(&degree) {
         return Err(DeseqError::InvalidOptions {
-            reason: "formula raw polynomial degrees must be integers from 1 through 16".to_string(),
-        });
-    }
-    if !has_raw_true {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula poly() transforms require raw=TRUE".to_string(),
+            reason: "formula polynomial degrees must be integers from 1 through 16".to_string(),
         });
     }
     let covariate = numeric_covariates
@@ -914,12 +1180,101 @@ fn formula_numeric_raw_poly_term(
                 "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
             ),
         })?;
+    if raw {
+        return formula_numeric_raw_poly_columns(expression, numeric_name, covariate.values, degree);
+    }
+    formula_numeric_orthogonal_poly_columns(expression, numeric_name, covariate.values, degree)
+}
+
+fn reject_duplicate_formula_poly_argument(
+    seen: bool,
+    argument: &str,
+    expression: &str,
+) -> Result<(), DeseqError> {
+    reject_duplicate_formula_transform_argument(seen, "poly", argument, expression)
+}
+
+fn reject_duplicate_formula_transform_argument(
+    seen: bool,
+    transform: &str,
+    argument: &str,
+    expression: &str,
+) -> Result<(), DeseqError> {
+    if seen {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{transform}({expression})' argument '{argument}' matched multiple times"
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn split_formula_named_argument(argument: &str) -> Option<(String, &str)> {
+    let equals = formula_top_level_equals_index(argument)?;
+    let (key, value_with_equals) = argument.split_at(equals);
+    let value = &value_with_equals[1..];
+    let key = key
+        .split_whitespace()
+        .collect::<String>()
+        .to_ascii_lowercase();
+    Some((key, value.trim()))
+}
+
+fn formula_top_level_equals_index(argument: &str) -> Option<usize> {
+    let mut depth = 0_i32;
+    let mut in_backticks = false;
+    for (idx, character) in argument.char_indices() {
+        if character == '`' {
+            in_backticks = !in_backticks;
+            continue;
+        }
+        if in_backticks {
+            continue;
+        }
+        match character {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            '=' if depth == 0 => return Some(idx),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn parse_formula_bool_option(
+    value: &str,
+    argument: &str,
+    expression: &str,
+) -> Result<bool, DeseqError> {
+    match value
+        .split_whitespace()
+        .collect::<String>()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "true" | "t" => Ok(true),
+        "false" | "f" => Ok(false),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'poly({expression})' argument '{argument}' must be TRUE or FALSE"
+            ),
+        }),
+    }
+}
+
+fn formula_numeric_raw_poly_columns(
+    expression: &str,
+    numeric_name: &str,
+    values: &[f64],
+    degree: i32,
+) -> Result<FormulaNumericTransformExpansion, DeseqError> {
     let mut replacement_terms = Vec::with_capacity(degree as usize);
     let mut derived = Vec::with_capacity(degree as usize);
     for exponent in 1..=degree {
         let name = format!("{numeric_name}_poly_{exponent}");
-        let mut values = Vec::with_capacity(covariate.values.len());
-        for (idx, value) in covariate.values.iter().copied().enumerate() {
+        let mut column_values = Vec::with_capacity(values.len());
+        for (idx, value) in values.iter().copied().enumerate() {
             let transformed = value.powi(exponent);
             if !transformed.is_finite() {
                 return Err(DeseqError::InvalidOptions {
@@ -928,12 +1283,97 @@ fn formula_numeric_raw_poly_term(
                     ),
                 });
             }
-            values.push(transformed);
+            column_values.push(transformed);
         }
         replacement_terms.push(formula_variable_term(&name));
-        derived.push((name, values));
+        derived.push((name, column_values));
     }
     Ok((format!("({})", replacement_terms.join(" + ")), derived))
+}
+
+fn formula_numeric_orthogonal_poly_columns(
+    expression: &str,
+    numeric_name: &str,
+    values: &[f64],
+    degree: i32,
+) -> Result<FormulaNumericTransformExpansion, DeseqError> {
+    validate_formula_poly_values(expression, values, degree)?;
+    let mut basis = Vec::with_capacity(degree as usize + 1);
+    let constant_norm = (values.len() as f64).sqrt();
+    basis.push(vec![1.0 / constant_norm; values.len()]);
+    let mut replacement_terms = Vec::with_capacity(degree as usize);
+    let mut derived = Vec::with_capacity(degree as usize);
+    for exponent in 1..=degree {
+        let mut column_values = Vec::with_capacity(values.len());
+        for (idx, value) in values.iter().copied().enumerate() {
+            let transformed = value.powi(exponent);
+            if !transformed.is_finite() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula transform 'poly({expression})' produced non-finite value at sample {idx}"
+                    ),
+                });
+            }
+            column_values.push(transformed);
+        }
+        for previous in &basis {
+            let projection = formula_dot_product(&column_values, previous);
+            for (value, previous_value) in column_values.iter_mut().zip(previous) {
+                *value -= projection * previous_value;
+            }
+        }
+        let norm = formula_dot_product(&column_values, &column_values).sqrt();
+        if !norm.is_finite() || norm <= 0.0 {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'poly({expression})' produced a dependent polynomial column"
+                ),
+            });
+        }
+        for value in &mut column_values {
+            *value /= norm;
+        }
+        let name = format!("poly({numeric_name}, {degree}){exponent}");
+        replacement_terms.push(formula_variable_term(&name));
+        derived.push((name, column_values.clone()));
+        basis.push(column_values);
+    }
+    Ok((format!("({})", replacement_terms.join(" + ")), derived))
+}
+
+fn validate_formula_poly_values(
+    expression: &str,
+    values: &[f64],
+    degree: i32,
+) -> Result<(), DeseqError> {
+    let mut unique = Vec::new();
+    for (idx, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'poly({expression})' received non-finite value at sample {idx}"
+                ),
+            });
+        }
+        if !unique.contains(&value) {
+            unique.push(value);
+        }
+    }
+    if unique.len() <= degree as usize {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'poly({expression})' degree must be less than the number of unique values"
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn formula_dot_product(left: &[f64], right: &[f64]) -> f64 {
+    left.iter()
+        .zip(right)
+        .map(|(left, right)| left * right)
+        .sum()
 }
 
 fn split_formula_transform_arguments(expression: &str) -> Result<Vec<String>, DeseqError> {
@@ -944,6 +1384,14 @@ fn formula_numeric_identity_or_power_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
+    if let Some((key, value)) = split_formula_named_argument(expression.trim()) {
+        if key == "x" {
+            return formula_numeric_identity_or_power_term(value, numeric_covariates);
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula transform 'I({expression})' has unsupported argument '{key}'"),
+        });
+    }
     let Some((numeric_name, exponent_text)) = expression.split_once('^') else {
         if let Some((left, op, right)) = split_formula_numeric_scalar_expression(expression) {
             return formula_numeric_scalar_expression_term(
