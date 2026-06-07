@@ -522,6 +522,7 @@ fn cli_additive_beta_prior_wald_analysis(
             factor,
             sample_levels,
             reference,
+            levels: None,
         })
         .collect::<Vec<_>>();
     let numeric_values = numeric_value_paths

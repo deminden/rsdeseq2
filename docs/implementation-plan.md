@@ -219,7 +219,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Primitive formula-to-expanded-design parser for intercept-preserving
   additive main effects, `1` intercept-only designs, pairwise interactions,
   pairwise interactions without all lower-order main effects, pairwise `/`
-  nesting, pairwise `*` shorthand, and `0`/`-1` intercept removal.
+  nesting, R `%in%` nesting-operator interactions, pairwise `*` shorthand, and
+  formula-order `0`/`-1` removal plus `1` restoration of the intercept.
 - [x] Primitive formula-to-expanded-design parser support for three-variable
   `:`, `/`, and `*` terms, including treatment-style reported columns and
   expanded-design product columns for factor and numeric combinations.
@@ -229,18 +230,34 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Primitive formula `- term` subtraction for supported main effects,
   interactions, nested shorthand, and star-expanded terms.
 - [x] Primitive additive parenthesized formula groups, distributed through
-  supported `*`, `:`, `/`, and `- term` syntax.
+  supported `*`, `:`, `/`, `%in%`, and `- term` syntax.
 - [x] Nested additive parenthesized formula groups for supported `+`, `*`,
-  `:`, `/`, and `- term` syntax.
+  `:`, `/`, `%in%`, and `- term` syntax.
+- [x] Primitive parenthesized formula powers such as
+  `(condition + batch + dose)^2`, expanded into main effects and interactions
+  up to the requested positive integer order.
+- [x] Metadata-aware primitive dot formula powers such as `.^2` and `(.)^2`,
+  expanded over the supplied factor and numeric model-frame columns, including
+  matching subtraction.
 - [x] Primitive `I(numeric^k)` formula transforms for finite integer powers,
   materialized as derived numeric covariates in formula-expanded designs.
 - [x] Primitive raw polynomial formula transforms
   `poly(numeric, degree, raw=TRUE)`, materialized as derived numeric
   covariates in formula-expanded designs.
 - [x] Primitive common numeric function transforms in formulas: `log`,
-  `log2`, `log10`, `sqrt`, and `scale` of supplied numeric covariates.
-- [x] Primitive `offset(numeric)` formula extraction into per-sample log-offset
-  vectors beside formula-expanded designs.
+  `log2`, `log10`, `log1p`, `sqrt`, and `scale` of supplied numeric covariates,
+  including named or positional `center`/`scale` arguments for `scale()`.
+- [x] Primitive `offset(numeric)` and single-vector supported transform offset
+  formula extraction, such as `offset(log2(numeric))` and
+  `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors
+  beside formula-expanded designs.
+- [x] Primitive formula `.` expansion over supplied factor and numeric
+  model-frame columns as main effects and inside supported `*`, `:`, and `/`
+  shorthand terms, including subtraction of the expanded shorthand products.
+- [x] R-style duplicate formula-term simplification for supported primitive
+  main effects and interactions.
+- [x] Backtick-quoted model-frame column names for supported primitive formula
+  main effects, interactions, offsets, and numeric transforms.
 - [x] Additive-factor expanded beta-prior fit-and-Wald-results helpers that own
   design construction before running coefficient or numeric-contrast workflows.
 - [x] Additive-factor expanded beta-prior Cook's replacement-refit helpers that
@@ -503,10 +520,44 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] R-style coefficient-name cleanup for primitive factor-level contrast
   candidates, including whole-name and component-wise `make.names` handling
   for non-syntactic and reserved factor or level names.
+- [x] Ambiguity checks for primitive factor-level contrast coefficient
+  candidates, so treatment-style and expanded/no-intercept fallback routes do
+  not silently choose the first R-cleaned alias collision.
 - [x] R-style cleaned aliases for primitive coefficient-name and
   positive/negative coefficient-list contrasts, including intercept aliases,
   reserved-word cleanup, duplicate-list rejection after alias resolution, and
   exact-name precedence over cleaned aliases.
+- [x] Component-wise R-cleaned aliases for interaction coefficient names,
+  including coefficient-name and positive/negative coefficient-list contrast
+  requests while preserving the `:` interaction separator.
+- [x] Formula-built top-level named and coefficient-list Wald/LRT helpers share
+  the same R-cleaned coefficient alias resolution, including coefficients
+  generated from backtick-quoted non-syntactic model-frame column names and
+  limited Cook's replacement-refit contrast-request routes.
+- [x] Exact-first R-cleaned factor-name alias resolution for formula
+  model-frame character contrasts, with ambiguity errors for colliding cleaned
+  names.
+- [x] Declared formula factor levels can define an unused treatment reference
+  level, matching R model-matrix behavior for factors with unobserved base
+  levels.
+- [x] Formula model-frame character contrast metadata can infer the same unused
+  declared reference level while still requiring numerator/denominator sample
+  groups for character `contrastAllZero` handling.
+- [x] Builder-created `DeseqFit` objects retain optional formula/model-frame
+  metadata for later wrapper and already-fitted-object Wald/LRT
+  `results(contrast=...)` plumbing.
+- [x] Fitted-object `results(contrast=...)` dispatch can select stored Wald or
+  LRT output while reusing retained model-frame metadata for character
+  contrasts.
+- [x] Formula-built Cook's replacement contrast-request helpers route through
+  explicit model-frame metadata, keeping R-cleaned factor aliases and
+  reference handling consistent with non-replacement result paths.
+- [x] `FormulaModelFrame` exposes wrapper-facing validation, sample-count, and
+  resolved factor-reference metadata using the same rules as formula design
+  construction.
+- [x] Explicit-reference factor contrasts resolve expanded/no-intercept
+  `factorLevel` coefficient shapes as a fallback when treatment-style
+  `factor_level_vs_reference` columns are absent.
 - [x] Native linear-mu and GLM-mu Wald contrast wrappers for primitive numeric,
   coefficient-name/list, and caller-supplied factor-level requests.
 - [x] Add design coefficient-name selection for top-level Wald/LRT result
@@ -549,8 +600,8 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] DESeq2 contrast handling for `results(contrast=...)` on primitive Rust,
   CLI, and R wrapper already-fitted result routes, including character,
   list/listValues, numeric, factor-level reference inference from fitted
-  metadata, contrast-specific all-zero behavior, and `contrast` precedence over
-  `name`.
+  metadata, contrast-specific all-zero behavior, fitted-object Wald/LRT
+  dispatch, and `contrast` precedence over `name`.
 - [ ] Broader high-level Bioconductor object plumbing and remaining
   contrast-aware Cook's/refit edge cases.
 - [x] Initial Cook's distance and `maxCooks` diagnostics.
@@ -596,7 +647,9 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Apply DESeq2's two-group low-count Cook's heuristic automatically for
   supplied-dispersion fixed and limited GLM-mu factor-level result routes, plus
   limited GLM-mu replacement-refit routes, when caller-supplied sample levels
-  prove the contrast is a single two-level condition.
+  prove the contrast is a single two-level condition; selected-coefficient
+  Wald/LRT routes can infer the same gate from stored formula model-frame metadata
+  when it resolves exactly to the selected non-reference factor comparison.
 - [ ] Full Cook's outlier replacement behavior with DESeq2-style replacement
   refit for high-level wrapper object metadata, high-level Bioconductor assay
   attachment, and remaining contrast edge cases.

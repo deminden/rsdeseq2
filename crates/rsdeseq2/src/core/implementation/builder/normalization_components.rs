@@ -192,7 +192,19 @@ impl DeseqBuilder {
             input.design.n_samples(),
             input.design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(contrast) =
+            self.model_frame_factor_level_contrast_for_coefficient(input.design, input.coefficient)
+        {
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                input.counts,
+                &cooks.cooks,
+                contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(WaldPipelineOutput {
@@ -355,7 +367,19 @@ impl DeseqBuilder {
             input.full_design.n_samples(),
             input.full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(contrast) = self
+            .model_frame_factor_level_contrast_for_coefficient(input.full_design, input.coefficient)
+        {
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                input.counts,
+                &cooks.cooks,
+                contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(LrtPipelineOutput {
@@ -418,6 +442,7 @@ impl DeseqBuilder {
     }
 
     fn base_fit(
+        &self,
         counts: &CountMatrix,
         design: Option<DesignMatrix>,
         input: BaseFitInput,
@@ -426,6 +451,7 @@ impl DeseqBuilder {
             counts_summary: counts.summary(),
             design,
             reduced_design: None,
+            model_frame: self.model_frame.clone(),
             size_factors: input.size_factors,
             normalization_factors: input.normalization_factors,
             observation_weights: input.observation_weights,

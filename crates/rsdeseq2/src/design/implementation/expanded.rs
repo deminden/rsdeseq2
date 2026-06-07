@@ -155,7 +155,9 @@ pub fn expanded_additive_design_with_all_interactions(
         resolve_numeric_interaction_indices(numeric_covariates, numeric_interactions)?;
     let factor_levels = factors
         .iter()
-        .map(|factor| ordered_levels(factor.sample_levels, factor.reference))
+        .map(|factor| {
+            ordered_levels_with_declared(factor.sample_levels, factor.reference, factor.levels)
+        })
         .collect::<Vec<_>>();
 
     let mut expanded_names = vec!["Intercept".to_string()];

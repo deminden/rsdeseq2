@@ -295,6 +295,23 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
     output.results.metadata.comparison = Some(comparison);
 }
 
+fn factor_level_result_metadata(contrast: FactorLevelContrast<'_>) -> (String, String) {
+    let spec = match contrast.reference {
+        Some(reference) => ContrastSpec::factor_level_with_reference(
+            contrast.factor,
+            contrast.numerator,
+            contrast.denominator,
+            reference,
+        ),
+        None => ContrastSpec::factor_level(
+            contrast.factor,
+            contrast.numerator,
+            contrast.denominator,
+        ),
+    };
+    (spec.result_name(), spec.comparison())
+}
+
 fn apply_cooks_cutoff_for_factor_level_metadata(
     results: &mut DeseqResults,
     cutoff: Option<f64>,

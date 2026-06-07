@@ -79,7 +79,19 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(contrast) =
+            self.model_frame_factor_level_contrast_for_coefficient(design, coefficient)
+        {
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -372,7 +384,19 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(contrast) =
+            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)
+        {
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {

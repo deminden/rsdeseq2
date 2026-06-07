@@ -20,7 +20,9 @@ fn expanded_formula_design_from_state<'a>(
     // so expanded and reported designs stay aligned.
     let factor_levels = used_factors
         .iter()
-        .map(|factor| ordered_levels(factor.sample_levels, factor.reference))
+        .map(|factor| {
+            ordered_levels_with_declared(factor.sample_levels, factor.reference, factor.levels)
+        })
         .collect::<Vec<_>>();
 
     let mut expanded_names = Vec::new();
@@ -266,7 +268,9 @@ fn expanded_formula_design_from_state<'a>(
         factor_levels: state
             .selected_factors
             .iter()
-            .map(|factor| ordered_levels(factor.sample_levels, factor.reference))
+            .map(|factor| {
+                ordered_levels_with_declared(factor.sample_levels, factor.reference, factor.levels)
+            })
             .collect(),
         numeric_covariates: state
             .selected_numeric_covariates
@@ -444,7 +448,12 @@ fn validate_formula_used_factor_specs(
     n_samples: usize,
 ) -> Result<(), DeseqError> {
     for (idx, factor) in factors.iter().enumerate() {
-        validate_factor_design_inputs(factor.factor, factor.sample_levels, factor.reference)?;
+        validate_factor_design_inputs_with_levels(
+            factor.factor,
+            factor.sample_levels,
+            factor.reference,
+            factor.levels,
+        )?;
         if factor.sample_levels.len() != n_samples {
             return Err(invalid_dimensions(
                 "formula factor sample levels",
@@ -830,54 +839,24 @@ fn add_factor_numeric_formula_interaction<'a>(
     factor: &'a str,
     numeric: &'a str,
     factor_numeric_interactions: &mut Vec<ExpandedFactorNumericInteractionSpec<'a>>,
-    term: &str,
+    _term: &str,
 ) -> Result<(), DeseqError> {
     if factor_numeric_interactions
         .iter()
         .any(|interaction| interaction.factor == factor && interaction.numeric == numeric)
     {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{term}' appears more than once"),
-        });
+        return Ok(());
     }
     factor_numeric_interactions.push(ExpandedFactorNumericInteractionSpec { factor, numeric });
     Ok(())
 }
 
-fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<&str>, DeseqError> {
-    let pieces = term.split(delimiter).map(str::trim).collect::<Vec<_>>();
+fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
+    let pieces = split_formula_top_level(term, delimiter)?;
     if pieces.len() < 2 || pieces.iter().any(|piece| piece.is_empty()) {
         return Err(DeseqError::InvalidOptions {
             reason: format!("formula term '{term}' must contain non-empty variables"),
         });
     }
     Ok(pieces)
-}
-
-fn formula_piece_combinations<'a>(pieces: &[&'a str], order: usize) -> Vec<Vec<&'a str>> {
-    fn push_combinations<'a>(
-        pieces: &[&'a str],
-        order: usize,
-        start: usize,
-        current: &mut Vec<&'a str>,
-        output: &mut Vec<Vec<&'a str>>,
-    ) {
-        if current.len() == order {
-            output.push(current.clone());
-            return;
-        }
-        let remaining = order - current.len();
-        for idx in start..=pieces.len() - remaining {
-            current.push(pieces[idx]);
-            push_combinations(pieces, order, idx + 1, current, output);
-            current.pop();
-        }
-    }
-
-    if order == 0 || order > pieces.len() {
-        return Vec::new();
-    }
-    let mut output = Vec::new();
-    push_combinations(pieces, order, 0, &mut Vec::new(), &mut output);
-    output
 }

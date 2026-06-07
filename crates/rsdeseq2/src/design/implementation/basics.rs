@@ -35,6 +35,10 @@ pub struct ExpandedFactorSpec<'a> {
     pub sample_levels: &'a [String],
     /// Reference level for treatment-style reported coefficients.
     pub reference: &'a str,
+    /// Optional R factor level order. When supplied, design columns follow this
+    /// order instead of first-observed sample order, with `reference` still used
+    /// as the treatment base.
+    pub levels: Option<&'a [String]>,
 }
 
 /// Caller-supplied metadata for one additive numeric covariate.
@@ -44,6 +48,56 @@ pub struct ExpandedNumericSpec<'a> {
     pub name: &'a str,
     /// Per-sample finite numeric values in count-column order.
     pub values: &'a [f64],
+}
+
+/// Owned formula model frame for wrapper and object-style callers.
+///
+/// This bridges user-facing sample metadata to the borrowed primitive formula
+/// design helpers. Factor references can be supplied explicitly; when omitted,
+/// the first declared level is used as the treatment reference when `levels`
+/// are present, otherwise the first observed level is used.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FormulaModelFrame {
+    /// Categorical columns available to formula parsing.
+    pub factors: Vec<FormulaFactorColumn>,
+    /// Numeric columns available to formula parsing and supported transforms.
+    pub numeric_covariates: Vec<FormulaNumericColumn>,
+}
+
+/// Resolved factor reference metadata for one model-frame factor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResolvedFormulaFactorReference<'a> {
+    /// Factor column name.
+    pub factor: &'a str,
+    /// Treatment reference/base level used by formula design construction.
+    pub reference: &'a str,
+    /// Optional declared R factor level order, if supplied.
+    pub levels: Option<&'a [String]>,
+}
+
+/// Owned categorical model-frame column.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FormulaFactorColumn {
+    /// Column name used in formula terms.
+    pub name: String,
+    /// Per-sample factor levels in count-column order.
+    pub sample_levels: Vec<String>,
+    /// Optional R factor level order. When supplied, every observed sample
+    /// level must be present here and model-matrix columns follow this order.
+    pub levels: Option<Vec<String>>,
+    /// Optional treatment reference/base level. Defaults to the first declared
+    /// level when [`Self::levels`] is present, otherwise the first observed
+    /// sample level.
+    pub reference: Option<String>,
+}
+
+/// Owned numeric model-frame column.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FormulaNumericColumn {
+    /// Column name used in formula terms.
+    pub name: String,
+    /// Per-sample finite numeric values in count-column order.
+    pub values: Vec<f64>,
 }
 
 /// Caller-supplied metadata for one additive factor-by-factor interaction.
@@ -103,6 +157,83 @@ pub struct ExpandedFormulaDesignWithOffsets {
     pub design: ExpandedAdditiveFactorDesign,
     /// Per-sample offset values from supported `offset(numeric)` terms.
     pub offsets: Vec<f64>,
+}
+
+impl FormulaModelFrame {
+    /// Validate this model frame using the same rules as formula design construction.
+    pub fn validate(&self) -> Result<(), DeseqError> {
+        validate_formula_model_frame(self)
+    }
+
+    /// Number of samples represented by this model frame.
+    pub fn n_samples(&self) -> Result<usize, DeseqError> {
+        formula_model_frame_sample_count(self)
+    }
+
+    /// Resolved treatment reference for an exact factor column name.
+    ///
+    /// The resolution order matches formula design construction: explicit
+    /// `reference`, then the first declared level, then the first observed
+    /// sample level. `Ok(None)` means the model frame is valid but has no
+    /// factor with that exact name.
+    pub fn resolved_factor_reference(
+        &self,
+        factor_name: &str,
+    ) -> Result<Option<&str>, DeseqError> {
+        self.validate()?;
+        self.factors
+            .iter()
+            .find(|factor| factor.name == factor_name)
+            .map(formula_model_frame_factor_reference)
+            .transpose()
+    }
+
+    /// Resolved treatment reference for a factor column name or R-cleaned alias.
+    ///
+    /// Exact factor names win first. If no exact factor exists, this accepts
+    /// the same R-style cleanup used by formula coefficient aliases, so wrapper
+    /// callers can resolve metadata from user-facing names that came through
+    /// `make.names`-style paths. Ambiguous cleaned aliases return an error.
+    pub fn resolved_factor_reference_by_alias(
+        &self,
+        factor_name: &str,
+    ) -> Result<Option<&str>, DeseqError> {
+        self.validate()?;
+        if let Some(reference) = self.resolved_factor_reference(factor_name)? {
+            return Ok(Some(reference));
+        }
+        let matches = self
+            .factors
+            .iter()
+            .filter(|factor| r_like_make_name(&factor.name) == factor_name)
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [factor] => Ok(Some(formula_model_frame_factor_reference(factor)?)),
+            [] => Ok(None),
+            _ => Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "factor '{factor_name}' resolves ambiguously after R-style cleanup"
+                ),
+            }),
+        }
+    }
+
+    /// Resolved reference metadata for all factor columns in model-frame order.
+    pub fn resolved_factor_references(
+        &self,
+    ) -> Result<Vec<ResolvedFormulaFactorReference<'_>>, DeseqError> {
+        self.validate()?;
+        self.factors
+            .iter()
+            .map(|factor| {
+                Ok(ResolvedFormulaFactorReference {
+                    factor: factor.name.as_str(),
+                    reference: formula_model_frame_factor_reference(factor)?,
+                    levels: factor.levels.as_deref(),
+                })
+            })
+            .collect()
+    }
 }
 
 impl DesignMatrix {

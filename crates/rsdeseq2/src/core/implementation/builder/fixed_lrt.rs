@@ -28,7 +28,7 @@ impl DeseqBuilder {
             coefficient,
         })?;
 
-        let mut fit = Self::base_fit(
+        let mut fit = self.base_fit(
             counts,
             Some(full_design.clone()),
             stages.into_base_fit_input(),
@@ -101,7 +101,27 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(contrast) =
+            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)
+        {
+            let original_cooks =
+                original_fit
+                    .cooks
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "Cook's distances are required before replacement refit"
+                            .to_string(),
+                    })?;
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -174,7 +194,7 @@ impl DeseqBuilder {
         apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
 
-        let mut fit = Self::base_fit(
+        let mut fit = self.base_fit(
             counts,
             Some(full_design.clone()),
             stages.into_base_fit_input(),
@@ -299,6 +319,17 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if sample_levels.is_none() {
+            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+                return self.fit_fixed_dispersion_lrt_factor_level_contrast(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    factor_contrast,
+                );
+            }
+        }
         match contrast {
             ResultsContrast::Character {
                 factor,
@@ -342,6 +373,41 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run a supplied-dispersion LRT for a DESeq2
+    /// `results(contrast=...)` request using formula model-frame metadata.
+    ///
+    /// Character triplet contrasts resolve their factor reference and
+    /// per-sample levels from `model_frame`. List and numeric contrasts use the
+    /// same numeric all-zero handling as [`Self::fit_fixed_dispersion_lrt_results_contrast`].
+    pub fn fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        model_frame: &FormulaModelFrame,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
+        {
+            return self.fit_fixed_dispersion_lrt_factor_level_contrast(
+                counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                factor_contrast,
+            );
+        }
+        self.fit_fixed_dispersion_lrt_results_contrast::<String>(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            contrast,
+            None,
+        )
+    }
+
     /// Run supplied-dispersion LRT replacement refit for a named primitive contrast specification.
     pub fn fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
         &self,
@@ -381,6 +447,18 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if sample_levels.is_none() {
+            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+                return self.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    dispersions,
+                    factor_contrast,
+                    replacement_options,
+                );
+            }
+        }
         match contrast {
             ResultsContrast::Character {
                 factor,
@@ -424,6 +502,41 @@ impl DeseqBuilder {
                 )
             }
         }
+    }
+
+    /// Run supplied-dispersion LRT replacement refit for a DESeq2
+    /// `results(contrast=...)` request using formula model-frame metadata.
+    #[allow(clippy::too_many_arguments)]
+    pub fn fit_fixed_dispersion_lrt_results_contrast_from_model_frame_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        full_design: &DesignMatrix,
+        reduced_design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        model_frame: &FormulaModelFrame,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
+        {
+            return self.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+                counts,
+                full_design,
+                reduced_design,
+                dispersions,
+                factor_contrast,
+                replacement_options,
+            );
+        }
+        self.fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement::<String>(
+            counts,
+            full_design,
+            reduced_design,
+            dispersions,
+            contrast,
+            None,
+            replacement_options,
+        )
     }
 
     /// Run a supplied-dispersion LRT and report a factor-level full-model contrast.
@@ -513,16 +626,11 @@ impl DeseqBuilder {
             contrast,
         )?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
-        lrt_output.results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        lrt_output.results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        lrt_output.results.metadata.result_name = Some(result_name);
+        lrt_output.results.metadata.comparison = Some(comparison);
 
-        let mut fit = Self::base_fit(
+        let mut fit = self.base_fit(
             counts,
             Some(full_design.clone()),
             stages.into_base_fit_input(),
@@ -611,14 +719,9 @@ impl DeseqBuilder {
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
 
         Ok(CooksReplacementLrtOutput {
             original_fit,

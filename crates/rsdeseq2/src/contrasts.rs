@@ -1,14 +1,18 @@
 use std::collections::HashSet;
 
 use crate::core::CountMatrix;
-use crate::design::DesignMatrix;
+use crate::design::{
+    r_like_make_name, r_like_name_candidates as candidate_names, DesignMatrix, FormulaFactorColumn,
+    FormulaModelFrame,
+};
 use crate::errors::{invalid_dimensions, DeseqError};
 
 /// Primitive contrast specification for already-built design matrices.
 ///
 /// This intentionally covers only the parts of DESeq2 contrast handling that
-/// can be resolved from coefficient names alone. Formula parsing and factor
-/// level lookup remain caller or future-wrapper work.
+/// can be resolved from coefficient names and optional reference metadata.
+/// Formula-aware callers can use [`factor_level_contrast_from_model_frame`] to
+/// supply the matching factor levels for character-contrast all-zero handling.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ContrastSpec {
     /// Explicit numeric contrast with one value per coefficient.
@@ -47,9 +51,9 @@ pub enum ContrastSpec {
 /// Factor-level contrast request with sample labels for character-style
 /// `contrastAllZero` handling.
 ///
-/// The Rust core does not parse R formulas or own colData. This request keeps
-/// the necessary primitive values together after a caller or future wrapper has
-/// already built the model matrix and extracted sample levels.
+/// This request keeps the primitive values together after a caller has built
+/// the model matrix and extracted sample levels. Formula-model-frame callers
+/// can construct it with [`factor_level_contrast_from_model_frame`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FactorLevelContrast<'a> {
     /// Factor or variable name.
@@ -123,6 +127,126 @@ pub struct ResolvedResultsContrast {
     pub comparison: String,
     /// Matching DESeq2 all-zero handling rule.
     pub all_zero: ResultsContrastAllZero,
+}
+
+/// Resolve a character-style `results(contrast=...)` request against owned
+/// formula model-frame metadata.
+///
+/// List and numeric contrasts return `Ok(None)` because they do not need
+/// factor sample levels or reference metadata. Character contrasts return a
+/// [`FactorLevelContrast`] borrowing the matching model-frame factor column.
+/// When the contrast omits an explicit reference, the factor column reference
+/// is used; if the column has no explicit reference, the first declared factor
+/// level is used when present, otherwise the first observed sample level is
+/// used, matching [`crate::design::expanded_formula_design_from_model_frame`].
+pub fn factor_level_contrast_from_model_frame<'a>(
+    contrast: &'a ResultsContrast,
+    model_frame: &'a FormulaModelFrame,
+) -> Result<Option<FactorLevelContrast<'a>>, DeseqError> {
+    let ResultsContrast::Character {
+        factor,
+        numerator,
+        denominator,
+        reference,
+    } = contrast
+    else {
+        return Ok(None);
+    };
+    validate_factor_level_contrast(factor, numerator, denominator)?;
+    let column = resolve_model_frame_factor_column(model_frame, factor)?;
+    if column.sample_levels.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' has no sample levels"),
+        });
+    }
+    if !column.sample_levels.iter().any(|level| level == numerator) {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' does not contain numerator level '{numerator}'"),
+        });
+    }
+    if !column
+        .sample_levels
+        .iter()
+        .any(|level| level == denominator)
+    {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' does not contain denominator level '{denominator}'"),
+        });
+    }
+    let inferred_reference = reference
+        .as_deref()
+        .or(column.reference.as_deref())
+        .or_else(|| {
+            column
+                .levels
+                .as_ref()
+                .and_then(|levels| levels.first().map(String::as_str))
+        })
+        .or_else(|| column.sample_levels.first().map(String::as_str));
+    if let Some(reference) = inferred_reference {
+        if !model_frame_factor_level_exists(column, reference) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("factor '{factor}' does not contain reference level '{reference}'"),
+            });
+        }
+    }
+    Ok(Some(FactorLevelContrast {
+        factor: &column.name,
+        numerator,
+        denominator,
+        reference: inferred_reference,
+        sample_levels: &column.sample_levels,
+    }))
+}
+
+fn model_frame_factor_level_exists(column: &FormulaFactorColumn, level: &str) -> bool {
+    column
+        .levels
+        .as_ref()
+        .is_some_and(|levels| levels.iter().any(|candidate| candidate == level))
+        || column
+            .sample_levels
+            .iter()
+            .any(|candidate| candidate == level)
+}
+
+fn resolve_model_frame_factor_column<'a>(
+    model_frame: &'a FormulaModelFrame,
+    factor: &str,
+) -> Result<&'a FormulaFactorColumn, DeseqError> {
+    let exact = model_frame
+        .factors
+        .iter()
+        .filter(|column| column.name == factor)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [column] => return Ok(*column),
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("factor '{factor}' appears more than once in formula model frame"),
+            });
+        }
+    }
+
+    let matches = model_frame
+        .factors
+        .iter()
+        .filter(|column| {
+            candidate_names(&column.name)
+                .into_iter()
+                .any(|candidate| candidate == factor)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [column] => Ok(*column),
+        [] => Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' is not present in formula model frame"),
+        }),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' resolves ambiguously after R-style cleanup"),
+        }),
+    }
 }
 
 impl<'a> FactorLevelContrast<'a> {
@@ -314,7 +438,7 @@ impl ContrastSpec {
                 numerator,
                 denominator,
                 ..
-            } => format!("{factor}_{numerator}_vs_{denominator}"),
+            } => factor_level_result_name(factor, numerator, denominator),
         }
     }
 
@@ -512,8 +636,8 @@ fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
 /// This is the primitive-matrix analogue of DESeq2's
 /// `contrastAllZeroCharacter`: select samples whose supplied level is either
 /// `numerator` or `denominator`, then flag genes for which all selected raw
-/// counts are zero. Full factor validation remains caller or future-wrapper
-/// responsibility.
+/// counts are zero. Use [`factor_level_contrast_from_model_frame`] when the
+/// levels originate from owned formula metadata.
 pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
     counts: &CountMatrix,
     sample_levels: &[S],
@@ -581,37 +705,35 @@ fn resolve_factor_level_contrast(
 
     if let Some(reference) = reference {
         if numerator == reference {
-            let denominator_index = find_first_coefficient(
+            let denominator_index = find_treatment_or_expanded_coefficient(
                 names,
                 &standard_coefficient_names(factor, denominator, reference),
-            )
-            .or_else(|_| {
-                find_first_coefficient(names, &expanded_coefficient_names(factor, denominator))
-            })?;
+                &expanded_coefficient_names(factor, denominator),
+            )?;
             let mut values = vec![0.0; design.n_coefficients()];
             values[denominator_index] = -1.0;
             return Ok(values);
         }
         if denominator == reference {
-            let numerator_index = find_first_coefficient(
+            let numerator_index = find_treatment_or_expanded_coefficient(
                 names,
                 &standard_coefficient_names(factor, numerator, reference),
-            )
-            .or_else(|_| {
-                find_first_coefficient(names, &expanded_coefficient_names(factor, numerator))
-            })?;
+                &expanded_coefficient_names(factor, numerator),
+            )?;
             let mut values = vec![0.0; design.n_coefficients()];
             values[numerator_index] = 1.0;
             return Ok(values);
         }
 
-        let numerator_index = find_first_coefficient(
+        let numerator_index = find_treatment_or_expanded_coefficient(
             names,
             &standard_coefficient_names(factor, numerator, reference),
+            &expanded_coefficient_names(factor, numerator),
         )?;
-        let denominator_index = find_first_coefficient(
+        let denominator_index = find_treatment_or_expanded_coefficient(
             names,
             &standard_coefficient_names(factor, denominator, reference),
+            &expanded_coefficient_names(factor, denominator),
         )?;
         let mut values = vec![0.0; design.n_coefficients()];
         values[numerator_index] = 1.0;
@@ -619,18 +741,18 @@ fn resolve_factor_level_contrast(
         return Ok(values);
     }
 
-    if let Ok(index) = find_first_coefficient(
+    if let Some(index) = find_optional_coefficient(
         names,
         &standard_coefficient_names(factor, numerator, denominator),
-    ) {
+    )? {
         let mut values = vec![0.0; design.n_coefficients()];
         values[index] = 1.0;
         return Ok(values);
     }
-    if let Ok(index) = find_first_coefficient(
+    if let Some(index) = find_optional_coefficient(
         names,
         &standard_coefficient_names(factor, denominator, numerator),
-    ) {
+    )? {
         let mut values = vec![0.0; design.n_coefficients()];
         values[index] = -1.0;
         return Ok(values);
@@ -800,13 +922,17 @@ fn resolve_coefficient_name(names: &[String], wanted: &str) -> Result<usize, Des
     if let Ok(index) = find_coefficient(names, wanted) {
         return Ok(index);
     }
-    let candidates = coefficient_name_candidates(wanted)
-        .into_iter()
-        .filter(|candidate| candidate != wanted)
-        .collect::<Vec<_>>();
+    let candidates = coefficient_name_candidates(wanted);
     let matches = candidates
         .iter()
-        .filter_map(|candidate| names.iter().position(|name| name == candidate))
+        .flat_map(|candidate| {
+            names.iter().enumerate().filter_map(|(idx, name)| {
+                coefficient_name_candidates(name)
+                    .into_iter()
+                    .any(|name_candidate| name_candidate == *candidate)
+                    .then_some(idx)
+            })
+        })
         .collect::<HashSet<_>>();
     match matches.len() {
         0 => Err(DeseqError::InvalidOptions {
@@ -838,12 +964,62 @@ fn resolve_coefficient_name_list(
 
 fn coefficient_name_candidates(name: &str) -> Vec<String> {
     let mut candidates = candidate_names(name);
+    if name.contains(':') {
+        for candidate in interaction_coefficient_name_candidates(name) {
+            push_unique_candidate(&mut candidates, candidate);
+        }
+    }
     if name == "(Intercept)" {
         push_unique_candidate(&mut candidates, "Intercept".to_string());
     } else if name == "Intercept" {
         push_unique_candidate(&mut candidates, "(Intercept)".to_string());
     }
+    if let Some((factor_level, reference)) = name.split_once("_vs_") {
+        if let Some((factor, level)) = factor_level.rsplit_once('_') {
+            push_unique_candidate(
+                &mut candidates,
+                format!(
+                    "{}_{}_vs_{}",
+                    r_like_make_name(factor),
+                    r_like_make_name(level),
+                    r_like_make_name(reference)
+                ),
+            );
+            push_unique_candidate(
+                &mut candidates,
+                format!(
+                    "{}{}_vs_{}",
+                    r_like_make_name(factor),
+                    r_like_make_name(level),
+                    r_like_make_name(reference)
+                ),
+            );
+        }
+    }
     candidates
+}
+
+fn interaction_coefficient_name_candidates(name: &str) -> Vec<String> {
+    let parts = name.split(':').collect::<Vec<_>>();
+    if parts.len() < 2 {
+        return Vec::new();
+    }
+    let mut products = vec![String::new()];
+    for part in parts {
+        let part_candidates = candidate_names(part);
+        let mut next = Vec::new();
+        for prefix in &products {
+            for candidate in &part_candidates {
+                if prefix.is_empty() {
+                    next.push(candidate.clone());
+                } else {
+                    next.push(format!("{prefix}:{candidate}"));
+                }
+            }
+        }
+        products = next;
+    }
+    products
 }
 
 fn list_contrast_comparison(
@@ -882,15 +1058,56 @@ fn format_rounded_weight(weight: f64) -> String {
 }
 
 fn find_first_coefficient(names: &[String], candidates: &[String]) -> Result<usize, DeseqError> {
-    candidates
+    let matches = candidates
         .iter()
-        .find_map(|candidate| names.iter().position(|name| name == candidate))
-        .ok_or_else(|| DeseqError::InvalidOptions {
+        .flat_map(|candidate| {
+            names
+                .iter()
+                .enumerate()
+                .filter_map(move |(index, name)| (name == candidate).then_some(index))
+        })
+        .collect::<HashSet<_>>();
+    match matches.len() {
+        0 => Err(DeseqError::InvalidOptions {
             reason: format!(
                 "none of the candidate coefficients are present: {}",
                 candidates.join(", ")
             ),
-        })
+        }),
+        1 => Ok(*matches.iter().next().unwrap()),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "candidate coefficients resolve ambiguously after R-style cleanup: {}",
+                candidates.join(", ")
+            ),
+        }),
+    }
+}
+
+fn find_optional_coefficient(
+    names: &[String],
+    candidates: &[String],
+) -> Result<Option<usize>, DeseqError> {
+    match find_first_coefficient(names, candidates) {
+        Ok(index) => Ok(Some(index)),
+        Err(DeseqError::InvalidOptions { reason })
+            if reason.starts_with("none of the candidate coefficients are present") =>
+        {
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn find_treatment_or_expanded_coefficient(
+    names: &[String],
+    treatment_candidates: &[String],
+    expanded_candidates: &[String],
+) -> Result<usize, DeseqError> {
+    if let Some(index) = find_optional_coefficient(names, treatment_candidates)? {
+        return Ok(index);
+    }
+    find_first_coefficient(names, expanded_candidates)
 }
 
 fn find_shared_reference_standard_coefficients(
@@ -999,67 +1216,17 @@ fn standard_coefficient_candidates(factor: &str, level: &str, reference: &str) -
     candidates
 }
 
-fn candidate_names(raw: &str) -> Vec<String> {
-    let made = r_like_make_name(raw);
-    if made == raw {
-        vec![raw.to_string()]
-    } else {
-        vec![raw.to_string(), made]
-    }
-}
-
 fn push_unique_candidate(candidates: &mut Vec<String>, candidate: String) {
     if !candidates.iter().any(|existing| existing == &candidate) {
         candidates.push(candidate);
     }
 }
 
-fn r_like_make_name(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len().max(1));
-    for ch in raw.chars() {
-        if ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' {
-            out.push(ch);
-        } else {
-            out.push('.');
-        }
-    }
-    if out.is_empty() {
-        return "X".to_string();
-    }
-    let mut chars = out.chars();
-    let first = chars.next().unwrap_or('X');
-    let second = chars.next();
-    let invalid_start = !first.is_ascii_alphabetic() && first != '.'
-        || (first == '.' && second.is_some_and(|ch| ch.is_ascii_digit()));
-    if invalid_start {
-        out.insert(0, 'X');
-    }
-    if is_r_reserved_word(&out) {
-        out.push('.');
-    }
-    out
-}
-
-fn is_r_reserved_word(name: &str) -> bool {
-    matches!(
-        name,
-        "if" | "else"
-            | "repeat"
-            | "while"
-            | "function"
-            | "for"
-            | "in"
-            | "next"
-            | "break"
-            | "TRUE"
-            | "FALSE"
-            | "NULL"
-            | "Inf"
-            | "NaN"
-            | "NA"
-            | "NA_integer_"
-            | "NA_real_"
-            | "NA_complex_"
-            | "NA_character_"
+fn factor_level_result_name(factor: &str, numerator: &str, denominator: &str) -> String {
+    format!(
+        "{}_{}_vs_{}",
+        r_like_make_name(factor),
+        r_like_make_name(numerator),
+        r_like_make_name(denominator)
     )
 }

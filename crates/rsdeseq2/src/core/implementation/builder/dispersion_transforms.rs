@@ -5,7 +5,7 @@ impl DeseqBuilder {
         counts: &CountMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         let stages = self.normalization_stages(counts)?;
-        Ok(Self::base_fit(counts, None, stages.into_base_fit_input()))
+        Ok(self.base_fit(counts, None, stages.into_base_fit_input()))
     }
 
     /// Run initial normalization stages with design-aware observation-weight checks.
@@ -21,7 +21,7 @@ impl DeseqBuilder {
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         let stages = self.normalization_stages_for_design(counts, design)?;
-        Ok(Self::base_fit(
+        Ok(self.base_fit(
             counts,
             Some(design.clone()),
             stages.into_base_fit_input(),
@@ -57,7 +57,7 @@ impl DeseqBuilder {
             },
             self.gene_wise_dispersion_options,
         )?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
         fit.disp_gene_iter = Some(dispersion.disp_iter);
         fit.dispersion_converged = Some(dispersion.converged);
@@ -96,7 +96,7 @@ impl DeseqBuilder {
             self.gene_wise_dispersion_options,
             self.irls_options.clone(),
         )?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
         fit.disp_gene_iter = Some(dispersion.disp_iter);
         fit.dispersion_converged = Some(dispersion.converged);
@@ -362,7 +362,7 @@ impl DeseqBuilder {
                 })?;
         // The subset supplies only the trend; the transform is still evaluated
         // against the full count matrix and the caller's full-data offsets.
-        let full_fit = Self::base_fit(
+        let full_fit = self.base_fit(
             counts,
             Some(design.clone()),
             BaseFitInput {

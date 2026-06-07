@@ -1872,9 +1872,6 @@ mod tests {
         if let Some(path) = env::var_os("RSDESEQ2_RCOMPAT_HARD_OPTIM_FIXTURE") {
             candidates.push(PathBuf::from(path));
         }
-        candidates.push(PathBuf::from(
-            "/home/den/bio/rcompat-lbfgsb/fixtures/deseq_hard_real_subset/optim_cases.json",
-        ));
         candidates.push(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("../../../rcompat-lbfgsb/fixtures/deseq_hard_real_subset/optim_cases.json"),

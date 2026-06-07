@@ -1,9 +1,10 @@
 //! Common public imports for users of the `rsdeseq2` crate.
 
 pub use crate::contrasts::{
-    contrast_all_zero_factor_levels, contrast_all_zero_numeric, resolve_coefficient_index,
-    resolve_contrast, resolve_results_contrast, ContrastSpec, FactorLevelContrast,
-    ResolvedResultsContrast, ResultsContrast, ResultsContrastAllZero,
+    contrast_all_zero_factor_levels, contrast_all_zero_numeric,
+    factor_level_contrast_from_model_frame, resolve_coefficient_index, resolve_contrast,
+    resolve_results_contrast, ContrastSpec, FactorLevelContrast, ResolvedResultsContrast,
+    ResultsContrast, ResultsContrastAllZero,
 };
 pub use crate::cooks::{
     calculate_cooks_distance, max_cooks_after_replacement_refit, prepare_cooks_replacement_refit,
@@ -21,10 +22,12 @@ pub use crate::core::{
 pub use crate::design::{
     expanded_additive_design, expanded_additive_design_with_all_interactions,
     expanded_additive_design_with_interactions, expanded_additive_factor_design,
-    expanded_factor_design, expanded_formula_design, expanded_formula_design_with_offsets,
+    expanded_factor_design, expanded_formula_design, expanded_formula_design_from_model_frame,
+    expanded_formula_design_with_offsets, expanded_formula_design_with_offsets_from_model_frame,
     DesignMatrix, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
     ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec,
     ExpandedFormulaDesignWithOffsets, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+    FormulaFactorColumn, FormulaModelFrame, FormulaNumericColumn, ResolvedFormulaFactorReference,
 };
 pub use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,
@@ -180,6 +183,14 @@ pub use crate::results::{
     fit_expanded_formula_beta_prior_wald_results_with_cooks_replacement,
     fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights,
     fit_expanded_formula_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement,
+    fit_expanded_formula_model_frame_beta_prior_wald_contrast_results,
+    fit_expanded_formula_model_frame_beta_prior_wald_contrast_results_with_cooks_replacement,
+    fit_expanded_formula_model_frame_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
+    fit_expanded_formula_model_frame_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement,
+    fit_expanded_formula_model_frame_beta_prior_wald_results,
+    fit_expanded_formula_model_frame_beta_prior_wald_results_with_cooks_replacement,
+    fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights,
+    fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement,
     recompute_padj, resolve_cooks_cutoff, rsdeseq2_result_diagnostic_column_names,
     DeseqResultColumn, DeseqResultColumnMetadata, DeseqResultColumnValues, DeseqResultRow,
     DeseqResults, DeseqResultsDataFrame, DeseqResultsMetadata, DeseqResultsTableMetadata,
@@ -190,7 +201,9 @@ pub use crate::results::{
     ExpandedBetaPriorWaldResultsInput, ExpandedFactorBetaPriorWaldNormalizedResultsInput,
     ExpandedFactorBetaPriorWaldReplacementResults, ExpandedFactorBetaPriorWaldResults,
     ExpandedFactorBetaPriorWaldResultsInput, ExpandedFormulaBetaPriorWaldNormalizedResultsInput,
-    ExpandedFormulaBetaPriorWaldResultsInput, DESEQ2_RESULT_CORE_COLUMNS,
+    ExpandedFormulaBetaPriorWaldResultsInput,
+    ExpandedFormulaModelFrameBetaPriorWaldNormalizedResultsInput,
+    ExpandedFormulaModelFrameBetaPriorWaldResultsInput, DESEQ2_RESULT_CORE_COLUMNS,
     RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
 };
 pub use crate::transform::{

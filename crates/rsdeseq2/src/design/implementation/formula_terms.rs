@@ -32,10 +32,18 @@ fn join_formula_terms(terms: &[String]) -> String {
 fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError> {
     let mut terms = Vec::new();
     let mut depth = 0_i32;
+    let mut in_backticks = false;
     let mut sign = 1_i8;
     let mut start = 0_usize;
     let mut saw_term = false;
     for (idx, character) in rhs.char_indices() {
+        if character == '`' {
+            in_backticks = !in_backticks;
+            continue;
+        }
+        if in_backticks {
+            continue;
+        }
         match character {
             '(' => depth += 1,
             ')' => {
@@ -71,6 +79,11 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
             reason: "formula parentheses are unbalanced".to_string(),
         });
     }
+    if in_backticks {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
+        });
+    }
     let term = rhs[start..].trim();
     if term.is_empty() {
         return Err(DeseqError::InvalidOptions {
@@ -88,6 +101,14 @@ fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqErr
             reason: format!("formula term '{term}' contains unsupported nested subtraction"),
         });
     }
+    let power_pieces = split_formula_top_level(term, '^')?;
+    if power_pieces.len() > 1 {
+        return expand_parenthesized_formula_power(term, &power_pieces);
+    }
+    let nested_in_pieces = split_formula_top_level_operator(term, "%in%")?;
+    if nested_in_pieces.len() > 1 {
+        return expand_parenthesized_formula_in_operator(term, &nested_in_pieces);
+    }
     let additive_pieces = split_formula_top_level(term, '+')?;
     if additive_pieces.len() > 1 {
         return split_formula_additive_group(term);
@@ -98,10 +119,28 @@ fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqErr
             return expand_parenthesized_formula_operator(&pieces, delimiter);
         }
     }
-    if term.contains('(') || term.contains(')') {
+    if formula_contains_unquoted_parentheses(term) {
         return split_formula_additive_group(term);
     }
     Ok(vec![term.to_string()])
+}
+
+fn expand_parenthesized_formula_in_operator(
+    term: &str,
+    pieces: &[String],
+) -> Result<Vec<String>, DeseqError> {
+    if pieces.len() != 2 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula nesting term '{term}' must use one '%in%' operator"),
+        });
+    }
+    let inner = split_formula_additive_group(&pieces[0])?;
+    let outer = split_formula_additive_group(&pieces[1])?;
+    let alternatives = [outer, inner];
+    Ok(formula_alternative_products(&alternatives)
+        .into_iter()
+        .map(|product| product.join(":"))
+        .collect())
 }
 
 fn expand_parenthesized_formula_operator(
@@ -148,6 +187,54 @@ fn expand_parenthesized_star(alternatives: &[Vec<String>]) -> Result<Vec<String>
     Ok(terms)
 }
 
+fn expand_parenthesized_formula_power(
+    term: &str,
+    pieces: &[String],
+) -> Result<Vec<String>, DeseqError> {
+    if pieces.len() != 2 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula power term '{term}' must have one exponent"),
+        });
+    }
+    let terms = split_formula_additive_group(&pieces[0])?;
+    if terms.iter().any(|term| term == ".") {
+        return Ok(vec![term.to_string()]);
+    }
+    let order = parse_formula_interaction_power(term, &pieces[1])?;
+    let max_order = order.min(terms.len());
+    let mut expanded = Vec::new();
+    for interaction_order in 1..=max_order {
+        for combination in formula_term_combinations(&terms, interaction_order) {
+            push_unique_formula_term(&mut expanded, combination.join(":"));
+        }
+    }
+    Ok(expanded)
+}
+
+fn parse_formula_interaction_power(term: &str, exponent: &str) -> Result<usize, DeseqError> {
+    let exponent = exponent.trim();
+    if exponent.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula power term '{term}' has an empty exponent"),
+        });
+    }
+    let order = exponent
+        .parse::<usize>()
+        .map_err(|_| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula power term '{term}' requires a positive integer exponent"
+            ),
+        })?;
+    if order == 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula power term '{term}' requires a positive integer exponent"
+            ),
+        });
+    }
+    Ok(order)
+}
+
 fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     let stripped = strip_formula_outer_parentheses(term.trim())?;
     let pieces = split_formula_top_level(stripped, '+')?;
@@ -157,7 +244,7 @@ fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
                 reason: format!("formula term '{term}' contains unsupported nested subtraction"),
             });
         }
-        if stripped.contains('(') || stripped.contains(')') {
+        if formula_contains_unquoted_parentheses(stripped) {
             return expand_parenthesized_formula_term(stripped);
         }
         return Ok(vec![stripped.to_string()]);
@@ -217,8 +304,16 @@ fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
 fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
     let mut pieces = Vec::new();
     let mut depth = 0_i32;
+    let mut in_backticks = false;
     let mut start = 0_usize;
     for (idx, character) in term.char_indices() {
+        if character == '`' {
+            in_backticks = !in_backticks;
+            continue;
+        }
+        if in_backticks {
+            continue;
+        }
         match character {
             '(' => depth += 1,
             ')' => {
@@ -245,6 +340,97 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
     if depth != 0 {
         return Err(DeseqError::InvalidOptions {
             reason: "formula parentheses are unbalanced".to_string(),
+        });
+    }
+    if in_backticks {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
+        });
+    }
+    let piece = term[start..].trim();
+    if piece.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula term '{term}' contains an empty component"),
+        });
+    }
+    pieces.push(piece.to_string());
+    Ok(pieces)
+}
+
+fn formula_contains_unquoted_parentheses(term: &str) -> bool {
+    let mut in_backticks = false;
+    for character in term.chars() {
+        if character == '`' {
+            in_backticks = !in_backticks;
+            continue;
+        }
+        if !in_backticks && matches!(character, '(' | ')') {
+            return true;
+        }
+    }
+    false
+}
+
+fn formula_contains_top_level(term: &str, delimiter: char) -> Result<bool, DeseqError> {
+    Ok(split_formula_top_level(term, delimiter)?.len() > 1)
+}
+
+fn split_formula_top_level_operator(
+    term: &str,
+    operator: &str,
+) -> Result<Vec<String>, DeseqError> {
+    let mut pieces = Vec::new();
+    let mut depth = 0_i32;
+    let mut in_backticks = false;
+    let mut start = 0_usize;
+    let mut idx = 0_usize;
+    while idx < term.len() {
+        let Some(character) = term[idx..].chars().next() else {
+            break;
+        };
+        if character == '`' {
+            in_backticks = !in_backticks;
+            idx += character.len_utf8();
+            continue;
+        }
+        if in_backticks {
+            idx += character.len_utf8();
+            continue;
+        }
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: "formula parentheses are unbalanced".to_string(),
+                    });
+                }
+            }
+            _ if depth == 0 && term[idx..].starts_with(operator) => {
+                let piece = term[start..idx].trim();
+                if piece.is_empty() {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!("formula term '{term}' contains an empty component"),
+                    });
+                }
+                pieces.push(piece.to_string());
+                idx += operator.len();
+                start = idx;
+                continue;
+            }
+            _ => {}
+        }
+        idx += character.len_utf8();
+    }
+    if depth != 0 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula parentheses are unbalanced".to_string(),
+        });
+    }
+    if in_backticks {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
         });
     }
     let piece = term[start..].trim();
@@ -297,6 +483,33 @@ fn formula_group_combinations(groups: &[Vec<String>], order: usize) -> Vec<Vec<V
     }
     let mut output = Vec::new();
     push_group_combinations(groups, order, 0, &mut Vec::new(), &mut output);
+    output
+}
+
+fn formula_term_combinations(terms: &[String], order: usize) -> Vec<Vec<String>> {
+    fn push_term_combinations(
+        terms: &[String],
+        order: usize,
+        start: usize,
+        current: &mut Vec<String>,
+        output: &mut Vec<Vec<String>>,
+    ) {
+        if current.len() == order {
+            output.push(current.clone());
+            return;
+        }
+        let remaining = order - current.len();
+        for idx in start..=terms.len() - remaining {
+            current.push(terms[idx].clone());
+            push_term_combinations(terms, order, idx + 1, current, output);
+            current.pop();
+        }
+    }
+    if order == 0 || order > terms.len() {
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    push_term_combinations(terms, order, 0, &mut Vec::new(), &mut output);
     output
 }
 

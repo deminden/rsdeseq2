@@ -696,9 +696,10 @@ primitive `- term` subtraction for the same supported term subset. Additive
 parenthesized groups, including nested additive groups, distribute through
 `*`, `:`, `/`, and subtraction in that same primitive subset. Integer numeric
 power transforms such as `I(dose^2)` and common numeric function transforms
-`log(numeric)`, `log2(numeric)`, `log10(numeric)`, `sqrt(numeric)`, and
-`scale(numeric)` are materialized as derived numeric covariates with sanitized
-coefficient names. `scale(numeric)` supports boolean or scalar numeric
+`log(numeric)`, `log2(numeric)`, `log10(numeric)`, `log1p(numeric)`,
+`sqrt(numeric)`, and `scale(numeric)` are materialized as derived numeric
+covariates with sanitized coefficient names. `scale(numeric)` supports boolean
+or scalar numeric
 `center=` and `scale=` arguments and follows R's single-column default:
 centered scaling divides by sample standard deviation, while uncentered
 scaling divides by root mean square.
@@ -707,10 +708,11 @@ Raw polynomial transforms `poly(numeric, degree, raw=TRUE)` are materialized as
 group participates in supported main-effect, interaction, shorthand, and
 subtraction expansion. Orthogonal `poly()` remains outside the native formula
 subset.
-`offset(numeric)` terms are extracted by
-`expanded_formula_design_with_offsets()` into per-sample log-offset vectors,
-with multiple offsets summed sample-wise. Formula-driven fit-and-results
-helpers exponentiate those log offsets and multiply them into either
+`offset(numeric)` terms and single-vector supported transform offsets such as
+`offset(log2(numeric))` or `offset(I(numeric + other_numeric))` are extracted
+by `expanded_formula_design_with_offsets()` into per-sample log-offset
+vectors, with multiple offsets summed sample-wise. Formula-driven
+fit-and-results helpers exponentiate those log offsets and multiply them into either
 sample-level size factors expanded across genes or supplied gene/sample
 normalization factors, then run the same expanded beta-prior Wald coefficient
 and numeric-contrast workflows from the parsed design. Splines, arbitrary R
@@ -885,8 +887,12 @@ wrapper can use fitted `factorLevels` or factor-valued `colData` to infer the
 reference level for character triplet contrasts. Primitive Rust, CLI, and R
 already-fitted result routes now cover DESeq2-style character, list/listValues,
 and numeric `results(contrast=...)` semantics, including `contrast` taking
-precedence over `name`. Remaining work is high-level Bioconductor object
-mutation/plumbing and broader contrast-aware Cook's/refit edge-case handling.
+precedence over `name`. Stored `DeseqFit` objects expose a single
+`results_contrast_request()` dispatcher that selects Wald or LRT behavior from
+the fitted test state while preserving branch-specific contrast semantics and
+contrast-all-zero cleanup for character and two-sided numeric/list contrasts.
+Remaining work is high-level Bioconductor object mutation/plumbing and broader
+contrast-aware Cook's/refit edge-case handling.
 
 For primitive numeric contrasts with both positive and negative coefficients,
 the supplied-dispersion and native linear-mu/GLM-mu Wald contrast pipelines
@@ -1194,8 +1200,17 @@ primitive contrasts. `fit_contrast()`,
 rows for primitive numeric, named/list, and caller-supplied factor-level Wald
 contrasts. Compatibility-named parametric Wald helpers expose the same
 contrast shapes while pinning the dispersion trend to the parametric branch.
+Builder-created `DeseqFit` objects retain optional formula/model-frame
+metadata, including factor levels and references, for later wrapper or
+already-fitted-object Wald/LRT `results(contrast=...)` assembly through the
+unified fitted-object contrast dispatcher.
 The corresponding `*_with_cooks_replacement()` helpers expose the limited
-replacement-refit workflow when callers supply replacement options. LRT
+replacement-refit workflow when callers supply replacement options; formula
+contrast-request replacement helpers use the same exact-first R-cleaned
+coefficient aliases as the non-replacement result routes. Stored formula
+model-frame metadata also lets selected-coefficient Wald replacement refits
+reuse the two-group low-count Cook's gate when the selected coefficient is the
+non-reference comparison for one two-level factor. LRT
 remains available through `DeseqBuilder::fit_lrt()`,
 `DeseqBuilder::fit_lrt_name()`,
 `DeseqBuilder::fit_lrt_contrast()`,

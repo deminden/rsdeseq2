@@ -84,14 +84,9 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -174,14 +169,9 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -300,14 +290,9 @@ impl DeseqBuilder {
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -401,14 +386,9 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -499,14 +479,9 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -623,14 +598,9 @@ impl DeseqBuilder {
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 
@@ -721,14 +691,9 @@ impl DeseqBuilder {
             Some(&contrast_all_zero),
             fit,
         )?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
         Ok((fit, results))
     }
 }

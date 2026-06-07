@@ -7,6 +7,12 @@ pub struct DeseqFit {
     pub design: Option<DesignMatrix>,
     /// Optional reduced design matrix information for likelihood-ratio tests.
     pub reduced_design: Option<DesignMatrix>,
+    /// Optional formula/model-frame metadata used to construct the design.
+    ///
+    /// This lets already-fitted object routes keep factor levels, references,
+    /// and R-cleaned alias behavior without asking callers to repeat the same
+    /// metadata for later result or replacement/refit requests.
+    pub model_frame: Option<FormulaModelFrame>,
     /// Estimated or supplied size factors.
     pub size_factors: Vec<f64>,
     /// Optional gene/sample normalization factors.
@@ -128,6 +134,7 @@ pub struct DeseqBuilder {
     execution_mode: ExecutionMode,
     threads: Option<usize>,
     reduced_design: Option<DesignMatrix>,
+    model_frame: Option<FormulaModelFrame>,
     irls_options: IrlsOptions,
     gene_wise_dispersion_options: GeneWiseDispersionOptions,
     wald_test_options: WaldTestOptions,
@@ -200,6 +207,200 @@ impl DeseqFit {
     /// Short alias for [`DeseqFit::variance_stabilizing_transform`].
     pub fn vst(&self, counts: &CountMatrix) -> Result<RowMajorMatrix<f64>, DeseqError> {
         self.variance_stabilizing_transform(counts)
+    }
+
+    /// Formula/model-frame metadata stored with this fit, if available.
+    pub fn current_model_frame(&self) -> Option<&FormulaModelFrame> {
+        self.model_frame.as_ref()
+    }
+
+    /// Assemble `results(contrast=...)` rows from this already-fitted object.
+    ///
+    /// The stored test state chooses Wald or LRT behavior. Character triplet
+    /// contrasts use retained formula/model-frame metadata when available.
+    pub fn results_contrast_request(
+        &self,
+        counts: &CountMatrix,
+        contrast: &ResultsContrast,
+        gene_names: Option<&[String]>,
+    ) -> Result<DeseqResults, DeseqError> {
+        match (self.wald.is_some(), self.lrt.is_some()) {
+            (true, false) => self.wald_results_contrast_request(counts, contrast, gene_names),
+            (false, true) => self.lrt_results_contrast_request(counts, contrast, gene_names),
+            (true, true) => Err(DeseqError::InvalidOptions {
+                reason: "fitted-object contrast results require either Wald or LRT output, not both"
+                    .to_string(),
+            }),
+            (false, false) => Err(DeseqError::InvalidOptions {
+                reason: "fitted-object contrast results require stored Wald or LRT output"
+                    .to_string(),
+            }),
+        }
+    }
+
+    /// Assemble Wald `results(contrast=...)` rows from this already-fitted object.
+    ///
+    /// Character triplet contrasts use stored formula/model-frame metadata for
+    /// factor levels and references. List and numeric contrasts use the design
+    /// coefficient names carried by the fitted GLM state.
+    pub fn wald_results_contrast_request(
+        &self,
+        counts: &CountMatrix,
+        contrast: &ResultsContrast,
+        gene_names: Option<&[String]>,
+    ) -> Result<DeseqResults, DeseqError> {
+        validate_fit_counts_shape(self, counts, "Wald results contrast request")?;
+        let fit = self.as_nbinom_glm_fit()?;
+        let numeric_contrast = match contrast {
+            ResultsContrast::Character { .. } => {
+                let model_frame =
+                    self.model_frame
+                        .as_ref()
+                        .ok_or_else(|| DeseqError::InvalidOptions {
+                            reason: "character results contrast requires stored formula model-frame metadata or explicit sample levels".to_string(),
+                        })?;
+                let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
+                    })?;
+                let contrast_spec = factor_level_contrast_spec(factor_contrast);
+                let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
+                let contrast_all_zero = contrast_all_zero_factor_levels(
+                    counts,
+                    factor_contrast.sample_levels,
+                    factor_contrast.numerator,
+                    factor_contrast.denominator,
+                )?;
+                let mut output = wald_test_contrast_with_options(
+                    &fit,
+                    &numeric,
+                    &WaldTestOptions::default(),
+                )?;
+                apply_contrast_all_zero_to_wald_contrast(
+                    &mut output,
+                    &contrast_all_zero,
+                    &self.all_zero,
+                )?;
+                let mut results = build_wald_contrast_results(
+                    &self.base_mean,
+                    &fit,
+                    &output,
+                    gene_names,
+                    self.dispersion.as_deref(),
+                )?;
+                results.apply_wald_test_options(&WaldTestOptions::default());
+                self.attach_fit_diagnostics_to_results(&mut results)?;
+                let (result_name, comparison) = factor_level_result_metadata(factor_contrast);
+                results.metadata.result_name = Some(result_name);
+                results.metadata.comparison = Some(comparison);
+                return Ok(results);
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                contrast.as_contrast_spec()
+            }
+        };
+        let numeric = resolve_contrast(&fit.model_matrix, &numeric_contrast)?;
+        let mut output =
+            wald_test_contrast_with_options(&fit, &numeric, &WaldTestOptions::default())?;
+        let contrast_all_zero = contrast_all_zero_numeric(counts, &fit.model_matrix, &numeric)?;
+        apply_contrast_all_zero_to_wald_contrast(
+            &mut output,
+            &contrast_all_zero,
+            &self.all_zero,
+        )?;
+        let mut results = build_wald_contrast_results(
+            &self.base_mean,
+            &fit,
+            &output,
+            gene_names,
+            self.dispersion.as_deref(),
+        )?;
+        results.apply_wald_test_options(&WaldTestOptions::default());
+        self.attach_fit_diagnostics_to_results(&mut results)?;
+        results.metadata.result_name = Some(numeric_contrast.result_name());
+        results.metadata.comparison = Some(numeric_contrast.comparison());
+        Ok(results)
+    }
+
+    /// Assemble LRT `results(contrast=...)` rows from this already-fitted object.
+    ///
+    /// The LRT statistic and p-value come from the stored full-vs-reduced test;
+    /// the requested contrast only changes the reported effect-size columns.
+    pub fn lrt_results_contrast_request(
+        &self,
+        counts: &CountMatrix,
+        contrast: &ResultsContrast,
+        gene_names: Option<&[String]>,
+    ) -> Result<DeseqResults, DeseqError> {
+        validate_fit_counts_shape(self, counts, "LRT results contrast request")?;
+        let fit = self.as_nbinom_glm_fit()?;
+        let lrt = self.lrt.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored LRT output is required for LRT contrast results".to_string(),
+        })?;
+        let numeric_contrast = match contrast {
+            ResultsContrast::Character { .. } => {
+                let model_frame =
+                    self.model_frame
+                        .as_ref()
+                        .ok_or_else(|| DeseqError::InvalidOptions {
+                            reason: "character results contrast requires stored formula model-frame metadata or explicit sample levels".to_string(),
+                        })?;
+                let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
+                    })?;
+                let contrast_spec = factor_level_contrast_spec(factor_contrast);
+                let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
+                let contrast_all_zero = contrast_all_zero_factor_levels(
+                    counts,
+                    factor_contrast.sample_levels,
+                    factor_contrast.numerator,
+                    factor_contrast.denominator,
+                )?;
+                let output = wald_test_contrast_with_options(
+                    &fit,
+                    &numeric,
+                    &WaldTestOptions::default(),
+                )?;
+                let mut results = build_lrt_contrast_results(
+                    &self.base_mean,
+                    &fit,
+                    lrt,
+                    &output,
+                    gene_names,
+                    self.dispersion.as_deref(),
+                )?;
+                self.attach_fit_diagnostics_to_results(&mut results)?;
+                apply_contrast_all_zero_to_lrt_results(
+                    &mut results,
+                    &contrast_all_zero,
+                    &self.all_zero,
+                )?;
+                let (result_name, comparison) = factor_level_result_metadata(factor_contrast);
+                results.metadata.result_name = Some(result_name);
+                results.metadata.comparison = Some(comparison);
+                return Ok(results);
+            }
+            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
+                contrast.as_contrast_spec()
+            }
+        };
+        let numeric = resolve_contrast(&fit.model_matrix, &numeric_contrast)?;
+        let output = wald_test_contrast_with_options(&fit, &numeric, &WaldTestOptions::default())?;
+        let mut results = build_lrt_contrast_results(
+            &self.base_mean,
+            &fit,
+            lrt,
+            &output,
+            gene_names,
+            self.dispersion.as_deref(),
+        )?;
+        self.attach_fit_diagnostics_to_results(&mut results)?;
+        let contrast_all_zero = contrast_all_zero_numeric(counts, &fit.model_matrix, &numeric)?;
+        apply_contrast_all_zero_to_lrt_results(&mut results, &contrast_all_zero, &self.all_zero)?;
+        results.metadata.result_name = Some(numeric_contrast.result_name());
+        results.metadata.comparison = Some(numeric_contrast.comparison());
+        Ok(results)
     }
 
     /// Apply the implemented regularized-log sample-effect transform.
@@ -472,6 +673,140 @@ impl DeseqFit {
             self.normalization_factors.as_ref(),
             self.observation_weights.as_ref(),
         )
+    }
+
+    fn as_nbinom_glm_fit(&self) -> Result<NbinomGlmFit, DeseqError> {
+        let design = self.design.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored design is required for fitted-object results".to_string(),
+        })?;
+        let beta = self.beta.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored beta matrix is required for fitted-object results".to_string(),
+        })?;
+        let beta_se = self
+            .beta_se
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "stored beta standard-error matrix is required for fitted-object results"
+                    .to_string(),
+            })?;
+        let beta_optim_start =
+            self.beta_optim_start
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta optimizer starts are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let beta_converged =
+            self.beta_converged
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta convergence flags are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let beta_iter = self.beta_iter.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored beta iteration counts are required for fitted-object results".to_string(),
+        })?;
+        let beta_optim_iter =
+            self.beta_optim_iter
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta optimizer iterations are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let beta_optim_start_objective =
+            self.beta_optim_start_objective
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta optimizer start objectives are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let beta_optim_objective =
+            self.beta_optim_objective
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta optimizer objectives are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let beta_optim_gradient_norm =
+            self.beta_optim_gradient_norm
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored beta optimizer gradient norms are required for fitted-object results"
+                        .to_string(),
+                })?;
+        let log_like = self.log_like.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored log likelihoods are required for fitted-object results".to_string(),
+        })?;
+        let mu = self.mu.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored fitted means are required for fitted-object results".to_string(),
+        })?;
+        let hat_diagonal =
+            self.hat_diagonal
+                .as_ref()
+                .ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: "stored hat diagonals are required for fitted-object results".to_string(),
+                })?;
+        Ok(NbinomGlmFit {
+            log_like: log_like.clone(),
+            beta_converged: beta_converged.clone(),
+            beta: beta.clone(),
+            beta_se: beta_se.clone(),
+            beta_optim_start: beta_optim_start.clone(),
+            beta_covariance: self.beta_covariance.clone(),
+            mu: mu.clone(),
+            beta_iter: beta_iter.clone(),
+            beta_optim_iter: beta_optim_iter.clone(),
+            beta_optim_start_objective: beta_optim_start_objective.clone(),
+            beta_optim_objective: beta_optim_objective.clone(),
+            beta_optim_gradient_norm: beta_optim_gradient_norm.clone(),
+            model_matrix: design.clone(),
+            n_terms: design.n_coefficients(),
+            hat_diagonal: hat_diagonal.clone(),
+        })
+    }
+
+    fn attach_fit_diagnostics_to_results(
+        &self,
+        results: &mut DeseqResults,
+    ) -> Result<(), DeseqError> {
+        if results.rows.len() != self.all_zero.len() {
+            return Err(invalid_dimensions(
+                "fitted-object result rows",
+                self.all_zero.len(),
+                results.rows.len(),
+            ));
+        }
+        if let Some(max_cooks) = &self.max_cooks {
+            if max_cooks.len() != results.rows.len() {
+                return Err(invalid_dimensions(
+                    "fitted-object maxCooks rows",
+                    results.rows.len(),
+                    max_cooks.len(),
+                ));
+            }
+            for (row, max_cook) in results.rows.iter_mut().zip(max_cooks.iter().copied()) {
+                row.max_cooks = max_cook;
+            }
+        }
+        for (row, all_zero) in results.rows.iter_mut().zip(&self.all_zero) {
+            if *all_zero {
+                row.converged = None;
+                row.max_cooks = None;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn factor_level_contrast_spec(contrast: FactorLevelContrast<'_>) -> ContrastSpec {
+    match contrast.reference {
+        Some(reference) => ContrastSpec::factor_level_with_reference(
+            contrast.factor,
+            contrast.numerator,
+            contrast.denominator,
+            reference,
+        ),
+        None => ContrastSpec::factor_level(contrast.factor, contrast.numerator, contrast.denominator),
     }
 }
 

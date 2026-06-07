@@ -4,10 +4,11 @@ use crate::cooks::{
 };
 use crate::core::CountMatrix;
 use crate::design::{
-    expanded_factor_design, expanded_formula_design_with_offsets, DesignMatrix,
+    expanded_factor_design, expanded_formula_design_with_offsets,
+    expanded_formula_design_with_offsets_from_model_frame, DesignMatrix,
     ExpandedAdditiveFactorDesign, ExpandedFactorDesign, ExpandedFactorInteractionSpec,
-    ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec, ExpandedNumericInteractionSpec,
-    ExpandedNumericSpec,
+    ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec, ExpandedFormulaDesignWithOffsets,
+    ExpandedNumericInteractionSpec, ExpandedNumericSpec, FormulaModelFrame,
 };
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::glm::{
@@ -412,6 +413,32 @@ pub struct ExpandedFormulaBetaPriorWaldResultsInput<'a> {
     pub options: BetaPriorRefitOptions,
 }
 
+/// Inputs for a formula-driven expanded beta-prior Wald workflow using owned
+/// model-frame sample metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFormulaModelFrameBetaPriorWaldResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`].
+    pub formula: &'a str,
+    /// Owned factor and numeric covariates referenced by the formula.
+    pub model_frame: &'a FormulaModelFrame,
+    /// Per-sample size factors.
+    pub size_factors: &'a [f64],
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
 /// Inputs for a formula-driven expanded beta-prior Wald workflow with normalization factors.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'a> {
@@ -423,6 +450,32 @@ pub struct ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'a> {
     pub factors: &'a [ExpandedFactorSpec<'a>],
     /// Candidate numeric covariates referenced by the formula.
     pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    /// Gene x sample normalization-factor matrix.
+    pub normalization_factors: &'a RowMajorMatrix<f64>,
+    /// Optional normalized observation weights.
+    pub weights: Option<&'a RowMajorMatrix<f64>>,
+    /// Per-gene final dispersions used by the fixed-dispersion GLM.
+    pub dispersions: &'a [f64],
+    /// Per-gene base means used for result rows and beta-prior weights.
+    pub base_mean: &'a [f64],
+    /// Per-gene fitted dispersion trend used for beta-prior weights.
+    pub disp_fit: &'a [f64],
+    /// Optional gene names for result rows.
+    pub gene_names: Option<&'a [String]>,
+    /// Beta-prior refit options.
+    pub options: BetaPriorRefitOptions,
+}
+
+/// Inputs for a formula-driven expanded beta-prior Wald workflow with
+/// normalization factors and owned model-frame sample metadata.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpandedFormulaModelFrameBetaPriorWaldNormalizedResultsInput<'a> {
+    /// Raw count matrix.
+    pub counts: &'a CountMatrix,
+    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`].
+    pub formula: &'a str,
+    /// Owned factor and numeric covariates referenced by the formula.
+    pub model_frame: &'a FormulaModelFrame,
     /// Gene x sample normalization-factor matrix.
     pub normalization_factors: &'a RowMajorMatrix<f64>,
     /// Optional normalized observation weights.

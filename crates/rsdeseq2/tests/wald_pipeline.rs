@@ -729,7 +729,7 @@ fn original_zero_intercept_factor_level_contrasts_return_signed_lfcs() {
     );
     assert_eq!(
         result_21.metadata.result_name.as_deref(),
-        Some("condition_2_vs_1")
+        Some("condition_X2_vs_X1")
     );
 }
 
@@ -996,6 +996,328 @@ fn fixed_dispersion_wald_results_character_contrast_requires_sample_levels() {
 }
 
 #[test]
+fn fixed_dispersion_wald_results_character_contrast_uses_formula_model_frame() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        6,
+        vec![
+            0, 0, 0, 0, 10, 10, //
+            10, 10, 20, 20, 40, 40,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "condition_C_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "B", "B", "C", "C"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: levels.clone(),
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+
+    let (_explicit_fit, explicit_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_results_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            Some(&levels),
+        )
+        .unwrap();
+    let (_model_frame_fit, model_frame_results) = builder
+        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            &model_frame,
+        )
+        .unwrap();
+    let builder_with_model_frame = builder.clone().model_frame(model_frame.clone());
+    assert_eq!(
+        builder_with_model_frame.current_model_frame(),
+        Some(&model_frame)
+    );
+    let (_stored_model_frame_fit, stored_model_frame_results) = builder_with_model_frame
+        .fit_fixed_dispersion_wald_results_contrast::<String>(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(model_frame_results, explicit_results);
+    assert_eq!(stored_model_frame_results, explicit_results);
+    assert_eq!(model_frame_results.rows[0].log2_fold_change, Some(0.0));
+    assert_eq!(model_frame_results.rows[0].pvalue, Some(1.0));
+    assert_eq!(
+        model_frame_results.metadata.result_name.as_deref(),
+        Some("condition_B_vs_A")
+    );
+}
+
+#[test]
+fn fixed_dispersion_wald_model_frame_contrast_uses_declared_factor_levels() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        6,
+        vec![
+            8, 5, 9, 6, 14, 16, //
+            30, 20, 36, 24, 50, 58,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "condition_C_vs_A".into(),
+        ]),
+    )
+    .unwrap();
+    let observed_levels = ["B", "A", "B", "A", "C", "C"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: observed_levels.clone(),
+            levels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 6])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+
+    let (_explicit_fit, explicit_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_factor_level_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
+        )
+        .unwrap();
+    let (_model_frame_fit, model_frame_results) = builder
+        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "C", "B"),
+            &model_frame,
+        )
+        .unwrap();
+
+    assert_eq!(model_frame_results, explicit_results);
+    assert_eq!(
+        model_frame_results.metadata.result_name.as_deref(),
+        Some("condition_C_vs_B")
+    );
+    assert_eq!(
+        model_frame_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition C vs B")
+    );
+}
+
+#[test]
+fn fixed_dispersion_wald_model_frame_contrast_uses_unused_declared_reference_with_expanded_design()
+{
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        4,
+        vec![
+            8, 9, 14, 16, //
+            30, 36, 50, 58,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            0.0, 1.0, //
+            0.0, 1.0,
+        ],
+        Some(vec!["conditionB".into(), "conditionC".into()]),
+    )
+    .unwrap();
+    let observed_levels = ["B", "B", "C", "C"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: observed_levels.clone(),
+            levels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 4])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+
+    let (_explicit_fit, explicit_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_factor_level_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            FactorLevelContrast::with_reference("condition", "C", "B", "A", &observed_levels),
+        )
+        .unwrap();
+    let (_model_frame_fit, model_frame_results) = builder
+        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "C", "B"),
+            &model_frame,
+        )
+        .unwrap();
+
+    assert_eq!(model_frame_results, explicit_results);
+    assert_eq!(
+        model_frame_results.metadata.result_name.as_deref(),
+        Some("condition_C_vs_B")
+    );
+    assert_eq!(
+        model_frame_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: condition C vs B")
+    );
+}
+
+#[test]
+fn fixed_dispersion_wald_model_frame_contrast_accepts_cleaned_factor_name_alias() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        4,
+        vec![
+            0, 0, 10, 10, //
+            10, 20, 40, 50,
+        ],
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "cell.type_B.1_vs_A.0".into()]),
+    )
+    .unwrap();
+    let levels = ["A 0", "A 0", "B-1", "B-1"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels.clone(),
+            levels: Some(vec!["A 0".to_string(), "B-1".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .size_factors(vec![1.0; 4])
+        .disable_cooks_cutoff()
+        .disable_independent_filtering();
+
+    let (_explicit_fit, explicit_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald_factor_level_contrast(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
+        )
+        .unwrap();
+    let (_model_frame_fit, model_frame_results) = builder
+        .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("cell.type", "B-1", "A 0"),
+            &model_frame,
+        )
+        .unwrap();
+    let (_stored_fit, stored_results) = builder
+        .model_frame(model_frame)
+        .fit_fixed_dispersion_wald_results_contrast::<String>(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("cell.type", "B-1", "A 0"),
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(model_frame_results, explicit_results);
+    assert_eq!(stored_results, explicit_results);
+    assert_eq!(
+        model_frame_results.metadata.result_name.as_deref(),
+        Some("cell.type_B.1_vs_A.0")
+    );
+    assert_eq!(
+        model_frame_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: cell type B-1 vs A 0")
+    );
+}
+
+#[test]
 fn fixed_dispersion_wald_factor_level_contrast_applies_low_count_cooks_gate() {
     let counts = CountMatrix::from_row_major_u32(1, 6, vec![1, 20, 21, 20, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(
@@ -1032,6 +1354,120 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_low_count_cooks_gate() {
     assert!(results.rows[0].max_cooks.unwrap() > 0.0);
     assert_eq!(results.rows[0].cooks_outlier, Some(false));
     assert!(results.rows[0].pvalue.is_some());
+}
+
+#[test]
+fn fixed_dispersion_wald_coefficient_uses_stored_formula_low_count_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32(1, 6, vec![1, 20, 21, 20, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "A", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["A".to_string(), "B".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+
+    let (_generic_fit, generic_results) = builder
+        .clone()
+        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
+        .unwrap();
+    let (_formula_fit, formula_results) = builder
+        .model_frame(model_frame)
+        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
+        .unwrap();
+
+    assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
+    assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(generic_results.rows[0].pvalue, None);
+    assert_eq!(formula_results.rows[0].cooks_outlier, Some(false));
+    assert!(formula_results.rows[0].pvalue.is_some());
+}
+
+#[test]
+fn fixed_dispersion_wald_replacement_uses_stored_formula_low_count_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32(1, 6, vec![1, 20, 21, 20, 20, 20]).unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let levels = ["A", "A", "A", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["A".to_string(), "B".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+
+    let generic = builder
+        .clone()
+        .fit_wald_glm_mu_with_cooks_replacement(
+            &counts,
+            &design,
+            1,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+    let formula = builder
+        .model_frame(model_frame)
+        .fit_wald_glm_mu_with_cooks_replacement(
+            &counts,
+            &design,
+            1,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+
+    assert!(formula.results.rows[0].max_cooks.unwrap() > 0.0);
+    assert_eq!(generic.results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(generic.results.rows[0].pvalue, None);
+    assert_eq!(formula.results.rows[0].cooks_outlier, Some(false));
+    assert!(formula.results.rows[0].pvalue.is_some());
 }
 
 #[test]
@@ -1619,6 +2055,29 @@ fn fixed_dispersion_wald_factor_level_cooks_replacement_preserves_metadata() {
         output.results.metadata.comparison.as_deref(),
         Some("factor-level contrast: condition B vs A")
     );
+
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: levels,
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let model_frame_request = DeseqBuilder::new()
+        .size_factors(vec![1.0; 8])
+        .disable_independent_filtering()
+        .fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.1, 0.1],
+            &ResultsContrast::character("condition", "B", "A"),
+            &model_frame,
+            &options,
+        )
+        .unwrap();
+    assert_eq!(model_frame_request.results, output.results);
 }
 
 #[test]

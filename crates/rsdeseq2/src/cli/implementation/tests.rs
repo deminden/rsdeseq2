@@ -86,6 +86,7 @@ mod tests {
             },
             design: None,
             reduced_design: None,
+            model_frame: None,
             size_factors: vec![1.0, 1.0],
             normalization_factors: None,
             observation_weights: None,

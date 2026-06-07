@@ -6,7 +6,12 @@ fn validate_additive_factor_specs(factors: &[ExpandedFactorSpec<'_>]) -> Result<
     }
     let n_samples = factors[0].sample_levels.len();
     for (idx, factor) in factors.iter().enumerate() {
-        validate_factor_design_inputs(factor.factor, factor.sample_levels, factor.reference)?;
+        validate_factor_design_inputs_with_levels(
+            factor.factor,
+            factor.sample_levels,
+            factor.reference,
+            factor.levels,
+        )?;
         if factor.sample_levels.len() != n_samples {
             return Err(invalid_dimensions(
                 "additive factor sample levels",
@@ -259,6 +264,65 @@ fn validate_factor_design_inputs<S: AsRef<str>>(
     Ok(())
 }
 
+fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
+    factor: &str,
+    sample_levels: &[S],
+    reference: &str,
+    levels: Option<&[String]>,
+) -> Result<(), DeseqError> {
+    let Some(levels) = levels else {
+        validate_factor_design_inputs(factor, sample_levels, reference)?;
+        return Ok(());
+    };
+    if factor.is_empty() || reference.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "factor and reference level must be non-empty".to_string(),
+        });
+    }
+    if sample_levels.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "sample levels must be non-empty".to_string(),
+        });
+    }
+    if levels.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' declared levels must be non-empty"),
+        });
+    }
+    let mut has_reference = false;
+    for (idx, level) in levels.iter().enumerate() {
+        if level.is_empty() {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("factor '{factor}' declared level {idx} must be non-empty"),
+            });
+        }
+        if levels[..idx].iter().any(|previous| previous == level) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("factor '{factor}' has duplicate declared level '{level}'"),
+            });
+        }
+        has_reference |= level == reference;
+    }
+    if !has_reference {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "reference level '{reference}' is not present in factor '{factor}' declared levels"
+            ),
+        });
+    }
+    for (idx, level) in sample_levels.iter().enumerate() {
+        let level = level.as_ref();
+        if !levels.iter().any(|candidate| candidate == level) {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "sample level {idx} value '{level}' is not present in factor '{factor}' declared levels"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn ordered_levels<S: AsRef<str>>(sample_levels: &[S], reference: &str) -> Vec<String> {
     let mut levels = vec![reference.to_string()];
     for level in sample_levels {
@@ -268,6 +332,23 @@ fn ordered_levels<S: AsRef<str>>(sample_levels: &[S], reference: &str) -> Vec<St
         }
     }
     levels
+}
+
+fn ordered_levels_with_declared<S: AsRef<str>>(
+    sample_levels: &[S],
+    reference: &str,
+    levels: Option<&[String]>,
+) -> Vec<String> {
+    let Some(levels) = levels else {
+        return ordered_levels(sample_levels, reference);
+    };
+    let mut ordered = vec![reference.to_string()];
+    for level in levels {
+        if level != reference {
+            ordered.push(level.clone());
+        }
+    }
+    ordered
 }
 
 fn expanded_factor_coefficient_name(factor: &str, level: &str) -> String {
@@ -315,4 +396,63 @@ fn standard_factor_numeric_interaction_coefficient_name(
 
 fn numeric_interaction_coefficient_name(left_numeric: &str, right_numeric: &str) -> String {
     format!("{left_numeric}:{right_numeric}")
+}
+
+pub(crate) fn r_like_name_candidates(raw: &str) -> Vec<String> {
+    let made = r_like_make_name(raw);
+    if made == raw {
+        vec![raw.to_string()]
+    } else {
+        vec![raw.to_string(), made]
+    }
+}
+
+pub(crate) fn r_like_make_name(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len().max(1));
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' {
+            out.push(ch);
+        } else {
+            out.push('.');
+        }
+    }
+    if out.is_empty() {
+        return "X".to_string();
+    }
+    let mut chars = out.chars();
+    let first = chars.next().unwrap_or('X');
+    let second = chars.next();
+    let invalid_start = !first.is_ascii_alphabetic() && first != '.'
+        || (first == '.' && second.is_some_and(|ch| ch.is_ascii_digit()));
+    if invalid_start {
+        out.insert(0, 'X');
+    }
+    if is_r_reserved_word(&out) {
+        out.push('.');
+    }
+    out
+}
+
+fn is_r_reserved_word(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "else"
+            | "repeat"
+            | "while"
+            | "function"
+            | "for"
+            | "in"
+            | "next"
+            | "break"
+            | "TRUE"
+            | "FALSE"
+            | "NULL"
+            | "Inf"
+            | "NaN"
+            | "NA"
+            | "NA_integer_"
+            | "NA_real_"
+            | "NA_complex_"
+            | "NA_character_"
+    )
 }

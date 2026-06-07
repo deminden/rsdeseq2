@@ -17,6 +17,7 @@ impl DeseqBuilder {
             execution_mode: ExecutionMode::default(),
             threads: None,
             reduced_design: None,
+            model_frame: None,
             irls_options: IrlsOptions::default(),
             gene_wise_dispersion_options: GeneWiseDispersionOptions::default(),
             wald_test_options: WaldTestOptions::default(),
@@ -118,6 +119,47 @@ impl DeseqBuilder {
     pub fn reduced_design(mut self, reduced_design: DesignMatrix) -> Self {
         self.reduced_design = Some(reduced_design);
         self
+    }
+
+    /// Store owned formula/model-frame metadata for object-style result routing.
+    ///
+    /// Character `results(contrast=...)` requests can use this metadata to
+    /// infer the factor reference and per-sample levels when call sites do not
+    /// pass explicit sample-level vectors.
+    pub fn model_frame(mut self, model_frame: FormulaModelFrame) -> Self {
+        self.model_frame = Some(model_frame);
+        self
+    }
+
+    /// Build a supported expanded formula design from stored model-frame metadata.
+    ///
+    /// This is the object-style companion to
+    /// [`crate::design::expanded_formula_design_from_model_frame`].
+    pub fn expanded_formula_design(
+        &self,
+        formula: &str,
+    ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
+        let model_frame = self.model_frame.as_ref().ok_or_else(|| {
+            DeseqError::InvalidOptions {
+                reason: "formula design construction requires builder model-frame metadata"
+                    .to_string(),
+            }
+        })?;
+        expanded_formula_design_from_model_frame(formula, model_frame)
+    }
+
+    /// Build a supported expanded formula design plus formula offsets from stored metadata.
+    pub fn expanded_formula_design_with_offsets(
+        &self,
+        formula: &str,
+    ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
+        let model_frame = self.model_frame.as_ref().ok_or_else(|| {
+            DeseqError::InvalidOptions {
+                reason: "formula design construction requires builder model-frame metadata"
+                    .to_string(),
+            }
+        })?;
+        expanded_formula_design_with_offsets_from_model_frame(formula, model_frame)
     }
 
     /// Set IRLS options for fixed-dispersion GLM fitting.
@@ -237,6 +279,11 @@ impl DeseqBuilder {
         self.reduced_design.as_ref()
     }
 
+    /// Current formula/model-frame metadata, if supplied.
+    pub fn current_model_frame(&self) -> Option<&FormulaModelFrame> {
+        self.model_frame.as_ref()
+    }
+
     /// Current IRLS options.
     pub fn current_irls_options(&self) -> IrlsOptions {
         self.irls_options.clone()
@@ -280,5 +327,101 @@ impl DeseqBuilder {
     /// Current observation-weight preprocessing options.
     pub fn current_observation_weight_options(&self) -> ObservationWeightOptions {
         self.observation_weight_options
+    }
+
+    fn model_frame_factor_level_contrast<'a>(
+        &'a self,
+        contrast: &'a ResultsContrast,
+    ) -> Result<Option<FactorLevelContrast<'a>>, DeseqError> {
+        match self.model_frame.as_ref() {
+            Some(model_frame) => factor_level_contrast_from_model_frame(contrast, model_frame),
+            None => Ok(None),
+        }
+    }
+
+    fn model_frame_factor_level_contrast_for_coefficient<'a>(
+        &'a self,
+        design: &DesignMatrix,
+        coefficient: usize,
+    ) -> Option<FactorLevelContrast<'a>> {
+        let model_frame = self.model_frame.as_ref()?;
+        let [column] = model_frame.factors.as_slice() else {
+            return None;
+        };
+        if column.sample_levels.len() != design.n_samples() {
+            return None;
+        }
+        let mut observed_levels = Vec::<&str>::new();
+        for level in &column.sample_levels {
+            if !observed_levels.iter().any(|observed| *observed == level) {
+                observed_levels.push(level);
+            }
+        }
+        let [first_level, second_level] = observed_levels.as_slice() else {
+            return None;
+        };
+        let reference = column
+            .reference
+            .as_deref()
+            .or_else(|| {
+                column
+                    .levels
+                    .as_ref()
+                    .and_then(|levels| levels.first().map(String::as_str))
+            })
+            .unwrap_or(first_level);
+        if reference != *first_level && reference != *second_level {
+            return None;
+        }
+        let numerator = if reference == *first_level {
+            *second_level
+        } else {
+            *first_level
+        };
+        let contrast = FactorLevelContrast {
+            factor: &column.name,
+            numerator,
+            denominator: reference,
+            reference: Some(reference),
+            sample_levels: &column.sample_levels,
+        };
+        let contrast_spec =
+            ContrastSpec::factor_level_with_reference(&column.name, numerator, reference, reference);
+        let Ok(numeric_contrast) = resolve_contrast(design, &contrast_spec) else {
+            return None;
+        };
+        if numeric_contrast
+            .iter()
+            .enumerate()
+            .all(|(idx, value)| {
+                if idx == coefficient {
+                    (*value - 1.0).abs() <= f64::EPSILON
+                } else {
+                    value.abs() <= f64::EPSILON
+                }
+            })
+        {
+            Some(contrast)
+        } else {
+            None
+        }
+    }
+
+    fn standard_design_from_formula_without_offsets(
+        &self,
+        formula: &str,
+    ) -> Result<DesignMatrix, DeseqError> {
+        if formula_has_offset_terms(formula)? {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: "top-level formula workflows with formula offsets".to_string(),
+            });
+        }
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        if !formula_design.offsets.is_empty() {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: "top-level formula workflows with formula offsets".to_string(),
+            });
+        }
+        Ok(formula_design.design.standard_design)
     }
 }

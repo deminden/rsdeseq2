@@ -27,7 +27,7 @@ impl DeseqBuilder {
             dispersions,
             coefficient,
         })?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.dispersion = Some(wald_output.expanded_dispersions);
         fit.cooks = Some(wald_output.cooks.cooks);
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
@@ -64,7 +64,7 @@ impl DeseqBuilder {
             contrast,
             None,
         )?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.dispersion = Some(wald_output.expanded_dispersions);
         fit.cooks = Some(wald_output.cooks.cooks);
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
@@ -87,6 +87,16 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if sample_levels.is_none() {
+            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+                return self.fit_fixed_dispersion_wald_factor_level_contrast(
+                    counts,
+                    design,
+                    dispersions,
+                    factor_contrast,
+                );
+            }
+        }
         let resolved = resolve_results_contrast(design, contrast)?;
         let contrast_all_zero = match &resolved.all_zero {
             ResultsContrastAllZero::Character {
@@ -123,7 +133,7 @@ impl DeseqBuilder {
             &resolved.numeric,
             contrast_all_zero.as_deref(),
         )?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.dispersion = Some(wald_output.expanded_dispersions);
         fit.cooks = Some(wald_output.cooks.cooks);
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
@@ -133,6 +143,38 @@ impl DeseqBuilder {
         results.metadata.result_name = Some(resolved.result_name);
         results.metadata.comparison = Some(resolved.comparison);
         Ok((fit, results))
+    }
+
+    /// Run a supplied-dispersion Wald pipeline for a DESeq2
+    /// `results(contrast=...)` request using formula model-frame metadata.
+    ///
+    /// Character triplet contrasts resolve their factor reference and
+    /// per-sample levels from `model_frame`. List and numeric contrasts use the
+    /// same numeric all-zero handling as [`Self::fit_fixed_dispersion_wald_results_contrast`].
+    pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        model_frame: &FormulaModelFrame,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
+        {
+            return self.fit_fixed_dispersion_wald_factor_level_contrast(
+                counts,
+                design,
+                dispersions,
+                factor_contrast,
+            );
+        }
+        self.fit_fixed_dispersion_wald_results_contrast::<String>(
+            counts,
+            design,
+            dispersions,
+            contrast,
+            None,
+        )
     }
 
     /// Run the supplied-dispersion Wald coefficient path with Cook's replacement refit.
@@ -299,6 +341,17 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if sample_levels.is_none() {
+            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+                return self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    dispersions,
+                    factor_contrast,
+                    replacement_options,
+                );
+            }
+        }
         match contrast {
             ResultsContrast::Character {
                 factor,
@@ -342,6 +395,37 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run supplied-dispersion Wald replacement refit for a DESeq2
+    /// `results(contrast=...)` request using formula model-frame metadata.
+    pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        dispersions: &[f64],
+        contrast: &ResultsContrast,
+        model_frame: &FormulaModelFrame,
+        replacement_options: &CooksReplacementOptions,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
+        {
+            return self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                counts,
+                design,
+                dispersions,
+                factor_contrast,
+                replacement_options,
+            );
+        }
+        self.fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement::<String>(
+            counts,
+            design,
+            dispersions,
+            contrast,
+            None,
+            replacement_options,
+        )
+    }
+
     /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.
     ///
     /// This resolves coefficient names and DESeq2-style positive/negative
@@ -370,8 +454,8 @@ impl DeseqBuilder {
     ///
     /// This resolves DESeq2-shaped coefficient names from the design matrix and
     /// applies DESeq2-style character contrast all-zero handling using
-    /// caller-supplied sample levels. R formula parsing and colData ownership
-    /// remain outside the Rust core.
+    /// caller-supplied sample levels. Model-frame callers can use
+    /// [`Self::fit_fixed_dispersion_wald_results_contrast_from_model_frame`].
     pub fn fit_fixed_dispersion_wald_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -435,20 +519,15 @@ impl DeseqBuilder {
             &mut wald_output.results,
             &self.independent_filtering_options,
         )?;
-        let mut fit = Self::base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
+        let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
         fit.dispersion = Some(wald_output.expanded_dispersions);
         fit.cooks = Some(wald_output.cooks.cooks);
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
         attach_glm_fit(&mut fit, wald_output.glm_fit);
         fit.wald = Some(wald_output.wald_contrast.wald);
-        wald_output.results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        wald_output.results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        wald_output.results.metadata.result_name = Some(result_name);
+        wald_output.results.metadata.comparison = Some(comparison);
         Ok((fit, wald_output.results))
     }
 
@@ -519,14 +598,9 @@ impl DeseqBuilder {
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
-        results.metadata.result_name = Some(format!(
-            "{}_{}_vs_{}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
-        results.metadata.comparison = Some(format!(
-            "factor-level contrast: {} {} vs {}",
-            contrast.factor, contrast.numerator, contrast.denominator
-        ));
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.metadata.result_name = Some(result_name);
+        results.metadata.comparison = Some(comparison);
 
         Ok(CooksReplacementWaldOutput {
             original_fit,

@@ -27,8 +27,10 @@ implemented Wald/LRT paths:
 - `wald`
 - `lrt`
 
-Broader object-style workflows and formula/metadata-aware behavior remain in
-the Rust API roadmap rather than mature CLI surface.
+Broader object-style workflows remain in the Rust API roadmap rather than
+mature CLI surface. Formula/model-frame support is now partly available in the
+Rust API for implemented expanded-design and contrast routes, but it is not yet
+a full R formula engine.
 
 ## Matched Or Partly Matched
 
@@ -55,6 +57,7 @@ and selected result/filtering/Cook's primitives.
 | Transformations | `normTransform`, mean-fit, parametric, and local VST primitives, fit-state and builder-level VST dispatch, low-level rlog sample-effect fitting with retained GLM intermediates, frozen-intercept rlog primitives, rlog prior estimation, fit-state rlog and frozen-rlog reuse, builder-level design-aware/blind GLM-mu rlog and frozen-rlog helpers, and native CLI `vst`/`rlog` commands including frozen-intercept rlog input. |
 | Dispersion prior/MAP | Prior variance, MAP shrinkage, outlier replacement, weighted low-level objective pieces. |
 | Diagnostics | `DeseqFit` fields plus DESeq2-style alias view for implemented row metadata. |
+| Formula/model-frame routing | Expanded formula designs can be built from explicit or builder-stored owned model-frame columns with factor reference inference/override, declared R factor level order, numeric covariates, formula offsets, and validation. Implemented Wald/LRT result contrast routes can resolve DESeq2-style character contrasts from explicit or builder-stored model-frame factor metadata, including reference inference from declared factor levels before observed sample order. Top-level Wald helpers can build supported formulas directly, and top-level LRT helpers can build supported full/reduced formulas directly, including Cook's replacement-refit paths for the supported fixed and limited native builders. |
 | Reference validation | Generated DESeq2 1.46.0 fixtures for implemented stages, including unweighted and weighted GLM-mu mean/local MAP/Wald/LRT anchors plus local Cox-Reid MAP/Wald/LRT anchors and compact result-row checks. |
 
 ## Major Missing Pieces
@@ -105,11 +108,15 @@ Still missing:
 
 Still missing:
 
-- full `results(contrast=...)` semantics,
-- formula/metadata-aware factor-level handling,
+- full `results(contrast=...)` semantics across every object-style route,
+- full formula/metadata-aware factor-level handling beyond the implemented
+  owned-model-frame character contrast resolver and supported fixed/native
+  Wald/LRT routes,
 - remaining coefficient-name cleanup beyond the implemented R-style aliases
   for primitive coefficient-name, list, and factor-level candidates,
-- complete formula-aware contrast Cook's/refit behavior,
+- complete formula-aware contrast Cook's/refit behavior outside the currently
+  wired fixed and limited native Wald/LRT model-frame routes and formula-built
+  top-level native helpers,
 - full Bioconductor result-object metadata and formula-aware result metadata
   beyond the typed primitive table view.
 
@@ -124,8 +131,8 @@ Still missing:
   tables beyond the implemented primitive replacement/refit metadata and assay
   exports,
 - broader formula-aware low-count Cook's heuristic selection outside the
-  currently gated supplied-dispersion fixed and limited GLM-mu two-level
-  factor result/replacement-refit routes.
+  currently gated supplied-dispersion fixed, limited GLM-mu two-level factor,
+  and model-frame character contrast result/replacement-refit routes.
 
 ### Transformations And Secondary APIs
 

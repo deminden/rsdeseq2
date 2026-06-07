@@ -17,7 +17,10 @@ DESeq2-compatible workflows.
 Implemented areas include size-factor estimation, normalized counts and base
 row metadata, fixed-dispersion and native-dispersion NB GLM Wald/LRT workflows,
 DESeq2-style result contrasts, Cook's and independent-filtering helpers,
-beta-prior refit workflows, and `normTransform`/VST/rlog building blocks.
+beta-prior refit workflows, owned model-frame formula inputs for the supported
+expanded-design/result paths, builder-stored formula metadata for supported
+Wald/LRT design and contrast routing, and `normTransform`/VST/rlog building
+blocks.
 
 Interface work still in progress: complete Bioconductor `DESeqDataSet`
 mutation/metadata plumbing, full glmGamPoi behavior, high-level rlog object
