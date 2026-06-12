@@ -33,10 +33,21 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
     let mut terms = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
+    let mut quote = None;
     let mut sign = 1_i8;
     let mut start = 0_usize;
     let mut saw_term = false;
     for (idx, character) in rhs.char_indices() {
+        if let Some(active_quote) = quote {
+            if character == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            continue;
+        }
         if character == '`' {
             in_backticks = !in_backticks;
             continue;
@@ -84,6 +95,11 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
             reason: "formula backtick-quoted variable name is unbalanced".to_string(),
         });
     }
+    if quote.is_some() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula quoted string is unbalanced".to_string(),
+        });
+    }
     let term = rhs[start..].trim();
     if term.is_empty() {
         return Err(DeseqError::InvalidOptions {
@@ -96,7 +112,7 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
 
 fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqError> {
     let term = strip_formula_outer_parentheses(term.trim())?;
-    if term.contains('-') {
+    if formula_contains_unquoted_char(term, '-') {
         return Err(DeseqError::InvalidOptions {
             reason: format!("formula term '{term}' contains unsupported nested subtraction"),
         });
@@ -239,7 +255,7 @@ fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     let stripped = strip_formula_outer_parentheses(term.trim())?;
     let pieces = split_formula_top_level(stripped, '+')?;
     if pieces.len() == 1 {
-        if stripped.contains('-') {
+        if formula_contains_unquoted_char(stripped, '-') {
             return Err(DeseqError::InvalidOptions {
                 reason: format!("formula term '{term}' contains unsupported nested subtraction"),
             });
@@ -251,7 +267,7 @@ fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     }
     let mut terms = Vec::new();
     for piece in pieces {
-        if piece.contains('-') {
+        if formula_contains_unquoted_char(&piece, '-') {
             return Err(DeseqError::InvalidOptions {
                 reason: format!("formula group '{term}' contains unsupported nested subtraction"),
             });
@@ -270,8 +286,19 @@ fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
             return Ok(stripped);
         }
         let mut depth = 0_i32;
+        let mut quote = None;
         let mut encloses_whole_term = true;
         for (idx, character) in stripped.char_indices() {
+            if let Some(active_quote) = quote {
+                if character == active_quote {
+                    quote = None;
+                }
+                continue;
+            }
+            if matches!(character, '"' | '\'') {
+                quote = Some(character);
+                continue;
+            }
             match character {
                 '(' => depth += 1,
                 ')' => {
@@ -294,6 +321,11 @@ fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
                 reason: "formula parentheses are unbalanced".to_string(),
             });
         }
+        if quote.is_some() {
+            return Err(DeseqError::InvalidOptions {
+                reason: "formula quoted string is unbalanced".to_string(),
+            });
+        }
         if !encloses_whole_term {
             return Ok(stripped);
         }
@@ -305,8 +337,19 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
     let mut pieces = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
+    let mut quote = None;
     let mut start = 0_usize;
     for (idx, character) in term.char_indices() {
+        if let Some(active_quote) = quote {
+            if character == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            continue;
+        }
         if character == '`' {
             in_backticks = !in_backticks;
             continue;
@@ -347,6 +390,11 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
             reason: "formula backtick-quoted variable name is unbalanced".to_string(),
         });
     }
+    if quote.is_some() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula quoted string is unbalanced".to_string(),
+        });
+    }
     let piece = term[start..].trim();
     if piece.is_empty() {
         return Err(DeseqError::InvalidOptions {
@@ -359,12 +407,48 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
 
 fn formula_contains_unquoted_parentheses(term: &str) -> bool {
     let mut in_backticks = false;
+    let mut quote = None;
     for character in term.chars() {
+        if let Some(active_quote) = quote {
+            if character == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            continue;
+        }
         if character == '`' {
             in_backticks = !in_backticks;
             continue;
         }
         if !in_backticks && matches!(character, '(' | ')') {
+            return true;
+        }
+    }
+    false
+}
+
+fn formula_contains_unquoted_char(term: &str, needle: char) -> bool {
+    let mut in_backticks = false;
+    let mut quote = None;
+    for character in term.chars() {
+        if let Some(active_quote) = quote {
+            if character == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            continue;
+        }
+        if character == '`' {
+            in_backticks = !in_backticks;
+            continue;
+        }
+        if !in_backticks && character == needle {
             return true;
         }
     }
@@ -382,12 +466,25 @@ fn split_formula_top_level_operator(
     let mut pieces = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
+    let mut quote = None;
     let mut start = 0_usize;
     let mut idx = 0_usize;
     while idx < term.len() {
         let Some(character) = term[idx..].chars().next() else {
             break;
         };
+        if let Some(active_quote) = quote {
+            if character == active_quote {
+                quote = None;
+            }
+            idx += character.len_utf8();
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            idx += character.len_utf8();
+            continue;
+        }
         if character == '`' {
             in_backticks = !in_backticks;
             idx += character.len_utf8();
@@ -431,6 +528,11 @@ fn split_formula_top_level_operator(
     if in_backticks {
         return Err(DeseqError::InvalidOptions {
             reason: "formula backtick-quoted variable name is unbalanced".to_string(),
+        });
+    }
+    if quote.is_some() {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula quoted string is unbalanced".to_string(),
         });
     }
     let piece = term[start..].trim();

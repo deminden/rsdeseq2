@@ -1052,7 +1052,7 @@ fn fixed_dispersion_wald_results_character_contrast_uses_formula_model_frame() {
             Some(&levels),
         )
         .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
+    let (model_frame_fit, model_frame_results) = builder
         .fit_fixed_dispersion_wald_results_contrast_from_model_frame(
             &counts,
             &design,
@@ -1066,7 +1066,7 @@ fn fixed_dispersion_wald_results_character_contrast_uses_formula_model_frame() {
         builder_with_model_frame.current_model_frame(),
         Some(&model_frame)
     );
-    let (_stored_model_frame_fit, stored_model_frame_results) = builder_with_model_frame
+    let (stored_model_frame_fit, stored_model_frame_results) = builder_with_model_frame
         .fit_fixed_dispersion_wald_results_contrast::<String>(
             &counts,
             &design,
@@ -1078,6 +1078,11 @@ fn fixed_dispersion_wald_results_character_contrast_uses_formula_model_frame() {
 
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(stored_model_frame_results, explicit_results);
+    assert_eq!(model_frame_fit.current_model_frame(), Some(&model_frame));
+    assert_eq!(
+        stored_model_frame_fit.current_model_frame(),
+        Some(&model_frame)
+    );
     assert_eq!(model_frame_results.rows[0].log2_fold_change, Some(0.0));
     assert_eq!(model_frame_results.rows[0].pvalue, Some(1.0));
     assert_eq!(
@@ -2078,6 +2083,10 @@ fn fixed_dispersion_wald_factor_level_cooks_replacement_preserves_metadata() {
         )
         .unwrap();
     assert_eq!(model_frame_request.results, output.results);
+    assert_eq!(
+        model_frame_request.original_fit.current_model_frame(),
+        Some(&model_frame)
+    );
 }
 
 #[test]

@@ -388,9 +388,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        let builder = self.clone().model_frame(model_frame.clone());
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return self.fit_fixed_dispersion_lrt_factor_level_contrast(
+            return builder.fit_fixed_dispersion_lrt_factor_level_contrast(
                 counts,
                 full_design,
                 reduced_design,
@@ -398,7 +399,7 @@ impl DeseqBuilder {
                 factor_contrast,
             );
         }
-        self.fit_fixed_dispersion_lrt_results_contrast::<String>(
+        builder.fit_fixed_dispersion_lrt_results_contrast::<String>(
             counts,
             full_design,
             reduced_design,
@@ -517,9 +518,10 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let builder = self.clone().model_frame(model_frame.clone());
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return self.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+            return builder.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,
@@ -528,7 +530,7 @@ impl DeseqBuilder {
                 replacement_options,
             );
         }
-        self.fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement::<String>(
+        builder.fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement::<String>(
             counts,
             full_design,
             reduced_design,

@@ -157,6 +157,16 @@ pub struct ExpandedFormulaDesignWithOffsets {
     pub design: ExpandedAdditiveFactorDesign,
     /// Per-sample offset values from supported `offset(numeric)` terms.
     pub offsets: Vec<f64>,
+    /// Formula-local model frame after supported transforms have been
+    /// materialized.
+    ///
+    /// This includes the original supplied columns plus derived factor and
+    /// numeric columns such as `relevel(condition, ref = "B")`,
+    /// `factor(condition, levels = c(...))`, `droplevels(condition)`, and
+    /// supported numeric transforms. Downstream result routing can use this to
+    /// resolve character contrasts against the same labels and references that
+    /// produced the design matrix.
+    pub model_frame: FormulaModelFrame,
 }
 
 impl FormulaModelFrame {

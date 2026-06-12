@@ -258,14 +258,32 @@ reference; no DESeq2 source is vendored or translated line by line.
 - [x] Primitive formula `relevel(factor, ref=...)` transforms materialized as
   derived factor metadata with the same sample levels and declared level order
   but a formula-local treatment reference, including positional or named
-  `x`/`ref` arguments.
+  `x`/`ref` arguments and nested `factor()`/`as.factor()` inputs.
 - [x] Primitive formula `factor(factor)` and `as.factor(factor)` transforms
   over already-supplied factor metadata, preserving declared levels and
   treatment references while producing R-shaped coefficient-name prefixes.
+- [x] Simple `factor(factor, levels=c(...))` formula level reordering for
+  already-supplied factor metadata, with positional or named `x`/`levels`
+  arguments and the first supplied level used as the formula-local treatment
+  reference.
+- [x] Conservative `factor(factor, levels=c(...), labels=c(...))` support for
+  already-supplied factor metadata, relabeling sample levels and coefficient
+  names when labels map one-to-one onto explicit levels; the formula-local
+  metadata is retained for object-style Wald/LRT `results(contrast=...)` and
+  supported Cook's replacement result routes.
+- [x] Primitive formula `droplevels(factor)` over already-supplied factor
+  metadata or simple formula-derived factors, dropping unused declared levels
+  and selecting a formula-local treatment reference from the remaining observed
+  levels when needed.
 - [x] Primitive `offset(numeric)` and single-vector supported transform offset
   formula extraction, such as `offset(log2(numeric))` and
   `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors
   beside formula-expanded designs.
+- [x] Formula-expanded designs now carry a formula-local owned model frame for
+  the supplied and supported derived factor/numeric columns, allowing top-level
+  formula `results(contrast=...)` character routes to resolve transformed
+  factor labels and references from the same metadata used to build the design,
+  including supported Cook's replacement paths.
 - [x] Primitive formula `.` expansion over supplied factor and numeric
   model-frame columns as main effects and inside supported `*`, `:`, and `/`
   shorthand terms, including subtraction of the expanded shorthand products.
@@ -534,7 +552,8 @@ reference; no DESeq2 source is vendored or translated line by line.
   DESeq2's `contrastAllZeroCharacter` selected-sample rule.
 - [x] R-style coefficient-name cleanup for primitive factor-level contrast
   candidates, including whole-name and component-wise `make.names` handling
-  for non-syntactic and reserved factor or level names.
+  for non-syntactic and reserved factor or level names, and alias-aware stored
+  coefficient lookup for formula-transform factor labels.
 - [x] Ambiguity checks for primitive factor-level contrast coefficient
   candidates, so treatment-style and expanded/no-intercept fallback routes do
   not silently choose the first R-cleaned alias collision.
@@ -560,7 +579,9 @@ reference; no DESeq2 source is vendored or translated line by line.
   groups for character `contrastAllZero` handling.
 - [x] Builder-created `DeseqFit` objects retain optional formula/model-frame
   metadata for later wrapper and already-fitted-object Wald/LRT
-  `results(contrast=...)` plumbing.
+  `results(contrast=...)` plumbing, including fixed-dispersion
+  model-frame wrappers and the supported top-level LRT formula default,
+  named, fit-only, and Cook's replacement-refit helpers.
 - [x] Fitted-object `results(contrast=...)` dispatch can select stored Wald or
   LRT output while reusing retained model-frame metadata for character
   contrasts.

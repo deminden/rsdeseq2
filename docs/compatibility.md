@@ -124,9 +124,12 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   transforms `poly(numeric, degree, raw=TRUE)` and `poly(numeric, degree)`,
   including positional or named `x`, `degree`, `raw`, and `simple` arguments,
   factor reference transforms such as `relevel(condition, ref="B")` with
-  positional or named `x`/`ref` arguments, factor identity transforms such as
+  positional or named `x`/`ref` arguments, including nested
+  `relevel(factor(condition), ref="B")`, factor identity transforms such as
   `factor(condition)` and `as.factor(condition)` for already-supplied factor
-  metadata,
+  metadata, simple `factor(condition, levels=c(...))` level reordering with
+  positional or named `x`/`levels` arguments, and `droplevels(condition)` over
+  already-supplied or simple formula-derived factor metadata,
   common numeric function transforms `log(numeric)`, `log2(numeric)`,
   `log10(numeric)`, `log1p(numeric)`, and `sqrt(numeric)`, including named
   `x` and scalar `log()` `base` arguments, `scale(numeric)` with R-style named
@@ -275,13 +278,22 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   `FormulaModelFrame` exposes validation, sample-count, and resolved
   factor-reference accessors so wrapper/object code can inspect the same
   explicit-reference, declared-level, and first-observed fallback rules used by
-  formula design construction.
+  formula design construction. Formula design construction also returns a
+  formula-local model frame beside offsets, so supported derived factor labels
+  such as `relevel(...)`, `factor(..., levels=...)`,
+  `factor(..., levels=..., labels=...)`, and `droplevels(...)` can
+  drive character contrast metadata and all-zero handling through top-level
+  formula result, fixed-dispersion model-frame result, and supported Cook's
+  replacement routes. Fitted objects from supported formula and model-frame
+  routes retain this metadata for later object-style result requests.
   Non-reference factor-level
   comparisons can infer a shared reference from coefficient names such as
   `B_vs_A` and `C_vs_A`. Factor-level coefficient candidates include R-style
   whole-name and component-wise `make.names` cleanup for non-syntactic and
-  reserved factor or level names, with ambiguity errors for treatment-style
-  and expanded/no-intercept alias collisions.
+  reserved factor or level names, including stored formula-transform labels
+  such as `factor(..., levels=...)`, `relevel(...)`, and `droplevels(...)`,
+  with ambiguity errors for treatment-style and expanded/no-intercept alias
+  collisions.
   Coefficient-list contrast weights follow DESeq2 `listValues` sign
   validation, and list comparison labels follow DESeq2's two-sided and
   one-sided naming shape. Interaction coefficient aliases can be cleaned

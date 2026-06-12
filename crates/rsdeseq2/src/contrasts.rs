@@ -1061,10 +1061,15 @@ fn find_first_coefficient(names: &[String], candidates: &[String]) -> Result<usi
     let matches = candidates
         .iter()
         .flat_map(|candidate| {
-            names
-                .iter()
-                .enumerate()
-                .filter_map(move |(index, name)| (name == candidate).then_some(index))
+            names.iter().enumerate().filter_map(move |(index, name)| {
+                if name == candidate {
+                    return Some(index);
+                }
+                coefficient_name_candidates(name)
+                    .into_iter()
+                    .any(|name_candidate| name_candidate == *candidate)
+                    .then_some(index)
+            })
         })
         .collect::<HashSet<_>>();
     match matches.len() {
@@ -1148,8 +1153,16 @@ fn standard_coefficients_for_level(
         .into_iter()
         .flat_map(|prefix| {
             names.iter().enumerate().filter_map(move |(index, name)| {
-                name.strip_prefix(&prefix)
-                    .map(|reference| (index, reference.to_string()))
+                if let Some(reference) = name.strip_prefix(&prefix) {
+                    return Some((index, reference.to_string()));
+                }
+                coefficient_name_candidates(name)
+                    .into_iter()
+                    .find_map(|candidate| {
+                        candidate
+                            .strip_prefix(&prefix)
+                            .map(|reference| (index, reference.to_string()))
+                    })
             })
         })
         .collect()

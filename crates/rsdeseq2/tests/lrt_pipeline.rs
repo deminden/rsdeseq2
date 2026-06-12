@@ -310,7 +310,7 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let (_model_frame_fit, model_frame_results) = builder
+    let (model_frame_fit, model_frame_results) = builder
         .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
             &counts,
             &full,
@@ -320,9 +320,9 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
             &model_frame,
         )
         .unwrap();
-    let (_stored_model_frame_fit, stored_model_frame_results) = builder
+    let (stored_model_frame_fit, stored_model_frame_results) = builder
         .clone()
-        .model_frame(model_frame)
+        .model_frame(model_frame.clone())
         .fit_fixed_dispersion_lrt_results_contrast::<String>(
             &counts,
             &full,
@@ -360,6 +360,11 @@ fn fixed_dispersion_lrt_factor_level_contrast_only_zeroes_lfc() {
     );
     assert_eq!(model_frame_results, contrast_results);
     assert_eq!(stored_model_frame_results, contrast_results);
+    assert_eq!(model_frame_fit.current_model_frame(), Some(&model_frame));
+    assert_eq!(
+        stored_model_frame_fit.current_model_frame(),
+        Some(&model_frame)
+    );
 }
 
 #[test]
@@ -577,7 +582,7 @@ fn fixed_dispersion_lrt_model_frame_contrast_accepts_cleaned_factor_name_alias()
             FactorLevelContrast::new("cell type", "B-1", "A 0", &levels),
         )
         .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
+    let (model_frame_fit, model_frame_results) = builder
         .clone()
         .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
             &counts,
@@ -588,7 +593,7 @@ fn fixed_dispersion_lrt_model_frame_contrast_accepts_cleaned_factor_name_alias()
             &model_frame,
         )
         .unwrap();
-    let (_stored_fit, stored_results) = builder
+    let (stored_fit, stored_results) = builder
         .clone()
         .model_frame(model_frame.clone())
         .fit_fixed_dispersion_lrt_results_contrast::<String>(
@@ -615,6 +620,12 @@ fn fixed_dispersion_lrt_model_frame_contrast_accepts_cleaned_factor_name_alias()
     assert_eq!(model_frame_results, explicit_results);
     assert_eq!(stored_results, explicit_results);
     assert_eq!(replacement.results, explicit_results);
+    assert_eq!(model_frame_fit.current_model_frame(), Some(&model_frame));
+    assert_eq!(stored_fit.current_model_frame(), Some(&model_frame));
+    assert_eq!(
+        replacement.original_fit.current_model_frame(),
+        Some(&model_frame)
+    );
     assert_eq!(
         model_frame_results.metadata.result_name.as_deref(),
         Some("cell.type_B.1_vs_A.0")
@@ -917,6 +928,10 @@ fn fixed_dispersion_lrt_factor_level_replacement_preserves_metadata() {
     assert!(output.refit_plan.n_refit > 0);
     assert_eq!(request.results, output.results);
     assert_eq!(model_frame_request.results, output.results);
+    assert_eq!(
+        model_frame_request.original_fit.current_model_frame(),
+        Some(&model_frame)
+    );
     assert_eq!(
         output.results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")

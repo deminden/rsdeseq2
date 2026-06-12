@@ -1726,24 +1726,81 @@ fn top_level_lrt_formula_fit_state_retains_model_frame_metadata() {
     };
     let builder = native_lrt_builder().model_frame(model_frame.clone());
     let options = CooksReplacementOptions::new(f64::MAX);
+    let transformed_formula = "~ relevel(`cell type`, ref='B cell')";
 
     let (fit, _results) = builder
         .clone()
-        .fit_lrt_formula_with_results(&counts, "~ `cell type`", "~ 1")
+        .fit_lrt_formula_with_results(&counts, transformed_formula, "~ 1")
+        .unwrap();
+    let (named_fit, _named_results) = builder
+        .clone()
+        .fit_lrt_formula_with_results_name(
+            &counts,
+            transformed_formula,
+            "~ 1",
+            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+        )
+        .unwrap();
+    let fit_only = builder
+        .clone()
+        .fit_lrt_formula(&counts, transformed_formula, "~ 1")
+        .unwrap();
+    let named_fit_only = builder
+        .clone()
+        .fit_lrt_formula_name(
+            &counts,
+            transformed_formula,
+            "~ 1",
+            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+        )
         .unwrap();
     let replacement = builder
+        .clone()
         .fit_lrt_formula_with_results_with_cooks_replacement(
             &counts,
-            "~ `cell type`",
+            transformed_formula,
             "~ 1",
             &options,
         )
         .unwrap();
+    let named_replacement = builder
+        .fit_lrt_formula_with_results_name_with_cooks_replacement(
+            &counts,
+            transformed_formula,
+            "~ 1",
+            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+            &options,
+        )
+        .unwrap();
 
-    assert_eq!(fit.current_model_frame(), Some(&model_frame));
+    let transformed_model_frame = fit.current_model_frame().unwrap();
+    assert_eq!(
+        transformed_model_frame
+            .factors
+            .iter()
+            .map(|factor| factor.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cell type", "relevel(cell type, ref = \"B cell\")"]
+    );
+    assert_eq!(
+        named_fit.current_model_frame(),
+        Some(transformed_model_frame)
+    );
+    assert_eq!(
+        fit_only.current_model_frame(),
+        Some(transformed_model_frame)
+    );
+    assert_eq!(
+        named_fit_only.current_model_frame(),
+        Some(transformed_model_frame)
+    );
     assert_eq!(
         replacement.original_fit.current_model_frame(),
-        Some(&model_frame)
+        Some(transformed_model_frame)
+    );
+    assert_eq!(
+        named_replacement.original_fit.current_model_frame(),
+        Some(transformed_model_frame)
     );
     assert_eq!(
         replacement

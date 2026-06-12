@@ -12,6 +12,9 @@ include!("implementation/expanded.rs");
 // Formula entry points, offsets, and numeric transforms.
 include!("implementation/formula_entry.rs");
 
+// Formula factor transforms such as factor(), relevel(), and droplevels().
+include!("implementation/formula_factors.rs");
+
 // Formula term splitting and parenthesized-term expansion.
 include!("implementation/formula_terms.rs");
 

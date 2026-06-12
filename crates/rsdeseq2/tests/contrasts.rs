@@ -134,12 +134,16 @@ fn coefficient_name_contrast_resolves_component_cleaned_interaction_aliases() {
 fn coefficient_name_contrast_resolves_cleaned_formula_transform_interaction_aliases() {
     let design = DesignMatrix::from_row_major(
         4,
-        3,
-        vec![1.0; 12],
+        6,
+        vec![1.0; 24],
         Some(vec![
             "Intercept".into(),
             "condition_B_vs_A:poly(dose, 2)1".into(),
             "relevel(condition, ref = \"B\")_A_vs_B".into(),
+            "factor(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+            "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
+                .into(),
+            "droplevels(condition)_A_vs_B".into(),
         ]),
     )
     .unwrap();
@@ -150,7 +154,7 @@ fn coefficient_name_contrast_resolves_cleaned_formula_transform_interaction_alia
             &ContrastSpec::coefficient_name("condition_B_vs_A:poly.dose..2.1")
         )
         .unwrap(),
-        vec![0.0, 1.0, 0.0]
+        vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_coefficient_index(&design, "condition_B_vs_A:poly.dose..2.1").unwrap(),
@@ -162,11 +166,37 @@ fn coefficient_name_contrast_resolves_cleaned_formula_transform_interaction_alia
             &ContrastSpec::coefficient_name("relevel.condition..ref....B.._A_vs_B")
         )
         .unwrap(),
-        vec![0.0, 0.0, 1.0]
+        vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_coefficient_index(&design, "relevel.condition..ref....B.._A_vs_B").unwrap(),
         2
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::coefficient_name("factor.condition..levels...c..B....A..._A_vs_B")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::coefficient_name(
+                "relevel.factor.condition..levels...c..C....B....A.....ref....B.._C_vs_B"
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::coefficient_name("droplevels.condition._A_vs_B")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     );
 }
 
@@ -261,6 +291,29 @@ fn contrast_specs_expose_stable_result_metadata_labels() {
     assert_eq!(
         cleaned_factor.comparison(),
         "factor-level contrast: if B-1 vs A 0"
+    );
+    let formula_factor =
+        ContrastSpec::factor_level("factor(condition, levels = c(\"B\", \"A\"))", "A", "B");
+    assert_eq!(
+        formula_factor.result_name(),
+        "factor.condition..levels...c..B....A..._A_vs_B"
+    );
+    assert_eq!(
+        formula_factor.comparison(),
+        "factor-level contrast: factor(condition, levels = c(\"B\", \"A\")) A vs B"
+    );
+    let relabeled_formula_factor = ContrastSpec::factor_level(
+        "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))",
+        "treated",
+        "control",
+    );
+    assert_eq!(
+        relabeled_formula_factor.result_name(),
+        "factor.condition..levels...c..A....B....labels...c..control....treated..._treated_vs_control"
+    );
+    assert_eq!(
+        relabeled_formula_factor.comparison(),
+        "factor-level contrast: factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
     );
 
     let list = ContrastSpec::list_with_values(
@@ -613,6 +666,38 @@ fn results_contrast_character_preserves_character_all_zero_semantics() {
             denominator: "3".into(),
         }
     );
+
+    let formula_design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![1.0; 8],
+        Some(vec![
+            "Intercept".into(),
+            "factor(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+        ]),
+    )
+    .unwrap();
+    let formula_resolved = resolve_results_contrast(
+        &formula_design,
+        &ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B"),
+    )
+    .unwrap();
+    assert_eq!(formula_resolved.numeric, vec![0.0, 1.0]);
+    assert_eq!(
+        formula_resolved.result_name,
+        "factor.condition..levels...c..B....A..._A_vs_B"
+    );
+    assert_eq!(
+        formula_resolved.comparison,
+        "factor-level contrast: factor.condition..levels...c..B....A... A vs B"
+    );
+    assert_eq!(
+        formula_resolved.all_zero,
+        ResultsContrastAllZero::Character {
+            numerator: "A".into(),
+            denominator: "B".into(),
+        }
+    );
 }
 
 #[test]
@@ -888,6 +973,105 @@ fn factor_level_contrast_resolves_expanded_shapes() {
 }
 
 #[test]
+fn factor_level_contrast_resolves_formula_factor_transform_names() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        6,
+        vec![1.0; 24],
+        Some(vec![
+            "Intercept".into(),
+            "factor(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+            "droplevels(condition)_A_vs_B".into(),
+            "relevel(droplevels(condition), ref = \"A\")_B_vs_A".into(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))_treated_vs_control".into(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control group\", \"treated-group\"))_treated-group_vs_control group".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("factor.condition..levels...c..B....A...", "A", "B")
+        )
+        .unwrap(),
+        vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("droplevels.condition.", "A", "B")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("relevel.droplevels.condition...ref....A..", "B", "A")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "factor.condition..levels...c..A....B....labels...c..control....treated...",
+                "treated",
+                "control",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "factor.condition..levels...c..A....B....labels...c..control.group....treated.group...",
+                "treated-group",
+                "control group",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    );
+}
+
+#[test]
+fn factor_level_contrast_resolves_no_intercept_formula_factor_labels() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            0.0, 1.0, //
+            0.0, 1.0,
+        ],
+        Some(vec![
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control group\", \"treated-group\"))control group".into(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control group\", \"treated-group\"))treated-group".into(),
+        ]),
+    )
+    .unwrap();
+
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "factor.condition..levels...c..A....B....labels...c..control.group....treated.group...",
+                "treated-group",
+                "control group",
+            )
+        )
+        .unwrap(),
+        vec![-1.0, 1.0]
+    );
+}
+
+#[test]
 fn factor_level_contrast_infers_shared_reference_with_r_like_names() {
     let design = DesignMatrix::from_row_major(
         4,
@@ -994,6 +1178,28 @@ fn factor_level_contrast_rejects_ambiguous_candidate_name_aliases() {
     )
     .unwrap_err();
     assert!(expanded_err.to_string().contains("ambiguously"));
+}
+
+#[test]
+fn factor_level_contrast_rejects_ambiguous_formula_factor_transform_aliases() {
+    let design = DesignMatrix::from_row_major(
+        4,
+        3,
+        vec![1.0; 12],
+        Some(vec![
+            "Intercept".into(),
+            "factor(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+            "factor.condition..levels...c..B....A..._A_vs_B".into(),
+        ]),
+    )
+    .unwrap();
+
+    let err = resolve_contrast(
+        &design,
+        &ContrastSpec::factor_level("factor.condition..levels...c..B....A...", "A", "B"),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("ambiguously"));
 }
 
 #[test]

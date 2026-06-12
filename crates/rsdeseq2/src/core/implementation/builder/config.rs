@@ -411,6 +411,13 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<DesignMatrix, DeseqError> {
+        Ok(self.formula_design_without_offsets(formula)?.design.standard_design)
+    }
+
+    fn formula_design_without_offsets(
+        &self,
+        formula: &str,
+    ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
         if formula_has_offset_terms(formula)? {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "top-level formula workflows with formula offsets".to_string(),
@@ -422,6 +429,6 @@ impl DeseqBuilder {
                 feature: "top-level formula workflows with formula offsets".to_string(),
             });
         }
-        Ok(formula_design.design.standard_design)
+        Ok(formula_design)
     }
 }
