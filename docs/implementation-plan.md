@@ -259,6 +259,9 @@ reference; no DESeq2 source is vendored or translated line by line.
   derived factor metadata with the same sample levels and declared level order
   but a formula-local treatment reference, including positional or named
   `x`/`ref` arguments.
+- [x] Primitive formula `factor(factor)` and `as.factor(factor)` transforms
+  over already-supplied factor metadata, preserving declared levels and
+  treatment references while producing R-shaped coefficient-name prefixes.
 - [x] Primitive `offset(numeric)` and single-vector supported transform offset
   formula extraction, such as `offset(log2(numeric))` and
   `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors

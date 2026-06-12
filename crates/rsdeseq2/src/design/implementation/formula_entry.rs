@@ -471,12 +471,12 @@ fn expand_formula_factor_transform_terms(
     let mut expanded = String::with_capacity(rhs.len());
     let mut derived = Vec::new();
     let mut remainder = rhs;
-    while let Some(start) = next_formula_factor_relevel_transform(remainder) {
+    while let Some((start, transform)) = next_formula_factor_transform(remainder) {
         expanded.push_str(&remainder[..start]);
-        let after_open = &remainder[start + "relevel(".len()..];
+        let after_open = &remainder[start + transform.prefix.len()..];
         let close = formula_transform_close_index(after_open)?;
         let expression = after_open[..close].trim();
-        let factor = formula_relevel_transform_term(expression, factors)?;
+        let factor = formula_factor_transform_term(transform, expression, factors)?;
         let replacement = formula_variable_term(&factor.name);
         if !derived.iter().any(|candidate: &FormulaDerivedFactorCovariate| {
             candidate.name == factor.name
@@ -490,7 +490,28 @@ fn expand_formula_factor_transform_terms(
     Ok((expanded, derived))
 }
 
-fn next_formula_factor_relevel_transform(rhs: &str) -> Option<usize> {
+#[derive(Clone, Copy, Debug)]
+struct FormulaFactorTransform {
+    prefix: &'static str,
+    label: &'static str,
+}
+
+const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 3] = [
+    FormulaFactorTransform {
+        prefix: "as.factor(",
+        label: "as.factor",
+    },
+    FormulaFactorTransform {
+        prefix: "relevel(",
+        label: "relevel",
+    },
+    FormulaFactorTransform {
+        prefix: "factor(",
+        label: "factor",
+    },
+];
+
+fn next_formula_factor_transform(rhs: &str) -> Option<(usize, FormulaFactorTransform)> {
     let mut in_backticks = false;
     let mut idx = 0_usize;
     while idx < rhs.len() {
@@ -503,12 +524,93 @@ fn next_formula_factor_relevel_transform(rhs: &str) -> Option<usize> {
             idx += character.len_utf8();
             continue;
         }
-        if !in_backticks && rhs[idx..].starts_with("relevel(") {
-            return Some(idx);
+        if !in_backticks {
+            if let Some(transform) = FORMULA_FACTOR_TRANSFORMS
+                .iter()
+                .find(|transform| rhs[idx..].starts_with(transform.prefix))
+            {
+                return Some((idx, *transform));
+            }
         }
         idx += character.len_utf8();
     }
     None
+}
+
+fn formula_factor_transform_term(
+    transform: FormulaFactorTransform,
+    expression: &str,
+    factors: &[ExpandedFactorSpec<'_>],
+) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
+    match transform.label {
+        "relevel" => formula_relevel_transform_term(expression, factors),
+        "factor" | "as.factor" => formula_factor_identity_transform_term(transform, expression, factors),
+        _ => unreachable!("validated formula factor transform"),
+    }
+}
+
+fn formula_factor_identity_transform_term(
+    transform: FormulaFactorTransform,
+    expression: &str,
+    factors: &[ExpandedFactorSpec<'_>],
+) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
+    let arguments = split_formula_transform_arguments(expression)?;
+    if arguments.is_empty() {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{}({expression})' must provide a factor",
+                transform.label
+            ),
+        });
+    }
+    let mut factor_text = None;
+    for argument in &arguments {
+        let trimmed = argument.trim();
+        if let Some((key, value)) = split_formula_named_argument(trimmed) {
+            if key == "x" {
+                reject_duplicate_formula_transform_argument(
+                    factor_text.is_some(),
+                    transform.label,
+                    "x",
+                    expression,
+                )?;
+                factor_text = Some(value.to_string());
+                continue;
+            }
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                    transform.label
+                ),
+            });
+        }
+        if factor_text.is_none() {
+            factor_text = Some(trimmed.to_string());
+            continue;
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                transform.label
+            ),
+        });
+    }
+    let Some(factor_text) = factor_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{}({expression})' must provide a factor",
+                transform.label
+            ),
+        });
+    };
+    let factor_name = formula_variable_name(factor_text.trim())?;
+    let factor = find_formula_factor(factor_name, factors)?;
+    Ok(FormulaDerivedFactorCovariate {
+        name: format!("{}({factor_name})", transform.label),
+        sample_levels: factor.sample_levels.to_vec(),
+        reference: factor.reference.to_string(),
+        levels: factor.levels.map(|levels| levels.to_vec()),
+    })
 }
 
 fn formula_relevel_transform_term(
@@ -547,7 +649,9 @@ fn formula_relevel_transform_term(
                         "ref",
                         expression,
                     )?;
-                    reference = Some(parse_formula_string_argument(value, "relevel", "ref", expression)?);
+                    reference = Some(parse_formula_string_argument(
+                        value, "relevel", "ref", expression,
+                    )?);
                     continue;
                 }
                 _ => {
@@ -595,14 +699,7 @@ fn formula_relevel_transform_term(
         });
     };
     let factor_name = formula_variable_name(factor_text.trim())?;
-    let factor = factors
-        .iter()
-        .find(|candidate| candidate.factor == factor_name)
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!(
-                "formula factor '{factor_name}' is not present in supplied design metadata"
-            ),
-        })?;
+    let factor = find_formula_factor(factor_name, factors)?;
     validate_factor_design_inputs_with_levels(
         factor.factor,
         factor.sample_levels,
@@ -615,6 +712,20 @@ fn formula_relevel_transform_term(
         reference,
         levels: factor.levels.map(|levels| levels.to_vec()),
     })
+}
+
+fn find_formula_factor<'a>(
+    factor_name: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+) -> Result<&'a ExpandedFactorSpec<'a>, DeseqError> {
+    factors
+        .iter()
+        .find(|candidate| candidate.factor == factor_name)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula factor '{factor_name}' is not present in supplied design metadata"
+            ),
+        })
 }
 
 fn formula_offset_values(

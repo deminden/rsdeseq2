@@ -1043,6 +1043,81 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
 }
 
 #[test]
+fn expanded_formula_design_supports_factor_identity_transforms() {
+    let condition = vec![
+        "A".to_string(),
+        "B".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let condition_levels = vec!["A".to_string(), "B".to_string()];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+            levels: Some(&condition_levels),
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+            levels: None,
+        },
+    ];
+
+    let design =
+        expanded_formula_design("~ factor(condition) + as.factor(x=batch)", &factors, &[]).unwrap();
+
+    assert_eq!(
+        design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition)_B_vs_A".to_string(),
+            "as.factor(batch)_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        design.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition)A".to_string(),
+            "factor(condition)B".to_string(),
+            "as.factor(batch)X".to_string(),
+            "as.factor(batch)Y".to_string(),
+        ]
+    );
+
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: condition,
+            levels: Some(vec!["A".to_string(), "B".to_string()]),
+            reference: Some("B".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let from_model_frame =
+        expanded_formula_design_from_model_frame("~ as.factor(condition)", &model_frame).unwrap();
+    assert_eq!(
+        from_model_frame
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "as.factor(condition)_A_vs_B".to_string(),
+        ]
+    );
+}
+
+#[test]
 fn formula_model_frame_resolves_r_cleaned_factor_reference_aliases() {
     let model_frame = FormulaModelFrame {
         factors: vec![
@@ -3784,6 +3859,19 @@ fn expanded_formula_design_validates_unsupported_terms() {
         expanded_formula_design("~ poly(dose, 2, raw=TRUE, raw=FALSE)", &factors, &numeric)
             .is_err()
     );
+    assert!(expanded_formula_design("~ factor(dose)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ factor(missing)", &factors, &numeric).is_err());
+    assert!(
+        expanded_formula_design("~ factor(condition, levels=c('A','B'))", &factors, &numeric)
+            .is_err()
+    );
+    assert!(expanded_formula_design("~ factor(x=condition, x=batch)", &factors, &numeric).is_err());
+    assert!(
+        expanded_formula_design("~ as.factor(condition, extra=1)", &factors, &numeric).is_err()
+    );
+    assert!(expanded_formula_design("~ relevel(dose, ref='A')", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ relevel(condition)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design("~ relevel(condition, ref='Z')", &factors, &numeric).is_err());
     assert!(
         expanded_formula_design_with_offsets("~ condition - offset(dose)", &factors, &numeric)
             .is_err()
