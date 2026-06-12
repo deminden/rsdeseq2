@@ -134,11 +134,12 @@ fn coefficient_name_contrast_resolves_component_cleaned_interaction_aliases() {
 fn coefficient_name_contrast_resolves_cleaned_formula_transform_interaction_aliases() {
     let design = DesignMatrix::from_row_major(
         4,
-        2,
-        vec![1.0; 8],
+        3,
+        vec![1.0; 12],
         Some(vec![
             "Intercept".into(),
             "condition_B_vs_A:poly(dose, 2)1".into(),
+            "relevel(condition, ref = \"B\")_A_vs_B".into(),
         ]),
     )
     .unwrap();
@@ -149,11 +150,23 @@ fn coefficient_name_contrast_resolves_cleaned_formula_transform_interaction_alia
             &ContrastSpec::coefficient_name("condition_B_vs_A:poly.dose..2.1")
         )
         .unwrap(),
-        vec![0.0, 1.0]
+        vec![0.0, 1.0, 0.0]
     );
     assert_eq!(
         resolve_coefficient_index(&design, "condition_B_vs_A:poly.dose..2.1").unwrap(),
         1
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::coefficient_name("relevel.condition..ref....B.._A_vs_B")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 1.0]
+    );
+    assert_eq!(
+        resolve_coefficient_index(&design, "relevel.condition..ref....B.._A_vs_B").unwrap(),
+        2
     );
 }
 

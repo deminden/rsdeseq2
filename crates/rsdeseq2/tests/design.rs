@@ -964,6 +964,85 @@ fn expanded_formula_design_from_model_frame_infers_and_overrides_references() {
 }
 
 #[test]
+fn expanded_formula_design_supports_relevel_factor_transform() {
+    let condition = vec![
+        "A".to_string(),
+        "B".to_string(),
+        "C".to_string(),
+        "B".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let condition_levels = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+            levels: Some(&condition_levels),
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+            levels: None,
+        },
+    ];
+
+    let design =
+        expanded_formula_design("~ relevel(condition, ref=\"B\") + batch", &factors, &[]).unwrap();
+
+    assert_eq!(
+        design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(condition, ref = \"B\")_A_vs_B".to_string(),
+            "relevel(condition, ref = \"B\")_C_vs_B".to_string(),
+            "batch_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        design.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(condition, ref = \"B\")B".to_string(),
+            "relevel(condition, ref = \"B\")A".to_string(),
+            "relevel(condition, ref = \"B\")C".to_string(),
+            "batchX".to_string(),
+            "batchY".to_string(),
+        ]
+    );
+
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: condition,
+            levels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]),
+            reference: Some("A".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let from_model_frame =
+        expanded_formula_design_from_model_frame("~ relevel(x=condition, ref='C')", &model_frame)
+            .unwrap();
+    assert_eq!(
+        from_model_frame
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(condition, ref = \"C\")_A_vs_C".to_string(),
+            "relevel(condition, ref = \"C\")_B_vs_C".to_string(),
+        ]
+    );
+}
+
+#[test]
 fn formula_model_frame_resolves_r_cleaned_factor_reference_aliases() {
     let model_frame = FormulaModelFrame {
         factors: vec![

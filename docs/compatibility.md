@@ -123,6 +123,8 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   transforms such as `I(dose^2)`, raw and default orthogonal polynomial
   transforms `poly(numeric, degree, raw=TRUE)` and `poly(numeric, degree)`,
   including positional or named `x`, `degree`, `raw`, and `simple` arguments,
+  factor reference transforms such as `relevel(condition, ref="B")` with
+  positional or named `x`/`ref` arguments,
   common numeric function transforms `log(numeric)`, `log2(numeric)`,
   `log10(numeric)`, `log1p(numeric)`, and `sqrt(numeric)`, including named
   `x` and scalar `log()` `base` arguments, `scale(numeric)` with R-style named

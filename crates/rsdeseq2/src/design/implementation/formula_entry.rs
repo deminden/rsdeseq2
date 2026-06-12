@@ -44,6 +44,16 @@ pub fn expanded_formula_design_with_offsets<'a>(
 ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
     let rhs = formula_rhs(formula)?;
     let (rhs, offsets) = extract_formula_offsets(rhs, numeric_covariates)?;
+    let (rhs, derived_factor_covariates) = expand_formula_factor_transform_terms(&rhs, factors)?;
+    let mut all_factors =
+        Vec::with_capacity(factors.len() + derived_factor_covariates.len());
+    all_factors.extend(factors.iter().cloned());
+    all_factors.extend(derived_factor_covariates.iter().map(|factor| ExpandedFactorSpec {
+        factor: factor.name.as_str(),
+        sample_levels: factor.sample_levels.as_slice(),
+        reference: factor.reference.as_str(),
+        levels: factor.levels.as_deref(),
+    }));
     let (rhs, derived_numeric_covariates) =
         expand_formula_numeric_transform_terms(&rhs, numeric_covariates)?;
     let mut all_numeric_covariates =
@@ -66,7 +76,7 @@ pub fn expanded_formula_design_with_offsets<'a>(
             });
         }
         if sign < 0 {
-            remove_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            remove_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if term == "1" {
@@ -78,7 +88,7 @@ pub fn expanded_formula_design_with_offsets<'a>(
             continue;
         }
         if formula_contains_top_level(term, '^')? {
-            add_power_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            add_power_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if formula_contains_top_level(term, '(')? || formula_contains_top_level(term, ')')? {
@@ -87,27 +97,28 @@ pub fn expanded_formula_design_with_offsets<'a>(
             });
         }
         if formula_contains_top_level(term, '/')? {
-            add_nested_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            add_nested_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if formula_contains_top_level(term, '*')? {
-            add_star_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            add_star_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         if formula_contains_top_level(term, ':')? {
-            add_interaction_formula_term(term, factors, &all_numeric_covariates, &mut state)?;
+            add_interaction_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
             continue;
         }
         add_main_formula_term(
             term,
-            factors,
+            &all_factors,
             &all_numeric_covariates,
             &mut state.selected_factors,
             &mut state.selected_numeric_covariates,
         )?;
     }
 
-    let design = expanded_formula_design_from_state(&state, factors, &all_numeric_covariates)?;
+    let design =
+        expanded_formula_design_from_state(&state, &all_factors, &all_numeric_covariates)?;
     Ok(ExpandedFormulaDesignWithOffsets { design, offsets })
 }
 
@@ -331,6 +342,14 @@ struct FormulaDerivedNumericCovariate {
     values: Vec<f64>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct FormulaDerivedFactorCovariate {
+    name: String,
+    sample_levels: Vec<String>,
+    reference: String,
+    levels: Option<Vec<String>>,
+}
+
 type FormulaDerivedNumericTerm = (String, Vec<f64>);
 type FormulaNumericTransformExpansion = (String, Vec<FormulaDerivedNumericTerm>);
 
@@ -443,6 +462,159 @@ fn extract_formula_offsets(
         offsets.clear();
     }
     Ok((join_formula_terms(&remaining_terms), offsets))
+}
+
+fn expand_formula_factor_transform_terms(
+    rhs: &str,
+    factors: &[ExpandedFactorSpec<'_>],
+) -> Result<(String, Vec<FormulaDerivedFactorCovariate>), DeseqError> {
+    let mut expanded = String::with_capacity(rhs.len());
+    let mut derived = Vec::new();
+    let mut remainder = rhs;
+    while let Some(start) = next_formula_factor_relevel_transform(remainder) {
+        expanded.push_str(&remainder[..start]);
+        let after_open = &remainder[start + "relevel(".len()..];
+        let close = formula_transform_close_index(after_open)?;
+        let expression = after_open[..close].trim();
+        let factor = formula_relevel_transform_term(expression, factors)?;
+        let replacement = formula_variable_term(&factor.name);
+        if !derived.iter().any(|candidate: &FormulaDerivedFactorCovariate| {
+            candidate.name == factor.name
+        }) {
+            derived.push(factor);
+        }
+        expanded.push_str(&replacement);
+        remainder = &after_open[close + 1..];
+    }
+    expanded.push_str(remainder);
+    Ok((expanded, derived))
+}
+
+fn next_formula_factor_relevel_transform(rhs: &str) -> Option<usize> {
+    let mut in_backticks = false;
+    let mut idx = 0_usize;
+    while idx < rhs.len() {
+        let character = rhs[idx..]
+            .chars()
+            .next()
+            .expect("idx is inside rhs char boundary");
+        if character == '`' {
+            in_backticks = !in_backticks;
+            idx += character.len_utf8();
+            continue;
+        }
+        if !in_backticks && rhs[idx..].starts_with("relevel(") {
+            return Some(idx);
+        }
+        idx += character.len_utf8();
+    }
+    None
+}
+
+fn formula_relevel_transform_term(
+    expression: &str,
+    factors: &[ExpandedFactorSpec<'_>],
+) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
+    let arguments = split_formula_transform_arguments(expression)?;
+    if arguments.len() < 2 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'relevel({expression})' must provide factor and ref"
+            ),
+        });
+    }
+    let mut factor_text = None;
+    let mut reference = None;
+    let mut positional_idx = 0_usize;
+    for argument in &arguments {
+        let trimmed = argument.trim();
+        if let Some((key, value)) = split_formula_named_argument(trimmed) {
+            match key.as_str() {
+                "x" => {
+                    reject_duplicate_formula_transform_argument(
+                        factor_text.is_some(),
+                        "relevel",
+                        "x",
+                        expression,
+                    )?;
+                    factor_text = Some(value.to_string());
+                    continue;
+                }
+                "ref" => {
+                    reject_duplicate_formula_transform_argument(
+                        reference.is_some(),
+                        "relevel",
+                        "ref",
+                        expression,
+                    )?;
+                    reference = Some(parse_formula_string_argument(value, "relevel", "ref", expression)?);
+                    continue;
+                }
+                _ => {
+                    return Err(DeseqError::InvalidOptions {
+                        reason: format!(
+                            "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
+                        ),
+                    });
+                }
+            }
+        }
+        match positional_idx {
+            0 if factor_text.is_none() => {
+                factor_text = Some(trimmed.to_string());
+                positional_idx += 1;
+                continue;
+            }
+            1 if reference.is_none() => {
+                reference = Some(parse_formula_string_argument(
+                    trimmed, "relevel", "ref", expression,
+                )?);
+                positional_idx += 1;
+                continue;
+            }
+            _ => {}
+        }
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
+            ),
+        });
+    }
+    let Some(factor_text) = factor_text else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'relevel({expression})' must provide a factor"
+            ),
+        });
+    };
+    let Some(reference) = reference else {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'relevel({expression})' must provide ref"
+            ),
+        });
+    };
+    let factor_name = formula_variable_name(factor_text.trim())?;
+    let factor = factors
+        .iter()
+        .find(|candidate| candidate.factor == factor_name)
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula factor '{factor_name}' is not present in supplied design metadata"
+            ),
+        })?;
+    validate_factor_design_inputs_with_levels(
+        factor.factor,
+        factor.sample_levels,
+        &reference,
+        factor.levels,
+    )?;
+    Ok(FormulaDerivedFactorCovariate {
+        name: format!("relevel({factor_name}, ref = \"{reference}\")"),
+        sample_levels: factor.sample_levels.to_vec(),
+        reference,
+        levels: factor.levels.map(|levels| levels.to_vec()),
+    })
 }
 
 fn formula_offset_values(
@@ -1261,6 +1433,36 @@ fn parse_formula_bool_option(
             ),
         }),
     }
+}
+
+fn parse_formula_string_argument(
+    value: &str,
+    transform: &str,
+    argument: &str,
+    expression: &str,
+) -> Result<String, DeseqError> {
+    let value = strip_formula_outer_parentheses(value.trim())?.trim();
+    let parsed = if let Some(stripped) = value
+        .strip_prefix('"')
+        .and_then(|candidate| candidate.strip_suffix('"'))
+    {
+        stripped
+    } else if let Some(stripped) = value
+        .strip_prefix('\'')
+        .and_then(|candidate| candidate.strip_suffix('\''))
+    {
+        stripped
+    } else {
+        value
+    };
+    if parsed.is_empty() || parsed.contains(['"', '\'', '`']) {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform '{transform}({expression})' argument '{argument}' must be a simple level string"
+            ),
+        });
+    }
+    Ok(parsed.to_string())
 }
 
 fn formula_numeric_raw_poly_columns(

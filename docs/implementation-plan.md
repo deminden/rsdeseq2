@@ -255,6 +255,10 @@ reference; no DESeq2 source is vendored or translated line by line.
   `log2`, `log10`, `log1p`, `sqrt`, and `scale` of supplied numeric covariates,
   including named `x` for scalar transforms, scalar `log()` `base` arguments,
   and named or positional `center`/`scale` arguments for `scale()`.
+- [x] Primitive formula `relevel(factor, ref=...)` transforms materialized as
+  derived factor metadata with the same sample levels and declared level order
+  but a formula-local treatment reference, including positional or named
+  `x`/`ref` arguments.
 - [x] Primitive `offset(numeric)` and single-vector supported transform offset
   formula extraction, such as `offset(log2(numeric))` and
   `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors
