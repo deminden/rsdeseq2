@@ -85,21 +85,31 @@ waldFitRust <- function(baseMean,
                         counts = NULL,
                         sampleLevels = NULL,
                         factorLevels = NULL,
+                        factorReferences = NULL,
                         modelMatrix = NULL,
+                        colData = NULL,
                         rowNames = NULL) {
   beta <- .rsdeseq2_validate_beta_matrix(beta, resultsNames)
   resultsNames <- colnames(beta)
   nGenes <- nrow(beta)
+  geneNames <- rownames(beta)
   baseMean <- .rsdeseq2_validate_result_numeric_vector(baseMean, "baseMean", allowNA = FALSE)
+  baseMean <- .rsdeseq2_align_named_gene_vector(baseMean, geneNames, "baseMean")
   if (length(baseMean) != nGenes) {
     stop("baseMean must have one value per beta row", call. = FALSE)
   }
-  rowNames <- .rsdeseq2_validate_row_names(rowNames %||% rownames(beta) %||% names(baseMean), nGenes)
-  betaCovariance <- .rsdeseq2_validate_beta_covariance(betaCovariance, nGenes, length(resultsNames))
+  rowNames <- .rsdeseq2_validate_row_names(rowNames %||% geneNames %||% names(baseMean), nGenes)
+  betaCovariance <- .rsdeseq2_validate_beta_covariance(betaCovariance, nGenes, resultsNames)
+  betaCovariance <- .rsdeseq2_align_named_gene_array(betaCovariance, geneNames, "betaCovariance")
   betaSE <- .rsdeseq2_validate_beta_se_matrix(betaSE, nGenes, resultsNames)
+  betaSE <- .rsdeseq2_align_named_gene_matrix(betaSE, geneNames, "betaSE")
   counts <- .rsdeseq2_validate_optional_contrast_counts(counts, nGenes)
+  counts <- .rsdeseq2_align_named_gene_matrix(counts, geneNames, "counts")
   sampleLevels <- .rsdeseq2_validate_optional_sample_levels(sampleLevels, counts)
+  colData <- .rsdeseq2_validate_optional_col_data(colData, counts)
+  factorLevels <- factorLevels %||% .rsdeseq2_factor_levels_from_col_data(colData)
   factorLevels <- .rsdeseq2_validate_optional_factor_levels(factorLevels)
+  factorReferences <- .rsdeseq2_validate_optional_factor_references(factorReferences, factorLevels)
   modelMatrix <- .rsdeseq2_validate_optional_model_matrix(modelMatrix, counts, resultsNames)
 
   out <- list(
@@ -110,7 +120,9 @@ waldFitRust <- function(baseMean,
     resultsNames = resultsNames,
     counts = counts,
     sampleLevels = sampleLevels,
+    colData = colData,
     factorLevels = factorLevels,
+    factorReferences = factorReferences,
     modelMatrix = modelMatrix,
     rowNames = rowNames
   )
@@ -129,19 +141,27 @@ lrtFitRust <- function(baseMean,
                        counts = NULL,
                        sampleLevels = NULL,
                        factorLevels = NULL,
+                       factorReferences = NULL,
                        modelMatrix = NULL,
+                       colData = NULL,
                        rowNames = NULL) {
   beta <- .rsdeseq2_validate_beta_matrix(beta, resultsNames)
   resultsNames <- colnames(beta)
   nGenes <- nrow(beta)
+  geneNames <- rownames(beta)
   baseMean <- .rsdeseq2_validate_result_numeric_vector(baseMean, "baseMean", allowNA = FALSE)
+  baseMean <- .rsdeseq2_align_named_gene_vector(baseMean, geneNames, "baseMean")
   if (length(baseMean) != nGenes) {
     stop("baseMean must have one value per beta row", call. = FALSE)
   }
-  rowNames <- .rsdeseq2_validate_row_names(rowNames %||% rownames(beta) %||% names(baseMean), nGenes)
-  betaCovariance <- .rsdeseq2_validate_beta_covariance(betaCovariance, nGenes, length(resultsNames))
+  rowNames <- .rsdeseq2_validate_row_names(rowNames %||% geneNames %||% names(baseMean), nGenes)
+  betaCovariance <- .rsdeseq2_validate_beta_covariance(betaCovariance, nGenes, resultsNames)
+  betaCovariance <- .rsdeseq2_align_named_gene_array(betaCovariance, geneNames, "betaCovariance")
   betaSE <- .rsdeseq2_validate_beta_se_matrix(betaSE, nGenes, resultsNames)
+  betaSE <- .rsdeseq2_align_named_gene_matrix(betaSE, geneNames, "betaSE")
   lrtStat <- .rsdeseq2_validate_lrt_stat(lrtStat, nGenes)
+  lrtStat <- .rsdeseq2_align_named_gene_vector(lrtStat, geneNames, "lrtStat")
+  lrtDf <- .rsdeseq2_align_named_gene_vector(lrtDf, geneNames, "lrtDf", allowScalar = TRUE)
   lrtDf <- .rsdeseq2_validate_lrt_df(lrtDf, nGenes)
   if (is.null(lrtPvalue)) {
     if (is.null(lrtDf)) {
@@ -150,11 +170,16 @@ lrtFitRust <- function(baseMean,
     lrtPvalue <- stats::pchisq(lrtStat, df = lrtDf, lower.tail = FALSE)
     lrtPvalue[is.na(lrtStat) | is.na(lrtDf)] <- NA_real_
   } else {
+    lrtPvalue <- .rsdeseq2_align_named_gene_vector(lrtPvalue, geneNames, "lrtPvalue")
     lrtPvalue <- .rsdeseq2_validate_result_pvalues(lrtPvalue, nGenes)
   }
   counts <- .rsdeseq2_validate_optional_contrast_counts(counts, nGenes)
+  counts <- .rsdeseq2_align_named_gene_matrix(counts, geneNames, "counts")
   sampleLevels <- .rsdeseq2_validate_optional_sample_levels(sampleLevels, counts)
+  colData <- .rsdeseq2_validate_optional_col_data(colData, counts)
+  factorLevels <- factorLevels %||% .rsdeseq2_factor_levels_from_col_data(colData)
   factorLevels <- .rsdeseq2_validate_optional_factor_levels(factorLevels)
+  factorReferences <- .rsdeseq2_validate_optional_factor_references(factorReferences, factorLevels)
   modelMatrix <- .rsdeseq2_validate_optional_model_matrix(modelMatrix, counts, resultsNames)
 
   out <- list(
@@ -168,7 +193,9 @@ lrtFitRust <- function(baseMean,
     resultsNames = resultsNames,
     counts = counts,
     sampleLevels = sampleLevels,
+    colData = colData,
     factorLevels = factorLevels,
+    factorReferences = factorReferences,
     modelMatrix = modelMatrix,
     rowNames = rowNames
   )
@@ -203,11 +230,18 @@ resultsNamesRust <- function(object) {
     return(colnames(beta))
   }
   if (is.list(object)) {
-    if (!is.null(object$resultsNames)) {
-      return(.rsdeseq2_validate_results_names(object$resultsNames))
+    resultNames <- .rsdeseq2_object_field(object, "resultsNames")
+    if (!is.null(resultNames)) {
+      beta <- .rsdeseq2_object_field(object, "beta")
+      if (!is.null(beta)) {
+        beta <- .rsdeseq2_validate_beta_matrix(beta, resultNames)
+        return(colnames(beta))
+      }
+      return(.rsdeseq2_validate_results_names(resultNames))
     }
-    if (!is.null(object$beta)) {
-      return(resultsNamesRust(object$beta))
+    beta <- .rsdeseq2_object_field(object, "beta")
+    if (!is.null(beta)) {
+      return(resultsNamesRust(beta))
     }
   }
   fields <- .rsdeseq2_extract_wald_fit_fields(object)
@@ -241,13 +275,14 @@ resultsNames <- function(object, ...) {
 }
 
 .rsdeseq2_extract_wald_fit_fields <- function(object) {
-  mcols <- .rsdeseq2_object_field(object, "mcols")
+  mcols <- .rsdeseq2_coerce_mcols_frame(.rsdeseq2_object_field(object, "mcols"))
   assays <- .rsdeseq2_object_field(object, "assays")
   colData <- .rsdeseq2_object_field(object, "colData")
+  explicitResultsNames <- .rsdeseq2_object_field(object, "resultsNames")
   beta <- .rsdeseq2_object_field(object, "beta") %||%
     .rsdeseq2_object_field(object, "betaMatrix") %||%
-    .rsdeseq2_mcols_beta_matrix(mcols)
-  resultsNames <- .rsdeseq2_object_field(object, "resultsNames") %||% colnames(beta)
+    .rsdeseq2_mcols_beta_matrix(mcols, explicitResultsNames)
+  resultsNames <- explicitResultsNames %||% colnames(beta)
   list(
     baseMean = .rsdeseq2_object_field(object, "baseMean") %||%
       .rsdeseq2_mcols_column(mcols, "baseMean"),
@@ -259,8 +294,10 @@ resultsNames <- function(object, ...) {
     counts = .rsdeseq2_object_field(object, "counts") %||%
       .rsdeseq2_object_field(assays, "counts"),
     sampleLevels = .rsdeseq2_object_field(object, "sampleLevels"),
+    colData = colData,
     factorLevels = .rsdeseq2_object_field(object, "factorLevels") %||%
       .rsdeseq2_factor_levels_from_col_data(colData),
+    factorReferences = .rsdeseq2_object_field(object, "factorReferences"),
     modelMatrix = .rsdeseq2_object_field(object, "modelMatrix"),
     rowNames = .rsdeseq2_object_field(object, "rowNames") %||%
       rownames(beta) %||%
@@ -270,7 +307,7 @@ resultsNames <- function(object, ...) {
 
 .rsdeseq2_extract_lrt_fit_fields <- function(object) {
   fields <- .rsdeseq2_extract_wald_fit_fields(object)
-  mcols <- .rsdeseq2_object_field(object, "mcols")
+  mcols <- .rsdeseq2_coerce_mcols_frame(.rsdeseq2_object_field(object, "mcols"))
   fields$lrtStat <- .rsdeseq2_object_field(object, "lrtStat") %||%
     .rsdeseq2_object_field(object, "stat") %||%
     .rsdeseq2_mcols_column(mcols, "stat")
@@ -288,29 +325,78 @@ resultsNames <- function(object, ...) {
   if (is.list(object) && !is.null(object[[name]])) {
     return(object[[name]])
   }
+  for (alias in .rsdeseq2_object_field_aliases(name)) {
+    if (is.list(object) && !is.null(object[[alias]])) {
+      return(object[[alias]])
+    }
+  }
   accessed <- .rsdeseq2_optional_object_accessor(object, name)
   if (!is.null(accessed)) {
     return(accessed)
+  }
+  attributed <- .rsdeseq2_object_attribute_field(object, name)
+  if (!is.null(attributed)) {
+    return(attributed)
   }
   if (isS4(object)) {
     slots <- methods::slotNames(object)
     if (name %in% slots) {
       return(methods::slot(object, name))
     }
-    aliases <- switch(
-      name,
-      mcols = c("elementMetadata", "rowData"),
-      colData = c("colData"),
-      rowNames = c("NAMES"),
-      character()
-    )
-    for (alias in aliases) {
+    for (alias in .rsdeseq2_object_field_aliases(name)) {
       if (alias %in% slots) {
         return(methods::slot(object, alias))
       }
     }
   }
+  bracketAccessed <- .rsdeseq2_optional_bracket_field(object, name)
+  if (!is.null(bracketAccessed)) {
+    return(bracketAccessed)
+  }
   NULL
+}
+
+.rsdeseq2_object_attribute_field <- function(object, name) {
+  if (is.null(object) || is.null(name)) {
+    return(NULL)
+  }
+  value <- attr(object, name, exact = TRUE)
+  if (!is.null(value)) {
+    return(value)
+  }
+  for (alias in .rsdeseq2_object_field_aliases(name)) {
+    value <- attr(object, alias, exact = TRUE)
+    if (!is.null(value)) {
+      return(value)
+    }
+  }
+  NULL
+}
+
+.rsdeseq2_object_field_aliases <- function(name) {
+  switch(
+    name,
+    beta = c("coef", "coefficients"),
+    betaMatrix = c("coefMatrix", "coefficientMatrix"),
+    betaCovariance = c("betaCov", "coefCovariance", "coefficientCovariance"),
+    factorLevels = c("factorLevelNames", "factorLevelsList", "levelNames"),
+    factorReferences = c("factorReference", "factorReferenceLevels", "referenceLevels"),
+    mcols = c("elementMetadata", "rowData"),
+    modelMatrix = c("model.matrix", "designMatrix", "fullModelMatrix"),
+    resultsNames = c("resultNames", "coefNames", "coefficientNames"),
+    rowNames = c("NAMES"),
+    character()
+  )
+}
+
+.rsdeseq2_optional_bracket_field <- function(object, name) {
+  if (is.null(object) || is.null(name)) {
+    return(NULL)
+  }
+  tryCatch(
+    object[[name]],
+    error = function(e) NULL
+  )
 }
 
 .rsdeseq2_optional_object_accessor <- function(object, name) {
@@ -341,13 +427,65 @@ resultsNames <- function(object, ...) {
 }
 
 .rsdeseq2_mcols_column <- function(mcols, name) {
-  if (is.null(mcols) || is.null(mcols[[name]])) {
+  mcols <- .rsdeseq2_coerce_mcols_frame(mcols)
+  column <- .rsdeseq2_mcols_resolve_column_name(name, mcols)
+  if (is.null(column) || is.na(column)) {
     return(NULL)
   }
-  mcols[[name]]
+  out <- mcols[[column]]
+  .rsdeseq2_apply_mcols_row_names(out, rownames(mcols))
+}
+
+.rsdeseq2_apply_mcols_row_names <- function(value, rowNames) {
+  if (is.null(value) || is.null(rowNames)) {
+    return(value)
+  }
+  if (is.vector(value) && is.null(names(value)) &&
+    .rsdeseq2_has_explicit_row_names(rowNames, length(value))) {
+    names(value) <- rowNames
+    return(value)
+  }
+  if (is.matrix(value) && is.null(rownames(value)) &&
+    .rsdeseq2_has_explicit_row_names(rowNames, nrow(value))) {
+    rownames(value) <- rowNames
+    return(value)
+  }
+  if (is.array(value) && length(dim(value)) >= 1L &&
+    .rsdeseq2_has_explicit_row_names(rowNames, dim(value)[[1L]])) {
+    names <- dimnames(value)
+    if (is.null(names)) {
+      names <- vector("list", length(dim(value)))
+    }
+    if (is.null(names[[1L]])) {
+      names[[1L]] <- rowNames
+      dimnames(value) <- names
+    }
+  }
+  value
+}
+
+.rsdeseq2_coerce_mcols_frame <- function(mcols) {
+  if (is.null(mcols)) {
+    return(NULL)
+  }
+  if (is.data.frame(mcols)) {
+    return(mcols)
+  }
+  coerced <- tryCatch(
+    as.data.frame(mcols),
+    error = function(e) NULL
+  )
+  if (is.null(coerced) || !is.data.frame(coerced)) {
+    return(mcols)
+  }
+  coerced
 }
 
 .rsdeseq2_factor_levels_from_col_data <- function(colData) {
+  if (is.null(colData)) {
+    return(NULL)
+  }
+  colData <- .rsdeseq2_coerce_col_data_frame(colData)
   if (is.null(colData)) {
     return(NULL)
   }
@@ -357,6 +495,8 @@ resultsNames <- function(object, ...) {
     column <- colData[[name]]
     if (is.factor(column)) {
       out[[name]] <- levels(column)
+    } else if (is.character(column) && length(column) > 0L && !anyNA(column) && all(nzchar(column))) {
+      out[[name]] <- sort(unique(column))
     }
   }
   if (length(out) == 0L) {
@@ -365,7 +505,8 @@ resultsNames <- function(object, ...) {
   out
 }
 
-.rsdeseq2_mcols_beta_matrix <- function(mcols) {
+.rsdeseq2_mcols_beta_matrix <- function(mcols, resultsNames = NULL) {
+  mcols <- .rsdeseq2_coerce_mcols_frame(mcols)
   if (is.null(mcols)) {
     return(NULL)
   }
@@ -375,6 +516,15 @@ resultsNames <- function(object, ...) {
   }
   if (is.null(colnames(mcols))) {
     return(NULL)
+  }
+  if (!is.null(resultsNames)) {
+    betaColumns <- .rsdeseq2_mcols_resolve_column_names(mcols, resultsNames)
+    if (is.null(betaColumns)) {
+      return(NULL)
+    }
+    out <- as.matrix(mcols[, betaColumns, drop = FALSE])
+    colnames(out) <- resultsNames
+    return(out)
   }
   seColumns <- grep("^SE_", colnames(mcols), value = TRUE)
   betaColumns <- sub("^SE_", "", seColumns)
@@ -386,16 +536,57 @@ resultsNames <- function(object, ...) {
 }
 
 .rsdeseq2_mcols_prefixed_matrix <- function(mcols, prefix, resultsNames) {
+  mcols <- .rsdeseq2_coerce_mcols_frame(mcols)
   if (is.null(mcols) || is.null(resultsNames)) {
     return(NULL)
   }
-  columns <- paste0(prefix, resultsNames)
-  if (is.null(colnames(mcols)) || !all(columns %in% colnames(mcols))) {
+  columns <- .rsdeseq2_mcols_resolve_column_names(mcols, paste0(prefix, resultsNames))
+  if (is.null(columns)) {
     return(NULL)
   }
   out <- as.matrix(mcols[, columns, drop = FALSE])
   colnames(out) <- resultsNames
   out
+}
+
+.rsdeseq2_mcols_resolve_column_names <- function(mcols, names) {
+  mcols <- .rsdeseq2_coerce_mcols_frame(mcols)
+  columns <- vapply(
+    names,
+    .rsdeseq2_mcols_resolve_column_name,
+    character(1L),
+    mcols = mcols,
+    USE.NAMES = FALSE
+  )
+  if (anyNA(columns)) {
+    return(NULL)
+  }
+  columns
+}
+
+.rsdeseq2_mcols_resolve_column_name <- function(name, mcols) {
+  mcols <- .rsdeseq2_coerce_mcols_frame(mcols)
+  columns <- colnames(mcols)
+  if (is.null(columns) || is.null(name)) {
+    return(NA_character_)
+  }
+  exact <- which(columns == name)
+  if (length(exact) == 1L) {
+    return(columns[[exact]])
+  }
+  if (length(exact) > 1L) {
+    stop(sprintf("mcols column %s is duplicated", name), call. = FALSE)
+  }
+  alias <- make.names(name)
+  aliases <- make.names(columns)
+  matches <- which(aliases == alias)
+  if (length(matches) == 1L) {
+    return(columns[[matches]])
+  }
+  if (length(matches) > 1L) {
+    stop(sprintf("mcols column alias %s is ambiguous", name), call. = FALSE)
+  }
+  NA_character_
 }
 
 .rsdeseq2_results_primitive_wald_fit <- function(object,
@@ -411,6 +602,8 @@ resultsNames <- function(object, ...) {
                                                  independentFiltering) {
   resultsNames <- object$resultsNames
   reference <- reference %||% .rsdeseq2_reference_for_character_contrast(object, contrast)
+  contrast <- .rsdeseq2_canonicalize_character_contrast(object, contrast)
+  reference <- .rsdeseq2_canonicalize_character_contrast_reference(object, contrast, reference)
   if (is.null(contrast)) {
     if (is.null(name)) {
       if (length(resultsNames) < 2L) {
@@ -458,11 +651,11 @@ resultsNames <- function(object, ...) {
     lfcSE = wald$lfcSE,
     stat = wald$stat,
     pvalue = wald$pvalue,
+    contrast = numericContrast,
     rowNames = object$rowNames
   )
   attr(out, "resultName") <- resultName
   attr(out, "comparison") <- comparison
-  attr(out, "contrast") <- numericContrast
   attr(out, "contrastAllZero") <- allZero$type
   attr(out, "lfcThreshold") <- waldOptions$lfcThreshold
   attr(out, "altHypothesis") <- waldOptions$altHypothesis
@@ -493,6 +686,8 @@ resultsNames <- function(object, ...) {
   }
   resultsNames <- object$resultsNames
   reference <- reference %||% .rsdeseq2_reference_for_character_contrast(object, contrast)
+  contrast <- .rsdeseq2_canonicalize_character_contrast(object, contrast)
+  reference <- .rsdeseq2_canonicalize_character_contrast_reference(object, contrast, reference)
   if (is.null(contrast)) {
     if (is.null(name)) {
       if (length(resultsNames) < 2L) {
@@ -533,11 +728,11 @@ resultsNames <- function(object, ...) {
     lfcSE = lrt$lfcSE,
     stat = object$lrtStat,
     pvalue = object$lrtPvalue,
+    contrast = numericContrast,
     rowNames = object$rowNames
   )
   attr(out, "resultName") <- resultName
   attr(out, "comparison") <- comparison
-  attr(out, "contrast") <- numericContrast
   attr(out, "contrastAllZero") <- allZero$type
   if (!is.null(object$lrtDf)) {
     attr(out, "lrtDf") <- object$lrtDf
@@ -557,10 +752,12 @@ resultsTableRust <- function(baseMean,
                              padj = NULL,
                              dispersion = NULL,
                              converged = NULL,
+                             contrast = NULL,
                              rowNames = NULL) {
   baseMean <- .rsdeseq2_validate_result_numeric_vector(baseMean, "baseMean", allowNA = FALSE)
   nGenes <- length(baseMean)
   rowNames <- .rsdeseq2_validate_row_names(rowNames %||% names(baseMean), nGenes)
+  baseMean <- .rsdeseq2_align_named_gene_vector(baseMean, rowNames, "baseMean")
 
   if (is.null(pvalue)) {
     if (!is.null(padj)) {
@@ -569,32 +766,62 @@ resultsTableRust <- function(baseMean,
     padj <- NULL
   } else {
     pvalue <- .rsdeseq2_validate_result_pvalues(pvalue, nGenes)
+    pvalue <- .rsdeseq2_align_named_gene_vector(pvalue, rowNames, "pvalue")
     if (is.null(padj)) {
       padj <- stats::p.adjust(pvalue, method = "BH")
     } else {
       padj <- .rsdeseq2_validate_result_pvalues(padj, nGenes, name = "padj")
+      padj <- .rsdeseq2_align_named_gene_vector(padj, rowNames, "padj")
     }
   }
 
+  log2FoldChange <- .rsdeseq2_validate_result_optional_numeric(log2FoldChange, nGenes, "log2FoldChange")
+  log2FoldChange <- .rsdeseq2_align_named_gene_vector(log2FoldChange, rowNames, "log2FoldChange")
+  lfcSE <- .rsdeseq2_validate_result_optional_numeric(lfcSE, nGenes, "lfcSE")
+  lfcSE <- .rsdeseq2_align_named_gene_vector(lfcSE, rowNames, "lfcSE")
+  stat <- .rsdeseq2_validate_result_optional_numeric(stat, nGenes, "stat")
+  stat <- .rsdeseq2_align_named_gene_vector(stat, rowNames, "stat")
+
   out <- data.frame(
     baseMean = baseMean,
-    log2FoldChange = .rsdeseq2_validate_result_optional_numeric(log2FoldChange, nGenes, "log2FoldChange"),
-    lfcSE = .rsdeseq2_validate_result_optional_numeric(lfcSE, nGenes, "lfcSE"),
-    stat = .rsdeseq2_validate_result_optional_numeric(stat, nGenes, "stat"),
+    log2FoldChange = log2FoldChange,
+    lfcSE = lfcSE,
+    stat = stat,
     pvalue = pvalue %||% rep(NA_real_, nGenes),
     padj = padj %||% rep(NA_real_, nGenes),
     check.names = FALSE
   )
 
   if (!is.null(dispersion)) {
-    out$dispersion <- .rsdeseq2_validate_result_optional_numeric(dispersion, nGenes, "dispersion")
+    dispersion <- .rsdeseq2_validate_result_optional_numeric(dispersion, nGenes, "dispersion")
+    out$dispersion <- .rsdeseq2_align_named_gene_vector(dispersion, rowNames, "dispersion")
   }
   if (!is.null(converged)) {
-    out$converged <- .rsdeseq2_validate_result_optional_logical(converged, nGenes, "converged")
+    converged <- .rsdeseq2_validate_result_optional_logical(converged, nGenes, "converged")
+    out$converged <- .rsdeseq2_align_named_gene_vector(converged, rowNames, "converged")
+  }
+  if (!is.null(contrast)) {
+    contrast <- .rsdeseq2_validate_result_table_contrast(contrast)
+    attr(out, "contrast") <- contrast
   }
   if (!is.null(rowNames)) {
     rownames(out) <- rowNames
   }
+  out
+}
+
+.rsdeseq2_validate_result_table_contrast <- function(contrast) {
+  if (!is.numeric(contrast) || is.list(contrast)) {
+    stop("contrast metadata must be a numeric vector", call. = FALSE)
+  }
+  if (length(contrast) == 0L) {
+    stop("contrast metadata cannot be empty", call. = FALSE)
+  }
+  if (any(!is.finite(contrast))) {
+    stop("contrast metadata must contain finite values", call. = FALSE)
+  }
+  out <- as.numeric(contrast)
+  names(out) <- names(contrast)
   out
 }
 
@@ -663,6 +890,7 @@ applyCooksCutoffRust <- function(pvalue,
                                  native = FALSE) {
   pvalue <- .rsdeseq2_validate_pvalues(pvalue)
   maxCooks <- .rsdeseq2_validate_optional_numeric_vector(maxCooks, length(pvalue), "maxCooks")
+  maxCooks <- .rsdeseq2_align_named_gene_vector(maxCooks, names(pvalue), "maxCooks")
   cooksCutoff <- .rsdeseq2_validate_cooks_cutoff(cooksCutoff)
 
   if (is.null(cooksCutoff)) {
@@ -671,10 +899,12 @@ applyCooksCutoffRust <- function(pvalue,
 
   if (isTRUE(lowCountHeuristic)) {
     counts <- .rsdeseq2_validate_counts(counts)
-    cooks <- .rsdeseq2_validate_cooks_matrix(cooks, nrow(counts), ncol(counts))
     if (nrow(counts) != length(pvalue)) {
       stop("counts must have one row per p-value", call. = FALSE)
     }
+    counts <- .rsdeseq2_align_named_gene_matrix(counts, names(pvalue), "counts")
+    cooks <- .rsdeseq2_validate_cooks_matrix(cooks, nrow(counts), ncol(counts))
+    cooks <- .rsdeseq2_align_cooks_matrix(cooks, counts)
   } else {
     counts <- NULL
     cooks <- NULL
@@ -706,6 +936,39 @@ applyCooksCutoffRust <- function(pvalue,
     cooks = cooks,
     lowCountHeuristic = lowCountHeuristic
   )
+}
+
+.rsdeseq2_align_cooks_matrix <- function(cooks, counts) {
+  cooksNames <- rownames(cooks)
+  countNames <- rownames(counts)
+  if (!is.null(countNames) &&
+    !is.null(cooksNames) &&
+    .rsdeseq2_has_explicit_row_names(cooksNames, nrow(cooks))) {
+    if (anyNA(cooksNames) || any(!nzchar(cooksNames)) || anyDuplicated(cooksNames)) {
+      stop("cooks row names must be unique non-empty gene names", call. = FALSE)
+    }
+    missing <- setdiff(countNames, cooksNames)
+    if (length(missing) > 0L) {
+      stop("cooks row names must contain all count row names", call. = FALSE)
+    }
+    cooks <- cooks[countNames, , drop = FALSE]
+  }
+
+  cooksSamples <- colnames(cooks)
+  countSamples <- colnames(counts)
+  if (!is.null(countSamples) &&
+    !is.null(cooksSamples) &&
+    .rsdeseq2_has_explicit_row_names(cooksSamples, ncol(cooks))) {
+    if (anyNA(cooksSamples) || any(!nzchar(cooksSamples)) || anyDuplicated(cooksSamples)) {
+      stop("cooks column names must be unique non-empty sample names", call. = FALSE)
+    }
+    missing <- setdiff(countSamples, cooksSamples)
+    if (length(missing) > 0L) {
+      stop("cooks column names must contain all count sample names", call. = FALSE)
+    }
+    cooks <- cooks[, countSamples, drop = FALSE]
+  }
+  cooks
 }
 
 .rsdeseq2_parse_results_contrast <- function(contrast,
@@ -749,9 +1012,9 @@ applyCooksCutoffRust <- function(pvalue,
       denominator = denominator,
       reference = reference,
       numeric = numeric,
-      resultName = sprintf("%s_%s_vs_%s", factor, numerator, denominator),
+      resultName = sprintf("%s_%s_vs_%s", make.names(factor), make.names(numerator), make.names(denominator)),
       comparison = sprintf("factor-level contrast: %s %s vs %s", factor, numerator, denominator),
-      allZero = list(type = "character", numerator = numerator, denominator = denominator)
+      allZero = list(type = "character", factor = factor, numerator = numerator, denominator = denominator)
     ))
   }
 
@@ -796,15 +1059,86 @@ applyCooksCutoffRust <- function(pvalue,
 }
 
 .rsdeseq2_reference_for_character_contrast <- function(object, contrast) {
-  if (!is.character(contrast) || length(contrast) != 3L || is.null(object$factorLevels)) {
+  if (!is.character(contrast) || length(contrast) != 3L) {
     return(NULL)
   }
   factor <- contrast[[1L]]
+  fields <- names(object$factorReferences)
+  if (is.null(fields)) {
+    fields <- names(object$factorLevels)
+  }
+  factor <- .rsdeseq2_resolve_named_metadata_field(factor, fields, "factor reference")
+  if (is.null(factor)) {
+    return(NULL)
+  }
+  if (!is.null(object$factorReferences) && !is.null(object$factorReferences[[factor]])) {
+    return(object$factorReferences[[factor]])
+  }
+  if (is.null(object$factorLevels)) {
+    return(NULL)
+  }
   levels <- object$factorLevels[[factor]]
   if (is.null(levels) || length(levels) == 0L) {
     return(NULL)
   }
   levels[[1L]]
+}
+
+.rsdeseq2_canonicalize_character_contrast <- function(object, contrast) {
+  if (!is.character(contrast) || length(contrast) != 3L) {
+    return(contrast)
+  }
+  factor <- contrast[[1L]]
+  fields <- names(object$factorLevels)
+  if (is.null(fields) && !is.null(object$colData)) {
+    fields <- colnames(object$colData) %||% names(object$colData)
+  }
+  canonical <- .rsdeseq2_resolve_named_metadata_field(factor, fields, "character contrast factor")
+  if (is.null(canonical)) {
+    if (is.null(object$sampleLevels)) {
+      return(contrast)
+    }
+    canonical <- factor
+  }
+  contrast[[1L]] <- canonical
+  levelCandidates <- .rsdeseq2_character_contrast_level_candidates(object, canonical)
+  if (!is.null(levelCandidates)) {
+    contrast[[2L]] <- .rsdeseq2_resolve_sample_level_alias(contrast[[2L]], levelCandidates, "numerator")
+    contrast[[3L]] <- .rsdeseq2_resolve_sample_level_alias(contrast[[3L]], levelCandidates, "denominator")
+  }
+  contrast
+}
+
+.rsdeseq2_character_contrast_level_candidates <- function(object, factor) {
+  if (!is.null(object$factorLevels) && !is.null(object$factorLevels[[factor]])) {
+    return(object$factorLevels[[factor]])
+  }
+  if (!is.null(object$colData)) {
+    fields <- colnames(object$colData) %||% names(object$colData)
+    column <- .rsdeseq2_resolve_named_metadata_field(factor, fields, "character contrast factor")
+    if (!is.null(column)) {
+      values <- object$colData[[column]]
+      if (is.factor(values)) {
+        return(levels(values))
+      }
+      return(unique(as.character(values)))
+    }
+  }
+  if (!is.null(object$sampleLevels)) {
+    return(unique(as.character(object$sampleLevels)))
+  }
+  NULL
+}
+
+.rsdeseq2_canonicalize_character_contrast_reference <- function(object, contrast, reference) {
+  if (is.null(reference) || !is.character(contrast) || length(contrast) != 3L) {
+    return(reference)
+  }
+  levelCandidates <- .rsdeseq2_character_contrast_level_candidates(object, contrast[[1L]])
+  if (is.null(levelCandidates)) {
+    return(reference)
+  }
+  .rsdeseq2_resolve_sample_level_alias(reference, levelCandidates, "reference")
 }
 
 .rsdeseq2_validate_beta_matrix <- function(beta, resultsNames) {
@@ -821,15 +1155,32 @@ applyCooksCutoffRust <- function(pvalue,
   if (length(resultsNames) != ncol(beta)) {
     stop("resultsNames must have one value per beta column", call. = FALSE)
   }
+  betaColumns <- colnames(beta)
+  if (!is.null(betaColumns) && .rsdeseq2_has_explicit_row_names(betaColumns, ncol(beta))) {
+    if (length(betaColumns) != ncol(beta) || anyNA(betaColumns) || any(!nzchar(betaColumns))) {
+      stop("beta column names must be non-empty when supplied", call. = FALSE)
+    }
+    if (anyDuplicated(betaColumns)) {
+      stop("beta column names must be unique when supplied", call. = FALSE)
+    }
+    order <- vapply(
+      resultsNames,
+      .rsdeseq2_resolve_results_name_index,
+      integer(1L),
+      resultsNames = betaColumns
+    )
+    beta <- beta[, order, drop = FALSE]
+  }
   colnames(beta) <- resultsNames
   storage.mode(beta) <- "double"
   beta
 }
 
-.rsdeseq2_validate_beta_covariance <- function(betaCovariance, nGenes, nCoef) {
+.rsdeseq2_validate_beta_covariance <- function(betaCovariance, nGenes, resultsNames) {
   if (is.null(betaCovariance)) {
     return(NULL)
   }
+  nCoef <- length(resultsNames)
   if (!is.array(betaCovariance) || !is.numeric(betaCovariance) || length(dim(betaCovariance)) != 3L) {
     stop("betaCovariance must be a numeric array with dimensions genes x coefficients x coefficients", call. = FALSE)
   }
@@ -839,7 +1190,39 @@ applyCooksCutoffRust <- function(pvalue,
   if (any(!is.na(betaCovariance) & !is.finite(betaCovariance))) {
     stop("betaCovariance must contain finite values or NA", call. = FALSE)
   }
+  betaCovariance <- .rsdeseq2_align_beta_covariance_axis(betaCovariance, resultsNames, 2L)
+  betaCovariance <- .rsdeseq2_align_beta_covariance_axis(betaCovariance, resultsNames, 3L)
+  names <- dimnames(betaCovariance)
+  if (is.null(names)) {
+    names <- vector("list", 3L)
+  }
+  names[[2L]] <- resultsNames
+  names[[3L]] <- resultsNames
+  dimnames(betaCovariance) <- names
   betaCovariance
+}
+
+.rsdeseq2_align_beta_covariance_axis <- function(betaCovariance, resultsNames, axis) {
+  axisNames <- dimnames(betaCovariance)[[axis]]
+  if (is.null(axisNames) || !.rsdeseq2_has_explicit_row_names(axisNames, dim(betaCovariance)[[axis]])) {
+    return(betaCovariance)
+  }
+  if (length(axisNames) != dim(betaCovariance)[[axis]] || anyNA(axisNames) || any(!nzchar(axisNames))) {
+    stop("betaCovariance coefficient names must be non-empty when supplied", call. = FALSE)
+  }
+  if (anyDuplicated(axisNames)) {
+    stop("betaCovariance coefficient names must be unique when supplied", call. = FALSE)
+  }
+  order <- vapply(
+    resultsNames,
+    .rsdeseq2_resolve_results_name_index,
+    integer(1L),
+    resultsNames = axisNames
+  )
+  if (axis == 2L) {
+    return(betaCovariance[, order, , drop = FALSE])
+  }
+  betaCovariance[, , order, drop = FALSE]
 }
 
 .rsdeseq2_validate_beta_se_matrix <- function(betaSE, nGenes, resultsNames) {
@@ -851,6 +1234,22 @@ applyCooksCutoffRust <- function(pvalue,
   }
   if (any(!is.na(betaSE) & (!is.finite(betaSE) | betaSE < 0))) {
     stop("betaSE must contain non-negative finite values or NA", call. = FALSE)
+  }
+  betaSEColumns <- colnames(betaSE)
+  if (!is.null(betaSEColumns)) {
+    if (length(betaSEColumns) != ncol(betaSE) || anyNA(betaSEColumns) || any(!nzchar(betaSEColumns))) {
+      stop("betaSE column names must be non-empty when supplied", call. = FALSE)
+    }
+    if (anyDuplicated(betaSEColumns)) {
+      stop("betaSE column names must be unique when supplied", call. = FALSE)
+    }
+    order <- vapply(
+      resultsNames,
+      .rsdeseq2_resolve_results_name_index,
+      integer(1L),
+      resultsNames = betaSEColumns
+    )
+    betaSE <- betaSE[, order, drop = FALSE]
   }
   colnames(betaSE) <- resultsNames
   storage.mode(betaSE) <- "double"
@@ -878,7 +1277,122 @@ applyCooksCutoffRust <- function(pvalue,
   if (!is.character(sampleLevels) || length(sampleLevels) != ncol(counts) || anyNA(sampleLevels) || any(!nzchar(sampleLevels))) {
     stop("sampleLevels must be a character vector with one value per sample", call. = FALSE)
   }
+  sampleNames <- colnames(counts)
+  levelNames <- names(sampleLevels)
+  if (!is.null(sampleNames) && !is.null(levelNames)) {
+    if (anyNA(levelNames) || any(!nzchar(levelNames)) || anyDuplicated(levelNames)) {
+      stop("sampleLevels names must be unique non-empty sample names", call. = FALSE)
+    }
+    missing <- setdiff(sampleNames, levelNames)
+    if (length(missing) > 0L) {
+      stop("sampleLevels names must contain all count sample names", call. = FALSE)
+    }
+    sampleLevels <- sampleLevels[sampleNames]
+  }
   sampleLevels
+}
+
+.rsdeseq2_align_named_gene_vector <- function(values, geneNames, name, allowScalar = FALSE) {
+  valueNames <- names(values)
+  if (is.null(geneNames) || is.null(valueNames)) {
+    return(values)
+  }
+  if (isTRUE(allowScalar) && length(values) == 1L && length(geneNames) != 1L) {
+    return(values)
+  }
+  if (anyNA(valueNames) || any(!nzchar(valueNames)) || anyDuplicated(valueNames)) {
+    stop(sprintf("%s names must be unique non-empty gene names", name), call. = FALSE)
+  }
+  missing <- setdiff(geneNames, valueNames)
+  if (length(missing) > 0L) {
+    stop(sprintf("%s names must contain all beta row names", name), call. = FALSE)
+  }
+  values[geneNames]
+}
+
+.rsdeseq2_align_named_gene_matrix <- function(values, geneNames, name) {
+  valueNames <- rownames(values)
+  if (is.null(values) || is.null(geneNames) || is.null(valueNames) ||
+    !.rsdeseq2_has_explicit_row_names(valueNames, nrow(values))) {
+    return(values)
+  }
+  if (anyNA(valueNames) || any(!nzchar(valueNames)) || anyDuplicated(valueNames)) {
+    stop(sprintf("%s row names must be unique non-empty gene names", name), call. = FALSE)
+  }
+  missing <- setdiff(geneNames, valueNames)
+  if (length(missing) > 0L) {
+    stop(sprintf("%s row names must contain all beta row names", name), call. = FALSE)
+  }
+  values[geneNames, , drop = FALSE]
+}
+
+.rsdeseq2_align_named_gene_array <- function(values, geneNames, name) {
+  valueNames <- dimnames(values)[[1L]]
+  if (is.null(values) || is.null(geneNames) || is.null(valueNames) ||
+    !.rsdeseq2_has_explicit_row_names(valueNames, dim(values)[[1L]])) {
+    return(values)
+  }
+  if (anyNA(valueNames) || any(!nzchar(valueNames)) || anyDuplicated(valueNames)) {
+    stop(sprintf("%s row names must be unique non-empty gene names", name), call. = FALSE)
+  }
+  missing <- setdiff(geneNames, valueNames)
+  if (length(missing) > 0L) {
+    stop(sprintf("%s row names must contain all beta row names", name), call. = FALSE)
+  }
+  values[geneNames, , , drop = FALSE]
+}
+
+.rsdeseq2_validate_optional_col_data <- function(colData, counts) {
+  if (is.null(colData)) {
+    return(NULL)
+  }
+  colData <- .rsdeseq2_coerce_col_data_frame(colData)
+  if (is.null(colData)) {
+    stop("colData must be a data.frame or coercible with as.data.frame", call. = FALSE)
+  }
+  if (!is.null(counts) && nrow(colData) != ncol(counts)) {
+    stop("colData must have one row per sample", call. = FALSE)
+  }
+  if (!is.null(counts)) {
+    sampleNames <- colnames(counts)
+    colDataNames <- rownames(colData)
+    if (.rsdeseq2_has_explicit_row_names(colDataNames, nrow(colData)) &&
+      !is.null(sampleNames)) {
+      if (anyNA(colDataNames) || any(!nzchar(colDataNames)) || anyDuplicated(colDataNames)) {
+        stop("colData row names must be unique non-empty sample names", call. = FALSE)
+      }
+      missing <- setdiff(sampleNames, colDataNames)
+      if (length(missing) > 0L) {
+        stop("colData row names must contain all count sample names", call. = FALSE)
+      }
+      colData <- colData[sampleNames, , drop = FALSE]
+    }
+  }
+  colData
+}
+
+.rsdeseq2_coerce_col_data_frame <- function(colData) {
+  if (is.null(colData)) {
+    return(NULL)
+  }
+  if (is.data.frame(colData)) {
+    return(colData)
+  }
+  coerced <- tryCatch(
+    as.data.frame(colData),
+    error = function(e) NULL
+  )
+  if (is.null(coerced) || !is.data.frame(coerced)) {
+    return(NULL)
+  }
+  coerced
+}
+
+.rsdeseq2_has_explicit_row_names <- function(rowNames, nRows) {
+  if (is.null(rowNames) || length(rowNames) != nRows) {
+    return(FALSE)
+  }
+  !identical(rowNames, as.character(seq_len(nRows)))
 }
 
 .rsdeseq2_validate_optional_factor_levels <- function(factorLevels) {
@@ -892,10 +1406,70 @@ applyCooksCutoffRust <- function(pvalue,
     if (!is.character(levels) || length(levels) == 0L || anyNA(levels) || any(!nzchar(levels))) {
       stop("factorLevels entries must be non-empty character vectors", call. = FALSE)
     }
+    if (anyDuplicated(levels)) {
+      stop("factorLevels entries must contain unique levels", call. = FALSE)
+    }
+    if (anyDuplicated(make.names(levels))) {
+      stop("factorLevels entries must resolve to unique R-cleaned level aliases", call. = FALSE)
+    }
     levels
   })
   if (anyDuplicated(names(out))) {
     stop("factorLevels names must be unique", call. = FALSE)
+  }
+  cleanedNames <- make.names(names(out))
+  if (anyDuplicated(cleanedNames)) {
+    stop("factorLevels names must resolve to unique R-cleaned aliases", call. = FALSE)
+  }
+  out
+}
+
+.rsdeseq2_validate_optional_factor_references <- function(factorReferences, factorLevels = NULL) {
+  if (is.null(factorReferences)) {
+    return(NULL)
+  }
+  if (is.list(factorReferences)) {
+    if (is.null(names(factorReferences)) || anyNA(names(factorReferences)) || any(!nzchar(names(factorReferences)))) {
+      stop("factorReferences must be a named character vector or named list", call. = FALSE)
+    }
+    out <- vapply(factorReferences, function(reference) {
+      if (!is.character(reference) || length(reference) != 1L || is.na(reference) || !nzchar(reference)) {
+        stop("factorReferences entries must be single non-empty character values", call. = FALSE)
+      }
+      reference
+    }, character(1L))
+  } else {
+    if (!is.character(factorReferences) || is.null(names(factorReferences)) || anyNA(names(factorReferences)) || any(!nzchar(names(factorReferences)))) {
+      stop("factorReferences must be a named character vector or named list", call. = FALSE)
+    }
+    if (anyNA(factorReferences) || any(!nzchar(factorReferences))) {
+      stop("factorReferences entries must be single non-empty character values", call. = FALSE)
+    }
+    out <- factorReferences
+  }
+  if (anyDuplicated(names(out))) {
+    stop("factorReferences names must be unique", call. = FALSE)
+  }
+  if (!is.null(factorLevels)) {
+    canonicalNames <- vapply(names(out), function(factor) {
+      .rsdeseq2_resolve_named_metadata_field(factor, names(factorLevels), "factor reference")
+    }, character(1L))
+    matchedCanonicalNames <- canonicalNames[!is.na(canonicalNames)]
+    if (anyDuplicated(matchedCanonicalNames)) {
+      stop("factorReferences aliases must resolve to unique factor names", call. = FALSE)
+    }
+    for (idx in seq_along(out)) {
+      factor <- canonicalNames[[idx]]
+      if (is.na(factor) || is.null(factorLevels[[factor]])) {
+        next
+      }
+      out[[idx]] <- .rsdeseq2_resolve_sample_level_alias(
+        out[[idx]],
+        factorLevels[[factor]],
+        "reference"
+      )
+      names(out)[[idx]] <- factor
+    }
   }
   out
 }
@@ -912,6 +1486,35 @@ applyCooksCutoffRust <- function(pvalue,
   }
   if (any(!is.finite(modelMatrix))) {
     stop("modelMatrix must contain finite values", call. = FALSE)
+  }
+  sampleNames <- colnames(counts)
+  modelMatrixNames <- rownames(modelMatrix)
+  if (.rsdeseq2_has_explicit_row_names(modelMatrixNames, nrow(modelMatrix)) &&
+    !is.null(sampleNames)) {
+    if (anyNA(modelMatrixNames) || any(!nzchar(modelMatrixNames)) || anyDuplicated(modelMatrixNames)) {
+      stop("modelMatrix row names must be unique non-empty sample names", call. = FALSE)
+    }
+    missing <- setdiff(sampleNames, modelMatrixNames)
+    if (length(missing) > 0L) {
+      stop("modelMatrix row names must contain all count sample names", call. = FALSE)
+    }
+    modelMatrix <- modelMatrix[sampleNames, , drop = FALSE]
+  }
+  modelMatrixColumns <- colnames(modelMatrix)
+  if (!is.null(modelMatrixColumns)) {
+    if (length(modelMatrixColumns) != ncol(modelMatrix) || anyNA(modelMatrixColumns) || any(!nzchar(modelMatrixColumns))) {
+      stop("modelMatrix column names must be non-empty when supplied", call. = FALSE)
+    }
+    if (anyDuplicated(modelMatrixColumns)) {
+      stop("modelMatrix column names must be unique when supplied", call. = FALSE)
+    }
+    order <- vapply(
+      resultsNames,
+      .rsdeseq2_resolve_results_name_index,
+      integer(1L),
+      resultsNames = modelMatrixColumns
+    )
+    modelMatrix <- modelMatrix[, order, drop = FALSE]
   }
   colnames(modelMatrix) <- resultsNames
   storage.mode(modelMatrix) <- "double"
@@ -1170,13 +1773,21 @@ applyCooksCutoffRust <- function(pvalue,
     return(NULL)
   }
   if (identical(allZero$type, "character")) {
-    if (is.null(fit$sampleLevels)) {
-      stop("character contrast all-zero handling requires sampleLevels", call. = FALSE)
+    sampleLevels <- .rsdeseq2_character_contrast_sample_levels(fit, allZero)
+    numerator <- .rsdeseq2_resolve_sample_level_alias(
+      allZero$numerator,
+      sampleLevels,
+      "numerator"
+    )
+    denominator <- .rsdeseq2_resolve_sample_level_alias(
+      allZero$denominator,
+      sampleLevels,
+      "denominator"
+    )
+    if (identical(numerator, denominator)) {
+      stop("character contrast all-zero handling requires distinct numerator and denominator levels", call. = FALSE)
     }
-    if (!all(c(allZero$numerator, allZero$denominator) %in% fit$sampleLevels)) {
-      stop("character contrast all-zero handling requires sampleLevels to contain numerator and denominator levels", call. = FALSE)
-    }
-    selected <- fit$sampleLevels %in% c(allZero$numerator, allZero$denominator)
+    selected <- sampleLevels %in% c(numerator, denominator)
     return(rowSums(fit$counts[, selected, drop = FALSE] == 0) == sum(selected))
   }
   if (!identical(allZero$type, "numeric")) {
@@ -1193,9 +1804,83 @@ applyCooksCutoffRust <- function(pvalue,
   rowSums(fit$counts[, selected, drop = FALSE]) == 0
 }
 
+.rsdeseq2_character_contrast_sample_levels <- function(fit, allZero) {
+  if (!is.null(fit$sampleLevels)) {
+    return(fit$sampleLevels)
+  }
+  colData <- fit$colData
+  factor <- allZero$factor
+  field <- .rsdeseq2_resolve_named_metadata_field(
+    factor,
+    colnames(colData) %||% names(colData),
+    "colData"
+  )
+  if (is.null(colData) || is.null(factor) || is.null(field) || is.null(colData[[field]])) {
+    stop("character contrast all-zero handling requires sampleLevels or matching colData factor", call. = FALSE)
+  }
+  sampleLevels <- colData[[field]]
+  if (is.factor(sampleLevels)) {
+    sampleLevels <- as.character(sampleLevels)
+  }
+  if (!is.character(sampleLevels) ||
+    length(sampleLevels) != ncol(fit$counts) ||
+    anyNA(sampleLevels) ||
+    any(!nzchar(sampleLevels))) {
+    stop("character contrast all-zero handling requires colData factor values with one non-missing value per sample", call. = FALSE)
+  }
+  sampleLevels
+}
+
+.rsdeseq2_resolve_sample_level_alias <- function(level, sampleLevels, role) {
+  uniqueLevels <- unique(sampleLevels)
+  exact <- which(uniqueLevels == level)
+  if (length(exact) == 1L) {
+    return(uniqueLevels[[exact]])
+  }
+  if (length(exact) > 1L) {
+    stop(sprintf("character contrast %s level %s is duplicated", role, level), call. = FALSE)
+  }
+  alias <- make.names(level)
+  aliases <- make.names(uniqueLevels)
+  matches <- which(aliases == alias)
+  if (length(matches) == 1L) {
+    return(uniqueLevels[[matches]])
+  }
+  if (length(matches) > 1L) {
+    stop(sprintf("character contrast %s level alias %s is ambiguous", role, level), call. = FALSE)
+  }
+  stop(sprintf("character contrast all-zero handling requires sampleLevels or colData to contain %s level %s", role, level), call. = FALSE)
+}
+
+.rsdeseq2_resolve_named_metadata_field <- function(name, fields, source) {
+  if (is.null(name) || is.null(fields)) {
+    return(NULL)
+  }
+  exact <- which(fields == name)
+  if (length(exact) == 1L) {
+    return(fields[[exact]])
+  }
+  if (length(exact) > 1L) {
+    stop(sprintf("%s field %s is duplicated", source, name), call. = FALSE)
+  }
+  alias <- make.names(name)
+  aliases <- make.names(fields)
+  matches <- which(aliases == alias)
+  if (length(matches) == 1L) {
+    return(fields[[matches]])
+  }
+  if (length(matches) > 1L) {
+    stop(sprintf("%s field alias %s is ambiguous", source, name), call. = FALSE)
+  }
+  NULL
+}
+
 .rsdeseq2_validate_results_names <- function(resultsNames) {
   if (!is.character(resultsNames) || length(resultsNames) == 0L || anyNA(resultsNames) || any(!nzchar(resultsNames))) {
     stop("resultsNames must be a non-empty character vector", call. = FALSE)
+  }
+  if (anyDuplicated(resultsNames)) {
+    stop("resultsNames must be unique", call. = FALSE)
   }
   resultsNames
 }
@@ -1310,7 +1995,7 @@ applyCooksCutoffRust <- function(pvalue,
       return(out)
     }
   } else {
-    if (identical(numerator, reference)) {
+    if (.rsdeseq2_same_factor_level_name(numerator, reference)) {
       denominatorIdx <- .rsdeseq2_find_first_results_name(
         resultsNames,
         c(
@@ -1321,7 +2006,7 @@ applyCooksCutoffRust <- function(pvalue,
       if (!is.na(denominatorIdx)) {
         return(.rsdeseq2_unit_contrast(resultsNames, denominatorIdx, -1))
       }
-    } else if (identical(denominator, reference)) {
+    } else if (.rsdeseq2_same_factor_level_name(denominator, reference)) {
       numeratorIdx <- .rsdeseq2_find_first_results_name(
         resultsNames,
         c(
@@ -1376,6 +2061,10 @@ applyCooksCutoffRust <- function(pvalue,
     ),
     call. = FALSE
   )
+}
+
+.rsdeseq2_same_factor_level_name <- function(left, right) {
+  identical(left, right) || identical(make.names(left), make.names(right))
 }
 
 .rsdeseq2_unit_contrast <- function(resultsNames, index, value) {

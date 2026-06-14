@@ -5,9 +5,9 @@ fn expand_formula_factor_transform_terms(
     let mut expanded = String::with_capacity(rhs.len());
     let mut derived = Vec::new();
     let mut remainder = rhs;
-    while let Some((start, transform)) = next_formula_factor_transform(remainder) {
+    while let Some((start, after_open_idx, transform)) = next_formula_factor_transform(remainder) {
         expanded.push_str(&remainder[..start]);
-        let after_open = &remainder[start + transform.prefix.len()..];
+        let after_open = &remainder[after_open_idx..];
         let close = formula_transform_close_index(after_open)?;
         let expression = after_open[..close].trim();
         let factor = formula_factor_transform_term(transform, expression, factors)?;
@@ -27,48 +27,73 @@ fn expand_formula_factor_transform_terms(
 
 #[derive(Clone, Copy, Debug)]
 struct FormulaFactorTransform {
-    prefix: &'static str,
+    name: &'static str,
     label: &'static str,
 }
 
-const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 4] = [
+const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 6] = [
     FormulaFactorTransform {
-        prefix: "as.factor(",
+        name: "as.factor",
         label: "as.factor",
     },
     FormulaFactorTransform {
-        prefix: "droplevels(",
+        name: "as.ordered",
+        label: "as.ordered",
+    },
+    FormulaFactorTransform {
+        name: "droplevels",
         label: "droplevels",
     },
     FormulaFactorTransform {
-        prefix: "relevel(",
+        name: "relevel",
         label: "relevel",
     },
     FormulaFactorTransform {
-        prefix: "factor(",
+        name: "factor",
         label: "factor",
+    },
+    FormulaFactorTransform {
+        name: "ordered",
+        label: "ordered",
     },
 ];
 
-fn next_formula_factor_transform(rhs: &str) -> Option<(usize, FormulaFactorTransform)> {
+fn next_formula_factor_transform(rhs: &str) -> Option<(usize, usize, FormulaFactorTransform)> {
     let mut in_backticks = false;
+    let mut quote = None;
+    let mut escaped_quote = false;
     let mut idx = 0_usize;
     while idx < rhs.len() {
         let character = rhs[idx..]
             .chars()
             .next()
             .expect("idx is inside rhs char boundary");
+        if let Some(active_quote) = quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
+                quote = None;
+            }
+            idx += character.len_utf8();
+            continue;
+        }
+        if matches!(character, '"' | '\'') && !in_backticks {
+            quote = Some(character);
+            idx += character.len_utf8();
+            continue;
+        }
         if character == '`' {
             in_backticks = !in_backticks;
             idx += character.len_utf8();
             continue;
         }
         if !in_backticks {
-            if let Some(transform) = FORMULA_FACTOR_TRANSFORMS
-                .iter()
-                .find(|transform| rhs[idx..].starts_with(transform.prefix))
-            {
-                return Some((idx, *transform));
+            for transform in FORMULA_FACTOR_TRANSFORMS {
+                if let Some(after_open_idx) = formula_call_after_open(rhs, idx, transform.name) {
+                    return Some((idx, after_open_idx, transform));
+                }
             }
         }
         idx += character.len_utf8();
@@ -84,11 +109,15 @@ fn formula_factor_transform_term(
     match transform.label {
         "relevel" => formula_relevel_transform_term(expression, factors),
         "droplevels" => formula_droplevels_transform_term(transform, expression, factors),
-        "factor" | "as.factor" => {
+        "factor" | "as.factor" | "ordered" | "as.ordered" => {
             formula_factor_identity_transform_term(transform, expression, factors)
         }
         _ => unreachable!("validated formula factor transform"),
     }
+}
+
+fn formula_factor_transform_accepts_levels(transform: FormulaFactorTransform) -> bool {
+    matches!(transform.label, "factor" | "ordered")
 }
 
 fn formula_droplevels_transform_term(
@@ -153,7 +182,7 @@ fn formula_factor_identity_transform_term(
                     factor_text = Some(value.to_string());
                     continue;
                 }
-                "levels" if transform.label == "factor" => {
+                "levels" if formula_factor_transform_accepts_levels(transform) => {
                     reject_duplicate_formula_transform_argument(
                         levels.is_some(),
                         transform.label,
@@ -168,7 +197,7 @@ fn formula_factor_identity_transform_term(
                     )?);
                     continue;
                 }
-                "labels" if transform.label == "factor" => {
+                "labels" if formula_factor_transform_accepts_levels(transform) => {
                     reject_duplicate_formula_transform_argument(
                         labels.is_some(),
                         transform.label,
@@ -198,7 +227,7 @@ fn formula_factor_identity_transform_term(
                 positional_idx += 1;
                 continue;
             }
-            1 if transform.label == "factor" && levels.is_none() => {
+            1 if formula_factor_transform_accepts_levels(transform) && levels.is_none() => {
                 levels = Some(parse_formula_string_vector_argument(
                     trimmed,
                     transform.label,
@@ -208,7 +237,7 @@ fn formula_factor_identity_transform_term(
                 positional_idx += 1;
                 continue;
             }
-            2 if transform.label == "factor" && labels.is_none() => {
+            2 if formula_factor_transform_accepts_levels(transform) && labels.is_none() => {
                 labels = Some(parse_formula_string_vector_argument(
                     trimmed,
                     transform.label,
@@ -415,6 +444,7 @@ fn formula_relevel_transform_term(
         });
     };
     let factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
+    let reference = resolve_formula_factor_reference_alias(&factor, &reference)?;
     validate_factor_design_inputs_with_levels(
         &factor.name,
         &factor.sample_levels,
@@ -429,6 +459,33 @@ fn formula_relevel_transform_term(
     })
 }
 
+fn resolve_formula_factor_reference_alias(
+    factor: &FormulaDerivedFactorCovariate,
+    requested: &str,
+) -> Result<String, DeseqError> {
+    let levels = formula_factor_level_candidates(factor);
+    let borrowed_levels = levels.iter().map(String::as_str).collect::<Vec<_>>();
+    resolve_formula_reference_alias_from_levels(&factor.name, &borrowed_levels, requested)
+        .map(str::to_string)
+}
+
+fn formula_factor_level_candidates(factor: &FormulaDerivedFactorCovariate) -> Vec<String> {
+    let mut levels = Vec::new();
+    if let Some(declared) = &factor.levels {
+        for level in declared {
+            if !levels.iter().any(|candidate| candidate == level) {
+                levels.push(level.clone());
+            }
+        }
+    }
+    for level in &factor.sample_levels {
+        if !levels.iter().any(|candidate| candidate == level) {
+            levels.push(level.clone());
+        }
+    }
+    levels
+}
+
 fn formula_factor_argument_covariate(
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -436,20 +493,14 @@ fn formula_factor_argument_covariate(
     if let Ok(factor_name) = formula_variable_name(expression) {
         let factor = find_formula_factor(factor_name, factors)?;
         return Ok(FormulaDerivedFactorCovariate {
-            name: factor_name.to_string(),
+            name: factor.factor.to_string(),
             sample_levels: factor.sample_levels.to_vec(),
             reference: factor.reference.to_string(),
             levels: factor.levels.map(|levels| levels.to_vec()),
         });
     }
     for transform in FORMULA_FACTOR_TRANSFORMS {
-        if transform.label == "relevel" {
-            continue;
-        }
-        let Some(inner) = expression
-            .strip_prefix(transform.prefix)
-            .and_then(|value| value.strip_suffix(')'))
-        else {
+        let Some(inner) = formula_transform_inner_expression(expression, transform) else {
             continue;
         };
         return formula_factor_transform_term(transform, inner.trim(), factors);
@@ -461,18 +512,54 @@ fn formula_factor_argument_covariate(
     })
 }
 
+fn formula_transform_inner_expression(
+    expression: &str,
+    transform: FormulaFactorTransform,
+) -> Option<&str> {
+    let trimmed = expression.trim();
+    let after_open = formula_call_after_open(trimmed, 0, transform.name)?;
+    trimmed[after_open..].strip_suffix(')')
+}
+
 fn find_formula_factor<'a>(
     factor_name: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
 ) -> Result<&'a ExpandedFactorSpec<'a>, DeseqError> {
-    factors
+    let exact = factors
         .iter()
-        .find(|candidate| candidate.factor == factor_name)
-        .ok_or_else(|| DeseqError::InvalidOptions {
+        .filter(|candidate| candidate.factor == factor_name)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [factor] => return Ok(*factor),
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula factor '{factor_name}' appears more than once"),
+            });
+        }
+    }
+
+    let aliases = factors
+        .iter()
+        .filter(|candidate| {
+            r_like_name_candidates(candidate.factor)
+                .into_iter()
+                .any(|candidate| candidate == factor_name)
+        })
+        .collect::<Vec<_>>();
+    match aliases.as_slice() {
+        [factor] => Ok(*factor),
+        [] => Err(DeseqError::InvalidOptions {
             reason: format!(
                 "formula factor '{factor_name}' is not present in supplied design metadata"
             ),
-        })
+        }),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "formula factor '{factor_name}' resolves ambiguously after R-style cleanup"
+            ),
+        }),
+    }
 }
 
 fn formula_observed_levels_for_factor(factor: &FormulaDerivedFactorCovariate) -> Vec<String> {

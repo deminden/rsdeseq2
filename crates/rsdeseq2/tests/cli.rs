@@ -252,6 +252,48 @@ sample2\tTRUE
     .unwrap();
 }
 
+fn write_cell_type_contrast_design_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tIntercept\tcell.type_B.cell_vs_A.cell
+sample3\t1\t1
+sample1\t1\t0
+sample4\t1\t1
+sample2\t1\t0
+",
+    )
+    .unwrap();
+}
+
+fn write_cell_type_sample_level_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tcell.type
+sample3\tB cell
+sample1\tA cell
+sample4\tB cell
+sample2\tA cell
+",
+    )
+    .unwrap();
+}
+
+fn write_ambiguous_cell_type_sample_level_fixture(path: &Path) {
+    fs::write(
+        path,
+        "\
+sample\tcell.type
+sample3\tB cell
+sample1\tA cell
+sample4\tB cell
+sample2\tA-cell
+",
+    )
+    .unwrap();
+}
+
 fn run_cli(args: &[&str]) {
     let status = Command::new(env!("CARGO_BIN_EXE_rsdeseq2"))
         .args(args)
@@ -270,6 +312,24 @@ fn run_cli_failure(args: &[&str]) {
         "CLI unexpectedly succeeded with stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn run_cli_failure_contains(args: &[&str], needle: &str) {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsdeseq2"))
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "CLI unexpectedly succeeded with stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(needle),
+        "expected stderr to contain {needle:?}, got:\n{stderr}"
     );
 }
 
@@ -1129,6 +1189,7 @@ fn cli_wald_accepts_lfc_threshold_alternative() {
 fn cli_wald_accepts_numeric_contrast() {
     let dir = temp_dir("wald-contrast");
     let output = dir.join("wald.tsv");
+    let table_metadata = dir.join("metadata.tsv");
 
     run_cli(&[
         "wald",
@@ -1140,11 +1201,16 @@ fn cli_wald_accepts_numeric_contrast() {
         "mean",
         "--contrast",
         "0,1",
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
 
     assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcontrast\n");
+    assert_tsv_contains(&table_metadata, "comparison\tprimitive numeric contrast\n");
+    assert_tsv_contains(&table_metadata, "contrast\t0,1\n");
 }
 
 #[test]
@@ -2506,6 +2572,7 @@ fn cli_wald_rejects_ambiguous_r_cleaned_coefficient_name_alias() {
 fn cli_wald_accepts_list_contrast() {
     let dir = temp_dir("wald-contrast-list");
     let output = dir.join("wald.tsv");
+    let table_metadata = dir.join("metadata.tsv");
 
     run_cli(&[
         "wald",
@@ -2522,11 +2589,19 @@ fn cli_wald_accepts_list_contrast() {
         "--contrast-positive-weight",
         "1",
         "--contrast-negative-weight=-0.5",
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
 
     assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcontrast\n");
+    assert_tsv_contains(
+        &table_metadata,
+        "comparison\tcoefficient list contrast: conditionB vs 0.5 (Intercept)\n",
+    );
+    assert_tsv_contains(&table_metadata, "contrast\t-0.5,1\n");
 }
 
 #[test]
@@ -2617,6 +2692,82 @@ fn cli_wald_accepts_factor_level_contrast_with_r_cleaned_level_names() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_wald_accepts_factor_level_contrast_with_cleaned_reference_alias() {
+    let dir = temp_dir("wald-contrast-factor-reference");
+    let design = dir.join("design.tsv");
+    let levels = dir.join("levels.tsv");
+    let table_metadata = dir.join("metadata.tsv");
+    let output = dir.join("wald.tsv");
+    write_cell_type_contrast_design_fixture(&design);
+    write_cell_type_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "wald",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "cell.type",
+        "--contrast-numerator",
+        "B.cell",
+        "--contrast-denominator",
+        "A.cell",
+        "--contrast-reference",
+        "A.cell",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcell.type_B.cell_vs_A.cell\n");
+    assert_tsv_contains(
+        &table_metadata,
+        "comparison\tfactor-level contrast: cell.type B cell vs A cell\n",
+    );
+    assert_tsv_contains(&table_metadata, "contrast\t0,1\n");
+}
+
+#[test]
+fn cli_wald_rejects_ambiguous_cleaned_factor_level_alias() {
+    let dir = temp_dir("wald-contrast-factor-ambiguous-level");
+    let design = dir.join("design.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("wald.tsv");
+    write_cell_type_contrast_design_fixture(&design);
+    write_ambiguous_cell_type_sample_level_fixture(&levels);
+
+    run_cli_failure_contains(
+        &[
+            "wald",
+            "--counts",
+            reference_data_path("counts.tsv").to_str().unwrap(),
+            "--design",
+            design.to_str().unwrap(),
+            "--fit-type",
+            "mean",
+            "--contrast-factor",
+            "cell.type",
+            "--contrast-numerator",
+            "B.cell",
+            "--contrast-denominator",
+            "A.cell",
+            "--contrast-sample-levels",
+            levels.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ],
+        "denominator level 'A.cell' resolves ambiguously",
+    );
 }
 
 #[test]
@@ -2958,6 +3109,7 @@ fn cli_lrt_rejects_ambiguous_r_cleaned_coefficient_name_alias() {
 fn cli_lrt_accepts_numeric_contrast() {
     let dir = temp_dir("lrt-contrast");
     let output = dir.join("lrt.tsv");
+    let table_metadata = dir.join("metadata.tsv");
 
     run_cli(&[
         "lrt",
@@ -2971,11 +3123,16 @@ fn cli_lrt_accepts_numeric_contrast() {
         "mean",
         "--contrast",
         "0,1",
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
 
     assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcontrast\n");
+    assert_tsv_contains(&table_metadata, "comparison\tprimitive numeric contrast\n");
+    assert_tsv_contains(&table_metadata, "contrast\t0,1\n");
 }
 
 #[test]
@@ -3034,6 +3191,7 @@ fn cli_lrt_accepts_r_cleaned_named_contrast_alias() {
 fn cli_lrt_accepts_list_contrast() {
     let dir = temp_dir("lrt-contrast-list");
     let output = dir.join("lrt.tsv");
+    let table_metadata = dir.join("metadata.tsv");
 
     run_cli(&[
         "lrt",
@@ -3052,11 +3210,19 @@ fn cli_lrt_accepts_list_contrast() {
         "--contrast-positive-weight",
         "1",
         "--contrast-negative-weight=-0.5",
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
 
     assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcontrast\n");
+    assert_tsv_contains(
+        &table_metadata,
+        "comparison\tcoefficient list contrast: conditionB vs 0.5 (Intercept)\n",
+    );
+    assert_tsv_contains(&table_metadata, "contrast\t-0.5,1\n");
 }
 
 #[test]
@@ -3155,6 +3321,90 @@ fn cli_lrt_accepts_factor_level_contrast_with_r_cleaned_level_names() {
     ]);
 
     assert_deseq_results_table(&output);
+}
+
+#[test]
+fn cli_lrt_accepts_factor_level_contrast_with_cleaned_reference_alias() {
+    let dir = temp_dir("lrt-contrast-factor-reference");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let levels = dir.join("levels.tsv");
+    let table_metadata = dir.join("metadata.tsv");
+    let output = dir.join("lrt.tsv");
+    write_cell_type_contrast_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+    write_cell_type_sample_level_fixture(&levels);
+
+    run_cli(&[
+        "lrt",
+        "--counts",
+        reference_data_path("counts.tsv").to_str().unwrap(),
+        "--design",
+        design.to_str().unwrap(),
+        "--reduced-design",
+        reduced_design.to_str().unwrap(),
+        "--fit-type",
+        "mean",
+        "--contrast-factor",
+        "cell.type",
+        "--contrast-numerator",
+        "B.cell",
+        "--contrast-denominator",
+        "A.cell",
+        "--contrast-reference",
+        "A.cell",
+        "--contrast-sample-levels",
+        levels.to_str().unwrap(),
+        "--result-table-metadata-output",
+        table_metadata.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+    ]);
+
+    assert_deseq_results_table(&output);
+    assert_tsv_contains(&table_metadata, "resultName\tcell.type_B.cell_vs_A.cell\n");
+    assert_tsv_contains(
+        &table_metadata,
+        "comparison\tfactor-level contrast: cell.type B cell vs A cell\n",
+    );
+    assert_tsv_contains(&table_metadata, "contrast\t0,1\n");
+}
+
+#[test]
+fn cli_lrt_rejects_ambiguous_cleaned_factor_level_alias() {
+    let dir = temp_dir("lrt-contrast-factor-ambiguous-level");
+    let design = dir.join("design.tsv");
+    let reduced_design = dir.join("reduced.tsv");
+    let levels = dir.join("levels.tsv");
+    let output = dir.join("lrt.tsv");
+    write_cell_type_contrast_design_fixture(&design);
+    write_intercept_design_fixture(&reduced_design);
+    write_ambiguous_cell_type_sample_level_fixture(&levels);
+
+    run_cli_failure_contains(
+        &[
+            "lrt",
+            "--counts",
+            reference_data_path("counts.tsv").to_str().unwrap(),
+            "--design",
+            design.to_str().unwrap(),
+            "--reduced-design",
+            reduced_design.to_str().unwrap(),
+            "--fit-type",
+            "mean",
+            "--contrast-factor",
+            "cell.type",
+            "--contrast-numerator",
+            "B.cell",
+            "--contrast-denominator",
+            "A.cell",
+            "--contrast-sample-levels",
+            levels.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ],
+        "denominator level 'A.cell' resolves ambiguously",
+    );
 }
 
 #[test]

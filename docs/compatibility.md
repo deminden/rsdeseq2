@@ -18,7 +18,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw and orthogonal polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, owned model-frame formula inputs with factor reference inference/override, builder-stored model-frame formula design helpers, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, supported-formula, and owned-model-frame helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, model-frame wrapper tests, and CLI smoke tests; splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, pure-Rust locfit-compatible local trend fixtures including a single-usable-row edge case and real-data fitted-value parity, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
-| Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, R-cleaned coefficient/list/factor-level aliases, R-cleaned factor-level result names, explicit and builder-stored owned-model-frame character contrast resolution for supported fixed/native Wald/LRT routes, top-level formula-built Wald designs and LRT full/reduced designs for supported model-frame formulas, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected formula-built and explicit-design replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
+| Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, R-cleaned coefficient/list/factor-level aliases, R-cleaned factor-level result names, explicit and builder-stored owned-model-frame character contrast resolution for supported fixed/native Wald/LRT routes, resolved numeric contrast metadata for implemented contrast result and replacement/refit paths, top-level formula-built Wald designs and LRT full/reduced designs for supported model-frame formulas, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected formula-built and explicit-design replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
 | Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; full Bioconductor object workflow remains future work. |
 
 ## Implemented
@@ -114,8 +114,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   intercept-preserving `+`, `:`, `/`, `*` shorthand, and `0`/`-1` intercept
   removal/restoration terms in formula order, including lower-order-omitted
   pairwise interactions and higher-order interaction/nesting/star-expansion
-  terms, primitive `- term` subtraction, additive parenthesized groups, plain
-  numeric identity transforms
+  terms, primitive `- term` subtraction, additive parenthesized groups with
+  signed `+`/`-` terms such as `(condition + batch - batch)`, plain numeric
+  identity transforms
   such as `I(dose)` and `I(x=dose)` and signed identities such as `I(-dose)`,
   simple scalar arithmetic transforms such as `I(dose + 1)`, `I(dose / 2)`,
   and `I(1 - dose)`, simple two-covariate
@@ -126,28 +127,74 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   factor reference transforms such as `relevel(condition, ref="B")` with
   positional or named `x`/`ref` arguments, including nested
   `relevel(factor(condition), ref="B")`, factor identity transforms such as
-  `factor(condition)` and `as.factor(condition)` for already-supplied factor
-  metadata, simple `factor(condition, levels=c(...))` level reordering with
-  positional or named `x`/`levels` arguments, and `droplevels(condition)` over
-  already-supplied or simple formula-derived factor metadata,
+  `factor(condition)`, `as.factor(condition)`, `ordered(condition)`, and
+  `as.ordered(condition)` for already-supplied factor metadata, simple
+  `factor(condition, levels=c(...))` and
+  `ordered(condition, levels=c(...))` level reordering with positional or named
+  `x`/`levels` arguments, conservative
+  `factor(condition, levels=c(...), labels=c(...))` and
+  `ordered(condition, levels=c(...), labels=c(...))` relabeling with
+  positional or named `x`/`levels`/`labels` arguments, and
+  `droplevels(condition)` over already-supplied or simple formula-derived
+  factor metadata. `as.factor(...)` and `as.ordered(...)` intentionally reject
+  `levels`/`labels` arguments. Nested factor-valued transforms in the supported subset,
+  such as `factor(relevel(...))`, `ordered(relevel(...))`,
+  `relevel(ordered(...))`, and `droplevels(ordered(...))`, preserve
+  formula-local references after relabeling or dropped-level pruning. Quoted
+  level and label strings in this supported subset can
+  contain spaces, hyphens, parentheses, transform-like text, equals signs,
+  escaped quotes, and escaped backslashes. Supported factor-valued transform
+  arguments use the same exact-first, unambiguous R-cleaned aliases as
+  primitive formula variables, so non-syntactic supplied factor names can be
+  addressed consistently inside `factor(...)`, `ordered(...)`,
+  `relevel(...)`, and `droplevels(...)`. Supported `relevel(..., ref=...)` references also resolve
+  exact levels first and then unambiguous R-cleaned level aliases, storing the
+  canonical supplied level after resolution. Supported formulas can also include
   common numeric function transforms `log(numeric)`, `log2(numeric)`,
-  `log10(numeric)`, `log1p(numeric)`, and `sqrt(numeric)`, including named
-  `x` and scalar `log()` `base` arguments, `scale(numeric)` with R-style named
-  `x` plus named or positional `center`/`scale` arguments, and
+  `log10(numeric)`, `log1p(numeric)`, `sqrt(numeric)`, and numeric identity
+  coercions `as.numeric(numeric)`, `as.double(numeric)`, and
+  `as.integer(numeric)`, including named `x` arguments, scalar `log()` `base`
+  arguments, `scale(numeric)` with
+  R-style named `x` plus named or positional `center`/`scale` arguments, and
   `offset(numeric)` plus single-vector supported transform offsets such as
   `offset(log2(numeric))` or `offset(I(numeric + other_numeric))` into
-  per-sample log-offset vectors in the supported formula subset. Primitive `.`
+  per-sample log-offset vectors in the supported formula subset.
+  `as.numeric(factor)`, `as.double(factor)`, and `as.integer(factor)`
+  materialize 1-based factor codes from declared level order when available,
+  otherwise first observed level order. Supported
+  numeric transform arguments use the same exact-first, unambiguous R-cleaned
+  aliases as primitive formula variables, so expressions such as
+  `log2(dose.value)`, `I(dose.value + 1)`, `scale(dose.value)`, and
+  `poly(dose.value, ...)` resolve canonical supplied numeric metadata without
+  silently accepting alias collisions. Public formula model-frame helpers expose
+  the same numeric alias resolution for wrapper/object metadata plumbing.
+  Derived factor and numeric transform names are ordinary formula variables
+  after expansion, so exact or R-cleaned collisions with supplied or previously
+  derived variables are rejected instead of silently changing coefficient
+  lookup.
+  Primitive `.`
   expansion adds all supplied factors
   followed by all supplied numeric covariates as a main effect and inside
   supported `*`, `:`, and `/` shorthand terms, including matching subtraction
   of those expanded terms. Repeated supported formula terms are simplified
   rather than duplicated. Backtick-quoted model-frame column names are accepted
   in supported main effects, interactions, offsets, and numeric transforms.
-  Nested additive parenthesized groups are expanded through supported `+`, `*`,
-  `:`, `/`, `%in%`, subtraction syntax, and positive-integer formula powers
-  such as `(condition + batch + dose)^2`; metadata-aware dot powers such as
-  `.^2` and `(.)^2` expand over the supplied factor and numeric model-frame
-  columns.
+  Formula variable lookup resolves exact supplied metadata names first, then
+  unambiguous R-cleaned aliases, so non-syntactic factor and numeric names can
+  be used either quoted or in their cleaned form without silently picking
+  collisions.
+  R-like unary `+` / `-` sign sequences are accepted in supported term lists
+  and additive parenthesized groups, including formula-order `0`/`-1`
+  intercept removal and `1`, `-0`, and `- -1` restoration. Signed additive
+  groups are reduced inside supported `*`, `:`, `/`, `%in%`, and power
+  expressions before operator products are formed. Nested additive
+  parenthesized groups are expanded through supported `+`, `*`, `:`, `/`,
+  `%in%`, subtraction syntax, and positive-integer formula powers such as
+  `(condition + batch + dose)^2`; signed power bases such as
+  `(condition + batch + dose - dose)^2` are normalized before interaction
+  expansion. Metadata-aware dot terms such as `.`, `condition:.`,
+  `condition*.`, `.^2`, and `(.)^2` expand over the supplied factor and
+  numeric model-frame columns.
 - Additive-factor expanded beta-prior fit-and-Wald-results helpers that build
   the design internally, then run coefficient or numeric-contrast workflows
   with size-factor, normalization-factor, and optional observation-weight
@@ -156,6 +203,12 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   supported primitive formula subset, including `offset(numeric)` conversion
   into size-factor or normalization-factor GLM offsets, using the same
   coefficient and numeric-contrast result assembly paths.
+- Top-level stored-model-frame Wald and LRT formula fit/result helpers,
+  including `results(contrast=...)` and Cook's replacement-refit helpers, apply
+  supported full-formula offsets by exponentiating the parsed per-sample log
+  offsets and multiplying them into size-factor-derived or caller-supplied
+  normalization-factor GLM offsets before the native GLM-mu fit. Reduced LRT
+  formulas still reject formula offsets.
 - DESeq2-style observation-weight preprocessing helper with row-max
   normalization, weighted design-rank checks, thresholded Cox-Reid sub-design
   checks, and `weights_fail` flags.
@@ -270,22 +323,46 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   list-contrast result helpers share the same alias resolution, including
   formula-built designs with quoted/non-syntactic model-frame column names
   and the corresponding limited Cook's replacement-refit contrast-request
-  routes. Builder-created fit states retain the formula/model-frame metadata
-  used to build them so wrapper and already-fitted-object routes can recover
-  factor levels and references for later Wald/LRT `results(contrast=...)`
-  assembly, including the unified fitted-object dispatcher that selects Wald or
-  LRT output from the stored test state.
+  routes. Supplied-dispersion fixed and limited GLM-mu replacement-refit
+  named/list/numeric contrast routes can also infer the same two-level factor
+  Cook's low-count heuristic when stored formula metadata proves the numeric
+  contrast is exactly the non-reference factor comparison. Builder-created fit
+  states retain the formula/model-frame metadata used to build them so wrapper and
+  already-fitted-object routes can recover factor levels and references for
+  later Wald/LRT `results(contrast=...)` assembly, while explicit
+  fitted-object factor-level helpers accept caller-supplied sample levels when
+  no stored model frame is available. The
+  unified fitted-object dispatcher selects Wald or LRT output from the stored
+  test state. R-wrapper already-fitted object routes also infer character
+  contrast factor levels from `colData`, preserving declared factor levels and
+  treating plain character sample annotations as categorical metadata when
+  explicit factor-level metadata is absent.
   `FormulaModelFrame` exposes validation, sample-count, and resolved
   factor-reference accessors so wrapper/object code can inspect the same
   explicit-reference, declared-level, and first-observed fallback rules used by
-  formula design construction. Formula design construction also returns a
-  formula-local model frame beside offsets, so supported derived factor labels
+  formula design construction. `DeseqBuilder::try_model_frame` provides a
+  checked wrapper-ingestion path, and explicit model-frame contrast helpers use
+  the same validation before storing metadata, so invalid model frames are
+  rejected before later formula, contrast, or Cook's/refit routing depends on
+  them. Cook's replacement/refit helpers that infer factor-level behavior from
+  selected coefficients or numeric contrasts also validate stored model-frame
+  metadata before deciding whether factor-aware low-count handling applies.
+  Explicit model-frame references are resolved exact first and then by
+  unambiguous R-cleaned aliases against declared levels and observed sample
+  levels, returning the canonical raw level for downstream character contrasts
+  and Cook's low-count gates. Formula design construction
+  also returns a formula-local model frame beside offsets, so supported derived factor labels
   such as `relevel(...)`, `factor(..., levels=...)`,
   `factor(..., levels=..., labels=...)`, and `droplevels(...)` can
   drive character contrast metadata and all-zero handling through top-level
   formula result, fixed-dispersion model-frame result, and supported Cook's
-  replacement routes. Fitted objects from supported formula and model-frame
-  routes retain this metadata for later object-style result requests.
+  replacement routes. Supported formula-built Wald/LRT replacement-refit
+  routes also retain formula-local numeric metadata for selected coefficients,
+  coefficient-list contrasts, and numeric-vector contrasts created by supported
+  numeric transforms such as `as.double(factor)`, with the same exact-first
+  R-cleaned coefficient alias lookup where names are involved. Fitted objects
+  from supported formula and model-frame routes retain this metadata for later
+  object-style result requests.
   Non-reference factor-level
   comparisons can infer a shared reference from coefficient names such as
   `B_vs_A` and `C_vs_A`. Factor-level coefficient candidates include R-style
@@ -298,7 +375,10 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   validation, and list comparison labels follow DESeq2's two-sided and
   one-sided naming shape. Interaction coefficient aliases can be cleaned
   component-wise for coefficient-name and list contrasts while preserving the
-  `:` separator.
+  `:` separator. Resolved Rust character contrast metadata keeps the requested
+  factor name together with numerator and denominator levels so downstream
+  object and wrapper routes can keep `contrastAllZero` bookkeeping
+  self-contained.
 - Native linear-mu and GLM-mu Wald contrast entry points reuse the implemented
   MAP dispersion paths, then run numeric, named/list, or caller-supplied
   factor-level contrast result assembly. Compatibility-named parametric-only
@@ -351,15 +431,29 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - R-wrapper primitive and already-fitted-object `results()` routes support
   DESeq2-style character triplet, coefficient-list/listValues, and numeric
   `contrast = ...` forms for Wald and LRT fits. Character triplets use supplied
-  `reference` metadata or infer the first declared factor level before falling
-  back to observed sample order from primitive `factorLevels` / factor-valued
-  `colData`; declared factor levels may define an unused treatment reference
-  for both model-matrix construction and character contrast metadata, matching
-  R factor model-matrix behavior. Formula model-frame character contrasts, including
+  `reference` metadata, then explicit wrapper `factorReferences`, then the
+  first declared factor level before falling back to observed sample order from
+  primitive `factorLevels` / factor-valued `colData`; when counts are
+  available, character contrast all-zero handling can also use the matching
+  `colData` factor values as per-sample levels.
+  Already-fitted object routes can read nested count assays from plain lists or
+  bracket-addressable assay containers.
+  Named `colData` rows are aligned to named count columns before wrapper
+  contrast metadata uses them. Wrapper `factorLevels` and `colData` factor
+  lookups resolve exact metadata names first, then unambiguous R-cleaned aliases
+  for non-syntactic field names. Wrapper character contrast all-zero handling
+  resolves requested numerator, denominator, and explicit reference levels
+  exact first, then through unambiguous R-cleaned aliases against observed
+  sample levels.
+  Declared factor levels may define an unused treatment reference for both
+  model-matrix construction and character contrast metadata, matching R factor
+  model-matrix behavior. Formula model-frame character contrasts, including
   supplied-dispersion model-frame routes and stored model-frame formula helpers,
-  resolve exact factor names first, then unambiguous R-cleaned factor-name
-  aliases. The public model-frame factor-reference metadata helper exposes the
-  same exact-first cleaned-alias resolution for wrapper/object code.
+  resolve exact factor and level names first, then unambiguous R-cleaned
+  aliases for factor names, numerator/denominator levels, and explicit or
+  stored reference levels. The public model-frame factor-reference metadata
+  helper exposes the same exact-first cleaned-alias resolution for
+  wrapper/object code.
   Explicit-reference factor contrasts can resolve either treatment-style
   `factor_level_vs_reference` columns or expanded/no-intercept `factorLevel`
   columns; `contrast` takes precedence over `name`, matching DESeq2.
@@ -380,8 +474,13 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
   the requested numerator and denominator levels. The same gate is also used
   after limited GLM-mu factor-level replacement refits. Selected-coefficient
   Wald/LRT routes, including the limited replacement-refit paths, also apply it
-  when stored formula model-frame metadata proves the selected coefficient is
-  the non-reference comparison for a single two-level factor.
+  when stored formula model-frame metadata proves the selected coefficient or
+  numeric contrast is the non-reference comparison, or its reverse, for a
+  single two-level factor; stored references are resolved against observed
+  levels exact first, then by unambiguous R-cleaned aliases. Direct
+  factor-level character all-zero checks use the same exact-first unambiguous
+  R-cleaned alias rule when matching requested numerator and denominator levels
+  against observed sample labels.
 - Primitive Cook's outlier count replacement transform from `replaceOutliers`:
   trimmed normalized means, size-factor or normalization-factor rescaling,
   integer truncation, replaceable-sample masks, and per-gene `replace` flags.
@@ -409,7 +508,9 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 - Test-selected top-level Cook's replacement-refit helpers can return a typed
   Wald-or-LRT enum, so `test=Lrt` can reuse a builder-stored reduced design for
   default, named-coefficient, numeric-contrast, named-contrast, and factor-level
-  contrast replacement-refit workflows.
+  contrast replacement-refit workflows. The enum exposes shared accessors for
+  selected test type, original fit/results, replacement refit plan, optional
+  refit fit/results, and final merged results.
 - Base-mean independent filtering with filtered BH adjustment metadata and an
   R `stats::lowess`-shaped rejection-curve smoother for DESeq2's default
   threshold-selection grid, plus a paired `filterNumRej`-shaped
@@ -578,11 +679,12 @@ Benjamini-Hochberg propagation from upstream p-value tail rows.
 - DESeq2-style `results(contrast=...)` semantics are implemented for primitive
   Rust, CLI, and R wrapper already-fitted result routes: character triplets,
   coefficient-list/listValues, numeric contrasts, factor-level reference
-  inference from fitted metadata where available, contrast-specific all-zero
-  behavior for character and two-sided numeric/list contrasts, `contrast`
-  precedence over `name`, and fitted-object dispatch from stored Wald or LRT
-  state. Remaining contrast work is high-level Bioconductor object plumbing and
-  broader contrast-aware Cook's/refit edge cases.
+  inference from fitted metadata where available, explicit fitted-object
+  factor-level routes with caller-supplied sample levels, contrast-specific
+  all-zero behavior for character and two-sided numeric/list contrasts,
+  `contrast` precedence over `name`, and fitted-object dispatch from stored
+  Wald or LRT state. Remaining contrast work is high-level Bioconductor object
+  plumbing and broader contrast-aware Cook's/refit edge cases.
 - Full Cook's outlier replacement behavior for high-level Bioconductor assay
   attachment, high-level wrapper-object metadata, and all remaining DESeq2 edge
   cases.

@@ -3,14 +3,18 @@ fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, DeseqError> {
     let mut expanded = Vec::new();
     for (sign, term) in signed_terms {
         for expanded_term in expand_parenthesized_formula_term(&term)? {
-            if sign < 0 {
-                expanded.push(format!("- {expanded_term}"));
-            } else {
-                expanded.push(expanded_term);
-            }
+            expanded.push(apply_formula_term_sign(sign, expanded_term));
         }
     }
     Ok(join_formula_terms(&expanded))
+}
+
+fn apply_formula_term_sign(sign: i8, term: String) -> String {
+    if sign >= 0 {
+        return term;
+    }
+    term.strip_prefix("- ")
+        .map_or_else(|| format!("- {term}"), ToOwned::to_owned)
 }
 
 fn join_formula_terms(terms: &[String]) -> String {
@@ -34,12 +38,17 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
     let mut depth = 0_i32;
     let mut in_backticks = false;
     let mut quote = None;
+    let mut escaped_quote = false;
     let mut sign = 1_i8;
     let mut start = 0_usize;
-    let mut saw_term = false;
+    let mut preserve_negative_one_sentinel = false;
     for (idx, character) in rhs.char_indices() {
         if let Some(active_quote) = quote {
-            if character == active_quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
                 quote = None;
             }
             continue;
@@ -68,18 +77,23 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
             '+' | '-' if depth == 0 => {
                 let term = rhs[start..idx].trim();
                 if term.is_empty() {
-                    if saw_term || character == '+' {
-                        return Err(DeseqError::InvalidOptions {
-                            reason: "formula contains an empty term".to_string(),
-                        });
+                    if character == '-' {
+                        preserve_negative_one_sentinel = sign < 0;
+                        sign = -1;
+                    } else {
+                        preserve_negative_one_sentinel = false;
                     }
-                    sign = -1;
                     start = idx + character.len_utf8();
                     continue;
                 }
+                let term = if sign < 0 && preserve_negative_one_sentinel && term == "1" {
+                    "-1"
+                } else {
+                    term
+                };
                 terms.push((sign, term.to_string()));
-                saw_term = true;
                 sign = if character == '-' { -1 } else { 1 };
+                preserve_negative_one_sentinel = false;
                 start = idx + character.len_utf8();
             }
             _ => {}
@@ -106,16 +120,19 @@ fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError
             reason: "formula contains an empty term".to_string(),
         });
     }
+    let term = if sign < 0 && preserve_negative_one_sentinel && term == "1" {
+        "-1"
+    } else {
+        term
+    };
     terms.push((sign, term.to_string()));
     Ok(terms)
 }
 
 fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqError> {
     let term = strip_formula_outer_parentheses(term.trim())?;
-    if formula_contains_unquoted_char(term, '-') {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' contains unsupported nested subtraction"),
-        });
+    if term == "-1" {
+        return Ok(vec![term.to_string()]);
     }
     let power_pieces = split_formula_top_level(term, '^')?;
     if power_pieces.len() > 1 {
@@ -134,6 +151,9 @@ fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqErr
         if pieces.len() > 1 {
             return expand_parenthesized_formula_operator(&pieces, delimiter);
         }
+    }
+    if formula_contains_unquoted_char(term, '-') {
+        return expand_signed_additive_formula_group(term);
     }
     if formula_contains_unquoted_parentheses(term) {
         return split_formula_additive_group(term);
@@ -212,7 +232,7 @@ fn expand_parenthesized_formula_power(
             reason: format!("formula power term '{term}' must have one exponent"),
         });
     }
-    let terms = split_formula_additive_group(&pieces[0])?;
+    let terms = split_formula_power_base_terms(&pieces[0])?;
     if terms.iter().any(|term| term == ".") {
         return Ok(vec![term.to_string()]);
     }
@@ -225,6 +245,14 @@ fn expand_parenthesized_formula_power(
         }
     }
     Ok(expanded)
+}
+
+fn split_formula_power_base_terms(term: &str) -> Result<Vec<String>, DeseqError> {
+    let stripped = strip_formula_outer_parentheses(term.trim())?;
+    if !formula_contains_unquoted_char(stripped, '-') {
+        return split_formula_additive_group(stripped);
+    }
+    simplify_signed_additive_formula_group(stripped)
 }
 
 fn parse_formula_interaction_power(term: &str, exponent: &str) -> Result<usize, DeseqError> {
@@ -253,13 +281,11 @@ fn parse_formula_interaction_power(term: &str, exponent: &str) -> Result<usize, 
 
 fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     let stripped = strip_formula_outer_parentheses(term.trim())?;
+    if formula_contains_unquoted_char(stripped, '-') {
+        return simplify_signed_additive_formula_group(stripped);
+    }
     let pieces = split_formula_top_level(stripped, '+')?;
     if pieces.len() == 1 {
-        if formula_contains_unquoted_char(stripped, '-') {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula term '{term}' contains unsupported nested subtraction"),
-            });
-        }
         if formula_contains_unquoted_parentheses(stripped) {
             return expand_parenthesized_formula_term(stripped);
         }
@@ -268,12 +294,54 @@ fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     let mut terms = Vec::new();
     for piece in pieces {
         if formula_contains_unquoted_char(&piece, '-') {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula group '{term}' contains unsupported nested subtraction"),
-            });
+            for expanded in simplify_signed_additive_formula_group(&piece)? {
+                push_unique_formula_term(&mut terms, expanded);
+            }
+            continue;
         }
         for expanded in expand_parenthesized_formula_term(&piece)? {
             push_unique_formula_term(&mut terms, expanded);
+        }
+    }
+    Ok(terms)
+}
+
+fn simplify_signed_additive_formula_group(term: &str) -> Result<Vec<String>, DeseqError> {
+    let stripped = strip_formula_outer_parentheses(term.trim())?;
+    let signed_terms = split_formula_signed_terms(stripped)?;
+    let mut terms = Vec::new();
+    for (sign, signed_term) in signed_terms {
+        if sign < 0 {
+            if let Ok(expanded_terms) = expand_parenthesized_formula_term(&signed_term) {
+                for expanded in expanded_terms {
+                    remove_signed_formula_group_term(&mut terms, &expanded);
+                }
+            }
+            continue;
+        }
+        for expanded in expand_parenthesized_formula_term(&signed_term)? {
+            push_unique_formula_term(&mut terms, expanded);
+        }
+    }
+    Ok(terms)
+}
+
+fn remove_signed_formula_group_term(terms: &mut Vec<String>, term: &str) {
+    terms.retain(|candidate| candidate != term);
+}
+
+fn expand_signed_additive_formula_group(term: &str) -> Result<Vec<String>, DeseqError> {
+    let stripped = strip_formula_outer_parentheses(term.trim())?;
+    let signed_terms = split_formula_signed_terms(stripped)?;
+    if signed_terms.len() == 1 && signed_terms[0].0 >= 0 && signed_terms[0].1.trim() == stripped {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula term '{term}' contains unsupported nested subtraction"),
+        });
+    }
+    let mut terms = Vec::new();
+    for (sign, signed_term) in signed_terms {
+        for expanded in expand_parenthesized_formula_term(&signed_term)? {
+            push_unique_formula_term(&mut terms, apply_formula_term_sign(sign, expanded));
         }
     }
     Ok(terms)
@@ -287,10 +355,15 @@ fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
         }
         let mut depth = 0_i32;
         let mut quote = None;
+        let mut escaped_quote = false;
         let mut encloses_whole_term = true;
         for (idx, character) in stripped.char_indices() {
             if let Some(active_quote) = quote {
-                if character == active_quote {
+                if escaped_quote {
+                    escaped_quote = false;
+                } else if character == '\\' {
+                    escaped_quote = true;
+                } else if character == active_quote {
                     quote = None;
                 }
                 continue;
@@ -338,10 +411,15 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
     let mut depth = 0_i32;
     let mut in_backticks = false;
     let mut quote = None;
+    let mut escaped_quote = false;
     let mut start = 0_usize;
     for (idx, character) in term.char_indices() {
         if let Some(active_quote) = quote {
-            if character == active_quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
                 quote = None;
             }
             continue;
@@ -408,9 +486,14 @@ fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, D
 fn formula_contains_unquoted_parentheses(term: &str) -> bool {
     let mut in_backticks = false;
     let mut quote = None;
+    let mut escaped_quote = false;
     for character in term.chars() {
         if let Some(active_quote) = quote {
-            if character == active_quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
                 quote = None;
             }
             continue;
@@ -433,9 +516,14 @@ fn formula_contains_unquoted_parentheses(term: &str) -> bool {
 fn formula_contains_unquoted_char(term: &str, needle: char) -> bool {
     let mut in_backticks = false;
     let mut quote = None;
+    let mut escaped_quote = false;
     for character in term.chars() {
         if let Some(active_quote) = quote {
-            if character == active_quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
                 quote = None;
             }
             continue;
@@ -467,6 +555,7 @@ fn split_formula_top_level_operator(
     let mut depth = 0_i32;
     let mut in_backticks = false;
     let mut quote = None;
+    let mut escaped_quote = false;
     let mut start = 0_usize;
     let mut idx = 0_usize;
     while idx < term.len() {
@@ -474,7 +563,11 @@ fn split_formula_top_level_operator(
             break;
         };
         if let Some(active_quote) = quote {
-            if character == active_quote {
+            if escaped_quote {
+                escaped_quote = false;
+            } else if character == '\\' {
+                escaped_quote = true;
+            } else if character == active_quote {
                 quote = None;
             }
             idx += character.len_utf8();

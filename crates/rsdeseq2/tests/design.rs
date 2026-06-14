@@ -941,6 +941,27 @@ fn expanded_formula_design_from_model_frame_infers_and_overrides_references() {
             },
         ]
     );
+    assert_eq!(
+        model_frame
+            .resolved_numeric_covariate("dose")
+            .unwrap()
+            .unwrap(),
+        ResolvedFormulaNumericCovariate {
+            name: "dose",
+            values: &[0.0, 1.0, 2.0, 3.0],
+        }
+    );
+    assert_eq!(
+        model_frame.resolved_numeric_covariate("missing").unwrap(),
+        None
+    );
+    assert_eq!(
+        model_frame.resolved_numeric_covariates().unwrap(),
+        vec![ResolvedFormulaNumericCovariate {
+            name: "dose",
+            values: &[0.0, 1.0, 2.0, 3.0],
+        }]
+    );
 
     let from_model_frame =
         expanded_formula_design_from_model_frame("~ condition * batch + dose", &model_frame)
@@ -1043,6 +1064,35 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
         ]
     );
 
+    let cell_levels = vec![
+        "T cell".to_string(),
+        "B-cell".to_string(),
+        "NK cell".to_string(),
+    ];
+    let cell_type = vec![
+        "T cell".to_string(),
+        "B-cell".to_string(),
+        "NK cell".to_string(),
+        "B-cell".to_string(),
+    ];
+    let cell_factors = [ExpandedFactorSpec {
+        factor: "cell type",
+        sample_levels: &cell_type,
+        reference: "T cell",
+        levels: Some(&cell_levels),
+    }];
+    let cleaned_ref =
+        expanded_formula_design("~ relevel(`cell type`, ref=\"B.cell\")", &cell_factors, &[])
+            .unwrap();
+    assert_eq!(
+        cleaned_ref.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(cell type, ref = \"B-cell\")_T cell_vs_B-cell".to_string(),
+            "relevel(cell type, ref = \"B-cell\")_NK cell_vs_B-cell".to_string(),
+        ]
+    );
+
     let nested_named = expanded_formula_design(
         "~ relevel(x=as.factor(condition), ref=\"C\")",
         &factors,
@@ -1058,6 +1108,52 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
         ]
     );
 
+    let nested_ordered_named = expanded_formula_design(
+        "~ relevel(x=as.ordered(condition), ref=\"C\")",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        nested_ordered_named
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(as.ordered(condition), ref = \"C\")_A_vs_C".to_string(),
+            "relevel(as.ordered(condition), ref = \"C\")_B_vs_C".to_string(),
+        ]
+    );
+
+    let nested_as_factor =
+        expanded_formula_design("~ factor(relevel(condition, ref=\"B\"))", &factors, &[]).unwrap();
+    assert_eq!(
+        nested_as_factor
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(relevel(condition, ref = \"B\"))_A_vs_B".to_string(),
+            "factor(relevel(condition, ref = \"B\"))_C_vs_B".to_string(),
+        ]
+    );
+
+    let nested_ordered_relevel =
+        expanded_formula_design("~ ordered(relevel(condition, ref=\"B\"))", &factors, &[]).unwrap();
+    assert_eq!(
+        nested_ordered_relevel
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(relevel(condition, ref = \"B\"))_A_vs_B".to_string(),
+            "ordered(relevel(condition, ref = \"B\"))_C_vs_B".to_string(),
+        ]
+    );
+
     let nested_levels = expanded_formula_design(
         "~ relevel(factor(condition, levels=c('C','B','A')), ref='B')",
         &factors,
@@ -1066,6 +1162,43 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
     .unwrap();
     assert_eq!(
         nested_levels.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
+                .to_string(),
+            "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_A_vs_B"
+                .to_string(),
+        ]
+    );
+
+    let nested_ordered_levels = expanded_formula_design(
+        "~ relevel(ordered(condition, levels=c('C','B','A')), ref='B')",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        nested_ordered_levels
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(ordered(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
+                .to_string(),
+            "relevel(ordered(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_A_vs_B"
+                .to_string(),
+        ]
+    );
+
+    let spaced_nested = expanded_formula_design(
+        "~ relevel ( factor ( condition, levels = c('C', 'B', 'A') ), ref = 'B' )",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        spaced_nested.standard_design.coefficient_names().unwrap(),
         &[
             "Intercept".to_string(),
             "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
@@ -1091,6 +1224,37 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
             "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"C\")_B_vs_C"
                 .to_string(),
             "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"C\")_A_vs_C"
+                .to_string(),
+        ]
+    );
+
+    let equals_condition = vec![
+        "A=B".to_string(),
+        "C".to_string(),
+        "A=B".to_string(),
+        "C".to_string(),
+    ];
+    let equals_levels = vec!["A=B".to_string(), "C".to_string()];
+    let equals_factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &equals_condition,
+        reference: "A=B",
+        levels: Some(&equals_levels),
+    }];
+    let positional_equals_reference = expanded_formula_design(
+        "~ relevel(factor(condition, levels=c('A=B','C')), 'A=B')",
+        &equals_factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        positional_equals_reference
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "relevel(factor(condition, levels = c(\"A=B\", \"C\")), ref = \"A=B\")_C_vs_A=B"
                 .to_string(),
         ]
     );
@@ -1172,6 +1336,28 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
         ]
     );
 
+    let ordered =
+        expanded_formula_design("~ ordered(condition) + as.ordered(x=batch)", &factors, &[])
+            .unwrap();
+    assert_eq!(
+        ordered.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition)_B_vs_A".to_string(),
+            "as.ordered(batch)_Y_vs_X".to_string(),
+        ]
+    );
+    assert_eq!(
+        ordered.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition)A".to_string(),
+            "ordered(condition)B".to_string(),
+            "as.ordered(batch)X".to_string(),
+            "as.ordered(batch)Y".to_string(),
+        ]
+    );
+
     let interaction =
         expanded_formula_design("~ factor(condition):as.factor(batch)", &factors, &[]).unwrap();
     assert_eq!(
@@ -1192,6 +1378,21 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
             "factor(condition)A:as.factor(batch)Y".to_string(),
             "factor(condition)B:as.factor(batch)X".to_string(),
             "factor(condition)B:as.factor(batch)Y".to_string(),
+        ]
+    );
+
+    let spaced = expanded_formula_design(
+        "~ factor ( condition ) + as.factor ( x = batch )",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        spaced.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition)_B_vs_A".to_string(),
+            "as.factor(batch)_Y_vs_X".to_string(),
         ]
     );
 
@@ -1250,6 +1451,65 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
     )
     .unwrap();
     assert_eq!(relabeled_positional, relabeled);
+
+    let ordered_reordered =
+        expanded_formula_design("~ ordered(condition, levels=c('B','A'))", &factors, &[]).unwrap();
+    assert_eq!(
+        ordered_reordered
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition, levels = c(\"B\", \"A\"))_A_vs_B".to_string(),
+        ]
+    );
+    assert_eq!(
+        ordered_reordered
+            .expanded_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition, levels = c(\"B\", \"A\"))B".to_string(),
+            "ordered(condition, levels = c(\"B\", \"A\"))A".to_string(),
+        ]
+    );
+
+    let ordered_relabeled = expanded_formula_design(
+        "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        ordered_relabeled
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))_treated_vs_control".to_string(),
+        ]
+    );
+    assert_eq!(
+        ordered_relabeled
+            .expanded_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))control".to_string(),
+            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))treated".to_string(),
+        ]
+    );
+    let ordered_relabeled_named = expanded_formula_design(
+        "~ ordered(x=condition, labels=c('control','treated'), levels=c('A','B'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(ordered_relabeled_named, ordered_relabeled);
 
     let relabeled_non_syntactic = expanded_formula_design(
         "~ factor(condition, levels=c('A','B'), labels=c('control group','treated-group'))",
@@ -1336,6 +1596,132 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
     assert_eq!(
         relabeled_non_syntactic_factor.reference.as_deref(),
         Some("control group")
+    );
+
+    let relabeled_transform_text = expanded_formula_design(
+        "~ factor(condition, levels=c('A','B'), labels=c('control factor(A)','treated factor(B)'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        relabeled_transform_text
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control factor(A)\", \"treated factor(B)\"))_treated factor(B)_vs_control factor(A)".to_string(),
+        ]
+    );
+    let relabeled_transform_text_with_offsets = expanded_formula_design_with_offsets(
+        "~ factor(condition, levels=c('A','B'), labels=c('control factor(A)','treated factor(B)'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    let relabeled_transform_text_factor = relabeled_transform_text_with_offsets
+        .model_frame
+        .factors
+        .iter()
+        .find(|factor| factor.name.contains("control factor(A)"))
+        .unwrap();
+    assert_eq!(
+        relabeled_transform_text_factor.levels.as_deref(),
+        Some(
+            &[
+                "control factor(A)".to_string(),
+                "treated factor(B)".to_string()
+            ][..]
+        )
+    );
+    assert_eq!(
+        relabeled_transform_text_factor.reference.as_deref(),
+        Some("control factor(A)")
+    );
+
+    let relabeled_comma_text = expanded_formula_design(
+        "~ factor(condition, levels=c('A','B'), labels=c('control, baseline','treated, response'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        relabeled_comma_text
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control, baseline\", \"treated, response\"))_treated, response_vs_control, baseline".to_string(),
+        ]
+    );
+    let relabeled_comma_text_with_offsets = expanded_formula_design_with_offsets(
+        "~ factor(condition, levels=c('A','B'), labels=c('control, baseline','treated, response'))",
+        &factors,
+        &[],
+    )
+    .unwrap();
+    let relabeled_comma_text_factor = relabeled_comma_text_with_offsets
+        .model_frame
+        .factors
+        .iter()
+        .find(|factor| factor.name.contains("control, baseline"))
+        .unwrap();
+    assert_eq!(
+        relabeled_comma_text_factor.levels.as_deref(),
+        Some(
+            &[
+                "control, baseline".to_string(),
+                "treated, response".to_string()
+            ][..]
+        )
+    );
+    assert_eq!(
+        relabeled_comma_text_factor.reference.as_deref(),
+        Some("control, baseline")
+    );
+
+    let relabeled_escaped_text = expanded_formula_design(
+        r#"~ factor(condition, levels=c('A','B'), labels=c("control \"quote\"","treated \\ path"))"#,
+        &factors,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        relabeled_escaped_text
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            r#"factor(condition, levels = c("A", "B"), labels = c("control \"quote\"", "treated \\ path"))_treated \ path_vs_control "quote""#.to_string(),
+        ]
+    );
+    let relabeled_escaped_text_with_offsets = expanded_formula_design_with_offsets(
+        r#"~ factor(condition, levels=c('A','B'), labels=c("control \"quote\"","treated \\ path"))"#,
+        &factors,
+        &[],
+    )
+    .unwrap();
+    let relabeled_escaped_text_factor = relabeled_escaped_text_with_offsets
+        .model_frame
+        .factors
+        .iter()
+        .find(|factor| factor.name.contains(r#"control \"quote\""#))
+        .unwrap();
+    assert_eq!(
+        relabeled_escaped_text_factor.levels.as_deref(),
+        Some(
+            &[
+                "control \"quote\"".to_string(),
+                "treated \\ path".to_string()
+            ][..]
+        )
+    );
+    assert_eq!(
+        relabeled_escaped_text_factor.reference.as_deref(),
+        Some("control \"quote\"")
     );
 }
 
@@ -1424,6 +1810,57 @@ fn expanded_formula_design_supports_droplevels_factor_transform() {
         ]
     );
 
+    let dropped_ordered = expanded_formula_design_from_model_frame(
+        "~ droplevels(ordered(condition, levels=c('A','B','Z')))",
+        &model_frame,
+    )
+    .unwrap();
+    assert_eq!(
+        dropped_ordered.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))_B_vs_A".to_string(),
+        ]
+    );
+    assert_eq!(
+        dropped_ordered.expanded_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))A".to_string(),
+            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))B".to_string(),
+        ]
+    );
+
+    let dropped_releveled = expanded_formula_design_from_model_frame(
+        "~ droplevels(relevel(condition, ref='A'))",
+        &model_frame,
+    )
+    .unwrap();
+    assert_eq!(
+        dropped_releveled
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "droplevels(relevel(condition, ref = \"A\"))_B_vs_A".to_string(),
+        ]
+    );
+    let dropped_releveled_with_offsets = expanded_formula_design_with_offsets_from_model_frame(
+        "~ droplevels(relevel(condition, ref='A'))",
+        &model_frame,
+    )
+    .unwrap();
+    assert_eq!(
+        dropped_releveled_with_offsets
+            .model_frame
+            .factors
+            .iter()
+            .find(|factor| factor.name == "droplevels(relevel(condition, ref = \"A\"))")
+            .and_then(|factor| factor.reference.as_deref()),
+        Some("A")
+    );
+
     let observed_reference = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
             name: "condition".to_string(),
@@ -1473,6 +1910,12 @@ fn formula_model_frame_resolves_r_cleaned_factor_reference_aliases() {
                 levels: None,
                 reference: Some("A".to_string()),
             },
+            FormulaFactorColumn {
+                name: "TRUE".to_string(),
+                sample_levels: vec!["off".to_string(), "on".to_string(), "off".to_string()],
+                levels: None,
+                reference: Some("off".to_string()),
+            },
         ],
         numeric_covariates: Vec::new(),
     };
@@ -1488,6 +1931,12 @@ fn formula_model_frame_resolves_r_cleaned_factor_reference_aliases() {
             .resolved_factor_reference_by_alias("if.")
             .unwrap(),
         Some("A")
+    );
+    assert_eq!(
+        model_frame
+            .resolved_factor_reference_by_alias("TRUE.")
+            .unwrap(),
+        Some("off")
     );
     assert_eq!(
         model_frame
@@ -1543,6 +1992,190 @@ fn formula_model_frame_factor_reference_aliases_prefer_exact_and_reject_ambiguou
     assert!(ambiguous
         .resolved_factor_reference_by_alias("cell.type")
         .is_err());
+}
+
+#[test]
+fn formula_model_frame_numeric_aliases_prefer_exact_and_reject_ambiguous() {
+    let exact = FormulaModelFrame {
+        factors: Vec::new(),
+        numeric_covariates: vec![
+            FormulaNumericColumn {
+                name: "dose value".to_string(),
+                values: vec![1.0, 2.0],
+            },
+            FormulaNumericColumn {
+                name: "dose.value".to_string(),
+                values: vec![3.0, 4.0],
+            },
+            FormulaNumericColumn {
+                name: "if".to_string(),
+                values: vec![5.0, 6.0],
+            },
+        ],
+    };
+    assert_eq!(
+        exact
+            .resolved_numeric_covariate_by_alias("dose.value")
+            .unwrap()
+            .unwrap(),
+        ResolvedFormulaNumericCovariate {
+            name: "dose.value",
+            values: &[3.0, 4.0],
+        }
+    );
+    assert_eq!(
+        exact
+            .resolved_numeric_covariate_by_alias("if.")
+            .unwrap()
+            .unwrap(),
+        ResolvedFormulaNumericCovariate {
+            name: "if",
+            values: &[5.0, 6.0],
+        }
+    );
+    assert_eq!(
+        exact
+            .resolved_numeric_covariate_by_alias("missing")
+            .unwrap(),
+        None
+    );
+
+    let ambiguous = FormulaModelFrame {
+        factors: Vec::new(),
+        numeric_covariates: vec![
+            FormulaNumericColumn {
+                name: "dose value".to_string(),
+                values: vec![1.0, 2.0],
+            },
+            FormulaNumericColumn {
+                name: "dose-value".to_string(),
+                values: vec![3.0, 4.0],
+            },
+        ],
+    };
+    assert!(ambiguous
+        .resolved_numeric_covariate_by_alias("dose.value")
+        .is_err());
+}
+
+#[test]
+fn formula_model_frame_reference_accepts_cleaned_level_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "B cell".to_string(),
+                "A cell".to_string(),
+            ],
+            levels: Some(vec!["A cell".to_string(), "B cell".to_string()]),
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    assert_eq!(
+        model_frame.resolved_factor_reference("cell type").unwrap(),
+        Some("A cell")
+    );
+    assert_eq!(
+        model_frame.resolved_factor_references().unwrap(),
+        vec![ResolvedFormulaFactorReference {
+            factor: "cell type",
+            reference: "A cell",
+            levels: Some(&["A cell".to_string(), "B cell".to_string()][..]),
+        }]
+    );
+
+    let design = expanded_formula_design_from_model_frame("~ `cell type`", &model_frame).unwrap();
+    assert_eq!(
+        design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "cell type_B cell_vs_A cell".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn formula_model_frame_reference_alias_can_resolve_observed_levels_without_declared_levels() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "B cell".to_string(),
+                "A cell".to_string(),
+            ],
+            levels: None,
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    assert_eq!(
+        model_frame.resolved_factor_reference("cell type").unwrap(),
+        Some("A cell")
+    );
+
+    let design = expanded_formula_design_from_model_frame("~ `cell type`", &model_frame).unwrap();
+    assert_eq!(
+        design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "cell type_B cell_vs_A cell".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn formula_model_frame_reference_rejects_ambiguous_cleaned_level_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "A-cell".to_string(),
+                "B cell".to_string(),
+            ],
+            levels: Some(vec![
+                "A cell".to_string(),
+                "A-cell".to_string(),
+                "B cell".to_string(),
+            ]),
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    assert!(model_frame
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("reference level 'A.cell' resolves ambiguously"));
+
+    let declared_collision = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "A-cell".to_string(),
+                "B cell".to_string(),
+            ],
+            levels: Some(vec![
+                "A cell".to_string(),
+                "A-cell".to_string(),
+                "B cell".to_string(),
+            ]),
+            reference: Some("B cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    assert!(declared_collision
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("declared level 'A-cell' resolves ambiguously after R-style cleanup"));
 }
 
 #[test]
@@ -1758,6 +2391,294 @@ fn expanded_formula_design_from_model_frame_supports_dot_main_effects() {
             .unwrap();
     let intercept_only = expanded_formula_design_from_model_frame("~ 1", &model_frame).unwrap();
     assert_eq!(all_dot_removed, intercept_only);
+}
+
+#[test]
+fn expanded_formula_design_supports_dot_main_effects() {
+    let condition = vec![
+        "B".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "A".to_string(),
+    ];
+    let batch = vec![
+        "X".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+        "Y".to_string(),
+    ];
+    let dose = [1.0, 2.0, 4.0, 8.0];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+            levels: None,
+        },
+        ExpandedFactorSpec {
+            factor: "batch",
+            sample_levels: &batch,
+            reference: "X",
+            levels: None,
+        },
+    ];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let dot = expanded_formula_design("~ .", &factors, &numeric).unwrap();
+    let explicit =
+        expanded_formula_design("~ condition + batch + dose", &factors, &numeric).unwrap();
+    assert_eq!(dot, explicit);
+
+    let removed = expanded_formula_design("~ . - dose - condition", &factors, &numeric).unwrap();
+    let expected_removed = expanded_formula_design("~ batch", &factors, &numeric).unwrap();
+    assert_eq!(removed, expected_removed);
+
+    let star_dot = expanded_formula_design("~ condition * .", &factors, &numeric).unwrap();
+    let star_explicit = expanded_formula_design(
+        "~ condition + batch + dose + condition:batch + condition:dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(star_dot, star_explicit);
+
+    let interaction_dot = expanded_formula_design("~ condition:.", &factors, &numeric).unwrap();
+    let interaction_explicit =
+        expanded_formula_design("~ condition:batch + condition:dose", &factors, &numeric).unwrap();
+    assert_eq!(interaction_dot, interaction_explicit);
+
+    let nested_dot = expanded_formula_design("~ condition / .", &factors, &numeric).unwrap();
+    let nested_explicit = expanded_formula_design(
+        "~ condition + condition:batch + condition:dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(nested_dot, nested_explicit);
+
+    assert!(expanded_formula_design("~ .", &[], &[]).is_err());
+}
+
+#[test]
+fn expanded_formula_design_resolves_r_cleaned_variable_aliases() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [1.0, 2.0, 4.0, 8.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "cell type",
+        sample_levels: &condition,
+        reference: "A",
+        levels: None,
+    }];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose value",
+        values: &dose,
+    }];
+
+    let cleaned = expanded_formula_design(
+        "~ cell.type + dose.value + cell.type:dose.value",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    let quoted = expanded_formula_design(
+        "~ `cell type` + `dose value` + `cell type`:`dose value`",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(cleaned, quoted);
+
+    let cleaned_removed =
+        expanded_formula_design("~ cell.type + dose.value - dose.value", &factors, &numeric)
+            .unwrap();
+    let factor_only = expanded_formula_design("~ `cell type`", &factors, &numeric).unwrap();
+    assert_eq!(cleaned_removed, factor_only);
+
+    let cleaned_transform = expanded_formula_design(
+        "~ factor(cell.type) + relevel(cell.type, ref='B') + droplevels(cell.type)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        cleaned_transform
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(cell type)_B_vs_A".to_string(),
+            "relevel(cell type, ref = \"B\")_A_vs_B".to_string(),
+            "droplevels(cell type)_B_vs_A".to_string(),
+        ]
+    );
+
+    let cleaned_numeric_transforms = expanded_formula_design(
+        "~ log2(dose.value) + I(dose.value + 1) + scale(dose.value, center=FALSE, scale=FALSE) + poly(dose.value, 2, raw=TRUE)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        cleaned_numeric_transforms
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose value_log2".to_string(),
+            "dose value_plus_1".to_string(),
+            "dose value_identity".to_string(),
+            "dose value_poly_1".to_string(),
+            "dose value_poly_2".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
+    let first = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let second = vec![
+        "X".to_string(),
+        "Y".to_string(),
+        "X".to_string(),
+        "Y".to_string(),
+    ];
+    let factors = [
+        ExpandedFactorSpec {
+            factor: "cell type",
+            sample_levels: &first,
+            reference: "A",
+            levels: None,
+        },
+        ExpandedFactorSpec {
+            factor: "cell-type",
+            sample_levels: &second,
+            reference: "X",
+            levels: None,
+        },
+    ];
+
+    let error = expanded_formula_design("~ cell.type", &factors, &[])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("resolves ambiguously"));
+    let transform_error = expanded_formula_design("~ factor(cell.type)", &factors, &[])
+        .unwrap_err()
+        .to_string();
+    assert!(transform_error.contains("resolves ambiguously"));
+
+    let transform_alias_levels = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let transform_alias_collision = [
+        ExpandedFactorSpec {
+            factor: "cell type",
+            sample_levels: &transform_alias_levels,
+            reference: "A",
+            levels: None,
+        },
+        ExpandedFactorSpec {
+            factor: "factor.cell.type.",
+            sample_levels: &transform_alias_levels,
+            reference: "A",
+            levels: None,
+        },
+    ];
+    let derived_factor_alias_error =
+        expanded_formula_design("~ factor(`cell type`)", &transform_alias_collision, &[])
+            .unwrap_err()
+            .to_string();
+    assert!(derived_factor_alias_error.contains("resolves ambiguously"));
+
+    let dose = [0.0, 1.0];
+    let exact_cross_type_error = expanded_formula_design(
+        "~ condition",
+        &[ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &first,
+            reference: "A",
+            levels: None,
+        }],
+        &[ExpandedNumericSpec {
+            name: "condition",
+            values: &dose,
+        }],
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(exact_cross_type_error.contains("formula variable 'condition' appears more than once"));
+
+    let alias_cross_type_error = expanded_formula_design(
+        "~ cell.type",
+        &[ExpandedFactorSpec {
+            factor: "cell type",
+            sample_levels: &first,
+            reference: "A",
+            levels: None,
+        }],
+        &[ExpandedNumericSpec {
+            name: "cell-type",
+            values: &dose,
+        }],
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(alias_cross_type_error.contains("resolves ambiguously"));
+
+    let numeric = [
+        ExpandedNumericSpec {
+            name: "dose value",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "dose-value",
+            values: &dose,
+        },
+    ];
+    let numeric_error = expanded_formula_design("~ log2(dose.value)", &[], &numeric)
+        .unwrap_err()
+        .to_string();
+    assert!(numeric_error.contains("resolves ambiguously"));
+    let numeric_identity_error = expanded_formula_design("~ I(dose.value + 1)", &[], &numeric)
+        .unwrap_err()
+        .to_string();
+    assert!(numeric_identity_error.contains("resolves ambiguously"));
+
+    let numeric_transform_alias_collision = [
+        ExpandedNumericSpec {
+            name: "dose value",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "dose.value_as.numeric",
+            values: &dose,
+        },
+    ];
+    let derived_numeric_alias_error = expanded_formula_design(
+        "~ as.numeric(`dose value`)",
+        &[],
+        &numeric_transform_alias_collision,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(derived_numeric_alias_error.contains("resolves ambiguously"));
 }
 
 #[test]
@@ -2009,7 +2930,29 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
             values: vec![0.0, 1.0],
         }],
     };
-    assert!(expanded_formula_design_from_model_frame("~ condition", &duplicate).is_err());
+    let duplicate_error = expanded_formula_design_from_model_frame("~ condition", &duplicate)
+        .unwrap_err()
+        .to_string();
+    assert!(duplicate_error.contains("cannot be both a factor and numeric covariate"));
+
+    let ambiguous_cross_type = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec!["A".to_string(), "B".to_string()],
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "cell-type".to_string(),
+            values: vec![0.0, 1.0],
+        }],
+    };
+    let ambiguous_error =
+        expanded_formula_design_from_model_frame("~ cell.type", &ambiguous_cross_type)
+            .unwrap_err()
+            .to_string();
+    assert!(ambiguous_error
+        .contains("formula column 'cell-type' resolves ambiguously after R-style cleanup"));
 
     let bad_reference = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -2280,8 +3223,39 @@ fn expanded_formula_design_supports_intercept_removal() {
     assert_eq!(restored, with_intercept);
     assert_eq!(restored_from_minus_one, with_intercept);
 
+    let plus_zero = expanded_formula_design("~ condition + 0", &factors, &[]).unwrap();
+    assert_eq!(plus_zero, minus_one);
+
+    let minus_zero = expanded_formula_design("~ condition - 0", &factors, &[]).unwrap();
+    assert_eq!(minus_zero, with_intercept);
+
+    let zero_minus_zero = expanded_formula_design("~ 0 - 0 + condition", &factors, &[]).unwrap();
+    assert_eq!(zero_minus_zero, with_intercept);
+
+    let plus_zero_plus_one = expanded_formula_design("~ condition + 0 + 1", &factors, &[]).unwrap();
+    assert_eq!(plus_zero_plus_one, with_intercept);
+
     let removed_again = expanded_formula_design("~ 0 + 1 + condition - 1", &factors, &[]).unwrap();
     assert_eq!(removed_again, minus_one);
+
+    let plus_zero_minus_one =
+        expanded_formula_design("~ condition + 0 - 1", &factors, &[]).unwrap();
+    assert_eq!(plus_zero_minus_one, minus_one);
+
+    let minus_one_minus_zero =
+        expanded_formula_design("~ condition - 1 - 0", &factors, &[]).unwrap();
+    assert_eq!(minus_one_minus_zero, with_intercept);
+
+    let minus_negative_one = expanded_formula_design("~ condition - -1", &factors, &[]).unwrap();
+    assert_eq!(minus_negative_one, with_intercept);
+
+    let zero_minus_negative_one =
+        expanded_formula_design("~ 0 - -1 + condition", &factors, &[]).unwrap();
+    assert_eq!(zero_minus_negative_one, with_intercept);
+
+    let plus_zero_minus_negative_one =
+        expanded_formula_design("~ condition + 0 - -1", &factors, &[]).unwrap();
+    assert_eq!(plus_zero_minus_negative_one, with_intercept);
 
     let interaction_only = expanded_formula_design("~ 0 + condition:batch", &factors, &[]).unwrap();
     assert_eq!(
@@ -2305,6 +3279,69 @@ fn expanded_formula_design_supports_intercept_removal() {
             0.0, 0.0, 0.0, 1.0,
         ]
     );
+}
+
+#[test]
+fn expanded_formula_design_supports_leading_unary_plus() {
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let dose = [0.0, 1.0, 2.0, 3.0];
+    let factors = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+        levels: None,
+    }];
+    let numeric = [ExpandedNumericSpec {
+        name: "dose",
+        values: &dose,
+    }];
+
+    let leading_plus = expanded_formula_design("~ + condition + dose", &factors, &numeric).unwrap();
+    let repeated_leading_plus =
+        expanded_formula_design("~ + + condition + dose", &factors, &numeric).unwrap();
+    let explicit = expanded_formula_design("~ condition + dose", &factors, &numeric).unwrap();
+    assert_eq!(leading_plus, explicit);
+    assert_eq!(repeated_leading_plus, explicit);
+
+    let leading_plus_intercept =
+        expanded_formula_design("~ + 1 + condition", &factors, &numeric).unwrap();
+    let explicit_intercept =
+        expanded_formula_design("~ 1 + condition", &factors, &numeric).unwrap();
+    assert_eq!(leading_plus_intercept, explicit_intercept);
+
+    let repeated_plus =
+        expanded_formula_design("~ condition + + dose", &factors, &numeric).unwrap();
+    assert_eq!(repeated_plus, explicit);
+
+    let plus_minus =
+        expanded_formula_design("~ condition + dose + - dose", &factors, &numeric).unwrap();
+    let minus_plus =
+        expanded_formula_design("~ condition + dose - + dose", &factors, &numeric).unwrap();
+    let repeated_minus =
+        expanded_formula_design("~ condition + dose - - dose", &factors, &numeric).unwrap();
+    let condition_only = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
+    assert_eq!(plus_minus, condition_only);
+    assert_eq!(minus_plus, condition_only);
+    assert_eq!(repeated_minus, condition_only);
+
+    let plus_minus_intercept =
+        expanded_formula_design("~ condition + - 1", &factors, &numeric).unwrap();
+    let minus_plus_intercept =
+        expanded_formula_design("~ condition - + 1", &factors, &numeric).unwrap();
+    let no_intercept = expanded_formula_design("~ condition - 1", &factors, &numeric).unwrap();
+    assert_eq!(plus_minus_intercept, no_intercept);
+    assert_eq!(minus_plus_intercept, no_intercept);
+
+    let minus_negative_one_intercept =
+        expanded_formula_design("~ condition - - 1", &factors, &numeric).unwrap();
+    assert_eq!(minus_negative_one_intercept, condition_only);
+
+    assert!(expanded_formula_design("~ condition +", &factors, &numeric).is_err());
 }
 
 #[test]
@@ -2720,6 +3757,35 @@ fn expanded_formula_design_supports_parenthesized_groups() {
         expanded_formula_design("~ condition:batch + condition:dose", &factors, &numeric).unwrap();
     assert_eq!(grouped_nested_in, expanded_nested_in);
 
+    let signed_grouped_star =
+        expanded_formula_design("~ condition * (batch + dose - dose)", &factors, &numeric).unwrap();
+    let expanded_signed_star =
+        expanded_formula_design("~ condition + batch + condition:batch", &factors, &numeric)
+            .unwrap();
+    assert_eq!(signed_grouped_star, expanded_signed_star);
+
+    let signed_grouped_interaction =
+        expanded_formula_design("~ condition:(batch + dose - dose)", &factors, &numeric).unwrap();
+    let expanded_signed_interaction =
+        expanded_formula_design("~ condition:batch", &factors, &numeric).unwrap();
+    assert_eq!(signed_grouped_interaction, expanded_signed_interaction);
+
+    let signed_grouped_nested =
+        expanded_formula_design("~ condition / (batch + dose - dose)", &factors, &numeric).unwrap();
+    let expanded_signed_nested =
+        expanded_formula_design("~ condition + condition:batch", &factors, &numeric).unwrap();
+    assert_eq!(signed_grouped_nested, expanded_signed_nested);
+
+    let signed_grouped_nested_in = expanded_formula_design(
+        "~ (condition + batch - batch) %in% dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    let expanded_signed_nested_in =
+        expanded_formula_design("~ dose:condition", &factors, &numeric).unwrap();
+    assert_eq!(signed_grouped_nested_in, expanded_signed_nested_in);
+
     let removed_group = expanded_formula_design(
         "~ condition + batch + dose - (batch + dose)",
         &factors,
@@ -2728,6 +3794,19 @@ fn expanded_formula_design_supports_parenthesized_groups() {
     .unwrap();
     let expected_removed = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
     assert_eq!(removed_group, expected_removed);
+
+    let signed_group =
+        expanded_formula_design("~ condition + (batch + dose - dose)", &factors, &numeric).unwrap();
+    let expected_signed_group =
+        expanded_formula_design("~ condition + batch", &factors, &numeric).unwrap();
+    assert_eq!(signed_group, expected_signed_group);
+
+    let inverted_signed_group =
+        expanded_formula_design("~ condition + batch - (batch - dose)", &factors, &numeric)
+            .unwrap();
+    let expected_inverted_signed_group =
+        expanded_formula_design("~ condition + dose", &factors, &numeric).unwrap();
+    assert_eq!(inverted_signed_group, expected_inverted_signed_group);
 
     let removed_nested_in = expanded_formula_design(
         "~ condition + condition:batch + condition:dose - (batch + dose) %in% condition",
@@ -2821,6 +3900,16 @@ fn expanded_formula_design_supports_nested_parenthesized_groups() {
     .unwrap();
     let expected_removed = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
     assert_eq!(removed_nested_group, expected_removed);
+
+    let nested_signed_group = expanded_formula_design(
+        "~ condition + batch + (dose + (time - dose))",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    let expected_nested_signed_group =
+        expanded_formula_design("~ condition + batch + time", &factors, &numeric).unwrap();
+    assert_eq!(nested_signed_group, expected_nested_signed_group);
 }
 
 #[test]
@@ -2921,6 +4010,26 @@ fn expanded_formula_design_supports_parenthesized_power_terms() {
     let explicit_first_order =
         expanded_formula_design("~ condition + batch + dose", &factors, &numeric).unwrap();
     assert_eq!(first_order, explicit_first_order);
+
+    let signed_base =
+        expanded_formula_design("~ (condition + batch + dose - dose)^2", &factors, &numeric)
+            .unwrap();
+    let explicit_signed_base =
+        expanded_formula_design("~ condition + batch + condition:batch", &factors, &numeric)
+            .unwrap();
+    assert_eq!(signed_base, explicit_signed_base);
+
+    let signed_nested_base = expanded_formula_design(
+        "~ (condition + (batch + dose) - dose)^2",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(signed_nested_base, explicit_signed_base);
+
+    let signed_absent_removal =
+        expanded_formula_design("~ (condition + batch - missing)^2", &factors, &numeric).unwrap();
+    assert_eq!(signed_absent_removal, explicit_signed_base);
 
     assert!(expanded_formula_design("~ (condition + batch)^0", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ (condition + batch)^2.5", &factors, &numeric).is_err());
@@ -3453,6 +4562,23 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
         .coefficient_index("condition_B_vs_A:dose_log2")
         .is_ok());
 
+    let spaced = expanded_formula_design(
+        "~ log ( dose ) + log2 ( dose ) + sqrt ( x = dose ) + scale ( dose, center = FALSE, scale = FALSE )",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        spaced.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_log".to_string(),
+            "dose_log2".to_string(),
+            "dose_sqrt".to_string(),
+            "dose_identity".to_string(),
+        ]
+    );
+
     let named_function_args = expanded_formula_design(
         "~ log(x=dose) + log(dose, base=2) + log(x=dose, base=10) + log(dose, 4) + log2(x=dose) + sqrt(x=dose)",
         &factors,
@@ -3488,11 +4614,137 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
         assert_eq!(row[6], value.sqrt());
     }
 
+    let numeric_coercions = expanded_formula_design(
+        "~ as.numeric(dose) + as.double(dose) + as.integer(x=dose) + condition:as.numeric(dose)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        numeric_coercions
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_as.numeric".to_string(),
+            "dose_as.double".to_string(),
+            "dose_as.integer".to_string(),
+            "condition_B_vs_A:dose_as.numeric".to_string(),
+        ]
+    );
+    for (sample, value) in dose.iter().copied().enumerate() {
+        let row = numeric_coercions
+            .standard_design
+            .matrix()
+            .row(sample)
+            .unwrap();
+        assert_eq!(row[1], value);
+        assert_eq!(row[2], value);
+        assert_eq!(row[3], value);
+        assert_eq!(row[4], if condition[sample] == "B" { value } else { 0.0 });
+    }
+
+    let spaced_coercions = expanded_formula_design(
+        "~ as.numeric ( dose ) + as.double ( dose ) + as.integer ( x = dose )",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        spaced_coercions
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "dose_as.numeric".to_string(),
+            "dose_as.double".to_string(),
+            "dose_as.integer".to_string(),
+        ]
+    );
+
     let removed =
         expanded_formula_design("~ condition + sqrt(dose) - sqrt(dose)", &factors, &numeric)
             .unwrap();
     let expected = expanded_formula_design("~ condition", &factors, &numeric).unwrap();
     assert_eq!(removed, expected);
+
+    let removed_coercion = expanded_formula_design(
+        "~ condition + as.numeric(dose) - as.numeric(dose)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(removed_coercion, expected);
+
+    let condition_levels = vec!["B".to_string(), "A".to_string()];
+    let aliased_factor = [ExpandedFactorSpec {
+        factor: "cell type",
+        sample_levels: &condition,
+        reference: "A",
+        levels: Some(&condition_levels),
+    }];
+    let factor_coercions = expanded_formula_design(
+        "~ as.numeric(cell.type) + as.double(cell.type) + as.integer(`cell type`) + as.numeric(cell.type):dose",
+        &aliased_factor,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        factor_coercions
+            .standard_design
+            .coefficient_names()
+            .unwrap(),
+        &[
+            "Intercept".to_string(),
+            "cell type_as.numeric".to_string(),
+            "cell type_as.double".to_string(),
+            "cell type_as.integer".to_string(),
+            "cell type_as.numeric:dose".to_string(),
+        ]
+    );
+    for (sample, dose_value) in dose.iter().copied().enumerate() {
+        let code = if condition[sample] == "B" { 1.0 } else { 2.0 };
+        let row = factor_coercions
+            .standard_design
+            .matrix()
+            .row(sample)
+            .unwrap();
+        assert_eq!(row[1], code);
+        assert_eq!(row[2], code);
+        assert_eq!(row[3], code);
+        assert_eq!(row[4], code * dose_value);
+    }
+
+    let removed_factor_coercion = expanded_formula_design(
+        "~ `cell type` + as.numeric(`cell type`) - as.numeric(`cell type`)",
+        &aliased_factor,
+        &numeric,
+    )
+    .unwrap();
+    let expected_factor =
+        expanded_formula_design("~ `cell type`", &aliased_factor, &numeric).unwrap();
+    assert_eq!(removed_factor_coercion, expected_factor);
+
+    let duplicate_name_numeric = [
+        ExpandedNumericSpec {
+            name: "dose",
+            values: &dose,
+        },
+        ExpandedNumericSpec {
+            name: "dose_as.numeric",
+            values: &dose,
+        },
+    ];
+    let duplicate_name_error =
+        expanded_formula_design("~ as.numeric(dose)", &factors, &duplicate_name_numeric)
+            .unwrap_err()
+            .to_string();
+    assert!(
+        duplicate_name_error.contains("formula variable 'dose_as.numeric' appears more than once"),
+        "{duplicate_name_error}"
+    );
 
     let scaled_interaction =
         expanded_formula_design("~ condition * scale(dose)", &factors, &numeric).unwrap();
@@ -3674,6 +4926,33 @@ fn expanded_formula_design_transform_parser_handles_nested_parentheses_and_quote
         assert_eq!(row[1], value.log2());
         assert_eq!(row[2], value + 1.0);
     }
+
+    let condition = vec![
+        "A".to_string(),
+        "A".to_string(),
+        "B".to_string(),
+        "B".to_string(),
+    ];
+    let factor_with_space = [ExpandedFactorSpec {
+        factor: "condition",
+        sample_levels: &condition,
+        reference: "A",
+        levels: None,
+    }];
+    let factor_design = expanded_formula_design(
+        "~ factor (condition) + relevel (condition, ref = 'B')",
+        &factor_with_space,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        factor_design.standard_design.coefficient_names().unwrap(),
+        &[
+            "Intercept".to_string(),
+            "factor(condition)_B_vs_A".to_string(),
+            "relevel(condition, ref = \"B\")_A_vs_B".to_string(),
+        ]
+    );
 
     let literal_log = [1.0_f64, 3.0, 5.0, 7.0];
     let literal_poly = [2.0_f64, 4.0, 6.0, 8.0];
@@ -4056,6 +5335,15 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
             .collect::<Vec<_>>()
     );
 
+    let spaced = expanded_formula_design_with_offsets(
+        "~ condition + offset ( log2 ( dose ) ) + offset ( I ( x = dose + `exposure value` ) )",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(spaced.design, expected_design);
+    assert_eq!(spaced.offsets, transformed.offsets);
+
     let quoted =
         expanded_formula_design_with_offsets("~ offset(`exposure value`)", &[], &numeric).unwrap();
     assert_eq!(quoted.offsets, exposure);
@@ -4079,6 +5367,65 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
         dose.iter()
             .zip(exposure.iter())
             .map(|(dose, exposure)| dose.log2() + exposure)
+            .collect::<Vec<_>>()
+    );
+
+    let parenthesized = expanded_formula_design_with_offsets(
+        "~ (condition + offset(log2(dose))) + (offset(`exposure value`) + 1)",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(parenthesized.design, expected_design);
+    assert_eq!(
+        parenthesized.offsets,
+        dose.iter()
+            .zip(exposure.iter())
+            .map(|(dose, exposure)| dose.log2() + exposure)
+            .collect::<Vec<_>>()
+    );
+
+    let nested_parenthesized = expanded_formula_design_with_offsets(
+        "~ condition + ((offset(log2(dose)) + 1)) + (offset(`exposure value`) + (dose - dose))",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(nested_parenthesized.design, expected_design);
+    assert_eq!(nested_parenthesized.offsets, parenthesized.offsets);
+
+    let coercion_offsets = expanded_formula_design_with_offsets(
+        "~ offset(as.numeric(dose)) + offset(as.double(dose)) + offset(as.integer(x=`exposure value`))",
+        &[],
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(
+        coercion_offsets.offsets,
+        dose.iter()
+            .zip(exposure.iter())
+            .map(|(dose, exposure)| dose + dose + exposure)
+            .collect::<Vec<_>>()
+    );
+
+    let factor_offset_levels = vec!["B".to_string(), "A".to_string()];
+    let factor_offsets = expanded_formula_design_with_offsets(
+        "~ condition + offset(as.numeric(condition)) + offset(as.double(condition))",
+        &[ExpandedFactorSpec {
+            factor: "condition",
+            sample_levels: &condition,
+            reference: "A",
+            levels: Some(&factor_offset_levels),
+        }],
+        &numeric,
+    )
+    .unwrap();
+    assert_eq!(factor_offsets.design, expected_design);
+    assert_eq!(
+        factor_offsets.offsets,
+        condition
+            .iter()
+            .map(|level| if level == "B" { 2.0 } else { 4.0 })
             .collect::<Vec<_>>()
     );
 
@@ -4149,11 +5496,16 @@ fn expanded_formula_design_with_offsets_carries_formula_local_model_frame() {
 #[test]
 fn formula_offset_detection_is_syntax_level() {
     assert!(!formula_has_offset_terms("~ condition + offset_like").unwrap());
+    assert!(!formula_has_offset_terms("~ condition + myoffset(exposure)").unwrap());
     assert!(formula_has_offset_terms("~ condition + offset(exposure)").unwrap());
     assert!(formula_has_offset_terms("~ condition + offset(log2(exposure))").unwrap());
+    assert!(formula_has_offset_terms("~ condition + offset ( log2 ( exposure ) )").unwrap());
     assert!(formula_has_offset_terms("~ condition + offset(I(exposure + 1))").unwrap());
     assert!(formula_has_offset_terms("~ condition - offset(exposure)").unwrap());
     assert!(formula_has_offset_terms("~ condition + offset( exposure )").unwrap());
+    assert!(formula_has_offset_terms("~ (condition + offset(exposure))").unwrap());
+    assert!(formula_has_offset_terms("~ (condition + offset(log2(exposure)))").unwrap());
+    assert!(formula_has_offset_terms("~ ((condition + (offset(log2(exposure)))))").unwrap());
     assert!(formula_has_offset_terms("~ condition + offset(exposure").is_err());
     assert!(formula_has_offset_terms("condition + offset(exposure)").is_err());
 }
@@ -4198,10 +5550,21 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(
         expanded_formula_design("~ condition + condition:condition", &factors, &numeric).is_err()
     );
+    assert!(expanded_formula_design(
+        "~ as.ordered(condition, levels=c('A','B'))",
+        &factors,
+        &numeric
+    )
+    .is_err());
     assert!(expanded_formula_design("~ condition - missing", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ condition -", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ (condition + batch", &factors, &numeric).is_err());
-    assert!(expanded_formula_design("~ condition + (batch - dose)", &factors, &numeric).is_err());
+    assert!(expanded_formula_design(
+        "~ condition + (missing + batch - dose)^2",
+        &factors,
+        &numeric
+    )
+    .is_err());
     assert!(expanded_formula_design("~ I(dose^x)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose^32)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose + missing)", &factors, &numeric).is_err());
@@ -4323,6 +5686,12 @@ fn expanded_formula_design_validates_unsupported_terms() {
         &numeric
     )
     .is_err());
+    assert!(expanded_formula_design(
+        "~ as.ordered(condition, labels=c('control','treated'))",
+        &factors,
+        &numeric
+    )
+    .is_err());
     assert!(expanded_formula_design("~ droplevels(dose)", &factors, &numeric).is_err());
     assert!(
         expanded_formula_design("~ droplevels(condition, except='A')", &factors, &numeric).is_err()
@@ -4334,10 +5703,35 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ relevel(dose, ref='A')", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ relevel(condition)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ relevel(condition, ref='Z')", &factors, &numeric).is_err());
+    let ambiguous_levels = vec![
+        "B cell".to_string(),
+        "B-cell".to_string(),
+        "T cell".to_string(),
+    ];
+    let ambiguous_factor = [ExpandedFactorSpec {
+        factor: "cell type",
+        sample_levels: &ambiguous_levels,
+        reference: "T cell",
+        levels: Some(&ambiguous_levels),
+    }];
+    let ambiguous_relevel = expanded_formula_design(
+        "~ relevel(`cell type`, ref='B.cell')",
+        &ambiguous_factor,
+        &[],
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(ambiguous_relevel.contains("resolves ambiguously"));
     assert!(
         expanded_formula_design_with_offsets("~ condition - offset(dose)", &factors, &numeric)
             .is_err()
     );
+    assert!(expanded_formula_design_with_offsets(
+        "~ condition - (offset(dose) + 1)",
+        &factors,
+        &numeric
+    )
+    .is_err());
     assert!(expanded_formula_design_with_offsets(
         "~ condition + offset(missing)",
         &factors,

@@ -662,6 +662,7 @@ fn results_contrast_character_preserves_character_all_zero_semantics() {
     assert_eq!(
         resolved.all_zero,
         ResultsContrastAllZero::Character {
+            factor: "condition".into(),
             numerator: "1".into(),
             denominator: "3".into(),
         }
@@ -694,6 +695,7 @@ fn results_contrast_character_preserves_character_all_zero_semantics() {
     assert_eq!(
         formula_resolved.all_zero,
         ResultsContrastAllZero::Character {
+            factor: "factor.condition..levels...c..B....A...".into(),
             numerator: "A".into(),
             denominator: "B".into(),
         }
@@ -869,6 +871,239 @@ fn model_frame_factor_level_contrast_accepts_r_cleaned_factor_name_alias() {
         contrast.sample_levels,
         &model_frame.factors[0].sample_levels
     );
+
+    let relabeled_model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control factor(A)\", \"treated factor(B)\"))".to_string(),
+            sample_levels: vec![
+                "control factor(A)".to_string(),
+                "treated factor(B)".to_string(),
+                "control factor(A)".to_string(),
+                "treated factor(B)".to_string(),
+            ],
+            levels: Some(vec![
+                "control factor(A)".to_string(),
+                "treated factor(B)".to_string(),
+            ]),
+            reference: Some("control factor(A)".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let relabeled_request = ResultsContrast::character(
+        "factor.condition..levels...c..A....B....labels...c..control.factor.A.....treated.factor.B....",
+        "treated factor(B)",
+        "control factor(A)",
+    );
+    let relabeled_contrast =
+        factor_level_contrast_from_model_frame(&relabeled_request, &relabeled_model_frame)
+            .unwrap()
+            .unwrap();
+    assert_eq!(
+        relabeled_contrast.factor,
+        relabeled_model_frame.factors[0].name
+    );
+    assert_eq!(relabeled_contrast.reference, Some("control factor(A)"));
+    assert_eq!(
+        relabeled_contrast.sample_levels,
+        &relabeled_model_frame.factors[0].sample_levels
+    );
+
+    let escaped_model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: r#"factor(condition, levels = c("A", "B"), labels = c("control \"quote\"", "treated \\ path"))"#.to_string(),
+            sample_levels: vec![
+                "control \"quote\"".to_string(),
+                "treated \\ path".to_string(),
+                "control \"quote\"".to_string(),
+                "treated \\ path".to_string(),
+            ],
+            levels: Some(vec![
+                "control \"quote\"".to_string(),
+                "treated \\ path".to_string(),
+            ]),
+            reference: Some("control \"quote\"".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let escaped_request = ResultsContrast::character(
+        r#"factor.condition..levels...c..A....B....labels...c..control...quote......treated....path..."#,
+        "treated \\ path",
+        "control \"quote\"",
+    );
+    let escaped_contrast =
+        factor_level_contrast_from_model_frame(&escaped_request, &escaped_model_frame)
+            .unwrap()
+            .unwrap();
+    assert_eq!(escaped_contrast.factor, escaped_model_frame.factors[0].name);
+    assert_eq!(escaped_contrast.reference, Some("control \"quote\""));
+    assert_eq!(
+        escaped_contrast.sample_levels,
+        &escaped_model_frame.factors[0].sample_levels
+    );
+}
+
+#[test]
+fn model_frame_factor_level_contrast_accepts_r_cleaned_level_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "T cell".to_string(),
+                "B cell".to_string(),
+                "B cell".to_string(),
+                "T cell".to_string(),
+            ],
+            levels: Some(vec!["T cell".to_string(), "B cell".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let request = ResultsContrast::character("cell.type", "B.cell", "T.cell");
+    let contrast = factor_level_contrast_from_model_frame(&request, &model_frame)
+        .unwrap()
+        .unwrap();
+    assert_eq!(contrast.factor, "cell type");
+    assert_eq!(contrast.numerator, "B cell");
+    assert_eq!(contrast.denominator, "T cell");
+    assert_eq!(contrast.reference, Some("T cell"));
+    assert_eq!(
+        contrast.sample_levels,
+        &model_frame.factors[0].sample_levels
+    );
+}
+
+#[test]
+fn model_frame_factor_level_contrast_prefers_exact_levels_before_cleaned_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "A.cell".to_string(),
+                "B cell".to_string(),
+                "B.cell".to_string(),
+            ],
+            levels: Some(vec![
+                "A cell".to_string(),
+                "A.cell".to_string(),
+                "B cell".to_string(),
+                "B.cell".to_string(),
+            ]),
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let request = ResultsContrast::character("cell.type", "B.cell", "A.cell");
+    let contrast = factor_level_contrast_from_model_frame(&request, &model_frame)
+        .unwrap()
+        .unwrap();
+    assert_eq!(contrast.numerator, "B.cell");
+    assert_eq!(contrast.denominator, "A.cell");
+    assert_eq!(contrast.reference, Some("A.cell"));
+
+    let cleaned_request = ResultsContrast::character("cell.type", "B.cell.", "A.cell.");
+    assert!(
+        factor_level_contrast_from_model_frame(&cleaned_request, &model_frame)
+            .unwrap_err()
+            .to_string()
+            .contains("does not contain numerator level")
+    );
+}
+
+#[test]
+fn model_frame_factor_level_contrast_resolves_cleaned_reference_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "T cell".to_string(),
+                "B cell".to_string(),
+                "B cell".to_string(),
+                "T cell".to_string(),
+            ],
+            levels: Some(vec![
+                "A cell".to_string(),
+                "T cell".to_string(),
+                "B cell".to_string(),
+            ]),
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let request = ResultsContrast::character("cell.type", "B.cell", "T.cell");
+    let contrast = factor_level_contrast_from_model_frame(&request, &model_frame)
+        .unwrap()
+        .unwrap();
+    assert_eq!(contrast.reference, Some("A cell"));
+
+    let explicit =
+        ResultsContrast::character_with_reference("cell.type", "B.cell", "T.cell", "A.cell");
+    let explicit_contrast = factor_level_contrast_from_model_frame(&explicit, &model_frame)
+        .unwrap()
+        .unwrap();
+    assert_eq!(explicit_contrast.reference, Some("A cell"));
+}
+
+#[test]
+fn model_frame_factor_level_contrast_resolves_cleaned_observed_reference_alias() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "B cell".to_string(),
+                "B cell".to_string(),
+                "A cell".to_string(),
+            ],
+            levels: None,
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    let request = ResultsContrast::character("cell.type", "B.cell", "A.cell");
+    let contrast = factor_level_contrast_from_model_frame(&request, &model_frame)
+        .unwrap()
+        .unwrap();
+    assert_eq!(contrast.factor, "cell type");
+    assert_eq!(contrast.numerator, "B cell");
+    assert_eq!(contrast.denominator, "A cell");
+    assert_eq!(contrast.reference, Some("A cell"));
+}
+
+#[test]
+fn model_frame_factor_level_contrast_rejects_ambiguous_level_aliases() {
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec![
+                "A cell".to_string(),
+                "B cell".to_string(),
+                "B-cell".to_string(),
+                "A cell".to_string(),
+            ],
+            levels: Some(vec![
+                "A cell".to_string(),
+                "B cell".to_string(),
+                "B-cell".to_string(),
+            ]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+
+    assert!(factor_level_contrast_from_model_frame(
+        &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
+        &model_frame,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("ambiguously"));
 }
 
 #[test]
@@ -946,6 +1181,66 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
     .unwrap_err()
     .to_string()
     .contains("ambiguously"));
+
+    let cross_type_duplicate = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: vec!["A".to_string(), "B".to_string()],
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "condition".to_string(),
+            values: vec![0.0, 1.0],
+        }],
+    };
+    assert!(factor_level_contrast_from_model_frame(
+        &ResultsContrast::character("condition", "B", "A"),
+        &cross_type_duplicate,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("cannot be both a factor and numeric covariate"));
+
+    let cross_type_alias = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: vec!["A".to_string(), "B".to_string()],
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "cell-type".to_string(),
+            values: vec![0.0, 1.0],
+        }],
+    };
+    assert!(factor_level_contrast_from_model_frame(
+        &ResultsContrast::character("cell type", "B", "A"),
+        &cross_type_alias,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("resolves ambiguously after R-style cleanup"));
+
+    let bad_numeric_shape = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: vec!["A".to_string(), "B".to_string()],
+            levels: None,
+            reference: None,
+        }],
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "dose".to_string(),
+            values: vec![0.0],
+        }],
+    };
+    assert!(factor_level_contrast_from_model_frame(
+        &ResultsContrast::character("condition", "B", "A"),
+        &bad_numeric_shape,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("formula numeric covariate values"));
 }
 
 #[test]
@@ -976,15 +1271,21 @@ fn factor_level_contrast_resolves_expanded_shapes() {
 fn factor_level_contrast_resolves_formula_factor_transform_names() {
     let design = DesignMatrix::from_row_major(
         4,
-        6,
-        vec![1.0; 24],
+        11,
+        vec![1.0; 44],
         Some(vec![
             "Intercept".into(),
             "factor(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+            "ordered(condition, levels = c(\"B\", \"A\"))_A_vs_B".into(),
+            "relevel(ordered(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
+                .into(),
             "droplevels(condition)_A_vs_B".into(),
             "relevel(droplevels(condition), ref = \"A\")_B_vs_A".into(),
             "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))_treated_vs_control".into(),
+            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))_treated_vs_control".into(),
             "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control group\", \"treated-group\"))_treated-group_vs_control group".into(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control factor(A)\", \"treated factor(B)\"))_treated factor(B)_vs_control factor(A)".into(),
+            "factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control, baseline\", \"treated, response\"))_treated, response_vs_control, baseline".into(),
         ]),
     )
     .unwrap();
@@ -995,7 +1296,27 @@ fn factor_level_contrast_resolves_formula_factor_transform_names() {
             &ContrastSpec::factor_level("factor.condition..levels...c..B....A...", "A", "B")
         )
         .unwrap(),
-        vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+        vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level("ordered.condition..levels...c..B....A...", "A", "B")
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "relevel.ordered.condition..levels...c..C....B....A.....ref....B..",
+                "C",
+                "B",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_contrast(
@@ -1003,7 +1324,7 @@ fn factor_level_contrast_resolves_formula_factor_transform_names() {
             &ContrastSpec::factor_level("droplevels.condition.", "A", "B")
         )
         .unwrap(),
-        vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+        vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_contrast(
@@ -1011,7 +1332,7 @@ fn factor_level_contrast_resolves_formula_factor_transform_names() {
             &ContrastSpec::factor_level("relevel.droplevels.condition...ref....A..", "B", "A")
         )
         .unwrap(),
-        vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_contrast(
@@ -1023,7 +1344,19 @@ fn factor_level_contrast_resolves_formula_factor_transform_names() {
             )
         )
         .unwrap(),
-        vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+                "treated",
+                "control",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
         resolve_contrast(
@@ -1035,7 +1368,31 @@ fn factor_level_contrast_resolves_formula_factor_transform_names() {
             )
         )
         .unwrap(),
-        vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "factor.condition..levels...c..A....B....labels...c..control.factor.A.....treated.factor.B....",
+                "treated factor(B)",
+                "control factor(A)",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    );
+    assert_eq!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::factor_level(
+                "factor.condition..levels...c..A....B....labels...c..control..baseline....treated..response...",
+                "treated, response",
+                "control, baseline",
+            )
+        )
+        .unwrap(),
+        vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     );
 }
 
@@ -1357,6 +1714,45 @@ fn contrast_all_zero_factor_levels_matches_deseq2_character_shape() {
         contrast_all_zero_factor_levels(&counts, &levels, "C", "A").unwrap(),
         vec![false, false, true, false]
     );
+}
+
+#[test]
+fn contrast_all_zero_factor_levels_resolves_cleaned_level_aliases() {
+    let counts = CountMatrix::from_row_major_u32(
+        2,
+        4,
+        vec![
+            0, 0, 5, 6, //
+            0, 3, 0, 0,
+        ],
+    )
+    .unwrap();
+    let levels = vec!["A cell", "A cell", "B-cell", "B-cell"];
+
+    assert_eq!(
+        contrast_all_zero_factor_levels(&counts, &levels, "B.cell", "A.cell").unwrap(),
+        vec![false, false]
+    );
+    assert_eq!(
+        contrast_all_zero_factor_levels(&counts, &levels, "B-cell", "A.cell").unwrap(),
+        vec![false, false]
+    );
+
+    let same_level = contrast_all_zero_factor_levels(&counts, &levels, "A.cell", "A cell")
+        .unwrap_err()
+        .to_string();
+    assert!(same_level.contains("resolve to the same level"));
+}
+
+#[test]
+fn contrast_all_zero_factor_levels_rejects_ambiguous_cleaned_level_aliases() {
+    let counts = CountMatrix::from_row_major_u32(1, 4, vec![0, 0, 0, 0]).unwrap();
+    let levels = vec!["A cell", "A-cell", "B", "B"];
+
+    let err = contrast_all_zero_factor_levels(&counts, &levels, "A.cell", "B")
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("resolves ambiguously"));
 }
 
 #[test]

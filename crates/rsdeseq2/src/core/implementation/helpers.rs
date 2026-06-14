@@ -269,30 +269,64 @@ fn apply_contrast_metadata_to_replacement_output(
     output: &mut CooksReplacementWaldOutput,
     result_name: String,
     comparison: String,
+    contrast: Option<&[f64]>,
 ) {
-    output.original_results.metadata.result_name = Some(result_name.clone());
-    output.original_results.metadata.comparison = Some(comparison.clone());
-    if let Some(refit_results) = &mut output.refit_results {
-        refit_results.metadata.result_name = Some(result_name.clone());
-        refit_results.metadata.comparison = Some(comparison.clone());
+    output.original_results.set_resolved_contrast_metadata(
+        result_name.clone(),
+        comparison.clone(),
+        contrast.unwrap_or(&[]),
+    );
+    if contrast.is_none() {
+        output.original_results.metadata.contrast = None;
     }
-    output.results.metadata.result_name = Some(result_name);
-    output.results.metadata.comparison = Some(comparison);
+    if let Some(refit_results) = &mut output.refit_results {
+        refit_results.set_resolved_contrast_metadata(
+            result_name.clone(),
+            comparison.clone(),
+            contrast.unwrap_or(&[]),
+        );
+        if contrast.is_none() {
+            refit_results.metadata.contrast = None;
+        }
+    }
+    output
+        .results
+        .set_resolved_contrast_metadata(result_name, comparison, contrast.unwrap_or(&[]));
+    if contrast.is_none() {
+        output.results.metadata.contrast = None;
+    }
 }
 
 fn apply_lrt_contrast_metadata_to_replacement_output(
     output: &mut CooksReplacementLrtOutput,
     result_name: String,
     comparison: String,
+    contrast: Option<&[f64]>,
 ) {
-    output.original_results.metadata.result_name = Some(result_name.clone());
-    output.original_results.metadata.comparison = Some(comparison.clone());
-    if let Some(refit_results) = &mut output.refit_results {
-        refit_results.metadata.result_name = Some(result_name.clone());
-        refit_results.metadata.comparison = Some(comparison.clone());
+    output.original_results.set_resolved_contrast_metadata(
+        result_name.clone(),
+        comparison.clone(),
+        contrast.unwrap_or(&[]),
+    );
+    if contrast.is_none() {
+        output.original_results.metadata.contrast = None;
     }
-    output.results.metadata.result_name = Some(result_name);
-    output.results.metadata.comparison = Some(comparison);
+    if let Some(refit_results) = &mut output.refit_results {
+        refit_results.set_resolved_contrast_metadata(
+            result_name.clone(),
+            comparison.clone(),
+            contrast.unwrap_or(&[]),
+        );
+        if contrast.is_none() {
+            refit_results.metadata.contrast = None;
+        }
+    }
+    output
+        .results
+        .set_resolved_contrast_metadata(result_name, comparison, contrast.unwrap_or(&[]));
+    if contrast.is_none() {
+        output.results.metadata.contrast = None;
+    }
 }
 
 fn factor_level_result_metadata(contrast: FactorLevelContrast<'_>) -> (String, String) {

@@ -106,6 +106,8 @@ pub enum ResultsContrast {
 pub enum ResultsContrastAllZero {
     /// Use `contrastAllZeroCharacter`: inspect samples in the two factor levels.
     Character {
+        /// Factor or variable name supplied by the character contrast.
+        factor: String,
         /// Numerator level.
         numerator: String,
         /// Denominator level.
@@ -153,61 +155,129 @@ pub fn factor_level_contrast_from_model_frame<'a>(
         return Ok(None);
     };
     validate_factor_level_contrast(factor, numerator, denominator)?;
+    model_frame.validate()?;
     let column = resolve_model_frame_factor_column(model_frame, factor)?;
     if column.sample_levels.is_empty() {
         return Err(DeseqError::InvalidOptions {
             reason: format!("factor '{factor}' has no sample levels"),
         });
     }
-    if !column.sample_levels.iter().any(|level| level == numerator) {
+    let resolved_numerator =
+        resolve_observed_model_frame_factor_level(column, factor, numerator, "numerator")?;
+    let resolved_denominator =
+        resolve_observed_model_frame_factor_level(column, factor, denominator, "denominator")?;
+    if resolved_numerator == resolved_denominator {
         return Err(DeseqError::InvalidOptions {
-            reason: format!("factor '{factor}' does not contain numerator level '{numerator}'"),
+            reason: format!(
+                "factor '{factor}' numerator and denominator resolve to the same level '{resolved_numerator}'"
+            ),
         });
     }
-    if !column
-        .sample_levels
-        .iter()
-        .any(|level| level == denominator)
-    {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("factor '{factor}' does not contain denominator level '{denominator}'"),
-        });
-    }
-    let inferred_reference = reference
-        .as_deref()
-        .or(column.reference.as_deref())
-        .or_else(|| {
-            column
-                .levels
-                .as_ref()
-                .and_then(|levels| levels.first().map(String::as_str))
-        })
-        .or_else(|| column.sample_levels.first().map(String::as_str));
-    if let Some(reference) = inferred_reference {
-        if !model_frame_factor_level_exists(column, reference) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("factor '{factor}' does not contain reference level '{reference}'"),
-            });
-        }
-    }
+    let inferred_reference = if let Some(reference) = reference.as_deref() {
+        Some(resolve_any_model_frame_factor_level(
+            column,
+            factor,
+            reference,
+            "reference",
+        )?)
+    } else if let Some(reference) = column.reference.as_deref() {
+        Some(resolve_any_model_frame_factor_level(
+            column,
+            factor,
+            reference,
+            "reference",
+        )?)
+    } else {
+        column
+            .levels
+            .as_ref()
+            .and_then(|levels| levels.first().map(String::as_str))
+            .or_else(|| column.sample_levels.first().map(String::as_str))
+    };
     Ok(Some(FactorLevelContrast {
         factor: &column.name,
-        numerator,
-        denominator,
+        numerator: resolved_numerator,
+        denominator: resolved_denominator,
         reference: inferred_reference,
         sample_levels: &column.sample_levels,
     }))
 }
 
-fn model_frame_factor_level_exists(column: &FormulaFactorColumn, level: &str) -> bool {
-    column
-        .levels
-        .as_ref()
-        .is_some_and(|levels| levels.iter().any(|candidate| candidate == level))
-        || column
-            .sample_levels
+fn resolve_observed_model_frame_factor_level<'a>(
+    column: &'a FormulaFactorColumn,
+    factor: &str,
+    requested: &str,
+    role: &str,
+) -> Result<&'a str, DeseqError> {
+    let levels = unique_level_candidates(column.sample_levels.iter().map(String::as_str));
+    resolve_model_frame_factor_level_from_candidates(&levels, factor, requested, role)
+}
+
+fn resolve_any_model_frame_factor_level<'a>(
+    column: &'a FormulaFactorColumn,
+    factor: &str,
+    requested: &str,
+    role: &str,
+) -> Result<&'a str, DeseqError> {
+    let levels = unique_level_candidates(
+        column
+            .levels
             .iter()
-            .any(|candidate| candidate == level)
+            .flatten()
+            .map(String::as_str)
+            .chain(column.sample_levels.iter().map(String::as_str)),
+    );
+    resolve_model_frame_factor_level_from_candidates(&levels, factor, requested, role)
+}
+
+fn unique_level_candidates<'a>(levels: impl Iterator<Item = &'a str>) -> Vec<&'a str> {
+    let mut seen = HashSet::new();
+    levels.filter(|level| seen.insert(*level)).collect()
+}
+
+fn resolve_model_frame_factor_level_from_candidates<'a>(
+    levels: &[&'a str],
+    factor: &str,
+    requested: &str,
+    role: &str,
+) -> Result<&'a str, DeseqError> {
+    let exact = levels
+        .iter()
+        .copied()
+        .filter(|level| *level == requested)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [level] => return Ok(*level),
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "factor '{factor}' {role} level '{requested}' appears more than once"
+                ),
+            });
+        }
+    }
+
+    let matches = levels
+        .iter()
+        .copied()
+        .filter(|level| {
+            candidate_names(level)
+                .into_iter()
+                .any(|candidate| candidate == requested)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [level] => Ok(*level),
+        [] => Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' does not contain {role} level '{requested}'"),
+        }),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "factor '{factor}' {role} level '{requested}' resolves ambiguously after R-style cleanup"
+            ),
+        }),
+    }
 }
 
 fn resolve_model_frame_factor_column<'a>(
@@ -473,10 +543,12 @@ pub fn resolve_results_contrast(
     let numeric = resolve_contrast(design, &spec)?;
     let all_zero = match contrast {
         ResultsContrast::Character {
+            factor,
             numerator,
             denominator,
             ..
         } => ResultsContrastAllZero::Character {
+            factor: factor.clone(),
             numerator: numerator.clone(),
             denominator: denominator.clone(),
         },
@@ -652,6 +724,16 @@ pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
             sample_levels.len(),
         ));
     }
+    let observed_levels = unique_sample_levels(sample_levels);
+    let numerator = resolve_sample_level_alias(&observed_levels, numerator, "numerator")?;
+    let denominator = resolve_sample_level_alias(&observed_levels, denominator, "denominator")?;
+    if numerator == denominator {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "contrastAllZero numerator and denominator resolve to the same level '{numerator}'"
+            ),
+        });
+    }
     let mut numerator_count = 0usize;
     let mut denominator_count = 0usize;
     let selected_samples = sample_levels
@@ -691,6 +773,65 @@ pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
         flags.push(zero_count == selected_count);
     }
     Ok(flags)
+}
+
+fn unique_sample_levels<S: AsRef<str>>(sample_levels: &[S]) -> Vec<&str> {
+    let mut seen = HashSet::new();
+    sample_levels
+        .iter()
+        .filter_map(|level| {
+            let level = level.as_ref();
+            if seen.insert(level) {
+                Some(level)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn resolve_sample_level_alias<'a>(
+    observed_levels: &[&'a str],
+    requested: &str,
+    role: &str,
+) -> Result<&'a str, DeseqError> {
+    let exact = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| *level == requested)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [level] => return Ok(*level),
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "contrastAllZero {role} level '{requested}' appears more than once"
+                ),
+            });
+        }
+    }
+
+    let matches = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| {
+            candidate_names(level)
+                .into_iter()
+                .any(|candidate| candidate == requested)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [level] => Ok(*level),
+        [] => Err(DeseqError::InvalidOptions {
+            reason: format!("contrastAllZero sample levels do not contain {role} level '{requested}'"),
+        }),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "contrastAllZero {role} level '{requested}' resolves ambiguously after R-style cleanup"
+            ),
+        }),
+    }
 }
 
 fn resolve_factor_level_contrast(

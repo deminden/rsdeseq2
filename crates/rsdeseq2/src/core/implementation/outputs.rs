@@ -156,6 +156,14 @@ pub enum CooksReplacementTestOutput {
 }
 
 impl CooksReplacementTestOutput {
+    /// Test type selected for this replacement-refit output.
+    pub fn test_type(&self) -> TestType {
+        match self {
+            Self::Wald(_) => TestType::Wald,
+            Self::Lrt(_) => TestType::Lrt,
+        }
+    }
+
     /// Final merged result rows after replacement/refit.
     pub fn results(&self) -> &DeseqResults {
         match self {
@@ -164,11 +172,35 @@ impl CooksReplacementTestOutput {
         }
     }
 
+    /// Original result rows before replacement/refit.
+    pub fn original_results(&self) -> &DeseqResults {
+        match self {
+            Self::Wald(output) => &output.original_results,
+            Self::Lrt(output) => &output.original_results,
+        }
+    }
+
     /// Original fit before replacement/refit.
     pub fn original_fit(&self) -> &DeseqFit {
         match self {
             Self::Wald(output) => &output.original_fit,
             Self::Lrt(output) => &output.original_fit,
+        }
+    }
+
+    /// Refit on replacement counts, when any non-all-zero replacement row exists.
+    pub fn refit_fit(&self) -> Option<&DeseqFit> {
+        match self {
+            Self::Wald(output) => output.refit_fit.as_ref(),
+            Self::Lrt(output) => output.refit_fit.as_ref(),
+        }
+    }
+
+    /// Result rows from the replacement-count refit, before merge.
+    pub fn refit_results(&self) -> Option<&DeseqResults> {
+        match self {
+            Self::Wald(output) => output.refit_results.as_ref(),
+            Self::Lrt(output) => output.refit_results.as_ref(),
         }
     }
 

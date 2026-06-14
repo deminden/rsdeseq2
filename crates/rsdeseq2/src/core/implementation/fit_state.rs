@@ -257,43 +257,13 @@ impl DeseqFit {
                     self.model_frame
                         .as_ref()
                         .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "character results contrast requires stored formula model-frame metadata or explicit sample levels".to_string(),
+                            reason: "character results contrast requires stored formula model-frame metadata; use wald_results_factor_level_contrast when supplying explicit sample levels".to_string(),
                         })?;
                 let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
                     .ok_or_else(|| DeseqError::InvalidOptions {
                         reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
                     })?;
-                let contrast_spec = factor_level_contrast_spec(factor_contrast);
-                let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
-                let contrast_all_zero = contrast_all_zero_factor_levels(
-                    counts,
-                    factor_contrast.sample_levels,
-                    factor_contrast.numerator,
-                    factor_contrast.denominator,
-                )?;
-                let mut output = wald_test_contrast_with_options(
-                    &fit,
-                    &numeric,
-                    &WaldTestOptions::default(),
-                )?;
-                apply_contrast_all_zero_to_wald_contrast(
-                    &mut output,
-                    &contrast_all_zero,
-                    &self.all_zero,
-                )?;
-                let mut results = build_wald_contrast_results(
-                    &self.base_mean,
-                    &fit,
-                    &output,
-                    gene_names,
-                    self.dispersion.as_deref(),
-                )?;
-                results.apply_wald_test_options(&WaldTestOptions::default());
-                self.attach_fit_diagnostics_to_results(&mut results)?;
-                let (result_name, comparison) = factor_level_result_metadata(factor_contrast);
-                results.metadata.result_name = Some(result_name);
-                results.metadata.comparison = Some(comparison);
-                return Ok(results);
+                return self.wald_results_factor_level_contrast(counts, factor_contrast, gene_names);
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
                 contrast.as_contrast_spec()
@@ -317,8 +287,54 @@ impl DeseqFit {
         )?;
         results.apply_wald_test_options(&WaldTestOptions::default());
         self.attach_fit_diagnostics_to_results(&mut results)?;
-        results.metadata.result_name = Some(numeric_contrast.result_name());
-        results.metadata.comparison = Some(numeric_contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            numeric_contrast.result_name(),
+            numeric_contrast.comparison(),
+            &numeric,
+        );
+        Ok(results)
+    }
+
+    /// Assemble Wald `results(contrast=...)` rows for an explicit factor-level contrast.
+    ///
+    /// This is the fitted-object route for callers that already know the
+    /// per-sample factor levels. Formula-built fits can instead use
+    /// [`DeseqFit::wald_results_contrast_request`] with stored model-frame
+    /// metadata.
+    pub fn wald_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        contrast: FactorLevelContrast<'_>,
+        gene_names: Option<&[String]>,
+    ) -> Result<DeseqResults, DeseqError> {
+        validate_fit_counts_shape(self, counts, "Wald factor-level results contrast")?;
+        let fit = self.as_nbinom_glm_fit()?;
+        let contrast_spec = factor_level_contrast_spec(contrast);
+        let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let mut output =
+            wald_test_contrast_with_options(&fit, &numeric, &WaldTestOptions::default())?;
+        apply_contrast_all_zero_to_wald_contrast(
+            &mut output,
+            &contrast_all_zero,
+            &self.all_zero,
+        )?;
+        let mut results = build_wald_contrast_results(
+            &self.base_mean,
+            &fit,
+            &output,
+            gene_names,
+            self.dispersion.as_deref(),
+        )?;
+        results.apply_wald_test_options(&WaldTestOptions::default());
+        self.attach_fit_diagnostics_to_results(&mut results)?;
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric);
         Ok(results)
     }
 
@@ -343,43 +359,13 @@ impl DeseqFit {
                     self.model_frame
                         .as_ref()
                         .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "character results contrast requires stored formula model-frame metadata or explicit sample levels".to_string(),
+                            reason: "character results contrast requires stored formula model-frame metadata; use lrt_results_factor_level_contrast when supplying explicit sample levels".to_string(),
                         })?;
                 let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
                     .ok_or_else(|| DeseqError::InvalidOptions {
                         reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
                     })?;
-                let contrast_spec = factor_level_contrast_spec(factor_contrast);
-                let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
-                let contrast_all_zero = contrast_all_zero_factor_levels(
-                    counts,
-                    factor_contrast.sample_levels,
-                    factor_contrast.numerator,
-                    factor_contrast.denominator,
-                )?;
-                let output = wald_test_contrast_with_options(
-                    &fit,
-                    &numeric,
-                    &WaldTestOptions::default(),
-                )?;
-                let mut results = build_lrt_contrast_results(
-                    &self.base_mean,
-                    &fit,
-                    lrt,
-                    &output,
-                    gene_names,
-                    self.dispersion.as_deref(),
-                )?;
-                self.attach_fit_diagnostics_to_results(&mut results)?;
-                apply_contrast_all_zero_to_lrt_results(
-                    &mut results,
-                    &contrast_all_zero,
-                    &self.all_zero,
-                )?;
-                let (result_name, comparison) = factor_level_result_metadata(factor_contrast);
-                results.metadata.result_name = Some(result_name);
-                results.metadata.comparison = Some(comparison);
-                return Ok(results);
+                return self.lrt_results_factor_level_contrast(counts, factor_contrast, gene_names);
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
                 contrast.as_contrast_spec()
@@ -398,8 +384,51 @@ impl DeseqFit {
         self.attach_fit_diagnostics_to_results(&mut results)?;
         let contrast_all_zero = contrast_all_zero_numeric(counts, &fit.model_matrix, &numeric)?;
         apply_contrast_all_zero_to_lrt_results(&mut results, &contrast_all_zero, &self.all_zero)?;
-        results.metadata.result_name = Some(numeric_contrast.result_name());
-        results.metadata.comparison = Some(numeric_contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            numeric_contrast.result_name(),
+            numeric_contrast.comparison(),
+            &numeric,
+        );
+        Ok(results)
+    }
+
+    /// Assemble LRT `results(contrast=...)` rows for an explicit factor-level contrast.
+    ///
+    /// The stored full-vs-reduced LRT supplies the statistic and p-value; the
+    /// explicit factor contrast supplies reported effect-size columns and
+    /// character-contrast all-zero handling.
+    pub fn lrt_results_factor_level_contrast(
+        &self,
+        counts: &CountMatrix,
+        contrast: FactorLevelContrast<'_>,
+        gene_names: Option<&[String]>,
+    ) -> Result<DeseqResults, DeseqError> {
+        validate_fit_counts_shape(self, counts, "LRT factor-level results contrast")?;
+        let fit = self.as_nbinom_glm_fit()?;
+        let lrt = self.lrt.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "stored LRT output is required for LRT contrast results".to_string(),
+        })?;
+        let contrast_spec = factor_level_contrast_spec(contrast);
+        let numeric = resolve_contrast(&fit.model_matrix, &contrast_spec)?;
+        let contrast_all_zero = contrast_all_zero_factor_levels(
+            counts,
+            contrast.sample_levels,
+            contrast.numerator,
+            contrast.denominator,
+        )?;
+        let output = wald_test_contrast_with_options(&fit, &numeric, &WaldTestOptions::default())?;
+        let mut results = build_lrt_contrast_results(
+            &self.base_mean,
+            &fit,
+            lrt,
+            &output,
+            gene_names,
+            self.dispersion.as_deref(),
+        )?;
+        self.attach_fit_diagnostics_to_results(&mut results)?;
+        apply_contrast_all_zero_to_lrt_results(&mut results, &contrast_all_zero, &self.all_zero)?;
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric);
         Ok(results)
     }
 

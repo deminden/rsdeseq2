@@ -531,7 +531,10 @@ fn top_level_formula_fit_state_retains_model_frame_metadata() {
             levels: Some(vec!["T cell".to_string(), "B cell".to_string()]),
             reference: Some("T cell".to_string()),
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "dose value".to_string(),
+            values: vec![0.5, 1.5, 0.25, 1.25, 0.75, 1.75, 0.4, 1.4],
+        }],
     };
     let builder = glm_mu_native_wald_builder()
         .disable_independent_filtering()
@@ -594,6 +597,14 @@ fn top_level_formula_fit_state_retains_model_frame_metadata() {
             transformed_coefficient,
         )
         .unwrap();
+    let replacement_transformed = builder
+        .fit_formula_with_results_name_with_cooks_replacement(
+            &counts,
+            "~ relevel(`cell type`, ref='B cell')",
+            "relevel.cell.type..ref....B.cell.._T.cell_vs_B.cell",
+            &options,
+        )
+        .unwrap();
 
     assert_eq!(
         named_transformed.current_model_frame(),
@@ -602,6 +613,80 @@ fn top_level_formula_fit_state_retains_model_frame_metadata() {
     assert_eq!(
         fit_only_transformed.current_model_frame(),
         transformed.current_model_frame()
+    );
+    assert_eq!(
+        replacement_transformed.original_fit.current_model_frame(),
+        transformed.current_model_frame()
+    );
+
+    let numeric_formula = "~ `cell type` + as.numeric(`dose value`)";
+    let (numeric_fit, _numeric_results) = builder
+        .fit_formula_with_results_name(&counts, numeric_formula, "dose value_as.numeric")
+        .expect("formula with derived numeric metadata should fit");
+    let numeric_frame = numeric_fit.current_model_frame().unwrap();
+    assert_eq!(
+        numeric_frame
+            .numeric_covariates
+            .iter()
+            .map(|covariate| covariate.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["dose value", "dose value_as.numeric"]
+    );
+    assert_eq!(
+        numeric_frame
+            .resolved_numeric_covariate_by_alias("dose.value_as.numeric")
+            .unwrap()
+            .unwrap(),
+        ResolvedFormulaNumericCovariate {
+            name: "dose value_as.numeric",
+            values: &[0.5, 1.5, 0.25, 1.25, 0.75, 1.75, 0.4, 1.4],
+        }
+    );
+
+    let factor_code_formula = "~ as.double(`cell type`)";
+    let (factor_code_fit, _factor_code_results) = builder
+        .clone()
+        .fit_formula_with_results_name(&counts, factor_code_formula, "cell type_as.double")
+        .expect("formula with factor-code numeric metadata should fit");
+    let factor_code_replacement = builder
+        .fit_formula_with_results_name_with_cooks_replacement(
+            &counts,
+            factor_code_formula,
+            "cell.type_as.double",
+            &options,
+        )
+        .expect("factor-code formula replacement should resolve cleaned coefficient alias");
+    let factor_code_frame = factor_code_fit.current_model_frame().unwrap();
+    assert_eq!(
+        factor_code_frame
+            .numeric_covariates
+            .iter()
+            .map(|covariate| covariate.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["dose value", "cell type_as.double"]
+    );
+    assert_eq!(
+        factor_code_frame
+            .resolved_numeric_covariate_by_alias("cell.type_as.double")
+            .unwrap()
+            .unwrap(),
+        ResolvedFormulaNumericCovariate {
+            name: "cell type_as.double",
+            values: &[1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0],
+        }
+    );
+    assert_eq!(factor_code_replacement.refit_plan.n_refit, 0);
+    assert_eq!(
+        factor_code_replacement.original_fit.current_model_frame(),
+        factor_code_fit.current_model_frame()
+    );
+    assert_eq!(
+        factor_code_replacement
+            .results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some("cell type_as.double")
     );
 }
 
@@ -656,6 +741,74 @@ fn top_level_formula_list_contrast_accepts_r_cleaned_quoted_coefficient_alias() 
     assert_eq!(
         raw_results.metadata.comparison.as_deref(),
         Some("coefficient list contrast: cell type_B cell_vs_T cell effect")
+    );
+}
+
+#[test]
+fn top_level_formula_list_contrast_accepts_cleaned_positive_and_negative_aliases() {
+    let counts = native_wald_counts_with_zero_row();
+    let levels = [
+        "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "NK cell", "NK cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels,
+            levels: Some(vec![
+                "T cell".to_string(),
+                "B cell".to_string(),
+                "NK cell".to_string(),
+            ]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = glm_mu_native_wald_builder()
+        .disable_independent_filtering()
+        .model_frame(model_frame);
+
+    let (cleaned_fit, cleaned_results) = builder
+        .clone()
+        .fit_formula_with_results_contrast_request(
+            &counts,
+            "~ `cell type`",
+            &ResultsContrast::list(
+                vec!["cell.type_NK.cell_vs_T.cell".into()],
+                vec!["cell.type_B.cell_vs_T.cell".into()],
+            ),
+        )
+        .unwrap();
+    let (raw_fit, raw_results) = builder
+        .fit_formula_with_results_contrast_request(
+            &counts,
+            "~ `cell type`",
+            &ResultsContrast::list(
+                vec!["cell type_NK cell_vs_T cell".into()],
+                vec!["cell type_B cell_vs_T cell".into()],
+            ),
+        )
+        .unwrap();
+
+    assert_wald_fit_state_matches(
+        &cleaned_fit,
+        &raw_fit,
+        "three-level formula R-cleaned list Wald",
+    );
+    assert_eq!(cleaned_results.rows, raw_results.rows);
+    assert_eq!(
+        cleaned_results.metadata.comparison.as_deref(),
+        Some(
+            "coefficient list contrast: cell.type_NK.cell_vs_T.cell vs cell.type_B.cell_vs_T.cell"
+        )
+    );
+    assert_eq!(
+        raw_results.metadata.comparison.as_deref(),
+        Some(
+            "coefficient list contrast: cell type_NK cell_vs_T cell vs cell type_B cell_vs_T cell"
+        )
     );
 }
 
@@ -760,6 +913,26 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
         Some("factor.condition..levels...c..B....A..._A_vs_B")
     );
 
+    let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
+    let ordered_contrast =
+        ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
+    let (ordered_fit, mut expected_ordered_results) = transformed_builder
+        .fit_formula_with_results_contrast_request(&counts, ordered_formula, &ordered_contrast)
+        .unwrap();
+    expected_ordered_results.independent_filtering = None;
+    let object_ordered_results = ordered_fit
+        .results_contrast_request(&counts, &ordered_contrast, counts.gene_names())
+        .unwrap();
+    assert_eq!(object_ordered_results, expected_ordered_results);
+    assert_eq!(
+        object_ordered_results.metadata.result_name.as_deref(),
+        Some("ordered.condition..levels...c..B....A..._A_vs_B")
+    );
+    assert_eq!(
+        object_ordered_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
+    );
+
     let relabeled_builder = glm_mu_native_wald_builder()
         .disable_independent_filtering()
         .model_frame(FormulaModelFrame {
@@ -804,6 +977,47 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
         object_relabeled_results.metadata.comparison.as_deref(),
         Some(
             "factor-level contrast: factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
+        )
+    );
+
+    let ordered_relabeled_formula =
+        "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))";
+    let ordered_relabeled_contrast = ResultsContrast::character(
+        "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+        "treated",
+        "control",
+    );
+    let (ordered_relabeled_fit, mut expected_ordered_relabeled_results) = relabeled_builder
+        .fit_formula_with_results_contrast_request(
+            &counts,
+            ordered_relabeled_formula,
+            &ordered_relabeled_contrast,
+        )
+        .unwrap();
+    expected_ordered_relabeled_results.independent_filtering = None;
+    let object_ordered_relabeled_results = ordered_relabeled_fit
+        .results_contrast_request(&counts, &ordered_relabeled_contrast, counts.gene_names())
+        .unwrap();
+    assert_eq!(
+        object_ordered_relabeled_results,
+        expected_ordered_relabeled_results
+    );
+    assert_eq!(
+        object_ordered_relabeled_results
+            .metadata
+            .result_name
+            .as_deref(),
+        Some(
+            "ordered.condition..levels...c..A....B....labels...c..control....treated..._treated_vs_control"
+        )
+    );
+    assert_eq!(
+        object_ordered_relabeled_results
+            .metadata
+            .comparison
+            .as_deref(),
+        Some(
+            "factor-level contrast: ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
         )
     );
 }
@@ -983,6 +1197,213 @@ fn top_level_formula_list_contrast_cooks_replacement_accepts_r_cleaned_quoted_co
 }
 
 #[test]
+fn top_level_formula_list_contrast_cooks_replacement_accepts_cleaned_numeric_transform_alias() {
+    let counts = native_wald_counts_with_zero_row();
+    let levels = [
+        "T cell", "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "B cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["T cell".to_string(), "B cell".to_string()]),
+            reference: Some("T cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = glm_mu_native_wald_builder()
+        .disable_independent_filtering()
+        .model_frame(model_frame);
+    let options = CooksReplacementOptions::new(f64::MAX);
+
+    let cleaned_output = builder
+        .clone()
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ as.double(`cell type`)",
+            &ResultsContrast::list(vec!["cell.type_as.double".into()], Vec::new()),
+            &options,
+        )
+        .unwrap();
+    let raw_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ as.double(`cell type`)",
+            &ResultsContrast::list(vec!["cell type_as.double".into()], Vec::new()),
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Wald(cleaned_output) = cleaned_output else {
+        panic!("formula numeric-transform list replacement should route to Wald");
+    };
+    let CooksReplacementTestOutput::Wald(raw_output) = raw_output else {
+        panic!("formula numeric-transform list replacement should route to Wald");
+    };
+    assert_wald_fit_state_matches(
+        &cleaned_output.original_fit,
+        &raw_output.original_fit,
+        "numeric-transform formula R-cleaned list replacement Wald original",
+    );
+    assert_eq!(cleaned_output.refit_plan, raw_output.refit_plan);
+    assert_eq!(cleaned_output.results.rows, raw_output.results.rows);
+    assert_eq!(
+        cleaned_output
+            .original_fit
+            .current_model_frame()
+            .unwrap()
+            .resolved_numeric_covariate_by_alias("cell.type_as.double")
+            .unwrap()
+            .unwrap()
+            .name,
+        "cell type_as.double"
+    );
+    assert_eq!(
+        cleaned_output.results.metadata.comparison.as_deref(),
+        Some("coefficient list contrast: cell.type_as.double effect")
+    );
+    assert_eq!(
+        raw_output.results.metadata.comparison.as_deref(),
+        Some("coefficient list contrast: cell type_as.double effect")
+    );
+}
+
+#[test]
+fn top_level_formula_numeric_contrast_cooks_replacement_retains_numeric_transform_metadata() {
+    let counts = native_wald_counts_with_zero_row();
+    let levels = [
+        "T cell", "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "B cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["T cell".to_string(), "B cell".to_string()]),
+            reference: Some("T cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = glm_mu_native_wald_builder()
+        .disable_independent_filtering()
+        .model_frame(model_frame);
+    let options = CooksReplacementOptions::new(f64::MAX);
+
+    let numeric_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ as.double(`cell type`)",
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Wald(numeric_output) = numeric_output else {
+        panic!("formula numeric-transform numeric replacement should route to Wald");
+    };
+    assert_eq!(numeric_output.refit_plan.n_refit, 0);
+    assert_eq!(
+        numeric_output
+            .original_fit
+            .current_model_frame()
+            .unwrap()
+            .resolved_numeric_covariate_by_alias("cell.type_as.double")
+            .unwrap()
+            .unwrap()
+            .name,
+        "cell type_as.double"
+    );
+    assert_eq!(
+        numeric_output.results.metadata.comparison.as_deref(),
+        Some("primitive numeric contrast")
+    );
+}
+
+#[test]
+fn top_level_formula_list_contrast_cooks_replacement_accepts_cleaned_positive_and_negative_aliases()
+{
+    let counts = native_wald_counts_with_zero_row();
+    let levels = [
+        "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "NK cell", "NK cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels,
+            levels: Some(vec![
+                "T cell".to_string(),
+                "B cell".to_string(),
+                "NK cell".to_string(),
+            ]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = glm_mu_native_wald_builder()
+        .disable_independent_filtering()
+        .model_frame(model_frame);
+    let options = CooksReplacementOptions::new(f64::MAX);
+
+    let cleaned_output = builder
+        .clone()
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ `cell type`",
+            &ResultsContrast::list(
+                vec!["cell.type_NK.cell_vs_T.cell".into()],
+                vec!["cell.type_B.cell_vs_T.cell".into()],
+            ),
+            &options,
+        )
+        .unwrap();
+    let raw_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ `cell type`",
+            &ResultsContrast::list(
+                vec!["cell type_NK cell_vs_T cell".into()],
+                vec!["cell type_B cell_vs_T cell".into()],
+            ),
+            &options,
+        )
+        .unwrap();
+
+    let CooksReplacementTestOutput::Wald(cleaned_output) = cleaned_output else {
+        panic!("formula list contrast replacement should route to Wald");
+    };
+    let CooksReplacementTestOutput::Wald(raw_output) = raw_output else {
+        panic!("formula list contrast replacement should route to Wald");
+    };
+    assert_wald_fit_state_matches(
+        &cleaned_output.original_fit,
+        &raw_output.original_fit,
+        "three-level formula R-cleaned list replacement Wald original",
+    );
+    assert_eq!(cleaned_output.refit_plan, raw_output.refit_plan);
+    assert_eq!(cleaned_output.results.rows, raw_output.results.rows);
+    assert_eq!(
+        cleaned_output.results.metadata.comparison.as_deref(),
+        Some(
+            "coefficient list contrast: cell.type_NK.cell_vs_T.cell vs cell.type_B.cell_vs_T.cell"
+        )
+    );
+    assert_eq!(
+        raw_output.results.metadata.comparison.as_deref(),
+        Some(
+            "coefficient list contrast: cell type_NK cell_vs_T cell vs cell type_B cell_vs_T cell"
+        )
+    );
+}
+
+#[test]
 fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
@@ -997,7 +1418,10 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
             levels: None,
             reference: None,
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "exposure".to_string(),
+            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        }],
     };
     let builder = glm_mu_native_wald_builder().model_frame(model_frame);
     let replacement_options = CooksReplacementOptions {
@@ -1027,12 +1451,70 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_glm_mu_wald() {
             &replacement_options,
         )
         .unwrap();
+    let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
+        .values
+        .to_vec();
+    let mut normalization_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for _gene in 0..counts.n_genes() {
+        for offset in &offset_values {
+            normalization_values.push(offset.exp());
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
+            .unwrap();
+    let explicit_offset_output = builder
+        .clone()
+        .normalization_factors(normalization_factors.clone())
+        .fit_formula_with_results_with_cooks_replacement(
+            &counts,
+            "~ condition",
+            &replacement_options,
+        )
+        .unwrap();
+    let formula_offset_output = builder
+        .fit_formula_with_results_with_cooks_replacement(
+            &counts,
+            "~ condition + offset(exposure)",
+            &replacement_options,
+        )
+        .unwrap();
 
     assert_eq!(top_level_output.refit_plan, wald_output.refit_plan);
     assert_eq!(formula_output.refit_plan, wald_output.refit_plan);
     assert_eq!(
         transformed_formula_output.refit_plan,
         wald_output.refit_plan
+    );
+    assert_eq!(
+        formula_offset_output.refit_plan,
+        explicit_offset_output.refit_plan
+    );
+    assert_eq!(
+        formula_offset_output.original_fit.normalization_factors,
+        Some(normalization_factors.clone())
+    );
+    assert_wald_fit_state_matches(
+        &formula_offset_output.original_fit,
+        &explicit_offset_output.original_fit,
+        "formula top-level Wald replacement offset original",
+    );
+    assert_eq!(
+        formula_offset_output.original_results,
+        explicit_offset_output.original_results
+    );
+    assert_eq!(
+        formula_offset_output.refit_results,
+        explicit_offset_output.refit_results
+    );
+    assert_wald_fit_state_matches(
+        formula_offset_output.refit_fit.as_ref().unwrap(),
+        explicit_offset_output.refit_fit.as_ref().unwrap(),
+        "formula top-level Wald replacement offset refit",
+    );
+    assert_eq!(
+        formula_offset_output.results,
+        explicit_offset_output.results
     );
     assert_eq!(
         top_level_output.original_results,
@@ -1456,6 +1938,398 @@ fn native_formula_wald_default_uses_stored_formula_low_count_cooks_gate() {
 }
 
 #[test]
+fn native_formula_wald_default_uses_cleaned_stored_reference_for_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        3,
+        6,
+        vec![
+            1, 20, 21, 20, 20, 20, //
+            10, 11, 12, 15, 16, 17, //
+            30, 32, 31, 50, 52, 51,
+        ],
+        Some(vec!["low_count".into(), "stable".into(), "up".into()]),
+        None,
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "cell type_B cell_vs_A cell".into(),
+        ]),
+    )
+    .unwrap();
+    let levels = ["A cell", "A cell", "A cell", "B cell", "B cell", "B cell"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "cell type".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["A cell".to_string(), "B cell".to_string()]),
+            reference: Some("A.cell".to_string()),
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+
+    let (_generic_fit, generic_results) = builder
+        .clone()
+        .fit_wald_glm_mu(&counts, &design, 1)
+        .unwrap();
+    let generic_replacement = builder
+        .clone()
+        .fit_with_results_with_cooks_replacement(
+            &counts,
+            &design,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+    let (_formula_fit, formula_results) = builder
+        .clone()
+        .model_frame(model_frame.clone())
+        .fit_formula_with_results(&counts, "~ `cell type`")
+        .unwrap();
+    let formula_replacement = builder
+        .model_frame(model_frame)
+        .fit_formula_with_results_with_cooks_replacement(
+            &counts,
+            "~ `cell type`",
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+
+    assert_eq!(formula_results.rows[0].gene.as_deref(), Some("low_count"));
+    assert!(formula_results.rows[0].max_cooks.unwrap() > 0.0);
+    assert_eq!(generic_results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(generic_results.rows[0].pvalue, None);
+    assert_eq!(formula_results.rows[0].cooks_outlier, Some(false));
+    assert!(formula_results.rows[0].pvalue.is_some());
+    assert_eq!(
+        generic_replacement.results.rows[0].cooks_outlier,
+        Some(true)
+    );
+    assert_eq!(generic_replacement.results.rows[0].pvalue, None);
+    assert_eq!(
+        formula_replacement.results.rows[0].cooks_outlier,
+        Some(false)
+    );
+    assert!(formula_replacement.results.rows[0].pvalue.is_some());
+}
+
+#[test]
+fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        3,
+        6,
+        vec![
+            1, 20, 21, 20, 20, 20, //
+            10, 11, 12, 15, 16, 17, //
+            30, 32, 31, 50, 52, 51,
+        ],
+        Some(vec!["low_count".into(), "stable".into(), "up".into()]),
+        None,
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 0.0, //
+            1.0, 1.0, //
+            1.0, 1.0, //
+            1.0, 1.0,
+        ],
+        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
+    )
+    .unwrap();
+    let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    let levels = ["A", "A", "A", "B", "B", "B"]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+    let model_frame = FormulaModelFrame {
+        factors: vec![FormulaFactorColumn {
+            name: "condition".to_string(),
+            sample_levels: levels,
+            levels: Some(vec!["A".to_string(), "B".to_string()]),
+            reference: None,
+        }],
+        numeric_covariates: Vec::new(),
+    };
+    let replacement_options = CooksReplacementOptions::new(f64::MAX);
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+    let contrast = ContrastSpec::coefficient_name("condition_B_vs_A");
+
+    let generic_wald = builder
+        .clone()
+        .fit_with_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+    let formula_wald = builder
+        .clone()
+        .model_frame(model_frame.clone())
+        .fit_with_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(
+        generic_wald.results.rows[0].gene.as_deref(),
+        Some("low_count")
+    );
+    assert_eq!(generic_wald.results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(formula_wald.results.rows[0].cooks_outlier, Some(false));
+    assert!(formula_wald.results.rows[0].pvalue.is_some());
+
+    let generic_reverse_wald = builder
+        .clone()
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, -1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    let formula_reverse_wald = builder
+        .clone()
+        .model_frame(model_frame.clone())
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, -1.0],
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(
+        generic_reverse_wald.results.rows[0].gene.as_deref(),
+        Some("low_count")
+    );
+    assert_eq!(
+        generic_reverse_wald.results.rows[0].cooks_outlier,
+        Some(true)
+    );
+    assert_eq!(
+        formula_reverse_wald.results.rows[0].cooks_outlier,
+        Some(false)
+    );
+    assert!(formula_reverse_wald.results.rows[0].pvalue.is_some());
+
+    let generic_lrt = builder
+        .clone()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone())
+        .fit_with_test_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+    let formula_lrt = builder
+        .clone()
+        .model_frame(model_frame.clone())
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone())
+        .fit_with_test_results_contrast_spec_with_cooks_replacement(
+            &counts,
+            &design,
+            &contrast,
+            &replacement_options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Lrt(generic_lrt) = generic_lrt else {
+        panic!("named contrast should route to LRT");
+    };
+    let CooksReplacementTestOutput::Lrt(formula_lrt) = formula_lrt else {
+        panic!("named contrast should route to LRT");
+    };
+
+    assert_eq!(
+        generic_lrt.results.rows[0].gene.as_deref(),
+        Some("low_count")
+    );
+    assert_eq!(generic_lrt.results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(formula_lrt.results.rows[0].cooks_outlier, Some(false));
+    assert!(formula_lrt.results.rows[0].pvalue.is_some());
+
+    let generic_reverse_lrt = builder
+        .clone()
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design.clone())
+        .fit_with_test_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, -1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    let formula_reverse_lrt = builder
+        .model_frame(model_frame)
+        .test(TestType::Lrt)
+        .reduced_design(reduced_design)
+        .fit_with_test_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, -1.0],
+            &replacement_options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Lrt(generic_reverse_lrt) = generic_reverse_lrt else {
+        panic!("reverse numeric contrast should route to LRT");
+    };
+    let CooksReplacementTestOutput::Lrt(formula_reverse_lrt) = formula_reverse_lrt else {
+        panic!("reverse numeric contrast should route to LRT");
+    };
+
+    assert_eq!(
+        generic_reverse_lrt.results.rows[0].gene.as_deref(),
+        Some("low_count")
+    );
+    assert_eq!(
+        generic_reverse_lrt.results.rows[0].cooks_outlier,
+        Some(true)
+    );
+    assert_eq!(
+        formula_reverse_lrt.results.rows[0].cooks_outlier,
+        Some(false)
+    );
+    assert!(formula_reverse_lrt.results.rows[0].pvalue.is_some());
+}
+
+#[test]
+fn native_replacement_numeric_contrasts_do_not_infer_low_count_gate_from_multifactor_frame() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        3,
+        6,
+        vec![
+            1, 20, 21, 20, 20, 20, //
+            10, 11, 12, 15, 16, 17, //
+            30, 32, 31, 50, 52, 51,
+        ],
+        Some(vec!["low_count".into(), "stable".into(), "up".into()]),
+        None,
+    )
+    .unwrap();
+    let design = DesignMatrix::from_row_major(
+        6,
+        3,
+        vec![
+            1.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, //
+            1.0, 0.0, 0.0, //
+            1.0, 1.0, 1.0, //
+            1.0, 1.0, 0.0, //
+            1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "condition_B_vs_A".into(),
+            "batch_Y_vs_X".into(),
+        ]),
+    )
+    .unwrap();
+    let model_frame = FormulaModelFrame {
+        factors: vec![
+            FormulaFactorColumn {
+                name: "condition".to_string(),
+                sample_levels: ["A", "A", "A", "B", "B", "B"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+                levels: Some(vec!["A".to_string(), "B".to_string()]),
+                reference: None,
+            },
+            FormulaFactorColumn {
+                name: "batch".to_string(),
+                sample_levels: ["X", "Y", "X", "Y", "X", "Y"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+                levels: Some(vec!["X".to_string(), "Y".to_string()]),
+                reference: None,
+            },
+        ],
+        numeric_covariates: Vec::new(),
+    };
+    let replacement_options = CooksReplacementOptions::new(f64::MAX);
+    let builder = DeseqBuilder::new()
+        .fit_type(FitType::Mean)
+        .size_factors(vec![1.0; 6])
+        .gene_wise_dispersion_options(GeneWiseDispersionOptions {
+            use_cox_reid: false,
+            fit_method: GeneWiseDispersionFitMethod::Grid,
+            niter: 2,
+            ..GeneWiseDispersionOptions::default()
+        })
+        .cooks_cutoff_threshold(0.0)
+        .disable_independent_filtering();
+
+    let generic = builder
+        .clone()
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, 1.0, 0.0],
+            &replacement_options,
+        )
+        .unwrap();
+    let formula = builder
+        .model_frame(model_frame)
+        .fit_with_results_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            &[0.0, 1.0, 0.0],
+            &replacement_options,
+        )
+        .unwrap();
+
+    assert_eq!(generic.results.rows[0].gene.as_deref(), Some("low_count"));
+    assert_eq!(formula.results.rows, generic.results.rows);
+    assert_eq!(formula.results.metadata, generic.results.metadata);
+}
+
+#[test]
 fn top_level_fit_contrast_specs_return_default_glm_mu_wald_fits() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
@@ -1543,10 +2417,7 @@ fn top_level_fit_with_results_contrast_spec_cooks_replacement_preserves_metadata
             levels: None,
             reference: None,
         }],
-        numeric_covariates: vec![FormulaNumericColumn {
-            name: "exposure".to_string(),
-            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
-        }],
+        numeric_covariates: Vec::new(),
     };
     let model_frame_request_output = builder
         .fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(
@@ -1920,6 +2791,20 @@ fn top_level_test_output_routes_lrt_cooks_replacement_with_stored_reduced_design
         )
         .unwrap();
 
+    assert_eq!(top_level.test_type(), TestType::Lrt);
+    assert_eq!(top_level.results(), &expected.results);
+    assert_eq!(top_level.original_results(), &expected.original_results);
+    assert_eq!(top_level.refit_plan(), &expected.refit_plan);
+    assert_eq!(
+        top_level.original_fit().current_model_frame(),
+        expected.original_fit.current_model_frame()
+    );
+    assert_eq!(
+        top_level.refit_fit().is_some(),
+        expected.refit_fit.is_some()
+    );
+    assert_eq!(top_level.refit_results(), expected.refit_results.as_ref());
+
     let CooksReplacementTestOutput::Lrt(output) = top_level else {
         panic!("top-level test output should route to LRT");
     };
@@ -2078,7 +2963,10 @@ fn top_level_test_output_routes_lrt_cooks_replacement_contrasts() {
             levels: None,
             reference: None,
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "exposure".to_string(),
+            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        }],
     };
     let model_frame_request = builder
         .fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(
@@ -2186,6 +3074,46 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         Some("factor-level contrast: factor(condition, levels = c(\"B\", \"A\")) A vs B")
     );
 
+    let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
+    let ordered_contrast =
+        ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
+    let (ordered_fit, mut ordered_results) = builder
+        .fit_lrt_formula_with_results_contrast_request(
+            &counts,
+            ordered_formula,
+            reduced,
+            &ordered_contrast,
+        )
+        .unwrap();
+    ordered_results.independent_filtering = None;
+    let ordered_object_results = ordered_fit
+        .results_contrast_request(&counts, &ordered_contrast, counts.gene_names())
+        .unwrap();
+    let ordered_replacement = builder
+        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
+            &counts,
+            ordered_formula,
+            reduced,
+            &ordered_contrast,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+    assert_eq!(ordered_replacement.refit_plan.n_refit, 0);
+    assert_eq!(ordered_replacement.results.rows, ordered_results.rows);
+    assert_eq!(
+        ordered_replacement.results.metadata,
+        ordered_results.metadata
+    );
+    assert_eq!(ordered_object_results, ordered_results);
+    assert_eq!(
+        ordered_results.metadata.result_name.as_deref(),
+        Some("ordered.condition..levels...c..B....A..._A_vs_B")
+    );
+    assert_eq!(
+        ordered_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
+    );
+
     let relabeled_formula = "~ factor(condition, levels=c('A','B'), labels=c('control','treated'))";
     let relabeled_contrast = ResultsContrast::character(
         "factor.condition..levels...c..A....B....labels...c..control....treated...",
@@ -2227,6 +3155,53 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         relabeled_results.metadata.comparison.as_deref(),
         Some(
             "factor-level contrast: factor(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
+        )
+    );
+
+    let ordered_relabeled_formula =
+        "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))";
+    let ordered_relabeled_contrast = ResultsContrast::character(
+        "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+        "treated",
+        "control",
+    );
+    let (ordered_relabeled_fit, mut ordered_relabeled_results) = builder
+        .fit_lrt_formula_with_results_contrast_request(
+            &counts,
+            ordered_relabeled_formula,
+            reduced,
+            &ordered_relabeled_contrast,
+        )
+        .unwrap();
+    ordered_relabeled_results.independent_filtering = None;
+    let ordered_relabeled_object_results = ordered_relabeled_fit
+        .results_contrast_request(&counts, &ordered_relabeled_contrast, counts.gene_names())
+        .unwrap();
+    let ordered_relabeled_replacement = builder
+        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
+            &counts,
+            ordered_relabeled_formula,
+            reduced,
+            &ordered_relabeled_contrast,
+            &CooksReplacementOptions::new(f64::MAX),
+        )
+        .unwrap();
+    assert_eq!(ordered_relabeled_replacement.refit_plan.n_refit, 0);
+    assert_eq!(
+        ordered_relabeled_replacement.results.rows,
+        ordered_relabeled_results.rows
+    );
+    assert_eq!(ordered_relabeled_object_results, ordered_relabeled_results);
+    assert_eq!(
+        ordered_relabeled_results.metadata.result_name.as_deref(),
+        Some(
+            "ordered.condition..levels...c..A....B....labels...c..control....treated..._treated_vs_control"
+        )
+    );
+    assert_eq!(
+        ordered_relabeled_results.metadata.comparison.as_deref(),
+        Some(
+            "factor-level contrast: ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
         )
     );
 }
@@ -2280,6 +3255,20 @@ fn top_level_test_output_routes_wald_cooks_replacement() {
             &options,
         )
         .unwrap();
+
+    assert_eq!(top_level.test_type(), TestType::Wald);
+    assert_eq!(top_level.results(), &expected.results);
+    assert_eq!(top_level.original_results(), &expected.original_results);
+    assert_eq!(top_level.refit_plan(), &expected.refit_plan);
+    assert_eq!(
+        top_level.original_fit().current_model_frame(),
+        expected.original_fit.current_model_frame()
+    );
+    assert_eq!(
+        top_level.refit_fit().is_some(),
+        expected.refit_fit.is_some()
+    );
+    assert_eq!(top_level.refit_results(), expected.refit_results.as_ref());
 
     let CooksReplacementTestOutput::Wald(output) = top_level else {
         panic!("top-level test output should route to Wald");
@@ -2526,7 +3515,10 @@ fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() 
             levels: None,
             reference: None,
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "exposure".to_string(),
+            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        }],
     };
     let (model_frame_fit, model_frame_results) = builder
         .clone()
@@ -2582,13 +3574,67 @@ fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() 
         .clone()
         .fit_formula(&counts, "~ condition")
         .unwrap();
-    let offset_err = stored_builder
-        .fit_formula_with_results(&counts, "~ condition + offset(log2(exposure))")
-        .unwrap_err();
-    let DeseqError::UnsupportedFeature { feature } = offset_err else {
-        panic!("formula offsets should be rejected as unsupported, got {offset_err:?}");
-    };
-    assert!(feature.contains("formula offsets"));
+    let offset_values = model_frame.numeric_covariates[0].values.to_vec();
+    let mut normalization_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for _gene in 0..counts.n_genes() {
+        for offset in &offset_values {
+            normalization_values.push(offset.exp());
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
+            .unwrap();
+    let explicit_offset_builder = stored_builder
+        .clone()
+        .size_factors(vec![1.0; counts.n_samples()])
+        .normalization_factors(normalization_factors.clone());
+    let formula_offset_builder = stored_builder
+        .clone()
+        .size_factors(vec![1.0; counts.n_samples()]);
+    let (explicit_offset_fit, explicit_offset_results) = explicit_offset_builder
+        .fit_formula_with_results(&counts, "~ condition")
+        .unwrap();
+    let (formula_offset_fit, formula_offset_results) = formula_offset_builder
+        .fit_formula_with_results(&counts, "~ condition + offset(exposure)")
+        .unwrap();
+    assert_eq!(
+        formula_offset_fit.normalization_factors,
+        Some(normalization_factors)
+    );
+    assert_wald_fit_state_matches(
+        &formula_offset_fit,
+        &explicit_offset_fit,
+        "top-level stored model-frame formula offset request",
+    );
+    assert_result_rows_close(
+        &formula_offset_results.rows,
+        &explicit_offset_results.rows,
+        "top-level stored model-frame formula offset results",
+    );
+    let (explicit_offset_contrast_fit, explicit_offset_contrast_results) = explicit_offset_builder
+        .fit_formula_with_results_contrast_request(
+            &counts,
+            "~ condition",
+            &ResultsContrast::character("condition", "B", "A"),
+        )
+        .unwrap();
+    let (formula_offset_contrast_fit, formula_offset_contrast_results) = formula_offset_builder
+        .fit_formula_with_results_contrast_request(
+            &counts,
+            "~ condition + offset(exposure)",
+            &ResultsContrast::character("condition", "B", "A"),
+        )
+        .unwrap();
+    assert_wald_fit_state_matches(
+        &formula_offset_contrast_fit,
+        &explicit_offset_contrast_fit,
+        "top-level stored model-frame formula offset contrast request",
+    );
+    assert_result_rows_close(
+        &formula_offset_contrast_results.rows,
+        &explicit_offset_contrast_results.rows,
+        "top-level stored model-frame formula offset contrast results",
+    );
     assert_wald_fit_state_matches(
         &character_fit,
         &factor_fit,
@@ -2662,6 +3708,7 @@ fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() 
         numeric_results.metadata.comparison.as_deref(),
         Some("primitive numeric contrast")
     );
+    assert_eq!(numeric_results.metadata.contrast, Some(vec![0.0, 1.0]));
 
     let (_list_fit, list_results) = builder
         .fit_with_results_contrast_request(
@@ -2679,6 +3726,113 @@ fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() 
         list_results.metadata.comparison.as_deref(),
         Some("coefficient list contrast: condition_B_vs_A effect")
     );
+    assert_eq!(list_results.metadata.contrast, Some(vec![0.0, 1.0]));
+}
+
+#[test]
+fn top_level_results_contrast_request_canonicalizes_cleaned_sample_level_aliases() {
+    let counts = native_wald_counts_with_zero_row();
+    let design = DesignMatrix::from_row_major(
+        8,
+        2,
+        vec![
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        Some(vec![
+            "Intercept".into(),
+            "cell.type_B.cell_vs_A.cell".into(),
+        ]),
+    )
+    .unwrap();
+    let builder = glm_mu_native_wald_builder().disable_independent_filtering();
+    let levels = [
+        "A cell", "A cell", "A cell", "A cell", "B cell", "B cell", "B cell", "B cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+
+    let (_factor_fit, factor_results) = builder
+        .clone()
+        .fit_with_results_factor_level_contrast(
+            &counts,
+            &design,
+            FactorLevelContrast::new("cell type", "B cell", "A cell", &levels),
+        )
+        .unwrap();
+    let (_character_fit, character_results) = builder
+        .clone()
+        .fit_with_results_contrast_request(
+            &counts,
+            &design,
+            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
+            Some(&levels),
+        )
+        .unwrap();
+    let replacement_options = CooksReplacementOptions::new(f64::MAX);
+    let factor_replacement = builder
+        .clone()
+        .fit_with_test_results_factor_level_contrast_with_cooks_replacement(
+            &counts,
+            &design,
+            FactorLevelContrast::new("cell type", "B cell", "A cell", &levels),
+            &replacement_options,
+        )
+        .unwrap();
+    let request_replacement = builder
+        .fit_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            &design,
+            &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
+            Some(&levels),
+            &replacement_options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Wald(factor_replacement) = factor_replacement else {
+        panic!("factor contrast should route to Wald");
+    };
+    let CooksReplacementTestOutput::Wald(request_replacement) = request_replacement else {
+        panic!("character contrast request should route to Wald");
+    };
+
+    assert_eq!(character_results.rows, factor_results.rows);
+    assert_eq!(
+        character_results.metadata.result_name.as_deref(),
+        Some("cell.type_B.cell_vs_A.cell")
+    );
+    assert_eq!(
+        character_results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: cell.type B cell vs A cell")
+    );
+    assert_eq!(
+        request_replacement.results.rows,
+        factor_replacement.results.rows
+    );
+    assert_eq!(
+        request_replacement.results.metadata.result_name.as_deref(),
+        Some("cell.type_B.cell_vs_A.cell")
+    );
+    assert_eq!(
+        request_replacement.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: cell.type B cell vs A cell")
+    );
+
+    let ambiguous_levels = [
+        "A cell", "A-cell", "A cell", "A-cell", "B cell", "B cell", "B cell", "B cell",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect::<Vec<_>>();
+    let ambiguous = builder.fit_with_results_contrast_request(
+        &counts,
+        &design,
+        &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
+        Some(&ambiguous_levels),
+    );
+    assert!(ambiguous
+        .unwrap_err()
+        .to_string()
+        .contains("denominator level 'A.cell' resolves ambiguously"));
 }
 
 #[test]
@@ -2744,7 +3898,10 @@ fn top_level_formula_contrast_request_uses_formula_derived_factor_metadata() {
             levels: Some(vec!["A".to_string(), "B".to_string()]),
             reference: Some("A".to_string()),
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "exposure".to_string(),
+            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        }],
     };
     let builder = glm_mu_native_wald_builder().model_frame(model_frame);
     let formula = "~ factor(condition, levels=c('B','A'))";
@@ -2775,6 +3932,27 @@ fn top_level_formula_contrast_request_uses_formula_derived_factor_metadata() {
         "top-level formula-derived factor contrast",
     );
     assert_eq!(formula_results, explicit_results);
+    let mut detached_fit = formula_fit.clone();
+    detached_fit.model_frame = None;
+    let explicit_object_results = detached_fit
+        .wald_results_factor_level_contrast(
+            &counts,
+            FactorLevelContrast::with_reference(transformed_factor, "A", "B", "B", &levels),
+            counts.gene_names(),
+        )
+        .unwrap();
+    assert_eq!(explicit_object_results.rows, formula_results.rows);
+    assert_eq!(explicit_object_results.metadata, formula_results.metadata);
+    let missing_metadata = detached_fit
+        .wald_results_contrast_request(
+            &counts,
+            &ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B"),
+            None,
+        )
+        .unwrap_err();
+    assert!(missing_metadata
+        .to_string()
+        .contains("use wald_results_factor_level_contrast"));
     assert_eq!(
         formula_results.metadata.result_name.as_deref(),
         Some("factor.condition..levels...c..B....A..._A_vs_B")
@@ -2795,7 +3973,10 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
             levels: Some(vec!["A".to_string(), "B".to_string()]),
             reference: Some("A".to_string()),
         }],
-        numeric_covariates: Vec::new(),
+        numeric_covariates: vec![FormulaNumericColumn {
+            name: "exposure".to_string(),
+            values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        }],
     };
     let builder = glm_mu_native_wald_builder().model_frame(model_frame);
     let formula = "~ factor(condition, levels=c('B','A'))";
@@ -2821,6 +4002,126 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
     assert_eq!(
         output.results.metadata.comparison.as_deref(),
         Some("factor-level contrast: factor(condition, levels = c(\"B\", \"A\")) A vs B")
+    );
+
+    let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
+    let ordered_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            ordered_formula,
+            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Wald(ordered_output) = ordered_output else {
+        panic!("ordered formula-derived contrast replacement should route to Wald");
+    };
+
+    assert_eq!(ordered_output.refit_plan.n_refit, 0);
+    assert_eq!(ordered_output.results.rows, output.results.rows);
+    assert_eq!(
+        ordered_output.results.metadata.result_name.as_deref(),
+        Some("ordered.condition..levels...c..B....A..._A_vs_B")
+    );
+    assert_eq!(
+        ordered_output.results.metadata.comparison.as_deref(),
+        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
+    );
+
+    let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
+        .values
+        .to_vec();
+    let mut normalization_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    for _gene in 0..counts.n_genes() {
+        for offset in &offset_values {
+            normalization_values.push(offset.exp());
+        }
+    }
+    let normalization_factors =
+        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
+            .unwrap();
+    let explicit_offset_output = builder
+        .clone()
+        .normalization_factors(normalization_factors.clone())
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            formula,
+            &ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap();
+    let formula_offset_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ factor(condition, levels=c('B','A')) + offset(exposure)",
+            &ResultsContrast::character("factor.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Wald(explicit_offset_output) = explicit_offset_output else {
+        panic!("explicit-offset formula-derived contrast replacement should route to Wald");
+    };
+    let CooksReplacementTestOutput::Wald(formula_offset_output) = formula_offset_output else {
+        panic!("formula-offset formula-derived contrast replacement should route to Wald");
+    };
+    assert_eq!(
+        formula_offset_output.original_fit.normalization_factors,
+        Some(normalization_factors.clone())
+    );
+    assert_wald_fit_state_matches(
+        &formula_offset_output.original_fit,
+        &explicit_offset_output.original_fit,
+        "formula-derived contrast replacement offset original",
+    );
+    assert_eq!(
+        formula_offset_output.original_results,
+        explicit_offset_output.original_results
+    );
+    assert_eq!(
+        formula_offset_output.refit_results,
+        explicit_offset_output.refit_results
+    );
+    assert_eq!(
+        formula_offset_output.results,
+        explicit_offset_output.results
+    );
+
+    let explicit_ordered_offset_output = builder
+        .clone()
+        .normalization_factors(normalization_factors.clone())
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            ordered_formula,
+            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap();
+    let formula_ordered_offset_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            "~ ordered(condition, levels=c('B','A')) + offset(exposure)",
+            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap();
+    let CooksReplacementTestOutput::Wald(explicit_ordered_offset_output) =
+        explicit_ordered_offset_output
+    else {
+        panic!("explicit-offset ordered formula-derived contrast replacement should route to Wald");
+    };
+    let CooksReplacementTestOutput::Wald(formula_ordered_offset_output) =
+        formula_ordered_offset_output
+    else {
+        panic!("formula-offset ordered formula-derived contrast replacement should route to Wald");
+    };
+    assert_wald_fit_state_matches(
+        &formula_ordered_offset_output.original_fit,
+        &explicit_ordered_offset_output.original_fit,
+        "ordered formula-derived contrast replacement offset original",
+    );
+    assert_eq!(
+        formula_ordered_offset_output.results,
+        explicit_ordered_offset_output.results
     );
 }
 
@@ -3649,6 +4950,10 @@ fn native_glm_mu_contrast_spec_cooks_replacement_preserves_metadata() {
     assert_eq!(
         output.original_results.metadata.result_name.as_deref(),
         Some("condition_B_vs_A")
+    );
+    assert_eq!(
+        output.original_results.metadata.comparison.as_deref(),
+        Some("coefficient condition_B_vs_A")
     );
     assert_eq!(
         output.results.metadata.result_name.as_deref(),

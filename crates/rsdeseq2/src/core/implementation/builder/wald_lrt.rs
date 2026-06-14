@@ -44,8 +44,11 @@ impl DeseqBuilder {
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) =
             self.fit_wald_linear_mu_contrast(counts, design, &numeric_contrast)?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -85,8 +88,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -129,8 +131,11 @@ impl DeseqBuilder {
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) =
             self.fit_wald_linear_mu_contrast_parametric(counts, design, &numeric_contrast)?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -170,8 +175,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -222,8 +226,11 @@ impl DeseqBuilder {
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) =
             self.fit_wald_glm_mu_contrast(counts, design, &numeric_contrast)?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -291,8 +298,7 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -344,8 +350,11 @@ impl DeseqBuilder {
             reduced_design,
             &numeric_contrast,
         )?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -387,8 +396,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -437,8 +445,11 @@ impl DeseqBuilder {
             reduced_design,
             &numeric_contrast,
         )?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -480,8 +491,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -527,8 +537,11 @@ impl DeseqBuilder {
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
         let (fit, mut results) =
             self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, &numeric_contrast)?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -599,8 +612,7 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -649,8 +661,11 @@ impl DeseqBuilder {
             reduced_design,
             &numeric_contrast,
         )?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -692,8 +707,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 }

@@ -987,6 +987,7 @@ mod tests {
                 test_type: Some(crate::options::TestType::Wald),
                 result_name: Some("condition_B_vs_A".to_string()),
                 comparison: Some("coefficient condition_B_vs_A".to_string()),
+                contrast: Some(vec![0.0, 1.0]),
                 lfc_threshold: 1.5,
                 alt_hypothesis: Some("greater".to_string()),
                 ..crate::results::DeseqResultsTableMetadata::default()
@@ -1035,6 +1036,7 @@ mod tests {
                 "testType\tWald\n",
                 "resultName\tcondition_B_vs_A\n",
                 "comparison\tcoefficient condition_B_vs_A\n",
+                "contrast\t0,1\n",
                 "lfcThreshold\t1.5\n",
                 "altHypothesis\tgreater\n",
                 "pAdjustMethod\tBH\n",

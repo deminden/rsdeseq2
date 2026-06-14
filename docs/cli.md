@@ -153,7 +153,12 @@ coefficient names such as `condition_B_vs_A` and `condition_C_vs_A`. Supplying
 `--contrast-sample-levels` as a two-column sample/level TSV additionally
 enables DESeq2-style factor-level all-zero contrast handling and must be paired
 with a factor-level contrast request; sample rows are aligned by label against
-the count-matrix columns. For LRT result tables, this cleanup zeroes only the
+the count-matrix columns. With sample-level TSVs, numerator, denominator, and
+explicit `--contrast-reference` labels resolve exact values first, then
+unambiguous R-cleaned aliases, and result metadata reports the canonical sample
+levels. When `--result-table-metadata-output` is requested for a contrast run,
+the sidecar also includes the resolved numeric contrast vector in design-column
+order. For LRT result tables, factor-level all-zero cleanup zeroes only the
 displayed log2 fold change.
 
 The `wald` command can also run the supplied-dispersion expanded beta-prior

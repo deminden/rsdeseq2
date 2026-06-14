@@ -13,7 +13,12 @@ fn remove_formula_term<'a>(
         state.has_intercept = false;
         return Ok(());
     }
-    if term == "0" || term == "-1" {
+    if term == "0" {
+        state.has_intercept = true;
+        return Ok(());
+    }
+    if term == "-1" {
+        state.has_intercept = true;
         return Ok(());
     }
     if formula_contains_top_level(term, '^')? {
@@ -856,16 +861,69 @@ fn resolve_formula_variable<'a>(
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<FormulaVariableRef<'a>, DeseqError> {
-    if let Some(factor) = factors
+    let exact_factors = factors
         .iter()
-        .find(|candidate| candidate.factor == variable)
-    {
+        .filter(|candidate| candidate.factor == variable)
+        .collect::<Vec<_>>();
+    match exact_factors.as_slice() {
+        [_] => {}
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula variable '{variable}' appears more than once"),
+            });
+        }
+    }
+    let exact_numeric = numeric_covariates
+        .iter()
+        .filter(|candidate| candidate.name == variable)
+        .collect::<Vec<_>>();
+    match exact_numeric.as_slice() {
+        [_] => {}
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("formula variable '{variable}' appears more than once"),
+            });
+        }
+    }
+    if exact_factors.len() + exact_numeric.len() > 1 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula variable '{variable}' appears more than once"),
+        });
+    }
+    if let [factor] = exact_factors.as_slice() {
         return Ok(FormulaVariableRef::Factor(factor.factor));
     }
-    if let Some(covariate) = numeric_covariates
+    if let [covariate] = exact_numeric.as_slice() {
+        return Ok(FormulaVariableRef::Numeric(covariate.name));
+    }
+
+    let factor_aliases = factors
         .iter()
-        .find(|candidate| candidate.name == variable)
-    {
+        .filter(|candidate| {
+            r_like_name_candidates(candidate.factor)
+                .into_iter()
+                .any(|candidate| candidate == variable)
+        })
+        .collect::<Vec<_>>();
+    let numeric_aliases = numeric_covariates
+        .iter()
+        .filter(|candidate| {
+            r_like_name_candidates(candidate.name)
+                .into_iter()
+                .any(|candidate| candidate == variable)
+        })
+        .collect::<Vec<_>>();
+    if factor_aliases.len() + numeric_aliases.len() > 1 {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula variable '{variable}' resolves ambiguously after R-style cleanup"),
+        });
+    }
+    if let [factor] = factor_aliases.as_slice() {
+        return Ok(FormulaVariableRef::Factor(factor.factor));
+    }
+    if let [covariate] = numeric_aliases.as_slice() {
         return Ok(FormulaVariableRef::Numeric(covariate.name));
     }
     Err(DeseqError::InvalidOptions {

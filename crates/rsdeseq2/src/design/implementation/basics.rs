@@ -75,6 +75,15 @@ pub struct ResolvedFormulaFactorReference<'a> {
     pub levels: Option<&'a [String]>,
 }
 
+/// Resolved numeric covariate metadata for one model-frame column.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResolvedFormulaNumericCovariate<'a> {
+    /// Numeric column name.
+    pub name: &'a str,
+    /// Per-sample finite numeric values.
+    pub values: &'a [f64],
+}
+
 /// Owned categorical model-frame column.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FormulaFactorColumn {
@@ -215,7 +224,11 @@ impl FormulaModelFrame {
         let matches = self
             .factors
             .iter()
-            .filter(|factor| r_like_make_name(&factor.name) == factor_name)
+            .filter(|factor| {
+                r_like_name_candidates(&factor.name)
+                    .into_iter()
+                    .any(|candidate| candidate == factor_name)
+            })
             .collect::<Vec<_>>();
         match matches.as_slice() {
             [factor] => Ok(Some(formula_model_frame_factor_reference(factor)?)),
@@ -243,6 +256,76 @@ impl FormulaModelFrame {
                 })
             })
             .collect()
+    }
+
+    /// Resolved numeric covariate for an exact numeric column name.
+    ///
+    /// `Ok(None)` means the model frame is valid but has no numeric covariate
+    /// with that exact name.
+    pub fn resolved_numeric_covariate(
+        &self,
+        numeric_name: &str,
+    ) -> Result<Option<ResolvedFormulaNumericCovariate<'_>>, DeseqError> {
+        self.validate()?;
+        Ok(self
+            .numeric_covariates
+            .iter()
+            .find(|covariate| covariate.name == numeric_name)
+            .map(|covariate| ResolvedFormulaNumericCovariate {
+                name: covariate.name.as_str(),
+                values: covariate.values.as_slice(),
+            }))
+    }
+
+    /// Resolved numeric covariate for a numeric column name or R-cleaned alias.
+    ///
+    /// Exact numeric names win first. If no exact numeric column exists, this
+    /// accepts the same R-style cleanup used by formula numeric transform
+    /// lookup. Ambiguous cleaned aliases return an error.
+    pub fn resolved_numeric_covariate_by_alias(
+        &self,
+        numeric_name: &str,
+    ) -> Result<Option<ResolvedFormulaNumericCovariate<'_>>, DeseqError> {
+        self.validate()?;
+        if let Some(covariate) = self.resolved_numeric_covariate(numeric_name)? {
+            return Ok(Some(covariate));
+        }
+        let matches = self
+            .numeric_covariates
+            .iter()
+            .filter(|covariate| {
+                r_like_name_candidates(&covariate.name)
+                    .into_iter()
+                    .any(|candidate| candidate == numeric_name)
+            })
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [covariate] => Ok(Some(ResolvedFormulaNumericCovariate {
+                name: covariate.name.as_str(),
+                values: covariate.values.as_slice(),
+            })),
+            [] => Ok(None),
+            _ => Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
+                ),
+            }),
+        }
+    }
+
+    /// Resolved metadata for all numeric columns in model-frame order.
+    pub fn resolved_numeric_covariates(
+        &self,
+    ) -> Result<Vec<ResolvedFormulaNumericCovariate<'_>>, DeseqError> {
+        self.validate()?;
+        Ok(self
+            .numeric_covariates
+            .iter()
+            .map(|covariate| ResolvedFormulaNumericCovariate {
+                name: covariate.name.as_str(),
+                values: covariate.values.as_slice(),
+            })
+            .collect())
     }
 }
 

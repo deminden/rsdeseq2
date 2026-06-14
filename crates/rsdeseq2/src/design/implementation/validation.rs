@@ -301,6 +301,19 @@ fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
                 reason: format!("factor '{factor}' has duplicate declared level '{level}'"),
             });
         }
+        let cleaned_level = r_like_make_name(level);
+        if levels[..idx].iter().any(|previous| {
+            r_like_make_name(previous) == cleaned_level
+                && previous.as_str() != cleaned_level
+                && level.as_str() != cleaned_level
+        })
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "factor '{factor}' declared level '{level}' resolves ambiguously after R-style cleanup"
+                ),
+            });
+        }
         has_reference |= level == reference;
     }
     if !has_reference {

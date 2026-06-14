@@ -193,7 +193,7 @@ impl DeseqBuilder {
             input.design.n_coefficients(),
         )?;
         if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(input.design, input.coefficient)
+            self.model_frame_factor_level_contrast_for_coefficient(input.design, input.coefficient)?
         {
             apply_cooks_cutoff_for_factor_level_metadata(
                 &mut results,
@@ -368,7 +368,7 @@ impl DeseqBuilder {
             input.full_design.n_coefficients(),
         )?;
         if let Some(contrast) = self
-            .model_frame_factor_level_contrast_for_coefficient(input.full_design, input.coefficient)
+            .model_frame_factor_level_contrast_for_coefficient(input.full_design, input.coefficient)?
         {
             apply_cooks_cutoff_for_factor_level_metadata(
                 &mut results,

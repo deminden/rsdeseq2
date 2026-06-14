@@ -117,6 +117,46 @@ fn result_table_metadata_exposes_description_label_precedence() {
 }
 
 #[test]
+fn result_table_metadata_preserves_resolved_numeric_contrast() {
+    let mut results = DeseqResults::default();
+    results.set_resolved_contrast_metadata(
+        "condition_B_vs_A",
+        "factor-level contrast: condition B vs A",
+        &[0.0, 1.0, -1.0],
+    );
+
+    assert_eq!(
+        results.metadata.contrast.as_deref(),
+        Some(&[0.0, 1.0, -1.0][..])
+    );
+    assert_eq!(
+        results.metadata.scalar_metadata(),
+        vec![
+            DeseqResultsTableMetadataEntry {
+                name: "resultName".to_string(),
+                value: "condition_B_vs_A".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "comparison".to_string(),
+                value: "factor-level contrast: condition B vs A".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "contrast".to_string(),
+                value: "0,1,-1".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "lfcThreshold".to_string(),
+                value: "0".to_string(),
+            },
+            DeseqResultsTableMetadataEntry {
+                name: "pAdjustMethod".to_string(),
+                value: "BH".to_string(),
+            },
+        ]
+    );
+}
+
+#[test]
 fn build_wald_results_populates_deseq2_shaped_columns() {
     let fit = toy_fit(vec![2.0, 1.0], vec![0.5, 1.0], vec![true, false]);
     let names = vec!["gene_a".to_string(), "gene_b".to_string()];

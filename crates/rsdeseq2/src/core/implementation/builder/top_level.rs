@@ -45,17 +45,13 @@ impl DeseqBuilder {
     /// Build a supported formula design from stored model-frame metadata and
     /// run the currently implemented DESeq-like workflow with result rows.
     ///
-    /// Formula `offset(...)` terms are rejected here because the current
-    /// top-level native workflow takes an explicit design matrix but not a
-    /// formula-offset vector.
     pub fn fit_formula_with_results(
         &self,
         counts: &CountMatrix,
         formula: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results(counts, &formula_design.design.standard_design)
     }
 
@@ -86,9 +82,8 @@ impl DeseqBuilder {
         formula: &str,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_name(
                 counts,
                 &formula_design.design.standard_design,
@@ -139,9 +134,8 @@ impl DeseqBuilder {
         formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_with_cooks_replacement(
                 counts,
                 &formula_design.design.standard_design,
@@ -183,9 +177,8 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_name_with_cooks_replacement(
                 counts,
                 &formula_design.design.standard_design,
@@ -229,9 +222,8 @@ impl DeseqBuilder {
         formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_with_cooks_replacement(
                 counts,
                 &formula_design.design.standard_design,
@@ -282,9 +274,8 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_name_with_cooks_replacement(
                 counts,
                 &formula_design.design.standard_design,
@@ -426,13 +417,13 @@ impl DeseqBuilder {
                     .iter()
                     .map(|level| level.as_ref().to_string())
                     .collect::<Vec<_>>();
-                let contrast = FactorLevelContrast {
+                let contrast = factor_level_contrast_from_sample_levels(
                     factor,
                     numerator,
                     denominator,
-                    reference: reference.as_deref(),
-                    sample_levels: &levels,
-                };
+                    reference.as_deref(),
+                    &levels,
+                )?;
                 self.fit_with_results_factor_level_contrast(counts, design, contrast)
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
@@ -450,9 +441,8 @@ impl DeseqBuilder {
         formula: &str,
         contrast: &ResultsContrast,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_contrast_request::<String>(
                 counts,
                 &formula_design.design.standard_design,
@@ -474,7 +464,7 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
             return builder.fit_with_results_factor_level_contrast(counts, design, factor_contrast);
@@ -583,13 +573,13 @@ impl DeseqBuilder {
                         .iter()
                         .map(|level| level.as_ref().to_string())
                         .collect::<Vec<_>>();
-                    let contrast = FactorLevelContrast {
+                    let contrast = factor_level_contrast_from_sample_levels(
                         factor,
                         numerator,
                         denominator,
-                        reference: reference.as_deref(),
-                        sample_levels: &levels,
-                    };
+                        reference.as_deref(),
+                        &levels,
+                    )?;
                     self.fit_with_results_factor_level_contrast_with_cooks_replacement(
                         counts,
                         design,
@@ -634,9 +624,8 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        let formula_design = self.formula_design_without_offsets(formula)?;
-        self.clone()
-            .model_frame(formula_design.model_frame)
+        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_contrast_request_with_cooks_replacement::<String>(
                 counts,
                 &formula_design.design.standard_design,
@@ -656,7 +645,7 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         match self.test {
             TestType::Wald => {
                 if let Some(factor_contrast) =
@@ -821,19 +810,15 @@ impl DeseqBuilder {
     /// Build supported full and reduced formula designs from stored
     /// model-frame metadata and run the top-level LRT workflow.
     ///
-    /// Formula `offset(...)` terms are rejected here because the current
-    /// top-level native workflow takes explicit design matrices but not a
-    /// formula-offset vector.
     pub fn fit_lrt_formula_with_results(
         &self,
         counts: &CountMatrix,
         full_formula: &str,
         reduced_formula: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results(
                 counts,
                 &full_formula_design.design.standard_design,
@@ -863,10 +848,9 @@ impl DeseqBuilder {
         reduced_formula: &str,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_name(
                 counts,
                 &full_formula_design.design.standard_design,
@@ -885,10 +869,9 @@ impl DeseqBuilder {
         reduced_formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_with_cooks_replacement(
                 counts,
                 &full_formula_design.design.standard_design,
@@ -908,10 +891,9 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_name_with_cooks_replacement(
                 counts,
                 &full_formula_design.design.standard_design,
@@ -1031,13 +1013,13 @@ impl DeseqBuilder {
                     .iter()
                     .map(|level| level.as_ref().to_string())
                     .collect::<Vec<_>>();
-                let contrast = FactorLevelContrast {
+                let contrast = factor_level_contrast_from_sample_levels(
                     factor,
                     numerator,
                     denominator,
-                    reference: reference.as_deref(),
-                    sample_levels: &levels,
-                };
+                    reference.as_deref(),
+                    &levels,
+                )?;
                 self.fit_lrt_with_results_factor_level_contrast(
                     counts,
                     full_design,
@@ -1067,7 +1049,7 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
             return builder.fit_lrt_with_results_factor_level_contrast(
@@ -1096,10 +1078,9 @@ impl DeseqBuilder {
         reduced_formula: &str,
         contrast: &ResultsContrast,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_contrast_request::<String>(
                 counts,
                 &full_formula_design.design.standard_design,
@@ -1265,13 +1246,13 @@ impl DeseqBuilder {
                     .iter()
                     .map(|level| level.as_ref().to_string())
                     .collect::<Vec<_>>();
-                let contrast = FactorLevelContrast {
+                let contrast = factor_level_contrast_from_sample_levels(
                     factor,
                     numerator,
                     denominator,
-                    reference: reference.as_deref(),
-                    sample_levels: &levels,
-                };
+                    reference.as_deref(),
+                    &levels,
+                )?;
                 self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
@@ -1304,7 +1285,7 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
             return builder.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
@@ -1336,10 +1317,9 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let full_formula_design = self.formula_design_without_offsets(full_formula)?;
+        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
-        self.clone()
-            .model_frame(full_formula_design.model_frame)
+        self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_contrast_request_with_cooks_replacement::<String>(
                 counts,
                 &full_formula_design.design.standard_design,

@@ -9,7 +9,9 @@ nbinomLRTRust <- function(baseMean = NULL,
                           counts = NULL,
                           sampleLevels = NULL,
                           factorLevels = NULL,
+                          factorReferences = NULL,
                           modelMatrix = NULL,
+                          colData = NULL,
                           rowNames = NULL,
                           object = NULL,
                           ...) {
@@ -29,7 +31,9 @@ nbinomLRTRust <- function(baseMean = NULL,
     counts <- counts %||% fields$counts
     sampleLevels <- sampleLevels %||% fields$sampleLevels
     factorLevels <- factorLevels %||% fields$factorLevels
+    factorReferences <- factorReferences %||% fields$factorReferences
     modelMatrix <- modelMatrix %||% fields$modelMatrix
+    colData <- colData %||% fields$colData
     rowNames <- rowNames %||% fields$rowNames
   }
   if (is.null(baseMean) || is.null(beta) || is.null(lrtStat)) {
@@ -47,7 +51,9 @@ nbinomLRTRust <- function(baseMean = NULL,
     counts = counts,
     sampleLevels = sampleLevels,
     factorLevels = factorLevels,
+    factorReferences = factorReferences,
     modelMatrix = modelMatrix,
+    colData = colData,
     rowNames = rowNames
   )
 }

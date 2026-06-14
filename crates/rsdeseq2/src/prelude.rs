@@ -28,6 +28,7 @@ pub use crate::design::{
     ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec,
     ExpandedFormulaDesignWithOffsets, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
     FormulaFactorColumn, FormulaModelFrame, FormulaNumericColumn, ResolvedFormulaFactorReference,
+    ResolvedFormulaNumericCovariate,
 };
 pub use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,

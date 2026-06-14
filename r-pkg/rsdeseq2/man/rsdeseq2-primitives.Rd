@@ -43,15 +43,17 @@ applyCooksCutoffRust(pvalue, maxCooks, cooksCutoff, counts = NULL,
 
 resultsTableRust(baseMean, log2FoldChange = NULL, lfcSE = NULL,
   stat = NULL, pvalue = NULL, padj = NULL, dispersion = NULL,
-  converged = NULL, rowNames = NULL)
+  converged = NULL, contrast = NULL, rowNames = NULL)
 
 waldFitRust(baseMean, beta, betaCovariance = NULL, betaSE = NULL,
   resultsNames = NULL, counts = NULL, sampleLevels = NULL,
-  factorLevels = NULL, modelMatrix = NULL, rowNames = NULL)
+  factorLevels = NULL, factorReferences = NULL, modelMatrix = NULL,
+  colData = NULL, rowNames = NULL)
 
 lrtFitRust(baseMean, beta, betaCovariance = NULL, betaSE = NULL,
   lrtStat, lrtPvalue = NULL, lrtDf = NULL, resultsNames = NULL,
-  counts = NULL, sampleLevels = NULL, factorLevels = NULL, modelMatrix = NULL,
+  counts = NULL, sampleLevels = NULL, factorLevels = NULL,
+  factorReferences = NULL, modelMatrix = NULL, colData = NULL,
   rowNames = NULL)
 
 resultsNames(object, ...)
@@ -85,13 +87,14 @@ estimateDispersionsRust(...)
 
 nbinomWaldTestRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
   betaSE = NULL, resultsNames = NULL, counts = NULL,
-  sampleLevels = NULL, factorLevels = NULL, modelMatrix = NULL, rowNames = NULL,
-  object = NULL, ...)
+  sampleLevels = NULL, factorLevels = NULL, factorReferences = NULL,
+  modelMatrix = NULL, colData = NULL, rowNames = NULL, object = NULL, ...)
 
 nbinomLRTRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
   betaSE = NULL, lrtStat = NULL, lrtPvalue = NULL, lrtDf = NULL,
   resultsNames = NULL, counts = NULL, sampleLevels = NULL, factorLevels = NULL,
-  modelMatrix = NULL, rowNames = NULL, object = NULL, ...)
+  factorReferences = NULL, modelMatrix = NULL, colData = NULL,
+  rowNames = NULL, object = NULL, ...)
 }
 \arguments{
 \item{counts}{Numeric or integer matrix with genes in rows and samples in columns.}
@@ -130,8 +133,12 @@ used for character contrast all-zero handling.}
 \item{factorLevels}{Optional named list of factor levels. For character
 contrasts, the first level is used as the reference when \code{reference} is
 not supplied, matching DESeq2 fitted-object behavior.}
+\item{factorReferences}{Optional named character vector or list of factor
+reference levels used for character contrast resolution.}
 \item{modelMatrix}{Optional numeric model matrix, samples by coefficients, used
 for numeric/list contrast all-zero handling.}
+\item{colData}{Optional sample metadata used to derive factor levels and
+character contrast sample-level vectors.}
 \item{contrast}{DESeq2-style contrast specification: character triplet, list, or
 numeric vector.}
 \item{name}{Optional coefficient name for \code{results()}.}

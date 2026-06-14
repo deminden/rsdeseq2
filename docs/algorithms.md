@@ -883,11 +883,12 @@ contrast requests. Coefficient-list comparison labels follow DESeq2's
 contrasts.
 
 The core resolver operates over an already-built design matrix, while the R
-wrapper can use fitted `factorLevels` or factor-valued `colData` to infer the
-reference level for character triplet contrasts. Primitive Rust, CLI, and R
-already-fitted result routes now cover DESeq2-style character, list/listValues,
-and numeric `results(contrast=...)` semantics, including `contrast` taking
-precedence over `name`. Stored `DeseqFit` objects expose a single
+wrapper can use explicit `factorReferences`, fitted `factorLevels`, or
+factor-valued `colData` to infer the reference level for character triplet
+contrasts. Primitive Rust, CLI, and R already-fitted result routes now cover
+DESeq2-style character, list/listValues, and numeric `results(contrast=...)`
+semantics, including `contrast` taking precedence over `name`. Stored
+`DeseqFit` objects expose a single
 `results_contrast_request()` dispatcher that selects Wald or LRT behavior from
 the fitted test state while preserving branch-specific contrast semantics and
 contrast-all-zero cleanup for character and two-sided numeric/list contrasts.
@@ -909,8 +910,9 @@ For factor-level contrasts, a separate primitive helper mirrors DESeq2's
 column. Samples whose level is either the numerator or denominator are selected;
 genes with zero raw counts across all selected samples get the same
 `log2FoldChange = 0`, `stat = 0`, and `pvalue = 1` override in the
-factor-level Wald contrast builder. The R wrapper can derive the reference from
-fitted factor metadata for already-fitted result objects; full high-level
+factor-level Wald contrast builder. The R wrapper can derive sample levels and
+references from fitted factor metadata for already-fitted result objects,
+including exact-first and unambiguous R-cleaned aliases; full high-level
 `DESeqDataSet` mutation remains an interface boundary.
 
 ## Wald LFC Thresholds
@@ -1019,8 +1021,11 @@ stage-by-stage parity checks, especially when result-table differences need to
 be traced back to `dispGeneEst`, `dispFit`, `dispMAP`, final dispersion
 estimates, beta estimates, beta optimizer starts, beta standard errors,
 iteration/convergence fields, deviance, or Cook's summaries.
-Full Bioconductor result objects, formula-aware contrast metadata, and complete
-wrapper metadata preservation are future work.
+Full Bioconductor result objects and complete high-level object mutation remain
+future work. The lightweight Rust fit/result metadata and primitive R wrapper
+already preserve implemented formula-aware contrast labels, sample-level
+metadata, factor levels, and explicit factor references for the supported
+already-fitted routes.
 
 ## Cook's Distances
 

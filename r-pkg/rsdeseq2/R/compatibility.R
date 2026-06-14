@@ -221,14 +221,18 @@
   if (any(!is.na(value) & !is.finite(value))) {
     stop(sprintf("%s must contain finite values or NA", name), call. = FALSE)
   }
-  as.numeric(value)
+  out <- as.numeric(value)
+  names(out) <- names(value)
+  out
 }
 
 .rsdeseq2_validate_result_optional_logical <- function(value, nGenes, name) {
   if (!is.logical(value) || length(value) != nGenes) {
     stop(sprintf("%s must be a logical vector with one value per gene", name), call. = FALSE)
   }
-  value
+  out <- as.logical(value)
+  names(out) <- names(value)
+  out
 }
 
 .rsdeseq2_validate_result_pvalues <- function(value, nGenes, name = "pvalue") {
@@ -239,7 +243,9 @@
   if (any(invalid)) {
     stop(sprintf("%s must contain values in [0, 1] or NA", name), call. = FALSE)
   }
-  as.numeric(value)
+  out <- as.numeric(value)
+  names(out) <- names(value)
+  out
 }
 
 .rsdeseq2_validate_result_table <- function(results) {

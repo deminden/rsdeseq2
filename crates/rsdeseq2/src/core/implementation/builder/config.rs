@@ -126,9 +126,25 @@ impl DeseqBuilder {
     /// Character `results(contrast=...)` requests can use this metadata to
     /// infer the factor reference and per-sample levels when call sites do not
     /// pass explicit sample-level vectors.
+    ///
+    /// This setter intentionally preserves existing builder-style chaining and
+    /// does not validate immediately. Wrapper and object-ingestion code should
+    /// prefer [`Self::try_model_frame`], while formula-built helper paths store
+    /// model frames that were already validated during formula construction.
     pub fn model_frame(mut self, model_frame: FormulaModelFrame) -> Self {
         self.model_frame = Some(model_frame);
         self
+    }
+
+    /// Validate and store owned formula/model-frame metadata.
+    ///
+    /// This checked companion to [`Self::model_frame`] is intended for
+    /// wrapper/object ingestion paths where invalid metadata should fail before
+    /// a later formula, contrast, or Cook's/refit route depends on it.
+    pub fn try_model_frame(mut self, model_frame: FormulaModelFrame) -> Result<Self, DeseqError> {
+        model_frame.validate()?;
+        self.model_frame = Some(model_frame);
+        Ok(self)
     }
 
     /// Build a supported expanded formula design from stored model-frame metadata.
@@ -343,13 +359,29 @@ impl DeseqBuilder {
         &'a self,
         design: &DesignMatrix,
         coefficient: usize,
-    ) -> Option<FactorLevelContrast<'a>> {
-        let model_frame = self.model_frame.as_ref()?;
+    ) -> Result<Option<FactorLevelContrast<'a>>, DeseqError> {
+        let mut coefficient_contrast = vec![0.0; design.n_coefficients()];
+        coefficient_contrast[coefficient] = 1.0;
+        self.model_frame_factor_level_contrast_for_numeric_contrast(design, &coefficient_contrast)
+    }
+
+    fn model_frame_factor_level_contrast_for_numeric_contrast<'a>(
+        &'a self,
+        design: &DesignMatrix,
+        contrast: &[f64],
+    ) -> Result<Option<FactorLevelContrast<'a>>, DeseqError> {
+        if contrast.len() != design.n_coefficients() {
+            return Ok(None);
+        }
+        let Some(model_frame) = self.model_frame.as_ref() else {
+            return Ok(None);
+        };
+        model_frame.validate()?;
         let [column] = model_frame.factors.as_slice() else {
-            return None;
+            return Ok(None);
         };
         if column.sample_levels.len() != design.n_samples() {
-            return None;
+            return Ok(None);
         }
         let mut observed_levels = Vec::<&str>::new();
         for level in &column.sample_levels {
@@ -358,9 +390,9 @@ impl DeseqBuilder {
             }
         }
         let [first_level, second_level] = observed_levels.as_slice() else {
-            return None;
+            return Ok(None);
         };
-        let reference = column
+        let raw_reference = column
             .reference
             .as_deref()
             .or_else(|| {
@@ -370,15 +402,20 @@ impl DeseqBuilder {
                     .and_then(|levels| levels.first().map(String::as_str))
             })
             .unwrap_or(first_level);
+        let reference =
+            match resolve_observed_level_alias_for_builder(raw_reference, &observed_levels) {
+                Some(reference) => reference,
+                None => return Ok(None),
+            };
         if reference != *first_level && reference != *second_level {
-            return None;
+            return Ok(None);
         }
         let numerator = if reference == *first_level {
             *second_level
         } else {
             *first_level
         };
-        let contrast = FactorLevelContrast {
+        let factor_contrast = FactorLevelContrast {
             factor: &column.name,
             numerator,
             denominator: reference,
@@ -388,22 +425,20 @@ impl DeseqBuilder {
         let contrast_spec =
             ContrastSpec::factor_level_with_reference(&column.name, numerator, reference, reference);
         let Ok(numeric_contrast) = resolve_contrast(design, &contrast_spec) else {
-            return None;
+            return Ok(None);
         };
-        if numeric_contrast
-            .iter()
-            .enumerate()
-            .all(|(idx, value)| {
-                if idx == coefficient {
-                    (*value - 1.0).abs() <= f64::EPSILON
-                } else {
-                    value.abs() <= f64::EPSILON
-                }
-            })
-        {
-            Some(contrast)
+        if numeric_contrasts_match(&numeric_contrast, contrast) {
+            Ok(Some(factor_contrast))
+        } else if numeric_contrasts_match_with_scale(&numeric_contrast, contrast, -1.0) {
+            Ok(Some(FactorLevelContrast {
+                factor: &column.name,
+                numerator: reference,
+                denominator: numerator,
+                reference: Some(reference),
+                sample_levels: &column.sample_levels,
+            }))
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -430,5 +465,212 @@ impl DeseqBuilder {
             });
         }
         Ok(formula_design)
+    }
+
+    fn with_formula_offsets(
+        &self,
+        counts: &CountMatrix,
+        formula_design: &ExpandedFormulaDesignWithOffsets,
+    ) -> Result<Self, DeseqError> {
+        if formula_design.offsets.is_empty() {
+            return Ok(self.clone().model_frame(formula_design.model_frame.clone()));
+        }
+        if formula_design.offsets.len() != counts.n_samples() {
+            return Err(invalid_dimensions(
+                "formula offsets",
+                counts.n_samples(),
+                formula_design.offsets.len(),
+            ));
+        }
+        let offset_multipliers = formula_design
+            .offsets
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(sample, offset)| {
+                let multiplier = offset.exp();
+                if multiplier.is_finite() && multiplier > 0.0 {
+                    Ok(multiplier)
+                } else {
+                    Err(DeseqError::InvalidOptions {
+                        reason: format!(
+                            "formula offset exponentiated to non-finite factor at sample {sample}"
+                        ),
+                    })
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut builder = self.clone().model_frame(formula_design.model_frame.clone());
+        let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+        match &self.normalization_factors {
+            Some(factors) => {
+                validate_normalization_factors(counts, factors)?;
+                for gene in 0..counts.n_genes() {
+                    let row = factors.row(gene)?;
+                    for (sample, multiplier) in offset_multipliers.iter().copied().enumerate() {
+                        values.push(row[sample] * multiplier);
+                    }
+                }
+            }
+            None => {
+                let control_gene_indices = self
+                    .size_factor_options
+                    .control_genes
+                    .as_ref()
+                    .map(|control_genes| control_genes.to_indices(counts.n_genes()))
+                    .transpose()?;
+                let size_factors = match &self.size_factor_options.supplied_size_factors {
+                    Some(size_factors) => size_factors.clone(),
+                    None => estimate_size_factors_with_options(
+                        counts,
+                        self.size_factor_options.method,
+                        self.size_factor_options.geo_means.as_deref(),
+                        control_gene_indices.as_deref(),
+                    )?,
+                };
+                normalized_counts(counts, &size_factors)?;
+                for _gene in 0..counts.n_genes() {
+                    for (sample, multiplier) in offset_multipliers.iter().copied().enumerate() {
+                        values.push(size_factors[sample] * multiplier);
+                    }
+                }
+                builder.size_factor_options.supplied_size_factors = Some(size_factors);
+            }
+        }
+        builder.normalization_factors = Some(RowMajorMatrix::from_row_major(
+            counts.n_genes(),
+            counts.n_samples(),
+            values,
+        )?);
+        Ok(builder)
+    }
+}
+
+fn numeric_contrasts_match(expected: &[f64], observed: &[f64]) -> bool {
+    numeric_contrasts_match_with_scale(expected, observed, 1.0)
+}
+
+fn numeric_contrasts_match_with_scale(expected: &[f64], observed: &[f64], scale: f64) -> bool {
+    expected
+        .iter()
+        .zip(observed.iter())
+        .all(|(expected, observed)| (scale * *expected - *observed).abs() <= f64::EPSILON)
+}
+
+fn resolve_observed_level_alias_for_builder<'a>(
+    requested: &str,
+    observed_levels: &[&'a str],
+) -> Option<&'a str> {
+    let exact = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| *level == requested)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [level] => return Some(*level),
+        [] => {}
+        _ => return None,
+    }
+
+    let matches = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| {
+            design_name_candidates(level)
+                .into_iter()
+                .any(|candidate| candidate == requested)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [level] => Some(*level),
+        _ => None,
+    }
+}
+
+fn factor_level_contrast_from_sample_levels<'a>(
+    factor: &'a str,
+    numerator: &str,
+    denominator: &str,
+    reference: Option<&str>,
+    sample_levels: &'a [String],
+) -> Result<FactorLevelContrast<'a>, DeseqError> {
+    let mut observed_levels = Vec::<&str>::new();
+    for level in sample_levels {
+        if !observed_levels.iter().any(|observed| *observed == level) {
+            observed_levels.push(level);
+        }
+    }
+    let numerator =
+        resolve_sample_level_alias_for_builder(factor, numerator, "numerator", &observed_levels)?;
+    let denominator = resolve_sample_level_alias_for_builder(
+        factor,
+        denominator,
+        "denominator",
+        &observed_levels,
+    )?;
+    if numerator == denominator {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "factor '{factor}' numerator and denominator resolve to the same level '{numerator}'"
+            ),
+        });
+    }
+    let reference = reference
+        .map(|reference| {
+            resolve_sample_level_alias_for_builder(factor, reference, "reference", &observed_levels)
+        })
+        .transpose()?;
+    Ok(FactorLevelContrast {
+        factor,
+        numerator,
+        denominator,
+        reference,
+        sample_levels,
+    })
+}
+
+fn resolve_sample_level_alias_for_builder<'a>(
+    factor: &str,
+    requested: &str,
+    role: &str,
+    observed_levels: &[&'a str],
+) -> Result<&'a str, DeseqError> {
+    let exact = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| *level == requested)
+        .collect::<Vec<_>>();
+    match exact.as_slice() {
+        [level] => return Ok(*level),
+        [] => {}
+        _ => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "factor '{factor}' {role} level '{requested}' appears more than once"
+                ),
+            });
+        }
+    }
+
+    let matches = observed_levels
+        .iter()
+        .copied()
+        .filter(|level| {
+            design_name_candidates(level)
+                .into_iter()
+                .any(|candidate| candidate == requested)
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [level] => Ok(*level),
+        [] => Err(DeseqError::InvalidOptions {
+            reason: format!("factor '{factor}' does not contain {role} level '{requested}'"),
+        }),
+        _ => Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "factor '{factor}' {role} level '{requested}' resolves ambiguously after R-style cleanup"
+            ),
+        }),
     }
 }

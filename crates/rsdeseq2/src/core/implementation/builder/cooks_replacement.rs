@@ -80,7 +80,7 @@ impl DeseqBuilder {
             design.n_coefficients(),
         )?;
         if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(design, coefficient)
+            self.model_frame_factor_level_contrast_for_coefficient(design, coefficient)?
         {
             apply_cooks_cutoff_for_factor_level_metadata(
                 &mut results,
@@ -165,7 +165,27 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(factor_contrast) =
+            self.model_frame_factor_level_contrast_for_numeric_contrast(design, contrast)?
+        {
+            let original_cooks =
+                original_fit
+                    .cooks
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "Cook's distances are required before replacement refit"
+                            .to_string(),
+                    })?;
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                factor_contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -197,6 +217,7 @@ impl DeseqBuilder {
             &mut output,
             contrast.result_name(),
             contrast.comparison(),
+            Some(&numeric_contrast),
         );
         Ok(output)
     }
@@ -209,6 +230,20 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let metadata_contrast = resolve_contrast(design, &contrast_spec)?;
         let raw_builder = self
             .clone()
             .disable_cooks_cutoff()
@@ -293,14 +328,22 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
-        Ok(CooksReplacementWaldOutput {
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        let mut output = CooksReplacementWaldOutput {
             original_fit,
             original_results,
             refit_plan,
             refit_fit,
             refit_results,
             results,
-        })
+        };
+        apply_contrast_metadata_to_replacement_output(
+            &mut output,
+            result_name,
+            comparison,
+            Some(&metadata_contrast),
+        );
+        Ok(output)
     }
 
     /// Run the current GLM-mu native LRT path with limited Cook's replacement refit.
@@ -385,7 +428,7 @@ impl DeseqBuilder {
             full_design.n_coefficients(),
         )?;
         if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)
+            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)?
         {
             apply_cooks_cutoff_for_factor_level_metadata(
                 &mut results,
@@ -467,7 +510,27 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(factor_contrast) =
+            self.model_frame_factor_level_contrast_for_numeric_contrast(full_design, contrast)?
+        {
+            let original_cooks =
+                original_fit
+                    .cooks
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "Cook's distances are required before replacement refit"
+                            .to_string(),
+                    })?;
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                factor_contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -489,6 +552,20 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let metadata_contrast = resolve_contrast(full_design, &contrast_spec)?;
         let raw_builder = self
             .clone()
             .disable_cooks_cutoff()
@@ -578,14 +655,22 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
-        Ok(CooksReplacementLrtOutput {
+        let (result_name, comparison) = factor_level_result_metadata(contrast);
+        let mut output = CooksReplacementLrtOutput {
             original_fit,
             original_results,
             refit_plan,
             refit_fit,
             refit_results,
             results,
-        })
+        };
+        apply_lrt_contrast_metadata_to_replacement_output(
+            &mut output,
+            result_name,
+            comparison,
+            Some(&metadata_contrast),
+        );
+        Ok(output)
     }
 
     /// Run native GLM-mu LRT replacement refit for a named primitive contrast specification.
@@ -609,6 +694,7 @@ impl DeseqBuilder {
             &mut output,
             contrast.result_name(),
             contrast.comparison(),
+            Some(&numeric_contrast),
         );
         Ok(output)
     }

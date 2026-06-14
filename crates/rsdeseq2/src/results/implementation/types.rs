@@ -66,6 +66,9 @@ pub struct DeseqResultsTableMetadata {
     pub result_name: Option<String>,
     /// Free-form comparison description for wrappers or callers.
     pub comparison: Option<String>,
+    /// Resolved numeric contrast over the fitted model coefficients, if this
+    /// table reports a contrast rather than a single coefficient.
+    pub contrast: Option<Vec<f64>>,
     /// Log2 fold-change threshold used for Wald-threshold tests.
     pub lfc_threshold: f64,
     /// Alternative hypothesis name for thresholded Wald tests.
@@ -89,6 +92,7 @@ impl Default for DeseqResultsTableMetadata {
             test_type: None,
             result_name: None,
             comparison: None,
+            contrast: None,
             lfc_threshold: 0.0,
             alt_hypothesis: None,
             p_adjust_method: "BH".to_string(),
@@ -133,6 +137,16 @@ impl DeseqResultsTableMetadata {
             entries.push(DeseqResultsTableMetadataEntry {
                 name: "comparison".to_string(),
                 value: value.clone(),
+            });
+        }
+        if let Some(values) = &self.contrast {
+            entries.push(DeseqResultsTableMetadataEntry {
+                name: "contrast".to_string(),
+                value: values
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
             });
         }
         entries.push(DeseqResultsTableMetadataEntry {
@@ -683,6 +697,18 @@ impl DeseqResults {
     pub fn with_metadata(mut self, metadata: DeseqResultsTableMetadata) -> Self {
         self.metadata = metadata;
         self
+    }
+
+    /// Attach metadata for a resolved numeric contrast.
+    pub fn set_resolved_contrast_metadata(
+        &mut self,
+        result_name: impl Into<String>,
+        comparison: impl Into<String>,
+        contrast: &[f64],
+    ) {
+        self.metadata.result_name = Some(result_name.into());
+        self.metadata.comparison = Some(comparison.into());
+        self.metadata.contrast = Some(contrast.to_vec());
     }
 
     /// Attach the Wald threshold and alternative used to produce p-values.

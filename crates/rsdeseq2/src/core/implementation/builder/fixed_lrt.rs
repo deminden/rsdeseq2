@@ -102,7 +102,7 @@ impl DeseqBuilder {
             full_design.n_coefficients(),
         )?;
         if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)
+            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)?
         {
             let original_cooks =
                 original_fit
@@ -267,7 +267,27 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        if let Some(factor_contrast) =
+            self.model_frame_factor_level_contrast_for_numeric_contrast(full_design, contrast)?
+        {
+            let original_cooks =
+                original_fit
+                    .cooks
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "Cook's distances are required before replacement refit"
+                            .to_string(),
+                    })?;
+            apply_cooks_cutoff_for_factor_level_metadata(
+                &mut results,
+                cooks_cutoff,
+                counts,
+                original_cooks,
+                factor_contrast,
+            )?;
+        } else {
+            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        }
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -297,8 +317,11 @@ impl DeseqBuilder {
             dispersions,
             &numeric_contrast,
         )?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -345,13 +368,13 @@ impl DeseqBuilder {
                     .iter()
                     .map(|level| level.as_ref().to_string())
                     .collect::<Vec<_>>();
-                let contrast = FactorLevelContrast {
+                let contrast = factor_level_contrast_from_sample_levels(
                     factor,
                     numerator,
                     denominator,
-                    reference: reference.as_deref(),
-                    sample_levels: &levels,
-                };
+                    reference.as_deref(),
+                    &levels,
+                )?;
                 self.fit_fixed_dispersion_lrt_factor_level_contrast(
                     counts,
                     full_design,
@@ -388,7 +411,7 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
             return builder.fit_fixed_dispersion_lrt_factor_level_contrast(
@@ -432,6 +455,7 @@ impl DeseqBuilder {
             &mut output,
             contrast.result_name(),
             contrast.comparison(),
+            Some(&numeric_contrast),
         );
         Ok(output)
     }
@@ -475,13 +499,13 @@ impl DeseqBuilder {
                     .iter()
                     .map(|level| level.as_ref().to_string())
                     .collect::<Vec<_>>();
-                let contrast = FactorLevelContrast {
+                let contrast = factor_level_contrast_from_sample_levels(
                     factor,
                     numerator,
                     denominator,
-                    reference: reference.as_deref(),
-                    sample_levels: &levels,
-                };
+                    reference.as_deref(),
+                    &levels,
+                )?;
                 self.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
@@ -518,7 +542,7 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        let builder = self.clone().model_frame(model_frame.clone());
+        let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
             return builder.fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
@@ -629,8 +653,11 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        lrt_output.results.metadata.result_name = Some(result_name);
-        lrt_output.results.metadata.comparison = Some(comparison);
+        lrt_output.results.set_resolved_contrast_metadata(
+            result_name,
+            comparison,
+            &numeric_contrast,
+        );
 
         let mut fit = self.base_fit(
             counts,
@@ -661,6 +688,20 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        let contrast_spec = match contrast.reference {
+            Some(reference) => ContrastSpec::factor_level_with_reference(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+                reference,
+            ),
+            None => ContrastSpec::factor_level(
+                contrast.factor,
+                contrast.numerator,
+                contrast.denominator,
+            ),
+        };
+        let numeric_contrast = resolve_contrast(full_design, &contrast_spec)?;
         let raw_builder = self
             .clone()
             .disable_cooks_cutoff()
@@ -722,8 +763,7 @@ impl DeseqBuilder {
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
 
         Ok(CooksReplacementLrtOutput {
             original_fit,

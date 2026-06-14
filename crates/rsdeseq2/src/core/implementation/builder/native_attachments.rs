@@ -38,8 +38,11 @@ impl DeseqBuilder {
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) =
             self.fit_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
-        results.metadata.result_name = Some(contrast.result_name());
-        results.metadata.comparison = Some(contrast.comparison());
+        results.set_resolved_contrast_metadata(
+            contrast.result_name(),
+            contrast.comparison(),
+            &numeric_contrast,
+        );
         Ok((fit, results))
     }
 
@@ -79,8 +82,7 @@ impl DeseqBuilder {
             fit,
         )?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.metadata.result_name = Some(result_name);
-        results.metadata.comparison = Some(comparison);
+        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
         Ok((fit, results))
     }
 
@@ -165,7 +167,13 @@ impl DeseqBuilder {
         fit.max_cooks = Some(wald_output.cooks.max_cooks);
         attach_glm_fit(&mut fit, wald_output.glm_fit);
         fit.wald = Some(wald_output.wald_contrast.wald);
-        Ok((fit, wald_output.results))
+        let mut results = wald_output.results;
+        results.set_resolved_contrast_metadata(
+            "contrast",
+            "primitive numeric contrast",
+            contrast,
+        );
+        Ok((fit, results))
     }
 
     fn attach_native_lrt(
@@ -295,6 +303,11 @@ impl DeseqBuilder {
         )?;
         apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
+        lrt_output.results.set_resolved_contrast_metadata(
+            "contrast",
+            "primitive numeric contrast",
+            contrast,
+        );
 
         fit.reduced_design = Some(reduced_design.clone());
         fit.dispersion = Some(lrt_output.expanded_dispersions);
