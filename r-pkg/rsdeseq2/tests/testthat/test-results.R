@@ -2016,7 +2016,16 @@ testthat::test_that("R object extraction preserves mcols row names for primitive
 
 testthat::test_that("R mcols row-name preservation covers vector matrix and array payloads", {
   rowNames <- c("g1", "g2")
-  applyMcolsRowNames <- get(".rsdeseq2_apply_mcols_row_names", envir = asNamespace("rsdeseq2"))
+  helperEnvironment <- if ("rsdeseq2" %in% loadedNamespaces()) {
+    asNamespace("rsdeseq2")
+  } else {
+    .GlobalEnv
+  }
+  applyMcolsRowNames <- get(
+    ".rsdeseq2_apply_mcols_row_names",
+    envir = helperEnvironment,
+    inherits = TRUE
+  )
   vector <- applyMcolsRowNames(c(10, 20), rowNames)
   matrix <- applyMcolsRowNames(matrix(1:4, nrow = 2), rowNames)
   array <- applyMcolsRowNames(array(1:8, dim = c(2, 2, 2)), rowNames)
