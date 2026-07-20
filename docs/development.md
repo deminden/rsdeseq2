@@ -35,6 +35,18 @@ cargo test -p rsdeseq2 --test wald_reference
 cargo test -p rsdeseq2 --test lrt_reference
 ```
 
+The optimizer stress reference specifically requires R 4.6.0:
+
+```bash
+OPENBLAS_NUM_THREADS=1 \
+  conda run -n rsfgsea-r460 Rscript \
+  scripts/generate_lbfgsb_synthetic_stress_fixtures.R
+```
+
+The current `rcompat-lbfgsb` 0.2.0 result is 512/512 exact endpoints,
+objectives, and evaluation counts. The previous 0.1.6 baseline was 495/512 at
+practical tolerances, 0/512 exact, and 317/512 for exact evaluation counts.
+
 The reference tests are skip-safe when
 `crates/rsdeseq2/tests/data/deseq2_reference/` has not been generated. Once the
 R script is run, they compare the implemented Rust stages against the generated

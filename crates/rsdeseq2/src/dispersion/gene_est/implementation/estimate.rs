@@ -169,31 +169,45 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
             )?,
         };
 
-        for (compact_row, gene) in fit_genes.iter().copied().enumerate() {
-            let fit_mu_raw = fit.mu.row(compact_row)?;
-            let fit_mu = fit_mu_raw
-                .iter()
-                .copied()
-                .map(|value| value.max(options.min_mu))
-                .collect::<Vec<_>>();
+        let updates = fit_genes
+            .par_iter()
+            .copied()
+            .enumerate()
+            .map(
+                |(compact_row, gene)| -> Result<
+                    (usize, Vec<f64>, GeneDispersionFitDiagnostics),
+                    DeseqError,
+                > {
+                    let fit_mu_raw = fit.mu.row(compact_row)?;
+                    let fit_mu = fit_mu_raw
+                        .iter()
+                        .copied()
+                        .map(|value| value.max(options.min_mu))
+                        .collect::<Vec<_>>();
+                    // DESeq2 passes the full non-all-zero weight matrix into fitDisp
+                    // even when counts/mu are subset by fitidx; the C++ then indexes
+                    // weights by compact row position.
+                    let weight_row = input
+                        .observation_weights
+                        .map(|weights| weights.row(fitting_gene_order[compact_row]))
+                        .transpose()?;
+                    let diagnostics = fit_dispersion_for_gene_detailed_with_weights(
+                        input.counts.row(gene)?,
+                        &fit_mu,
+                        input.design,
+                        alpha_hat[gene],
+                        options,
+                        input.counts.n_samples(),
+                        weight_row,
+                    )?;
+                    Ok((gene, fit_mu, diagnostics))
+                },
+            )
+            .collect::<Result<Vec<_>, DeseqError>>()?;
+
+        for (gene, fit_mu, diagnostics) in updates {
             let start = gene * input.counts.n_samples();
             mu_values[start..start + input.counts.n_samples()].copy_from_slice(&fit_mu);
-            // DESeq2 passes the full non-all-zero weight matrix into fitDisp
-            // even when counts/mu are subset by fitidx; the C++ then indexes
-            // weights by compact row position.
-            let weight_row = input
-                .observation_weights
-                .map(|weights| weights.row(fitting_gene_order[compact_row]))
-                .transpose()?;
-            let diagnostics = fit_dispersion_for_gene_detailed_with_weights(
-                input.counts.row(gene)?,
-                &fit_mu,
-                input.design,
-                alpha_hat[gene],
-                options,
-                input.counts.n_samples(),
-                weight_row,
-            )?;
             alpha_hat_new[gene] = diagnostics.estimate.min(max_disp);
             disp_iter[gene] = diagnostics.iterations;
             initial_lp[gene] = diagnostics.initial_lp;
@@ -231,33 +245,41 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
         }
     }
 
+    let final_rows = (0..input.counts.n_genes())
+        .into_par_iter()
+        .map(|gene| -> Result<(usize, f64, bool), DeseqError> {
+            if input.all_zero[gene] {
+                return Ok((gene, f64::NAN, false));
+            }
+            let converged = disp_iter[gene] < options.maxit && disp_iter[gene] != 1;
+            let mut estimate = disp_gene_est[gene];
+            if !converged && estimate > options.min_disp * 10.0 {
+                let mu = &mu_values[gene * input.counts.n_samples()
+                    ..gene * input.counts.n_samples() + input.counts.n_samples()];
+                let weight_row = input
+                    .observation_weights
+                    .map(|weights| weights.row(gene))
+                    .transpose()?;
+                estimate = fit_dispersion_grid_inner(DispersionOptimizerInput {
+                    counts: input.counts.row(gene)?,
+                    mu,
+                    design: Some(input.design),
+                    initial_dispersion: estimate,
+                    options,
+                    n_samples: input.counts.n_samples(),
+                    prior: None,
+                    weights: weight_row,
+                })?
+                .0;
+            }
+            Ok((gene, estimate.clamp(options.min_disp, max_disp), converged))
+        })
+        .collect::<Result<Vec<_>, DeseqError>>()?;
+
     let mut converged = vec![false; input.counts.n_genes()];
-    for gene in 0..input.counts.n_genes() {
-        if input.all_zero[gene] {
-            disp_gene_est[gene] = f64::NAN;
-            continue;
-        }
-        converged[gene] = disp_iter[gene] < options.maxit && disp_iter[gene] != 1;
-        if !converged[gene] && disp_gene_est[gene] > options.min_disp * 10.0 {
-            let mu = &mu_values[gene * input.counts.n_samples()
-                ..gene * input.counts.n_samples() + input.counts.n_samples()];
-            let weight_row = input
-                .observation_weights
-                .map(|weights| weights.row(gene))
-                .transpose()?;
-            disp_gene_est[gene] = fit_dispersion_grid_inner(DispersionOptimizerInput {
-                counts: input.counts.row(gene)?,
-                mu,
-                design: Some(input.design),
-                initial_dispersion: disp_gene_est[gene],
-                options,
-                n_samples: input.counts.n_samples(),
-                prior: None,
-                weights: weight_row,
-            })?
-            .0;
-        }
-        disp_gene_est[gene] = disp_gene_est[gene].clamp(options.min_disp, max_disp);
+    for (gene, estimate, row_converged) in final_rows {
+        disp_gene_est[gene] = estimate;
+        converged[gene] = row_converged;
     }
 
     Ok(GeneWiseDispersionOutput {

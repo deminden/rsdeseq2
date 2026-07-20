@@ -55,6 +55,7 @@ fn cox_reid_adjustment_weighted_with_threshold(
         alpha,
         weights,
         weight_threshold,
+        CoxReidMatrixOrder::Value,
     )?;
     let determinant = matrices.xtwx.determinant();
     if !determinant.is_finite() || determinant <= 0.0 {
@@ -69,8 +70,25 @@ fn cox_reid_adjustment_weighted_with_threshold(
 
 struct CoxReidDesignMatrices {
     xtwx: DMatrix<f64>,
-    d_xtwx: DMatrix<f64>,
-    d2_xtwx: DMatrix<f64>,
+    d_xtwx: Option<DMatrix<f64>>,
+    d2_xtwx: Option<DMatrix<f64>>,
+}
+
+#[derive(Clone, Copy)]
+enum CoxReidMatrixOrder {
+    Value,
+    Derivative,
+    SecondDerivative,
+}
+
+impl CoxReidMatrixOrder {
+    fn needs_derivative(self) -> bool {
+        matches!(self, Self::Derivative | Self::SecondDerivative)
+    }
+
+    fn needs_second_derivative(self) -> bool {
+        matches!(self, Self::SecondDerivative)
+    }
 }
 
 fn cox_reid_weighted_design_matrices_with_threshold(
@@ -79,6 +97,7 @@ fn cox_reid_weighted_design_matrices_with_threshold(
     alpha: f64,
     weights: Option<&[f64]>,
     weight_threshold: f64,
+    order: CoxReidMatrixOrder,
 ) -> Result<CoxReidDesignMatrices, DeseqError> {
     if design.n_samples() != mu.len() {
         return Err(invalid_dimensions(
@@ -110,18 +129,31 @@ fn cox_reid_weighted_design_matrices_with_threshold(
     // are zero on the retained sample subset before building determinant terms.
     let p = selected_columns.len();
     let mut xtwx = DMatrix::<f64>::zeros(p, p);
-    let mut d_xtwx = DMatrix::<f64>::zeros(p, p);
-    let mut d2_xtwx = DMatrix::<f64>::zeros(p, p);
+    let mut d_xtwx = order
+        .needs_derivative()
+        .then(|| DMatrix::<f64>::zeros(p, p));
+    let mut d2_xtwx = order
+        .needs_second_derivative()
+        .then(|| DMatrix::<f64>::zeros(p, p));
     for sample in selected_samples {
         let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
-        let weight_terms = cox_reid_weight_terms(mu, alpha, sample)?;
         let row = design.matrix().row(sample)?;
-        for (left_idx, left_col) in selected_columns.iter().copied().enumerate() {
-            for (right_idx, right_col) in selected_columns.iter().copied().enumerate() {
+        let active_columns = selected_columns
+            .iter()
+            .copied()
+            .enumerate()
+            .filter_map(|(idx, col)| (row[col] != 0.0).then_some((idx, row[col])))
+            .collect::<Vec<_>>();
+        if active_columns.is_empty() {
+            continue;
+        }
+        let weight_terms = cox_reid_weight_terms(mu, alpha, sample)?;
+        for (left_pos, (left_idx, left_value)) in active_columns.iter().copied().enumerate() {
+            for (right_idx, right_value) in active_columns.iter().copied().skip(left_pos) {
                 let x_product = checked_mul(
-                    row[left_col],
-                    row[right_col],
+                    left_value,
+                    right_value,
                     sample,
                     "Cox-Reid weighted design product",
                 )?;
@@ -136,28 +168,41 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                     sample,
                     "Cox-Reid weighted design xtwx",
                 )?;
-                checked_matrix_add_assign(
-                    &mut d_xtwx[(left_idx, right_idx)],
-                    checked_mul(
-                        x_product,
-                        weight_terms.d_weight,
+                if left_idx != right_idx {
+                    xtwx[(right_idx, left_idx)] = xtwx[(left_idx, right_idx)];
+                }
+                if let Some(d_xtwx) = &mut d_xtwx {
+                    checked_matrix_add_assign(
+                        &mut d_xtwx[(left_idx, right_idx)],
+                        checked_mul(
+                            x_product,
+                            weight_terms.d_weight,
+                            sample,
+                            "Cox-Reid weighted design derivative",
+                        )?,
                         sample,
                         "Cox-Reid weighted design derivative",
-                    )?,
-                    sample,
-                    "Cox-Reid weighted design derivative",
-                )?;
-                checked_matrix_add_assign(
-                    &mut d2_xtwx[(left_idx, right_idx)],
-                    checked_mul(
-                        x_product,
-                        weight_terms.d2_weight,
+                    )?;
+                    if left_idx != right_idx {
+                        d_xtwx[(right_idx, left_idx)] = d_xtwx[(left_idx, right_idx)];
+                    }
+                }
+                if let Some(d2_xtwx) = &mut d2_xtwx {
+                    checked_matrix_add_assign(
+                        &mut d2_xtwx[(left_idx, right_idx)],
+                        checked_mul(
+                            x_product,
+                            weight_terms.d2_weight,
+                            sample,
+                            "Cox-Reid weighted design second derivative",
+                        )?,
                         sample,
                         "Cox-Reid weighted design second derivative",
-                    )?,
-                    sample,
-                    "Cox-Reid weighted design second derivative",
-                )?;
+                    )?;
+                    if left_idx != right_idx {
+                        d2_xtwx[(right_idx, left_idx)] = d2_xtwx[(left_idx, right_idx)];
+                    }
+                }
             }
         }
     }
@@ -253,6 +298,7 @@ fn cox_reid_adjustment_derivative_weighted_with_threshold(
         alpha,
         weights,
         weight_threshold,
+        CoxReidMatrixOrder::Derivative,
     )?;
     let Some(inverse) = matrices.xtwx.try_inverse() else {
         return Err(DeseqError::InvalidDimensions {
@@ -261,7 +307,12 @@ fn cox_reid_adjustment_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    Ok(-0.5 * trace_product(&inverse, &matrices.d_xtwx)? * alpha)
+    let d_xtwx = matrices.d_xtwx.ok_or(DeseqError::InvalidDimensions {
+        context: "Cox-Reid weighted design derivative".to_string(),
+        expected: design.n_coefficients(),
+        actual: 0,
+    })?;
+    Ok(-0.5 * trace_product(&inverse, &d_xtwx)? * alpha)
 }
 
 /// Second derivative of the Cox-Reid adjustment with respect to log alpha.
@@ -306,6 +357,7 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
         alpha,
         weights,
         weight_threshold,
+        CoxReidMatrixOrder::SecondDerivative,
     )?;
     let Some(inverse) = matrices.xtwx.try_inverse() else {
         return Err(DeseqError::InvalidDimensions {
@@ -314,19 +366,23 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    let second_trace_product = &inverse * &matrices.d_xtwx * &inverse * &matrices.d_xtwx;
+    let d_xtwx = matrices.d_xtwx.ok_or(DeseqError::InvalidDimensions {
+        context: "Cox-Reid weighted design derivative".to_string(),
+        expected: design.n_coefficients(),
+        actual: 0,
+    })?;
+    let d2_xtwx = matrices.d2_xtwx.ok_or(DeseqError::InvalidDimensions {
+        context: "Cox-Reid weighted design second derivative".to_string(),
+        expected: design.n_coefficients(),
+        actual: 0,
+    })?;
+    let second_trace_product = &inverse * &d_xtwx * &inverse * &d_xtwx;
     let second_trace = checked_sum_indexed(
         second_trace_product.diagonal().iter().copied(),
         "Cox-Reid second trace product",
     )?;
-    let trace_bi_d2b = trace_product(&inverse, &matrices.d2_xtwx)?;
+    let trace_bi_d2b = trace_product(&inverse, &d2_xtwx)?;
     let second_alpha = 0.5 * (second_trace - trace_bi_d2b);
-    let first_log_alpha = cox_reid_adjustment_derivative_weighted_with_threshold(
-        design,
-        mu,
-        log_alpha,
-        weights,
-        weight_threshold,
-    )?;
+    let first_log_alpha = -0.5 * trace_product(&inverse, &d_xtwx)? * alpha;
     checked_cox_reid_log_alpha_second_derivative(second_alpha, alpha, first_log_alpha)
 }

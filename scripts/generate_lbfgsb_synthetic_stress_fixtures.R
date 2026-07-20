@@ -10,7 +10,7 @@ get_arg <- function(name, default = NULL) {
 }
 
 source_root <- get_arg("--source-root", "results/fixtures/lbfgsb_hard_real_2026-06-01")
-out_dir <- get_arg("--output-dir", "results/fixtures/lbfgsb_synthetic_stress_2026-06-06")
+out_dir <- get_arg("--output-dir", "results/fixtures/lbfgsb_synthetic_stress_2026-07-20")
 n_cases <- as.integer(get_arg("--n-cases", "512"))
 n_seeds <- as.integer(get_arg("--n-seeds", "128"))
 max_per_source <- as.integer(get_arg("--max-per-source", "16"))
@@ -18,9 +18,28 @@ lower <- as.numeric(get_arg("--lower", "-30"))
 upper <- as.numeric(get_arg("--upper", "30"))
 maxit <- as.integer(get_arg("--maxit", "100"))
 
+required_r_version <- "4.6.0"
+actual_r_version <- as.character(getRversion())
+if (!identical(actual_r_version, required_r_version)) {
+  stop(
+    "fixture generation requires R ", required_r_version,
+    "; running R ", actual_r_version
+  )
+}
+
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_tsv <- function(x, path) {
+  # write.table() limits doubles to roughly DBL_DIG decimal digits, which is
+  # not enough to recover every IEEE-754 value used by optim().  These stress
+  # cases contain very flat directions, so a one-bit input change can produce
+  # a materially different optimizer path.  Pre-format doubles with enough
+  # digits for exact round trips before handing the table to write.table().
+  double_columns <- vapply(x, is.double, logical(1))
+  x[double_columns] <- lapply(
+    x[double_columns],
+    function(values) sprintf("%.17g", values)
+  )
   utils::write.table(
     x,
     path,
@@ -30,6 +49,23 @@ write_tsv <- function(x, path) {
     col.names = TRUE,
     na = "NA"
   )
+}
+
+assert_double_round_trip <- function(original, path, compressed = FALSE) {
+  input <- if (compressed) gzfile(path) else path
+  restored <- utils::read.delim(
+    input,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  stopifnot(nrow(restored) == nrow(original))
+  double_columns <- names(original)[vapply(original, is.double, logical(1))]
+  for (name in double_columns) {
+    if (!identical(original[[name]], as.double(restored[[name]]))) {
+      stop("double column did not round-trip exactly: ", name, " in ", path)
+    }
+  }
+  invisible(TRUE)
 }
 
 bind_rows_fill <- function(rows) {
@@ -409,21 +445,33 @@ cases <- bind_rows_fill(case_rows)
 samples <- bind_rows_fill(sample_rows)
 coefficients <- bind_rows_fill(coefficient_rows)
 
-write_tsv(cases, file.path(out_dir, "cases.tsv"))
-write_tsv(coefficients, file.path(out_dir, "coefficients.tsv"))
-write_tsv(samples, gzfile(file.path(out_dir, "samples.tsv.gz")))
-write_tsv(pool, file.path(out_dir, "candidate_pool.tsv"))
+cases_path <- file.path(out_dir, "cases.tsv")
+coefficients_path <- file.path(out_dir, "coefficients.tsv")
+samples_path <- file.path(out_dir, "samples.tsv.gz")
+pool_path <- file.path(out_dir, "candidate_pool.tsv")
+write_tsv(cases, cases_path)
+write_tsv(coefficients, coefficients_path)
+write_tsv(samples, gzfile(samples_path))
+write_tsv(pool, pool_path)
+assert_double_round_trip(cases, cases_path)
+assert_double_round_trip(coefficients, coefficients_path)
+assert_double_round_trip(samples, samples_path, compressed = TRUE)
+assert_double_round_trip(pool, pool_path)
 
 manifest <- data.frame(
   key = c(
     "source_root", "n_requested_cases", "n_written_cases", "n_seed_rows",
     "n_candidate_pool", "max_per_source", "lower", "upper", "maxit", "factr",
-    "pgtol", "lmm", "r_version"
+    "pgtol", "lmm", "r_version", "r_platform", "blas", "lapack",
+    "openblas_num_threads", "numeric_serialization"
   ),
   value = c(
     source_root, n_cases, nrow(cases), nrow(hardest),
     nrow(pool), max_per_source, lower, upper, maxit, 1e7, 0, 5,
-    R.version.string
+    R.version.string, R.version$platform,
+    if (is.null(sessionInfo()$BLAS)) "" else sessionInfo()$BLAS,
+    if (is.null(sessionInfo()$LAPACK)) "" else sessionInfo()$LAPACK,
+    Sys.getenv("OPENBLAS_NUM_THREADS", unset = ""), "%.17g"
   ),
   check.names = FALSE
 )
@@ -443,6 +491,9 @@ readme <- c(
   "- `samples.tsv.gz`: sample-level count, size factor, dispersion, weight, and design row for each case.",
   "- `candidate_pool.tsv`: all nonduplicate candidates considered before selecting the final cases.",
   "- `manifest.tsv`: generation settings.",
+  "",
+  "Double-valued columns use 17 significant digits so the serialized inputs round-trip to the exact IEEE-754 values used for the R optimizer run.",
+  "The manifest records the R platform, BLAS/LAPACK libraries, and BLAS thread setting because weakly identified optimizer paths can be arithmetic-sensitive.",
   "",
   "Good first targets for an optimizer port are cases with `optim_convergence == 0`, high `max_abs_start_to_optim`, high `optim_fn_count`, and small `projected_gradient_norm`."
 )

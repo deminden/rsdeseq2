@@ -15,7 +15,7 @@ apples-to-apples validation and benchmarking, but they are not a claim of full
 | Size factors and normalized counts | Matches DESeq2 `ratio` and `poscounts` behavior for covered fixtures, including supplied geometric means and control genes. | Hand tests, generated DESeq2 normalization fixtures, and real/synthetic CLI benchmark diffs. |
 | Base row metadata | Matches `baseMean`, `baseVar`, `allZero`, normalization-factor metadata, and weighted base metadata for implemented inputs. | Generated DESeq2 metadata fixtures and unit tests. |
 | Negative-binomial likelihood/deviance | Matches DESeq2's `mu`/dispersion parameterization and `-2 * logLike` convention. | Hand-formula and fixed-dispersion GLM fixture checks. |
-| Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures including fitted means and hats. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
+| Fixed-dispersion GLM | Matches implemented `fitNbinomGLMs` fields for supplied dispersions: betas, SEs/covariance, fitted means, hats, log likelihood, Wald/LRT, weighted paths, and forced optim fallback fixtures. Optim fallback rows take the optimized beta/SE/fitted-mean/log-likelihood outputs while preserving DESeq2's pre-optimizer IRLS hats for downstream Cook's decisions. | Optional DESeq2-internal Wald/LRT/Cook's/optim reference tests plus deterministic Rust tests. |
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw and orthogonal polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and workflow plumbing, owned model-frame formula inputs with factor reference inference/override, builder-stored model-frame formula design helpers, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, supported-formula, and owned-model-frame helpers can now build the expanded design internally for replacement-refit workflows too, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, model-frame wrapper tests, and CLI smoke tests; splines, arbitrary R expressions, and full R-compatible formula parsing still need coverage. |
 | Dispersion trend and MAP pieces | Matches or closely tracks parametric/mean trend fixtures, pure-Rust locfit-compatible local trend fixtures including a single-usable-row edge case and real-data fitted-value parity, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic anchors. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, R-cleaned coefficient/list/factor-level aliases, R-cleaned factor-level result names, explicit and builder-stored owned-model-frame character contrast resolution for supported fixed/native Wald/LRT routes, resolved numeric contrast metadata for implemented contrast result and replacement/refit paths, top-level formula-built Wald designs and LRT full/reduced designs for supported model-frame formulas, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected formula-built and explicit-design replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
@@ -633,31 +633,63 @@ convergence, and `weightsFail` row expansion.
 The fixed-dispersion IRLS path now includes a bounded limited-memory BFGS-style
 pure-Rust optim fallback for routed rows. It follows DESeq2's objective-only
 `optim(..., method="L-BFGS-B")` shape with R-style finite differences and no
-extra post-polish. The current real-data focused contrast has zero missingness
-mismatches for baseMean, log2 fold change, lfcSE, Wald statistic, p-value, and
-adjusted p-value. Mean absolute differences are `2.17e-08` for log2 fold
-change, `1.57e-10` for lfcSE, `3.19e-08` for Wald statistic, `3.64e-09` for
-p-value, and `2.12e-08` for adjusted p-value. The harshest max absolute
-differences are `7.70e-04`, `8.26e-07`, `1.25e-03`, `6.50e-05`, and
-`4.50e-05`, respectively. The largest previous non-optimizer lfcSE tail was
-caused by clamping the MAP dispersion start to `maxDisp`; the line search now
-preserves high starts and only clamps final stored dispersions, reducing
-`lfcSE_max_abs` by about 396x on that contrast. The current checked reference
-fixtures still use
-`useOptim=FALSE`; the reference generator also has an optional
-`forceOptim=TRUE` fixture and skip-safe Rust comparison hook for validating the
-bounded fallback where DESeq2 is installed locally.
+extra post-polish. For fallback rows, DESeq2 keeps the pre-optimizer IRLS hat
+diagonals for downstream Cook's decisions, so Rust preserves those hats too
+while using the optimizer-refit beta, SE/covariance, fitted means, row log
+likelihoods, and convergence diagnostics.
 
-`scripts/analyze_parity_mismatch_sources.py` joins the current real-data
-diagnostics with offline optimizer fixture summaries to separate first-stage
-beta differences from downstream statistic and adjusted-p-value amplification.
-On the current hard contrast, the largest local tail rows are optimizer-beta
-target rows: for the worst row, Rust differs from the offline DESeq2 optimizer
-target by the full `7.70e-04` log2-fold-change gap, while the saved reference is
-within `4.66e-08` of that target. The next most useful parity work is therefore
-the exact L-BFGS-B wrapper/Fortran behavior for routed beta rows. The secondary
-non-optimizer target is now isolated to MAP dispersion line-search sensitivity
-in a small set of high-dispersion rows; adjusted-p-value maxima mostly reflect
+The fallback uses `rcompat-lbfgsb` 0.2.0. Its precision was checked against the
+512-case synthetic stress bundle generated by R 4.6.0 (`stats::optim`) with
+OpenBLAS 0.3.32, one BLAS thread, and 17-digit round-trip serialization. At the
+scan's practical thresholds (maximum parameter error `5e-3`, absolute objective
+error `1e-5` or relative objective error `1e-8`), 0.1.6 matched both endpoint
+and objective in 495/512 cases and matched R's function/gradient counts in
+317/512. Version 0.2.0 matched all 512 endpoints, objective values, and counts.
+With all endpoint and objective tolerances set to zero, the result improved
+from 0/512 exact cases on 0.1.6 to 512/512 on 0.2.0. This is evidence for this
+pinned R/platform/objective fixture family, not a claim of bit-exact behavior
+for arbitrary platforms or callback arithmetic.
+
+In a dependency-only 65,580-gene kidney replay, the exact optimizer gain did
+not materially improve end-to-end Wald parity. From 0.1.6 to 0.2.0, median and
+p99 absolute errors generally changed by less than 2%; LFC, statistic, and
+p-value maxima were unchanged at the displayed precision. The `lfcSE` maximum
+changed from `1.95e-06` to `5.10e-06`, and the BH-adjusted-p maximum from
+`4.50e-05` to `7.29e-05`. This distinction is expected because fallback rows
+are a small part of the workflow and other numerical stages dominate the
+remaining tails. The complete compact table is tracked in
+[`data/lbfgsb_real_data_precision.tsv`](data/lbfgsb_real_data_precision.tsv).
+The production fallback now supplies the closed-form beta gradient through the
+0.2.0 API instead of asking the optimizer for finite differences. Against the
+same R 4.6.0 reference this reduced median/p99 error by 22%/20% for LFC,
+22%/20% for SE, and 22%/20% for the Wald statistic. The p-value median improved
+15%, while its p99 and the dominant maxima were effectively unchanged.
+Only 26/65,580 kidney rows (`0.040%`) and 305/535,178 fitted rows across eight
+hard-real contrasts (`0.057%`) used L-BFGS-B. On eight non-replaced kidney tail
+rows, median dispersion drift of `4.77e-08` corresponded to median optimizer
+beta-target drift of `9.82e-05`, identifying upstream objective-input parity as
+the next practical accuracy target. Three whole-workflow runs showed no clear
+speed change: the 0.1.6 and 0.2.0 ranges overlapped (`25.87–28.09 s` versus
+`25.76–28.51 s`). A direct finite-difference/analytic-gradient comparison also
+overlapped (`28.46–28.66 s` versus `28.18–28.77 s`), with a descriptive 0.8%
+median reduction. See
+[`data/lbfgsb_real_data_route_summary.tsv`](data/lbfgsb_real_data_route_summary.tsv).
+
+After the IRLS fitted-mean and fallback-hat fixes, targeted publication-style
+Wald checks reran the former worst/diagnostic full-blocked contrasts for blood,
+muscle, and pancreas. They covered 209,030 result rows with zero missing-row or
+finite/NA-pattern mismatches across `baseMean`,
+`log2FoldChange`, `lfcSE`, `stat`, `pvalue`, and `padj`. The largest observed
+absolute differences in those checks were `4.13e-03` for p-value and
+`3.21e-03` for adjusted p-value; remaining differences are finite numeric
+drift rather than row swaps or missingness cascades.
+
+`scripts/analyze_parity_mismatch_sources.py` joins real-data diagnostics with
+offline optimizer fixture summaries to separate first-stage beta differences
+from downstream statistic and adjusted-p-value amplification. The focused
+hard-contrast diagnostics showed optimizer-beta target rows as the largest
+local tails, with secondary non-optimizer rows isolated to MAP dispersion
+line-search sensitivity; adjusted-p-value maxima mostly reflected
 Benjamini-Hochberg propagation from upstream p-value tail rows.
 
 ## Missing

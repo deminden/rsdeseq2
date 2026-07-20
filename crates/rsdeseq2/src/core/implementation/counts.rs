@@ -46,9 +46,9 @@ use crate::options::{
     TestType,
 };
 use crate::results::{
-    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_contrast_results,
-    build_lrt_results, build_wald_contrast_results, build_wald_results_from_wald,
-    resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
+    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic,
+    build_lrt_contrast_results, build_lrt_results, build_wald_contrast_results,
+    build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
 use crate::transform::{
     fast_vst_eligible_count as count_fast_vst_eligible_rows,

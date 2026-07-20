@@ -122,6 +122,22 @@ distances, matched GLM-mu result-row p-values and adjusted p-values, and
 compact matched GLM-mu Wald/LRT result rows, and Cook's replacement/refit
 bookkeeping against the generated references.
 
+The separate L-BFGS-B stress oracle is generated with the pinned R 4.6.0
+environment:
+
+```bash
+OPENBLAS_NUM_THREADS=1 \
+  conda run -n rsfgsea-r460 Rscript \
+  scripts/generate_lbfgsb_synthetic_stress_fixtures.R
+```
+
+The generator refuses other R versions and serializes doubles with 17
+significant digits. The 2026-07-20 fixture contains 512 cases and records x86_64
+Linux, OpenBLAS 0.3.32, one thread. Replaying it with `rcompat-lbfgsb` 0.2.0
+produces 512/512 exact endpoints, objective values, and evaluation counts. The
+0.1.6 baseline produced 495/512 practical-tolerance matches, 0/512 exact
+endpoint-plus-objective matches, and 317/512 exact count matches.
+
 The current native Wald pipeline is covered by Rust self-consistency tests:
 it preserves dispersion intermediates, expands all-zero rows, and produces the
 same GLM/result fields as the supplied-dispersion Wald path when fed its own

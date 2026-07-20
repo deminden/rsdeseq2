@@ -413,23 +413,26 @@ fn mu_alpha_terms(
         let inv_one_plus = one_plus.recip();
         let ratio = mu_alpha * inv_one_plus;
         let alpha_over_one_plus = alpha * inv_one_plus;
-        let inv_one_plus_squared = checked_mul(
+        let inv_one_plus_squared = checked_mu_alpha_product(
             inv_one_plus,
             inv_one_plus,
             index,
-            &format!("{context} inverse denominator square"),
+            context,
+            "inverse denominator square",
         )?;
-        let ratio_squared = checked_mul(
+        let ratio_squared = checked_mu_alpha_product(
             ratio,
             ratio,
             index,
-            &format!("{context} mean-dispersion ratio square"),
+            context,
+            "mean-dispersion ratio square",
         )?;
-        let mu_squared_alpha_over_one_plus_squared = checked_mul(
+        let mu_squared_alpha_over_one_plus_squared = checked_mu_alpha_product(
             ratio_squared,
             alpha.recip(),
             index,
-            &format!("{context} mean curvature term"),
+            context,
+            "mean curvature term",
         )?;
         MuAlphaTerms {
             log1p: (1.0 + mu_alpha).ln(),
@@ -466,6 +469,25 @@ fn mu_alpha_terms(
         }
     }
     Ok(terms)
+}
+
+fn checked_mu_alpha_product(
+    left: f64,
+    right: f64,
+    index: usize,
+    context: &str,
+    suffix: &str,
+) -> Result<f64, DeseqError> {
+    let value = left * right;
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DeseqError::NonFiniteValue {
+            context: format!("{context} {suffix}"),
+            index: Some(index),
+            value,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

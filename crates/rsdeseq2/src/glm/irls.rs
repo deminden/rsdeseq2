@@ -1,5 +1,6 @@
 use nalgebra::{DMatrix, DVector};
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use rayon::prelude::*;
+use rcompat_lbfgsb::{optim_lbfgsb_with_gradient, Bounds, OptimControl};
 use std::cell::RefCell;
 
 use crate::core::CountMatrix;
@@ -242,102 +243,30 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let mut beta_optim_objective = vec![f64::NAN; counts.n_genes()];
     let mut beta_optim_gradient_norm = vec![f64::NAN; counts.n_genes()];
 
-    for (gene, dispersion) in dispersions.iter().copied().enumerate() {
-        if counts.is_all_zero_gene(gene)? {
-            return Err(DeseqError::InvalidCounts {
-                reason: format!(
-                    "gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"
-                ),
-            });
-        }
-        let y = counts
-            .row(gene)?
-            .iter()
-            .copied()
-            .map(f64::from)
-            .collect::<Vec<_>>();
-        let nf = normalization_factors.row(gene)?;
-        let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
-        let mut beta = initial_beta(&x, &y, nf)?;
-        let mut mu = fitted_mu(&x, &beta, nf, options.min_mu)?;
-        let mut dev_old = 0.0;
-        let mut dev = 0.0;
-        let mut iter = 0_usize;
-        let mut converged = false;
+    let row_outputs = (0..counts.n_genes())
+        .into_par_iter()
+        .map(|gene| {
+            fit_fixed_dispersion_irls_row(IrlsRowInput {
+                gene,
+                counts,
+                x: &x,
+                normalization_factors,
+                dispersions,
+                weights,
+                ridge_lambda: &ridge_lambda,
+                options: &options,
+            })
+        })
+        .collect::<Result<Vec<_>, DeseqError>>()?;
 
-        for t in 0..options.maxit {
-            iter += 1;
-            let w = working_weights(&mu, dispersion, weight_row)?;
-            let z = working_response(&mu, nf, &y)?;
-            let Some(next_beta) =
-                solve_weighted_least_squares(&x, &w, &z, &ridge_lambda, options.solver)
-            else {
-                iter = options.maxit;
-                break;
-            };
-            beta = next_beta;
-            if beta
-                .iter()
-                .any(|value| !value.is_finite() || value.abs() > options.max_beta_abs)
-            {
-                iter = options.maxit;
-                break;
-            }
-            mu = fitted_mu(&x, &beta, nf, options.min_mu)?;
-            dev = -2.0
-                * nbinom_log_likelihood_weighted(counts.row(gene)?, &mu, dispersion, weight_row)?;
-            let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
-                iter = options.maxit;
-                break;
-            };
-            if t > 0 && conv_test < options.beta_tol {
-                converged = true;
-                break;
-            }
-            dev_old = dev;
-        }
-
-        let w = working_weights(&mu, dispersion, weight_row)?;
-        let Some((beta_covariance, hat_diag)) = covariance_and_hat_diagonal(&x, &w, &ridge_lambda)
-        else {
-            iter = options.maxit;
-            (0..p).for_each(|_| beta_var_values.push(f64::NAN));
-            (0..p * p).for_each(|_| beta_covariance_values.push(f64::NAN));
-            hat_values.extend(vec![f64::NAN; counts.n_samples()]);
-            for (col, value) in beta.iter().copied().enumerate() {
-                beta_values.push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
-            }
-            let output_mu = fitted_mu_unfloored(&x, &beta, nf)?;
-            mu_values.extend(output_mu.iter().copied());
-            beta_iter.push(iter);
-            beta_converged.push(false);
-            continue;
-        };
-
-        for (col, value) in beta.iter().copied().enumerate() {
-            beta_values.push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
-        }
-        for diagonal in 0..p {
-            let value = beta_covariance[diagonal * p + diagonal];
-            beta_var_values.push(checked_log2_standard_error(
-                value,
-                diagonal,
-                "IRLS beta standard error",
-            )?);
-        }
-        for (idx, value) in beta_covariance.into_iter().enumerate() {
-            beta_covariance_values.push(checked_log2_covariance(
-                value,
-                idx,
-                "IRLS beta covariance log2 scale",
-            )?);
-        }
-        let output_mu = fitted_mu_unfloored(&x, &beta, nf)?;
-        mu_values.extend(output_mu.iter().copied());
-        hat_values.extend(hat_diag);
-        beta_iter.push(iter);
-        beta_converged.push(converged && iter < options.maxit);
-        let _ = dev;
+    for row in row_outputs {
+        beta_values.extend(row.beta);
+        beta_var_values.extend(row.beta_se);
+        beta_covariance_values.extend(row.beta_covariance);
+        mu_values.extend(row.mu);
+        hat_values.extend(row.hat);
+        beta_iter.push(row.iter);
+        beta_converged.push(row.converged);
     }
 
     let beta_for_routing =
@@ -423,6 +352,140 @@ struct OptimFallbackInput<'a> {
     options: &'a IrlsOptions,
 }
 
+struct IrlsRowInput<'a> {
+    gene: usize,
+    counts: &'a CountMatrix,
+    x: &'a DMatrix<f64>,
+    normalization_factors: &'a RowMajorMatrix<f64>,
+    dispersions: &'a [f64],
+    weights: Option<&'a RowMajorMatrix<f64>>,
+    ridge_lambda: &'a [f64],
+    options: &'a IrlsOptions,
+}
+
+struct IrlsRowOutput {
+    beta: Vec<f64>,
+    beta_se: Vec<f64>,
+    beta_covariance: Vec<f64>,
+    mu: Vec<f64>,
+    hat: Vec<f64>,
+    iter: usize,
+    converged: bool,
+}
+
+fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutput, DeseqError> {
+    let gene = input.gene;
+    let p = input.x.ncols();
+    if input.counts.is_all_zero_gene(gene)? {
+        return Err(DeseqError::InvalidCounts {
+            reason: format!("gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"),
+        });
+    }
+    let y = input
+        .counts
+        .row(gene)?
+        .iter()
+        .copied()
+        .map(f64::from)
+        .collect::<Vec<_>>();
+    let nf = input.normalization_factors.row(gene)?;
+    let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
+    let dispersion = input.dispersions[gene];
+    let mut beta = initial_beta(input.x, &y, nf)?;
+    let mut mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
+    let mut dev_old = 0.0;
+    let mut dev = 0.0;
+    let mut iter = 0_usize;
+    let mut converged = false;
+
+    for t in 0..input.options.maxit {
+        iter += 1;
+        let w = working_weights(&mu, dispersion, weight_row)?;
+        let z = working_response(&mu, nf, &y)?;
+        let Some(next_beta) =
+            solve_weighted_least_squares(input.x, &w, &z, input.ridge_lambda, input.options.solver)
+        else {
+            iter = input.options.maxit;
+            break;
+        };
+        beta = next_beta;
+        if beta
+            .iter()
+            .any(|value| !value.is_finite() || value.abs() > input.options.max_beta_abs)
+        {
+            iter = input.options.maxit;
+            break;
+        }
+        mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
+        dev = -2.0
+            * nbinom_log_likelihood_weighted(input.counts.row(gene)?, &mu, dispersion, weight_row)?;
+        let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
+            iter = input.options.maxit;
+            break;
+        };
+        if t > 0 && conv_test < input.options.beta_tol {
+            converged = true;
+            break;
+        }
+        dev_old = dev;
+    }
+
+    let mut row = IrlsRowOutput {
+        beta: Vec::with_capacity(p),
+        beta_se: Vec::with_capacity(p),
+        beta_covariance: Vec::with_capacity(p * p),
+        mu: Vec::with_capacity(input.counts.n_samples()),
+        hat: Vec::with_capacity(input.counts.n_samples()),
+        iter,
+        converged: false,
+    };
+
+    let w = working_weights(&mu, dispersion, weight_row)?;
+    let Some((beta_covariance, hat_diag)) =
+        covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
+    else {
+        row.iter = input.options.maxit;
+        row.beta_se.extend(std::iter::repeat_n(f64::NAN, p));
+        row.beta_covariance
+            .extend(std::iter::repeat_n(f64::NAN, p * p));
+        row.hat
+            .extend(std::iter::repeat_n(f64::NAN, input.counts.n_samples()));
+        for (col, value) in beta.iter().copied().enumerate() {
+            row.beta
+                .push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
+        }
+        row.mu
+            .extend(fitted_mu_unfloored(input.x, &beta, nf)?.iter().copied());
+        return Ok(row);
+    };
+
+    for (col, value) in beta.iter().copied().enumerate() {
+        row.beta
+            .push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
+    }
+    for diagonal in 0..p {
+        let value = beta_covariance[diagonal * p + diagonal];
+        row.beta_se.push(checked_log2_standard_error(
+            value,
+            diagonal,
+            "IRLS beta standard error",
+        )?);
+    }
+    for (idx, value) in beta_covariance.into_iter().enumerate() {
+        row.beta_covariance.push(checked_log2_covariance(
+            value,
+            idx,
+            "IRLS beta covariance log2 scale",
+        )?);
+    }
+    row.mu
+        .extend(fitted_mu_unfloored(input.x, &beta, nf)?.iter().copied());
+    row.hat.extend(hat_diag);
+    row.converged = converged && row.iter < input.options.maxit;
+    let _ = dev;
+    Ok(row)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn refit_optim_fallback_rows(
     rows: &[usize],
@@ -431,7 +494,7 @@ fn refit_optim_fallback_rows(
     beta_optim_start_values: &mut [f64],
     beta_covariance_values: &mut [f64],
     mu_values: &mut [f64],
-    hat_values: &mut [f64],
+    _hat_values: &mut [f64],
     beta_converged: &mut [bool],
     optim_log_like: &mut [Option<f64>],
     beta_optim_iter: &mut [f64],
@@ -482,7 +545,7 @@ fn refit_optim_fallback_rows(
             .map(|value| value.max(input.options.min_mu))
             .collect::<Vec<_>>();
         let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
-        let Some((beta_covariance, hat_diag)) =
+        let Some((beta_covariance, _hat_diag)) =
             covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
         else {
             return Err(DeseqError::UnsupportedFeature {
@@ -510,9 +573,9 @@ fn refit_optim_fallback_rows(
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;
         }
-        for (sample, value) in hat_diag.into_iter().enumerate() {
-            hat_values[gene * n + sample] = value;
-        }
+        // DESeq2 updates beta, SE, mu, and log-likelihood after L-BFGS-B
+        // fallback, but preserves the original IRLS hat diagonals returned by
+        // fitBetaWrapper. Cook's replacement relies on that pre-optim leverage.
         beta_converged[gene] = output.converged;
         beta_optim_iter[gene] = output.iterations as f64;
         beta_optim_start_objective[gene] = start_objective;
@@ -608,11 +671,18 @@ fn minimize_beta_log2_lbfgsb(
             feature: format!("optim fallback L-BFGS-B bounds failed: {error}"),
         })?;
     let control = optim_fallback_control(parameters.len(), maxit, gradient_tol);
-    let solution = optim_lbfgsb(parameters, bounds, &mut objective, control).map_err(|error| {
-        DeseqError::UnsupportedFeature {
-            feature: format!("optim fallback L-BFGS-B failed: {error}"),
+    let mut gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
+        Ok((_, gradient)) => gradient,
+        Err(error) => {
+            deferred_error.borrow_mut().get_or_insert(error);
+            vec![0.0; beta.len()]
         }
-    })?;
+    };
+    let solution =
+        optim_lbfgsb_with_gradient(parameters, bounds, &mut objective, &mut gradient, control)
+            .map_err(|error| DeseqError::UnsupportedFeature {
+                feature: format!("optim fallback L-BFGS-B failed: {error}"),
+            })?;
     if let Some(error) = deferred_error.into_inner() {
         return Err(error);
     }
@@ -925,24 +995,6 @@ fn checked_sum2(left: f64, right: f64) -> Option<f64> {
     (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
-fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
-    let scale = values
-        .iter()
-        .copied()
-        .map(f64::abs)
-        .try_fold(0.0_f64, |scale, value| {
-            value.is_finite().then_some(scale.max(value))
-        })?;
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let mut sum = 0.0;
-    for value in values.iter().copied() {
-        sum = checked_sum2(sum, checked_div2(value, scale)?)?;
-    }
-    checked_product2(sum, scale)
-}
-
 fn checked_product2(left: f64, right: f64) -> Option<f64> {
     let product = left * right;
     (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
@@ -1070,14 +1122,11 @@ fn fitted_mu_impl(
                 index: Some(sample),
                 value: f64::NAN,
             })?;
-            let mu = factor * eta.exp();
-            if !mu.is_finite() {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "IRLS fitted mean".to_string(),
-                    index: Some(sample),
-                    value: mu,
-                });
-            }
+            let mu = finite_scaled_exp(factor, eta).ok_or(DeseqError::NonFiniteValue {
+                context: "IRLS fitted mean".to_string(),
+                index: Some(sample),
+                value: f64::NAN,
+            })?;
             if mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "IRLS fitted mean".to_string(),
@@ -1091,19 +1140,72 @@ fn fitted_mu_impl(
 }
 
 fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f64> {
-    let mut terms = Vec::with_capacity(x.ncols());
+    let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
-        terms.push(checked_product2(x[(row, col)], beta[col])?);
+        sum.add(checked_product2(x[(row, col)], beta[col])?)?;
     }
-    checked_scaled_sum(&terms)
+    sum.finish()
 }
 
 fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> Option<f64> {
-    let mut terms = Vec::with_capacity(x.ncols());
+    let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
-        terms.push(checked_product2(x[(row, col)], beta[col])?);
+        sum.add(checked_product2(x[(row, col)], beta[col])?)?;
     }
-    checked_scaled_sum(&terms)
+    sum.finish()
+}
+
+#[derive(Default)]
+struct ScaledSum {
+    scale: f64,
+    normalized_sum: f64,
+}
+
+impl ScaledSum {
+    fn add(&mut self, value: f64) -> Option<()> {
+        if !value.is_finite() {
+            return None;
+        }
+        let abs = value.abs();
+        if abs == 0.0 {
+            return Some(());
+        }
+        if self.scale == 0.0 {
+            self.scale = abs;
+            self.normalized_sum = value / abs;
+            return Some(());
+        }
+        if abs > self.scale {
+            let rescaled = self.normalized_sum * (self.scale / abs);
+            self.normalized_sum = checked_sum2(rescaled, value / abs)?;
+            self.scale = abs;
+        } else {
+            self.normalized_sum = checked_sum2(self.normalized_sum, value / self.scale)?;
+        }
+        Some(())
+    }
+
+    fn finish(self) -> Option<f64> {
+        if self.scale == 0.0 {
+            return Some(0.0);
+        }
+        checked_product2(self.normalized_sum, self.scale)
+    }
+}
+
+fn finite_scaled_exp(factor: f64, eta: f64) -> Option<f64> {
+    if !factor.is_finite() || factor <= 0.0 || !eta.is_finite() {
+        return None;
+    }
+    let log_mu = factor.ln() + eta;
+    if log_mu >= f64::MAX.ln() {
+        return Some(f64::MAX);
+    }
+    if log_mu <= f64::MIN_POSITIVE.ln() {
+        return Some(f64::MIN_POSITIVE);
+    }
+    let mu = log_mu.exp();
+    (mu.is_finite() && mu > 0.0).then_some(mu)
 }
 
 fn working_weights(
@@ -1117,19 +1219,8 @@ fn working_weights(
         .enumerate()
         .map(|(sample, value)| {
             validate_positive_finite(value, "mu", sample)?;
-            let disp_mu =
-                checked_product2(dispersion, value).ok_or(DeseqError::NonFiniteValue {
-                    context: "IRLS working weight dispersion mean product".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                })?;
-            let denominator = checked_sum2(1.0, disp_mu).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working weight denominator".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
             let working_weight =
-                checked_div2(value, denominator).ok_or(DeseqError::NonFiniteValue {
+                stable_working_weight(value, dispersion).ok_or(DeseqError::NonFiniteValue {
                     context: "IRLS working weight".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
@@ -1150,6 +1241,17 @@ fn working_weights(
         .collect()
 }
 
+fn stable_working_weight(mu: f64, dispersion: f64) -> Option<f64> {
+    validate_positive_finite(mu, "mu", 0).ok()?;
+    validate_positive_finite(dispersion, "dispersion", 0).ok()?;
+    let disp_mu = dispersion * mu;
+    if disp_mu.is_infinite() && disp_mu.is_sign_positive() {
+        return Some(dispersion.recip());
+    }
+    let denominator = checked_sum2(1.0, disp_mu)?;
+    checked_div2(mu, denominator)
+}
+
 fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, DeseqError> {
     mu.iter()
         .copied()
@@ -1159,11 +1261,12 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
         .map(|(sample, ((mu, factor), count))| {
             validate_positive_finite(mu, "mu", sample)?;
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let normalized_mu = checked_div2(mu, factor).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working response normalized mean".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
+            let log_normalized_mu =
+                stable_log_normalized_mean(mu, factor).ok_or(DeseqError::NonFiniteValue {
+                    context: "IRLS working response normalized mean".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
             let residual = checked_sum2(count, -mu).ok_or(DeseqError::NonFiniteValue {
                 context: "IRLS working response residual".to_string(),
                 index: Some(sample),
@@ -1174,13 +1277,19 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
                 index: Some(sample),
                 value: f64::NAN,
             })?;
-            checked_sum2(normalized_mu.ln(), scaled_residual).ok_or(DeseqError::NonFiniteValue {
+            checked_sum2(log_normalized_mu, scaled_residual).ok_or(DeseqError::NonFiniteValue {
                 context: "IRLS working response".to_string(),
                 index: Some(sample),
                 value: f64::NAN,
             })
         })
         .collect()
+}
+
+fn stable_log_normalized_mean(mu: f64, factor: f64) -> Option<f64> {
+    validate_positive_finite(mu, "mu", 0).ok()?;
+    validate_positive_finite(factor, "normalization factor", 0).ok()?;
+    checked_sum2(mu.ln(), -factor.ln())
 }
 
 fn solve_weighted_least_squares(
@@ -1254,20 +1363,17 @@ fn covariance_and_hat_diagonal(
         }
     }
     let mut hat = Vec::with_capacity(x.nrows());
-    for sample in 0..x.nrows() {
+    for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
         let mut value = 0.0;
-        let sqrt_weight = w[sample].sqrt();
-        if !sqrt_weight.is_finite() {
+        if !weight.is_finite() {
             return None;
         }
-        for left in 0..x.ncols() {
-            for right in 0..x.ncols() {
-                let weighted_left = checked_product2(x[(sample, left)], sqrt_weight)?;
-                let weighted_right = checked_product2(x[(sample, right)], sqrt_weight)?;
-                let weighted_product = checked_product2(weighted_left, weighted_right)?;
+        let active = active_design_columns(x, sample);
+        for (left, left_value) in active.iter().copied() {
+            for (right, right_value) in active.iter().copied() {
                 value = checked_sum2(
                     value,
-                    checked_product2(weighted_product, inverse[(right, left)])?,
+                    checked_product4(left_value, weight, right_value, inverse[(right, left)])?,
                 )?;
             }
         }
@@ -1284,17 +1390,20 @@ fn xtwx_and_xtwz(
 ) -> Option<(DMatrix<f64>, DVector<f64>)> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
     let mut xtwz = DVector::zeros(x.ncols());
-    for sample in 0..x.nrows() {
-        for col in 0..x.ncols() {
-            xtwz[col] = checked_sum2(
-                xtwz[col],
-                checked_product3(x[(sample, col)], w[sample], z[sample])?,
-            )?;
-            for row in 0..x.ncols() {
+    for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
+        let active = active_design_columns(x, sample);
+        for (col, col_value) in active.iter().copied() {
+            xtwz[col] = checked_sum2(xtwz[col], checked_product3(col_value, weight, z[sample])?)?;
+        }
+        for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
+            for (col, col_value) in active.iter().copied().skip(left_pos) {
                 xtwx[(row, col)] = checked_sum2(
                     xtwx[(row, col)],
-                    checked_product3(x[(sample, row)], w[sample], x[(sample, col)])?,
+                    checked_product3(row_value, weight, col_value)?,
                 )?;
+                if row != col {
+                    xtwx[(col, row)] = xtwx[(row, col)];
+                }
             }
         }
     }
@@ -1307,17 +1416,30 @@ fn xtwx_and_xtwz(
 
 fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
-    for sample in 0..x.nrows() {
-        for col in 0..x.ncols() {
-            for row in 0..x.ncols() {
+    for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
+        let active = active_design_columns(x, sample);
+        for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
+            for (col, col_value) in active.iter().copied().skip(left_pos) {
                 xtwx[(row, col)] = checked_sum2(
                     xtwx[(row, col)],
-                    checked_product3(x[(sample, row)], w[sample], x[(sample, col)])?,
+                    checked_product3(row_value, weight, col_value)?,
                 )?;
+                if row != col {
+                    xtwx[(col, row)] = xtwx[(row, col)];
+                }
             }
         }
     }
     Some(xtwx)
+}
+
+fn active_design_columns(x: &DMatrix<f64>, row: usize) -> Vec<(usize, f64)> {
+    (0..x.ncols())
+        .filter_map(|col| {
+            let value = x[(row, col)];
+            (value != 0.0).then_some((col, value))
+        })
+        .collect()
 }
 
 fn normalization_factors_from_size_factors(
@@ -1769,6 +1891,40 @@ mod tests {
     }
 
     #[test]
+    fn fitted_mu_saturates_overflowed_exponential_mean() {
+        let x = DMatrix::from_row_slice(1, 1, &[1000.0]);
+        let beta = DVector::from_vec(vec![1.0]);
+        let nf = [1.0];
+
+        let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
+
+        assert_eq!(mu, vec![f64::MAX]);
+    }
+
+    #[test]
+    fn fitted_mu_avoids_intermediate_exponential_overflow_with_small_factor() {
+        let x = DMatrix::from_row_slice(1, 1, &[1000.0]);
+        let beta = DVector::from_vec(vec![1.0]);
+        let nf = [f64::MIN_POSITIVE];
+
+        let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
+
+        assert!(mu[0].is_finite());
+        assert!(mu[0] > 1.0e126);
+    }
+
+    #[test]
+    fn fitted_mu_saturates_final_overflowed_mean_with_small_factor() {
+        let x = DMatrix::from_row_slice(1, 1, &[2000.0]);
+        let beta = DVector::from_vec(vec![1.0]);
+        let nf = [f64::MIN_POSITIVE];
+
+        let mu = fitted_mu(&x, &beta, &nf, 0.5).unwrap();
+
+        assert_eq!(mu, vec![f64::MAX]);
+    }
+
+    #[test]
     fn fitted_mu_log2_rejects_overflowed_linear_predictor() {
         let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
         let nf = [1.0];
@@ -1786,12 +1942,7 @@ mod tests {
 
     #[test]
     fn working_weights_reject_nonfinite_arithmetic() {
-        let err = working_weights(&[f64::MAX], 2.0, None).unwrap_err();
-        assert!(matches!(
-            err,
-            DeseqError::NonFiniteValue { context, index, .. }
-                if context == "IRLS working weight dispersion mean product" && index == Some(0)
-        ));
+        assert_eq!(working_weights(&[f64::MAX], 2.0, None).unwrap(), vec![0.5]);
 
         let err = working_weights(&[f64::MAX], f64::MIN_POSITIVE, Some(&[10.0])).unwrap_err();
         assert!(matches!(
@@ -1802,14 +1953,15 @@ mod tests {
     }
 
     #[test]
-    fn working_response_rejects_nonfinite_arithmetic() {
-        let err = working_response(&[f64::MAX], &[f64::MIN_POSITIVE], &[1.0]).unwrap_err();
-        assert!(matches!(
-            err,
-            DeseqError::NonFiniteValue { context, index, .. }
-                if context == "IRLS working response normalized mean" && index == Some(0)
-        ));
+    fn working_response_avoids_normalized_mean_overflow() {
+        let z = working_response(&[f64::MAX], &[f64::MIN_POSITIVE], &[1.0]).unwrap();
 
+        assert!(z[0].is_finite());
+        assert!(z[0] > 1400.0);
+    }
+
+    #[test]
+    fn working_response_rejects_nonfinite_arithmetic() {
         let err = working_response(&[f64::MIN_POSITIVE], &[1.0], &[f64::MAX]).unwrap_err();
         assert!(matches!(
             err,

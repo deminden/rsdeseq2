@@ -179,23 +179,50 @@ The generator is:
 
 ## Benchmark Interpretation
 
-Current benchmarks compare only implemented apples-to-apples primitives, mainly
-size-factor and base-mean CLI paths against equivalent DESeq2/R reference
-operations. They are not claims about full `DESeq()` speed, because full DESeq2
-workflow parity is not implemented yet.
+Current benchmarks compare implemented apples-to-apples primitives against
+equivalent DESeq2/R reference operations, plus offline DESeq2 result fixtures
+for broader real-data parity. They are not claims about full `DESeq()` speed,
+because full DESeq2 workflow parity is not implemented yet.
 
-The latest local runs use `/usr/bin/time -v` with repeated process-level runs.
-On the 73,321 gene x 818 sample real count matrix, three-repeat medians were:
+The publication-style normalization sweep completed all 17 tissue matrices
+with zero mismatches. Size factors matched to `4.53e-14`, normalized counts to
+`1.94e-07`, and base means to `6.52e-09` max absolute difference. Median
+`rsdeseq2` elapsed times were 0.872 s for size factors, 3.772 s for normalized
+counts, and 0.764 s for base means.
 
-- `size-factors`: `rsdeseq2` 3.48 s and 237 MiB RSS versus DESeq2/R 24.67 s
-  and 2.03 GiB RSS, max absolute difference `3.15e-14`.
-- `base-mean`: `rsdeseq2` 4.07 s and 695 MiB RSS versus DESeq2/R 25.88 s and
-  2.47 GiB RSS, max absolute difference `5.47e-09`.
+After fixing the IRLS fitted-mean and optimizer-fallback hat handling issues,
+the targeted post-fix Wald checks reran the former worst/diagnostic
+full-blocked contrasts for blood, muscle, and pancreas. These checks covered
+209,030 result rows with zero missing-row or finite/NA-pattern mismatches
+across `baseMean`, `log2FoldChange`, `lfcSE`, `stat`,
+`pvalue`, and `padj`. The remaining differences are finite numeric drift.
 
-The five-tissue saved-reference parity sweep also completed with zero swaps:
-size factors matched to `2.62e-14`, normalized counts to `1.19e-07`, and base
-means to `4.66e-09` max absolute difference. The current hard real Wald
-contrast has matching missingness and tight medians, while the remaining tail
-differences are concentrated in standard errors and derived Wald statistics.
+The L-BFGS-B fallback now uses `rcompat-lbfgsb` 0.2.0. Against 512 bounded
+negative-binomial stress objectives saved from R 4.6.0, it reproduced 512/512
+endpoints, objective values, and function/gradient counts exactly. Version
+0.1.6 matched 495/512 cases at the practical scan thresholds, 0/512 exactly,
+and 317/512 evaluation counts. The exact result is scoped to the pinned
+x86_64 Linux, OpenBLAS 0.3.32, one-thread fixture stack.
+
+That isolated dependency-only gain did not translate into a large end-to-end
+change on the controlled 65,580-gene kidney replay. The implemented
+analytic-gradient fallback does: compared with 0.2.0 finite differences,
+median/p99 errors improved by about 22%/20% for LFC, SE, and statistic. Dominant
+maxima remained essentially unchanged.
+The tracked before/after table is
+[`data/lbfgsb_real_data_precision.tsv`](data/lbfgsb_real_data_precision.tsv).
+The reason is now quantified: fallback routing covered 26/65,580 kidney genes
+(`0.040%`) and 305/535,178 rows across eight hard-real contrasts (`0.057%`).
+For the eight non-replaced kidney optimizer-tail rows, median dispersion drift
+of `4.77e-08` was amplified into median beta-target drift of `9.82e-05`.
+Upstream dispersion parity remains the source of the dominant rare tail, but
+the fallback itself no longer adds finite-difference noise. The
+route and timing evidence is tracked in
+[`data/lbfgsb_real_data_route_summary.tsv`](data/lbfgsb_real_data_route_summary.tsv).
+
+The 2026-07-20 moderate process benchmark used R 4.6.0 and DESeq2 1.52.0 on
+10k/50k genes x 16 samples. For the checked primitive CLI stages, `rsdeseq2`
+was 33x-406x faster and used 38x-100x lower peak RSS than the DESeq2/R
+reference process.
 
 See [benchmarks.md](benchmarks.md) for running time/RAM benchmarks.

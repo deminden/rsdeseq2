@@ -398,6 +398,10 @@ reference; no DESeq2 source is vendored or translated line by line.
   means, and row log likelihoods.
 - [x] Replace the earlier post-optimizer polish with the R-compatible
   objective-only finite-difference L-BFGS-B fallback shape used by DESeq2.
+- [x] Upgrade the fallback to `rcompat-lbfgsb` 0.2.0 and validate exact endpoint,
+  objective, and evaluation-count parity on all 512 pinned R 4.6.0 synthetic
+  stress cases; 0.1.6 reached 495/512 at practical tolerances, 0/512 exactly,
+  and 317/512 exact evaluation counts.
 - [x] Add optional DESeq2 reference-generation and skip-safe Rust test hooks
   for fixed-dispersion force-optim fallback rows.
 - [x] DESeq2-style Cook's distance matrix for the supplied-dispersion Wald

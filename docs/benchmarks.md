@@ -1,13 +1,13 @@
 # Benchmarks
 
-The current benchmark suite measures workflow surfaces with apples-to-apples
-reference comparisons against original DESeq2. It reports CLI-stage timings
-rather than one monolithic `DESeq()` call so each validated stage has its own
-speed, memory, and numeric-parity record.
+The benchmark suite measures validated command surfaces with apples-to-apples
+reference comparisons against DESeq2. It reports CLI-stage timings, memory, and
+numeric parity for each checked stage instead of treating a full `DESeq()` run
+as one opaque benchmark.
 
 ## What Is Measured
 
-The speed/RAM benchmark runner measures:
+The speed/RSS benchmark runner measures:
 
 - `rsdeseq2 size-factors` versus `DESeq2::estimateSizeFactorsForMatrix()`,
 - `rsdeseq2 base-mean` versus DESeq2 size factors plus normalized row means,
@@ -17,48 +17,61 @@ The speed/RAM benchmark runner measures:
 - per-group medians, min/max ranges, and median absolute deviation for elapsed
   time and peak RSS.
 
-This is a process-level benchmark. It includes CLI/R startup, TSV parsing, and
-output writing. That makes it useful for end-user command behavior, but it is
-not a pure inner-loop microbenchmark. Use `cargo bench -p rsdeseq2` for Rust
-microbenchmarks.
+These are process-level measurements. They include command startup, TSV
+parsing, output writing, R startup, and DESeq2 package loading. Use
+`cargo bench -p rsdeseq2` when you need Rust inner-loop microbenchmarks.
 
 ## Run
 
+Synthetic moderate run:
+
 ```bash
-scripts/benchmark_rsdeseq2.sh \
-  --rscript Rscript \
-  --genes 1000,10000 \
-  --samples 8,16 \
-  --repeats 3
+python3 scripts/benchmark_speed_memory.py \
+  --genes 10000,50000 \
+  --samples 16 \
+  --repeats 2 \
+  --rscript /path/to/Rscript-from-an-R-4.6-DESeq2-1.52-environment \
+  --output results/benchmarks/speed_memory_r460_2026-07-20.tsv
 ```
 
-Outputs:
+Real count matrix run:
 
-- `results/benchmarks/speed_memory.tsv`
-- `results/benchmarks/speed_memory_summary.tsv`
+```bash
+scripts/benchmark_rsdeseq2.sh \
+  --rscript /path/to/Rscript \
+  --counts-file /path/to/raw_counts.tsv.gz \
+  --repeats 3 \
+  --output results/benchmarks/real_speed_memory.tsv
+```
 
-## Latest Local Run
+The count table must be tab-delimited with gene IDs in the first column. Plain
+TSV and gzip-compressed TSV inputs are both supported.
 
-On 2026-05-24, a three-repeat run against DESeq2 1.46.0 in the local
-`rnaseq451` R environment measured the current primitive CLI paths on synthetic
-matrices with 1,000 or 10,000 genes and 8 or 16 samples.
+## Current Moderate Run
 
-Observed medians:
+On 2026-07-20, a two-repeat process-level run used R 4.6.0 and DESeq2 1.52.0.
+The dimensions were chosen to be large enough to include real parsing and
+matrix work, but small enough to rerun during ordinary development.
 
-- `rsdeseq2`: 0.0021-0.0091 seconds, 3.25-5.5 MiB maximum RSS.
-- DESeq2/R reference process: 3.41-3.66 seconds by median elapsed time,
-  661-673 MiB maximum RSS.
-- Max absolute output difference versus DESeq2: at most `3.41e-12`.
+Median process-level results:
 
-The full table is in `results/benchmarks/speed_memory_current_summary.tsv`.
+| operation | genes | samples | `rsdeseq2` elapsed | DESeq2 elapsed | speedup | `rsdeseq2` RSS | DESeq2 RSS | RSS ratio | max abs diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `size-factors` | 10,000 | 16 | 0.010 s | 4.06 s | 406x | 6.0 MiB | 601.8 MiB | 100x | `5.33e-15` |
+| `base-mean` | 10,000 | 16 | 0.020 s | 3.77 s | 188x | 6.9 MiB | 602.0 MiB | 87x | `5.68e-13` |
+| `size-factors` | 50,000 | 16 | 0.080 s | 4.27 s | 53x | 12.0 MiB | 633.0 MiB | 53x | `5.33e-15` |
+| `base-mean` | 50,000 | 16 | 0.135 s | 4.45 s | 33x | 16.6 MiB | 638.6 MiB | 38x | `4.55e-12` |
 
-## Real Dataset Run
+The raw and summary files for this run are:
 
-On 2026-05-27, a three-repeat run used a GTEx
-`muscle_raw_counts.tsv.gz` matrix with 73,321 genes and 818 samples. The
-benchmark runner materializes compressed `.tsv.gz` count inputs into its
-temporary directory before running either CLI, so both tools read the same
-uncompressed count table.
+- `results/benchmarks/speed_memory_r460_2026-07-20.tsv`
+- `results/benchmarks/speed_memory_r460_2026-07-20_summary.tsv`
+
+## Historical Real Matrix Run
+
+On 2026-05-27, a three-repeat run used a real GTEx muscle count matrix with
+73,321 genes and 818 samples. The runner materializes compressed inputs before
+running either CLI, so both tools read the same uncompressed count table.
 
 Observed medians, with min-max elapsed ranges in parentheses:
 
@@ -69,228 +82,150 @@ Observed medians, with min-max elapsed ranges in parentheses:
 | `base-mean` | `rsdeseq2` | 4.07 s (3.95-4.25) | 695 MiB | `5.47e-09` |
 | `base-mean` | DESeq2/R | 25.88 s (25.76-26.56) | 2.47 GiB | |
 
-The README reports this real-data table because both operations have matching
-reference outputs. The resulting primitive CLI speedups were 7.1x for size
-factors and 6.4x for base means. Peak RSS was about 8.7x lower for size
-factors and 3.6x lower for base means. The full table is in
-`results/benchmarks/real_muscle_speed_memory_2026-05-27_summary.tsv`.
+The primitive CLI speedups were 7.1x for size factors and 6.4x for base means.
+Peak RSS was about 8.7x lower for size factors and 3.6x lower for base means.
 
-For a quick smoke run:
+## Publication Normalization Parity
 
-```bash
-scripts/benchmark_rsdeseq2.sh \
-  --rscript Rscript \
-  --genes 1000 \
-  --samples 8 \
-  --repeats 1
-```
+The publication-style normalization sweep compares Rust primitive outputs with
+offline DESeq2 outputs generated ahead of time from the same count matrices.
+It does not call R to produce expected values during comparison.
 
-To benchmark an existing real count matrix instead of synthetic counts, pass a
-plain or gzip-compressed tab-delimited count table with gene IDs in the first
-column:
+| output | coverage | median elapsed | max RSS | max abs diff | max rel diff | mismatches |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `size-factors` | 17 tissues, 8,731 samples | 0.872 s | 238.6 MiB | `4.53e-14` | `2.64e-14` | 0 |
+| `normalized-counts` | 17 tissues, 612,699,575 cells | 3.772 s | 694.4 MiB | `1.94e-07` | `9.89e-15` | 0 |
+| `base-mean` | 17 tissues, 1,185,270 genes | 0.764 s | 694.9 MiB | `6.52e-09` | `8.21e-15` | 0 |
 
-```bash
-scripts/benchmark_rsdeseq2.sh \
-  --rscript Rscript \
-  --counts-file /path/to/raw_counts.tsv.gz \
-  --repeats 3 \
-  --output results/benchmarks/real_speed_memory.tsv
-```
+## Wald Parity Checks
 
-## Interpret Carefully
+The Wald parity check compares `rsdeseq2 wald` result tables with offline
+DESeq2 result tables. To reproduce a check, prepare:
 
-Rust speedups in this benchmark should be read as primitive CLI speedups, not
-as full-workflow DESeq2 speedups. DESeq2 package loading and R process startup
-are included, because users pay that cost when running the reference command as
-a process. The summary file reports medians, min/max ranges, and median
-absolute deviations so repeated runs are less sensitive to one noisy sample
-while still showing spread.
-
-If `DESeq2` is not installed in the selected R environment, DESeq2 rows fail
-clearly in the raw output rather than being substituted by any fallback.
-
-## Real-Data Parity Sweep
-
-On 2026-05-27, `scripts/real_data_parity.py` compared the Rust CLI with
-offline DESeq2 outputs generated from GTEx tissue count matrices. The script
-does not call R; it treats saved DESeq2 outputs as fixtures, derives
-full-tissue size factors from the reference normalized-count matrices, and
-compares only outputs where the current Rust CLI has matched inputs. The full
-Wald result-table check uses a kidney null-split `condition_B_vs_A` contrast
-with design `~ perm_block + condition`; normalization checks cover kidney,
-liver, pancreas, heart, and muscle tissue matrices. The latest recorded run
-used a local release build and completed with zero swaps for every command. The
-full driver run took 319.78 seconds wall time, with 710,656 KiB peak RSS and
-zero swaps.
+- the raw count table used by DESeq2,
+- the design/sample metadata used by the contrast,
+- the DESeq2 size-factor mode or normalized-count source used by the contrast,
+- the DESeq2 result table with `gene`, `baseMean`, `log2FoldChange`, `lfcSE`,
+  `stat`, `pvalue`, and `padj` columns.
 
 Command shape:
 
 ```bash
 python3 scripts/real_data_parity.py \
-  --study-root <gtex-benchmark-root> \
+  --study-root /path/to/study-inputs-and-reference-outputs \
   --binary target/release/rsdeseq2 \
-  --tissue kidney \
-  --tissue liver \
-  --tissue pancreas \
-  --tissue heart \
-  --tissue muscle \
-  --contrast kidney:full_blocked_permutation:1 \
   --contrast-size-factors estimate \
-  --output results/benchmarks/real_data_parity_2026-05-27_fresh.tsv
+  --contrast tissue:null_type:replicate_id \
+  --output results/benchmarks/wald_parity.tsv \
+  --diagnostics-output results/benchmarks/wald_parity_diagnostics.tsv \
+  --diagnostics-limit 20
 ```
 
-Add `--diagnostics-output <path>` to the real-data parity script when working
-on numerical parity. For contrast runs this also asks the CLI for Cook's
-replacement row metadata plus original-fit and replacement-refit diagnostic
-sidecars, then joins the relevant `dispGeneEst`, `dispFit`, `dispMAP`,
-`dispersion`, dispersion/beta iteration and convergence fields, deviance,
-Cook's summaries, Rust fallback-optimizer iteration, start/final objective,
-and projected-gradient fields, beta, and beta standard-error values onto the
-largest result-table differences.
+The post-fix check deliberately reran a small but informative set of
+publication-style full-blocked contrasts instead of a fresh full sweep:
 
-Primitive outputs with reference-level agreement:
+- the previous worst aggregate adjusted-p tail,
+- the diagnosed Cook's replacement cascade,
+- the earlier one-row p-value/NA anomaly.
 
-| output | coverage | median elapsed | max RSS | max abs diff | max rel diff | mismatches |
+| contrast class | rows | elapsed | peak RSS | max p-value abs diff | max adjusted-p abs diff | mismatch counters |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `size-factors` | 5 tissues, 1,998 samples | 1.55 s | 237 MiB | `2.62e-14` | `1.99e-14` | 0 |
-| `normalized-counts` | 5 tissues, 138,321,118 cells | 7.03 s | 693 MiB | `1.19e-07` | `9.74e-15` | 0 |
-| `base-mean` | 5 tissues, 341,286 genes | 1.64 s | 694 MiB | `4.66e-09` | `6.73e-15` | 0 |
+| blood full-blocked permutation | 69,817 | 1,875.14 s | 6,006.6 MiB | `4.13e-03` | `3.21e-03` | 0 |
+| muscle full-blocked permutation | 70,671 | 872.53 s | 5,982.8 MiB | `2.18e-03` | `2.43e-03` | 0 |
+| pancreas full-blocked permutation | 68,542 | 105.89 s | 2,677.6 MiB | `1.37e-03` | `8.32e-04` | 0 |
 
-The same run also reconstructed a kidney Wald result for the
-`condition_B_vs_A` contrast with design `~ perm_block + condition`, using
-split-estimated size factors. The CLI Wald path applies Cook's
-outlier replacement/refit before final Cook's masking and independent filtering,
-matching the saved reference result shape closely:
+Together these checks cover 209,030 result rows with zero missing-row or
+finite/NA-pattern mismatches across result columns. The remaining differences
+are finite numeric drift in the fitted model path; the mismatch counter does
+not impose a tolerance on finite differences.
 
-Central full-result differences:
+The diagnosed issue was not an `rcompat-lbfgsb` optimizer bug. DESeq2 preserves
+the pre-optimizer IRLS hat diagonals after L-BFGS-B fallback, and those hat
+diagonals feed Cook's replacement decisions. Rust now preserves the same
+pre-optimizer hats for fallback rows while still taking the optimizer's beta,
+standard error, fitted mean, log-likelihood, and convergence diagnostics.
 
-| metric | mean abs diff | median abs diff | p99 abs diff |
+### L-BFGS-B precision refresh
+
+The `rcompat-lbfgsb` 0.2.0 dependency was compared with 0.1.6 by replaying the
+same 512 bounded negative-binomial objective cases against saved R 4.6.0
+`optim(..., method="L-BFGS-B")` outputs. The oracle was generated on
+x86_64 Linux with OpenBLAS 0.3.32, one BLAS thread, and exact 17-digit input
+serialization.
+
+| dependency | endpoint + objective within scan tolerance | exact endpoint + objective | exact function/gradient counts |
 | --- | ---: | ---: | ---: |
-| `baseMean` | `1.13e-12` | `8.88e-16` | `6.82e-12` |
-| `log2FoldChange` | `2.17e-08` | `3.77e-14` | `3.33e-12` |
-| `lfcSE` | `1.57e-10` | `2.33e-12` | `1.66e-10` |
-| `stat` | `3.19e-08` | `6.07e-12` | `3.44e-11` |
-| `pvalue` | `3.64e-09` | `3.03e-12` | `4.20e-11` |
-| `padj` | `2.12e-08` | `0` | `7.87e-11` |
+| `rcompat-lbfgsb` 0.1.6 | 495/512 | 0/512 | 317/512 |
+| `rcompat-lbfgsb` 0.2.0 | 512/512 | 512/512 | 512/512 |
 
-Extreme full-result tails:
+The practical scan thresholds are maximum parameter error `5e-3`, absolute
+objective error `1e-5`, or relative objective error `1e-8`. The exact run sets
+all three endpoint/objective tolerances to zero. The fixture generator is
+`scripts/generate_lbfgsb_synthetic_stress_fixtures.R`; it refuses R versions
+other than 4.6.0. These figures characterize the pinned fixture stack and do
+not imply that floating-point-sensitive callbacks are bit-exact across other
+platforms or math-library configurations.
 
-| metric | p99.9 abs diff | max abs diff | mismatches |
+#### Effect on end-to-end real-data precision
+
+A controlled replay held the current rsdeseq2 source, release profile, input,
+design, and saved DESeq2 reference constant and changed only
+`rcompat-lbfgsb` 0.1.6 versus 0.2.0. The target was the 65,580-gene kidney
+full-blocked permutation contrast with 78 samples and estimated size factors.
+
+| result column | 0.1.6 finite difference | 0.2.0 finite difference | 0.2.0 analytic gradient |
 | --- | ---: | ---: | ---: |
-| `baseMean` | `6.52e-09` | `6.52e-09` | 0 |
-| `log2FoldChange` | `7.70e-04` | `7.70e-04` | 0 |
-| `lfcSE` | `8.26e-07` | `8.26e-07` | 0 |
-| `stat` | `1.25e-03` | `1.25e-03` | 0 |
-| `pvalue` | `6.50e-05` | `6.50e-05` | 0 |
-| `padj` | `4.50e-05` | `4.50e-05` | 0 |
+| `log2FoldChange` | `3.11e-14` / `3.79e-12` / `7.70e-04` | `3.15e-14` / `3.79e-12` / `7.70e-04` | `2.46e-14` / `3.03e-12` / `7.70e-04` |
+| `lfcSE` | `1.74e-12` / `1.88e-10` / `1.95e-06` | `1.77e-12` / `1.88e-10` / `5.10e-06` | `1.38e-12` / `1.50e-10` / `5.10e-06` |
+| `stat` | `5.27e-12` / `3.70e-11` / `1.25e-03` | `5.33e-12` / `3.70e-11` / `1.25e-03` | `4.18e-12` / `2.96e-11` / `1.25e-03` |
+| `pvalue` | `2.76e-12` / `4.30e-11` / `6.50e-05` | `2.78e-12` / `4.30e-11` / `6.50e-05` | `2.37e-12` / `4.38e-11` / `6.50e-05` |
+| `padj` | `0` / `8.08e-11` / `4.50e-05` | `0` / `8.06e-11` / `7.29e-05` | `0` / `8.19e-11` / `7.29e-05` |
 
-The current focused Wald run used
-`results/benchmarks/real_data_parity_non_lbfgsb_start_probe.tsv`, covered
-65,580 genes and 78 retained samples, took 151.0 s, reached 610 MiB peak RSS,
-and reported zero swaps. The largest previous non-optimizer standard-error
-tail was caused by pre-clamping the MAP dispersion starting value to
-`maxDisp`; preserving starts above `maxDisp` and clamping only final stored
-dispersions reduced `lfcSE_max_abs` from `3.27e-04` to `8.26e-07` and
-`lfcSE_mean_abs` from `3.06e-08` to `1.57e-10` on this contrast. Remaining
-maximum differences are now dominated by other hard rows, including beta
-fallback/statistic tails.
+The dependency-only change is not a material end-to-end improvement. The
+production analytic-gradient path is: relative to 0.2.0 finite differences,
+median/p99 errors fell by 22%/20% for LFC, 22%/20% for SE, and 22%/20% for the
+Wald statistic. Dominant maxima remain controlled by other pipeline stages.
+Most genes do not use the fallback, and full
+Wald differences also include dispersion estimation, IRLS, covariance, Cook's
+handling, and BH propagation. The tracked comparison is
+[`docs/data/lbfgsb_real_data_precision.tsv`](data/lbfgsb_real_data_precision.tsv).
 
-Current mismatch attribution can be reproduced without calling R:
+The full per-gene diagnostics make the dilution explicit:
 
-```bash
-python3 scripts/analyze_parity_mismatch_sources.py --top 12
-```
+| diagnostic | result |
+| --- | ---: |
+| Kidney rows routed through L-BFGS-B | 26/65,580 (`0.040%`) |
+| Routed rows with Cook's replacement/refit optimization | 9 |
+| Routed LFCs changed by 0.2.0 | 18: 10 closer to DESeq2, 8 farther |
+| Eight-contrast hard-real bundle routing | 305/535,178 (`0.057%`) |
 
-On the current diagnostics file, the top 12 rows ranked by maximum absolute
-difference split into five direct optimizer-beta target rows, one
-replacement/refit optimizer row, and six adjusted-p-value propagation rows. The
-top 12 rows ranked by `log2FoldChange`, Wald statistic, or p-value are dominated
-by the same optimizer-routed beta rows, with a few focused no-optimizer rows now
-classified as MAP-dispersion propagated SE/stat tails because fixed-dispersion
-replay removes their betaSE/covariance error. For example, the worst row
-(`IGLV3-21`) has Rust-vs-reference `log2FoldChange_abs = 7.70e-04` and
-`stat_abs = 1.25e-03`; joining the offline DESeq2 optimizer fixture shows Rust
-beta differs from the DESeq2 optimizer target by `7.70e-04`, while the saved
-reference differs from that target by only `4.66e-08`. That makes optimizer
-target parity the first visible divergence for the largest local tail rows; the
-Wald statistic and p-value differences are downstream amplification. The
-largest `padj` rows mostly have local beta/statistic differences near
-floating-point scale and inherit Benjamini-Hochberg propagation from the
-upstream p-value tail.
+For the eight fixture-covered kidney optimizer rows that were not subsequently
+replaced, the median/max Rust-versus-DESeq2 dispersion differences were only
+`4.77e-08` / `1.42e-06`, but the corresponding optimizer beta-target
+differences were `9.82e-05` / `7.71e-04`. Thus the remaining optimizer-labeled
+tail is primarily an input-parity problem: 0.2.0 reproduces R exactly when the
+objective inputs are frozen, but a flat or weakly identified real objective can
+amplify a tiny upstream dispersion difference into a visibly different beta.
 
-A focused follow-up fixture for the largest no-optimizer, no-replacement
-standard-error rows is written by:
+Three whole-workflow timing runs had overlapping ranges: 0.1.6 median
+`26.79 s` (range `25.87–28.09 s`) and 0.2.0 median `25.94 s` (range
+`25.76–28.51 s`). The observed 3.2% median reduction is descriptive noise-scale
+evidence, not a demonstrated runtime gain. The tracked route, input-drift, and
+timing summary is
+[`docs/data/lbfgsb_real_data_route_summary.tsv`](data/lbfgsb_real_data_route_summary.tsv).
 
-```bash
-Rscript scripts/generate_se_covariance_hard_fixtures.R \
-  --top-n 48 \
-  --output-dir results/fixtures/se_covariance_hard_real_2026-06-05
-```
+A second controlled three-run comparison isolated the beta-gradient change.
+Finite differences had median `28.58 s` (range `28.46–28.66 s`); the analytic
+gradient had median `28.36 s` (range `28.18–28.77 s`). The 0.8% median change
+and overlapping ranges do not demonstrate a material whole-workflow speedup.
 
-The fixture records DESeq2's MAP-input mean matrix, MAP line-search diagnostics,
-final MAP dispersions, and fixed-dispersion GLM outputs for the selected real
-contrast rows. Generation took 39.1 s wall time, used 1.73 GiB peak RSS, and
-reported zero swaps on the current workstation run.
+## Interpret Carefully
 
-With DESeq2's final dispersions injected into the fixed-dispersion GLM path,
-the apparent standard-error/covariance tail disappears:
+Read the speedups above as primitive CLI speedups, not full-workflow DESeq2
+speedups. The DESeq2 reference is run as a separate R process because that is
+the reproducible command-line comparison users can repeat. For end-to-end Wald
+runtime, compare contrast-level runs with the same counts, design, size-factor
+mode, replacement settings, and independent-filtering settings.
 
-| fixed-dispersion output | mean abs diff | median abs diff | p99 abs diff | max abs diff |
-| --- | ---: | ---: | ---: | ---: |
-| `beta` | `2.72e-14` | `2.31e-14` | `9.59e-14` | `9.79e-14` |
-| `betaSE` | `2.55e-16` | `1.94e-16` | `9.99e-16` | `1.44e-15` |
-| `mu` | `7.89e-10` | `1.68e-11` | `2.75e-08` | `1.13e-07` |
-| `hat` | `7.62e-17` | `5.55e-17` | `3.75e-16` | `6.66e-16` |
-
-The residual no-optimizer tail is therefore upstream MAP dispersion
-line-search sensitivity, not covariance arithmetic. On the same 48-row fixture,
-direct MAP comparison after DESeq2-shaped plain NB-likelihood accumulation, a
-Stirling log-gamma branch for large positive likelihood arguments, and an
-R-shaped positive digamma path for likelihood derivatives gives. The MAP
-posterior now also uses plain source-order addition rather than magnitude-scaled
-summation, because one-ULP objective differences can flip Armijo decisions in
-near-flat high-dispersion rows.
-
-MAP dispersion value intermediates:
-
-| MAP field | mean abs diff | median abs diff | p95 abs diff |
-| --- | ---: | ---: | ---: |
-| `dispMAP` | `8.33e-09` | `4.72e-16` | `2.27e-13` |
-| stored `dispersion` | `8.33e-09` | `4.72e-16` | `2.27e-13` |
-| `dispInit` | `0.00e+00` | `0.00e+00` | `0.00e+00` |
-| line-search `log(alpha)` | `5.26e-08` | `2.22e-15` | `1.36e-12` |
-
-| MAP field | p99.9 abs diff | max abs diff | worst row |
-| --- | ---: | ---: | --- |
-| `dispMAP` | `2.31e-07` | `2.31e-07` | `ANKLE2` |
-| stored `dispersion` | `2.31e-07` | `2.31e-07` | `ANKLE2` |
-| `dispInit` | `0.00e+00` | `0.00e+00` | none |
-| line-search `log(alpha)` | `1.53e-06` | `1.53e-06` | `ANKLE2` |
-
-MAP objective and derivative diagnostics:
-
-| diagnostic | mean abs diff | median abs diff | p95 abs diff |
-| --- | ---: | ---: | ---: |
-| initial log posterior | `0.00e+00` | `0.00e+00` | `0.00e+00` |
-| initial derivative | `9.98e-15` | `8.10e-15` | `2.90e-14` |
-| final log posterior | `3.33e-11` | `0.00e+00` | `1.16e-10` |
-| final derivative | `8.22e-05` | `5.50e-05` | `3.21e-04` |
-
-| diagnostic | p99.9 abs diff | max abs diff | worst row |
-| --- | ---: | ---: | --- |
-| initial log posterior | `0.00e+00` | `0.00e+00` | none |
-| initial derivative | `2.96e-14` | `2.96e-14` | `PITPNM2` |
-| final log posterior | `9.31e-10` | `9.31e-10` | `GAPDH` |
-| final derivative | `5.89e-04` | `5.89e-04` | `EEF1A1` |
-
-MAP iteration diagnostics:
-
-| diagnostic | mismatches | max absolute iteration diff | worst row |
-| --- | ---: | ---: | --- |
-| `dispIter` | 4/48 | 32 | `ANKLE2` |
-| line-search iterations | 4/48 | 32 | `ANKLE2` |
-| accepted line-search steps | 0/48 | 0 | none |
-
-The remaining focused MAP differences are therefore in final near-boundary
-Armijo history and final `log(alpha)`, not in the fixed-dispersion
-SE/covariance arithmetic.
+If DESeq2 is not installed in the selected R environment, DESeq2 benchmark rows
+fail clearly in the raw output rather than being substituted by any fallback.

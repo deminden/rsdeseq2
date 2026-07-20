@@ -27,57 +27,25 @@ Detailed status lives in
 [docs/deseq2-gap-analysis.md][gap-analysis] and
 [docs/compatibility.md][compatibility].
 
-## Real-Data Parity
+## Numeric Evidence
 
-README benchmarks are shown only for outputs with matching DESeq2 1.46.0
-reference checks. The real-data parity sweep uses GTEx tissue count matrices:
-five tissues for normalization outputs, plus one kidney null-split condition
-contrast for the full Wald result-table path. DESeq2 reference outputs are
-generated offline and read back as fixtures.
+| evidence | scope | result |
+| --- | ---: | --- |
+| Normalization | 17 tissues, 8,731 samples, 612.7M cells | zero finite/NA mismatches; max relative error `9.89e-15` |
+| End-to-end Wald | 65,580-gene kidney contrast | LFC median / p99 / max abs error `2.46e-14` / `3.03e-12` / `7.70e-04`; p-value `2.37e-12` / `4.38e-11` / `6.50e-05` |
+| L-BFGS-B isolation | 512 R 4.6.0 stress objectives | 0.2.0 matches 512/512 endpoints, values, and counts exactly |
+| Process benchmark | 10k/50k genes × 16 samples | 33x–406x faster, 38x–100x lower peak RSS than DESeq2 1.52.0 for checked primitives |
 
-| workflow | reference case | coverage | runtime / peak RSS |
-| --- | --- | ---: | ---: |
-| `size-factors` | five tissues | 1,998 samples | 1.55 s / 237 MiB |
-| `normalized-counts` | five tissues | 138,321,118 count cells | 7.03 s / 693 MiB |
-| `base-mean` | five tissues | 341,286 genes | 1.64 s / 694 MiB |
-| `wald-results` | kidney Wald contrast `condition_B_vs_A`, design `~ perm_block + condition` | 65,580 genes, 78 samples | 151.0 s / 610 MiB |
-| `local-dispersion-trend` | GTEx local trend fixture | 64,344 finite fitted values | fixture check |
-
-The Wald result row includes Cook's outlier replacement/refit, final Cook's
-masking, and independent filtering; the full per-column Wald precision table is
-in [docs/benchmarks.md][benchmarks].
-
-Full-run normalization outputs:
-
-| workflow | max abs diff | max rel diff | mismatches |
-| --- | ---: | ---: | ---: |
-| `size-factors` | `2.62e-14` | `1.99e-14` | 0 |
-| `normalized-counts` | `1.19e-07` | `9.74e-15` | 0 |
-| `base-mean` | `4.66e-09` | `6.73e-15` | 0 |
-
-Local dispersion trend fixture:
-
-| median rel diff | p99 rel diff | max rel diff |
-| ---: | ---: | ---: |
-| `3.74e-13` | `5.85e-12` | `1.47e-11` |
-
-Remaining full Wald-result numeric tails:
-
-| metric | mean abs | median abs | p99 abs |
-| --- | ---: | ---: | ---: |
-| `log2FoldChange` | `2.17e-08` | `3.77e-14` | `3.33e-12` |
-| `lfcSE` | `1.57e-10` | `2.33e-12` | `1.66e-10` |
-| `stat` | `3.19e-08` | `6.07e-12` | `3.44e-11` |
-| `pvalue` | `3.64e-09` | `3.03e-12` | `4.20e-11` |
-| `padj` | `2.12e-08` | `0` | `7.87e-11` |
-
-| metric | p99.9 abs | max abs |
-| --- | ---: | ---: |
-| `log2FoldChange` | `7.70e-04` | `7.70e-04` |
-| `lfcSE` | `8.26e-07` | `8.26e-07` |
-| `stat` | `1.25e-03` | `1.25e-03` |
-| `pvalue` | `6.50e-05` | `6.50e-05` |
-| `padj` | `4.50e-05` | `4.50e-05` |
+The 0.2.0 optimizer is dramatically more precise in isolation. A
+dependency-only replay moved end-to-end errors by less than 2%, but using its
+analytic-gradient API reduced median/p99 LFC, SE, and statistic errors by about
+20–22% versus finite differences. Only 26/65,580 kidney
+genes (0.040%) and 305/535,178 fitted rows across eight real contrasts (0.057%)
+used the fallback; tiny upstream dispersion differences still change these
+sensitive optimizer targets. Three-run whole-workflow timing ranges overlapped,
+so this is a precision improvement rather than a claimed speedup. See the repository [benchmark
+documentation][benchmarks], tracked [before/after data][real-data-precision],
+and [route/input-drift summary][real-data-routes].
 
 ## Rust Usage
 
@@ -184,3 +152,5 @@ scripts/benchmark_rsdeseq2.sh
 [gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
 [benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
+[real-data-precision]: https://github.com/deminden/rsdeseq2/blob/main/docs/data/lbfgsb_real_data_precision.tsv
+[real-data-routes]: https://github.com/deminden/rsdeseq2/blob/main/docs/data/lbfgsb_real_data_route_summary.tsv

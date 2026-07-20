@@ -1473,7 +1473,7 @@ fn irls_optim_fallback_refits_nonconverged_rows_when_enabled() {
 }
 
 #[test]
-fn irls_optim_fallback_refreshes_hat_diagonal_for_refit_rows() {
+fn irls_optim_fallback_preserves_pre_optim_hat_diagonal() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(
         4,
@@ -1488,12 +1488,17 @@ fn irls_optim_fallback_refreshes_hat_diagonal_for_refit_rows() {
     )
     .unwrap();
 
-    let expected = fit_fixed_dispersion_irls(
+    let pre_optim = fit_fixed_dispersion_irls(
         &counts,
         &design,
         &[1.0, 1.0, 1.0, 1.0],
         &[0.05],
-        no_ridge_options(),
+        IrlsOptions {
+            maxit: 1,
+            ridge_lambda: 0.0,
+            use_optim: false,
+            ..IrlsOptions::default()
+        },
     )
     .unwrap();
     let with_optim = fit_fixed_dispersion_irls(
@@ -1515,7 +1520,7 @@ fn irls_optim_fallback_refreshes_hat_diagonal_for_refit_rows() {
         .hat_diagonal
         .as_slice()
         .iter()
-        .zip(expected.hat_diagonal.as_slice())
+        .zip(pre_optim.hat_diagonal.as_slice())
     {
         assert_relative_eq!(*actual, *expected, epsilon = 1e-8, max_relative = 1e-8);
     }

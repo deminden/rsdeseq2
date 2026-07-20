@@ -141,6 +141,19 @@ fn validate_optional_export_nonnegative(
     Ok(())
 }
 
+fn validate_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+    for (idx, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Write DESeq2-style result column metadata to a tab-delimited file.
 ///
 /// The output mirrors the `type` and `description` columns available from
@@ -309,7 +322,7 @@ fn validate_independent_filtering_export(
                 lowess_fit.len(),
             ));
         }
-        validate_nonnegative_finite_values("independent-filter lowess export", lowess_fit)?;
+        validate_finite_values("independent-filter lowess export", lowess_fit)?;
     }
     if let Some(selected_index) = filtering.selected_index {
         if selected_index >= filtering.theta.len() {
