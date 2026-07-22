@@ -29,12 +29,15 @@ fn parametric_trend_rejects_overflowed_tiny_mean_fit() {
     };
 
     let err = trend.evaluate(f64::MIN_POSITIVE).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("parametric dispersion trend produced"));
-    assert!(trend
-        .evaluate_many_allow_missing(&[0.0, f64::MIN_POSITIVE])
-        .is_err());
+    assert!(
+        err.to_string()
+            .contains("parametric dispersion trend produced")
+    );
+    assert!(
+        trend
+            .evaluate_many_allow_missing(&[0.0, f64::MIN_POSITIVE])
+            .is_err()
+    );
 }
 
 #[test]
@@ -79,15 +82,21 @@ fn dispersion_trends_validate_fit_state_before_allow_missing_evaluation() {
     };
     let missing_means = [0.0, f64::NAN];
 
-    assert!(invalid_parametric
-        .evaluate_many_allow_missing(&missing_means)
-        .is_err());
-    assert!(invalid_mean
-        .evaluate_many_allow_missing(&missing_means)
-        .is_err());
-    assert!(invalid_local
-        .evaluate_many_allow_missing(&missing_means)
-        .is_err());
+    assert!(
+        invalid_parametric
+            .evaluate_many_allow_missing(&missing_means)
+            .is_err()
+    );
+    assert!(
+        invalid_mean
+            .evaluate_many_allow_missing(&missing_means)
+            .is_err()
+    );
+    assert!(
+        invalid_local
+            .evaluate_many_allow_missing(&missing_means)
+            .is_err()
+    );
 }
 
 #[test]
@@ -119,16 +128,22 @@ fn trend_selection_helpers_report_helper_specific_dimension_contexts() {
     let mean_fit = mean_trend_use_for_fit(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
     let mean_value = mean_trend_use_for_mean(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
 
-    assert!(parametric
-        .to_string()
-        .contains("parametric dispersion trend rows"));
+    assert!(
+        parametric
+            .to_string()
+            .contains("parametric dispersion trend rows")
+    );
     assert!(local.to_string().contains("local dispersion trend rows"));
-    assert!(mean_fit
-        .to_string()
-        .contains("mean dispersion trend fit rows"));
-    assert!(mean_value
-        .to_string()
-        .contains("mean dispersion trend rows"));
+    assert!(
+        mean_fit
+            .to_string()
+            .contains("mean dispersion trend fit rows")
+    );
+    assert!(
+        mean_value
+            .to_string()
+            .contains("mean dispersion trend rows")
+    );
 }
 
 #[test]
@@ -136,33 +151,39 @@ fn fit_dispersion_trends_reject_invalid_min_disp_options() {
     let (means, disps) = trend_data();
 
     for min_disp in [0.0, f64::NAN, f64::INFINITY] {
-        assert!(fit_parametric_dispersion_trend(
-            &means,
-            &disps,
-            ParametricDispersionTrendOptions {
-                min_disp,
-                ..ParametricDispersionTrendOptions::default()
-            },
-        )
-        .is_err());
-        assert!(fit_local_dispersion_trend(
-            &means,
-            &disps,
-            LocalDispersionTrendOptions {
-                min_disp,
-                ..LocalDispersionTrendOptions::default()
-            },
-        )
-        .is_err());
-        assert!(fit_mean_dispersion_trend(
-            &means,
-            &disps,
-            MeanDispersionTrendOptions {
-                min_disp,
-                ..MeanDispersionTrendOptions::default()
-            },
-        )
-        .is_err());
+        assert!(
+            fit_parametric_dispersion_trend(
+                &means,
+                &disps,
+                ParametricDispersionTrendOptions {
+                    min_disp,
+                    ..ParametricDispersionTrendOptions::default()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            fit_local_dispersion_trend(
+                &means,
+                &disps,
+                LocalDispersionTrendOptions {
+                    min_disp,
+                    ..LocalDispersionTrendOptions::default()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            fit_mean_dispersion_trend(
+                &means,
+                &disps,
+                MeanDispersionTrendOptions {
+                    min_disp,
+                    ..MeanDispersionTrendOptions::default()
+                },
+            )
+            .is_err()
+        );
     }
 }
 
@@ -423,11 +444,12 @@ fn fit_local_dispersion_trend_sorts_fit_rows_once() {
     )
     .unwrap();
 
-    assert!(fit
-        .trend
-        .log_means
-        .windows(2)
-        .all(|window| window[0] <= window[1]));
+    assert!(
+        fit.trend
+            .log_means
+            .windows(2)
+            .all(|window| window[0] <= window[1])
+    );
     for (mean, expected) in means.iter().copied().zip(disps.iter().copied()) {
         assert_relative_eq!(fit.trend.evaluate(mean).unwrap(), expected, epsilon = 1e-12);
     }
@@ -668,32 +690,38 @@ fn fit_local_dispersion_trend_uses_constant_fit_for_single_usable_row() {
 
 #[test]
 fn fit_local_dispersion_trend_validates_inputs() {
-    assert!(fit_local_dispersion_trend(
-        &[10.0, 20.0],
-        &[0.1],
-        LocalDispersionTrendOptions::default(),
-    )
-    .is_err());
+    assert!(
+        fit_local_dispersion_trend(
+            &[10.0, 20.0],
+            &[0.1],
+            LocalDispersionTrendOptions::default(),
+        )
+        .is_err()
+    );
     for span in [0.0, 1.1, f64::NAN, f64::INFINITY] {
-        assert!(fit_local_dispersion_trend(
+        assert!(
+            fit_local_dispersion_trend(
+                &[10.0, 20.0],
+                &[0.1, 0.2],
+                LocalDispersionTrendOptions {
+                    span,
+                    ..LocalDispersionTrendOptions::default()
+                },
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        fit_local_dispersion_trend(
             &[10.0, 20.0],
             &[0.1, 0.2],
             LocalDispersionTrendOptions {
-                span,
+                degree: 3,
                 ..LocalDispersionTrendOptions::default()
             },
         )
-        .is_err());
-    }
-    assert!(fit_local_dispersion_trend(
-        &[10.0, 20.0],
-        &[0.1, 0.2],
-        LocalDispersionTrendOptions {
-            degree: 3,
-            ..LocalDispersionTrendOptions::default()
-        },
-    )
-    .is_err());
+        .is_err()
+    );
 }
 
 #[test]
@@ -749,15 +777,17 @@ fn fit_mean_dispersion_trend_rejects_invalid_trim_controls() {
     let (means, disps) = trend_data();
 
     for trim in [-0.1, 0.5001, f64::NAN, f64::INFINITY] {
-        assert!(fit_mean_dispersion_trend(
-            &means,
-            &disps,
-            MeanDispersionTrendOptions {
-                trim,
-                ..MeanDispersionTrendOptions::default()
-            },
-        )
-        .is_err());
+        assert!(
+            fit_mean_dispersion_trend(
+                &means,
+                &disps,
+                MeanDispersionTrendOptions {
+                    trim,
+                    ..MeanDispersionTrendOptions::default()
+                },
+            )
+            .is_err()
+        );
     }
 }
 

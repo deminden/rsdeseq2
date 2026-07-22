@@ -9,43 +9,54 @@ result-table assembly.
 the same documented and observed behavior independently, with parity checked
 against reference outputs.
 
-Use it today as a Rust crate, CLI, or R access layer for validated
-DESeq2-compatible workflows.
+The crate includes both a Rust library and the `rsdeseq2` command-line tool.
+It is not a drop-in replacement for the complete Bioconductor API.
 
-## Current Scope
+## Install
+
+Add the library to a Rust project:
+
+```bash
+cargo add rsdeseq2
+```
+
+Install the CLI:
+
+```bash
+cargo install rsdeseq2 --locked
+```
+
+## Supported Scope
 
 Implemented areas include size-factor estimation, normalized counts and base
-row metadata, fixed-dispersion and native-dispersion NB GLM Wald/LRT workflows,
-DESeq2-style result contrasts, Cook's and independent-filtering helpers,
-beta-prior refit workflows, and `normTransform`/VST/rlog building blocks.
+row metadata, fixed-dispersion and selected native-dispersion NB GLM Wald/LRT
+workflows, DESeq2-style result contrasts, Cook's and independent-filtering
+helpers, beta-prior refit workflows, and `normTransform`/VST/rlog building
+blocks.
 
-Interface work still in progress: complete Bioconductor `DESeqDataSet`
-mutation/metadata plumbing, full glmGamPoi behavior, high-level rlog object
-semantics, lfcShrink, plotting, and broader convenience APIs.
+Unsupported interfaces include complete Bioconductor `DESeqDataSet` mutation
+and metadata support, full glmGamPoi behavior, high-level rlog object semantics,
+lfcShrink, plotting, and other convenience APIs.
 
 Detailed status lives in
 [docs/deseq2-gap-analysis.md][gap-analysis] and
 [docs/compatibility.md][compatibility].
 
-## Numeric Evidence
+## Validation
 
-| evidence | scope | result |
-| --- | ---: | --- |
-| Normalization | 17 tissues, 8,731 samples, 612.7M cells | zero finite/NA mismatches; max relative error `9.89e-15` |
-| End-to-end Wald | 65,580-gene kidney contrast | LFC median / p99 / max abs error `2.46e-14` / `3.03e-12` / `7.70e-04`; p-value `2.37e-12` / `4.38e-11` / `6.50e-05` |
-| L-BFGS-B isolation | 512 R 4.6.0 stress objectives | 0.2.0 matches 512/512 endpoints, values, and counts exactly |
-| Process benchmark | 10k/50k genes × 16 samples | 33x–406x faster, 38x–100x lower peak RSS than DESeq2 1.52.0 for checked primitives |
+Measurements recorded for rsdeseq2 0.2.5 against saved R 4.6.1 / DESeq2
+1.52.0 outputs include:
 
-The 0.2.0 optimizer is dramatically more precise in isolation. A
-dependency-only replay moved end-to-end errors by less than 2%, but using its
-analytic-gradient API reduced median/p99 LFC, SE, and statistic errors by about
-20–22% versus finite differences. Only 26/65,580 kidney
-genes (0.040%) and 305/535,178 fitted rows across eight real contrasts (0.057%)
-used the fallback; tiny upstream dispersion differences still change these
-sensitive optimizer targets. Three-run whole-workflow timing ranges overlapped,
-so this is a precision improvement rather than a claimed speedup. See the repository [benchmark
-documentation][benchmarks], tracked [before/after data][real-data-precision],
-and [route/input-drift summary][real-data-routes].
+- four real-data Wald contrasts covering 278,257 rows with zero missing-row or
+  finite/NA-pattern mismatches;
+- 612,699,575 normalized-count values with zero finite/NA mismatches, maximum
+  absolute difference `1.937e-7`, and maximum relative difference `9.887e-15`;
+- 512/512 exact endpoints, objective values, and evaluation counts when
+  replaying the recorded bounded optimizer fixture with `rcompat-lbfgsb` 0.2.1.
+
+The measured primitive CLI timings do not establish a complete DESeq2 workflow
+speed difference. See the repository [benchmark documentation][benchmarks] for
+the full absolute measurements, baselines, fixtures, and interpretation.
 
 ## Rust Usage
 
@@ -126,12 +137,14 @@ cargo run -p rsdeseq2 -- lrt \
 
 ## Development
 
-Requires current stable Rust, tracked in `Cargo.toml` via `rust-version`.
+Requires Rust 1.97.1 or newer and uses the Rust 2024 edition, as declared by
+`rust-version` and `edition` in the workspace `Cargo.toml`.
 
 ```bash
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 ```
 
 Generate DESeq2 reference fixtures:
@@ -143,7 +156,7 @@ cargo test -p rsdeseq2 --test wald_reference
 cargo test -p rsdeseq2 --test lrt_reference
 ```
 
-Run speed/RAM benchmarks for current apples-to-apples primitives:
+Run matched speed/RAM benchmarks for the supported primitives:
 
 ```bash
 scripts/benchmark_rsdeseq2.sh
@@ -152,5 +165,3 @@ scripts/benchmark_rsdeseq2.sh
 [gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
 [benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
-[real-data-precision]: https://github.com/deminden/rsdeseq2/blob/main/docs/data/lbfgsb_real_data_precision.tsv
-[real-data-routes]: https://github.com/deminden/rsdeseq2/blob/main/docs/data/lbfgsb_real_data_route_summary.tsv

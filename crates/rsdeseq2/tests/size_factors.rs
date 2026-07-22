@@ -38,9 +38,11 @@ fn size_factor_geometric_means_keep_large_counts_finite() {
     let poscounts = estimate_size_factors_poscounts(&counts).unwrap();
 
     assert!(ratio.iter().all(|value| value.is_finite() && *value > 0.0));
-    assert!(poscounts
-        .iter()
-        .all(|value| value.is_finite() && *value > 0.0));
+    assert!(
+        poscounts
+            .iter()
+            .all(|value| value.is_finite() && *value > 0.0)
+    );
 }
 
 #[test]

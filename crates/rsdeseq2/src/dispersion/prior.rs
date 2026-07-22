@@ -1,4 +1,4 @@
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::{median_finite, trigamma};
 use statrs::distribution::{ChiSquared, ContinuousCDF, Normal};
 

@@ -397,11 +397,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if sample_levels.is_none() {
-            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+        if sample_levels.is_none()
+            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
                 return self.fit_with_results_factor_level_contrast(counts, design, factor_contrast);
             }
-        }
         match contrast {
             ResultsContrast::Character {
                 factor,
@@ -545,8 +544,8 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
-        if sample_levels.is_none() {
-            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+        if sample_levels.is_none()
+            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
                 return self
                     .fit_with_test_results_factor_level_contrast_with_cooks_replacement(
                         counts,
@@ -555,7 +554,6 @@ impl DeseqBuilder {
                         replacement_options,
                     );
             }
-        }
         match self.test {
             TestType::Wald => match contrast {
                 ResultsContrast::Character {
@@ -988,8 +986,8 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if sample_levels.is_none() {
-            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+        if sample_levels.is_none()
+            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
                 return self.fit_lrt_with_results_factor_level_contrast(
                     counts,
                     full_design,
@@ -997,7 +995,6 @@ impl DeseqBuilder {
                     factor_contrast,
                 );
             }
-        }
         match contrast {
             ResultsContrast::Character {
                 factor,
@@ -1220,8 +1217,8 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        if sample_levels.is_none() {
-            if let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
+        if sample_levels.is_none()
+            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
                 return self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
@@ -1230,7 +1227,6 @@ impl DeseqBuilder {
                     replacement_options,
                 );
             }
-        }
         match contrast {
             ResultsContrast::Character {
                 factor,

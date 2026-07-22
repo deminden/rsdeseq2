@@ -538,11 +538,10 @@ fn validate_optional_names(
     names: Option<&[String]>,
     expected: usize,
 ) -> Result<(), DeseqError> {
-    if let Some(names) = names {
-        if names.len() != expected {
+    if let Some(names) = names
+        && names.len() != expected {
             return Err(invalid_dimensions(context, expected, names.len()));
         }
-    }
     Ok(())
 }
 

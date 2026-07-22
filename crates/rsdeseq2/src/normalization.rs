@@ -1,5 +1,5 @@
 use crate::core::CountMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::median::median;
 use crate::matrix::RowMajorMatrix;
 use crate::options::SizeFactorMethod;
@@ -357,6 +357,25 @@ fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
     values.into_iter().try_fold(0.0, checked_sum2)
 }
 
+fn checked_compensated_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    for value in values {
+        if !value.is_finite() {
+            return None;
+        }
+        let next = checked_sum2(sum, value)?;
+        let roundoff = if sum.abs() >= value.abs() {
+            checked_sum2(sum - next, value)?
+        } else {
+            checked_sum2(value - next, sum)?
+        };
+        correction = checked_sum2(correction, roundoff)?;
+        sum = next;
+    }
+    checked_sum2(sum, correction)
+}
+
 fn checked_sum2(left: f64, right: f64) -> Option<f64> {
     let sum = left + right;
     (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
@@ -410,13 +429,16 @@ fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
             if row.contains(&0) {
                 Ok(f64::NEG_INFINITY)
             } else {
-                let sum = checked_sum(row.iter().map(|count| f64::from(*count).ln())).ok_or_else(
-                    || DeseqError::NonFiniteValue {
-                        context: "ratio geometric mean log sum".to_string(),
-                        index: Some(gene),
-                        value: f64::NAN,
-                    },
-                )?;
+                // R's rowMeans() accumulates with extended precision. A
+                // compensated sum preserves the same low-order information in
+                // portable f64 arithmetic and prevents near-boundary genes
+                // from changing optimizer routes through size-factor drift.
+                let sum = checked_compensated_sum(row.iter().map(|count| f64::from(*count).ln()))
+                    .ok_or_else(|| DeseqError::NonFiniteValue {
+                    context: "ratio geometric mean log sum".to_string(),
+                    index: Some(gene),
+                    value: f64::NAN,
+                })?;
                 checked_div2(sum, counts.n_samples() as f64).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "ratio geometric mean log mean".to_string(),
@@ -436,7 +458,7 @@ fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError>
             if row.iter().all(|count| *count == 0) {
                 Ok(f64::NEG_INFINITY)
             } else {
-                let sum = checked_sum(
+                let sum = checked_compensated_sum(
                     row.iter()
                         .filter(|count| **count > 0)
                         .map(|count| f64::from(*count).ln()),
@@ -551,11 +573,12 @@ fn usable_gene_indices(
 }
 
 fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
-    let log_sum = checked_sum(size_factors.iter().map(|value| value.ln())).ok_or_else(|| {
-        DeseqError::InvalidSizeFactors {
-            reason: "cannot stabilize size factors to geometric mean one".to_string(),
-        }
-    })?;
+    let log_sum =
+        checked_compensated_sum(size_factors.iter().map(|value| value.ln())).ok_or_else(|| {
+            DeseqError::InvalidSizeFactors {
+                reason: "cannot stabilize size factors to geometric mean one".to_string(),
+            }
+        })?;
     let log_mean = checked_div2(log_sum, size_factors.len() as f64).ok_or_else(|| {
         DeseqError::InvalidSizeFactors {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),
@@ -591,4 +614,24 @@ fn validate_size_factors(size_factors: &[f64], n_samples: usize) -> Result<(), D
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_compensated_sum;
+
+    #[test]
+    fn compensated_sum_preserves_representable_low_order_terms() {
+        let values = [1.0e16, 1.0, 1.0];
+        let naive = values.into_iter().sum::<f64>();
+        let compensated = checked_compensated_sum(values).unwrap();
+
+        assert_eq!(naive, 1.0e16);
+        assert_eq!(compensated, 1.0e16 + 2.0);
+    }
+
+    #[test]
+    fn compensated_sum_rejects_non_finite_values() {
+        assert_eq!(checked_compensated_sum([1.0, f64::INFINITY]), None);
+    }
 }

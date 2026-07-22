@@ -1,7 +1,8 @@
 [package]
 name = "rsdeseq2-r"
-version = "0.2.3"
-edition = "2021"
+version = "0.2.5"
+edition = "2024"
+rust-version = "1.97.1"
 publish = false
 
 [lib]

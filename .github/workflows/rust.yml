@@ -16,3 +16,13 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: README quick start
+        run: |
+          quickstart_output="$(mktemp)"
+          cargo run --quiet -p rsdeseq2 -- wald \
+            --counts examples/quickstart/counts.tsv \
+            --design examples/quickstart/design.tsv \
+            --fit-type mean \
+            --coefficient 1 \
+            --output "$quickstart_output"
+          test "$(wc -l < "$quickstart_output")" -eq 5

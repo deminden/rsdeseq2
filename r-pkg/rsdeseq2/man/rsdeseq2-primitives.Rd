@@ -22,8 +22,8 @@
 \title{rsdeseq2 R wrapper helpers}
 \description{
 R-facing helpers for implemented rsdeseq2 matrix stages, fitted-result objects,
-and DESeq2-compatible result-table semantics. High-level DESeqDataSet
-fitting/mutation integration is exposed through explicit API boundaries.
+and DESeq2-compatible result-table semantics. High-level DESeqDataSet fitting
+and mutation are not implemented.
 }
 \usage{
 estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"),
@@ -173,8 +173,8 @@ for implemented \code{results()} behavior, a list-like primitive Wald/LRT input,
 or an already-fitted DESeq2-shaped list/S4-like object with compatible \code{mcols}
 fields for direct \code{results()} dispatch, \code{nbinomWaldTestRust()}, or
 \code{nbinomLRTRust()}.}
-\item{fitType, engine, parityMode, nproc}{Future high-level DESeq options.}
-\item{...}{Additional arguments reserved for future compatibility.}
+\item{fitType, engine, parityMode, nproc}{Unsupported high-level DESeq options retained in the function signature.}
+\item{...}{Additional unsupported arguments retained in the function signature.}
 }
 \details{
 The implemented helpers operate on primitive R vectors and matrices. When

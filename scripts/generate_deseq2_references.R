@@ -17,11 +17,33 @@ script_path <- if (length(file_arg) > 0) {
 repo_root <- normalizePath(file.path(dirname(script_path), ".."), mustWork = FALSE)
 out_dir <- file.path(repo_root, "results", "parity")
 data_dir <- file.path(repo_root, "crates", "rsdeseq2", "tests", "data", "deseq2_reference")
+preserve_pattern <- "^hard_se_covariance_.*[.]tsv$"
+preserved_dir <- tempfile("rsdeseq2-preserved-reference-")
+preserved_files <- character()
 if (dir.exists(data_dir)) {
+  preserved_files <- list.files(data_dir, pattern = preserve_pattern, full.names = TRUE)
+  if (length(preserved_files) > 0) {
+    dir.create(preserved_dir, recursive = TRUE, showWarnings = FALSE)
+    copied <- file.copy(preserved_files, preserved_dir, overwrite = TRUE)
+    if (!all(copied)) {
+      stop("failed to preserve separately generated hard SE/covariance fixtures")
+    }
+  }
   unlink(data_dir, recursive = TRUE)
 }
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+if (length(preserved_files) > 0) {
+  restored <- file.copy(
+    file.path(preserved_dir, basename(preserved_files)),
+    data_dir,
+    overwrite = TRUE
+  )
+  if (!all(restored)) {
+    stop("failed to restore separately generated hard SE/covariance fixtures")
+  }
+  unlink(preserved_dir, recursive = TRUE)
+}
 
 write_tsv <- function(x, path) {
   write.table(
@@ -276,8 +298,8 @@ metadata <- data.frame(
     "DESeq2 roughDispEstimate, momentsDispEstimate, and estimateDispersionsGeneEst stored mu with normalizationFactors(dds)",
     "DESeq2:::fitNbinomGLMs with supplied dispersions, default 1e-6 beta ridge, useQR=FALSE, useOptim=TRUE, forceOptim=TRUE",
     "getBaseMeansAndVariances with raw weights, getAndCheckWeights row-normalized weights, and fitNbinomGLMs with supplied dispersions",
-    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) without observation weights for Cox-Reid gene-wise dispersion anchors",
-    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) with observation weights for weighted Cox-Reid gene-wise dispersion anchors",
+    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) without observation weights for Cox-Reid gene-wise dispersion references",
+    "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE) with observation weights for weighted Cox-Reid gene-wise dispersion references",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), estimateDispersionsMAP(useCR=FALSE), and full/reduced fitNbinomGLMs(useQR=FALSE,useOptim=FALSE) with observation weights",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE), estimateDispersionsFit(fitType='mean'), and estimateDispersionsMAP(useCR=TRUE) with observation weights",
     "estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE), estimateDispersionsFit(fitType='mean'), and estimateDispersionsMAP(useCR=FALSE) without observation weights",

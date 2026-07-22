@@ -1,8 +1,42 @@
 # rsdeseq2 R Package
 
-This package is the R-first access layer for `rsdeseq2`.
+This package provides R access to selected `rsdeseq2` primitives and native
+bridges. It does not fit complete `DESeqDataSet` workflows or replace the full
+DESeq2/Bioconductor interface.
 
-Currently implemented primitive matrix helpers:
+The package is tested with R 4.6.1. Each numerical reference fixture records
+the R version that generated it.
+
+## Install and Try a Primitive
+
+From a repository checkout:
+
+```bash
+R CMD INSTALL r-pkg/rsdeseq2
+```
+
+```r
+library(rsdeseq2)
+
+counts <- matrix(
+  c(10L, 12L, 20L, 24L,
+    5L,  7L,  6L,  8L,
+    100L, 80L, 90L, 120L),
+  nrow = 3L,
+  byrow = TRUE
+)
+estimateSizeFactorsRust(counts, native = TRUE)
+```
+
+The Rust core is validated against saved R 4.6.1 / DESeq2 1.52.0 outputs. The
+repository [validation summary](../../README.md#measured-validation) records
+the absolute measurements and their scope; the
+[benchmark documentation](../../docs/benchmarks.md) contains unrounded data,
+baselines, and reproduction commands. Those workflow-level measurements
+describe the native Rust core, not additional surface implemented by this R
+package.
+
+## Supported Primitive Helpers
 
 - `estimateSizeFactorsRust()`
 - `normalizedCountsRust()`
@@ -24,7 +58,9 @@ Currently implemented primitive matrix helpers:
 These helpers include an R-level implementation that mirrors the
 Rust-supported normalization algorithms, including gene/sample normalization
 factors, weighted base metadata, Cook's cutoff result masking, and diagnostic
-metadata shape while the native Rust bridge is still being wired.
+metadata shape. The R API does not expose the full Rust workflow. Registered
+primitive `.Call` bridges cover selected normalization, metadata, Cook's, and
+diagnostic operations.
 `baseMetadataRust(native = TRUE)` can use the registered package `.Call` bridge
 for that primitive and uses the R-level implementation when the shared library
 is unavailable. `estimateSizeFactorsRust(native = TRUE)`,
@@ -35,7 +71,7 @@ Cook's masking while R retains BH adjustment and output assembly.
 `resultsTableRust()` assembles already-computed primitive vectors into a
 DESeq2-shaped result data frame and computes BH-adjusted p-values when needed.
 `waldFitRust()` packages primitive Wald beta/covariance outputs.
-`nbinomWaldTestRust()` currently accepts those same already-computed primitive
+`nbinomWaldTestRust()` accepts those same already-computed primitive
 Wald inputs, or a list-like primitive object, and returns the same fit object.
 `lrtFitRust()` and `nbinomLRTRust()` do the corresponding primitive packaging
 for already-computed LRT statistics: `results()` reports the selected
@@ -59,4 +95,4 @@ character vectors for the same contrast-resolution workflow.
 `applyIndependentFilteringRust()` applies baseMean-driven filtered BH
 adjustment to primitive result tables and records filtering metadata as an
 attribute.
-DESeqDataSet fitting integration remains unsupported and returns clear errors.
+DESeqDataSet fitting integration is unsupported and returns clear errors.

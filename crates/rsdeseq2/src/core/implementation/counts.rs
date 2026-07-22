@@ -138,16 +138,14 @@ impl CountMatrix {
                 counts.len(),
             ));
         }
-        if let Some(names) = &gene_names {
-            if names.len() != n_genes {
+        if let Some(names) = &gene_names
+            && names.len() != n_genes {
                 return Err(invalid_dimensions("gene names", n_genes, names.len()));
             }
-        }
-        if let Some(names) = &sample_names {
-            if names.len() != n_samples {
+        if let Some(names) = &sample_names
+            && names.len() != n_samples {
                 return Err(invalid_dimensions("sample names", n_samples, names.len()));
             }
-        }
         Ok(Self {
             n_genes,
             n_samples,

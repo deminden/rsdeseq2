@@ -596,39 +596,45 @@ fn expanded_additive_design_with_interactions_validates_specs() {
         },
     ];
 
-    assert!(expanded_additive_design_with_interactions(
-        &factors,
-        &[],
-        &[ExpandedFactorInteractionSpec {
-            left_factor: "condition",
-            right_factor: "missing",
-        }]
-    )
-    .is_err());
-    assert!(expanded_additive_design_with_interactions(
-        &factors,
-        &[],
-        &[ExpandedFactorInteractionSpec {
-            left_factor: "condition",
-            right_factor: "condition",
-        }]
-    )
-    .is_err());
-    assert!(expanded_additive_design_with_interactions(
-        &factors,
-        &[],
-        &[
-            ExpandedFactorInteractionSpec {
+    assert!(
+        expanded_additive_design_with_interactions(
+            &factors,
+            &[],
+            &[ExpandedFactorInteractionSpec {
                 left_factor: "condition",
-                right_factor: "batch",
-            },
-            ExpandedFactorInteractionSpec {
-                left_factor: "batch",
+                right_factor: "missing",
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design_with_interactions(
+            &factors,
+            &[],
+            &[ExpandedFactorInteractionSpec {
+                left_factor: "condition",
                 right_factor: "condition",
-            },
-        ]
-    )
-    .is_err());
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design_with_interactions(
+            &factors,
+            &[],
+            &[
+                ExpandedFactorInteractionSpec {
+                    left_factor: "condition",
+                    right_factor: "batch",
+                },
+                ExpandedFactorInteractionSpec {
+                    left_factor: "batch",
+                    right_factor: "condition",
+                },
+            ]
+        )
+        .is_err()
+    );
 
     let dose = [0.0, 1.0];
     let time = [1.0, 2.0];
@@ -642,113 +648,133 @@ fn expanded_additive_design_with_interactions_validates_specs() {
             values: &time,
         },
     ];
-    assert!(expanded_additive_design_with_all_interactions(
-        &factors,
-        &numeric,
-        &[],
-        &[ExpandedFactorNumericInteractionSpec {
-            factor: "condition",
-            numeric: "missing",
-        }],
-        &[],
-    )
-    .is_err());
-    assert!(expanded_additive_design_with_all_interactions(
-        &factors,
-        &numeric,
-        &[],
-        &[],
-        &[ExpandedNumericInteractionSpec {
-            left_numeric: "dose",
-            right_numeric: "dose",
-        }],
-    )
-    .is_err());
-    assert!(expanded_additive_design_with_all_interactions(
-        &factors,
-        &numeric,
-        &[],
-        &[],
-        &[
-            ExpandedNumericInteractionSpec {
+    assert!(
+        expanded_additive_design_with_all_interactions(
+            &factors,
+            &numeric,
+            &[],
+            &[ExpandedFactorNumericInteractionSpec {
+                factor: "condition",
+                numeric: "missing",
+            }],
+            &[],
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design_with_all_interactions(
+            &factors,
+            &numeric,
+            &[],
+            &[],
+            &[ExpandedNumericInteractionSpec {
                 left_numeric: "dose",
-                right_numeric: "time",
-            },
-            ExpandedNumericInteractionSpec {
-                left_numeric: "time",
                 right_numeric: "dose",
-            },
-        ],
-    )
-    .is_err());
+            }],
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design_with_all_interactions(
+            &factors,
+            &numeric,
+            &[],
+            &[],
+            &[
+                ExpandedNumericInteractionSpec {
+                    left_numeric: "dose",
+                    right_numeric: "time",
+                },
+                ExpandedNumericInteractionSpec {
+                    left_numeric: "time",
+                    right_numeric: "dose",
+                },
+            ],
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn expanded_additive_design_validates_numeric_covariates() {
     let dose = [0.0, 1.0, 2.0];
     let bad = [0.0, f64::NAN, 2.0];
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &dose,
-        }]
-    )
-    .is_ok());
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "",
-            values: &dose,
-        }]
-    )
-    .is_err());
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &[],
-        }]
-    )
-    .is_err());
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &bad,
-        }]
-    )
-    .is_err());
-    assert!(expanded_additive_design(
-        &[],
-        &[
-            ExpandedNumericSpec {
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
                 name: "dose",
                 values: &dose,
-            },
-            ExpandedNumericSpec {
-                name: "dose",
+            }]
+        )
+        .is_ok()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
+                name: "",
                 values: &dose,
-            },
-        ]
-    )
-    .is_err());
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &[0.0, 1.0],
-        }]
-    )
-    .is_ok());
-    assert!(expanded_additive_design(
-        &[],
-        &[ExpandedNumericSpec {
-            name: "Intercept",
-            values: &dose,
-        }]
-    )
-    .is_err());
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &[],
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &bad,
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[
+                ExpandedNumericSpec {
+                    name: "dose",
+                    values: &dose,
+                },
+                ExpandedNumericSpec {
+                    name: "dose",
+                    values: &dose,
+                },
+            ]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &[0.0, 1.0],
+            }]
+        )
+        .is_ok()
+    );
+    assert!(
+        expanded_additive_design(
+            &[],
+            &[ExpandedNumericSpec {
+                name: "Intercept",
+                values: &dose,
+            }]
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -1989,9 +2015,11 @@ fn formula_model_frame_factor_reference_aliases_prefer_exact_and_reject_ambiguou
         ],
         numeric_covariates: Vec::new(),
     };
-    assert!(ambiguous
-        .resolved_factor_reference_by_alias("cell.type")
-        .is_err());
+    assert!(
+        ambiguous
+            .resolved_factor_reference_by_alias("cell.type")
+            .is_err()
+    );
 }
 
 #[test]
@@ -2053,9 +2081,11 @@ fn formula_model_frame_numeric_aliases_prefer_exact_and_reject_ambiguous() {
             },
         ],
     };
-    assert!(ambiguous
-        .resolved_numeric_covariate_by_alias("dose.value")
-        .is_err());
+    assert!(
+        ambiguous
+            .resolved_numeric_covariate_by_alias("dose.value")
+            .is_err()
+    );
 }
 
 #[test]
@@ -2148,11 +2178,13 @@ fn formula_model_frame_reference_rejects_ambiguous_cleaned_level_aliases() {
         numeric_covariates: Vec::new(),
     };
 
-    assert!(model_frame
-        .validate()
-        .unwrap_err()
-        .to_string()
-        .contains("reference level 'A.cell' resolves ambiguously"));
+    assert!(
+        model_frame
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("reference level 'A.cell' resolves ambiguously")
+    );
 
     let declared_collision = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -2171,11 +2203,13 @@ fn formula_model_frame_reference_rejects_ambiguous_cleaned_level_aliases() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(declared_collision
-        .validate()
-        .unwrap_err()
-        .to_string()
-        .contains("declared level 'A-cell' resolves ambiguously after R-style cleanup"));
+    assert!(
+        declared_collision
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("declared level 'A-cell' resolves ambiguously after R-style cleanup")
+    );
 }
 
 #[test]
@@ -2951,8 +2985,10 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
         expanded_formula_design_from_model_frame("~ cell.type", &ambiguous_cross_type)
             .unwrap_err()
             .to_string();
-    assert!(ambiguous_error
-        .contains("formula column 'cell-type' resolves ambiguously after R-style cleanup"));
+    assert!(
+        ambiguous_error
+            .contains("formula column 'cell-type' resolves ambiguously after R-style cleanup")
+    );
 
     let bad_reference = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -3501,10 +3537,11 @@ fn expanded_formula_design_supports_three_way_terms() {
     );
 
     let star = expanded_formula_design("~ condition * batch * dose", &factors, &numeric).unwrap();
-    assert!(star
-        .standard_design
-        .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose")
-        .is_ok());
+    assert!(
+        star.standard_design
+            .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose")
+            .is_ok()
+    );
     assert_eq!(
         star.higher_order_interactions,
         vec!["condition:batch:dose".to_string()]
@@ -3594,14 +3631,16 @@ fn expanded_formula_design_supports_arbitrary_order_terms() {
 
     let star =
         expanded_formula_design("~ condition * batch * dose * time", &factors, &numeric).unwrap();
-    assert!(star
-        .standard_design
-        .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose:time")
-        .is_ok());
-    assert!(star
-        .higher_order_interactions
-        .iter()
-        .any(|interaction| interaction == "condition:batch:dose:time"));
+    assert!(
+        star.standard_design
+            .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose:time")
+            .is_ok()
+    );
+    assert!(
+        star.higher_order_interactions
+            .iter()
+            .any(|interaction| interaction == "condition:batch:dose:time")
+    );
 
     let nested =
         expanded_formula_design("~ condition / batch / dose / time", &factors, &numeric).unwrap();
@@ -3671,14 +3710,18 @@ fn expanded_formula_design_supports_term_subtraction() {
         &numeric,
     )
     .unwrap();
-    assert!(removed_higher
-        .standard_design
-        .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose:time")
-        .is_err());
-    assert!(!removed_higher
-        .higher_order_interactions
-        .iter()
-        .any(|interaction| interaction == "condition:batch:dose:time"));
+    assert!(
+        removed_higher
+            .standard_design
+            .coefficient_index("condition_B_vs_A:batch_Y_vs_X:dose:time")
+            .is_err()
+    );
+    assert!(
+        !removed_higher
+            .higher_order_interactions
+            .iter()
+            .any(|interaction| interaction == "condition:batch:dose:time")
+    );
 
     let removed_nested = expanded_formula_design(
         "~ condition / batch / dose - condition / batch",
@@ -4169,10 +4212,12 @@ fn expanded_formula_design_supports_numeric_power_transforms() {
 
     let interaction =
         expanded_formula_design("~ condition * I(dose^2)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_pow_2")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_pow_2")
+            .is_ok()
+    );
 
     let removed =
         expanded_formula_design("~ condition + I(dose^2) - I(dose^2)", &factors, &numeric).unwrap();
@@ -4218,10 +4263,12 @@ fn expanded_formula_design_supports_numeric_identity_transform() {
     assert_eq!(design.numeric_covariates, vec!["dose_identity".to_string()]);
 
     let interaction = expanded_formula_design("~ condition * I(dose)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_identity")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_identity")
+            .is_ok()
+    );
 
     let removed =
         expanded_formula_design("~ condition + I(dose) - I(dose)", &factors, &numeric).unwrap();
@@ -4266,10 +4313,12 @@ fn expanded_formula_design_supports_signed_numeric_identity_transform() {
 
     let interaction =
         expanded_formula_design("~ condition * I(-dose)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_neg")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_neg")
+            .is_ok()
+    );
 
     let removed =
         expanded_formula_design("~ condition + I(-dose) - I(-dose)", &factors, &numeric).unwrap();
@@ -4323,10 +4372,12 @@ fn expanded_formula_design_supports_numeric_scalar_arithmetic_transform() {
 
     let interaction =
         expanded_formula_design("~ condition * I(dose + 1)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_plus_1")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_plus_1")
+            .is_ok()
+    );
 
     let removed = expanded_formula_design(
         "~ condition + I(dose + 1) - I(dose + 1)",
@@ -4384,10 +4435,12 @@ fn expanded_formula_design_supports_scalar_left_numeric_arithmetic_transform() {
 
     let interaction =
         expanded_formula_design("~ condition * I(1 + dose)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_plus_1")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_plus_1")
+            .is_ok()
+    );
 }
 
 #[test]
@@ -4448,10 +4501,12 @@ fn expanded_formula_design_supports_numeric_binary_arithmetic_transform() {
 
     let interaction =
         expanded_formula_design("~ condition * I(dose + time)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_plus_time")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_plus_time")
+            .is_ok()
+    );
 
     let named_x = expanded_formula_design(
         "~ I(x=dose) + I(x=dose + 1) + I(x=`dose/time`)",
@@ -4557,10 +4612,12 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
 
     let interaction =
         expanded_formula_design("~ condition * log2(dose)", &factors, &numeric).unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_log2")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_log2")
+            .is_ok()
+    );
 
     let spaced = expanded_formula_design(
         "~ log ( dose ) + log2 ( dose ) + sqrt ( x = dose ) + scale ( dose, center = FALSE, scale = FALSE )",
@@ -4748,10 +4805,12 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
 
     let scaled_interaction =
         expanded_formula_design("~ condition * scale(dose)", &factors, &numeric).unwrap();
-    assert!(scaled_interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_scale")
-        .is_ok());
+    assert!(
+        scaled_interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_scale")
+            .is_ok()
+    );
 
     let scaled_options = expanded_formula_design(
         "~ scale(dose, center=FALSE) + scale(dose, scale=FALSE) + scale(dose, center=FALSE, scale=FALSE) + scale(dose, FALSE, FALSE) + scale(dose, F, scale=T)",
@@ -5077,14 +5136,18 @@ fn expanded_formula_design_supports_raw_polynomial_transforms() {
         &numeric,
     )
     .unwrap();
-    assert!(treatment_interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_poly_1")
-        .is_ok());
-    assert!(treatment_interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:dose_poly_2")
-        .is_ok());
+    assert!(
+        treatment_interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_poly_1")
+            .is_ok()
+    );
+    assert!(
+        treatment_interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:dose_poly_2")
+            .is_ok()
+    );
 
     let named_order =
         expanded_formula_design("~ poly(dose, raw = TRUE, degree = 2)", &factors, &numeric)
@@ -5190,14 +5253,18 @@ fn expanded_formula_design_supports_orthogonal_polynomial_transforms() {
         &numeric,
     )
     .unwrap();
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:poly(dose, 2)1")
-        .is_ok());
-    assert!(interaction
-        .standard_design
-        .coefficient_index("condition_B_vs_A:poly(dose, 2)2")
-        .is_ok());
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:poly(dose, 2)1")
+            .is_ok()
+    );
+    assert!(
+        interaction
+            .standard_design
+            .coefficient_index("condition_B_vs_A:poly(dose, 2)2")
+            .is_ok()
+    );
 
     let removed = expanded_formula_design(
         "~ condition + poly(dose, 2) - poly(dose, 2)",
@@ -5429,12 +5496,10 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
             .collect::<Vec<_>>()
     );
 
-    assert!(expanded_formula_design_with_offsets(
-        "~ offset(poly(dose, 2, raw=TRUE))",
-        &[],
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design_with_offsets("~ offset(poly(dose, 2, raw=TRUE))", &[], &numeric)
+            .is_err()
+    );
 }
 
 #[test]
@@ -5550,21 +5615,25 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(
         expanded_formula_design("~ condition + condition:condition", &factors, &numeric).is_err()
     );
-    assert!(expanded_formula_design(
-        "~ as.ordered(condition, levels=c('A','B'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ as.ordered(condition, levels=c('A','B'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
     assert!(expanded_formula_design("~ condition - missing", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ condition -", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ (condition + batch", &factors, &numeric).is_err());
-    assert!(expanded_formula_design(
-        "~ condition + (missing + batch - dose)^2",
-        &factors,
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ condition + (missing + batch - dose)^2",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
     assert!(expanded_formula_design("~ I(dose^x)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose^32)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ I(dose + missing)", &factors, &numeric).is_err());
@@ -5582,15 +5651,17 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ log(x=dose, x=dose)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ log2(dose, base=2)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ sqrt(dose, extra=1)", &factors, &numeric).is_err());
-    assert!(expanded_formula_design(
-        "~ log1p(dose)",
-        &factors,
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &[-1.0, 0.0],
-        }]
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ log1p(dose)",
+            &factors,
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &[-1.0, 0.0],
+            }]
+        )
+        .is_err()
+    );
     assert!(expanded_formula_design("~ log2(dose", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(missing)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, center=maybe)", &factors, &numeric).is_err());
@@ -5599,35 +5670,41 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ scale(dose, scale=0)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, scale=-1)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, raw=TRUE)", &factors, &numeric).is_err());
-    assert!(expanded_formula_design(
-        "~ scale(dose, center=FALSE, center=TRUE)",
-        &factors,
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ scale(dose, center=FALSE, center=TRUE)",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
     assert!(
         expanded_formula_design("~ scale(dose, scale=FALSE, scale=TRUE)", &factors, &numeric)
             .is_err()
     );
     assert!(expanded_formula_design("~ scale(x=dose, x=dose)", &factors, &numeric).is_err());
-    assert!(expanded_formula_design(
-        "~ scale(dose)",
-        &factors,
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &[1.0, 1.0],
-        }]
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ poly(dose, 2)",
-        &factors,
-        &[ExpandedNumericSpec {
-            name: "dose",
-            values: &[0.0, 0.0],
-        }]
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ scale(dose)",
+            &factors,
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &[1.0, 1.0],
+            }]
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ poly(dose, 2)",
+            &factors,
+            &[ExpandedNumericSpec {
+                name: "dose",
+                values: &[0.0, 0.0],
+            }]
+        )
+        .is_err()
+    );
     assert!(expanded_formula_design("~ poly(dose, x, raw=TRUE)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ poly(dose, 32, raw=TRUE)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ poly(missing, 2, raw=TRUE)", &factors, &numeric).is_err());
@@ -5656,42 +5733,54 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(
         expanded_formula_design("~ factor(condition, levels='A')", &factors, &numeric).is_err()
     );
-    assert!(expanded_formula_design(
-        "~ factor(condition, labels=c('control','treated'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ factor(condition, levels=c('A','B'), labels=c('control'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ factor(condition, levels=c('A','B'), labels=c('group','group'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ as.factor(condition, levels=c('A','B'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ as.factor(condition, labels=c('control','treated'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design(
-        "~ as.ordered(condition, labels=c('control','treated'))",
-        &factors,
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design(
+            "~ factor(condition, labels=c('control','treated'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ factor(condition, levels=c('A','B'), labels=c('control'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ factor(condition, levels=c('A','B'), labels=c('group','group'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ as.factor(condition, levels=c('A','B'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ as.factor(condition, labels=c('control','treated'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design(
+            "~ as.ordered(condition, labels=c('control','treated'))",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
     assert!(expanded_formula_design("~ droplevels(dose)", &factors, &numeric).is_err());
     assert!(
         expanded_formula_design("~ droplevels(condition, except='A')", &factors, &numeric).is_err()
@@ -5726,24 +5815,22 @@ fn expanded_formula_design_validates_unsupported_terms() {
         expanded_formula_design_with_offsets("~ condition - offset(dose)", &factors, &numeric)
             .is_err()
     );
-    assert!(expanded_formula_design_with_offsets(
-        "~ condition - (offset(dose) + 1)",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design_with_offsets(
-        "~ condition + offset(missing)",
-        &factors,
-        &numeric
-    )
-    .is_err());
-    assert!(expanded_formula_design_with_offsets(
-        "~ condition + offset(dose + 1)",
-        &factors,
-        &numeric
-    )
-    .is_err());
+    assert!(
+        expanded_formula_design_with_offsets(
+            "~ condition - (offset(dose) + 1)",
+            &factors,
+            &numeric
+        )
+        .is_err()
+    );
+    assert!(
+        expanded_formula_design_with_offsets("~ condition + offset(missing)", &factors, &numeric)
+            .is_err()
+    );
+    assert!(
+        expanded_formula_design_with_offsets("~ condition + offset(dose + 1)", &factors, &numeric)
+            .is_err()
+    );
     assert!(
         expanded_formula_design("~ condition * batch * dose * missing", &factors, &numeric)
             .is_err()

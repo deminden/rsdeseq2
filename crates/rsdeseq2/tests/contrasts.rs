@@ -617,19 +617,23 @@ fn original_results_invalid_contrast_shapes_are_rejected() {
     assert!(resolve_contrast(&design, &ContrastSpec::factor_level("foo", "lo", "hi")).is_err());
     assert!(resolve_contrast(&design, &ContrastSpec::factor_level("condition", "4", "1")).is_err());
     assert!(resolve_contrast(&design, &ContrastSpec::factor_level("condition", "1", "1")).is_err());
-    assert!(resolve_contrast(
-        &design,
-        &ContrastSpec::list(vec!["condition_2_vs_1".into()], vec!["foo".into()])
-    )
-    .is_err());
-    assert!(resolve_contrast(
-        &design,
-        &ContrastSpec::list(
-            vec!["condition_2_vs_1".into()],
-            vec!["condition_2_vs_1".into()],
+    assert!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::list(vec!["condition_2_vs_1".into()], vec!["foo".into()])
         )
-    )
-    .is_err());
+        .is_err()
+    );
+    assert!(
+        resolve_contrast(
+            &design,
+            &ContrastSpec::list(
+                vec!["condition_2_vs_1".into()],
+                vec!["condition_2_vs_1".into()],
+            )
+        )
+        .is_err()
+    );
     assert!(resolve_contrast(&design, &ContrastSpec::list(Vec::new(), Vec::new())).is_err());
     assert!(resolve_contrast(&design, &ContrastSpec::Numeric(vec![0.0, 0.0, 0.0, 0.0])).is_err());
 }
@@ -771,18 +775,22 @@ fn model_frame_factor_level_contrast_infers_and_overrides_reference() {
         .unwrap();
     assert_eq!(explicit.reference, Some("A"));
 
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::numeric(vec![0.0, 1.0]),
-        &model_frame
-    )
-    .unwrap()
-    .is_none());
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::list(vec!["condition_C_vs_A".into()], Vec::new()),
-        &model_frame,
-    )
-    .unwrap()
-    .is_none());
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
+            &model_frame
+        )
+        .unwrap()
+        .is_none()
+    );
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::list(vec!["condition_C_vs_A".into()], Vec::new()),
+            &model_frame,
+        )
+        .unwrap()
+        .is_none()
+    );
 }
 
 #[test]
@@ -1097,13 +1105,15 @@ fn model_frame_factor_level_contrast_rejects_ambiguous_level_aliases() {
         numeric_covariates: Vec::new(),
     };
 
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
-        &model_frame,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("ambiguously"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
+            &model_frame,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("ambiguously")
+    );
 }
 
 #[test]
@@ -1125,13 +1135,15 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
         ],
         numeric_covariates: Vec::new(),
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("condition", "B", "A"),
-        &duplicate,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("more than once"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("condition", "B", "A"),
+            &duplicate,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("more than once")
+    );
 
     let missing_level = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -1142,20 +1154,24 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("condition", "C", "A"),
-        &missing_level,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("numerator level"));
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character_with_reference("condition", "B", "A", "C"),
-        &missing_level,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("reference level"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("condition", "C", "A"),
+            &missing_level,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("numerator level")
+    );
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character_with_reference("condition", "B", "A", "C"),
+            &missing_level,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("reference level")
+    );
 
     let ambiguous_cleaned = FormulaModelFrame {
         factors: vec![
@@ -1174,13 +1190,15 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
         ],
         numeric_covariates: Vec::new(),
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("cell.type", "B", "A"),
-        &ambiguous_cleaned,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("ambiguously"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("cell.type", "B", "A"),
+            &ambiguous_cleaned,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("ambiguously")
+    );
 
     let cross_type_duplicate = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -1194,13 +1212,15 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
             values: vec![0.0, 1.0],
         }],
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("condition", "B", "A"),
-        &cross_type_duplicate,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("cannot be both a factor and numeric covariate"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("condition", "B", "A"),
+            &cross_type_duplicate,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("cannot be both a factor and numeric covariate")
+    );
 
     let cross_type_alias = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -1214,13 +1234,15 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
             values: vec![0.0, 1.0],
         }],
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("cell type", "B", "A"),
-        &cross_type_alias,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("resolves ambiguously after R-style cleanup"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("cell type", "B", "A"),
+            &cross_type_alias,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("resolves ambiguously after R-style cleanup")
+    );
 
     let bad_numeric_shape = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -1234,13 +1256,15 @@ fn model_frame_factor_level_contrast_validates_factor_metadata() {
             values: vec![0.0],
         }],
     };
-    assert!(factor_level_contrast_from_model_frame(
-        &ResultsContrast::character("condition", "B", "A"),
-        &bad_numeric_shape,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("formula numeric covariate values"));
+    assert!(
+        factor_level_contrast_from_model_frame(
+            &ResultsContrast::character("condition", "B", "A"),
+            &bad_numeric_shape,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("formula numeric covariate values")
+    );
 }
 
 #[test]

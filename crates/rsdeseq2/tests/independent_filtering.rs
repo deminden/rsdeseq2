@@ -348,22 +348,26 @@ fn independent_filtering_rejects_invalid_options() {
     let fit = toy_fit(vec![1.0], vec![1.0], vec![true]);
     let mut results = build_wald_results(&[1.0], &fit, 0, None, None).unwrap();
 
-    assert!(apply_independent_filtering(
-        &mut results,
-        &IndependentFilteringOptions {
-            alpha: 1.0,
-            ..IndependentFilteringOptions::default()
-        },
-    )
-    .is_err());
-    assert!(apply_independent_filtering(
-        &mut results,
-        &IndependentFilteringOptions {
-            theta: Some(vec![0.5]),
-            ..IndependentFilteringOptions::default()
-        },
-    )
-    .is_err());
+    assert!(
+        apply_independent_filtering(
+            &mut results,
+            &IndependentFilteringOptions {
+                alpha: 1.0,
+                ..IndependentFilteringOptions::default()
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        apply_independent_filtering(
+            &mut results,
+            &IndependentFilteringOptions {
+                theta: Some(vec![0.5]),
+                ..IndependentFilteringOptions::default()
+            },
+        )
+        .is_err()
+    );
 }
 
 fn toy_fit(beta: Vec<f64>, beta_se: Vec<f64>, beta_converged: Vec<bool>) -> NbinomGlmFit {

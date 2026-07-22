@@ -4221,28 +4221,29 @@ fn apply_cooks_cutoff_low_count_heuristic_validates_inputs() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![1, 5, 6, 7]).unwrap();
     let bad_cooks = RowMajorMatrix::from_row_major(1, 3, vec![10.0, 0.1, 0.2]).unwrap();
 
-    assert!(apply_cooks_cutoff_with_low_count_heuristic(
-        &mut results,
-        Some(5.0),
-        &counts,
-        &bad_cooks,
-    )
-    .is_err());
-    assert!(apply_cooks_cutoff_with_low_count_heuristic(
-        &mut results,
-        Some(f64::NAN),
-        &counts,
-        &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
-    )
-    .is_err());
+    assert!(
+        apply_cooks_cutoff_with_low_count_heuristic(&mut results, Some(5.0), &counts, &bad_cooks,)
+            .is_err()
+    );
+    assert!(
+        apply_cooks_cutoff_with_low_count_heuristic(
+            &mut results,
+            Some(f64::NAN),
+            &counts,
+            &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
+        )
+        .is_err()
+    );
     results.rows[0].max_cooks = Some(f64::NAN);
-    assert!(apply_cooks_cutoff_with_low_count_heuristic(
-        &mut results,
-        Some(5.0),
-        &counts,
-        &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
-    )
-    .is_err());
+    assert!(
+        apply_cooks_cutoff_with_low_count_heuristic(
+            &mut results,
+            Some(5.0),
+            &counts,
+            &RowMajorMatrix::from_row_major(1, 4, vec![10.0, 0.1, 0.2, 0.3]).unwrap(),
+        )
+        .is_err()
+    );
 }
 
 #[test]

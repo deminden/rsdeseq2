@@ -182,7 +182,7 @@ impl DeseqFit {
 
     /// Apply VST using a caller-supplied fitted dispersion trend.
     ///
-    /// This is useful for DESeq2's fast `vst()` shape, where normalization and
+    /// This supports fast VST, where normalization and
     /// full-count reconstruction come from the full fit but the trend may have
     /// been estimated on a deterministic subset.
     pub fn variance_stabilizing_transform_with_trend(
@@ -548,7 +548,7 @@ impl DeseqFit {
     ///
     /// This uses the fit state's final dispersions and size-factor or
     /// normalization-factor offsets, while treating `frozen_intercept` as the
-    /// fixed log2 intercept surface. It is the fit-level building block for
+    /// fixed log2 intercept vector. It is the fit-level building block for
     /// frozen rlog reuse.
     pub fn regularized_log_transform_with_frozen_intercept(
         &self,
@@ -674,15 +674,16 @@ impl DeseqFit {
         )
     }
 
-    /// Number of rows eligible for DESeq2's fast `vst()` subset.
-    ///
-    /// This uses the stored `baseMean` vector and the DESeq2 `baseMean > 5`
-    /// rule, with the same finite-value validation as subset construction.
+    /// Number of rows eligible under this fit's fast-VST selection statistic.
+///
+    /// This uses the stored `baseMean` vector and the `baseMean > 5` rule. For
+    /// weighted fits the stored values are weighted, unlike DESeq2 1.52.0's
+    /// ordinary normalized-count row means.
     pub fn fast_vst_eligible_count(&self) -> Result<usize, DeseqError> {
         count_fast_vst_eligible_rows(&self.base_mean)
     }
 
-    /// Build the row-aligned subset used by DESeq2's fast `vst()` trend fit.
+    /// Build the row-aligned subset used by this fit's fast-VST trend fit.
     ///
     /// The returned bundle includes raw counts, normalized counts, optional
     /// normalization factors, optional observation weights, and original row

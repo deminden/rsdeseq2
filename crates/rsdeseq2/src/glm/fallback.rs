@@ -1,4 +1,4 @@
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 
 /// DESeq2-shaped row routing for bounded optim fallback fitting.

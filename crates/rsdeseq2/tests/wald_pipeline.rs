@@ -1378,9 +1378,10 @@ fn fixed_dispersion_wald_results_character_contrast_requires_sample_levels() {
         )
         .unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("requires sample levels for contrastAllZero"));
+    assert!(
+        err.to_string()
+            .contains("requires sample levels for contrastAllZero")
+    );
 }
 
 #[test]
@@ -2214,15 +2215,21 @@ fn fixed_dispersion_wald_contrast_validates_inputs() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![2, 4, 8]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[], &[1.0])
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1], &[1.0, 0.0])
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1], &[0.0])
-        .is_err());
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald_contrast(&counts, &design, &[], &[1.0])
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1], &[1.0, 0.0])
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald_contrast(&counts, &design, &[0.1], &[0.0])
+            .is_err()
+    );
 }
 
 #[test]
@@ -2877,15 +2884,21 @@ fn fixed_dispersion_wald_pipeline_validates_inputs() {
     )
     .unwrap();
 
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald(&counts, &design, &[], 0)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_wald(&counts, &rank_deficient, &[0.1], 1)
-        .is_err());
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald(&counts, &design, &[], 0)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald(&counts, &design, &[0.1], 1)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_wald(&counts, &rank_deficient, &[0.1], 1)
+            .is_err()
+    );
 }
 
 #[test]

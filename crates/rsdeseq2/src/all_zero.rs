@@ -1,6 +1,6 @@
 //! Helpers for expanding compact non-all-zero rows back to full gene order.
 
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 
 /// Return indices for rows that should be fit or copied from compact outputs.

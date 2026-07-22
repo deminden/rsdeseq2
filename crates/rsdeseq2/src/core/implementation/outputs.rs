@@ -213,7 +213,7 @@ impl CooksReplacementTestOutput {
     }
 }
 
-/// Output from the current fast-VST GLM-mu helper.
+/// Output from the fast-VST GLM-mu helper.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FastVstGlmMuOutput {
     /// Full count matrix transformed with the subset-fitted dispersion trend.
@@ -355,7 +355,7 @@ pub struct VstGlmMuMetadata {
 /// Source of the fitted dispersion trend used by automatic VST.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VstTrendSource {
-    /// The trend was fit on DESeq2's deterministic fast-VST subset.
+    /// The trend was fit on the deterministic fast-VST subset.
     FastSubset {
         /// Requested fast-subset size.
         nsub: usize,
@@ -381,7 +381,7 @@ pub enum VstFullDataReason {
 }
 
 impl FastVstGlmMuOutput {
-    /// DESeq2-shaped metadata view for explicit fast-VST diagnostics.
+    /// Metadata for explicit fast-VST diagnostics.
     pub fn metadata(&self) -> FastVstGlmMuMetadata {
         FastVstGlmMuMetadata {
             transformed_rows: self.transformed.n_rows(),
@@ -401,7 +401,7 @@ impl FastVstGlmMuOutput {
 }
 
 impl VstGlmMuOutput {
-    /// DESeq2-shaped metadata view for automatic VST diagnostics.
+    /// Metadata for automatic VST diagnostics.
     pub fn metadata(&self) -> VstGlmMuMetadata {
         VstGlmMuMetadata {
             trend_source: self.trend_source.as_str(),
@@ -479,7 +479,7 @@ impl RlogDesignMode {
 }
 
 impl VstTrendSource {
-    /// Stable DESeq2-shaped label for the automatic VST trend source.
+    /// Stable label for the automatic VST trend source.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::FastSubset { .. } => "fastSubset",

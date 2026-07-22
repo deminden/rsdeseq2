@@ -1,0 +1,8 @@
+metric	v0.2.4	v0.2.5	v0.2.5_vs_v0.2.4	unit
+median_absolute_error	0.00014637657972313423	6.0636129450841736e-10	241401.589x_lower	absolute_error
+mean_absolute_error	0.0003793917566690452	0.0001260818774570247	3.00909032x_lower	absolute_error
+maximum_absolute_error	0.0030938714191082184	0.0015259081158007781	50.6796531_percent_lower	absolute_error
+rows_improved		89		rows_of_100
+rows_improved_at_least_10x		78		rows_of_100
+elapsed	120.719	128.625		s
+maximum_resident_set	2945168	2947976		KiB

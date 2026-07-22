@@ -1,7 +1,7 @@
 # R Wrapper
 
-The R package currently exposes primitive matrix helpers for the implemented
-early normalization stages:
+The R package exposes primitive matrix helpers for the supported early
+normalization stages:
 
 - `estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"), geoMeans = NULL, controlGenes = NULL, native = FALSE)`
 - `normalizedCountsRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = FALSE)`
@@ -16,8 +16,9 @@ early normalization stages:
 These helpers validate ordinary R matrices with genes in rows and samples in
 columns. They include an R-level helper implementation that mirrors the
 Rust-supported size-factor, normalized-count, normalization-factor, baseMean,
-and early base-metadata algorithms while the native Rust bridge is still being
-wired.
+and early base-metadata algorithms. The R API does not expose full Rust-core
+workflow execution. Registered primitive `.Call` bridges are
+available for the selected operations described below.
 When `normalizationFactors` are supplied to `normalizedCountsRust()`,
 `baseMeanRust()`, or `baseMetadataRust()`, they preempt `sizeFactors`, matching
 DESeq2's normalized-count behavior.
@@ -42,7 +43,7 @@ the DESeq2 two-group low-count Cook's heuristic when the caller supplies raw
 `counts`, per-sample `cooks`, and has already established the one-factor
 two-level formula condition. It does not inspect DESeqDataSet objects or infer
 formula semantics. With `native = TRUE`, the masking and low-count heuristic
-step can use the registered `.Call` bridge; R still assembles the output table
+step can use the registered `.Call` bridge; R assembles the output table
 and computes BH-adjusted p-values. When p-values carry gene names, named
 `maxCooks`, count rows, and Cook's rows are aligned to that order before
 masking; named Cook's columns are aligned to named count columns before the
@@ -163,12 +164,12 @@ coefficient matrix are both present, their dimensions are validated together;
 `resultsNamesRust()` provides the same primitive helper under the Rust-suffixed
 name.
 
-`nbinomWaldTestRust()` currently accepts the same already-computed primitive
+`nbinomWaldTestRust()` accepts the same already-computed primitive
 Wald inputs, a list-like primitive object containing those fields, or an
 already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
 and returns an `rsdeseq2PrimitiveWaldFit` object. For unfitted
 `DESeqDataSet`-style inputs, use the Rust crate or CLI workflow entry points and
-then pass the fitted diagnostics through this wrapper surface.
+then pass the fitted diagnostics through the R API.
 
 `lrtFitRust()` packages already-computed primitive full-model beta matrices,
 coefficient covariance arrays, optional coefficient SEs, and LRT statistic /
@@ -182,7 +183,7 @@ primitive fields, a list-like primitive object containing them, or an
 already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
 and returns an `rsdeseq2PrimitiveLrtFit` object. For unfitted
 `DESeqDataSet`-style inputs, use the Rust crate or CLI workflow entry points and
-then pass the fitted diagnostics through this wrapper surface. `results()` can
+then pass the fitted diagnostics through the R API. `results()` can
 also consume list-like primitive or fitted-object
 LRT fields directly and internally package them through `nbinomLRTRust()`.
 
@@ -195,8 +196,8 @@ selection. The returned data frame gets a `filtered` column and an
 threshold, lowess fit, and alpha. This helper does not inspect DESeqDataSet
 objects.
 
-`deseq2McolsDiagnosticsRust()` is a pure-R shape contract for the Rust fit-state
-diagnostic alias view. It validates primitive vectors and returns a data frame
+`deseq2McolsDiagnosticsRust()` is a pure-R schema for the Rust fit-state
+diagnostic aliases. It validates primitive vectors and returns a data frame
 with DESeq2-style row metadata names such as `betaConv`, `fullBetaConv`,
 `reducedBetaConv`, `betaIter`, `reducedBetaIter`, `deviance`, and `maxCooks`.
 `rsdeseq2DiagnosticSchemaRust()` returns the same schema and can call the
@@ -208,6 +209,5 @@ Unsupported high-level entry points remain explicit:
 - `DESeq()`
 - `estimateDispersionsRust()`
 
-High-level `DESeqDataSet` fitting/mutation integration is the remaining wrapper
-boundary; the implemented wrapper surface covers primitive and already-fitted
-result objects.
+High-level `DESeqDataSet` fitting and mutation are unsupported. The R API
+accepts primitive and already-fitted result objects.

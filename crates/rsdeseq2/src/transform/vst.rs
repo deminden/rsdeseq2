@@ -3,7 +3,7 @@ use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDisp
 use crate::errors::DeseqError;
 use crate::matrix::RowMajorMatrix;
 
-/// Row-aligned subset used by DESeq2's fast `vst()` trend fit.
+/// Row-aligned subset for fast-VST trend fitting.
 ///
 /// The count matrix, normalized counts, normalization factors, and observation
 /// weights are all returned in the same deterministic row order selected by
@@ -38,7 +38,7 @@ pub struct FastVstSubsetMetadata {
 }
 
 impl FastVstSubset {
-    /// DESeq2-shaped metadata view for the deterministic fast-VST subset.
+    /// Metadata for the deterministic fast-VST subset.
     pub fn metadata(&self) -> FastVstSubsetMetadata {
         FastVstSubsetMetadata {
             rows: self.counts.n_genes(),
@@ -50,12 +50,14 @@ impl FastVstSubset {
     }
 }
 
-/// Select rows for DESeq2's fast `vst()` dispersion-trend subset.
+/// Select rows using the deterministic fast-VST rule.
 ///
-/// DESeq2 first keeps rows with mean normalized count above 5, orders those
-/// rows by base mean, then takes `round(seq(1, n, length.out=nsub))` positions
-/// on the ordered one-based index. The returned indices are zero-based row
-/// indices into the original matrix.
+/// With ordinary normalized-count row means, this matches DESeq2 1.52.0: keep
+/// values above 5, order by those means, and take
+/// `round(seq(1, n, length.out=nsub))` positions on the ordered one-based
+/// index. Callers may supply another finite selection statistic, such as the
+/// weighted `baseMean` used by Rust's weighted builder path. The returned
+/// indices are zero-based row indices into the original matrix.
 pub fn fast_vst_subset_indices(base_mean: &[f64], nsub: usize) -> Result<Vec<usize>, DeseqError> {
     if nsub == 0 {
         return Err(DeseqError::InvalidOptions {
@@ -93,7 +95,7 @@ pub fn fast_vst_subset_indices(base_mean: &[f64], nsub: usize) -> Result<Vec<usi
         .collect())
 }
 
-/// Count rows eligible for DESeq2's fast `vst()` trend-fit subset.
+/// Count rows eligible under the deterministic fast-VST rule.
 ///
 /// Rows are eligible when their base mean is finite and greater than 5. This
 /// helper validates finite input with the same checks used by
@@ -120,11 +122,10 @@ fn fast_vst_eligible_rows(base_mean: &[f64]) -> Result<Vec<(usize, f64)>, DeseqE
     Ok(eligible)
 }
 
-/// Select normalized-count rows for DESeq2's fast `vst()` trend fit.
+/// Select normalized-count rows for a fast-VST trend fit.
 ///
 /// This applies [`fast_vst_subset_indices`] to row base means and returns the
-/// selected rows in the same deterministic order DESeq2 uses for the subset
-/// dataset passed to dispersion fitting.
+/// selected rows in deterministic subset order.
 pub fn fast_vst_subset_normalized_counts(
     normalized_counts: &RowMajorMatrix<f64>,
     base_mean: &[f64],
@@ -154,7 +155,7 @@ pub fn fast_vst_subset_matrix_rows(
     select_matrix_rows(matrix, &row_indices)
 }
 
-/// Build the complete row-aligned input bundle for DESeq2's fast `vst()`.
+/// Build a complete row-aligned fast-VST input bundle.
 ///
 /// This helper centralizes the subset rule so raw counts and optional
 /// gene/sample matrices cannot drift out of alignment with the normalized

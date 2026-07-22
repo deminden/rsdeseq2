@@ -1,6 +1,6 @@
 use statrs::distribution::{ChiSquared, ContinuousCDF};
 
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::{LrtOutput, NbinomGlmFit};
 
 /// Compute DESeq2-style likelihood-ratio statistics from full and reduced fits.

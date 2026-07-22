@@ -148,7 +148,7 @@ write_tsv(
   file.path(out_dir, "locfit", "local_dispersion_ranked_hard_rows.tsv")
 )
 
-message("estimating MAP dispersions and GLM optimizer surfaces")
+message("estimating MAP dispersions and GLM optimizer results")
 dds_map <- estimateDispersionsMAP(dds_fit, quiet = TRUE)
 row_meta_map <- as.data.frame(S4Vectors::mcols(dds_map), optional = TRUE)
 glm_rows <- is.finite(row_meta_map$dispersion) & row_meta_map$dispersion > 0
@@ -342,14 +342,14 @@ manifest <- data.frame(
 write_tsv(manifest, file.path(out_dir, "manifest.tsv"))
 
 readme <- c(
-  "# Real DESeq2 Port Fixtures",
+  "# DESeq2 Reference Fixtures",
   "",
   sprintf("Source contrast: `%s`.", contrast_stem),
   "",
-  "This untracked bundle is intended for standalone pure-Rust ports of two numerically important DESeq2 dependencies:",
+  "This generated bundle contains offline reference data for two numerical DESeq2 dependencies:",
   "",
-  "- `lbfgsb/`: GLM beta optimization surfaces from `DESeq2:::fitNbinomGLMs` on the real split.",
-  "- `locfit/`: local dispersion-trend inputs and DESeq2/locfit outputs for every real gene row.",
+  "- `lbfgsb/`: GLM beta optimization results from `DESeq2:::fitNbinomGLMs` for the selected contrast.",
+  "- `locfit/`: local dispersion-trend inputs and DESeq2/locfit outputs for every gene row.",
   "",
   "The R/DESeq2 run is offline fixture generation only. Runtime computation in the Rust crate remains pure Rust.",
   "",

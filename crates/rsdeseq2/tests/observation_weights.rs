@@ -73,9 +73,10 @@ fn observation_weights_reject_overflowed_cox_reid_column_sum() {
 
     let err = preprocess_observation_weights(&weights, &design).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("observation weight Cox-Reid column sum"));
+    assert!(
+        err.to_string()
+            .contains("observation weight Cox-Reid column sum")
+    );
 }
 
 #[test]
@@ -132,15 +133,17 @@ fn observation_weights_validate_inputs() {
     assert!(preprocess_observation_weights(&bad_weight, &design).is_err());
 
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0; 4]).unwrap();
-    assert!(preprocess_observation_weights_with_options(
-        &weights,
-        &design,
-        ObservationWeightOptions {
-            weight_threshold: f64::NAN,
-            ..ObservationWeightOptions::default()
-        }
-    )
-    .is_err());
+    assert!(
+        preprocess_observation_weights_with_options(
+            &weights,
+            &design,
+            ObservationWeightOptions {
+                weight_threshold: f64::NAN,
+                ..ObservationWeightOptions::default()
+            }
+        )
+        .is_err()
+    );
 }
 
 #[test]

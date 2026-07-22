@@ -1,0 +1,4 @@
+output	coverage	median_elapsed_s	maximum_resident_set_KiB	maximum_absolute_error	maximum_relative_error	finite_or_NA_mismatches
+size_factors	8731_samples	3.40113	243616	2.1316282072803006e-14	6.501076167322657e-15	0
+normalized_counts	612699575_cells	25.2311	710604	1.9371509552001953e-07	9.886702483755014e-15	0
+base_mean	1185270_genes	3.57072	711324	6.51925802230835e-09	8.21444676848457e-15	0

@@ -157,9 +157,10 @@ fn nb_log_pmf_keeps_extreme_zero_count_product_finite() {
 fn weighted_log_likelihood_rejects_nonfinite_weighted_term() {
     let err = nbinom_log_likelihood_weighted(&[1], &[1.0], 0.3, Some(&[f64::MAX])).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("negative-binomial weighted log-likelihood term"));
+    assert!(
+        err.to_string()
+            .contains("negative-binomial weighted log-likelihood term")
+    );
 }
 
 #[test]

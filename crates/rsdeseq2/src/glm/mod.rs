@@ -6,10 +6,14 @@ pub mod fallback;
 pub mod irls;
 pub mod lrt;
 pub mod nb;
+mod r_arithmetic;
 pub mod wald;
 pub mod weights;
 
 pub use beta::{
+    BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
+    BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
+    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit,
     average_expanded_model_coefficients, average_expanded_model_covariances,
     beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
     estimate_beta_prior_variance, expanded_model_group_contrast,
@@ -25,17 +29,15 @@ pub use beta::{
     fit_glms_with_estimated_beta_prior_variance_and_weights, fit_intercept_only_fixed_dispersion,
     fit_intercept_only_fixed_dispersion_with_normalization_factors,
     fit_intercept_only_fixed_dispersion_with_weights, match_upper_quantile_for_variance,
-    match_weighted_upper_quantile_for_variance, BetaPriorGlmFit,
-    BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
-    BetaPriorVarianceMethod, BetaPriorVarianceOptions, ExpandedModelBetaPriorDesignInput,
-    ExpandedModelBetaPriorGlmFit,
+    match_weighted_upper_quantile_for_variance,
 };
 pub use dispersion_fit::fit_with_dispersion;
-pub use fallback::{optim_fallback_rows, OptimFallbackRows};
+pub use fallback::{OptimFallbackRows, optim_fallback_rows};
 pub use irls::{
-    fit_fixed_dispersion_irls, fit_fixed_dispersion_irls_with_normalization_factors,
+    IrlsOptions, IrlsSolver, fit_fixed_dispersion_irls,
+    fit_fixed_dispersion_irls_with_normalization_factors,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_fixed_dispersion_irls_with_weights, fit_irls, IrlsOptions, IrlsSolver,
+    fit_fixed_dispersion_irls_with_weights, fit_irls,
 };
 pub use lrt::lrt_test;
 pub use nb::{
@@ -43,14 +45,14 @@ pub use nb::{
     nbinom_log_pmf, nbinom_negative_twice_log_likelihood,
 };
 pub use wald::{
+    WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldPvalueType, WaldTestOptions,
     two_sided_normal_pvalue, two_sided_t_pvalue, wald_stat_and_pvalue,
     wald_stat_and_pvalue_with_options, wald_test, wald_test_coefficient,
     wald_test_coefficient_with_options, wald_test_contrast, wald_test_contrast_with_options,
-    WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldPvalueType, WaldTestOptions,
 };
 pub use weights::{
-    preprocess_observation_weights, preprocess_observation_weights_with_options,
-    ObservationWeightOptions, ObservationWeights,
+    ObservationWeightOptions, ObservationWeights, preprocess_observation_weights,
+    preprocess_observation_weights_with_options,
 };
 
 use crate::design::DesignMatrix;

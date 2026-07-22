@@ -6,7 +6,7 @@ pub const DEFAULT_RANK_TOLERANCE: f64 = 1e-10;
 /// Compute a deterministic row-major matrix rank with partial-pivot elimination.
 ///
 /// This is intentionally small and inspectable. It is used for DESeq2-style
-/// full-rank guards before GLM fitting and for observation-weight rank checks.
+/// full-rank checks before GLM fitting and for observation-weight rank checks.
 pub fn matrix_rank(
     values: &[f64],
     n_rows: usize,

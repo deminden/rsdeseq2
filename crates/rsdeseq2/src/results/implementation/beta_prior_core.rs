@@ -166,7 +166,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results(
 /// Fit an expanded beta-prior Wald coefficient workflow with Cook's replacement refit.
 ///
 /// Cook's distances are calculated from the collapsed prior fit on the reported
-/// standard-design surface. Replacement counts are then refit through the same
+/// standard-design result. Replacement counts are then refit through the same
 /// expanded beta-prior workflow with the original size factors and supplied
 /// dispersions.
 pub fn fit_expanded_beta_prior_wald_results_with_cooks_replacement(

@@ -20,11 +20,11 @@ Reference files should record:
   `fixed_wald_t_reference.tsv`, `fixed_wald_weighted_reference.tsv`,
   `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`,
   `fixed_mu_reduced.tsv`, `fixed_hat_reduced.tsv`, and `fixed_cooks_full.tsv`
-  for the current supplied-dispersion GLM parity checks, plus
+  for the supplied-dispersion GLM parity checks, plus
   `fixed_lrt_weighted_reference.tsv`, `fixed_weighted_mu_reduced.tsv`, and
   `fixed_weighted_hat_reduced.tsv` for weighted LRT parity.
 - `beta_prior_variance_reference.tsv` for DESeq2 `estimateBetaPriorVar`
-  weighted and quantile beta-prior variance anchors from the supplied-dispersion
+  weighted and quantile beta-prior variance references from the supplied-dispersion
   MLE beta matrix.
 - `beta_prior_refit_reference.tsv`, `beta_prior_refit_mu.tsv`, and
   `beta_prior_refit_hat.tsv` for supplied-dispersion GLM refits with
@@ -56,7 +56,7 @@ Reference files should record:
   `native_glm_mu_local_wald_mu.tsv`,
   `native_glm_mu_local_wald_hat.tsv`,
   `native_glm_mu_local_results_wald.tsv`, and
-  `native_glm_mu_local_results_lrt.tsv` for the current unweighted GLM-mu
+  `native_glm_mu_local_results_lrt.tsv` for the unweighted GLM-mu
   local-trend MAP/Wald/LRT intermediate and result-table branch, including
   the single-usable-row local fit edge case.
 - `native_glm_mu_local_cr_map_reference.tsv`,
@@ -65,7 +65,7 @@ Reference files should record:
   `native_glm_mu_local_cr_wald_mu.tsv`,
   `native_glm_mu_local_cr_wald_hat.tsv`,
   `native_glm_mu_local_cr_results_wald.tsv`, and
-  `native_glm_mu_local_cr_results_lrt.tsv` for the current unweighted GLM-mu
+  `native_glm_mu_local_cr_results_lrt.tsv` for the unweighted GLM-mu
   Cox-Reid local-trend MAP/Wald/LRT intermediates and compact result rows.
 - `native_weighted_glm_mu_reference.tsv`,
   `native_weighted_glm_mu_lrt_reference.tsv`,
@@ -102,7 +102,7 @@ Reference files should record:
   `native_weighted_glm_mu_local_cr_wald_mu.tsv`,
   `native_weighted_glm_mu_local_cr_wald_hat.tsv`,
   `native_weighted_glm_mu_local_cr_results_wald.tsv`, and
-  `native_weighted_glm_mu_local_cr_results_lrt.tsv` for the current weighted
+  `native_weighted_glm_mu_local_cr_results_lrt.tsv` for the weighted
   GLM-mu Cox-Reid local-trend MAP/Wald/LRT intermediates and compact result
   rows, including `weightsFail` row expansion.
 - `parametric_trend_reference.tsv`,
@@ -115,8 +115,8 @@ Reference files should record:
   `dispersion_prior_variance_low_df_reference.tsv`, and
   `map_dispersion_reference.tsv` for prior variance and MAP dispersion
   checks. The low-df prior fixture documents DESeq2's seeded Monte Carlo/R
-  `loess` output; Rust currently checks the shared inputs and bounded output
-  contract while exact numerical identity remains future work.
+  `loess` output; Rust checks the shared inputs and bounded output contract,
+  while exact numerical identity is not implemented.
 - `cooks_replacement_counts.tsv`, `cooks_replacement_design.tsv`,
   `cooks_replacement_cooks.tsv`, `cooks_replacement_size_factors.tsv`,
   `cooks_replacement_options.tsv`, `cooks_replacement_original_counts.tsv`,
@@ -125,12 +125,11 @@ Reference files should record:
   `cooks_replacement_rows.tsv` for DESeq2 `replaceOutliers` and
   `refitWithoutOutliers` bookkeeping checks.
 
-The Rust reference tests skip when the generated directory is absent. Once the
-files are generated locally, they compare the implemented stages against the R
-references.
+The Rust reference tests skip when the generated directory is absent. When the
+files are present, the tests compare implemented stages with the R references.
 
-By default, `scripts/generate_deseq2_references.R` writes fixtures expected to
-pass today, including weighted fixed-dispersion Wald/LRT, the current weighted
+By default, `scripts/generate_deseq2_references.R` writes deterministic fixtures
+for supported paths, including weighted fixed-dispersion Wald/LRT, weighted
 GLM-mu mean and local-trend MAP/Wald/LRT branches with matched result-row
 adjusted p-values, and unweighted/weighted GLM-mu Cox-Reid local-trend
-MAP/Wald/LRT anchors.
+MAP/Wald/LRT references.

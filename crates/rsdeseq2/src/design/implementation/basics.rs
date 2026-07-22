@@ -162,7 +162,7 @@ pub struct ExpandedAdditiveFactorDesign {
 /// Expanded formula design plus per-sample log-scale formula offsets.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedFormulaDesignWithOffsets {
-    /// Parsed expanded and reported design surfaces.
+    /// Parsed expanded and reported design matrices.
     pub design: ExpandedAdditiveFactorDesign,
     /// Per-sample offset values from supported `offset(numeric)` terms.
     pub offsets: Vec<f64>,
@@ -347,15 +347,14 @@ impl DesignMatrix {
         values: Vec<f64>,
         coefficient_names: Option<Vec<String>>,
     ) -> Result<Self, DeseqError> {
-        if let Some(names) = &coefficient_names {
-            if names.len() != n_coefficients {
+        if let Some(names) = &coefficient_names
+            && names.len() != n_coefficients {
                 return Err(invalid_dimensions(
                     "design coefficient names",
                     n_coefficients,
                     names.len(),
                 ));
             }
-        }
         let matrix = RowMajorMatrix::from_row_major(n_samples, n_coefficients, values)?;
         matrix.validate_finite("design matrix")?;
         Ok(Self {

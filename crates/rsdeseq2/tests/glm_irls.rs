@@ -212,9 +212,10 @@ fn beta_prior_quantile_matches_type7_upper_abs_quantile() {
 fn beta_prior_quantile_rejects_overflowed_variance() {
     let err = match_upper_quantile_for_variance(&[f64::MAX], 0.5).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("beta prior variance quantile produced non-finite variance"));
+    assert!(
+        err.to_string()
+            .contains("beta prior variance quantile produced non-finite variance")
+    );
 }
 
 #[test]
@@ -235,9 +236,10 @@ fn beta_prior_weighted_quantile_uses_row_weights() {
 fn beta_prior_weighted_quantile_rejects_overflowed_variance() {
     let err = match_weighted_upper_quantile_for_variance(&[f64::MAX], &[1.0], 0.5).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("weighted beta prior variance quantile produced non-finite variance"));
+    assert!(
+        err.to_string()
+            .contains("weighted beta prior variance quantile produced non-finite variance")
+    );
 }
 
 #[test]
@@ -395,26 +397,30 @@ fn beta_prior_variance_matches_optional_deseq2_reference() {
 fn beta_prior_variance_validates_dimensions_and_options() {
     let betas = RowMajorMatrix::from_row_major(2, 1, vec![1.0, 2.0]).unwrap();
 
-    assert!(estimate_beta_prior_variance(
-        &betas,
-        &[10.0],
-        &[0.1, 0.2],
-        None,
-        BetaPriorVarianceOptions::default(),
-    )
-    .is_err());
+    assert!(
+        estimate_beta_prior_variance(
+            &betas,
+            &[10.0],
+            &[0.1, 0.2],
+            None,
+            BetaPriorVarianceOptions::default(),
+        )
+        .is_err()
+    );
 
-    assert!(estimate_beta_prior_variance(
-        &betas,
-        &[10.0, 20.0],
-        &[0.1, 0.2],
-        None,
-        BetaPriorVarianceOptions {
-            upper_quantile: 1.0,
-            ..BetaPriorVarianceOptions::default()
-        },
-    )
-    .is_err());
+    assert!(
+        estimate_beta_prior_variance(
+            &betas,
+            &[10.0, 20.0],
+            &[0.1, 0.2],
+            None,
+            BetaPriorVarianceOptions {
+                upper_quantile: 1.0,
+                ..BetaPriorVarianceOptions::default()
+            },
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -1045,16 +1051,18 @@ fn beta_prior_refit_weight_helpers_validate_inputs() {
     let bad_normalization_factors =
         RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, f64::NAN, 1.0]).unwrap();
 
-    assert!(fit_glms_with_beta_prior_variance_and_weights(
-        &counts,
-        &design,
-        &[1.0; 4],
-        &[0.05],
-        Some(&bad_weights),
-        &beta_prior_variance,
-        no_ridge_options(),
-    )
-    .is_err());
+    assert!(
+        fit_glms_with_beta_prior_variance_and_weights(
+            &counts,
+            &design,
+            &[1.0; 4],
+            &[0.05],
+            Some(&bad_weights),
+            &beta_prior_variance,
+            no_ridge_options(),
+        )
+        .is_err()
+    );
     assert!(
         fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
             &counts,
@@ -1294,18 +1302,22 @@ fn beta_prior_estimated_refit_weights_influence_mle_and_prior_fit() {
 
     assert_ne!(weighted.mle_fit.beta, unweighted.mle_fit.beta);
     assert_ne!(weighted.prior_fit.beta, unweighted.prior_fit.beta);
-    assert!(weighted
-        .mle_fit
-        .beta
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
-    assert!(weighted
-        .prior_fit
-        .beta
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        weighted
+            .mle_fit
+            .beta
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
+    assert!(
+        weighted
+            .prior_fit
+            .beta
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
 }
 
 #[test]
@@ -1352,19 +1364,21 @@ fn beta_prior_estimated_refit_weight_helpers_validate_inputs() {
         },
     };
 
-    assert!(fit_glms_with_estimated_beta_prior_variance_and_weights(
-        &counts,
-        &design,
-        BetaPriorSizeFactorWeightInput {
-            size_factors: &[1.0; 4],
-            weights: Some(&bad_weights),
-        },
-        &[0.05; 3],
-        &[15.0, 50.0, 12.0],
-        &[0.1; 3],
-        options.clone(),
-    )
-    .is_err());
+    assert!(
+        fit_glms_with_estimated_beta_prior_variance_and_weights(
+            &counts,
+            &design,
+            BetaPriorSizeFactorWeightInput {
+                size_factors: &[1.0; 4],
+                weights: Some(&bad_weights),
+            },
+            &[0.05; 3],
+            &[15.0, 50.0, 12.0],
+            &[0.1; 3],
+            options.clone(),
+        )
+        .is_err()
+    );
     assert!(
         fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
             &counts,
@@ -1710,11 +1724,12 @@ fn irls_qr_solver_handles_default_ridge() {
 
     assert!(fit.beta_converged[0]);
     assert_relative_eq!(fit.beta.as_slice()[1], 2.0_f64.log2(), epsilon = 1e-5);
-    assert!(fit
-        .hat_diagonal
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        fit.hat_diagonal
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
 }
 
 #[test]
@@ -2012,42 +2027,50 @@ fn irls_validates_inputs() {
     );
 
     let bad_design = DesignMatrix::from_row_major(2, 1, vec![1.0, 1.0], None).unwrap();
-    assert!(fit_fixed_dispersion_irls(
-        &counts,
-        &bad_design,
-        &[1.0, 1.0, 1.0],
-        &[0.1],
-        no_ridge_options()
-    )
-    .is_err());
+    assert!(
+        fit_fixed_dispersion_irls(
+            &counts,
+            &bad_design,
+            &[1.0, 1.0, 1.0],
+            &[0.1],
+            no_ridge_options()
+        )
+        .is_err()
+    );
 
     let bad_weights = RowMajorMatrix::from_row_major(1, 3, vec![1.0, -1.0, 1.0]).unwrap();
-    assert!(fit_fixed_dispersion_irls_with_weights(
-        &counts,
-        &design,
-        &[1.0, 1.0, 1.0],
-        &[0.1],
-        Some(&bad_weights),
-        no_ridge_options()
-    )
-    .is_err());
+    assert!(
+        fit_fixed_dispersion_irls_with_weights(
+            &counts,
+            &design,
+            &[1.0, 1.0, 1.0],
+            &[0.1],
+            Some(&bad_weights),
+            no_ridge_options()
+        )
+        .is_err()
+    );
 
-    assert!(fit_fixed_dispersion_irls(
-        &counts,
-        &design,
-        &[1.0, 1.0, 1.0],
-        &[0.1],
-        no_ridge_options().ridge_lambda_by_coefficient(vec![0.0, 0.0])
-    )
-    .is_err());
-    assert!(fit_fixed_dispersion_irls(
-        &counts,
-        &design,
-        &[1.0, 1.0, 1.0],
-        &[0.1],
-        no_ridge_options().ridge_lambda_by_coefficient(vec![-1.0])
-    )
-    .is_err());
+    assert!(
+        fit_fixed_dispersion_irls(
+            &counts,
+            &design,
+            &[1.0, 1.0, 1.0],
+            &[0.1],
+            no_ridge_options().ridge_lambda_by_coefficient(vec![0.0, 0.0])
+        )
+        .is_err()
+    );
+    assert!(
+        fit_fixed_dispersion_irls(
+            &counts,
+            &design,
+            &[1.0, 1.0, 1.0],
+            &[0.1],
+            no_ridge_options().ridge_lambda_by_coefficient(vec![-1.0])
+        )
+        .is_err()
+    );
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::options::FitType;
 use rcompat_locfit::{Kernel, LocalFit, LocalRegressionConfig, PredictionMethod};
 
@@ -1475,9 +1475,10 @@ mod tests {
 
         let err = gamma_deviance(&means, &disps, &good, trend).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("parametric dispersion gamma deviance"));
+        assert!(
+            err.to_string()
+                .contains("parametric dispersion gamma deviance")
+        );
     }
 
     #[test]
@@ -1505,13 +1506,15 @@ mod tests {
         let disps = [0.15];
         let good = [true, true];
 
-        assert!(robust_parametric_trend_rows(
-            &means,
-            &disps,
-            trend,
-            ParametricDispersionTrendOptions::default(),
-        )
-        .is_err());
+        assert!(
+            robust_parametric_trend_rows(
+                &means,
+                &disps,
+                trend,
+                ParametricDispersionTrendOptions::default(),
+            )
+            .is_err()
+        );
         assert!(gamma_deviance(&means, &disps, &good, trend).is_err());
         assert!(weighted_gamma_identity_least_squares(&means, &disps, &good, trend).is_err());
         assert!(fitted_values_are_positive(&means, &[true], trend).is_err());
@@ -1542,9 +1545,10 @@ mod tests {
 
         let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("parametric dispersion weighted least-squares"));
+        assert!(
+            err.to_string()
+                .contains("parametric dispersion weighted least-squares")
+        );
     }
 
     #[test]
@@ -1559,9 +1563,10 @@ mod tests {
 
         let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("parametric dispersion weighted least-squares determinant"));
+        assert!(
+            err.to_string()
+                .contains("parametric dispersion weighted least-squares determinant")
+        );
     }
 
     #[test]
@@ -1576,9 +1581,10 @@ mod tests {
 
         let err = weighted_gamma_identity_least_squares(&means, &disps, &good, trend).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("parametric dispersion weighted least-squares coefficient numerator"));
+        assert!(
+            err.to_string()
+                .contains("parametric dispersion weighted least-squares coefficient numerator")
+        );
     }
 
     #[test]
@@ -1625,9 +1631,10 @@ mod tests {
 
         let err = parametric_coefficient_change(old, new).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("parametric dispersion coefficient change"));
+        assert!(
+            err.to_string()
+                .contains("parametric dispersion coefficient change")
+        );
     }
 
     #[test]

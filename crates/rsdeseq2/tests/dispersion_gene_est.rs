@@ -148,10 +148,12 @@ fn builder_rejects_rank_deficient_linear_mu_design() {
     )
     .unwrap();
 
-    assert!(DeseqBuilder::new()
-        .size_factors(vec![1.0; 4])
-        .fit_gene_wise_dispersions_linear_mu(&counts, &rank_deficient)
-        .is_err());
+    assert!(
+        DeseqBuilder::new()
+            .size_factors(vec![1.0; 4])
+            .fit_gene_wise_dispersions_linear_mu(&counts, &rank_deficient)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1087,23 +1089,25 @@ fn gene_wise_dispersion_options_reject_zero_niter() {
     let base_var = base_variance(&normalized).unwrap();
     let all_zero = counts.all_zero_flags();
 
-    assert!(estimate_gene_wise_dispersions_glm_mu(
-        GeneWiseDispersionInput {
-            counts: &counts,
-            design: &two_group_design(),
-            size_factors: &size_factors,
-            normalization_factors: None,
-            normalized_counts: &normalized,
-            base_mean: &base_mean,
-            base_var: &base_var,
-            all_zero: &all_zero,
-            observation_weights: None,
-        },
-        GeneWiseDispersionOptions {
-            niter: 0,
-            ..GeneWiseDispersionOptions::default()
-        },
-        IrlsOptions::default(),
-    )
-    .is_err());
+    assert!(
+        estimate_gene_wise_dispersions_glm_mu(
+            GeneWiseDispersionInput {
+                counts: &counts,
+                design: &two_group_design(),
+                size_factors: &size_factors,
+                normalization_factors: None,
+                normalized_counts: &normalized,
+                base_mean: &base_mean,
+                base_var: &base_var,
+                all_zero: &all_zero,
+                observation_weights: None,
+            },
+            GeneWiseDispersionOptions {
+                niter: 0,
+                ..GeneWiseDispersionOptions::default()
+            },
+            IrlsOptions::default(),
+        )
+        .is_err()
+    );
 }

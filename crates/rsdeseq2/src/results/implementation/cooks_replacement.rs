@@ -142,15 +142,14 @@ fn merge_beta_prior_replacement_results(
             original_results.rows.len(),
         ));
     }
-    if let Some(refit_results) = refit_results {
-        if refit_results.rows.len() != original_results.rows.len() {
+    if let Some(refit_results) = refit_results
+        && refit_results.rows.len() != original_results.rows.len() {
             return Err(invalid_dimensions(
                 "beta-prior replacement refit result rows",
                 original_results.rows.len(),
                 refit_results.rows.len(),
             ));
         }
-    }
     if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
         return Err(invalid_dimensions(
             "beta-prior replacement baseMean rows",

@@ -1,4 +1,4 @@
-//! Private implementation for the stable public module surface.
+//! Private implementation behind the stable public module API.
 //!
 //! The source is split by workflow so the public module can stay small
 //! while preserving existing paths through re-exports.
@@ -26,5 +26,5 @@ include!("implementation/posterior.rs");
 // Validation, compaction, and checked numeric helpers.
 include!("implementation/validation.rs");
 
-// Unit tests for gene-wise dispersion numeric guards.
+// Unit tests for gene-wise dispersion numeric checks.
 include!("implementation/tests.rs");

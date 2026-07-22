@@ -38,9 +38,10 @@ fn mad_squared_rejects_overflowed_variance() {
     let residuals = [-1.0e308, 0.0, 1.0e308];
     let err = mad_squared(&residuals).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("MAD squared produced non-finite dispersion prior variance"));
+    assert!(
+        err.to_string()
+            .contains("MAD squared produced non-finite dispersion prior variance")
+    );
 }
 
 #[test]

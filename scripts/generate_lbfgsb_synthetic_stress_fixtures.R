@@ -10,7 +10,7 @@ get_arg <- function(name, default = NULL) {
 }
 
 source_root <- get_arg("--source-root", "results/fixtures/lbfgsb_hard_real_2026-06-01")
-out_dir <- get_arg("--output-dir", "results/fixtures/lbfgsb_synthetic_stress_2026-07-20")
+out_dir <- get_arg("--output-dir", "results/fixtures/lbfgsb_synthetic_stress_r461_2026-07-22")
 n_cases <- as.integer(get_arg("--n-cases", "512"))
 n_seeds <- as.integer(get_arg("--n-seeds", "128"))
 max_per_source <- as.integer(get_arg("--max-per-source", "16"))
@@ -18,7 +18,7 @@ lower <- as.numeric(get_arg("--lower", "-30"))
 upper <- as.numeric(get_arg("--upper", "30"))
 maxit <- as.integer(get_arg("--maxit", "100"))
 
-required_r_version <- "4.6.0"
+required_r_version <- "4.6.1"
 actual_r_version <- as.character(getRversion())
 if (!identical(actual_r_version, required_r_version)) {
   stop(

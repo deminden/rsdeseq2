@@ -1,5 +1,5 @@
 use crate::design::DesignMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::qr::matrix_rank;
 use crate::matrix::RowMajorMatrix;
 

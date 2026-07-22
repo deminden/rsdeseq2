@@ -203,9 +203,11 @@ fn native_glm_mu_lrt_preserves_diagnostics_and_all_zero_rows() {
     assert_eq!(fit.disp_map.as_ref().unwrap().len(), counts.n_genes());
     assert_eq!(fit.dispersion.as_ref().unwrap().len(), counts.n_genes());
     assert_eq!(fit.disp_gene_iter.as_ref().unwrap()[0], 0);
-    assert!(fit.disp_gene_iter.as_ref().unwrap()[1..]
-        .iter()
-        .all(|iterations| *iterations > 0));
+    assert!(
+        fit.disp_gene_iter.as_ref().unwrap()[1..]
+            .iter()
+            .all(|iterations| *iterations > 0)
+    );
 
     assert_eq!(fit.beta.as_ref().unwrap().n_cols(), full.n_coefficients());
     assert_eq!(
@@ -577,10 +579,12 @@ fn lrt_results_contrast_request_canonicalizes_cleaned_sample_level_aliases() {
         &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
         Some(&ambiguous_levels),
     );
-    assert!(ambiguous
-        .unwrap_err()
-        .to_string()
-        .contains("denominator level 'A.cell' resolves ambiguously"));
+    assert!(
+        ambiguous
+            .unwrap_err()
+            .to_string()
+            .contains("denominator level 'A.cell' resolves ambiguously")
+    );
 }
 
 #[test]
@@ -979,9 +983,11 @@ fn top_level_lrt_formula_contrast_request_uses_cleaned_stored_model_frame_factor
             None,
         )
         .unwrap_err();
-    assert!(missing_metadata
-        .to_string()
-        .contains("use lrt_results_factor_level_contrast"));
+    assert!(
+        missing_metadata
+            .to_string()
+            .contains("use lrt_results_factor_level_contrast")
+    );
     assert_eq!(formula_replacement.results, explicit_replacement.results);
     assert_eq!(
         formula_offset_replacement
@@ -2147,9 +2153,11 @@ fn top_level_fit_lrt_with_results_accepts_coefficient_name() {
     assert_eq!(named_fit.lrt, indexed_fit.lrt);
     assert_lrt_fit_state_matches(&named_fit, &indexed_fit, "named LRT");
     assert_eq!(named_results, indexed_results);
-    assert!(builder
-        .fit_lrt_with_results_name(&counts, &full, &reduced, "missing")
-        .is_err());
+    assert!(
+        builder
+            .fit_lrt_with_results_name(&counts, &full, &reduced, "missing")
+            .is_err()
+    );
 }
 
 #[test]
@@ -2686,8 +2694,8 @@ fn fitted_lrt_object_applies_numeric_contrast_all_zero_from_stored_design() {
 }
 
 #[test]
-fn top_level_lrt_formula_list_contrast_cooks_replacement_accepts_r_cleaned_quoted_coefficient_alias(
-) {
+fn top_level_lrt_formula_list_contrast_cooks_replacement_accepts_r_cleaned_quoted_coefficient_alias()
+ {
     let counts = counts_with_zero_row();
     let levels = [
         "T cell", "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "B cell",
@@ -2863,8 +2871,8 @@ fn top_level_lrt_formula_numeric_contrast_cooks_replacement_retains_numeric_tran
 }
 
 #[test]
-fn top_level_lrt_formula_list_contrast_cooks_replacement_accepts_cleaned_positive_and_negative_aliases(
-) {
+fn top_level_lrt_formula_list_contrast_cooks_replacement_accepts_cleaned_positive_and_negative_aliases()
+ {
     let counts = counts_with_zero_row();
     let levels = [
         "T cell", "T cell", "T cell", "B cell", "B cell", "B cell", "NK cell", "NK cell",

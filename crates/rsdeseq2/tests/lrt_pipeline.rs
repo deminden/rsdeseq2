@@ -79,20 +79,22 @@ fn fixed_dispersion_lrt_pipeline_fits_full_and_reduced_models() {
         fit.reduced_hat_diagonal.as_ref().unwrap().n_cols(),
         counts.n_samples()
     );
-    assert!(fit
-        .reduced_mu
-        .as_ref()
-        .unwrap()
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
-    assert!(fit
-        .reduced_hat_diagonal
-        .as_ref()
-        .unwrap()
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        fit.reduced_mu
+            .as_ref()
+            .unwrap()
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
+    assert!(
+        fit.reduced_hat_diagonal
+            .as_ref()
+            .unwrap()
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
     assert_lrt_likelihood_state(&fit, &counts);
     assert_relative_eq!(
         results.rows[0].log2_fold_change.unwrap(),
@@ -190,22 +192,24 @@ fn fixed_dispersion_lrt_pipeline_expands_all_zero_rows() {
     assert!(fit.reduced_beta_iter.as_ref().unwrap()[1] > 0);
     assert!(fit.reduced_mu.as_ref().unwrap().row(0).unwrap()[0].is_nan());
     assert!(fit.reduced_hat_diagonal.as_ref().unwrap().row(0).unwrap()[0].is_nan());
-    assert!(fit
-        .reduced_mu
-        .as_ref()
-        .unwrap()
-        .row(1)
-        .unwrap()
-        .iter()
-        .all(|value| value.is_finite()));
-    assert!(fit
-        .reduced_hat_diagonal
-        .as_ref()
-        .unwrap()
-        .row(1)
-        .unwrap()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        fit.reduced_mu
+            .as_ref()
+            .unwrap()
+            .row(1)
+            .unwrap()
+            .iter()
+            .all(|value| value.is_finite())
+    );
+    assert!(
+        fit.reduced_hat_diagonal
+            .as_ref()
+            .unwrap()
+            .row(1)
+            .unwrap()
+            .iter()
+            .all(|value| value.is_finite())
+    );
     assert!(fit.full_deviance.as_ref().unwrap()[0].is_nan());
     assert_lrt_likelihood_state(&fit, &counts);
     assert!(fit.reduced_log_like.as_ref().unwrap()[0].is_nan());
@@ -1558,19 +1562,29 @@ fn fixed_dispersion_lrt_pipeline_validates_inputs() {
         DesignMatrix::from_row_major(4, 1, vec![0.0, 0.0, 0.0, 0.0], None).unwrap();
     let bad_samples = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[], 1)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_lrt(&counts, &full, &same_rank, &[0.1], 1)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_lrt(&counts, &full, &rank_deficient_reduced, &[0.1], 1)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_lrt(&counts, &full, &bad_samples, &[0.1], 1)
-        .is_err());
-    assert!(DeseqBuilder::new()
-        .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 2)
-        .is_err());
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[], 1)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_lrt(&counts, &full, &same_rank, &[0.1], 1)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_lrt(&counts, &full, &rank_deficient_reduced, &[0.1], 1)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_lrt(&counts, &full, &bad_samples, &[0.1], 1)
+            .is_err()
+    );
+    assert!(
+        DeseqBuilder::new()
+            .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 2)
+            .is_err()
+    );
 }

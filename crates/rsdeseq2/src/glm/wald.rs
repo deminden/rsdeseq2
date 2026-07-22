@@ -1,7 +1,7 @@
 use statrs::distribution::{Continuous, ContinuousCDF, Normal, StudentsT};
 use statrs::function::erf::erfc;
 
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::{NbinomGlmFit, WaldOutput};
 
 /// Options controlling Wald p-value calculation.
@@ -304,16 +304,15 @@ fn validate_contrast_inputs(fit: &NbinomGlmFit, contrast: &[f64]) -> Result<(), 
             fit.beta_se.len(),
         ));
     }
-    if let Some(covariance) = &fit.beta_covariance {
-        if covariance.n_rows() != fit.beta.n_rows()
-            || covariance.n_cols() != fit.beta.n_cols() * fit.beta.n_cols()
-        {
-            return Err(DeseqError::InvalidDimensions {
-                context: "Wald beta covariance matrix".to_string(),
-                expected: fit.beta.n_rows() * fit.beta.n_cols() * fit.beta.n_cols(),
-                actual: covariance.len(),
-            });
-        }
+    if let Some(covariance) = &fit.beta_covariance
+        && (covariance.n_rows() != fit.beta.n_rows()
+            || covariance.n_cols() != fit.beta.n_cols() * fit.beta.n_cols())
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: "Wald beta covariance matrix".to_string(),
+            expected: fit.beta.n_rows() * fit.beta.n_cols() * fit.beta.n_cols(),
+            actual: covariance.len(),
+        });
     }
     let mut any_nonzero = false;
     for (idx, value) in contrast.iter().copied().enumerate() {

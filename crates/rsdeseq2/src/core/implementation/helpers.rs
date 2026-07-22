@@ -149,15 +149,14 @@ fn merge_replacement_refit_results(
             original_results.rows.len(),
         ));
     }
-    if let Some(refit_results) = refit_results {
-        if refit_results.rows.len() != original_results.rows.len() {
+    if let Some(refit_results) = refit_results
+        && refit_results.rows.len() != original_results.rows.len() {
             return Err(invalid_dimensions(
                 "replacement-refit refit result rows",
                 original_results.rows.len(),
                 refit_results.rows.len(),
             ));
         }
-    }
     if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
         return Err(invalid_dimensions(
             "replacement-refit baseMean rows",

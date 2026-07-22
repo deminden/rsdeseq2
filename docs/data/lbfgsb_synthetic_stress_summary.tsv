@@ -1,0 +1,3 @@
+dependency	cases	practical_endpoint_and_objective_matches	practical_objective_matches	exact_endpoint_and_objective_matches	exact_function_and_gradient_count_matches	reference
+rcompat-lbfgsb-0.1.6	512	493	507	0	311	R_4.6.1_stats_optim
+rcompat-lbfgsb-0.2.1	512	512	512	512	512	R_4.6.1_stats_optim

@@ -127,13 +127,15 @@ fn intercept_only_fit_validates_inputs() {
     assert!(fit_intercept_only_fixed_dispersion(&counts, &[1.0, 2.0, 4.0], &[0.0]).is_err());
 
     let weights = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 1.0]).unwrap();
-    assert!(fit_intercept_only_fixed_dispersion_with_weights(
-        &counts,
-        &[1.0, 2.0, 4.0],
-        &[0.1],
-        Some(&weights),
-    )
-    .is_err());
+    assert!(
+        fit_intercept_only_fixed_dispersion_with_weights(
+            &counts,
+            &[1.0, 2.0, 4.0],
+            &[0.1],
+            Some(&weights),
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -150,9 +152,10 @@ fn intercept_only_fit_rejects_nonfinite_normalized_mean() {
     )
     .unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("non-finite normalized intercept mean"));
+    assert!(
+        err.to_string()
+            .contains("non-finite normalized intercept mean")
+    );
 }
 
 #[test]
@@ -177,7 +180,8 @@ fn intercept_only_fit_rejects_nonfinite_output_covariance() {
 
     let err = fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0], &[f64::MAX]).unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("non-finite intercept beta covariance"));
+    assert!(
+        err.to_string()
+            .contains("non-finite intercept beta covariance")
+    );
 }

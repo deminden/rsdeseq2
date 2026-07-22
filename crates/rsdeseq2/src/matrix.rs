@@ -1,6 +1,6 @@
 use core::ops::{Bound, RangeBounds};
 
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 
 /// A dense row-major matrix.
 ///

@@ -693,9 +693,9 @@ dependencies = [
 
 [[package]]
 name = "rcompat-lbfgsb"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbe56cd1389ac183ddbf5653886f2f29584ef5d68987e450dae5295807b48ad"
+checksum = "54ea889f89916d50f88b492e33ee01ccd60ce0fb301cde4825a1b0927b37d11d"
 
 [[package]]
 name = "rcompat-locfit"
@@ -734,7 +734,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rsdeseq2"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "approx",
  "clap",

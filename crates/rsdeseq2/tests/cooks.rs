@@ -271,51 +271,57 @@ fn replace_outlier_counts_validates_options_and_dimensions() {
     let cooks = RowMajorMatrix::from_row_major(1, 3, vec![0.0, 0.0, 0.0]).unwrap();
     let design = DesignMatrix::from_row_major(3, 1, vec![1.0, 1.0, 1.0], None).unwrap();
 
-    assert!(replace_outlier_counts(
-        &counts,
-        &normalized,
-        &[1.0, 1.0, 1.0],
-        None,
-        &cooks,
-        &design,
-        &CooksReplacementOptions {
-            trim: 0.2,
-            cooks_cutoff: 1.0,
-            min_replicates: 2,
-            which_samples: None,
-        },
-    )
-    .is_err());
-    assert!(replace_outlier_counts(
-        &counts,
-        &normalized,
-        &[1.0, 1.0, 1.0],
-        None,
-        &cooks,
-        &design,
-        &CooksReplacementOptions {
-            trim: 0.2,
-            cooks_cutoff: f64::NAN,
-            min_replicates: 3,
-            which_samples: None,
-        },
-    )
-    .is_err());
-    assert!(replace_outlier_counts(
-        &counts,
-        &normalized,
-        &[1.0, 1.0, 1.0],
-        None,
-        &cooks,
-        &design,
-        &CooksReplacementOptions {
-            trim: 0.2,
-            cooks_cutoff: 1.0,
-            min_replicates: 3,
-            which_samples: Some(vec![true, false]),
-        },
-    )
-    .is_err());
+    assert!(
+        replace_outlier_counts(
+            &counts,
+            &normalized,
+            &[1.0, 1.0, 1.0],
+            None,
+            &cooks,
+            &design,
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: 1.0,
+                min_replicates: 2,
+                which_samples: None,
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        replace_outlier_counts(
+            &counts,
+            &normalized,
+            &[1.0, 1.0, 1.0],
+            None,
+            &cooks,
+            &design,
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: f64::NAN,
+                min_replicates: 3,
+                which_samples: None,
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        replace_outlier_counts(
+            &counts,
+            &normalized,
+            &[1.0, 1.0, 1.0],
+            None,
+            &cooks,
+            &design,
+            &CooksReplacementOptions {
+                trim: 0.2,
+                cooks_cutoff: 1.0,
+                min_replicates: 3,
+                which_samples: Some(vec![true, false]),
+            },
+        )
+        .is_err()
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 Package: rsdeseq2
 Title: Rust Backend for DESeq2-Compatible Workflows
-Version: 0.2.3
+Version: 0.2.5
 Authors@R:
     person(given = "rsdeseq2", family = "contributors",
            role = c("aut", "cre"), email = "maintainers@example.com")

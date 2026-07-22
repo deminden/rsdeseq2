@@ -17,9 +17,10 @@ With gene/sample normalization factors, DESeq2 replaces `s_j` with
 mu_ij = NF_ij * q_ij
 ```
 
-The Rust core will use natural-log scale internally for GLM fitting. DESeq2
-reports log2 fold changes, so future result-building code must convert
-coefficient estimates explicitly.
+The core uses the scale required by each numerical stage and reports GLM
+coefficients on the DESeq2 log2 scale. The bounded fallback therefore evaluates
+`mu` from log2 coefficients while applying the corresponding natural-log prior
+conversion explicitly.
 
 ## Size Factors
 
@@ -30,6 +31,14 @@ any zero count receive a zero geometric mean and are skipped. For each sample,
 DESeq2 applies the location function to log count/geometric-mean ratios and then
 exponentiates. With the default median, even-sized contributing sets use the
 geometric midpoint of the two middle ratios on the original scale.
+
+The per-gene log sums use compensated accumulation. This retains low-order
+terms that a plain binary64 sum can discard and closely reproduces the
+extended-precision accumulation used by R's row-mean implementation. The same
+accumulation is used for `poscounts` log sums and for the final log-size-factor
+mean when supplied geometric means are stabilized. This matters at optimizer
+boundaries: a last-bit normalization difference can otherwise change whether
+a dispersion estimate is retained or sent to a grid fallback.
 
 `poscounts` follows DESeq2's implementation in
 `estimateSizeFactorsForMatrix`: zero log counts are replaced with zero before
@@ -85,14 +94,14 @@ This mirrors `getBaseMeansAndVariances` in DESeq2. It is not a weighted-mean
 estimator; the weights are applied to the normalized-count matrix first and an
 ordinary row mean is then computed.
 
-This is tested independently so future dispersion and result-table code can
-compare against DESeq2 intermediate values.
+This is tested independently for comparisons with DESeq2 intermediate values
+in dispersion and result-table stages.
 
 ## Design Matrix Rank
 
 DESeq2 checks GLM model matrices with `qr(modelMatrix)$rank < ncol(modelMatrix)`
-and stops when the design is not full rank. The Rust core mirrors that guard
-for supplied-dispersion Wald/LRT pipelines and the current native linear-mu
+and stops when the design is not full rank. The Rust core applies the same check
+for supplied-dispersion Wald/LRT pipelines and the supported native linear-mu
 dispersion path. `DesignMatrix` exposes deterministic rank helpers using
 partial-pivot elimination with a fixed tolerance, and rank errors report
 zero-only coefficient columns when they can be identified.
@@ -125,9 +134,9 @@ Benjamini-Hochberg adjustment ranks non-missing p-values, applies
 `p * m / rank`, walks backward with a cumulative minimum, and caps values at
 1. Missing p-values remain missing.
 
-## Roadmap
+## Pipeline Order
 
-Next numerical stages should be implemented in this order:
+The differential-expression pipeline is organized in this order:
 
 1. Negative-binomial log-likelihood.
 2. Fixed-dispersion GLM beta fitting with IRLS.
@@ -135,8 +144,8 @@ Next numerical stages should be implemented in this order:
    convergence/iteration metadata for fixed dispersions.
 4. Gene-wise dispersion estimation.
 5. Parametric dispersion trend, prior variance, and MAP shrinkage.
-6. Limited native Wald path for the current linear-mu and GLM-mu MAP subsets.
-7. Full Wald and LRT parity.
+6. Native Wald and LRT paths for supported linear-mu and GLM-mu MAP branches.
+7. Result assembly, contrasts, diagnostics, and filtering.
 
 ## Negative-Binomial Likelihood
 
@@ -190,7 +199,7 @@ For `fitType="local"`, Rust evaluates the fitted local dispersion trend on the
 same `sinh(seq(asinh(0), asinh(max(q)), length.out=1000))[-1]` grid shape used
 by DESeq2, integrates `1 / sqrt(dispersion(q) * q^2 + xim * q)` with a
 trapezoid rule, and rescales the integral using type-7 95% and 99.9% quantiles
-of row means so high counts follow `log2(q)`. The current interpolation is
+of row means so high counts follow `log2(q)`. The interpolation is
 deterministic linear interpolation over the integrated grid. The `xim` term can
 be computed from size factors with `mean(1 / sizeFactors)`, or from
 normalization factors by DESeq2's local-VST approximation
@@ -200,9 +209,9 @@ normalization-factor matrix directly and compute this local variance term
 internally; mean and parametric branches ignore the term after factor
 validation.
 
-For large counts all three transforms converge toward `log2(q)`. Remaining VST
-parity work includes frozen dispersion-function reuse, exact DESeq2 `splinefun`
-behavior for the local branch, broader object metadata, and remaining
+For large counts all three transforms converge toward `log2(q)`. Unsupported
+VST behavior includes frozen dispersion-function reuse, exact DESeq2
+`splinefun` behavior for the local branch, complete object metadata, and
 high-level wrapper semantics. A lower-level
 `vst_with_dispersion_trend` and its factor-aware variants mirror DESeq2's
 `getVarianceStabilizedData` branch selection once the caller already has a
@@ -214,63 +223,40 @@ matrix without reconstructing the dispatch inputs by hand. A fit-level
 fitted trend, which is the reusable primitive for applying a fast-subset trend
 to the full normalized count matrix.
 
-The fast `vst()` wrapper in DESeq2 estimates the dispersion trend on a
-deterministic subset before applying the fitted transform to all rows. The
-implemented Rust helper for this subset keeps rows with mean normalized count
-above 5, orders them by base mean, and selects
+The fast `vst()` wrapper in DESeq2 1.52.0 estimates the dispersion trend on a
+deterministic subset before applying the fitted transform to all rows. For
+inputs without observation weights, the Rust subset helper uses the same
+selection rule: compute ordinary row means of normalized counts, retain values
+above 5, order by those means, and select
 `round(seq(1, n, length.out=nsub))` positions using R-style half-to-even
 rounding. The exported `DEFAULT_FAST_VST_NSUB` constant is `1000`, matching the
-DESeq2 default, while explicit-size helpers remain available for small
-fixtures and diagnostics. `fast_vst_eligible_count` and the fit-level
-eligibility helper expose how many rows pass the same `baseMean > 5` and finite
-input checks before a default-size subset is requested. Companion helpers
-return selected normalized-count rows and aligned gene/sample matrix rows, such
-as normalization factors or observation weights, in that same deterministic
-order for the subset trend fit. A row-aligned
-`FastVstSubset` bundle combines the raw count subset, normalized-count subset,
-optional normalization factors, optional observation weights, and original row
-indices so downstream trend fitting can use one shared subset rule. The bundle
-also exposes a compact metadata view with subset shape, original row indices,
-and normalization-factor/observation-weight presence flags. `DeseqFit`
-exposes the same bundle from its stored `baseMean`, normalization factors, and
-preprocessed observation weights, which is the intended entry point for later
-automatic fast-VST trend re-estimation.
-`DeseqBuilder::fit_fast_vst_dispersion_trend_glm_mu` now fits the selected
-GLM-mu dispersion trend on that deterministic subset while preserving full-data
-size factors and subset normalization factors. The paired `fast_vst_glm_mu`
-helper applies the subset-fitted trend back to the full normalized count matrix,
-including the normalization-factor dispatch when factors are present, and
-returns a named output containing the transformed matrix, subset fit, and row
-bundle for diagnostics. `FastVstGlmMuOutput::metadata()` summarizes the
-transformed matrix shape, deterministic subset shape, original subset row
-indices, subset trend-fit shape, and stable trend-fit type label
-(`parametric`, `local`, or `mean`) for direct fast-VST benchmark logs.
-The public fast-VST builder validates `nsub > 0` before other branch checks so
-invalid subset requests report the same error shape as the lower-level subset
-helpers and automatic VST.
+DESeq2 default, while explicit-size helpers remain available for smaller
+datasets and diagnostics. `fast_vst_eligible_count` reports how many supplied
+selection values are finite and above 5. Companion helpers return selected
+normalized-count rows and aligned gene/sample matrix rows, including
+normalization factors and observation weights, in one deterministic order.
+
 Observation-weighted fast-VST trend fitting reuses the design-preprocessed
 weight matrix and subsets those rows alongside counts and normalization data.
-`DeseqBuilder::vst_glm_mu_auto` now performs the DESeq2-shaped automatic
-choice: use the deterministic fast subset when enough rows are eligible and
-carry any preprocessed observation weights through that subset, or fit the
-selected Rust trend on all rows when the default subset is too large for the
-dataset. The returned `VstGlmMuOutput` records whether the trend came from the
-fast subset or full data, the requested `nsub`, and the eligible-row count;
-`VstTrendSource` also exposes accessor helpers for these fields and for the
-fast-subset decision. Full-data trend metadata records whether that path was
-chosen because too few rows were eligible. The source and full-data reason
-enums expose stable labels: `fastSubset`, `fullData`, and
-`insufficientEligibleRows`. `VstGlmMuOutput::metadata()` packages those labels
-with `nsub`, eligible-row count, transform dimensions, trend-fit row and sample
-counts, stable trend-fit type label, optional fast-subset row count, and
-optional original fast-subset row indices for wrappers and benchmark logs.
-`blind_vst_glm_mu_auto` uses the same automatic choice with a named
-intercept-only design, matching the implemented part of DESeq2's `blind=TRUE`
-workflow without invoking any external runtime.
-`CountMatrix::select_rows` provides the matching raw-count subset while
-preserving gene and sample names, which mirrors the object subset passed to the
-fast-VST dispersion fit. Full fast-VST parity still requires object metadata
-and exact local interpolation semantics.
+For weighted builder inputs, Rust selects rows using its stored weighted
+`baseMean`, defined as the row mean of normalized counts multiplied
+elementwise by the raw observation weights. DESeq2 1.52.0 `vst()` instead
+selects rows using ordinary row means of normalized counts, without applying
+observation weights to the selection statistic. Weight propagation and
+weighted subset trend fitting are therefore implemented, but exact DESeq2
+subset-index parity is not claimed for weighted inputs.
+
+`DeseqBuilder::vst_glm_mu_auto` provides Rust-specific orchestration: it uses
+the fast subset when enough rows pass the Rust eligibility rule and otherwise
+fits the selected trend on all rows. DESeq2 1.52.0 `vst()` stops when fewer
+than `nsub` rows have ordinary mean normalized count above 5, so the Rust
+full-data fallback is not equivalent to that wrapper behavior. The returned
+`VstGlmMuOutput` records the trend source, requested `nsub`, eligible-row
+count, transform dimensions, trend-fit dimensions and type, and optional
+fast-subset indices. `blind_vst_glm_mu_auto` applies the same Rust decision
+with an intercept-only design. `CountMatrix::select_rows` preserves gene and
+sample names in the selected raw-count matrix. End-to-end weighted fast-VST
+parity with DESeq2 is not claimed.
 
 ## Regularized Log
 
@@ -303,8 +289,8 @@ prior-estimation step with the sample-effect fit when the caller already has
 `baseMean`, `dispFit`, and gene-wise dispersions from earlier stages.
 `rlog_fit_with_size_factors()` and `rlog_fit_with_normalization_factors()`
 retain the fitted intercept-plus-sample-effect GLM beside the transformed
-matrix, exposing the intermediate beta surface needed for stricter parity
-diagnostics and future frozen-rlog reuse.
+matrix, exposing the intermediate beta matrix needed for parity diagnostics
+and frozen-rlog reuse.
 `rlog_frozen_with_size_factors()` and
 `rlog_frozen_with_normalization_factors()` provide the matching low-level
 frozen-intercept transform: caller-supplied log2 intercepts are converted to
@@ -331,13 +317,13 @@ unfiltered count matrices remain accepted. `RlogOutput` includes the
 transformed matrix, fitted per-gene intercepts, estimated sample-effect prior
 variance, the offset source, and a compact metadata view for wrappers and
 benchmark logs.
-This is still not the full high-level DESeq2 `rlog()` object workflow. The
-low-level and builder-level frozen-intercept numeric surfaces are present,
-while full object dispatch and Bioconductor metadata remain future work.
+The full high-level DESeq2 `rlog()` object workflow is not implemented.
+Low-level and builder APIs support frozen intercepts; full object dispatch and
+Bioconductor metadata are unsupported.
 
 ## Gene-Wise Dispersion Objective
 
-The current gene-wise dispersion foundation follows DESeq2's fixed-mean
+The gene-wise dispersion foundation follows DESeq2's fixed-mean
 dispersion optimizer shape. For one gene, the alpha-dependent likelihood kernel
 used for scoring is:
 
@@ -393,7 +379,7 @@ d2 objective / d log(alpha)^2 =
   + d objective / d log(alpha)
 ```
 
-The default current gene-wise estimator still runs without a prior, matching
+The default gene-wise estimator runs without a prior, matching
 DESeq2's gene-wise estimate stage. Prior-aware objective, derivative,
 curvature, line-search, and grid functions are used by the MAP dispersion
 stage; the low-level versions also accept normalized observation weights.
@@ -444,7 +430,7 @@ The mean trend type is also implemented. It follows
 the trimmed mean of finite estimates with `dispGeneEst > 10 * minDisp`
 (`trim = 0.001` by default). Rust exposes those two row-selection masks
 separately, because DESeq2 uses the stricter threshold only as the preliminary
-viability gate. The fitted value is expanded back to every finite
+viability criterion. The fitted value is expanded back to every finite
 positive-base-mean row, with missing rows represented as `NaN`. The trimmed mean
 uses stable averaging so very large finite dispersion estimates do not overflow
 before division. An offline DESeq2 fixture checks the separate viability and
@@ -461,21 +447,14 @@ local trends use the same backend's direct local prediction path. A small
 offline DESeq2 local-trend fixture checks the fitted shape, with a second
 fixture covering mixed rows above and below the `10 * minDisp` fit threshold
 and another fixture checking predictions at means outside the original fit
-rows. The real-data local trend fixture currently checks 64,344 finite fitted
-values with median relative error `3.74e-13`, p99 `5.85e-12`, and max
-`1.47e-11` against DESeq2 1.46.0. Compared with the previous in-repo smoother,
-that real-data fixture moved from median relative error `7.99e-03`, p99
-`2.00e-01`, and max `4.28e-01` to the near-exact values above. The newest
-locfit-compatible backend revision tightened the same real-data fixture from
-median relative error `4.04e-10`, p99 `2.80e-09`, and max `3.19e-09` to the
-current values. On the committed small local-trend fixtures, the fitted-shape
-max absolute error improved from `3.29e-04` to `9.62e-05`, and the
-mixed-threshold max absolute error improved
-from `3.87e-02` to `1.98e-03`. The small out-of-fit prediction fixture moved
-from max absolute error `5.76e-05` to `2.56e-04`; this remains inside its
-`2e-3` DESeq2 reference tolerance, but it is not counted as an improvement.
-The committed GLM-mu local MAP/Wald/LRT fixtures were already at machine
-precision and are unchanged by this smoother swap.
+rows. A 64,344-value real-data fixture has median relative error `3.74e-13`,
+p99 `5.85e-12`, and maximum `1.47e-11` against DESeq2 1.46.0. The small
+fitted-shape and mixed-threshold fixtures have maximum absolute errors of
+`9.62e-05` and `1.98e-03`. The out-of-fit prediction fixture has maximum
+absolute error `2.56e-04`, within its `2e-3` reference tolerance but above the
+v0.2.4 baseline of `5.76e-05`; it is disclosed as a localized regression rather
+than counted as an improvement. The GLM-mu local MAP/Wald/LRT fixtures remain
+at machine precision.
 Manually constructed local trends reuse the
 builder shape checks for span and polynomial degree, then validate finite log
 dispersions, positive finite local weights, and a consistent empty state for the
@@ -485,7 +464,7 @@ missing `NaN` rows, so malformed manual trend state is reported even when every
 requested mean is missing. A separate offline fixture covers DESeq2's
 all-near-minimum local floor branch, where the helper returns the
 minimum-dispersion vector directly rather than a prediction function. Broader
-synthetic locfit edge cases and glmGamPoi trend support remain future work.
+synthetic locfit edge cases and glmGamPoi trend support are not implemented.
 
 ## Dispersion Prior Variance
 
@@ -519,7 +498,7 @@ smoothing over a fine grid. This preserves deterministic Rust runs without
 depending on R's random-number generator internals. Offline fixtures check the
 shared residual selection, robust variance, expected sampling variance, and
 bounded prior-variance range. Exact numerical identity with DESeq2's seeded
-Monte Carlo plus R `loess` result remains future work.
+Monte Carlo plus R `loess` result is not implemented.
 The public `estimate_dispersion_prior` entry point is a stage-shaped wrapper
 over this implemented prior-variance estimator.
 
@@ -565,9 +544,9 @@ dispersion = if dispOutlier then dispGeneEst else dispMAP
 
 All-zero genes are expanded with missing numeric values and false outlier flags.
 The low-level MAP optimizer accepts optional normalized observation weights,
-but the high-level native linear-mu dispersion pipeline still rejects weights
+but the high-level native linear-mu dispersion pipeline rejects weights
 because DESeq2 switches away from the `linearMu` branch when weights are
-present. The current MAP stage does not implement glmGamPoi MAP behavior,
+present. The MAP stage does not implement glmGamPoi MAP behavior,
 or replacement/refitting around dispersion outliers.
 
 ## Intercept-Only Fixed-Dispersion GLM
@@ -641,7 +620,7 @@ weight_i = 1 / (1 / baseMean_i + dispFit_i)
 Intercept columns named `Intercept` or `(Intercept)` receive the configured
 wide prior variance.
 
-The expanded-model beta-prior surface now has primitive helpers for the core
+The expanded-model beta-prior API has primitive helpers for the core
 coefficient and covariance arithmetic used after fitting an expanded model
 matrix. Given a log2-scale expanded beta matrix and groups of expanded columns,
 the collapse helper returns per-gene group averages:
@@ -677,18 +656,18 @@ the common Wald coefficient or numeric-contrast path, including size-factor,
 normalization-factor, and optional observation-weight inputs. A primitive
 one-factor design helper builds the expanded intercept-plus-level-indicator
 matrix, the matching treatment-style reported design, and coefficient groups
-from caller-supplied sample labels. One-factor fit-and-results helpers now own
+from caller-supplied sample labels. One-factor fit-and-results helpers own
 that construction and pass the generated expanded design, standard design, and
 column groups into the same Wald coefficient or numeric-contrast workflows.
 For additive designs, a multi-term helper covers primitive
 `~ factor1 + factor2 + numeric1 + factor1:factor2 + factor1:numeric1 +
 numeric1:numeric2 + ...` construction: intercept, one expanded indicator per
 factor level, treatment-style reported columns for non-reference levels,
-numeric covariates included unchanged in both design surfaces, primitive
+numeric covariates included unchanged in both design matrices, primitive
 pairwise interaction columns, and matching collapse groups. Additive
 fit-and-results helpers run the same coefficient and numeric-contrast
 workflows with size-factor, normalization-factor, and optional
-observation-weight inputs. A primitive formula helper now parses a
+observation-weight inputs. A primitive formula helper parses a
 DESeq2-style subset (`1` intercept-only, `+`, `:`, `/`, `*` shorthand, and
 `0`/`-1` intercept removal), including lower-order-omitted pairwise
 interactions, higher-order interaction/nesting/star-expansion terms, and
@@ -717,8 +696,8 @@ sample-level size factors expanded across genes or supplied gene/sample
 normalization factors, then run the same expanded beta-prior Wald coefficient
 and numeric-contrast workflows from the parsed design. Splines, arbitrary R
 expressions, orthogonal polynomial bases, and complete R-compatible formula
-semantics remain future work; the runtime numeric path is pure Rust and expects
-callers or wrappers to provide or derive unsupported design surfaces explicitly.
+semantics are unsupported; the runtime numeric path is pure Rust and expects
+callers or wrappers to provide unsupported design matrices explicitly.
 
 `fit_glms_with_beta_prior_variance()` performs the primitive fixed-dispersion
 refit from a supplied `betaPriorVar` vector. Size-factor, normalization-factor,
@@ -757,7 +736,7 @@ rank(X[weights_i > weightThreshold, nonzero_columns]) == ncol(nonzero_columns)
 For rank-deficient designs, it follows DESeq2's fallback shape and checks that
 no design column is entirely zero after weighting. Rows that fail are returned
 as `weights_fail`; higher-level pipelines can treat them like DESeq2 marks
-`mcols(dds)$allZero = TRUE` for failed-weight rows. The current helper is
+`mcols(dds)$allZero = TRUE` for failed-weight rows. The helper is
 deterministic and primitive-matrix based.
 
 Builder stages expose this preprocessing in the fit state. With a supplied
@@ -769,7 +748,7 @@ pass the compacted normalized weights into the weighted fixed-dispersion GLM
 kernels. The GLM-mu gene-wise dispersion, MAP, and native Wald path also
 passes compacted normalized weights through the fixed-dispersion mean fit,
 fixed-mean dispersion objective, MAP objective, and final Wald GLM. The
-high-level native linear-mu dispersion pipeline still rejects observation
+high-level native linear-mu dispersion pipeline rejects observation
 weights because DESeq2 switches away from `linearMu` when weights are present.
 
 The default Rust solver follows DESeq2's `useQR=TRUE` update by solving the
@@ -782,7 +761,7 @@ b = [sqrt(W) z; 0]
 beta_new = solve_qr(A, b)
 ```
 
-Post-fit hat diagonals and beta covariance still use the DESeq2 formula based
+Post-fit hat diagonals and beta covariance use the DESeq2 formula based
 on `(X' W X + ridge)^-1`. Builder pipelines copy the per-gene covariance rows
 into `DeseqFit.beta_covariance` so contrast diagnostics can be validated from
 the top-level fit state.
@@ -799,24 +778,51 @@ when `IrlsOptions.use_optim` is enabled, non-converged rows are fallback
 candidates. Routed rows are refit with a mature pure-Rust L-BFGS-B port on the
 log2 coefficient scale, using the same `[-30, 30]` coefficient bounds,
 100-iteration default, five correction pairs, and normal-prior penalty shape as
-DESeq2's backup path. The optimizer now uses the same R-compatible wrapper
-shape as DESeq2's `optim(..., method="L-BFGS-B")` fallback: objective-only calls
-with R-style finite-difference gradients, default `factr=1e7`, `pgtol=0`, and
-no extra post-optimizer polish. Failed high-gradient excursions still fall back
-to the optimizer start instead of storing an unstable move. The refit stores
-optimized betas even when the optimizer does not declare convergence, recomputes fitted
-means, standard errors, coefficient covariance, and row log likelihoods, and
-sets `beta_converged` from the optimizer convergence flag. `force_optim` sends
-every row through the bounded refit after IRLS.
+DESeq2's backup path. The primary candidate uses independently implemented
+R-compatible negative-binomial callback arithmetic, objective-only calls with
+R-style finite-difference gradients, fused predictor accumulation, the
+raw natural-log QR backup values passed into the log2 optimizer, default
+`factr=1e7`, and `pgtol=0`.
 
-The current port is `rcompat-lbfgsb` 0.2.0. A 512-case replay of bounded
-negative-binomial objectives generated by R 4.6.0 matched all 512 optimizer
+The final/refit path also computes an analytic solution as a stability check.
+Both endpoints are evaluated under the same reduced objective. The analytic
+endpoint replaces the compatible endpoint only when the analytic solver
+succeeds, the compatible objective exceeds the analytic objective by more than
+`10 * factr * f64::EPSILON * max(abs(compatible_objective), abs(analytic_objective), 1)`,
+and at least one coefficient differs by more than ten
+`ndeps_i * parscale_i` finite-difference steps. This check detects flat,
+materially divergent solutions without gene-specific rules or runtime access
+to DESeq2 values. Gene-wise dispersion refits use the analytic
+path directly; the callback-compatible route is limited to final/refit fitting.
+`IrlsOptions.r_optim_compat` defaults to `true`; setting it to `false` selects
+the analytic-only fallback and is used internally by gene-wise dispersion.
+
+Failed high-gradient excursions fall back to the optimizer start instead
+of storing an unstable move. The refit stores optimized betas even when the
+selected optimizer does not declare convergence, recomputes fitted means,
+standard errors, coefficient covariance, and row log likelihoods, and sets
+`beta_converged` from the selected optimizer convergence flag. `force_optim`
+sends every row through the bounded refit after IRLS.
+
+rsdeseq2 0.2.5 uses `rcompat-lbfgsb` 0.2.1. A 512-case replay of bounded
+negative-binomial objectives generated by R 4.6.1 matched all 512 optimizer
 endpoints, objective values, and function/gradient counts exactly. Under the
-same replay, 0.1.6 matched 495/512 endpoints plus objectives at the practical
+same replay, 0.1.6 matched 493/512 endpoints plus objectives and 507/512
+objectives at the practical
 `5e-3` parameter and `1e-5` absolute or `1e-8` relative objective thresholds,
-0/512 at zero tolerance, and 317/512 evaluation counts. These figures apply to
-the pinned x86_64 Linux/OpenBLAS 0.3.32 one-thread fixture environment; callback
+0/512 at zero tolerance, and 311/512 evaluation counts. These figures apply to
+the recorded x86_64 Linux/OpenBLAS 0.3.32 one-thread fixture environment; callback
 arithmetic or platform changes can alter floating-point-sensitive paths.
+
+On the fixed 100-row v0.2.4 high-error set, the measured v0.2.5 median absolute
+error is `6.064e-10`, mean absolute error is `1.261e-4`, and maximum absolute
+error is `1.526e-3`. The corresponding v0.2.4 measurements are `1.464e-4`,
+`3.794e-4`, and `3.094e-3`: the v0.2.5 values are 241,402x lower at the median,
+3.009x lower at the mean, and 50.68% lower at the maximum. Compensated
+size-factor accumulation removes the dispersion-trend amplification that
+dominated the median; callback-compatible final/refit optimization and its
+stability check remain important for the remaining tail. See
+[benchmarks.md](benchmarks.md) for the measured values and procedure.
 
 Returned beta estimates and standard errors are converted to log2 scale with
 `log2(e)`.
@@ -894,15 +900,15 @@ contrasts.
 The core resolver operates over an already-built design matrix, while the R
 wrapper can use explicit `factorReferences`, fitted `factorLevels`, or
 factor-valued `colData` to infer the reference level for character triplet
-contrasts. Primitive Rust, CLI, and R already-fitted result routes now cover
+contrasts. Primitive Rust, CLI, and R already-fitted result routes cover
 DESeq2-style character, list/listValues, and numeric `results(contrast=...)`
 semantics, including `contrast` taking precedence over `name`. Stored
 `DeseqFit` objects expose a single
 `results_contrast_request()` dispatcher that selects Wald or LRT behavior from
 the fitted test state while preserving branch-specific contrast semantics and
 contrast-all-zero cleanup for character and two-sided numeric/list contrasts.
-Remaining work is high-level Bioconductor object mutation/plumbing and broader
-contrast-aware Cook's/refit edge-case handling.
+High-level Bioconductor object mutation and metadata support and additional
+contrast-aware Cook's/refit edge cases are not implemented.
 
 For primitive numeric contrasts with both positive and negative coefficients,
 the supplied-dispersion and native linear-mu/GLM-mu Wald contrast pipelines
@@ -942,7 +948,7 @@ less:           beta < -T
 These formulas operate on log2-scale beta estimates and log2-scale standard
 errors, matching DESeq2 result columns. `lessAbs` requires a positive
 threshold, and `greaterAbsUPSHOT` with t p-values is explicitly unsupported,
-matching DESeq2's current guard.
+matching DESeq2's behavior.
 
 The helper operates on an `NbinomGlmFit` and a selected coefficient index. The
 builder pipelines wrap it with result-table assembly, Cook's filtering, and
@@ -1030,15 +1036,15 @@ stage-by-stage parity checks, especially when result-table differences need to
 be traced back to `dispGeneEst`, `dispFit`, `dispMAP`, final dispersion
 estimates, beta estimates, beta optimizer starts, beta standard errors,
 iteration/convergence fields, deviance, or Cook's summaries.
-Full Bioconductor result objects and complete high-level object mutation remain
-future work. The lightweight Rust fit/result metadata and primitive R wrapper
+Full Bioconductor result objects and complete high-level object mutation are
+not implemented. The lightweight Rust fit/result metadata and primitive R wrapper
 already preserve implemented formula-aware contrast labels, sample-level
 metadata, factor levels, and explicit factor references for the supported
 already-fitted routes.
 
 ## Cook's Distances
 
-The current implementation mirrors DESeq2's `calculateCooksDistance` shape for
+The implementation mirrors DESeq2's `calculateCooksDistance` shape for
 the supplied-dispersion Wald path and the limited native linear-mu Wald path:
 
 ```text
@@ -1056,7 +1062,7 @@ model-matrix cell has three or more replicates. The samples included in
 
 ## Cook's Cutoff
 
-For the current Wald result rows, Cook's cutoff filtering can be enabled,
+For supported Wald result rows, Cook's cutoff filtering can be enabled,
 disabled, or set to an explicit threshold through `CooksCutoff`. The default
 cutoff is DESeq2's:
 
@@ -1104,7 +1110,7 @@ where original Cook's distances in replaceable sample columns are zeroed before
 recording the maximum. If every sample is replaceable, post-refit `maxCooks` is
 missing for every gene.
 
-The first end-to-end replacement-refit paths are implemented for the current
+The end-to-end replacement-refit paths are implemented for the supported
 GLM-mu native Wald, Wald contrast, and LRT branches. They run the original fit
 with Cook's filtering and independent filtering disabled, prepare replacement
 counts from the original Cook's distances, estimate gene-wise dispersions on
@@ -1123,7 +1129,7 @@ assay/metadata preservation are not implemented yet.
 
 ## Independent Filtering
 
-The current result path implements DESeq2's default independent-filtering
+The result path implements DESeq2's default independent-filtering
 shape with `baseMean` as the filter statistic:
 
 ```text
@@ -1136,8 +1142,8 @@ numRej_t = count(padj_t < alpha)
 ```
 
 If the maximum number of rejections is no greater than 10, the first threshold
-is selected, matching DESeq2's guard against over-aggressive filtering when all
-genes are null. Otherwise, the threshold is selected using the same
+is selected, as in DESeq2, to avoid over-aggressive filtering when all genes
+are null. Otherwise, the threshold is selected using the same
 max-smoothed-fit-minus-RMSE rule as DESeq2, with an R `stats::lowess`-shaped
 smoother over the rejection curve. The smoother uses `f = 1/5`, R's
 floor-based span, sliding contiguous fitting window, tricube distance weights,
@@ -1199,9 +1205,9 @@ Cook's diagnostics and selected-coefficient Wald results
 This follows the DESeq2 `DESeq()` stage order at a high level:
 `estimateSizeFactors`, `estimateDispersions`, then `nbinomWaldTest`. The
 implemented Rust path remains narrower than DESeq2 because it only supports
-the current linear-mu no-weight or GLM-mu optionally weighted,
+the supported linear-mu no-weight or GLM-mu optionally weighted,
 parametric/local/mean-trend, deterministic-prior branches.
-`DeseqBuilder::fit()` and `DeseqBuilder::fit_with_results()` now expose the
+`DeseqBuilder::fit()` and `DeseqBuilder::fit_with_results()` expose the
 implemented GLM-mu Wald branch as a limited top-level workflow and report the
 last design coefficient by default, matching DESeq2's default result-coefficient
 shape. `fit_with_results_name()` exposes the selected-coefficient path by
@@ -1223,7 +1229,7 @@ replacement-refit workflow when callers supply replacement options; formula
 contrast-request replacement helpers use the same exact-first R-cleaned
 coefficient aliases as the non-replacement result routes. Stored formula
 model-frame metadata also lets selected-coefficient Wald replacement refits
-reuse the two-group low-count Cook's gate when the selected coefficient is the
+reuse the two-group low-count Cook's condition when the selected coefficient is the
 non-reference comparison for one two-level factor. LRT
 remains available through `DeseqBuilder::fit_lrt()`,
 `DeseqBuilder::fit_lrt_name()`,
@@ -1261,8 +1267,8 @@ parametric LRT entry points provide the same contrast routes while pinning the
 dispersion trend to the parametric branch regardless of the builder's
 configured `fit_type`.
 
-The supplied-dispersion LRT path mirrors the implemented contrast result
-surface for numeric, named/list, and caller-supplied factor-level full-model
+The supplied-dispersion LRT path supports the implemented numeric, named/list,
+and caller-supplied factor-level full-model
 effect sizes. Factor-level LRT contrasts use caller-provided sample levels for
 DESeq2-style character `contrastAllZero` cleanup, again zeroing only the
 reported LFC while preserving the likelihood-ratio statistic and p-values.
@@ -1292,15 +1298,15 @@ metadata columns.
 dispersion trend type label when a parametric, local, or mean trend has been
 attached, keeping transform and result parity logs on the same label set.
 
-The R reference generator validates this current scope with
+The R reference generator validates this supported scope with
 `DESeq2:::fitNbinomGLMs` using supplied dispersions, default `1e-6` beta ridge,
-`useQR=FALSE`, and `useOptim=FALSE`. Full DESeq2 parity still requires broader
+`useQR=FALSE`, and `useOptim=FALSE`. Full DESeq2 parity requires broader
 native dispersion validation, optim fallback, and richer
 result metadata.
 
 ## Gene-Wise Dispersion Foundation
 
-The current dispersion stage implements reusable pieces of DESeq2's
+The dispersion stage implements reusable pieces of DESeq2's
 `estimateDispersionsGeneEst` path for both the `linearMu` branch and an
 initial GLM-mu branch.
 
@@ -1358,7 +1364,7 @@ for iter in seq_len(niter):
   alpha_hat = alpha_hat_new
 ```
 
-This mirrors DESeq2's `niter` and `fitidx` shape. The current Rust branch uses
+This mirrors DESeq2's `niter` and `fitidx` shape. The Rust implementation uses
 the existing fixed-dispersion IRLS implementation for `fitNbinomGLMs`, applies
 the same `minmu` floor, and can consume builder-supplied normalized
 observation weights. It feeds the same parametric/local/mean trend, prior-variance,
@@ -1410,7 +1416,7 @@ on reject:
 
 The shared bounded optimizer and the GLM beta fallback reject non-finite norm,
 dot-product, movement, directional-derivative, and objective-building
-accumulations. Overflow in optimizer control quantities now
+accumulations. Overflow in optimizer control quantities
 produces a non-converged optimizer result for the affected row; overflow while
 building the beta objective, gradient, Hessian, or ridge penalty is converted
 into the same large finite penalty used for invalid fitted means. Fitted-mean reconstruction
@@ -1469,7 +1475,7 @@ whose likelihood difference cannot be represented finitely.
 Finite LRT chi-square upper-tail probabilities are clamped to `[0, 1]`, and
 reduced-model convergence flags are validated before being copied into LRT
 diagnostics.
-Stored full-model deviance diagnostics use the same finite guard around
+Stored full-model deviance diagnostics use the same finite check around
 `-2 * logLike`, turning non-representable values into the existing missing
 numeric representation.
 The public negative-binomial `-2 * logLik` helper also checks the final
@@ -1506,19 +1512,19 @@ All-zero genes are expanded with missing numeric values (`NaN` internally),
 following DESeq2's missing-row expansion convention. The implemented MAP path
 adds the log-dispersion prior, deterministic prior variance, and weighted
 optimizer support. The GLM-mu builder path can pass normalized observation
-weights through gene-wise dispersion, MAP, and native Wald/LRT stages; the current
-native linear-mu branch is still no-weight. The line-search diagnostics now
+weights through gene-wise dispersion, MAP, and native Wald/LRT stages; the
+native linear-mu branch accepts no weights. The line-search diagnostics
 record the final first and second derivatives (`last_dlp` and `last_d2lp`) for
 DESeq2-style curvature checks, and high-level fit states retain the gene-wise
-iteration counts as `dispGeneIter`-compatible diagnostics. The current weighted
+iteration counts as `dispGeneIter`-compatible diagnostics. The weighted
 GLM-mu mean and local-trend MAP/Wald/LRT branches have DESeq2 golden
 references, including compact result-table and BH-adjusted p-value checks for
 the matched result rows. The unweighted and weighted GLM-mu Cox-Reid
-local-trend branches have MAP/Wald/LRT anchors, including fitted means, hat
+local-trend branches have MAP/Wald/LRT references, including fitted means, hat
 diagonals, log-likelihoods, deviances, convergence, and compact result rows.
-Broader full parity still requires glmGamPoi trend support and remaining
+Broader full parity requires glmGamPoi trend support and remaining
 weighted-dispersion and synthetic smoother edge-case coverage.
-The local smoother now treats a single usable local-fit row as a constant
+The local smoother treats a single usable local-fit row as a constant
 log-dispersion trend, matching the generated tiny GLM-mu local fixture instead
 of failing on zero tricube neighborhood weight.
 
@@ -1527,13 +1533,13 @@ alongside the model-level LRT statistic and p-value, matching the shape of
 DESeq2 results after `nbinomLRT`.
 
 This mirrors the shape of DESeq2's `nbinomWaldTest` and `nbinomLRT` when
-dispersion estimates already exist. The native Wald path now supplies those
+dispersion estimates already exist. The native Wald path supplies those
 estimates from the limited linear-mu or GLM-mu parametric/local/mean MAP
 subsets.
 Cook's outlier replacement/refitting, beta priors, exact R `lowess` parity, and
-contrast result-table handling are available on the implemented workflow
-surfaces described above, with remaining gaps concentrated in high-level
-Bioconductor object attachment and edge-case coverage. Shared internal helpers
+contrast result-table handling are available for the workflows described
+above. High-level Bioconductor object attachment and some edge cases remain
+unsupported. Shared internal helpers
 skip all-zero rows during GLM fitting and expand compact outputs back to full
 gene order with `NaN` internal numeric values and `None` result-table values,
 matching the intent of DESeq2's `buildMatrixWithNARows` and

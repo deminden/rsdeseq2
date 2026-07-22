@@ -512,25 +512,31 @@ fn original_use_t_novel_contrast_uses_t_tail() {
 #[test]
 fn wald_test_coefficient_rejects_invalid_threshold_options() {
     let fit = toy_fit(vec![2.0], vec![0.5], 1, 1);
-    assert!(wald_test_coefficient_with_options(
-        &fit,
-        0,
-        &WaldTestOptions::normal().with_lfc_threshold(-1.0, WaldAlternative::Greater)
-    )
-    .is_err());
-    assert!(wald_test_coefficient_with_options(
-        &fit,
-        0,
-        &WaldTestOptions::normal().with_lfc_threshold(0.0, WaldAlternative::LessAbs)
-    )
-    .is_err());
-    assert!(wald_test_coefficient_with_options(
-        &fit,
-        0,
-        &WaldTestOptions::t_degrees_of_freedom(10.0)
-            .with_lfc_threshold(1.0, WaldAlternative::GreaterAbsUpshot)
-    )
-    .is_err());
+    assert!(
+        wald_test_coefficient_with_options(
+            &fit,
+            0,
+            &WaldTestOptions::normal().with_lfc_threshold(-1.0, WaldAlternative::Greater)
+        )
+        .is_err()
+    );
+    assert!(
+        wald_test_coefficient_with_options(
+            &fit,
+            0,
+            &WaldTestOptions::normal().with_lfc_threshold(0.0, WaldAlternative::LessAbs)
+        )
+        .is_err()
+    );
+    assert!(
+        wald_test_coefficient_with_options(
+            &fit,
+            0,
+            &WaldTestOptions::t_degrees_of_freedom(10.0)
+                .with_lfc_threshold(1.0, WaldAlternative::GreaterAbsUpshot)
+        )
+        .is_err()
+    );
 }
 
 #[test]

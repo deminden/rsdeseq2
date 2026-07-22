@@ -291,14 +291,16 @@ impl DeseqBuilder {
         }
     }
 
-    /// Fit the selected GLM-mu dispersion trend on DESeq2's fast-VST subset.
+    /// Fit the selected GLM-mu dispersion trend on a fast-VST subset.
     ///
     /// This is a building block for the high-level fast `vst()` workflow:
     /// size factors and normalization factors are derived from the full
     /// dataset, the deterministic fast-VST row subset is selected from the
     /// full-data `baseMean`, and the dispersion trend is fit on the subset
     /// count matrix. The returned subset keeps the original row indices and
-    /// aligned normalized counts/factors for inspection.
+    /// aligned normalized counts/factors for inspection. Unweighted selection
+    /// matches DESeq2 1.52.0. Weighted selection uses Rust's stored weighted
+    /// `baseMean`, so exact weighted subset-index parity is not claimed.
     pub fn fit_fast_vst_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -393,12 +395,14 @@ impl DeseqBuilder {
         self.fast_vst_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
     }
 
-    /// Apply the implemented GLM-mu VST path with DESeq2-like fast-path selection.
-    ///
-    /// When at least `nsub` rows have `baseMean > 5`, the dispersion trend is
-    /// fit on the deterministic fast-VST subset and applied to the full count
-    /// matrix. Otherwise, the selected GLM-mu dispersion trend is fit on the
-    /// full count matrix before transforming the full matrix.
+    /// Apply Rust's automatic GLM-mu VST path.
+///
+/// When at least `nsub` rows have `baseMean > 5`, the dispersion trend is
+/// fit on the deterministic fast-VST subset and applied to the full count
+/// matrix. Otherwise, the selected GLM-mu dispersion trend is fit on the
+    /// full count matrix before transforming the full matrix. DESeq2 1.52.0
+    /// instead stops when too few rows qualify, and weighted Rust fits select
+    /// on weighted `baseMean` rather than ordinary normalized-count row means.
     pub fn vst_glm_mu_auto(
         &self,
         counts: &CountMatrix,
@@ -412,8 +416,8 @@ impl DeseqBuilder {
         }
         let base_fit = self.fit_size_factors_and_base_means_with_design(counts, design)?;
         let eligible_rows = base_fit.fast_vst_eligible_count()?;
-        // Match DESeq2's fast path gate: enough high-baseMean rows use the
-        // deterministic subset, otherwise the trend is fit on all rows.
+        // Rust uses the deterministic subset when enough rows qualify and the
+        // full dataset otherwise. DESeq2's wrapper errors in the latter case.
         if eligible_rows >= nsub {
             let output = self.fast_vst_glm_mu(counts, design, nsub)?;
             return Ok(VstGlmMuOutput {

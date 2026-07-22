@@ -27,7 +27,7 @@
 /// Supported
 /// `offset(numeric)` and single-vector `offset(transform(numeric))` terms are
 /// parsed by [`expanded_formula_design_with_offsets`]; this compatibility
-/// helper returns only the design surface.
+/// helper returns only the design matrix.
 pub fn expanded_formula_design<'a>(
     formula: &str,
     factors: &'a [ExpandedFactorSpec<'a>],

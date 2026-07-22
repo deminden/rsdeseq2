@@ -1,7 +1,7 @@
 use statrs::function::gamma::ln_gamma;
 
 use crate::core::CountMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 
 /// Negative-binomial log PMF using DESeq2's `mu` and dispersion parameterization.
@@ -38,14 +38,14 @@ pub fn nbinom_log_likelihood_weighted(
             mu.len(),
         ));
     }
-    if let Some(weights) = weights {
-        if weights.len() != counts.len() {
-            return Err(invalid_dimensions(
-                "NB likelihood weights",
-                counts.len(),
-                weights.len(),
-            ));
-        }
+    if let Some(weights) = weights
+        && weights.len() != counts.len()
+    {
+        return Err(invalid_dimensions(
+            "NB likelihood weights",
+            counts.len(),
+            weights.len(),
+        ));
     }
     validate_dispersion(dispersion, None)?;
     let mut log_like = 0.0;
@@ -106,14 +106,14 @@ pub fn nbinom_log_likelihood_matrix(
             dispersions.len(),
         ));
     }
-    if let Some(weights) = weights {
-        if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
-            return Err(DeseqError::InvalidDimensions {
-                context: "NB likelihood weights matrix".to_string(),
-                expected: counts.n_genes() * counts.n_samples(),
-                actual: weights.len(),
-            });
-        }
+    if let Some(weights) = weights
+        && (weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples())
+    {
+        return Err(DeseqError::InvalidDimensions {
+            context: "NB likelihood weights matrix".to_string(),
+            expected: counts.n_genes() * counts.n_samples(),
+            actual: weights.len(),
+        });
     }
 
     let mut out = Vec::with_capacity(counts.n_genes());

@@ -1,15 +1,16 @@
 use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
-use rcompat_lbfgsb::{optim_lbfgsb_with_gradient, Bounds, OptimControl};
+use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 use std::cell::RefCell;
 
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
+use crate::glm::NbinomGlmFit;
 use crate::glm::beta::fit_intercept_only_fixed_dispersion;
 use crate::glm::fallback::optim_fallback_rows;
 use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted};
-use crate::glm::NbinomGlmFit;
+use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
 
@@ -74,6 +75,8 @@ pub struct IrlsOptions {
     pub optim_maxit: usize,
     /// Projected-gradient tolerance for fallback optimization.
     pub optim_tol: f64,
+    /// Match R `optim()` callback arithmetic and numerical gradients.
+    pub r_optim_compat: bool,
 }
 
 impl Default for IrlsOptions {
@@ -91,6 +94,7 @@ impl Default for IrlsOptions {
             force_optim: false,
             optim_maxit: 100,
             optim_tol: 0.0,
+            r_optim_compat: true,
         }
     }
 }
@@ -525,8 +529,11 @@ fn refit_optim_fallback_rows(
             weights: weight_row,
             ridge_lambda: input.ridge_lambda,
         };
-        let (start_objective, _, _) =
-            beta_log2_objective_gradient_hessian(&beta_input, &beta_start)?;
+        let start_objective = if input.options.r_optim_compat {
+            beta_log2_r_objective(&beta_input, &beta_start)?
+        } else {
+            beta_log2_objective(&beta_input, &beta_start)?
+        };
         let output = optimize_beta_log2(beta_input, &beta_start, input.options)?;
         let (_, final_gradient, _) =
             beta_log2_objective_gradient_hessian(&beta_input, &output.parameters)?;
@@ -614,7 +621,7 @@ fn optim_start_beta_log2(
     Ok(initial_beta(x, &y, nf)?
         .iter()
         .copied()
-        .map(|value| (std::f64::consts::LOG2_E * value).clamp(-bound, bound))
+        .map(|value| value.clamp(-bound, bound))
         .collect())
 }
 
@@ -640,6 +647,7 @@ fn optimize_beta_log2(
         options.max_beta_abs,
         options.optim_maxit,
         options.optim_tol,
+        options.r_optim_compat,
     )
 }
 
@@ -650,6 +658,7 @@ fn minimize_beta_log2_lbfgsb(
     upper: f64,
     maxit: usize,
     gradient_tol: f64,
+    r_optim_compat: bool,
 ) -> Result<BoundedOptimizationOutput, DeseqError> {
     let parameters = start
         .iter()
@@ -658,31 +667,89 @@ fn minimize_beta_log2_lbfgsb(
         .collect::<Vec<_>>();
     let start_parameters = parameters.clone();
     let deferred_error = RefCell::new(None);
-    let mut objective = |beta: &[f64]| match beta_log2_objective(&input, beta) {
+    let mut objective = |beta: &[f64]| match if r_optim_compat {
+        beta_log2_r_objective(&input, beta)
+    } else {
+        beta_log2_objective(&input, beta)
+    } {
         Ok(value) => value,
         Err(error) => {
             deferred_error.borrow_mut().get_or_insert(error);
             1.0e300
         }
     };
-    let start_value = beta_log2_objective(&input, &parameters)?;
+    let start_value = if r_optim_compat {
+        beta_log2_r_objective(&input, &parameters)?
+    } else {
+        beta_log2_objective(&input, &parameters)?
+    };
     let bounds = Bounds::new(vec![lower; parameters.len()], vec![upper; parameters.len()])
         .map_err(|error| DeseqError::UnsupportedFeature {
             feature: format!("optim fallback L-BFGS-B bounds failed: {error}"),
         })?;
     let control = optim_fallback_control(parameters.len(), maxit, gradient_tol);
-    let mut gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
-        Ok((_, gradient)) => gradient,
-        Err(error) => {
-            deferred_error.borrow_mut().get_or_insert(error);
-            vec![0.0; beta.len()]
+    let solution = if r_optim_compat {
+        let numeric = match optim_lbfgsb(
+            parameters.clone(),
+            bounds.clone(),
+            &mut objective,
+            control.clone(),
+        ) {
+            Ok(solution) => solution,
+            Err(error) => {
+                return Err(DeseqError::UnsupportedFeature {
+                    feature: format!("optim fallback L-BFGS-B failed: {error}"),
+                });
+            }
+        };
+        let mut chosen = numeric;
+        let mut analytic_objective =
+            |beta: &[f64]| beta_log2_objective(&input, beta).unwrap_or(1.0e300);
+        let mut analytic_gradient = |beta: &[f64]| {
+            beta_log2_value_gradient(&input, beta)
+                .map(|(_, gradient)| gradient)
+                .unwrap_or_else(|_| vec![0.0; beta.len()])
+        };
+        if let Ok(mut analytic) = optim_lbfgsb_with_gradient(
+            parameters,
+            bounds,
+            &mut analytic_objective,
+            &mut analytic_gradient,
+            control.clone(),
+        ) {
+            let numeric_reduced = beta_log2_objective(&input, &chosen.par)?;
+            let analytic_reduced = beta_log2_objective(&input, &analytic.par)?;
+            if analytic.is_success()
+                && !r_optim_candidate_within_analytic_tolerance(
+                    numeric_reduced,
+                    analytic_reduced,
+                    control.factr,
+                )
+                && r_optim_candidates_materially_disagree(
+                    &chosen.par,
+                    &analytic.par,
+                    &control.ndeps,
+                    &control.parscale,
+                )
+            {
+                analytic.value = beta_log2_r_objective(&input, &analytic.par)?;
+                chosen = analytic;
+            }
         }
-    };
-    let solution =
+        Ok(chosen)
+    } else {
+        let mut gradient = |beta: &[f64]| match beta_log2_value_gradient(&input, beta) {
+            Ok((_, gradient)) => gradient,
+            Err(error) => {
+                deferred_error.borrow_mut().get_or_insert(error);
+                vec![0.0; beta.len()]
+            }
+        };
         optim_lbfgsb_with_gradient(parameters, bounds, &mut objective, &mut gradient, control)
-            .map_err(|error| DeseqError::UnsupportedFeature {
-                feature: format!("optim fallback L-BFGS-B failed: {error}"),
-            })?;
+    }
+    .map_err(|error| DeseqError::UnsupportedFeature {
+        feature: format!("optim fallback L-BFGS-B failed: {error}"),
+    })?;
     if let Some(error) = deferred_error.into_inner() {
         return Err(error);
     }
@@ -717,6 +784,55 @@ fn optim_fallback_control(dimension: usize, maxit: usize, gradient_tol: f64) -> 
     control
 }
 
+fn r_optim_candidate_within_analytic_tolerance(
+    compatible_objective: f64,
+    analytic_objective: f64,
+    factr: f64,
+) -> bool {
+    if !compatible_objective.is_finite()
+        || !analytic_objective.is_finite()
+        || !factr.is_finite()
+        || factr < 0.0
+    {
+        return false;
+    }
+    // `factr * epsilon` is the L-BFGS-B relative-reduction tolerance. Allow a
+    // tenfold band for the deliberately finite-difference-compatible endpoint;
+    // beyond it the callback path and analytic solution disagree materially.
+    let scale = compatible_objective
+        .abs()
+        .max(analytic_objective.abs())
+        .max(1.0);
+    let tolerance = 10.0 * factr * f64::EPSILON * scale;
+    compatible_objective <= analytic_objective + tolerance
+}
+
+fn r_optim_candidates_materially_disagree(
+    compatible: &[f64],
+    analytic: &[f64],
+    ndeps: &[f64],
+    parscale: &[f64],
+) -> bool {
+    if compatible.len() != analytic.len()
+        || compatible.len() != ndeps.len()
+        || compatible.len() != parscale.len()
+    {
+        return true;
+    }
+    compatible
+        .iter()
+        .zip(analytic)
+        .zip(ndeps.iter().zip(parscale))
+        .any(|((&r_value, &analytic_value), (&step, &scale))| {
+            let resolution = step * scale;
+            !r_value.is_finite()
+                || !analytic_value.is_finite()
+                || !resolution.is_finite()
+                || resolution <= 0.0
+                || (r_value - analytic_value).abs() > 10.0 * resolution
+        })
+}
+
 fn beta_log2_value_gradient(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
@@ -747,14 +863,14 @@ fn beta_log2_objective_gradient_hessian(
             input.counts.len().min(input.nf.len()),
         ));
     }
-    if let Some(weights) = input.weights {
-        if weights.len() != input.x.nrows() {
-            return Err(invalid_dimensions(
-                "optim weights",
-                input.x.nrows(),
-                weights.len(),
-            ));
-        }
+    if let Some(weights) = input.weights
+        && weights.len() != input.x.nrows()
+    {
+        return Err(invalid_dimensions(
+            "optim weights",
+            input.x.nrows(),
+            weights.len(),
+        ));
     }
     validate_positive_finite(input.dispersion, "dispersion", 0)?;
 
@@ -769,12 +885,10 @@ fn beta_log2_objective_gradient_hessian(
         validate_nonnegative_finite(weight, "weight", sample)?;
         let mut eta = 0.0;
         for (col, beta_value) in beta.iter().copied().enumerate().take(p) {
-            let Some(term) = checked_product2(input.x[(sample, col)], beta_value) else {
+            let next_eta = input.x[(sample, col)].mul_add(beta_value, eta);
+            if !next_eta.is_finite() {
                 return Ok(beta_optim_penalty(p));
-            };
-            let Some(next_eta) = checked_sum2(eta, term) else {
-                return Ok(beta_optim_penalty(p));
-            };
+            }
             eta = next_eta;
         }
         let mu = input.nf[sample] * 2.0_f64.powf(eta);
@@ -907,6 +1021,31 @@ fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
 
 fn beta_log2_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
     beta_log2_objective_gradient_hessian(input, beta).map(|(objective, _, _)| objective)
+}
+
+fn beta_log2_r_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
+    let mut ll = 0.0;
+    for sample in 0..input.x.nrows() {
+        let mut eta = 0.0;
+        for (col, b) in beta.iter().copied().enumerate() {
+            eta = input.x[(sample, col)].mul_add(b, eta)
+        }
+        let mu = input.nf[sample] * 2.0_f64.powf(eta);
+        if !mu.is_finite() || mu <= 0.0 {
+            return Ok(1e300);
+        }
+        ll += input.weights.map_or(1.0, |w| w[sample])
+            * nbinom_log(input.counts[sample], mu, input.dispersion)
+    }
+    let l2 = std::f64::consts::LN_2.powi(2);
+    let mut lp = 0.0;
+    for (col, b) in beta.iter().copied().enumerate() {
+        let precision = input.ridge_lambda[col] * l2;
+        if precision > 0.0 {
+            lp += normal_log(b, precision);
+        }
+    }
+    Ok(-(ll + lp))
 }
 
 #[cfg(test)]
@@ -1140,11 +1279,14 @@ fn fitted_mu_impl(
 }
 
 fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f64> {
-    let mut sum = ScaledSum::default();
+    let mut sum = 0.0;
     for col in 0..x.ncols() {
-        sum.add(checked_product2(x[(row, col)], beta[col])?)?;
+        sum = x[(row, col)].mul_add(beta[col], sum);
+        if !sum.is_finite() {
+            return None;
+        }
     }
-    sum.finish()
+    Some(sum)
 }
 
 fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> Option<f64> {
@@ -1622,6 +1764,16 @@ mod tests {
     }
 
     #[test]
+    fn optim_start_preserves_backup_qr_natural_log_values() {
+        let x = DMatrix::from_element(2, 1, 1.0);
+        let counts = [9, 9];
+        let nf = [1.0, 1.0];
+        let start = optim_start_beta_log2(&[f64::NAN], &x, &counts, &nf, 30.0).unwrap();
+
+        assert_relative_eq!(start[0], 9.1_f64.ln(), epsilon = 1e-14);
+    }
+
+    #[test]
     fn optim_fallback_control_matches_r_optim_lbfgsb_defaults() {
         let options = IrlsOptions::default();
         assert_eq!(options.max_beta_abs, 30.0);
@@ -1634,6 +1786,54 @@ mod tests {
         assert_eq!(control.fnscale, 1.0);
         assert_eq!(control.parscale, vec![1.0; 3]);
         assert_eq!(control.ndeps, vec![1.0e-3; 3]);
+    }
+
+    #[test]
+    fn r_optim_candidate_accepts_objective_gap_within_factr_band() {
+        let analytic = 427.391043312651;
+        let tolerance = 10.0 * 1.0e7 * f64::EPSILON * analytic;
+
+        assert!(r_optim_candidate_within_analytic_tolerance(
+            analytic + tolerance,
+            analytic,
+            1.0e7,
+        ));
+    }
+
+    #[test]
+    fn r_optim_candidate_rejects_material_objective_gap() {
+        let analytic = 45.11460017889003;
+        let tolerance = 10.0 * 1.0e7 * f64::EPSILON * analytic;
+
+        assert!(!r_optim_candidate_within_analytic_tolerance(
+            analytic + 1.01 * tolerance,
+            analytic,
+            1.0e7,
+        ));
+        assert!(!r_optim_candidate_within_analytic_tolerance(
+            f64::INFINITY,
+            analytic,
+            1.0e7,
+        ));
+    }
+
+    #[test]
+    fn r_optim_candidate_disagreement_is_scaled_by_numeric_resolution() {
+        let ndeps = [1.0e-3, 1.0e-3];
+        let parscale = [1.0, 2.0];
+
+        assert!(!r_optim_candidates_materially_disagree(
+            &[1.0, 2.0],
+            &[1.009, 2.019],
+            &ndeps,
+            &parscale,
+        ));
+        assert!(r_optim_candidates_materially_disagree(
+            &[1.0, 2.0],
+            &[1.010_001, 2.0],
+            &ndeps,
+            &parscale,
+        ));
     }
 
     #[test]
@@ -1777,6 +1977,7 @@ mod tests {
             case.upper[0],
             case.control.maxit,
             case.control.pgtol,
+            false,
         )
         .unwrap();
 

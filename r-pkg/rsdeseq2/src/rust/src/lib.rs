@@ -11,13 +11,13 @@ const DIAGNOSTIC_SCHEMA_NAMES: [&[u8]; 7] = [
     b"maxCooks\0",
 ];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_placeholder() -> i32 {
     0
 }
 
 /// Number of DESeq2-style diagnostic schema names exported by the R bridge.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_diagnostic_schema_len() -> usize {
     DIAGNOSTIC_SCHEMA_NAMES.len()
 }
@@ -26,7 +26,7 @@ pub extern "C" fn rsdeseq2_r_diagnostic_schema_len() -> usize {
 ///
 /// The returned pointer has static lifetime. A null pointer indicates an
 /// out-of-range index.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_diagnostic_schema_name(index: usize) -> *const c_char {
     DIAGNOSTIC_SCHEMA_NAMES
         .get(index)

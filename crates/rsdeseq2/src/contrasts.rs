@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use crate::core::CountMatrix;
 use crate::design::{
-    r_like_make_name, r_like_name_candidates as candidate_names, DesignMatrix, FormulaFactorColumn,
-    FormulaModelFrame,
+    DesignMatrix, FormulaFactorColumn, FormulaModelFrame, r_like_make_name,
+    r_like_name_candidates as candidate_names,
 };
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 
 /// Primitive contrast specification for already-built design matrices.
 ///
@@ -824,7 +824,9 @@ fn resolve_sample_level_alias<'a>(
     match matches.as_slice() {
         [level] => Ok(*level),
         [] => Err(DeseqError::InvalidOptions {
-            reason: format!("contrastAllZero sample levels do not contain {role} level '{requested}'"),
+            reason: format!(
+                "contrastAllZero sample levels do not contain {role} level '{requested}'"
+            ),
         }),
         _ => Err(DeseqError::InvalidOptions {
             reason: format!(
@@ -1115,27 +1117,27 @@ fn coefficient_name_candidates(name: &str) -> Vec<String> {
     } else if name == "Intercept" {
         push_unique_candidate(&mut candidates, "(Intercept)".to_string());
     }
-    if let Some((factor_level, reference)) = name.split_once("_vs_") {
-        if let Some((factor, level)) = factor_level.rsplit_once('_') {
-            push_unique_candidate(
-                &mut candidates,
-                format!(
-                    "{}_{}_vs_{}",
-                    r_like_make_name(factor),
-                    r_like_make_name(level),
-                    r_like_make_name(reference)
-                ),
-            );
-            push_unique_candidate(
-                &mut candidates,
-                format!(
-                    "{}{}_vs_{}",
-                    r_like_make_name(factor),
-                    r_like_make_name(level),
-                    r_like_make_name(reference)
-                ),
-            );
-        }
+    if let Some((factor_level, reference)) = name.split_once("_vs_")
+        && let Some((factor, level)) = factor_level.rsplit_once('_')
+    {
+        push_unique_candidate(
+            &mut candidates,
+            format!(
+                "{}_{}_vs_{}",
+                r_like_make_name(factor),
+                r_like_make_name(level),
+                r_like_make_name(reference)
+            ),
+        );
+        push_unique_candidate(
+            &mut candidates,
+            format!(
+                "{}{}_vs_{}",
+                r_like_make_name(factor),
+                r_like_make_name(level),
+                r_like_make_name(reference)
+            ),
+        );
     }
     candidates
 }

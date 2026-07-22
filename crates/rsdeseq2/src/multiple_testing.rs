@@ -51,7 +51,7 @@ pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
                 return Err(DeseqError::InvalidSizeFactors {
                     reason: "validated p-value unexpectedly produced a missing adjustment"
                         .to_string(),
-                })
+                });
             }
         }
     }

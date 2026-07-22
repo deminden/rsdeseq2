@@ -1,4 +1,5 @@
-# rsdeseq2 Rust Vendor Placeholder
+# Rust Core Packaging Directory
 
-The R package will eventually vendor or reference the Rust core here for
-CRAN/Bioconductor-compatible builds. The native bridge is not implemented yet.
+The R build currently excludes the full numerical Rust core and provides
+selected primitive `.Call` bridges elsewhere in the package. This directory is
+reserved for the core sources needed by a CRAN/Bioconductor-compatible build.

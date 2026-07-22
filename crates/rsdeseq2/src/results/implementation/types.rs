@@ -243,7 +243,7 @@ pub struct DeseqResultsDataFrame {
 pub struct ExpandedBetaPriorWaldResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Expanded and reported design surfaces plus coefficient collapse groups.
+    /// Expanded and reported design matrices plus coefficient collapse groups.
     pub design: ExpandedModelBetaPriorDesignInput<'a>,
     /// Per-sample size factors.
     pub size_factors: &'a [f64],
@@ -266,7 +266,7 @@ pub struct ExpandedBetaPriorWaldResultsInput<'a> {
 pub struct ExpandedBetaPriorWaldNormalizedResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Expanded and reported design surfaces plus coefficient collapse groups.
+    /// Expanded and reported design matrices plus coefficient collapse groups.
     pub design: ExpandedModelBetaPriorDesignInput<'a>,
     /// Gene x sample normalization-factor matrix.
     pub normalization_factors: &'a RowMajorMatrix<f64>,
@@ -345,7 +345,7 @@ pub struct ExpandedAdditiveBetaPriorWaldResultsInput<'a> {
     pub counts: &'a CountMatrix,
     /// Additive factor terms used to build expanded and reported designs.
     pub factors: &'a [ExpandedFactorSpec<'a>],
-    /// Additive numeric covariates included unchanged in both design surfaces.
+    /// Additive numeric covariates included unchanged in both design matrices.
     pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     /// Factor-by-factor interactions included after main effects.
     pub interactions: &'a [ExpandedFactorInteractionSpec<'a>],
@@ -376,7 +376,7 @@ pub struct ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'a> {
     pub counts: &'a CountMatrix,
     /// Additive factor terms used to build expanded and reported designs.
     pub factors: &'a [ExpandedFactorSpec<'a>],
-    /// Additive numeric covariates included unchanged in both design surfaces.
+    /// Additive numeric covariates included unchanged in both design matrices.
     pub numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     /// Factor-by-factor interactions included after main effects.
     pub interactions: &'a [ExpandedFactorInteractionSpec<'a>],
@@ -533,7 +533,7 @@ pub struct ExpandedBetaPriorWaldReplacementResults {
 /// One-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedFactorBetaPriorWaldResults {
-    /// Generated expanded/standard one-factor design surfaces.
+    /// Generated expanded and standard one-factor design matrices.
     pub design: ExpandedFactorDesign,
     /// Expanded-design beta-prior fit with collapsed standard-design prior fit.
     pub fit: ExpandedModelBetaPriorGlmFit,
@@ -544,7 +544,7 @@ pub struct ExpandedFactorBetaPriorWaldResults {
 /// One-factor expanded beta-prior Wald replacement workflow with generated design metadata.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedFactorBetaPriorWaldReplacementResults {
-    /// Generated expanded/standard one-factor design surfaces.
+    /// Generated expanded and standard one-factor design matrices.
     pub design: ExpandedFactorDesign,
     /// Replacement-refit workflow output for the generated design.
     pub replacement: ExpandedBetaPriorWaldReplacementResults,
@@ -553,7 +553,7 @@ pub struct ExpandedFactorBetaPriorWaldReplacementResults {
 /// Additive-factor expanded beta-prior design, fit, and DESeq2-shaped Wald rows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedAdditiveBetaPriorWaldResults {
-    /// Generated expanded/standard additive-factor design surfaces.
+    /// Generated expanded and standard additive-factor design matrices.
     pub design: ExpandedAdditiveFactorDesign,
     /// Expanded-design beta-prior fit with collapsed standard-design prior fit.
     pub fit: ExpandedModelBetaPriorGlmFit,
@@ -564,13 +564,13 @@ pub struct ExpandedAdditiveBetaPriorWaldResults {
 /// Additive expanded beta-prior Wald replacement workflow with generated design metadata.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpandedAdditiveBetaPriorWaldReplacementResults {
-    /// Generated expanded/standard additive-factor design surfaces.
+    /// Generated expanded and standard additive-factor design matrices.
     pub design: ExpandedAdditiveFactorDesign,
     /// Replacement-refit workflow output for the generated design.
     pub replacement: ExpandedBetaPriorWaldReplacementResults,
 }
 
-/// One row of a future DESeq2-like results table.
+/// One row of a DESeq2-like results table.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeseqResultRow {
     /// Gene identifier, if available.

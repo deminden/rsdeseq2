@@ -1,6 +1,6 @@
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::multiple_testing::bh_adjust;
-use crate::results::{recompute_padj, DeseqResults};
+use crate::results::{DeseqResults, recompute_padj};
 
 /// One filtered adjusted-p-value column.
 pub type FilteredPadjColumn = Vec<Option<f64>>;
@@ -615,43 +615,38 @@ fn lowess_delta_pass(
             lowest_at(x, y, idx, n_left, n_right, robustness_weights)?.unwrap_or(y[idx]);
         fitted[idx] = fitted_value;
 
-        if let Some(last) = last_estimated {
-            if last < idx - 1 {
-                let denominator =
-                    checked_sub(x[idx], x[last], idx, "lowess interpolation denominator")?;
-                for point in last + 1..idx {
-                    fitted[point] = if denominator.abs() <= f64::EPSILON {
-                        fitted[last]
-                    } else {
-                        let fraction = checked_div(
-                            checked_sub(x[point], x[last], point, "lowess interpolation x delta")?,
-                            denominator,
+        if let Some(last) = last_estimated
+            && last < idx - 1
+        {
+            let denominator =
+                checked_sub(x[idx], x[last], idx, "lowess interpolation denominator")?;
+            for point in last + 1..idx {
+                fitted[point] = if denominator.abs() <= f64::EPSILON {
+                    fitted[last]
+                } else {
+                    let fraction = checked_div(
+                        checked_sub(x[point], x[last], point, "lowess interpolation x delta")?,
+                        denominator,
+                        point,
+                        "lowess interpolation fraction",
+                    )?;
+                    checked_add(
+                        checked_mul(
+                            fraction,
+                            fitted[idx],
                             point,
-                            "lowess interpolation fraction",
-                        )?;
-                        checked_add(
-                            checked_mul(
-                                fraction,
-                                fitted[idx],
-                                point,
-                                "lowess interpolation upper term",
-                            )?,
-                            checked_mul(
-                                checked_sub(
-                                    1.0,
-                                    fraction,
-                                    point,
-                                    "lowess interpolation complement",
-                                )?,
-                                fitted[last],
-                                point,
-                                "lowess interpolation lower term",
-                            )?,
+                            "lowess interpolation upper term",
+                        )?,
+                        checked_mul(
+                            checked_sub(1.0, fraction, point, "lowess interpolation complement")?,
+                            fitted[last],
                             point,
-                            "lowess interpolation fitted value",
-                        )?
-                    };
-                }
+                            "lowess interpolation lower term",
+                        )?,
+                        point,
+                        "lowess interpolation fitted value",
+                    )?
+                };
             }
         }
         let mut last = idx;

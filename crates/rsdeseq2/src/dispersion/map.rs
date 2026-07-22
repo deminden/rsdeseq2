@@ -1,13 +1,13 @@
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::dispersion::gene_est::{
-    fit_dispersion_grid_with_prior, fit_dispersion_grid_with_prior_and_weights,
-    fit_dispersion_line_search_no_cr_with_prior,
+    DispersionPrior, GeneWiseDispersionFitMethod, GeneWiseDispersionOptions,
+    WeightedDispersionFitInput, fit_dispersion_grid_with_prior,
+    fit_dispersion_grid_with_prior_and_weights, fit_dispersion_line_search_no_cr_with_prior,
     fit_dispersion_line_search_no_cr_with_prior_and_weights, fit_dispersion_line_search_with_prior,
-    fit_dispersion_line_search_with_prior_and_weights, DispersionPrior,
-    GeneWiseDispersionFitMethod, GeneWiseDispersionOptions, WeightedDispersionFitInput,
+    fit_dispersion_line_search_with_prior_and_weights,
 };
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 
 /// Options for DESeq2-style MAP dispersion fitting.

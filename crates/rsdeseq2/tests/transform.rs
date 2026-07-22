@@ -1,8 +1,12 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::{
-    estimate_rlog_sample_prior_variance, estimate_rlog_sample_prior_variance_with_quantile,
-    fast_vst_eligible_count, fast_vst_subset, fast_vst_subset_indices, fast_vst_subset_matrix_rows,
-    fast_vst_subset_normalized_counts, local_vst_inverse_size_factor_mean,
+    CountMatrix, DeseqError, DispersionTrendFit, IrlsOptions, LocalDispersionTrend,
+    LocalDispersionTrendFit, MeanDispersionTrend, MeanDispersionTrendFit,
+    ParametricDispersionTrend, ParametricDispersionTrendFit, RLOG_INTERCEPT_PRIOR_VARIANCE,
+    RLOG_PRIOR_UPPER_QUANTILE, RlogOffsetMode, RowMajorMatrix, estimate_rlog_sample_prior_variance,
+    estimate_rlog_sample_prior_variance_with_quantile, fast_vst_eligible_count, fast_vst_subset,
+    fast_vst_subset_indices, fast_vst_subset_matrix_rows, fast_vst_subset_normalized_counts,
+    local_vst_inverse_size_factor_mean,
     local_vst_inverse_size_factor_mean_from_normalization_factors, norm_transform,
     norm_transform_value, rlog_beta_prior_variance, rlog_fit_with_normalization_factors,
     rlog_fit_with_size_factors, rlog_frozen_with_normalization_factors,
@@ -12,10 +16,7 @@ use rsdeseq2::prelude::{
     rlog_with_size_factors, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
     vst_parametric_value, vst_with_dispersion_trend,
     vst_with_dispersion_trend_and_normalization_factors,
-    vst_with_dispersion_trend_and_size_factors, CountMatrix, DeseqError, DispersionTrendFit,
-    IrlsOptions, LocalDispersionTrend, LocalDispersionTrendFit, MeanDispersionTrend,
-    MeanDispersionTrendFit, ParametricDispersionTrend, ParametricDispersionTrendFit,
-    RlogOffsetMode, RowMajorMatrix, RLOG_INTERCEPT_PRIOR_VARIANCE, RLOG_PRIOR_UPPER_QUANTILE,
+    vst_with_dispersion_trend_and_size_factors,
 };
 
 fn expected_mean_vst(q: f64, alpha: f64) -> f64 {
@@ -272,42 +273,50 @@ fn frozen_rlog_validates_offsets_and_intercepts() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(2, 3, vec![1.0, 2.0, 4.0, 1.0, 2.0, 4.0]).unwrap();
 
-    assert!(rlog_frozen_with_size_factors(
-        &counts,
-        &size_factors,
-        &dispersions,
-        4.0,
-        &[3.0],
-        IrlsOptions::default(),
-    )
-    .is_err());
-    assert!(rlog_frozen_with_size_factors(
-        &counts,
-        &[1.0, f64::NAN, 4.0],
-        &dispersions,
-        4.0,
-        &[3.0, 2.0],
-        IrlsOptions::default(),
-    )
-    .is_err());
-    assert!(rlog_frozen_with_normalization_factors(
-        &counts,
-        &normalization_factors,
-        &dispersions,
-        0.0,
-        &[3.0, 2.0],
-        IrlsOptions::default(),
-    )
-    .is_err());
-    assert!(rlog_frozen_with_normalization_factors(
-        &counts,
-        &normalization_factors,
-        &dispersions,
-        4.0,
-        &[f64::NAN, 2.0],
-        IrlsOptions::default(),
-    )
-    .is_err());
+    assert!(
+        rlog_frozen_with_size_factors(
+            &counts,
+            &size_factors,
+            &dispersions,
+            4.0,
+            &[3.0],
+            IrlsOptions::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        rlog_frozen_with_size_factors(
+            &counts,
+            &[1.0, f64::NAN, 4.0],
+            &dispersions,
+            4.0,
+            &[3.0, 2.0],
+            IrlsOptions::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        rlog_frozen_with_normalization_factors(
+            &counts,
+            &normalization_factors,
+            &dispersions,
+            0.0,
+            &[3.0, 2.0],
+            IrlsOptions::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        rlog_frozen_with_normalization_factors(
+            &counts,
+            &normalization_factors,
+            &dispersions,
+            4.0,
+            &[f64::NAN, 2.0],
+            IrlsOptions::default(),
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -1040,22 +1049,26 @@ fn vst_mean_rejects_non_positive_and_non_finite_dispersion() {
 fn vst_parametric_rejects_invalid_trend_coefficients() {
     let normalized = RowMajorMatrix::from_row_major(1, 1, vec![1.0]).unwrap();
 
-    assert!(vst_parametric(
-        &normalized,
-        ParametricDispersionTrend {
-            asympt_disp: 0.0,
-            extra_pois: 1.0,
-        },
-    )
-    .is_err());
-    assert!(vst_parametric(
-        &normalized,
-        ParametricDispersionTrend {
-            asympt_disp: 0.2,
-            extra_pois: -0.1,
-        },
-    )
-    .is_err());
+    assert!(
+        vst_parametric(
+            &normalized,
+            ParametricDispersionTrend {
+                asympt_disp: 0.0,
+                extra_pois: 1.0,
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        vst_parametric(
+            &normalized,
+            ParametricDispersionTrend {
+                asympt_disp: 0.2,
+                extra_pois: -0.1,
+            },
+        )
+        .is_err()
+    );
 }
 
 fn constant_local_trend(dispersion: f64) -> LocalDispersionTrend {

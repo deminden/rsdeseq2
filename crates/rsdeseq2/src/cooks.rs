@@ -1,6 +1,6 @@
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{
     base_mean, base_variance, normalization_factors_from_size_factors,
@@ -662,14 +662,14 @@ fn validate_replacement_inputs(
             reason: "at least 3 replicates are required for outlier replacement".to_string(),
         });
     }
-    if let Some(samples) = &options.which_samples {
-        if samples.len() != counts.n_samples() {
-            return Err(invalid_dimensions(
-                "replacement whichSamples",
-                counts.n_samples(),
-                samples.len(),
-            ));
-        }
+    if let Some(samples) = &options.which_samples
+        && samples.len() != counts.n_samples()
+    {
+        return Err(invalid_dimensions(
+            "replacement whichSamples",
+            counts.n_samples(),
+            samples.len(),
+        ));
     }
     Ok(())
 }

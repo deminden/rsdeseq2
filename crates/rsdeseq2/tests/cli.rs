@@ -338,7 +338,8 @@ fn assert_deseq_results_table(path: &Path) {
     let mut lines = table.lines();
     let header = lines.next().unwrap();
     assert!(
-        header == "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\tdispersion\tconverged"
+        header
+            == "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\tdispersion\tconverged"
             || header
                 == "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\tdispersion\tconverged\tfiltered",
         "unexpected result header: {header}"

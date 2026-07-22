@@ -1,12 +1,12 @@
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
+use crate::errors::{DeseqError, invalid_dimensions};
+use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{
-    fit_fixed_dispersion_irls, fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_irls, IrlsOptions,
+    IrlsOptions, fit_fixed_dispersion_irls,
+    fit_fixed_dispersion_irls_with_normalization_factors_and_weights, fit_irls,
 };
 use crate::glm::nb::nbinom_log_likelihood_matrix;
-use crate::glm::NbinomGlmFit;
 use crate::matrix::RowMajorMatrix;
 use statrs::distribution::{ContinuousCDF, Normal};
 
@@ -62,13 +62,13 @@ pub struct ExpandedModelBetaPriorGlmFit {
     pub expanded_mle_fit: NbinomGlmFit,
     /// Refit GLM on the expanded design using beta-prior variance as ridge.
     pub expanded_prior_fit: NbinomGlmFit,
-    /// Prior fit collapsed onto the caller-supplied standard design surface.
+    /// Prior fit collapsed onto the caller-supplied standard design matrix.
     pub prior_fit: NbinomGlmFit,
     /// Log2-scale beta prior variances, one per expanded-design coefficient.
     pub beta_prior_variance: Vec<f64>,
 }
 
-/// Expanded and reported design surfaces for a beta-prior expanded-model refit.
+/// Expanded and reported design matrices for a beta-prior expanded-model refit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ExpandedModelBetaPriorDesignInput<'a> {
     /// Design used for expanded-model fitting.
@@ -218,7 +218,7 @@ pub fn average_expanded_model_covariances(
     RowMajorMatrix::from_row_major(expanded_covariance.n_rows(), n_groups * n_groups, values)
 }
 
-/// Collapse an expanded-model GLM fit to a standard coefficient surface.
+/// Collapse an expanded-model GLM fit to standard-design coefficients.
 ///
 /// This keeps gene/sample diagnostics and fitted means from the expanded fit,
 /// replaces the reported model matrix with `standard_design`, averages beta
@@ -1336,14 +1336,14 @@ fn validate_beta_prior_inputs(
             disp_fit.len(),
         ));
     }
-    if let Some(names) = coefficient_names {
-        if names.len() != beta_matrix.n_cols() {
-            return Err(invalid_dimensions(
-                "beta prior variance coefficient names",
-                beta_matrix.n_cols(),
-                names.len(),
-            ));
-        }
+    if let Some(names) = coefficient_names
+        && names.len() != beta_matrix.n_cols()
+    {
+        return Err(invalid_dimensions(
+            "beta prior variance coefficient names",
+            beta_matrix.n_cols(),
+            names.len(),
+        ));
     }
     validate_upper_quantile(options.upper_quantile)?;
     if !options.wide_prior_variance.is_finite() || options.wide_prior_variance <= 0.0 {
@@ -1623,17 +1623,18 @@ fn weighted_abs_quantile(
                     .to_string(),
             });
         }
-        if let Some((last_value, last_weight)) = unique.last_mut() {
-            if *last_value == value {
-                let Some(next_weight) = checked_sum2(*last_weight, normalized_weight) else {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: "weighted beta prior variance quantile produced non-finite merged weight"
+        if let Some((last_value, last_weight)) = unique.last_mut()
+            && *last_value == value
+        {
+            let Some(next_weight) = checked_sum2(*last_weight, normalized_weight) else {
+                return Err(DeseqError::InvalidOptions {
+                    reason:
+                        "weighted beta prior variance quantile produced non-finite merged weight"
                             .to_string(),
-                    });
-                };
-                *last_weight = next_weight;
-                continue;
-            }
+                });
+            };
+            *last_weight = next_weight;
+            continue;
         }
         unique.push((value, normalized_weight));
     }
@@ -1870,8 +1871,9 @@ mod tests {
     fn weighted_mean_rejects_nonfinite_products() {
         let err = weighted_mean(&[f64::MAX], &[2.0], 0).unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("gene 0 has non-finite weighted normalized mean"));
+        assert!(
+            err.to_string()
+                .contains("gene 0 has non-finite weighted normalized mean")
+        );
     }
 }

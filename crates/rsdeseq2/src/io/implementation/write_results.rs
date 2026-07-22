@@ -82,15 +82,14 @@ fn validate_optional_export_finite(
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
-    if let Some(value) = value {
-        if !value.is_finite() {
+    if let Some(value) = value
+        && !value.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: context.to_string(),
                 index: Some(idx),
                 value,
             });
         }
-    }
     Ok(())
 }
 
@@ -99,13 +98,12 @@ fn validate_optional_export_probability(
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
-    if let Some(value) = value {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+    if let Some(value) = value
+        && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
             return Err(DeseqError::InvalidOptions {
                 reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
             });
         }
-    }
     Ok(())
 }
 
@@ -114,13 +112,12 @@ fn validate_optional_export_positive(
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
-    if let Some(value) = value {
-        if !value.is_finite() || value <= 0.0 {
+    if let Some(value) = value
+        && (!value.is_finite() || value <= 0.0) {
             return Err(DeseqError::InvalidDispersion {
                 reason: format!("{context} at index {idx} must be finite and positive"),
             });
         }
-    }
     Ok(())
 }
 
@@ -129,15 +126,14 @@ fn validate_optional_export_nonnegative(
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
-    if let Some(value) = value {
-        if !value.is_finite() || value < 0.0 {
+    if let Some(value) = value
+        && (!value.is_finite() || value < 0.0) {
             return Err(DeseqError::NonFiniteValue {
                 context: context.to_string(),
                 index: Some(idx),
                 value,
             });
         }
-    }
     Ok(())
 }
 
@@ -212,15 +208,14 @@ pub fn write_deseq_mcols_diagnostics_tsv(
 ) -> Result<(), DeseqError> {
     let frame = diagnostics.data_frame();
     let n_rows = diagnostic_frame_row_count(&frame.columns)?;
-    if let Some(names) = gene_names {
-        if names.len() != n_rows {
+    if let Some(names) = gene_names
+        && names.len() != n_rows {
             return Err(invalid_dimensions(
                 "diagnostic gene names",
                 n_rows,
                 names.len(),
             ));
         }
-    }
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
     header.push("gene".to_string());
@@ -324,15 +319,14 @@ fn validate_independent_filtering_export(
         }
         validate_finite_values("independent-filter lowess export", lowess_fit)?;
     }
-    if let Some(selected_index) = filtering.selected_index {
-        if selected_index >= filtering.theta.len() {
+    if let Some(selected_index) = filtering.selected_index
+        && selected_index >= filtering.theta.len() {
             return Err(invalid_dimensions(
                 "independent-filter selected index",
                 filtering.theta.len().saturating_sub(1),
                 selected_index,
             ));
         }
-    }
     validate_optional_export_probability(filtering.filter_theta, "independent-filter theta", 0)?;
     validate_optional_export_nonnegative(
         filtering.filter_threshold,

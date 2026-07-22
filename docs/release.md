@@ -5,16 +5,31 @@ tests cover the implemented statistical pipeline.
 
 ## Pre-Release Checklist
 
+Keep the Rust crate, R package, and R-package Rust stub on the same release
+version. Benchmark comparisons may retain an older version as an explicit
+baseline.
+
 Before preparing a release commit:
 
-- Keep local DESeq2 inspection clones under ignored `external/`.
+- Keep DESeq2 source-inspection copies under ignored `external/`.
 - Keep Rust `target/`, generated archives/native objects, and generated
   parity/benchmark outputs out of git.
 - Keep the README scoped to validated workflows and avoid claiming full DESeq2
   workflow parity.
 - Run Rust formatting, linting, tests, package checks, and R wrapper checks.
-- Review staged files for accidental large artifacts or generated local
-  references.
+- Run the versioned 100-row parity benchmark and record its measurements. The
+  v0.2.5 median, mean, and maximum absolute errors are
+  `6.063612945084174e-10`, `1.260818774570247e-4`, and
+  `1.5259081158007781e-3`. The frozen v0.2.4 baseline measured
+  `1.4637657972313423e-4`, `3.793917566690452e-4`, and
+  `3.0938714191082184e-3`, respectively. The v0.2.5 median and mean are
+  241401.589x and 3.00909032x lower; the maximum is 50.6796531% lower, with a
+  v0.2.5-to-v0.2.4 ratio of `0.493203469`. In the fixed set, 89/100 rows
+  improved and 78/100 improved by at least 10x. The run includes compensated
+  accumulation of log counts when computing per-gene geometric means for
+  ratio size factors.
+- Review staged files for accidental large artifacts or generated reference
+  outputs.
 
 Before any release:
 
@@ -25,11 +40,19 @@ cargo test --workspace
 cargo package -p rsdeseq2 --locked
 scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
 Rscript scripts/generate_deseq2_references.R
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 scripts/score_frozen_worst_genes.py \
+  --fixture docs/data/wald_frozen_worst100_r461.tsv \
+  --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
+  --report-only
 ```
 
 The DESeq2 reference-generation script requires an R environment with
 Bioconductor DESeq2 installed. Generated references should be reviewed before
-they are committed.
+they are committed. The frozen scorer additionally requires the saved
+frozen-benchmark real-data diagnostics generated with a release binary and
+`--diagnostics-limit 69045`; see
+[reproducibility.md](reproducibility.md#versioned-high-error-benchmark).
 
 ## Crates.io Release
 

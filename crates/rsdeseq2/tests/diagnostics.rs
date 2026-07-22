@@ -80,12 +80,14 @@ fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
         diagnostics.disp_gene_iter.as_ref(),
         fit.disp_gene_iter.as_ref()
     );
-    assert!(diagnostics
-        .disp_gene_iter
-        .as_ref()
-        .unwrap()
-        .iter()
-        .all(|iterations| *iterations > 0));
+    assert!(
+        diagnostics
+            .disp_gene_iter
+            .as_ref()
+            .unwrap()
+            .iter()
+            .all(|iterations| *iterations > 0)
+    );
     assert_eq!(diagnostics.beta_conv, None);
     assert_eq!(diagnostics.deviance, None);
     assert_eq!(

@@ -129,6 +129,7 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
 
     let mut mean_options = irls_options;
     mean_options.min_mu = options.min_mu;
+    mean_options.r_optim_compat = false;
 
     for _ in 0..options.niter {
         let fit_genes = fitidx
@@ -442,15 +443,14 @@ pub fn moments_dispersion_estimates_with_normalization_factors(
             normalization_factors.n_rows(),
         ));
     }
-    if let Some(all_zero) = all_zero {
-        if all_zero.len() != base_mean.len() {
+    if let Some(all_zero) = all_zero
+        && all_zero.len() != base_mean.len() {
             return Err(invalid_dimensions(
                 "moments dispersion allZero",
                 base_mean.len(),
                 all_zero.len(),
             ));
         }
-    }
     let xim = normalization_factor_moments_xim(normalization_factors, all_zero)?;
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }

@@ -378,9 +378,11 @@ fn top_level_fit_with_results_accepts_coefficient_name() {
     assert_eq!(named_fit.wald, indexed_fit.wald);
     assert_wald_fit_state_matches(&named_fit, &indexed_fit, "named top-level Wald");
     assert_eq!(named_results, indexed_results);
-    assert!(builder
-        .fit_with_results_name(&counts, &design, "missing")
-        .is_err());
+    assert!(
+        builder
+            .fit_with_results_name(&counts, &design, "missing")
+            .is_err()
+    );
 }
 
 #[test]
@@ -3829,10 +3831,12 @@ fn top_level_results_contrast_request_canonicalizes_cleaned_sample_level_aliases
         &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
         Some(&ambiguous_levels),
     );
-    assert!(ambiguous
-        .unwrap_err()
-        .to_string()
-        .contains("denominator level 'A.cell' resolves ambiguously"));
+    assert!(
+        ambiguous
+            .unwrap_err()
+            .to_string()
+            .contains("denominator level 'A.cell' resolves ambiguously")
+    );
 }
 
 #[test]
@@ -3950,9 +3954,11 @@ fn top_level_formula_contrast_request_uses_formula_derived_factor_metadata() {
             None,
         )
         .unwrap_err();
-    assert!(missing_metadata
-        .to_string()
-        .contains("use wald_results_factor_level_contrast"));
+    assert!(
+        missing_metadata
+            .to_string()
+            .contains("use wald_results_factor_level_contrast")
+    );
     assert_eq!(
         formula_results.metadata.result_name.as_deref(),
         Some("factor.condition..levels...c..B....A..._A_vs_B")
@@ -4140,9 +4146,10 @@ fn top_level_results_character_contrast_request_requires_sample_levels() {
         )
         .unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("requires sample levels for contrastAllZero"));
+    assert!(
+        err.to_string()
+            .contains("requires sample levels for contrastAllZero")
+    );
 }
 
 #[test]
@@ -4733,19 +4740,22 @@ fn native_glm_mu_observation_weights_run_through_wald() {
         assert!(dispersion[gene].is_finite());
         assert!(dispersion[gene] > 0.0);
     }
-    assert!(fit
-        .wald
-        .as_ref()
-        .unwrap()
-        .pvalue
-        .iter()
-        .skip(1)
-        .any(|pvalue| pvalue.is_some_and(f64::is_finite)));
-    assert!(results
-        .rows
-        .iter()
-        .skip(1)
-        .any(|row| row.pvalue.is_some_and(f64::is_finite)));
+    assert!(
+        fit.wald
+            .as_ref()
+            .unwrap()
+            .pvalue
+            .iter()
+            .skip(1)
+            .any(|pvalue| pvalue.is_some_and(f64::is_finite))
+    );
+    assert!(
+        results
+            .rows
+            .iter()
+            .skip(1)
+            .any(|row| row.pvalue.is_some_and(f64::is_finite))
+    );
 }
 
 #[test]
@@ -5183,9 +5193,11 @@ fn native_linear_mu_generic_pipeline_accepts_local_and_rejects_glm_gam_poi() {
         .fit_type(FitType::GlmGamPoi)
         .fit_wald_linear_mu(&counts, &design, 1)
         .unwrap_err();
-    assert!(glm_gam_poi_err
-        .to_string()
-        .contains("glmGamPoi dispersion trend"));
+    assert!(
+        glm_gam_poi_err
+            .to_string()
+            .contains("glmGamPoi dispersion trend")
+    );
 }
 
 #[test]
@@ -5393,9 +5405,10 @@ fn fitted_rlog_requires_map_dispersions_and_matching_counts() {
         .fit_dispersion_trend_glm_mu(&counts, &design)
         .unwrap();
     let err = fit.rlog(&counts).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("final dispersions are required before rlog"));
+    assert!(
+        err.to_string()
+            .contains("final dispersions are required before rlog")
+    );
 
     let wrong_counts = CountMatrix::from_row_major_u32(1, counts.n_samples(), vec![1; 8]).unwrap();
     assert!(fit.rlog(&wrong_counts).is_err());
@@ -5415,18 +5428,21 @@ fn fitted_frozen_rlog_requires_final_dispersions_and_matching_inputs() {
     let err = fit
         .frozen_rlog(&counts, &frozen_intercept, 1.0)
         .unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("final dispersions are required before frozen rlog"));
+    assert!(
+        err.to_string()
+            .contains("final dispersions are required before frozen rlog")
+    );
 
     let map_fit = glm_mu_native_wald_builder()
         .fit_type(FitType::Mean)
         .fit_map_dispersions_glm_mu(&counts, &design)
         .unwrap();
     assert!(map_fit.frozen_rlog(&counts, &[1.0; 2], 1.0).is_err());
-    assert!(map_fit
-        .frozen_rlog(&counts, &frozen_intercept, 0.0)
-        .is_err());
+    assert!(
+        map_fit
+            .frozen_rlog(&counts, &frozen_intercept, 0.0)
+            .is_err()
+    );
 }
 
 #[test]
@@ -5449,12 +5465,14 @@ fn fitted_rlog_expands_all_zero_rows_as_zero_transform_rows() {
     assert_eq!(output.transformed.n_cols(), counts.n_samples());
     assert_eq!(output.intercept.len(), counts.n_genes());
     assert_eq!(output.intercept[0], 0.0);
-    assert!(output
-        .transformed
-        .row(0)
-        .unwrap()
-        .iter()
-        .all(|value| *value == 0.0));
+    assert!(
+        output
+            .transformed
+            .row(0)
+            .unwrap()
+            .iter()
+            .all(|value| *value == 0.0)
+    );
     assert_eq!(
         output.sample_prior_variance,
         compact_output.sample_prior_variance
@@ -5492,12 +5510,14 @@ fn fitted_frozen_rlog_expands_all_zero_rows_with_frozen_intercepts() {
         .unwrap();
 
     assert_eq!(output.intercept, frozen_intercept);
-    assert!(output
-        .transformed
-        .row(0)
-        .unwrap()
-        .iter()
-        .all(|value| *value == frozen_intercept[0]));
+    assert!(
+        output
+            .transformed
+            .row(0)
+            .unwrap()
+            .iter()
+            .all(|value| *value == frozen_intercept[0])
+    );
     for compact_gene in 0..compact_counts.n_genes() {
         assert_eq!(
             output.transformed.row(compact_gene + 1).unwrap(),
@@ -5683,12 +5703,14 @@ fn builder_fits_glm_mu_dispersion_trend_on_fast_vst_subset() {
         subset_fit.dispersion_trend.as_ref(),
         Some(DispersionTrendFit::Mean(_))
     ));
-    assert!(subset_fit
-        .disp_fit
-        .as_ref()
-        .unwrap()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        subset_fit
+            .disp_fit
+            .as_ref()
+            .unwrap()
+            .iter()
+            .all(|value| value.is_finite())
+    );
 }
 
 #[test]
@@ -5719,11 +5741,13 @@ fn builder_fast_vst_glm_mu_applies_subset_trend_to_full_counts() {
     assert_eq!(metadata.trend_fit_cols, counts.n_samples());
     assert_eq!(metadata.trend_fit_type, Some("mean"));
     assert_eq!(output.transformed, expected);
-    assert!(output
-        .transformed
-        .as_slice()
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        output
+            .transformed
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+    );
 }
 
 #[test]
@@ -5880,12 +5904,14 @@ fn builder_auto_vst_uses_fast_subset_when_observation_weights_are_present() {
     assert_eq!(output.trend_fit, fast.subset_fit);
     assert!(output.trend_fit.dispersion_trend.is_some());
     assert!(output.trend_fit.observation_weights.is_some());
-    assert!(output
-        .fast_subset
-        .as_ref()
-        .unwrap()
-        .observation_weights
-        .is_some());
+    assert!(
+        output
+            .fast_subset
+            .as_ref()
+            .unwrap()
+            .observation_weights
+            .is_some()
+    );
     for (subset_row, original_row) in output
         .fast_subset
         .as_ref()
@@ -6036,9 +6062,11 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 0)
         .unwrap_err();
     assert!(matches!(invalid_nsub, DeseqError::InvalidOptions { .. }));
-    assert!(invalid_nsub
-        .to_string()
-        .contains("fast VST subset size must be positive"));
+    assert!(
+        invalid_nsub
+            .to_string()
+            .contains("fast VST subset size must be positive")
+    );
 
     let (subset_fit, subset) = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 4)

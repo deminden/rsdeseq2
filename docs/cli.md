@@ -183,7 +183,7 @@ and matching `--beta-prior-additive-sample-levels` TSV paths. The CLI builds
 the multi-factor expanded and reported designs internally, verifies the
 reported design matches `--design`, and uses the same coefficient, contrast,
 normalization-factor, and replacement-sidecar behavior.
-The CLI still does not parse formulas.
+The CLI accepts explicit design matrices and does not parse formulas.
 It also accepts thresholded p-values through
 `--lfc-threshold` and `--alternative`, with alternatives `greater-abs`,
 `greater-abs-upshot`, `greater-abs2014`, `less-abs`, `greater`, and `less`.
@@ -210,7 +210,7 @@ candidate replacement counts, and `--cooks-outlier-cells-output` for the
 logical outlier-cell assay. Replacement sidecars require Cook's cutoff to be
 enabled so the replacement/refit branch runs.
 Formula construction, wrapper metadata preservation, and unsupported fit types
-remain outside the CLI for now. The `lrt` command compares the full design
+are not exposed by the CLI. The `lrt` command compares the full design
 against the supplied reduced numeric design matrix.
 
 The `rlog` command fits the implemented GLM-mu dispersion/MAP stages, estimates

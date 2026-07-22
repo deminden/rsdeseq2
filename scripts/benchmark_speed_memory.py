@@ -8,12 +8,22 @@ import csv
 import gzip
 import math
 import random
+import shutil
 import statistics
 import subprocess
-import shutil
+import sys
 import tempfile
 import time
 from pathlib import Path
+
+
+R_PROVENANCE_FIELDS = (
+    "r_version",
+    "deseq2_version",
+    "r_platform",
+    "blas",
+    "lapack",
+)
 
 
 def parse_int_list(value: str) -> list[int]:
@@ -125,6 +135,53 @@ def run_timed(time_bin: str, command: list[str], cwd: Path, metrics_path: Path) 
     }
 
 
+def query_r_provenance(rscript: str) -> dict[str, str]:
+    """Query reproducibility metadata from the R used by the benchmark."""
+    expression = """
+info <- sessionInfo()
+clean <- function(value) {
+  if (is.null(value) || length(value) == 0L || is.na(value[[1L]])) return("")
+  gsub("[\\t\\r\\n]", " ", as.character(value[[1L]]))
+}
+values <- list(
+  r_version = R.version.string,
+  deseq2_version = if (requireNamespace("DESeq2", quietly = TRUE)) {
+    as.character(utils::packageVersion("DESeq2"))
+  } else "",
+  r_platform = R.version$platform,
+  blas = info$BLAS,
+  lapack = info$LAPACK
+)
+for (name in names(values)) cat(name, "\\t", clean(values[[name]]), "\\n", sep = "")
+"""
+    provenance = {field: "" for field in R_PROVENANCE_FIELDS}
+    try:
+        proc = subprocess.run(
+            [rscript, "--vanilla", "-e", expression],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        print(f"warning: could not query R provenance: {error}", file=sys.stderr)
+        return provenance
+
+    if proc.returncode != 0:
+        detail = proc.stderr.strip().replace("\n", " ")[:300]
+        print(
+            f"warning: could not query R provenance (exit {proc.returncode}): {detail}",
+            file=sys.stderr,
+        )
+        return provenance
+
+    for line in proc.stdout.splitlines():
+        field, separator, value = line.partition("\t")
+        if separator and field in provenance:
+            provenance[field] = value
+    return provenance
+
+
 def read_numeric_output(path: Path) -> list[float]:
     values = []
     with path.open(newline="") as handle:
@@ -192,6 +249,7 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
         "returncode",
         "stderr",
         "command",
+        *R_PROVENANCE_FIELDS,
     ]
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
@@ -228,6 +286,7 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
         "max_max_rss_kb",
         "mad_max_rss_kb",
         "max_abs_diff_vs_deseq2",
+        *R_PROVENANCE_FIELDS,
     ]
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
@@ -258,6 +317,10 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
                     "max_max_rss_kb": max_or_blank(rss_values),
                     "mad_max_rss_kb": mad_or_blank(rss_values),
                     "max_abs_diff_vs_deseq2": median_or_blank(diff_values),
+                    **{
+                        field: group_rows[0].get(field, "")
+                        for field in R_PROVENANCE_FIELDS
+                    },
                 }
             )
 
@@ -295,6 +358,7 @@ def main() -> None:
 
     binary = repo / "target" / "release" / "rsdeseq2"
     deseq2_script = repo / "scripts" / "benchmark_deseq2.R"
+    r_provenance = query_r_provenance(args.rscript)
     rows: list[dict[str, object]] = []
 
     with tempfile.TemporaryDirectory(prefix="rsdeseq2-bench-") as tmp:
@@ -378,6 +442,7 @@ def main() -> None:
                                 "returncode": result["returncode"],
                                 "stderr": result["stderr"],
                                 "command": result["command"],
+                                **r_provenance,
                             }
                         )
 

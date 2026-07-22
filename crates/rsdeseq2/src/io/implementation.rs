@@ -1,4 +1,4 @@
-//! Private implementation for the stable public module surface.
+//! Private implementation behind the stable public module API.
 //!
 //! The source is split by workflow so the public module can stay small
 //! while preserving existing paths through re-exports.
