@@ -171,9 +171,7 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                     sample,
                     "Cox-Reid weighted design xtwx",
                 )?;
-                if left_idx != right_idx {
-                    xtwx[(right_idx, left_idx)] = xtwx[(left_idx, right_idx)];
-                }
+
                 if let Some(d_xtwx) = &mut d_xtwx {
                     checked_matrix_add_assign(
                         &mut d_xtwx[(left_idx, right_idx)],
@@ -186,9 +184,6 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                         sample,
                         "Cox-Reid weighted design derivative",
                     )?;
-                    if left_idx != right_idx {
-                        d_xtwx[(right_idx, left_idx)] = d_xtwx[(left_idx, right_idx)];
-                    }
                 }
                 if let Some(d2_xtwx) = &mut d2_xtwx {
                     checked_matrix_add_assign(
@@ -202,10 +197,19 @@ fn cox_reid_weighted_design_matrices_with_threshold(
                         sample,
                         "Cox-Reid weighted design second derivative",
                     )?;
-                    if left_idx != right_idx {
-                        d2_xtwx[(right_idx, left_idx)] = d2_xtwx[(left_idx, right_idx)];
-                    }
                 }
+            }
+        }
+    }
+    // Lower-triangle entries are read only after the sample reductions.
+    for left in 0..p {
+        for right in (left + 1)..p {
+            xtwx[(right, left)] = xtwx[(left, right)];
+            if let Some(matrix) = &mut d_xtwx {
+                matrix[(right, left)] = matrix[(left, right)];
+            }
+            if let Some(matrix) = &mut d2_xtwx {
+                matrix[(right, left)] = matrix[(left, right)];
             }
         }
     }
@@ -310,11 +314,13 @@ fn cox_reid_adjustment_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    let d_xtwx = matrices.d_xtwx.ok_or(DeseqError::InvalidDimensions {
-        context: "Cox-Reid weighted design derivative".to_string(),
-        expected: design.n_coefficients(),
-        actual: 0,
-    })?;
+    let d_xtwx = matrices
+        .d_xtwx
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "Cox-Reid weighted design derivative".to_string(),
+            expected: design.n_coefficients(),
+            actual: 0,
+        })?;
     Ok(-0.5 * trace_product(&inverse, &d_xtwx)? * alpha)
 }
 
@@ -369,16 +375,20 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
             actual: 0,
         });
     };
-    let d_xtwx = matrices.d_xtwx.ok_or(DeseqError::InvalidDimensions {
-        context: "Cox-Reid weighted design derivative".to_string(),
-        expected: design.n_coefficients(),
-        actual: 0,
-    })?;
-    let d2_xtwx = matrices.d2_xtwx.ok_or(DeseqError::InvalidDimensions {
-        context: "Cox-Reid weighted design second derivative".to_string(),
-        expected: design.n_coefficients(),
-        actual: 0,
-    })?;
+    let d_xtwx = matrices
+        .d_xtwx
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "Cox-Reid weighted design derivative".to_string(),
+            expected: design.n_coefficients(),
+            actual: 0,
+        })?;
+    let d2_xtwx = matrices
+        .d2_xtwx
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "Cox-Reid weighted design second derivative".to_string(),
+            expected: design.n_coefficients(),
+            actual: 0,
+        })?;
     let second_trace_product = &inverse * &d_xtwx * &inverse * &d_xtwx;
     let second_trace = checked_sum_indexed(
         second_trace_product.diagonal().iter().copied(),
