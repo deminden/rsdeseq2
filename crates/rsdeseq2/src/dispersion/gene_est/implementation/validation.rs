@@ -299,6 +299,7 @@ fn validate_normalization_factor(value: f64, index: usize) -> Result<(), DeseqEr
     Ok(())
 }
 
+#[inline(always)]
 fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
     if !mu.is_finite() || mu <= 0.0 {
         return Err(DeseqError::NonFiniteValue {
@@ -310,6 +311,7 @@ fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
     Ok(())
 }
 
+#[inline(always)]
 fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left * right;
     if value.is_finite() {
@@ -323,6 +325,7 @@ fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     }
 }
 
+#[inline(always)]
 fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left + right;
     if value.is_finite() {
@@ -336,6 +339,7 @@ fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     }
 }
 
+#[inline(always)]
 fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left - right;
     if value.is_finite() {
@@ -349,6 +353,7 @@ fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     }
 }
 
+#[inline(always)]
 fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let value = left / right;
     if left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite() {
@@ -362,6 +367,7 @@ fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64
     }
 }
 
+#[inline(always)]
 fn checked_matrix_add_assign(
     sum: &mut f64,
     term: f64,
@@ -410,6 +416,7 @@ fn mu_alpha_terms(
     mu_alpha_terms_impl::<true>(mu, alpha, index, context)
 }
 
+#[inline(always)]
 fn mu_alpha_terms_impl<const NEED_LOG: bool>(
     mu: f64,
     alpha: f64,
@@ -429,13 +436,8 @@ fn mu_alpha_terms_impl<const NEED_LOG: bool>(
             context,
             "inverse denominator square",
         )?;
-        let ratio_squared = checked_mu_alpha_product(
-            ratio,
-            ratio,
-            index,
-            context,
-            "mean-dispersion ratio square",
-        )?;
+        let ratio_squared =
+            checked_mu_alpha_product(ratio, ratio, index, context, "mean-dispersion ratio square")?;
         let mu_squared_alpha_over_one_plus_squared = checked_mu_alpha_product(
             ratio_squared,
             alpha.recip(),
@@ -480,6 +482,7 @@ fn mu_alpha_terms_impl<const NEED_LOG: bool>(
     Ok(terms)
 }
 
+#[inline(always)]
 fn checked_mu_alpha_product(
     left: f64,
     right: f64,
@@ -506,6 +509,7 @@ struct CoxReidWeightTerms {
     d2_weight: f64,
 }
 
+#[inline(always)]
 fn cox_reid_weight_terms(
     mu: f64,
     alpha: f64,
