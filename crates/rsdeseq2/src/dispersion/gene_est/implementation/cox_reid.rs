@@ -135,16 +135,19 @@ fn cox_reid_weighted_design_matrices_with_threshold(
     let mut d2_xtwx = order
         .needs_second_derivative()
         .then(|| DMatrix::<f64>::zeros(p, p));
+    let mut active_columns = Vec::with_capacity(p);
     for sample in selected_samples {
         let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
         let row = design.matrix().row(sample)?;
-        let active_columns = selected_columns
-            .iter()
-            .copied()
-            .enumerate()
-            .filter_map(|(idx, col)| (row[col] != 0.0).then_some((idx, row[col])))
-            .collect::<Vec<_>>();
+        active_columns.clear();
+        active_columns.extend(
+            selected_columns
+                .iter()
+                .copied()
+                .enumerate()
+                .filter_map(|(idx, col)| (row[col] != 0.0).then_some((idx, row[col]))),
+        );
         if active_columns.is_empty() {
             continue;
         }
