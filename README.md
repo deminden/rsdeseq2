@@ -6,7 +6,7 @@
 [![API documentation](https://img.shields.io/docsrs/rsdeseq2)](https://docs.rs/rsdeseq2)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`rsdeseq2` independently implements selected DESeq2-compatible count-data
+`rsdeseq2` independently implements DESeq2-compatible count-data
 workflows in Rust: normalization, dispersion estimation, negative-binomial
 Wald and likelihood-ratio tests, transformations, and result assembly. The
 Rust crate and CLI require neither R nor DESeq2 at runtime.
@@ -20,7 +20,7 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | --- | --- | --- |
 | [CLI](docs/cli.md) | File-based normalization, Wald/LRT, VST, and rlog workflows | Explicit numeric TSV inputs; no R formula parser |
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
-| [R package](r-pkg/rsdeseq2/README.md) | Selected primitive helpers and native bridges | Does not fit complete `DESeqDataSet` workflows |
+| [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
 
 ## Install and Run
 
@@ -116,60 +116,32 @@ estimateSizeFactorsRust(counts, native = TRUE)
 | Ratio and `poscounts` normalization | Supported | Includes supplied geometric means, control genes, normalized counts, base metadata, and normalization-factor offsets |
 | Wald and LRT result workflows | Supported for documented paths | Supplied-dispersion GLMs and implemented native-dispersion branches; coefficient, list, and numeric contrasts; Normal and t tails |
 | Diagnostics and result assembly | Supported for documented paths | Cook's diagnostics and replacement/refitting, independent filtering, adjusted p-values, and result metadata |
-| Transformations and priors | Partly supported | Beta-prior refits, supported formula/model-frame workflows, `normTransform`, VST, and rlog building blocks |
-| R package | Limited | Primitive helpers and selected native bridges; no complete `DESeqDataSet` fitting |
-| Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, `lfcShrink`, plotting, arbitrary R expressions, or full object-mutation and metadata semantics |
+| Transformations and priors | Supported for documented paths | Mean, parametric, and local VST; rlog; normal, `ashr`, and `apeglm` shrinkage; selected formula/model-frame workflows. Formula interactions and some transformed-factor contrast forms are unsupported |
+| R package | Partial | Matrix, list, and limited `DESeqDataSet` Wald/LRT fits; dataset transforms return Bioconductor transform objects and selected `lfcShrink` methods return `DESeqResults`. Full diagnostic and refit semantics are not implemented |
+| Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, plotting, arbitrary R expressions, or complete object-mutation and metadata semantics |
 
 The public Rust API is pre-1.0 and can change between minor releases. See the
 [compatibility matrix](docs/compatibility.md) and
 [DESeq2 gap analysis](docs/deseq2-gap-analysis.md) for feature-level detail.
 
-## Measured Validation
+## Validation
 
-Measurements recorded on 2026-07-22 compare a release-mode rsdeseq2 0.2.5
-binary with saved R 4.6.1 / DESeq2 1.52.0 outputs unless stated otherwise.
+Automated tests compare Rust stages with saved DESeq2 references for
+normalization, dispersion trends, GLM fitting, Wald/LRT results, and
+transformations. The real-data Wald test runs all 56,200 GTEx v8 genes across
+61 Kidney Cortex samples and compares Rust outputs with DESeq2 1.52.0. For the
+48,683 rows with finite Wald results, maximum absolute differences are
+`2.386e-7` for log2 fold change, `4.140e-10` for standard error, `3.734e-7`
+for the statistic, and `4.955e-8` for the p-value; size factors differ by at
+most `5.551e-15` relative. R integration tests also check `DESeqDataSet` fits,
+seeded full/fast VST and rlog workflows, and supported `lfcShrink()` methods.
+These tests establish behavior for their documented inputs, not complete
+DESeq2 workflow parity. See the [real-data fixture notes](crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md)
+for provenance and reproduction.
 
-- **Broad real-data Wald checks:** four full-blocked contrasts across three
-  tissues covered 278,257 result rows with zero missing-row or finite/NA-pattern
-  mismatches. Maximum absolute Wald-statistic errors by contrast were
-  `1.526e-3`, `1.768e-3`, `5.615e-5`, and `2.803e-4`.
-- **Frozen high-error regression set:** for 100 rows selected by the largest
-  rsdeseq2 0.2.4 errors, the measured 0.2.5 median, mean, and maximum selected
-  result-column absolute errors were `6.063612945084174e-10`,
-  `1.260818774570247e-4`, and `1.5259081158007781e-3`. The 0.2.4 measurements
-  were `1.4637657972313423e-4`, `3.793917566690452e-4`, and
-  `3.0938714191082184e-3`: the 0.2.5 values were 241401.589x, 3.00909032x, and
-  50.6796531% lower. Of the 100 rows, 89 improved and 78 improved by at least
-  10x. This selected set is a regression stress test, not a distribution-wide
-  accuracy estimate.
-- **Normalization sweep:** 17 tissues and 8,731 samples covered 612,699,575
-  normalized-count values with zero finite/NA mismatches. The measured maximum
-  absolute difference was `1.937e-7`, and the maximum relative difference was
-  `9.887e-15`.
-- **Optimizer isolation:** replaying 512 bounded negative-binomial objectives
-  with `rcompat-lbfgsb` 0.2.1 produced 512/512 exact endpoints, objective
-  values, and evaluation counts. The 0.1.6 measurements were 0/512 exact
-  endpoint-plus-objective matches and 311/512 exact evaluation counts.
-- **Primitive process benchmark:** for matched size-factor and base-mean CLI
-  stages over 10,000/50,000 genes and 16 samples, rsdeseq2 measured
-  `0.010–0.140 s` and `6.01–16.54 MiB`; DESeq2 measured `3.865–4.625 s` and
-  `601.64–638.58 MiB`. The measured ratios were 33.04x–386.5x lower elapsed
-  time and 38.62x–100.05x lower peak RSS.
-
-The 0.2.5 precision work did not establish a release-to-release performance
-gain. In the controlled two-run heart replay, the measured elapsed medians for
-size factors, normalized counts, and base mean were `2.108 s`, `14.317 s`, and
-`2.107 s`; the 0.2.4 measurements were `2.090 s`, `14.477 s`, and `2.099 s`.
-The relative changes were +0.87%, -1.11%, and +0.39%, within the observed
-run-to-run variation. The larger speed and memory ratios above apply only to
-the explicitly matched primitive stages, not to a complete `DESeq()` workflow.
-
-Ratio size-factor estimation uses compensated accumulation of log counts
-before downstream fitting. Rare optimizer fallback rows use independently
-implemented R-compatible arithmetic and a reference-independent stability
-check. Full measurements, interpretation, fixtures, and commands are in
-[Benchmarks](docs/benchmarks.md), [Algorithms](docs/algorithms.md), and
-[Reproducibility](docs/reproducibility.md).
+See [Benchmarks](docs/benchmarks.md), [Compatibility](docs/compatibility.md),
+and [Reproducibility](docs/reproducibility.md) for fixture definitions,
+commands, and detailed results.
 
 ## Documentation
 

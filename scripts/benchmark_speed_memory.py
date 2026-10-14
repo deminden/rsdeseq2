@@ -7,6 +7,7 @@ import argparse
 import csv
 import gzip
 import math
+import platform
 import random
 import shutil
 import statistics
@@ -107,13 +108,18 @@ def parse_time_metrics(path: Path) -> tuple[float | None, int | None]:
             elapsed = parse_elapsed_seconds(value)
         elif line.startswith("Maximum resident set size"):
             max_rss = int(line.rsplit(":", 1)[1].strip())
+        elif line.startswith("real "):
+            elapsed = parse_elapsed_seconds(line.split(maxsplit=1)[1])
+        elif line.endswith("maximum resident set size"):
+            max_rss = round(int(line.split()[0]) / 1024)
     return elapsed, max_rss
 
 
 def run_timed(time_bin: str, command: list[str], cwd: Path, metrics_path: Path) -> dict[str, object]:
     started = time.perf_counter()
+    time_args = ["-l"] if platform.system() == "Darwin" and Path(time_bin).name == "time" else ["-v"]
     proc = subprocess.run(
-        [time_bin, "-v", "-o", str(metrics_path), *command],
+        [time_bin, *time_args, "-o", str(metrics_path), *command],
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

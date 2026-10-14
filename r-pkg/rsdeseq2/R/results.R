@@ -14,6 +14,61 @@ results <- function(object,
     altHypothesis,
     c("greaterAbs", "lessAbs", "greater", "less", "greaterAbs2014", "greaterAbsUPSHOT")
   )
+  if (inherits(object, "DESeqDataSet")) {
+    fit <- S4Vectors::metadata(object)$rsdeseq2RustFit
+    if (is.null(fit)) {
+      stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling results()", call. = FALSE)
+    }
+    return(results(
+      object = fit,
+      contrast = contrast,
+      name = name,
+      listValues = listValues,
+      reference = reference,
+      lfcThreshold = lfcThreshold,
+      altHypothesis = altHypothesis,
+      useT = useT,
+      degreesOfFreedom = degreesOfFreedom,
+      alpha = alpha,
+      independentFiltering = independentFiltering,
+      ...
+    ))
+  }
+  if (inherits(object, "rsdeseq2RustFit")) {
+    if (is.null(contrast) && is.null(name) &&
+        identical(as.numeric(lfcThreshold), 0) && identical(altHypothesis, "greaterAbs")) {
+      out <- object$results
+      if (!isTRUE(independentFiltering)) {
+        out$padj <- stats::p.adjust(out$pvalue, method = "BH")
+        out$filtered <- NULL
+      } else if (!identical(as.numeric(alpha), 0.1)) {
+        out <- applyIndependentFilteringRust(out, alpha = alpha)
+      }
+      if (identical(object$test, "Wald")) {
+        attr(out, "resultName") <- utils::tail(object$resultsNames, 1L)
+      }
+      attr(out, "test") <- object$test
+      return(out)
+    }
+    primitive <- if (identical(object$test, "LRT")) {
+      nbinomLRTRust(object = object)
+    } else {
+      nbinomWaldTestRust(object = object)
+    }
+    return(results(
+      object = primitive,
+      contrast = contrast,
+      name = name,
+      listValues = listValues,
+      reference = reference,
+      lfcThreshold = lfcThreshold,
+      altHypothesis = altHypothesis,
+      useT = useT,
+      degreesOfFreedom = degreesOfFreedom,
+      alpha = alpha,
+      independentFiltering = independentFiltering
+    ))
+  }
   if (inherits(object, "rsdeseq2PrimitiveWaldFit")) {
     return(.rsdeseq2_results_primitive_wald_fit(
       object = object,
@@ -219,6 +274,10 @@ resolveResultsContrastRust <- function(contrast,
 }
 
 resultsNamesRust <- function(object) {
+  if (inherits(object, "DESeqDataSet")) {
+    fit <- S4Vectors::metadata(object)$rsdeseq2RustFit
+    if (!is.null(fit)) return(.rsdeseq2_validate_results_names(fit$resultsNames))
+  }
   if (inherits(object, c("rsdeseq2PrimitiveWaldFit", "rsdeseq2PrimitiveLrtFit"))) {
     return(.rsdeseq2_validate_results_names(object$resultsNames))
   }
@@ -298,7 +357,8 @@ resultsNames <- function(object, ...) {
     factorLevels = .rsdeseq2_object_field(object, "factorLevels") %||%
       .rsdeseq2_factor_levels_from_col_data(colData),
     factorReferences = .rsdeseq2_object_field(object, "factorReferences"),
-    modelMatrix = .rsdeseq2_object_field(object, "modelMatrix"),
+    modelMatrix = .rsdeseq2_object_field(object, "modelMatrix") %||%
+      .rsdeseq2_object_field(object, "design"),
     rowNames = .rsdeseq2_object_field(object, "rowNames") %||%
       rownames(beta) %||%
       rownames(mcols)
@@ -887,7 +947,7 @@ applyCooksCutoffRust <- function(pvalue,
                                  counts = NULL,
                                  cooks = NULL,
                                  lowCountHeuristic = FALSE,
-                                 native = FALSE) {
+                                 native = TRUE) {
   pvalue <- .rsdeseq2_validate_pvalues(pvalue)
   maxCooks <- .rsdeseq2_validate_optional_numeric_vector(maxCooks, length(pvalue), "maxCooks")
   maxCooks <- .rsdeseq2_align_named_gene_vector(maxCooks, names(pvalue), "maxCooks")
@@ -910,31 +970,20 @@ applyCooksCutoffRust <- function(pvalue,
     cooks <- NULL
   }
 
-  if (isTRUE(native)) {
-    nativeMasked <- .rsdeseq2_try_native_cooks_cutoff(
-      pvalue = pvalue,
-      maxCooks = maxCooks,
-      cooksCutoff = cooksCutoff,
-      counts = counts,
-      cooks = cooks,
-      lowCountHeuristic = lowCountHeuristic
-    )
-    if (!is.null(nativeMasked)) {
-      return(.rsdeseq2_cooks_cutoff_output(
-        nativeMasked$pvalue,
-        maxCooks,
-        nativeMasked$cooksOutlier
-      ))
-    }
-  }
-
-  .rsdeseq2_apply_cooks_cutoff_fallback(
-    pvalue = pvalue,
-    maxCooks = maxCooks,
-    cooksCutoff = cooksCutoff,
-    counts = counts,
-    cooks = cooks,
-    lowCountHeuristic = lowCountHeuristic
+  nativeMasked <- .Call(
+    "rsdeseq2_apply_cooks_cutoff",
+    pvalue,
+    maxCooks,
+    cooksCutoff,
+    counts,
+    cooks,
+    isTRUE(lowCountHeuristic),
+    PACKAGE = "rsdeseq2"
+  )
+  .rsdeseq2_cooks_cutoff_output(
+    nativeMasked$pvalue,
+    maxCooks,
+    nativeMasked$cooksOutlier
   )
 }
 
@@ -2213,51 +2262,4 @@ applyCooksCutoffRust <- function(pvalue,
 .rsdeseq2_weighted_name_list <- function(names, weight) {
   prefix <- if (identical(unname(weight), 1)) "" else sprintf("%s ", format(weight, trim = TRUE, scientific = FALSE))
   paste0(prefix, paste(names, collapse = " + "))
-}
-
-.rsdeseq2_apply_cooks_cutoff_fallback <- function(pvalue,
-                                                  maxCooks,
-                                                  cooksCutoff,
-                                                  counts,
-                                                  cooks,
-                                                  lowCountHeuristic) {
-  cooksOutlier <- ifelse(is.na(maxCooks), NA, maxCooks > cooksCutoff)
-  if (isTRUE(lowCountHeuristic)) {
-    for (gene in which(cooksOutlier %in% TRUE)) {
-      if (.rsdeseq2_low_count_cooks_spares_row(counts[gene, ], cooks[gene, ])) {
-        cooksOutlier[gene] <- FALSE
-      }
-    }
-  }
-
-  masked <- pvalue
-  masked[which(cooksOutlier %in% TRUE)] <- NA_real_
-  .rsdeseq2_cooks_cutoff_output(masked, maxCooks, cooksOutlier)
-}
-
-.rsdeseq2_try_native_cooks_cutoff <- function(pvalue,
-                                              maxCooks,
-                                              cooksCutoff,
-                                              counts,
-                                              cooks,
-                                              lowCountHeuristic) {
-  args <- list(
-    pvalue,
-    maxCooks,
-    cooksCutoff,
-    counts %||% NULL,
-    cooks %||% NULL,
-    as.logical(lowCountHeuristic)
-  )
-  out <- tryCatch(
-    do.call(.Call, c(list("rsdeseq2_apply_cooks_cutoff", PACKAGE = "rsdeseq2"), args)),
-    error = function(error) NULL
-  )
-  if (!is.null(out)) {
-    return(out)
-  }
-  tryCatch(
-    do.call(.Call, c(list("rsdeseq2_apply_cooks_cutoff"), args)),
-    error = function(error) NULL
-  )
 }

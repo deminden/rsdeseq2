@@ -1,0 +1,20 @@
+{
+  "source": "GTEx Analysis V8 gene read counts; exact Kidney - Cortex sample IDs shared with the neighboring L-BFGS-B fixture",
+  "source_url": "https://storage.googleapis.com/adult-gtex/bulk-gex/v8/rna-seq/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz",
+  "sample_annotations_url": "https://storage.googleapis.com/adult-gtex/annotations/v8/metadata-files/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt",
+  "source_sha256": "148ab1c84609608a00772b0e1431a1f87d5bf40b63071997510181d0a684a110",
+  "genes": 56200,
+  "samples": 61,
+  "tissue": "Kidney - Cortex",
+  "design": "~ perm_block + condition (captured as a numeric model matrix)",
+  "reference": {
+    "R": "R version 4.6.1 (2026-06-24)",
+    "DESeq2": "1.52.0",
+    "Bioconductor": "3.23",
+    "coefficient": "conditionB",
+    "fitType": "parametric",
+    "betaPrior": false,
+    "minReplicatesForReplace": "Inf",
+    "rows_with_finite_dispersion": 48683
+  }
+}

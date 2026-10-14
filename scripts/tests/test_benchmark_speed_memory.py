@@ -87,5 +87,24 @@ class RProvenanceTests(unittest.TestCase):
             self.assertEqual(summary_row[field], "")
 
 
+class TimingMetricsTests(unittest.TestCase):
+    def test_parses_gnu_time_verbose_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            metrics = Path(directory) / "time.txt"
+            metrics.write_text(
+                "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.25\n"
+                "Maximum resident set size (kbytes): 2048\n"
+            )
+
+            self.assertEqual(BENCHMARK.parse_time_metrics(metrics), (1.25, 2048))
+
+    def test_parses_macos_time_long_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            metrics = Path(directory) / "time.txt"
+            metrics.write_text("real 0:01.25\n  2097152  maximum resident set size\n")
+
+            self.assertEqual(BENCHMARK.parse_time_metrics(metrics), (1.25, 2048))
+
+
 if __name__ == "__main__":
     unittest.main()

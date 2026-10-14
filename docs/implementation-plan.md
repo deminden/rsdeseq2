@@ -56,9 +56,11 @@ line by line.
 - [x] Add primitive result-table column schema helpers for Rust APIs.
 - [x] Remove the obsolete Python wrapper scaffold from the repository.
 - [x] Restore the R package access layer and package CI.
-- [ ] Mature the R package wrapper after core parity improves. Mature wrapper
-  paths must call the Rust implementation and must not fall back to
-  R/Bioconductor DESeq2 for runtime computation.
+- [x] Expose documented matrix, list, and limited `DESeqDataSet` Wald/LRT
+  workflows through the R package, with Rust handling statistical computation
+  and unsupported arguments rejected explicitly.
+- [ ] Complete the R wrapper's DESeq2 object, diagnostic, and option coverage
+  without adding a DESeq2 runtime-computation fallback.
 - [x] Generate and commit small DESeq2 reference outputs when the R environment
   has Bioconductor DESeq2 installed.
 
@@ -598,8 +600,10 @@ line by line.
   linear-mu and GLM-mu branches.
 - [ ] Generalize the native Wald pipeline to DESeq2's full dispersion and GLM
   fitting behavior.
-- [ ] Keep mature R wrapper workflow exposure deferred until the Rust pipeline
-  is complete enough to expose without DESeq2 runtime fallback.
+- [x] Expose the implemented Rust dispersion and fitting pipeline through the
+  R package without a DESeq2 runtime fallback.
+- [ ] Expand wrapper coverage as Rust parity and object-level diagnostics are
+  implemented.
 
 ## Phase 5: Results Compatibility
 
@@ -931,9 +935,13 @@ line by line.
   labels for parametric, local, and mean dispersion trends.
 - [x] Blind automatic GLM-mu VST helper using a named intercept-only design,
   matching the implemented part of DESeq2's `blind=TRUE` transform shape.
-- [ ] Full VST with automatic trend estimation, frozen dispersion-function
-  reuse, fast-subset trend fitting, exact local `splinefun` parity, and object
-  metadata.
+- [x] Full VST with automatic trend estimation, frozen parametric/mean
+  dispersion-function reuse, fast-subset trend fitting, and transform metadata.
+- [x] Reuse a frozen local dispersion-function closure by evaluating it on
+  DESeq2's 999-point grid and applying local VST integration in Rust.
+- [x] Reuse stored `dispFit` values for design-aware dataset `rlog()` when
+  `blind=FALSE`, matching DESeq2's fitted-dataset route.
+- [ ] Add broader frozen-trend and local-VST edge-case parity tests.
 - [x] Low-level rlog sample-effect ridge-GLM primitive with explicit
   dispersions and sample-effect prior variance.
 - [x] Low-level rlog sample-effect prior variance estimation from normalized
@@ -947,16 +955,16 @@ line by line.
 - [x] Low-level frozen-intercept rlog helpers that reuse supplied log2
   intercepts as gene-specific offsets and refit sample effects with size-factor
   or normalization-factor offsets.
-- [x] Fit-state rlog dispatch from stored `baseMean`, `dispFit`, final
-  dispersions, and size-factor or normalization-factor offsets.
-- [x] Fit-state frozen-intercept rlog dispatch from stored final dispersions
+- [x] Fit-state rlog dispatch using stored `dispFit` values and size-factor or
+  normalization-factor offsets, matching DESeq2's `rlogData` dispersion input.
+- [x] Fit-state frozen-intercept rlog dispatch using stored trend dispersions
   and offsets, including all-zero row re-expansion with supplied intercepts.
 - [x] Fit-state and builder-level rlog all-zero row handling: fit compact
   nonzero rows and re-expand all-zero rows as zero transform rows.
 - [x] Rlog output metadata with transformed shape, fitted intercept count,
   estimated sample-effect prior variance, and offset-mode label.
-- [x] Builder-level `rlog_glm_mu` and `blind_rlog_glm_mu` helpers that compose
-  the implemented GLM-mu MAP dispersion path with fit-state rlog.
+- [x] Builder-level `rlog_glm_mu` and `blind_rlog_glm_mu` helpers that fit
+  GLM-mu gene-wise dispersions and their trend before fit-state rlog.
 - [x] Builder-level frozen-rlog reuse helpers for design-aware and blind GLM-mu
   workflows, retaining the learned source rlog, frozen transform, fit state,
   design mode, and trend-fit metadata.
@@ -965,10 +973,32 @@ line by line.
 - [x] Native CLI `rlog` command for blind, design-aware, and frozen-intercept
   GLM-mu MAP dispersion workflows with size-factor or normalization-factor
   offsets.
-- [ ] Full high-level rlog object dispatch using frozen-intercept reuse and
-  complete object metadata.
-- [ ] Mature R package wrapper backed only by Rust, with no fallback to
+- [x] Dataset-based R `vst()`, full-data
+  `varianceStabilizingTransformation()`, and `rlog()` workflows returning
+  `DESeqTransform`, including frozen-intercept rlog reuse and transform
+  metadata.
+- [x] Match DESeq2 fast `vst()` subset selection for weighted datasets and
+  error when fewer than `nsub` eligible genes are available.
+- [x] Rust-backed normal `lfcShrink()` for a named or indexed Wald coefficient
+  on an `rsdeseq2::DESeq()`-fitted dataset, returning `DESeqResults` with beta
+  prior metadata.
+- [x] Rust-backed normal `lfcShrink()` for additive-formula factor-level
+  contrasts using DESeq2-style expanded models and factor-level prior averaging.
+- [x] Rust-backed normal `lfcShrink()` for numeric expanded-design and list
+  contrasts, including supplied-result handling.
+- [x] Match DESeq2's explicit rejection of normal shrinkage with formula
+  interactions.
+- [x] Accept DESeq2-cleaned coefficient-name aliases for normal shrinkage on
+  transformed factors, and match DESeq2's rejection of factor-level contrast
+  syntax when the transformed design does not expose that contrast name.
+- [x] Add optional `ashr` shrinkage for fitted datasets, including posterior
+  means/SDs, s-values, thresholded false-sign-or-small s-values, pass-through
+  ash options, and prior metadata.
+- [x] Add optional `apeglm` shrinkage for named/indexed Wald coefficients,
+  posterior SDs, s-values and thresholded FSOS s-values.
+- [x] Implement documented Rust-backed R fitting paths without fallback to
   R/Bioconductor DESeq2.
+- [ ] Complete broader R/Bioconductor object integration and diagnostics.
 - [ ] Mature CLI.
 
 ## Engineering Rules

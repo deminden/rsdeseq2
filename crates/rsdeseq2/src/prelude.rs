@@ -217,8 +217,8 @@ pub use crate::transform::{
     rlog_frozen_with_size_factors, rlog_sample_design, rlog_sample_effect_design,
     rlog_sample_effect_prior_variance, rlog_with_estimated_prior_and_normalization_factors,
     rlog_with_estimated_prior_and_size_factors, rlog_with_normalization_factors,
-    rlog_with_size_factors, vst, vst_local, vst_mean, vst_mean_value, vst_parametric,
-    vst_parametric_value, vst_with_dispersion_trend,
+    rlog_with_size_factors, vst, vst_local, vst_local_from_dispersion_grid, vst_mean,
+    vst_mean_value, vst_parametric, vst_parametric_value, vst_with_dispersion_trend,
     vst_with_dispersion_trend_and_normalization_factors,
     vst_with_dispersion_trend_and_size_factors,
 };

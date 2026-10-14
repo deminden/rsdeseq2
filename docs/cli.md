@@ -213,7 +213,7 @@ Formula construction, wrapper metadata preservation, and unsupported fit types
 are not exposed by the CLI. The `lrt` command compares the full design
 against the supplied reduced numeric design matrix.
 
-The `rlog` command fits the implemented GLM-mu dispersion/MAP stages, estimates
+The `rlog` command fits the implemented GLM-mu gene-wise dispersion and trend stages, estimates
 the rlog sample-effect prior from normalized counts, `baseMean`, and `dispFit`,
 then writes the transformed gene x sample matrix. It defaults to `--blind=true`
 with an intercept-only design; use `--blind=false --design design.tsv` for a

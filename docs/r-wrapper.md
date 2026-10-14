@@ -1,50 +1,95 @@
-# R Wrapper
+# R Backend
 
-The R package exposes primitive matrix helpers for the supported early
-normalization stages:
+The R package builds and statically links the Rust crate used by the CLI.
+Cargo is required when installing the package from source. The core crate is
+vendored under `src/rust/vendor/rsdeseq2`; regenerate that copy from the
+repository root with `scripts/sync_r_vendor.sh` before making a source release.
 
-- `estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"), geoMeans = NULL, controlGenes = NULL, native = FALSE)`
-- `normalizedCountsRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = FALSE)`
-- `baseMeanRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = FALSE)`
-- `baseMetadataRust(counts, sizeFactors = NULL, normalizationFactors = NULL, weights = NULL, native = FALSE)`
-- `applyCooksCutoffRust(pvalue, maxCooks, cooksCutoff, counts = NULL, cooks = NULL, lowCountHeuristic = FALSE, native = FALSE)`
+`DESeq()` and `fitRust()` run dispersion estimation, GLM fitting, Wald tests,
+and likelihood-ratio tests in Rust. They accept a count matrix plus an explicit
+numeric design matrix, a list containing `counts` and `design`, or a
+Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. Formula
+designs are expanded with R's `model.matrix()` and passed to Rust. The fit
+retains coefficient estimates and covariance, so `results()` supports named
+coefficients and DESeq2-style contrasts as well as the default result table.
+Matrix and list inputs return an `rsdeseq2RustFit` list. A `DESeqDataSet` input
+returns the fitted dataset with the Rust fit stored in its metadata, and the
+package's `results()` and `resultsNames()` functions dispatch through that fit.
+Existing size factors, normalization factors, observation-weight assays, and
+formula offsets are passed through the fitting bridge; explicit matrices can
+also be provided for matrix or list inputs.
+
+This is a limited dataset integration. The adapter does not populate the full
+set of DESeq2 assays and row metadata, perform Cook's outlier replacement, or
+implement every DESeq2 fitting and result option. Use `rsdeseq2::results()` and
+`rsdeseq2::resultsNames()` to read the stored Rust fit; this does not register a
+replacement method for `DESeq2::results()`.
+
+For dataset transformations, `vst()`, `varianceStabilizingTransformation()`,
+and `rlog()` return Bioconductor `DESeqTransform` objects and run the trend,
+VST, or rlog computations in Rust. They support blind and design-aware
+dispersion fitting, normalization factors, observation weights, and formula
+offsets. Fast `vst()` selects its subset by ordinary normalized-count means,
+including for weighted datasets, and errors when fewer than `nsub` genes
+qualify. Rlog can also reuse supplied frozen intercepts and a shared sample
+prior variance. Full-data VST reuses existing frozen parametric/mean
+dispersion-function parameters in Rust. For a frozen local trend, R evaluates
+the existing function on DESeq2's 999-point grid and Rust integrates the
+sampled curve. Design-aware rlog reuses an existing `dispFit` column when
+`blind=FALSE`. Broader local-VST and fast-subset edge cases remain open.
+
+`lfcShrink()` currently accepts a dataset fitted by `rsdeseq2::DESeq()` and
+either a coefficient name/index or an expanded-design factor-level, numeric, or
+list contrast. Coefficient lookup accepts exact names and unambiguous
+DESeq2-cleaned aliases, including for transformed-factor formulas. The
+`type="normal"` contrast route builds the DESeq2-style
+expanded model in R, then estimates priors, refits, and tests the posterior
+contrast in Rust. Numeric contrasts require a supplied result table; list
+contrasts average selected coefficients and need supplied results when their
+names are absent from the unshrunk design. Optional `type="ashr"` shrinkage
+uses the ashr package for posterior means/SDs and s-values. Optional
+`type="apeglm"` shrinkage handles named/indexed Wald coefficients, including
+posterior SDs and s-values, but not contrasts. Formula interactions are
+rejected for normal shrinkage. Factor-level contrast syntax for transformed
+factors remains unsupported when DESeq2 cannot resolve its coefficient names.
+
+The package also exposes primitive matrix helpers:
+
+- `estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"), geoMeans = NULL, controlGenes = NULL, native = TRUE)`
+- `normalizedCountsRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = TRUE)`
+- `baseMeanRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = TRUE)`
+- `baseMetadataRust(counts, sizeFactors = NULL, normalizationFactors = NULL, weights = NULL, native = TRUE)`
+- `applyCooksCutoffRust(pvalue, maxCooks, cooksCutoff, counts = NULL, cooks = NULL, lowCountHeuristic = FALSE, native = TRUE)`
 - `resultsTableRust(baseMean, log2FoldChange = NULL, lfcSE = NULL, stat = NULL, pvalue = NULL, padj = NULL, dispersion = NULL, converged = NULL, rowNames = NULL)`
 - `applyIndependentFilteringRust(results, alpha = 0.1, theta = NULL, enabled = TRUE)`
 - `rsdeseq2DiagnosticSchemaRust(native = FALSE)`
 - `deseq2McolsDiagnosticsRust(nGenes, test = c("none", "Wald", "LRT"), ...)`
 
 These helpers validate ordinary R matrices with genes in rows and samples in
-columns. They include an R-level helper implementation that mirrors the
-Rust-supported size-factor, normalized-count, normalization-factor, baseMean,
-and early base-metadata algorithms. The R API does not expose full Rust-core
-workflow execution. Registered primitive `.Call` bridges are
-available for the selected operations described below.
+columns and call the Rust core through registered `.Call` bridges.
 When `normalizationFactors` are supplied to `normalizedCountsRust()`,
 `baseMeanRust()`, or `baseMetadataRust()`, they preempt `sizeFactors`, matching
 DESeq2's normalized-count behavior.
 
-`estimateSizeFactorsRust(native = TRUE)`, `normalizedCountsRust(native = TRUE)`,
-and `baseMeanRust(native = TRUE)` first try registered `.Call` bridges for
-primitive normalization summaries. If the package shared library is not loaded,
-the helper uses the R-level implementation.
+The retained `native` arguments on the primitive helpers are for source
+compatibility. Calls always use the Rust backend and report an error if the
+native library is unavailable.
 
 `baseMetadataRust()` returns primitive row metadata columns `baseMean`,
 `baseVar`, and `allZero`. When `weights` are supplied, they must be a finite
 non-negative matrix with the same dimensions as `counts`; the helper multiplies
 normalized counts by those raw observation weights before calculating row means
 and sample variances. This mirrors the early DESeq2 weighted metadata shape but
-does not modify DESeqDataSet `mcols()`. With `native = TRUE`, the helper first
-tries the registered `.Call` bridge for this primitive. If the package shared
-library is not loaded, the helper uses the R-level implementation.
+does not modify DESeqDataSet `mcols()`.
 
 `applyCooksCutoffRust()` is a primitive result-table helper. It masks p-values
 where `maxCooks > cooksCutoff`, recomputes BH-adjusted p-values, and can apply
 the DESeq2 two-group low-count Cook's heuristic when the caller supplies raw
 `counts`, per-sample `cooks`, and has already established the one-factor
 two-level formula condition. It does not inspect DESeqDataSet objects or infer
-formula semantics. With `native = TRUE`, the masking and low-count heuristic
-step can use the registered `.Call` bridge; R assembles the output table
-and computes BH-adjusted p-values. When p-values carry gene names, named
+formula semantics. The masking and low-count heuristic step use the registered
+`.Call` bridge; R assembles the output table and computes BH-adjusted p-values.
+When p-values carry gene names, named
 `maxCooks`, count rows, and Cook's rows are aligned to that order before
 masking; named Cook's columns are aligned to named count columns before the
 low-count heuristic is evaluated.
@@ -167,9 +212,9 @@ name.
 `nbinomWaldTestRust()` accepts the same already-computed primitive
 Wald inputs, a list-like primitive object containing those fields, or an
 already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
-and returns an `rsdeseq2PrimitiveWaldFit` object. For unfitted
-`DESeqDataSet`-style inputs, use the Rust crate or CLI workflow entry points and
-then pass the fitted diagnostics through the R API.
+and returns an `rsdeseq2PrimitiveWaldFit` object. This primitive constructor
+does not fit an unfitted dataset; use `DESeq()` or `fitRust()` for the supported
+high-level R fitting path.
 
 `lrtFitRust()` packages already-computed primitive full-model beta matrices,
 coefficient covariance arrays, optional coefficient SEs, and LRT statistic /
@@ -181,9 +226,9 @@ defines the reported LFC and SE, while `stat` and `pvalue` remain the supplied
 LRT model-comparison statistic and p-value. `nbinomLRTRust()` accepts those
 primitive fields, a list-like primitive object containing them, or an
 already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
-and returns an `rsdeseq2PrimitiveLrtFit` object. For unfitted
-`DESeqDataSet`-style inputs, use the Rust crate or CLI workflow entry points and
-then pass the fitted diagnostics through the R API. `results()` can
+and returns an `rsdeseq2PrimitiveLrtFit` object. This primitive constructor
+does not fit an unfitted dataset; use `DESeq()` or `fitRust()` for the supported
+high-level R fitting path. `results()` can
 also consume list-like primitive or fitted-object
 LRT fields directly and internally package them through `nbinomLRTRust()`.
 
@@ -204,10 +249,10 @@ with DESeq2-style row metadata names such as `betaConv`, `fullBetaConv`,
 registered native C stub when the shared library is loaded. These helpers do
 not inspect or modify DESeqDataSet objects.
 
-Unsupported high-level entry points remain explicit:
-
-- `DESeq()`
-- `estimateDispersionsRust()`
-
-High-level `DESeqDataSet` fitting and mutation are unsupported. The R API
-accepts primitive and already-fitted result objects.
+For matrix and list inputs, the returned `rsdeseq2RustFit` list contains the
+Rust result table, counts, design matrices, test, coefficient estimates, and
+covariance. For `DESeqDataSet` inputs, the fitted dataset is returned with the
+Rust fit stored in its metadata and updated size or normalization factors.
+`estimateDispersionsRust()` runs the same Rust fit pipeline and returns its
+final per-gene dispersion estimates. The package does not populate every
+DESeq2 diagnostic assay or support every DESeq2 fitting option.

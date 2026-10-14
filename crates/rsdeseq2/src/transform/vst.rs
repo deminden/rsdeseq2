@@ -308,6 +308,47 @@ pub fn vst_local(
         });
     }
     let integral = LocalVstIntegral::fit(max_count, trend, inverse_size_factor_mean)?;
+    vst_local_with_integral(normalized_counts, &integral, h1, h2)
+}
+
+/// Apply local VST using dispersion-function values sampled on the DESeq2 grid.
+///
+/// This supports frozen local dispersion functions whose fitted representation
+/// is owned by the caller (for example, an R closure). The input grid must be
+/// the increasing 999-point grid used by DESeq2, without the initial zero.
+pub fn vst_local_from_dispersion_grid(
+    normalized_counts: &RowMajorMatrix<f64>,
+    grid: &[f64],
+    dispersions: &[f64],
+    inverse_size_factor_mean: f64,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    validate_inverse_size_factor_mean(inverse_size_factor_mean)?;
+    let max_count = validate_normalized_counts_and_max(normalized_counts)?;
+    if max_count <= 0.0 {
+        return RowMajorMatrix::from_elem(
+            normalized_counts.n_rows(),
+            normalized_counts.n_cols(),
+            f64::NAN,
+        );
+    }
+    let row_means = normalized_count_row_means(normalized_counts)?;
+    let h1 = quantile_type7(&row_means, 0.95)?;
+    let h2 = quantile_type7(&row_means, 0.999)?;
+    if h1 <= 0.0 || h2 <= h1 {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local VST scaling quantiles must be positive and increasing".to_string(),
+        });
+    }
+    let integral = LocalVstIntegral::fit_from_grid(grid, dispersions, inverse_size_factor_mean)?;
+    vst_local_with_integral(normalized_counts, &integral, h1, h2)
+}
+
+fn vst_local_with_integral(
+    normalized_counts: &RowMajorMatrix<f64>,
+    integral: &LocalVstIntegral,
+    h1: f64,
+    h2: f64,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
     let int_h1 = integral.evaluate(h1.asinh())?;
     let int_h2 = integral.evaluate(h2.asinh())?;
     if int_h2 <= int_h1 {
@@ -597,6 +638,7 @@ pub fn vst_parametric_value(
 struct LocalVstIntegral {
     x: Vec<f64>,
     y: Vec<f64>,
+    second_derivatives: Vec<f64>,
 }
 
 impl LocalVstIntegral {
@@ -613,10 +655,41 @@ impl LocalVstIntegral {
             grid.push(value);
         }
         let dispersions = trend.evaluate_many_allow_missing(&grid)?;
+        Self::fit_from_grid(&grid, &dispersions, inverse_size_factor_mean)
+    }
+
+    fn fit_from_grid(
+        grid: &[f64],
+        dispersions: &[f64],
+        inverse_size_factor_mean: f64,
+    ) -> Result<Self, DeseqError> {
+        if grid.len() != dispersions.len() || grid.len() < 2 {
+            return Err(DeseqError::InvalidDimensions {
+                context: "local VST frozen dispersion grid".to_string(),
+                expected: grid.len().max(2),
+                actual: dispersions.len(),
+            });
+        }
+        for (idx, (q, dispersion)) in grid.iter().zip(dispersions).enumerate() {
+            if !q.is_finite() || *q <= 0.0 || (idx > 0 && *q <= grid[idx - 1]) {
+                return Err(DeseqError::InvalidDispersion {
+                    reason: format!(
+                        "local VST frozen grid value at index {idx} must be finite, positive, and increasing"
+                    ),
+                });
+            }
+            if !dispersion.is_finite() || *dispersion <= 0.0 {
+                return Err(DeseqError::InvalidDispersion {
+                    reason: format!(
+                        "local VST frozen dispersion at index {idx} must be finite and positive"
+                    ),
+                });
+            }
+        }
         let integrand = grid
             .iter()
             .copied()
-            .zip(dispersions)
+            .zip(dispersions.iter().copied())
             .map(|(q, dispersion)| {
                 let dispersion_q = checked_mul(dispersion, q, 0, "local VST dispersion q")?;
                 let dispersion_q2 = checked_mul(dispersion_q, q, 0, "local VST dispersion q2")?;
@@ -666,7 +739,12 @@ impl LocalVstIntegral {
                 actual: x.len(),
             });
         }
-        Ok(Self { x, y })
+        let second_derivatives = fmm_spline_second_derivatives(&x, &y)?;
+        Ok(Self {
+            x,
+            y,
+            second_derivatives,
+        })
     }
 
     fn evaluate(&self, target: f64) -> Result<f64, DeseqError> {
@@ -677,83 +755,220 @@ impl LocalVstIntegral {
                 value: target,
             });
         }
-        if target <= self.x[0] {
-            let fraction = checked_div(
-                target,
-                self.x[0],
-                0,
-                "local VST interpolation lower fraction",
-            )?;
-            let value = checked_mul(
-                self.y[0],
-                fraction,
-                0,
-                "local VST interpolation lower extrapolation",
-            )?;
-            return finite_value(value, None, "local VST interpolation lower extrapolation");
-        }
         let last = self.x.len() - 1;
-        if target >= self.x[last] {
-            let y_delta = checked_sub(
-                self.y[last],
-                self.y[last - 1],
-                last,
-                "local VST interpolation upper y delta",
-            )?;
-            let x_delta = checked_sub(
-                self.x[last],
-                self.x[last - 1],
-                last,
-                "local VST interpolation upper x delta",
-            )?;
-            let slope = checked_div(
-                y_delta,
-                x_delta,
-                last,
-                "local VST interpolation upper slope",
-            )?;
-            let target_delta = checked_sub(
-                target,
-                self.x[last],
-                last,
-                "local VST interpolation upper target delta",
-            )?;
-            let value = checked_interpolate(
-                self.y[last],
-                slope,
-                target_delta,
-                "local VST interpolation upper extrapolation",
-            )?;
-            return Ok(value);
-        }
-        let upper = self.x.partition_point(|value| *value < target);
-        let lower = upper - 1;
-        let target_delta = checked_sub(
-            target,
-            self.x[lower],
-            lower,
-            "local VST interpolation target delta",
-        )?;
-        let x_delta = checked_sub(
+        let lower = if target <= self.x[0] {
+            0
+        } else if target >= self.x[last] {
+            last - 1
+        } else {
+            self.x.partition_point(|value| *value < target) - 1
+        };
+        let upper = lower + 1;
+        let width = checked_sub(
             self.x[upper],
             self.x[lower],
             upper,
-            "local VST interpolation x delta",
+            "local VST spline width",
         )?;
-        let fraction = checked_div(
-            target_delta,
-            x_delta,
+        let left = checked_sub(
+            self.x[upper],
+            target,
             lower,
-            "local VST interpolation fraction",
+            "local VST spline left distance",
         )?;
-        let y_delta = checked_sub(
-            self.y[upper],
-            self.y[lower],
+        let right = checked_sub(
+            target,
+            self.x[lower],
+            lower,
+            "local VST spline right distance",
+        )?;
+        let left_cube = checked_mul(
+            checked_mul(left, left, lower, "local VST spline left cube")?,
+            left,
+            lower,
+            "local VST spline left cube",
+        )?;
+        let right_cube = checked_mul(
+            checked_mul(right, right, lower, "local VST spline right cube")?,
+            right,
+            lower,
+            "local VST spline right cube",
+        )?;
+        let width_six = checked_mul(6.0, width, lower, "local VST spline denominator")?;
+        let curvature_left = checked_div(
+            checked_mul(
+                self.second_derivatives[lower],
+                left_cube,
+                lower,
+                "local VST spline curvature",
+            )?,
+            width_six,
+            lower,
+            "local VST spline curvature",
+        )?;
+        let curvature_right = checked_div(
+            checked_mul(
+                self.second_derivatives[upper],
+                right_cube,
+                upper,
+                "local VST spline curvature",
+            )?,
+            width_six,
             upper,
-            "local VST interpolation y delta",
+            "local VST spline curvature",
         )?;
-        checked_interpolate(self.y[lower], fraction, y_delta, "local VST interpolation")
+        let width_squared = checked_mul(width, width, lower, "local VST spline width squared")?;
+        let correction_left = checked_div(
+            checked_mul(
+                self.second_derivatives[lower],
+                width_squared,
+                lower,
+                "local VST spline correction",
+            )?,
+            6.0,
+            lower,
+            "local VST spline correction",
+        )?;
+        let correction_right = checked_div(
+            checked_mul(
+                self.second_derivatives[upper],
+                width_squared,
+                upper,
+                "local VST spline correction",
+            )?,
+            6.0,
+            upper,
+            "local VST spline correction",
+        )?;
+        let linear_left = checked_div(
+            checked_mul(
+                checked_sub(
+                    self.y[lower],
+                    correction_left,
+                    lower,
+                    "local VST spline linear term",
+                )?,
+                left,
+                lower,
+                "local VST spline linear term",
+            )?,
+            width,
+            lower,
+            "local VST spline linear term",
+        )?;
+        let linear_right = checked_div(
+            checked_mul(
+                checked_sub(
+                    self.y[upper],
+                    correction_right,
+                    upper,
+                    "local VST spline linear term",
+                )?,
+                right,
+                upper,
+                "local VST spline linear term",
+            )?,
+            width,
+            upper,
+            "local VST spline linear term",
+        )?;
+        finite_value(
+            checked_add(
+                checked_add(
+                    curvature_left,
+                    curvature_right,
+                    lower,
+                    "local VST spline value",
+                )?,
+                checked_add(linear_left, linear_right, lower, "local VST spline value")?,
+                lower,
+                "local VST spline value",
+            )?,
+            None,
+            "local VST spline value",
+        )
     }
+}
+
+/// Compute the second derivatives for R's `splinefun(method = "fmm")` cubic
+/// spline. The end equations match the spline's third derivatives to cubic
+/// fits through the first and last four knots, as in R's `SplineCoef`.
+fn fmm_spline_second_derivatives(x: &[f64], y: &[f64]) -> Result<Vec<f64>, DeseqError> {
+    if x.len() != y.len() || x.len() < 4 {
+        return Err(DeseqError::InvalidDimensions {
+            context: "local VST FMM spline knots".to_string(),
+            expected: 4,
+            actual: x.len().min(y.len()),
+        });
+    }
+    let n = x.len();
+    let mut h = Vec::with_capacity(n - 1);
+    let mut slopes = Vec::with_capacity(n - 1);
+    for idx in 0..n - 1 {
+        let width = checked_sub(x[idx + 1], x[idx], idx, "local VST spline knot width")?;
+        if width <= 0.0 {
+            return Err(DeseqError::InvalidOptions {
+                reason: "local VST spline knots must be strictly increasing".to_string(),
+            });
+        }
+        h.push(width);
+        slopes.push(checked_div(
+            checked_sub(y[idx + 1], y[idx], idx, "local VST spline secant")?,
+            width,
+            idx,
+            "local VST spline secant",
+        )?);
+    }
+    // R solves for sigma = second_derivative / 6. The endpoint right-hand
+    // sides are divided-difference estimates of the cubic third derivatives.
+    let mut diagonal = vec![0.0; n];
+    let off_diagonal = h.clone();
+    let mut rhs = vec![0.0; n];
+    diagonal[0] = -h[0];
+    diagonal[n - 1] = -h[n - 2];
+    for knot in 1..n - 1 {
+        diagonal[knot] = 2.0 * (h[knot - 1] + h[knot]);
+        rhs[knot] = slopes[knot] - slopes[knot - 1];
+    }
+    let h0 = h[0];
+    let h1 = h[1];
+    let h2 = h[2];
+    rhs[0] = ((slopes[2] - slopes[1]) / (h1 + h2) - (slopes[1] - slopes[0]) / (h0 + h1)) * h0 * h0
+        / (h0 + h1 + h2);
+    let last = n - 2;
+    let before_last = n - 3;
+    let two_before_last = n - 4;
+    rhs[n - 1] = -((slopes[last] - slopes[before_last]) / (h[before_last] + h[last])
+        - (slopes[before_last] - slopes[two_before_last]) / (h[two_before_last] + h[before_last]))
+        * h[last]
+        * h[last]
+        / (h[two_before_last] + h[before_last] + h[last]);
+
+    for row in 1..n {
+        let factor = off_diagonal[row - 1] / diagonal[row - 1];
+        diagonal[row] -= factor * off_diagonal[row - 1];
+        rhs[row] -= factor * rhs[row - 1];
+    }
+    if diagonal
+        .iter()
+        .any(|value| !value.is_finite() || *value == 0.0)
+    {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local VST FMM spline system is singular".to_string(),
+        });
+    }
+    let mut sigma = vec![0.0; n];
+    sigma[n - 1] = rhs[n - 1] / diagonal[n - 1];
+    for row in (0..n - 1).rev() {
+        sigma[row] = (rhs[row] - off_diagonal[row] * sigma[row + 1]) / diagonal[row];
+    }
+    let second: Vec<f64> = sigma.into_iter().map(|value| 6.0 * value).collect();
+    if second.iter().any(|value| !value.is_finite()) {
+        return Err(DeseqError::InvalidDispersion {
+            reason: "local VST FMM spline coefficients must be finite".to_string(),
+        });
+    }
+    Ok(second)
 }
 
 fn validate_mean_dispersion(mean_dispersion: f64) -> Result<(), DeseqError> {

@@ -3,6 +3,23 @@
 No production release should claim DESeq2 parity until stage-by-stage reference
 tests cover the implemented statistical pipeline.
 
+## Version 0.2.6
+
+This release adds dataset-based R `vst()`,
+`varianceStabilizingTransformation()`, and `rlog()` workflows backed by the
+Rust transformations, plus `lfcShrink()` support for normal, `ashr`, and
+`apeglm` methods on the documented inputs. Frozen trend reuse, weighted fast
+VST subset behavior, and transformed-factor coefficient aliases are covered by
+integration tests. The Rust dependency refresh includes `rcompat-locfit`
+0.1.5, `rcompat-lbfgsb` 0.2.2, `clap` 4.6.7, `serde` 1.0.229,
+`serde_json` 1.0.154, and `thiserror` 2.0.21. The Rust crate, R package,
+vendored core, and their lockfiles are aligned at 0.2.6. A committed GTEx v8
+fixture checks fixed-dispersion Wald parity across all 56,200 genes for 61
+Kidney Cortex samples; maximum absolute differences from DESeq2 1.52.0 are
+below `2.4e-7` for the tested result fields. The v0.2.5 benchmark
+results below remain historical; no 0.2.6 release-to-release benchmark is
+claimed here.
+
 ## Pre-Release Checklist
 
 Keep the Rust crate, R package, and R-package Rust stub on the same release

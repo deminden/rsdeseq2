@@ -1,13 +1,18 @@
 # rsdeseq2 R Package
 
-This package provides R access to selected `rsdeseq2` primitives and native
-bridges. It does not fit complete `DESeqDataSet` workflows or replace the full
-DESeq2/Bioconductor interface.
+This package provides R access to the `rsdeseq2` Rust core. It builds and
+statically links the core from source, so Rust and Cargo are required to install
+the package. It supports matrix and formula-driven Wald/LRT workflows and
+selected DESeq2-shaped helpers, but not every Bioconductor object operation.
 
-The package is tested with R 4.6.1. Each numerical reference fixture records
-the R version that generated it.
+Version 0.2.6 adds dataset-based VST/rlog and normal, `ashr`, and `apeglm`
+shrinkage workflows on top of the Rust-backed fit. See the sections below for
+the supported inputs and known boundaries.
 
-## Install and Try a Primitive
+The R package is tested with R 4.6.1. Numerical reference fixtures record the
+R/DESeq2 versions that generated them.
+
+## Install and Run an Analysis
 
 From a repository checkout:
 
@@ -25,74 +30,56 @@ counts <- matrix(
   nrow = 3L,
   byrow = TRUE
 )
-estimateSizeFactorsRust(counts, native = TRUE)
+design <- cbind(Intercept = 1, condition = c(0, 0, 1, 1))
+fit <- DESeq(list(counts = counts, design = design), fitType = "mean")
+results(fit, independentFiltering = FALSE)
 ```
 
-The Rust core is validated against saved R 4.6.1 / DESeq2 1.52.0 outputs. The
-repository [validation summary](../../README.md#measured-validation) records
-the absolute measurements and their scope; the
-[benchmark documentation](../../docs/benchmarks.md) contains unrounded data,
-baselines, and reproduction commands. Those workflow-level measurements
-describe the native Rust core, not additional surface implemented by this R
-package.
+`DESeq()` also accepts a numeric model matrix through `design`, and a
+Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. Formula
+designs are expanded by R and fitted by Rust. LRT calls require a reduced design
+matrix or formula. The returned `rsdeseq2RustFit` stores coefficient estimates,
+covariance, size factors, the Rust result table, count matrix, and design
+metadata. `results()` supports named coefficients and DESeq2-style contrasts.
+Existing dataset size factors, normalization factors, observation-weight
+assays, and formula offsets are forwarded into the Rust fit.
+When input is a `DESeqDataSet`, `DESeq()` returns that dataset with fit state
+attached in metadata; matrix and list inputs return `rsdeseq2RustFit`.
+`estimateDispersionsRust()` returns the final per-gene dispersion estimates
+from the same Rust workflow.
 
-## Supported Primitive Helpers
+For `DESeqDataSet` inputs, `vst()` and
+`varianceStabilizingTransformation()` return `DESeqTransform` objects, while
+`rlog()` also supports reuse of supplied frozen gene intercepts and a shared
+sample-effect prior variance. These transformations run in Rust and honor
+design/blind mode, normalization factors, observation weights, and formula
+offsets. `lfcShrink()` supports `type="normal"` for a named or indexed Wald
+coefficient or an expanded-design factor-level, numeric, or list contrast from
+a dataset fitted with `rsdeseq2::DESeq()`; the contrast route uses the Rust
+expanded-model refit. Numeric contrasts require a supplied result table; list
+contrasts average selected expanded coefficients and need supplied results
+when their names are absent from the unshrunk design. The returned
+`DESeqResults` records the estimated beta-prior variances. With optional
+package `ashr` installed, `type="ashr"` returns posterior means/SDs and
+s-values. With optional package `apeglm` installed, `type="apeglm"` supports
+named/indexed coefficients and returns posterior SDs and s-values. Formula
+interactions are rejected for normal shrinkage. Cleaned coefficient aliases
+work for transformed-factor formulas; factor-level contrast syntax remains
+unsupported when DESeq2 cannot resolve its coefficient names.
 
-- `estimateSizeFactorsRust()`
-- `normalizedCountsRust()`
-- `baseMeanRust()`
-- `baseMetadataRust()`
-- `applyCooksCutoffRust()`
-- `resultsTableRust()`
-- `waldFitRust()`
-- `lrtFitRust()`
-- `nbinomWaldTestRust()`
-- `nbinomLRTRust()`
-- `resultsNames()`
-- `resultsNamesRust()`
-- `resolveResultsContrastRust()`
-- `applyIndependentFilteringRust()`
-- `rsdeseq2DiagnosticSchemaRust()`
-- `deseq2McolsDiagnosticsRust()`
+## Supported Helpers
 
-These helpers include an R-level implementation that mirrors the
-Rust-supported normalization algorithms, including gene/sample normalization
-factors, weighted base metadata, Cook's cutoff result masking, and diagnostic
-metadata shape. The R API does not expose the full Rust workflow. Registered
-primitive `.Call` bridges cover selected normalization, metadata, Cook's, and
-diagnostic operations.
-`baseMetadataRust(native = TRUE)` can use the registered package `.Call` bridge
-for that primitive and uses the R-level implementation when the shared library
-is unavailable. `estimateSizeFactorsRust(native = TRUE)`,
-`normalizedCountsRust(native = TRUE)`, and `baseMeanRust(native = TRUE)` follow
-the same pattern for primitive normalization summaries.
-`applyCooksCutoffRust(native = TRUE)` can use the registered native bridge for
-Cook's masking while R retains BH adjustment and output assembly.
-`resultsTableRust()` assembles already-computed primitive vectors into a
-DESeq2-shaped result data frame and computes BH-adjusted p-values when needed.
-`waldFitRust()` packages primitive Wald beta/covariance outputs.
-`nbinomWaldTestRust()` accepts those same already-computed primitive
-Wald inputs, or a list-like primitive object, and returns the same fit object.
-`lrtFitRust()` and `nbinomLRTRust()` do the corresponding primitive packaging
-for already-computed LRT statistics: `results()` reports the selected
-coefficient or contrast LFC/SE while preserving the LRT statistic and p-value.
-`results()` can report selected coefficients or DESeq2-style
-`contrast = ...` requests from primitive Wald or LRT fit objects, or from
-list-like objects containing the same primitive fields. It also recognizes
-already-fitted DESeq2-shaped list/S4 metadata with coefficient columns and
-matching `SE_` columns in `mcols`. These routes include
-`lfcThreshold`/`altHypothesis` Wald p-values with Normal or supplied t tails.
-When fitted `factorLevels` or factor-valued `colData` metadata is available,
-character triplet contrasts use the first factor level as the reference unless
-`reference` is supplied explicitly.
-Character, list, and numeric contrast forms are resolved by
-`resolveResultsContrastRust()` with matching all-zero handling metadata.
-Named coefficient results do not apply contrast all-zero handling.
-`resultsNames()` exposes coefficient names from primitive Wald/LRT fit objects,
-list-like primitive objects, fitted-object metadata, beta matrices, or validated
-character vectors for the same contrast-resolution workflow.
-`resultsNamesRust()` is the same primitive helper under the Rust-suffixed name.
-`applyIndependentFilteringRust()` applies baseMean-driven filtered BH
-adjustment to primitive result tables and records filtering metadata as an
-attribute.
-DESeqDataSet fitting integration is unsupported and returns clear errors.
+The package also exposes `estimateSizeFactorsRust()`, `normalizedCountsRust()`,
+`baseMeanRust()`, `baseMetadataRust()`, `applyCooksCutoffRust()`,
+`resultsTableRust()`, `waldFitRust()`, `lrtFitRust()`, `nbinomWaldTestRust()`,
+`nbinomLRTRust()`, `resultsNames()`, `resolveResultsContrastRust()`, and
+`applyIndependentFilteringRust()`.
+
+These helpers call Rust through registered `.Call` bridges. Legacy `native`
+arguments remain accepted for source compatibility; they no longer select an R
+implementation. Full DESeq2 diagnostic assays and every DESeq2 fitting option
+remain outside this package's implemented scope.
+
+The Rust core validation summary and benchmark scope are documented in the
+[repository README](../../README.md#validation) and
+[benchmark report](../../docs/benchmarks.md).

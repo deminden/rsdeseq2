@@ -19,7 +19,8 @@ benchmarking, but they are not a claim of full
 | Beta prior primitives | Implements DESeq2-shaped beta-prior variance and fixed-dispersion refit math, including Hmisc-style weighted quantiles, log2-to-natural ridge conversion, primitive one-factor and additive expanded design construction for categorical factors, numeric covariates, primitive pairwise interactions, formula-only higher-order interactions, formula term subtraction, primitive numeric transforms, raw and orthogonal polynomial formula transforms, nested additive parenthesized groups, formula offset extraction and integration, owned model-frame formula inputs with factor reference inference/override, builder-stored model-frame formula design helpers, primitive expanded-design refits, grouped collapse, Wald result assembly/workflows from collapsed prior fits with size-factor, normalization-factor, and observation-weight inputs, and primitive expanded beta-prior Wald Cook's replacement refits for selected coefficients and numeric contrasts with size-factor or normalization-factor offsets. One-factor, additive, supported-formula, and owned-model-frame helpers build the expanded design internally for replacement-refit workflows, and the native CLI exposes primitive supplied-dispersion expanded, one-factor, and additive categorical beta-prior Wald paths with normalization-factor and replacement-sidecar coverage. | Source-matched formula tests plus DESeq2 `estimateBetaPriorVar`, beta-prior refit, combined estimated-prior refit fixture checks, Rust expanded-model workflow tests, model-frame wrapper tests, and CLI smoke tests; splines, arbitrary R expressions, and full R-compatible formula parsing are unsupported. |
 | Dispersion trend and MAP pieces | Matches or closely approximates parametric/mean trend fixtures, pure-Rust locfit-compatible local trend fixtures including a single-usable-row edge case and real-data fitted-value parity, prior variance, MAP shrinkage, unweighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, unweighted GLM-mu mean and local MAP/Wald/LRT, weighted GLM-mu Cox-Reid mean MAP/Wald/LRT and local MAP/result rows, weighted GLM-mu local MAP/Wald/LRT, and weighted GLM-mu deterministic references. | Generated DESeq2 trend/prior/MAP/GLM-mu fixtures and finite-difference objective tests. |
 | Results, Cook's, filtering | Matches implemented result-table assembly, including DESeq2-shaped result rows and BH-adjusted p-values for the matched GLM-mu Wald/LRT fixture branches, R-cleaned coefficient/list/factor-level aliases, R-cleaned factor-level result names, explicit and builder-stored owned-model-frame character contrast resolution for supported fixed/native Wald/LRT routes, resolved numeric contrast metadata for implemented contrast result and replacement/refit paths, top-level formula-built Wald designs and LRT full/reduced designs for supported model-frame formulas, Cook's distance/masking/replacement planning, scalar replacement/refit metadata summaries, selected formula-built and explicit-design replacement-refit paths, and independent-filtering lowess fixtures. | Unit tests plus generated Cook's, GLM-mu result-row, and independent-filtering fixtures. |
-| Transform primitives | Matches closed-form `normTransform`, mean VST, parametric VST, deterministic unweighted fast-subset selection, implemented local numerical-integration helpers, and the low-level rlog sample-effect ridge-GLM primitive with explicit dispersions plus rlog sample-prior estimation from normalized counts. The weighted fast-VST selector uses Rust's weighted `baseMean` and is not claimed to match DESeq2 subset indices. Convenience rlog helpers compose prior estimation with size-factor or normalization-factor fitting when earlier-stage summaries are supplied; fit-state and builder-level design-aware/blind GLM-mu rlog dispatch are available after MAP dispersions are present and skip/re-expand all-zero rows. Rlog output metadata records shape, prior variance, offset mode, design mode, and retained fit diagnostics for the builder path. | Formula tests, stage-level dispatch tests, builder rlog tests, all-zero rlog expansion tests, and CLI rlog tests; the full Bioconductor object workflow is unsupported. |
+| Transform workflows | Implements DESeqDataSet-based `vst()`, `varianceStabilizingTransformation()`, and `rlog()` returning `DESeqTransform`; blind and design-aware modes, size or gene/sample normalization factors, observation weights, formula offsets, trend fallback, and frozen-intercept rlog reuse route through Rust. Full-data VST reuses frozen parametric/mean `dispersionFunction` coefficients in Rust and evaluates frozen local functions on the DESeq2 grid before Rust integration; design-aware rlog reuses stored `dispFit` values. Fast `vst()` uses ordinary normalized-count means for subset selection even with weights, propagates weights into the subset trend fit, and errors when fewer than `nsub` rows qualify, matching DESeq2's wrapper behavior. Local numerical integration uses R-compatible FMM cubic spline evaluation and endpoint extrapolation. | R integration tests check returned Bioconductor classes, finite assays, metadata, frozen trend reuse, frozen-intercept all-zero behavior, weighted fast-subset parity, and insufficient-subset errors. A seeded 1,200-gene, 12-sample fixture checks full and fast VST across mean, parametric, and local trends (maximum absolute errors below `0.002`, `0.0025`, and `0.006`/`0.004`, respectively), plus rlog across all three trends (below `0.007`, with prior variance within `1e-10`). Broader local-VST and fast-subset edge fixtures remain open. |
+| `lfcShrink` | Implements normal shrinkage for named/indexed coefficients and expanded-design factor-level, numeric, and list contrasts, optional `ashr` shrinkage with posterior means/SDs and s-values, and optional `apeglm` shrinkage for named/indexed coefficients with posterior SDs and s-values. Each method returns `DESeqResults` with method-specific prior metadata. Normal numeric contrasts require a supplied result table; normal list contrasts average selected expanded coefficients. Positive normal `lfcThreshold` recomputes posterior Wald statistics and p-values and reruns adjusted p-values/independent filtering; thresholded `ashr`/`apeglm` results include FSOS s-values. | R integration tests compare each method to DESeq2 on a seeded dataset, including thresholded and s-value behavior. Normal shrinkage accepts DESeq2-cleaned coefficient aliases for transformed-factor formulas; factor-level contrast syntax that DESeq2 cannot resolve remains unsupported. Formula interactions remain explicitly rejected. |
 
 ## Implemented
 
@@ -258,19 +259,17 @@ benchmarking, but they are not a claim of full
   fitting, full-matrix transformation, and diagnostic metadata. For inputs
   without observation weights, the subset selector implements DESeq2 1.52.0's
   ordinary normalized-count row-mean threshold, ordering, and rounded-position
-  rule. For weighted inputs, Rust uses its stored weighted `baseMean` for
-  eligibility and ordering, whereas DESeq2 `vst()` uses ordinary normalized
-  row means. Observation weights are nevertheless subset in the selected row
-  order and passed to the weighted dispersion-trend fit. Exact weighted
-  subset-index parity is therefore not claimed.
+  rule for both weighted and unweighted inputs. Observation weights are
+  subset in the selected row order and passed to the weighted
+  dispersion-trend fit.
 
   The automatic Rust helper uses the fast subset when enough rows pass its
   eligibility rule and otherwise fits the trend on all rows. This fallback is
-  Rust-specific: DESeq2 1.52.0 `vst()` stops when fewer than `nsub` rows have
-  ordinary mean normalized count above 5. Metadata reports the selected path,
-  eligible-row count, transform and trend-fit shapes, trend type, and optional
-  subset indices. The blind helper uses an intercept-only design with the same
-  Rust path selection.
+  Rust-specific: the Bioconductor dataset `vst()` wrapper uses the strict fast
+  path and stops when fewer than `nsub` rows have ordinary mean normalized
+  count above 5. Metadata reports the selected path, eligible-row count,
+  transform and trend-fit shapes, trend type, and optional subset indices. The
+  blind helper uses an intercept-only design with the same Rust path selection.
 - Pure-Rust locfit-compatible local dispersion trend fitting with DESeq2's
   `dispGeneEst >= 10 * minDisp` local-fit rule, base-mean weights,
   all-near-minimum floor behavior, builder dispatch, offline local-trend
@@ -738,8 +737,10 @@ upstream p-values.
   factor-level routes with caller-supplied sample levels, contrast-specific
   all-zero behavior for character and two-sided numeric/list contrasts,
   `contrast` precedence over `name`, and fitted-object dispatch from stored
-  Wald or LRT state. High-level Bioconductor object integration and additional
-  contrast-aware Cook's/refit edge cases remain unsupported.
+  Wald or LRT state. The R package has a limited fitted `DESeqDataSet` route
+  that stores Rust fit metadata and dispatches its own `results()` and
+  `resultsNames()` helpers. Complete Bioconductor object semantics and
+  additional contrast-aware Cook's/refit edge cases remain unsupported.
 - Full Cook's outlier replacement behavior for high-level Bioconductor assay
   attachment, high-level wrapper-object metadata, and all remaining DESeq2 edge
   cases.
@@ -756,24 +757,37 @@ upstream p-values.
   metadata entries.
   Shared internal all-zero row expansion helpers exist for compact GLM outputs
   and full-length masked vectors.
-- High-level R-style contrast handling for arbitrary unfitted `DESeqDataSet`
-  objects beyond the implemented primitive and already-fitted-object
-  `results()` routes.
-- Full high-level VST object workflow, exact DESeq2 `splinefun` behavior for
-  local VST, full high-level rlog object workflow, and lfcShrink-compatible
-  hooks. Mean-fit, parametric, local, fast-subset selection/subsetting,
-  automatic GLM-mu VST, blind automatic VST, and fit-state VST helpers are
-  available for normalized-count matrices and implemented fitted trends.
+- Complete DESeq2 `results()` semantics for arbitrary `DESeqDataSet` objects.
+  The R package dispatches supported name and contrast requests through the fit
+  it stores after `rsdeseq2::DESeq()`; it does not provide all DESeq2 result
+  metadata or edge-case behavior.
+- Some DESeq2 fast-VST subset edge cases and broader dataset-level local-VST
+  fixtures. Local integration uses the R-compatible FMM spline implementation.
+  Dataset-based `vst()`, full-data `varianceStabilizingTransformation()`,
+  and `rlog()` are implemented, including frozen-intercept rlog reuse, but
+  need broader numerical fixture coverage. Mean-fit, parametric, local,
+  fast-subset selection/subsetting, automatic GLM-mu VST, blind automatic VST,
+  and fit-state VST helpers are also available for normalized-count matrices
+  and fitted trends.
   Low-level rlog sample-effect ridge fitting is available when callers supply
   dispersions, with helpers to estimate the sample-effect prior variance from
   normalized counts, `baseMean`, and `dispFit`, or to estimate that prior and
   fit in one call for size-factor and normalization-factor inputs. `DeseqFit`
-  can run the same rlog path after fitted trend dispersions and final
-  dispersions are available in stored fit state. Builder-level `rlog_glm_mu`
-  and `blind_rlog_glm_mu` helpers compose the implemented GLM-mu MAP
-  dispersion path with fit-state rlog, with `*_with_fit` variants that retain
-  the dispersion fit state for diagnostics. The native CLI exposes this path
-  through `rlog` for blind and design-aware GLM-mu MAP dispersion workflows.
+  can run the same rlog path using fitted trend dispersions in stored fit
+  state. Builder-level `rlog_glm_mu` and `blind_rlog_glm_mu` helpers compose
+  the GLM-mu gene-wise and trend dispersion path with fit-state rlog, with
+  `*_with_fit` variants that retain the dispersion fit state for diagnostics.
+  The native CLI exposes this path through `rlog` for blind and design-aware
+  GLM-mu trend workflows.
+- Normal `lfcShrink()` is available for named or indexed Wald coefficients and
+  expanded-design factor-level, numeric, and list contrasts on
+  `rsdeseq2::DESeq()`-fitted datasets. Optional `ashr` shrinkage supports
+  posterior means/SDs and s-values; optional `apeglm` supports named/indexed
+  Wald coefficients, posterior SDs, and s-values. Numeric normal contrasts
+  require a supplied result table; list contrasts average selected expanded
+  coefficients. DESeq2-cleaned coefficient aliases work for transformed-factor
+  formulas, while factor-level contrast syntax remains unsupported when DESeq2
+  cannot resolve its coefficient names. Formula interactions remain rejected.
 - Top-level builder Wald helpers route through the implemented GLM-mu path.
   Top-level LRT helpers can store a reduced design on the builder and route
   default, named-coefficient, numeric-contrast, coefficient-name contrast, and

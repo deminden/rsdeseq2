@@ -434,8 +434,8 @@ impl DeseqFit {
 
     /// Apply the implemented regularized-log sample-effect transform.
     ///
-    /// The fit must already contain fitted trend dispersions (`dispFit`) and
-    /// final gene-wise dispersions (`dispersion`). The rlog sample-effect prior
+    /// The fit must already contain fitted trend dispersions (`dispFit`). The
+    /// rlog sample-effect prior
     /// is estimated from this fit's normalized counts, `baseMean`, and
     /// `dispFit`, then the sample-effect ridge GLM is fit with this fit's
     /// size factors or normalization factors.
@@ -466,12 +466,11 @@ impl DeseqFit {
             .ok_or_else(|| DeseqError::InvalidDispersion {
                 reason: "fitted dispersion trend values are required before rlog".to_string(),
             })?;
-        let dispersions =
-            self.dispersion
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "final dispersions are required before rlog".to_string(),
-                })?;
+        // DESeq2's rlogData fits sample effects using the fitted dispersion
+        // trend (`dispFit`), before MAP shrinkage to final per-gene
+        // dispersions. Use that same trend for both prior estimation and the
+        // regularized GLM.
+        let dispersions = disp_fit;
         let nonzero_rows = nonzero_gene_indices(&self.all_zero);
         if nonzero_rows.len() != counts.n_genes() {
             if nonzero_rows.is_empty() {
@@ -546,7 +545,7 @@ impl DeseqFit {
 
     /// Apply rlog with supplied frozen intercepts and sample-effect prior variance.
     ///
-    /// This uses the fit state's final dispersions and size-factor or
+    /// This uses the fit state's fitted dispersion trend and size-factor or
     /// normalization-factor offsets, while treating `frozen_intercept` as the
     /// fixed log2 intercept vector. It is the fit-level building block for
     /// frozen rlog reuse.
@@ -588,10 +587,10 @@ impl DeseqFit {
             ));
         }
         let dispersions =
-            self.dispersion
+            self.disp_fit
                 .as_ref()
                 .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "final dispersions are required before frozen rlog".to_string(),
+                    reason: "fitted dispersion trend values are required before frozen rlog".to_string(),
                 })?;
         let nonzero_rows = nonzero_gene_indices(&self.all_zero);
         if nonzero_rows.len() != counts.n_genes() {

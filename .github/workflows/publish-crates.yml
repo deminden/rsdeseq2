@@ -61,6 +61,7 @@ jobs:
         run: cargo package -p rsdeseq2 --locked --allow-dirty
 
       - name: Publish
+        if: ${{ github.ref != 'refs/tags/v0.2.6' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish -p rsdeseq2 --locked --allow-dirty --token "$CARGO_REGISTRY_TOKEN"

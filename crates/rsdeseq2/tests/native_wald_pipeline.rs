@@ -5227,7 +5227,7 @@ fn fitted_trend_state_drives_norm_and_vst_transforms() {
 }
 
 #[test]
-fn fitted_map_state_drives_rlog_transform() {
+fn fitted_trend_state_drives_rlog_transform() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
@@ -5242,7 +5242,7 @@ fn fitted_map_state_drives_rlog_transform() {
         &fit.size_factors,
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
-        fit.dispersion.as_ref().unwrap(),
+        fit.disp_fit.as_ref().unwrap(),
         IrlsOptions::default(),
     )
     .unwrap();
@@ -5269,7 +5269,7 @@ fn fitted_map_state_drives_rlog_transform() {
 }
 
 #[test]
-fn fitted_map_state_drives_rlog_transform_with_normalization_factors() {
+fn fitted_trend_state_drives_rlog_transform_with_normalization_factors() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
@@ -5294,7 +5294,7 @@ fn fitted_map_state_drives_rlog_transform_with_normalization_factors() {
         fit.normalization_factors.as_ref().unwrap(),
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
-        fit.dispersion.as_ref().unwrap(),
+        fit.disp_fit.as_ref().unwrap(),
         IrlsOptions::default(),
     )
     .unwrap();
@@ -5320,7 +5320,7 @@ fn fitted_map_state_drives_rlog_transform_with_normalization_factors() {
 }
 
 #[test]
-fn fitted_map_state_drives_frozen_rlog_transform() {
+fn fitted_trend_state_drives_frozen_rlog_transform() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
@@ -5336,7 +5336,7 @@ fn fitted_map_state_drives_frozen_rlog_transform() {
     let expected = rsdeseq2::prelude::rlog_frozen_with_size_factors(
         &counts,
         &fit.size_factors,
-        fit.dispersion.as_ref().unwrap(),
+        fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,
         IrlsOptions::default(),
@@ -5353,7 +5353,7 @@ fn fitted_map_state_drives_frozen_rlog_transform() {
 }
 
 #[test]
-fn fitted_map_state_drives_frozen_rlog_transform_with_normalization_factors() {
+fn fitted_trend_state_drives_frozen_rlog_transform_with_normalization_factors() {
     let full_counts = native_wald_counts_with_zero_row();
     let counts = full_counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
@@ -5379,7 +5379,7 @@ fn fitted_map_state_drives_frozen_rlog_transform_with_normalization_factors() {
     let expected = rsdeseq2::prelude::rlog_frozen_with_normalization_factors(
         &counts,
         fit.normalization_factors.as_ref().unwrap(),
-        fit.dispersion.as_ref().unwrap(),
+        fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,
         IrlsOptions::default(),
@@ -5395,7 +5395,7 @@ fn fitted_map_state_drives_frozen_rlog_transform_with_normalization_factors() {
 }
 
 #[test]
-fn fitted_rlog_requires_map_dispersions_and_matching_counts() {
+fn fitted_rlog_uses_trend_dispersions_and_rejects_mismatched_counts() {
     let counts = native_wald_counts_with_zero_row()
         .select_rows(&[1, 2, 3, 4, 5, 6, 7])
         .unwrap();
@@ -5404,18 +5404,15 @@ fn fitted_rlog_requires_map_dispersions_and_matching_counts() {
         .fit_type(FitType::Mean)
         .fit_dispersion_trend_glm_mu(&counts, &design)
         .unwrap();
-    let err = fit.rlog(&counts).unwrap_err();
-    assert!(
-        err.to_string()
-            .contains("final dispersions are required before rlog")
-    );
+    let output = fit.rlog(&counts).unwrap();
+    assert_eq!(output.transformed.n_rows(), counts.n_genes());
 
     let wrong_counts = CountMatrix::from_row_major_u32(1, counts.n_samples(), vec![1; 8]).unwrap();
     assert!(fit.rlog(&wrong_counts).is_err());
 }
 
 #[test]
-fn fitted_frozen_rlog_requires_final_dispersions_and_matching_inputs() {
+fn fitted_frozen_rlog_uses_trend_dispersions_and_validates_inputs() {
     let counts = native_wald_counts_with_zero_row()
         .select_rows(&[1, 2, 3, 4, 5, 6, 7])
         .unwrap();
@@ -5425,13 +5422,8 @@ fn fitted_frozen_rlog_requires_final_dispersions_and_matching_inputs() {
         .fit_dispersion_trend_glm_mu(&counts, &design)
         .unwrap();
     let frozen_intercept = vec![1.0; counts.n_genes()];
-    let err = fit
-        .frozen_rlog(&counts, &frozen_intercept, 1.0)
-        .unwrap_err();
-    assert!(
-        err.to_string()
-            .contains("final dispersions are required before frozen rlog")
-    );
+    let output = fit.frozen_rlog(&counts, &frozen_intercept, 1.0).unwrap();
+    assert_eq!(output.transformed.n_rows(), counts.n_genes());
 
     let map_fit = glm_mu_native_wald_builder()
         .fit_type(FitType::Mean)
@@ -6052,7 +6044,17 @@ fn builder_fast_vst_glm_mu_preserves_normalization_factors() {
 fn builder_fast_vst_subset_trend_preserves_observation_weights() {
     let counts = native_wald_counts_with_zero_row();
     let design = two_group_design();
-    let weights = nonunit_weights_for(&counts);
+    let n_samples = counts.n_samples();
+    let weights = RowMajorMatrix::from_row_major(
+        counts.n_genes(),
+        n_samples,
+        (0..counts.n_genes())
+            .flat_map(|gene| {
+                (0..n_samples).map(move |sample| if sample == gene % n_samples { 1.0 } else { 0.2 })
+            })
+            .collect(),
+    )
+    .unwrap();
     let builder = glm_mu_native_wald_builder().observation_weights(weights.clone());
     let base_fit = builder
         .fit_size_factors_and_base_means_with_design(&counts, &design)
@@ -6072,7 +6074,16 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 4)
         .unwrap();
 
-    assert_eq!(subset.row_indices, vec![1, 7, 4, 6]);
+    let normalized = base_fit.normalized_counts(&counts).unwrap();
+    let ordinary_means = base_mean(&normalized).unwrap();
+    let expected_rows = fast_vst_subset_indices(&ordinary_means, 4).unwrap();
+    assert_eq!(subset.row_indices, expected_rows);
+    assert_ne!(
+        expected_rows,
+        fast_vst_subset_indices(&base_fit.base_mean, 4).unwrap(),
+        "fixture must distinguish ordinary from weighted selection means"
+    );
+
     assert!(subset.observation_weights.is_some());
     assert!(subset_fit.observation_weights.is_some());
     assert_eq!(

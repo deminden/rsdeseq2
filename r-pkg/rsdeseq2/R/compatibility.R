@@ -126,6 +126,9 @@
   if (anyNA(geoMeans) || any(is.nan(geoMeans)) || any(geoMeans < 0)) {
     stop("geoMeans must be non-negative or infinite", call. = FALSE)
   }
+  if (all(geoMeans == 0)) {
+    stop("geoMeans must contain at least one positive value", call. = FALSE)
+  }
   logGeoMeans <- rep(-Inf, nGenes)
   positive <- geoMeans > 0
   logGeoMeans[positive] <- log(geoMeans[positive])

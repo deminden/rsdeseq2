@@ -401,7 +401,8 @@ pub fn rlog_with_estimated_prior_and_normalization_factors(
     })
 }
 
-/// Build the rlog sample design: intercept plus one indicator per sample.
+/// Build DESeq2's rlog sample design: an unpenalized intercept plus one
+/// regularized indicator coefficient per sample.
 pub fn rlog_sample_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> {
     if n_samples == 0 {
         return Err(DeseqError::InvalidOptions {

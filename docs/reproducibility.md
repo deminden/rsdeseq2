@@ -3,6 +3,29 @@
 DESeq2 compatibility requires more than matching final p-values. Intermediate
 outputs should be generated and compared stage by stage.
 
+## Full-gene real-data Wald parity
+
+The checked-in GTEx v8 fixture contains all 56,200 genes for 61 Kidney Cortex
+samples and saved DESeq2 1.52.0 references. The Rust integration test compares
+size factors and fixed-dispersion Wald fields across the complete gene set.
+The fixture directory documents the data source, comparison settings, and
+reproduction procedure.
+
+Regenerate the counts and DESeq2 references with Python 3, R 4.6.1, and DESeq2
+1.52.0:
+
+```bash
+python3 scripts/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
+cargo test -p rsdeseq2 --test gtex_real_wald_parity -- --nocapture
+```
+
+The generator downloads the official GTEx v8 gene-read matrix and sample
+annotations, then extracts the fixture's complete gene rows for its saved
+sample IDs. The compressed matrix is cached under `target/` and is not part of
+the repository. See
+[`tests/data/gtex_v8_real_wald/README.md`](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md)
+for provenance and result details.
+
 ## Reference Generation
 
 Run:

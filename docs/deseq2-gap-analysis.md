@@ -137,10 +137,17 @@ Missing scope:
 
 Missing scope:
 
-- high-level VST object workflow and exact local `splinefun` parity,
-- full high-level rlog object dispatch using frozen intercepts with complete
-  object metadata,
-- lfcShrink-compatible hooks,
+- dataset-level VST/rlog fixtures beyond the seeded 1,200-gene, 12-sample
+  full/fast VST and three-trend rlog check, plus remaining DESeq2 fast-VST
+  subset edge behavior and broader local-VST full-workflow parity,
+- broader transformed-factor coefficient-name and contrast edge cases for
+  normal `lfcShrink`; formula interactions are rejected like DESeq2, optional
+  `ashr` shrinkage handles posterior summaries and
+  s-values, optional `apeglm` handles coefficient shrinkage, and normal
+  shrinkage handles named or indexed Wald coefficients and expanded-design
+  factor-level,
+  numeric, and list contrasts, with numeric contrasts requiring a supplied
+  result table,
 - plotting helpers,
 - mature CLI commands for full differential expression.
 
@@ -156,6 +163,17 @@ Rules for that wrapper:
 - DESeq2 remains a test/reference dependency only,
 - wrapper tests should compare wrapper output to Rust and generated DESeq2
   fixtures, not use DESeq2 as a hidden execution path.
+
+The R package now exposes this contract through `DESeq()` and `fitRust()` for
+matrix, list, and limited `DESeqDataSet` inputs. It prepares formula designs in
+R and delegates fitting to Rust. For dataset inputs it stores the fit in
+metadata and updates the fitted size or normalization factors; its own
+`results()` and `resultsNames()` functions read that fit. This does not provide
+the complete DESeq2 object workflow, diagnostic assays, or all DESeq2 options.
+Dataset-based `vst()`, `varianceStabilizingTransformation()`, and `rlog()` return
+`DESeqTransform` objects using Rust transforms. `lfcShrink()` supports normal
+beta-prior shrinkage for named or indexed Wald coefficients and expanded-design
+factor-level, numeric, and list contrasts.
 
 ## DESeq2 Reference Sources
 
@@ -179,8 +197,9 @@ The generator is:
 
 Benchmarks compare matched primitives against
 equivalent DESeq2/R reference operations, plus offline DESeq2 result fixtures
-for broader real-data parity. They are not claims about full `DESeq()` speed,
-because full DESeq2 workflow parity is outside the implemented scope.
+for broader real-data parity. The R package's high-level `DESeq()` path is not
+yet benchmarked end to end, and full DESeq2 workflow parity remains outside the
+implemented scope.
 
 The publication-style normalization sweep completed all 17 tissue matrices
 with zero mismatches. Size factors matched to `2.132e-14`, normalized counts to

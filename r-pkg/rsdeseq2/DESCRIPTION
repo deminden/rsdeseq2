@@ -1,6 +1,6 @@
 Package: rsdeseq2
 Title: Rust Backend for DESeq2-Compatible Workflows
-Version: 0.2.5
+Version: 0.2.6
 Authors@R:
     person(given = "rsdeseq2", family = "contributors",
            role = c("aut", "cre"), email = "maintainers@example.com")
@@ -10,10 +10,16 @@ Description: R access layer for a Rust implementation of DESeq2-compatible
     differential expression workflow stages and result-table semantics.
 License: MIT + file LICENSE
 Encoding: UTF-8
+SystemRequirements: Cargo (Rust 1.97.1 or newer)
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.0
 Imports:
     methods
 Suggests:
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    SummarizedExperiment,
+    S4Vectors,
+    DESeq2,
+    ashr,
+    apeglm
 Config/testthat/edition: 3

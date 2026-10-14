@@ -5225,7 +5225,9 @@ fn expanded_formula_design_supports_orthogonal_polynomial_transforms() {
         .standard_design
         .matrix()
         .as_slice()
-        .chunks_exact(5)
+        .as_chunks::<5>()
+        .0
+        .iter()
         .enumerate()
     {
         for (observed, expected) in row[2..].iter().zip(&expected[row_idx * 3..row_idx * 3 + 3]) {
@@ -5295,7 +5297,9 @@ fn expanded_formula_design_supports_orthogonal_polynomial_transforms() {
         .standard_design
         .matrix()
         .as_slice()
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .flat_map(|row| row[1..].iter())
         .zip(repeated_expected)
     {

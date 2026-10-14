@@ -1,6 +1,7 @@
 \name{rsdeseq2-primitives}
 \alias{rsdeseq2-primitives}
 \alias{DESeq}
+\alias{fitRust}
 \alias{results}
 \alias{estimateSizeFactorsRust}
 \alias{normalizedCountsRust}
@@ -19,27 +20,41 @@
 \alias{estimateDispersionsRust}
 \alias{nbinomWaldTestRust}
 \alias{nbinomLRTRust}
+\alias{vst}
+\alias{varianceStabilizingTransformation}
+\alias{rlog}
+\alias{lfcShrink}
 \title{rsdeseq2 R wrapper helpers}
 \description{
-R-facing helpers for implemented rsdeseq2 matrix stages, fitted-result objects,
-and DESeq2-compatible result-table semantics. High-level DESeqDataSet fitting
-and mutation are not implemented.
+R-facing entry points to the Rust rsdeseq2 core for matrix stages, Wald/LRT
+fitting, and DESeq2-compatible result-table semantics. The package builds a
+static library from the vendored Rust source using Cargo.
 }
 \usage{
+DESeq(object, fitType = c("parametric", "local", "mean"),
+  test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
+  nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
+  normalizationFactors = NULL, weights = NULL, ...)
+
+fitRust(object, fitType = c("parametric", "local", "mean"),
+  test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
+  nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
+  normalizationFactors = NULL, weights = NULL, ...)
+
 estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"),
-  geoMeans = NULL, controlGenes = NULL, native = FALSE)
+  geoMeans = NULL, controlGenes = NULL, native = TRUE)
 
 normalizedCountsRust(counts, sizeFactors = NULL,
-  normalizationFactors = NULL, native = FALSE)
+  normalizationFactors = NULL, native = TRUE)
 
 baseMeanRust(counts, sizeFactors = NULL, normalizationFactors = NULL,
-  native = FALSE)
+  native = TRUE)
 
 baseMetadataRust(counts, sizeFactors = NULL, normalizationFactors = NULL,
-  weights = NULL, native = FALSE)
+  weights = NULL, native = TRUE)
 
 applyCooksCutoffRust(pvalue, maxCooks, cooksCutoff, counts = NULL,
-  cooks = NULL, lowCountHeuristic = FALSE, native = FALSE)
+  cooks = NULL, lowCountHeuristic = FALSE, native = TRUE)
 
 resultsTableRust(baseMean, log2FoldChange = NULL, lfcSE = NULL,
   stat = NULL, pvalue = NULL, padj = NULL, dispersion = NULL,
@@ -73,8 +88,10 @@ deseq2McolsDiagnosticsRust(nGenes, test = c("none", "Wald", "LRT"),
 
 rsdeseq2DiagnosticSchemaRust(native = FALSE)
 
-DESeq(object, fitType = "parametric", test = "Wald", engine = "rust",
-  parityMode = "strict", nproc = 1, ...)
+DESeq(object, fitType = c("parametric", "local", "mean"),
+  test = c("Wald", "LRT"), engine = "rust",
+  parityMode = "strict", nproc = 1, design = NULL, reduced = NULL,
+  sizeFactors = NULL, normalizationFactors = NULL, weights = NULL, ...)
 
 results(object, contrast = NULL, name = NULL, listValues = c(1, -1),
   reference = NULL, lfcThreshold = 0,
@@ -83,7 +100,8 @@ results(object, contrast = NULL, name = NULL, listValues = c(1, -1),
   degreesOfFreedom = NULL, alpha = 0.1,
   independentFiltering = TRUE, ...)
 
-estimateDispersionsRust(...)
+estimateDispersionsRust(counts, design,
+  fitType = c("parametric", "local", "mean"), nproc = 1L)
 
 nbinomWaldTestRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
   betaSE = NULL, resultsNames = NULL, counts = NULL,
@@ -95,6 +113,20 @@ nbinomLRTRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
   resultsNames = NULL, counts = NULL, sampleLevels = NULL, factorLevels = NULL,
   factorReferences = NULL, modelMatrix = NULL, colData = NULL,
   rowNames = NULL, object = NULL, ...)
+
+vst(object, blind = TRUE, nsub = 1000L,
+  fitType = c("parametric", "local", "mean"), nproc = 1L)
+
+varianceStabilizingTransformation(object, blind = TRUE,
+  fitType = c("parametric", "local", "mean"), nproc = 1L)
+
+rlog(object, blind = TRUE, intercept, betaPriorVar,
+  fitType = c("parametric", "local", "mean"), nproc = 1L)
+
+lfcShrink(dds, coef = NULL, type = "normal", res = NULL, contrast = NULL,
+  lfcThreshold = 0, svalue = FALSE, independentFiltering = TRUE,
+  alpha = 0.1, apeAdapt = TRUE, apeMethod = "nbinomCR",
+  quiet = FALSE, ...)
 }
 \arguments{
 \item{counts}{Numeric or integer matrix with genes in rows and samples in columns.}
@@ -103,9 +135,12 @@ nbinomLRTRust(baseMean = NULL, beta = NULL, betaCovariance = NULL,
 \item{controlGenes}{Optional control-gene subset, as logical, numeric, or row-name values.}
 \item{native}{Whether to use the registered native \code{.Call} bridge when
 available.}
-\item{sizeFactors}{Positive numeric size factors, one per sample.}
-\item{normalizationFactors}{Positive numeric matrix with the same dimensions as \code{counts}.}
-\item{weights}{Optional finite non-negative observation-weight matrix.}
+\item{sizeFactors}{Positive numeric size factors, one per sample. In high-level
+fitting, these are used when normalization factors are absent.}
+\item{normalizationFactors}{Positive numeric matrix with the same dimensions as
+\code{counts}; these preempt size factors in high-level fitting.}
+\item{weights}{Optional finite non-negative observation-weight matrix for base
+metadata or high-level fitting.}
 \item{pvalue}{Numeric p-value vector with values in \code{[0, 1]} or \code{NA}.}
 \item{maxCooks}{Numeric vector of maximum Cook's distances, one per p-value.}
 \item{cooksCutoff}{Numeric cutoff, \code{FALSE}, or \code{NULL}.}
@@ -140,7 +175,8 @@ for numeric/list contrast all-zero handling.}
 \item{colData}{Optional sample metadata used to derive factor levels and
 character contrast sample-level vectors.}
 \item{contrast}{DESeq2-style contrast specification: character triplet, list, or
-numeric vector.}
+numeric vector. For normal \code{lfcShrink}, numeric vectors refer to expanded
+design coefficients and require a supplied result table.}
 \item{name}{Optional coefficient name for \code{results()}.}
 \item{listValues}{Two numeric weights for list contrasts.}
 \item{reference}{Optional reference level for factor-level contrast resolution.}
@@ -173,8 +209,34 @@ for implemented \code{results()} behavior, a list-like primitive Wald/LRT input,
 or an already-fitted DESeq2-shaped list/S4-like object with compatible \code{mcols}
 fields for direct \code{results()} dispatch, \code{nbinomWaldTestRust()}, or
 \code{nbinomLRTRust()}.}
-\item{fitType, engine, parityMode, nproc}{Unsupported high-level DESeq options retained in the function signature.}
-\item{...}{Additional unsupported arguments retained in the function signature.}
+\item{fitType, engine, parityMode, nproc}{Trend fit, Rust engine, execution
+mode (\code{strict}, \code{fast}, or \code{diagnostic}), and thread count.}
+\item{blind}{Whether a transformation should ignore the dataset design and use
+an intercept-only dispersion fit.}
+\item{nsub}{Positive integer number of genes used to fit the fast VST trend.
+Genes are selected by ordinary normalized-count means above 5, including when
+observation weights are present. The transform errors if fewer than \code{nsub}
+genes qualify.}
+\item{intercept, betaPriorVar}{Optional frozen rlog gene intercepts on the
+log2 scale and their shared sample-effect prior variance. Supply both together.}
+\item{dds}{A DESeqDataSet fitted with \code{rsdeseq2::DESeq()}.}
+\item{coef}{A one-based coefficient index or coefficient name from
+\code{resultsNames(dds)}.}
+\item{type}{Shrinkage method. Dataset workflows support \code{"normal"} and
+optional \code{"ashr"} or \code{"apeglm"} methods.}
+\item{res}{Optional result table containing \code{log2FoldChange} and
+\code{lfcSE}.}
+\item{svalue}{Whether to request s-values. Normal shrinkage requires
+\code{FALSE}; \code{ashr} and \code{apeglm} support s-values.}
+\item{apeAdapt}{Whether apeglm adapts its prior using the supplied result
+estimate and standard error.}
+\item{apeMethod}{Apeglm optimization method, such as \code{"nbinomCR"},
+\code{"nbinomR"}, or \code{"general"}.}
+\item{quiet}{Whether to suppress method messages.}
+\item{design, reduced}{Full and reduced numeric model matrices, or formulas for
+\code{DESeqDataSet} input.}
+\item{...}{Additional options passed to the selected optional shrinkage
+package. Normal shrinkage rejects unsupported arguments.}
 }
 \details{
 The implemented helpers operate on primitive R vectors and matrices. When
@@ -206,8 +268,25 @@ objects, list-like primitive objects, fitted-object metadata, beta matrices, or
 supplied character vectors for contrast-resolution workflows.
 \code{applyIndependentFilteringRust} applies baseMean-driven filtered BH
 adjustment to primitive result tables and stores filtering metadata in the
-\code{"independentFiltering"} attribute. Unsupported high-level DESeqDataSet
-fitting entry points raise explicit errors.
+\code{"independentFiltering"} attribute. \code{DESeq} fits matrix and list
+inputs into an \code{rsdeseq2RustFit}; for a \code{DESeqDataSet}, it returns the
+dataset with the Rust fit in metadata and fitted size or normalization factors.
+The wrapper does not populate every DESeq2 diagnostic assay or implement every
+DESeq2 fitting option.
+\code{vst}, \code{varianceStabilizingTransformation}, and \code{rlog} accept
+DESeqDataSet inputs and return DESeqTransform objects while Rust performs the
+statistical transformation. \code{rlog} accepts frozen gene intercepts and a
+shared sample-effect prior variance. \code{lfcShrink} implements normal
+beta-prior shrinkage for a named or indexed Wald coefficient and expanded-model
+factor-level, numeric, and list contrasts. Numeric contrasts require a supplied
+result table; list contrasts average selected expanded coefficients and need
+supplied results when their names are absent from the unshrunk design. The
+contrast route uses a Rust expanded-model refit and returns a DESeqResults
+object with prior information. Optional \code{ashr} shrinkage returns
+posterior means/standard deviations and s-values. Optional \code{apeglm}
+shrinkage supports named/indexed Wald coefficients and returns posterior
+standard deviations and s-values. Formula interactions and transformed-factor
+normal contrasts are not implemented.
 }
 \value{
 Depending on the helper, a numeric vector, numeric matrix, data frame, or an

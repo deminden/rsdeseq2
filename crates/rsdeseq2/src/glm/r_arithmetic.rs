@@ -170,6 +170,9 @@ fn direct(x: f64) -> f64 {
     if x >= 1. {
         return ln_gamma(x) + x * (1. - l) + 0.5 * (l - L2);
     }
+    // Keep the exact R-compatible Euler–Mascheroni literal; Rust does not
+    // expose this constant, and Clippy's approximation lint is intentional here.
+    #[allow(clippy::approx_constant)]
     let mut g = -0.5772156649015329 * x;
     let mut p = x * x;
     for (n, z) in Z.iter().copied().enumerate().skip(2) {

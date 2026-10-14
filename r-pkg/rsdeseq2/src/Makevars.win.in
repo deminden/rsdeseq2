@@ -1,3 +1,15 @@
-# The implemented primitive .Call bridge is compiled from entrypoint.c by R's
-# default package build rules. A future Rust static-library bridge can extend
-# this file when the R-facing Rust ABI is ready.
+# Windows currently requires a Rust GNU toolchain compatible with the Rtools
+# linker. Build the Rust static library before linking the R .Call adapter.
+RUST_BACKEND = rust/target/release/librsdeseq2_r.a
+
+all: $(SHLIB)
+
+$(RUST_BACKEND): FORCE
+	cd rust && cargo build --release --locked
+
+FORCE:
+.PHONY: FORCE
+
+entrypoint.o: $(RUST_BACKEND)
+
+PKG_LIBS = $(RUST_BACKEND)

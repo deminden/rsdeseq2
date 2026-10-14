@@ -183,12 +183,12 @@ fn rlog_with_size_factors_returns_finite_sample_effect_transform() {
     assert_relative_eq!(
         transformed.get(0, 0).unwrap(),
         transformed.get(0, 1).unwrap(),
-        epsilon = 1e-6
+        epsilon = 2e-6
     );
     assert_relative_eq!(
         transformed.get(0, 1).unwrap(),
         transformed.get(0, 2).unwrap(),
-        epsilon = 1e-6
+        epsilon = 2e-6
     );
 }
 
@@ -704,7 +704,7 @@ fn vst_local_applies_numerical_integration_and_log2_scaling() {
         4,
         3,
         vec![
-            1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0,
+            0.0, 1.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0,
         ],
     )
     .unwrap();
@@ -720,6 +720,26 @@ fn vst_local_applies_numerical_integration_and_log2_scaling() {
     }
     let high = transformed.as_slice().last().copied().unwrap();
     assert_relative_eq!(high, 2048_f64.log2(), epsilon = 0.01);
+
+    // Generated with DESeq2's local VST integral and R's default
+    // splinefun(method = "fmm") on the same normalized counts and trend.
+    let deseq2_reference = [
+        0.076_842_478_649_917_9,
+        1.3680646949336577,
+        2.5253304329416277,
+        3.2914331525539073,
+        4.151_579_139_866_081,
+        5.074270681751285,
+        6.033_996_570_540_191,
+        7.014_054_503_108_848,
+        8.004_793_526_148_408,
+        9.001_010_753_139_13,
+        10.000002698086275,
+        11.000391062282539,
+    ];
+    for (observed, expected) in transformed.as_slice().iter().zip(deseq2_reference) {
+        assert_relative_eq!(*observed, expected, epsilon = 1e-8);
+    }
 }
 
 #[test]

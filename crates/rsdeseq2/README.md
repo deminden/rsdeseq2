@@ -31,12 +31,14 @@ cargo install rsdeseq2 --locked
 Implemented areas include size-factor estimation, normalized counts and base
 row metadata, fixed-dispersion and selected native-dispersion NB GLM Wald/LRT
 workflows, DESeq2-style result contrasts, Cook's and independent-filtering
-helpers, beta-prior refit workflows, and `normTransform`/VST/rlog building
-blocks.
+helpers, beta-prior refit workflows, `normTransform`/VST/rlog transformations,
+and native CLI VST/rlog commands. The R package also provides dataset-based
+VST/rlog objects and selected `lfcShrink()` methods; see its package README for
+the supported Bioconductor integrations.
 
 Unsupported interfaces include complete Bioconductor `DESeqDataSet` mutation
-and metadata support, full glmGamPoi behavior, high-level rlog object semantics,
-lfcShrink, plotting, and other convenience APIs.
+and metadata support, full glmGamPoi behavior, plotting, and other convenience
+APIs.
 
 Detailed status lives in
 [docs/deseq2-gap-analysis.md][gap-analysis] and
@@ -44,19 +46,17 @@ Detailed status lives in
 
 ## Validation
 
-Measurements recorded for rsdeseq2 0.2.5 against saved R 4.6.1 / DESeq2
-1.52.0 outputs include:
+The test suite compares Rust stages with saved DESeq2 references. Its real-data
+Wald fixture contains all 56,200 genes for 61 GTEx v8 Kidney Cortex samples.
+Against DESeq2 1.52.0, all 48,683 finite Wald rows match with maximum absolute
+differences of `2.386e-7` for log2 fold change, `4.140e-10` for standard error,
+`3.734e-7` for the statistic, and `4.955e-8` for the p-value. The maximum
+relative size-factor difference is `5.551e-15`. Fixture provenance and the
+reproduction command are in the [real-data fixture notes](tests/data/gtex_v8_real_wald/README.md).
 
-- four real-data Wald contrasts covering 278,257 rows with zero missing-row or
-  finite/NA-pattern mismatches;
-- 612,699,575 normalized-count values with zero finite/NA mismatches, maximum
-  absolute difference `1.937e-7`, and maximum relative difference `9.887e-15`;
-- 512/512 exact endpoints, objective values, and evaluation counts when
-  replaying the recorded bounded optimizer fixture with `rcompat-lbfgsb` 0.2.1.
-
-The measured primitive CLI timings do not establish a complete DESeq2 workflow
-speed difference. See the repository [benchmark documentation][benchmarks] for
-the full absolute measurements, baselines, fixtures, and interpretation.
+Primitive CLI timings do not establish a complete DESeq2 workflow speed
+difference. See the repository [benchmark documentation][benchmarks] for
+measurements and interpretation.
 
 ## Rust Usage
 

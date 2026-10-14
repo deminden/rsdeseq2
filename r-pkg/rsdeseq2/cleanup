@@ -1,2 +1,4 @@
 #!/usr/bin/env sh
-echo "rsdeseq2 cleanup: no generated Rust bridge artifacts to remove."
+package_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+rm -f "$package_root/src/Makevars" "$package_root/src/Makevars.win"
+echo "rsdeseq2 cleanup: removed generated Makevars files."

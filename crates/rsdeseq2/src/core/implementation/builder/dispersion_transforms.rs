@@ -298,9 +298,9 @@ impl DeseqBuilder {
     /// dataset, the deterministic fast-VST row subset is selected from the
     /// full-data `baseMean`, and the dispersion trend is fit on the subset
     /// count matrix. The returned subset keeps the original row indices and
-    /// aligned normalized counts/factors for inspection. Unweighted selection
-    /// matches DESeq2 1.52.0. Weighted selection uses Rust's stored weighted
-    /// `baseMean`, so exact weighted subset-index parity is not claimed.
+    /// aligned normalized counts/factors for inspection. Selection uses
+    /// ordinary means of normalized counts, matching DESeq2 1.52.0 even when
+    /// the trend fit propagates observation weights.
     pub fn fit_fast_vst_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -314,10 +314,11 @@ impl DeseqBuilder {
         }
         design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
         let stages = self.normalization_stages_for_design(counts, design)?;
+        let selection_means = base_mean(&stages.normalized)?;
         let subset = build_fast_vst_subset(
             counts,
             &stages.normalized,
-            &stages.base_mean,
+            &selection_means,
             nsub,
             stages.normalization_factors.as_ref(),
             stages.observation_weights.as_ref(),
@@ -401,8 +402,10 @@ impl DeseqBuilder {
 /// fit on the deterministic fast-VST subset and applied to the full count
 /// matrix. Otherwise, the selected GLM-mu dispersion trend is fit on the
     /// full count matrix before transforming the full matrix. DESeq2 1.52.0
-    /// instead stops when too few rows qualify, and weighted Rust fits select
-    /// on weighted `baseMean` rather than ordinary normalized-count row means.
+    /// instead stops when too few rows qualify. Both weighted and unweighted
+    /// Rust paths select rows using ordinary normalized-count row means, as
+    /// DESeq2 does; the automatic builder helper retains its documented
+    /// full-data fallback for too few eligible rows.
     pub fn vst_glm_mu_auto(
         &self,
         counts: &CountMatrix,
@@ -414,8 +417,9 @@ impl DeseqBuilder {
                 reason: "automatic VST subset size must be positive".to_string(),
             });
         }
-        let base_fit = self.fit_size_factors_and_base_means_with_design(counts, design)?;
-        let eligible_rows = base_fit.fast_vst_eligible_count()?;
+        let stages = self.normalization_stages_for_design(counts, design)?;
+        let selection_means = base_mean(&stages.normalized)?;
+        let eligible_rows = count_fast_vst_eligible_rows(&selection_means)?;
         // Rust uses the deterministic subset when enough rows qualify and the
         // full dataset otherwise. DESeq2's wrapper errors in the latter case.
         if eligible_rows >= nsub {
@@ -479,9 +483,10 @@ impl DeseqBuilder {
 
     /// Apply the implemented GLM-mu rlog workflow in one builder call.
     ///
-    /// This fits GLM-mu gene-wise, trend, prior, and MAP dispersion stages
-    /// using the builder's current options, then applies the fit-state rlog
-    /// transform with default IRLS options.
+    /// This fits GLM-mu gene-wise dispersions and the selected trend, then
+    /// applies the fit-state rlog transform with default IRLS options. As in
+    /// DESeq2's `rlogData`, sample effects are fit with the trend values before
+    /// MAP shrinkage to final per-gene dispersions.
     pub fn rlog_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -518,7 +523,7 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
-        let fit = self.fit_map_dispersions_glm_mu(counts, design)?;
+        let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
         let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
         Ok(RlogGlmMuOutput {
             rlog,

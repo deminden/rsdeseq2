@@ -1,3 +1,27 @@
 #!/usr/bin/env sh
-echo "rsdeseq2 configure: using the C .Call bridge for implemented primitive helpers."
-echo "rsdeseq2 configure: the Rust static-library bridge is not enabled yet."
+set -eu
+
+package_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "rsdeseq2 requires Cargo to build its Rust backend" >&2
+  exit 1
+fi
+case "$(uname -s)" in
+  Linux)
+    rust_link_libraries="-lpthread -lm -ldl"
+    rust_linker_flags="-Wl,-x"
+    ;;
+  Darwin)
+    rust_link_libraries="-lpthread -lm"
+    rust_linker_flags="-Wl,-x"
+    ;;
+  *)
+    rust_link_libraries="-lpthread -lm"
+    rust_linker_flags=""
+    ;;
+esac
+sed "s|@RUST_LINK_LIBS@|$rust_link_libraries|g" \
+  "$package_root/src/Makevars.in" |
+  sed "s|@RUST_LINK_FLAGS@|$rust_linker_flags|g" \
+  > "$package_root/src/Makevars"
+echo "rsdeseq2 configure: enabled the Rust core static library."

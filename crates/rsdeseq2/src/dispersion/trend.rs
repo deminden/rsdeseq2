@@ -365,9 +365,13 @@ impl LocalDispersionTrend {
     fn rcompat_fit(&self) -> Result<LocalFit, DeseqError> {
         let degree = self.degree.min(self.log_means.len().saturating_sub(1));
         let min_points = (degree + 1).min(self.log_means.len()).max(1);
+        // R locfit predicts from an interpolated evaluation grid. Use the
+        // Hermite-backed locfit approximation for ordinary DESeq2 fits once
+        // there are enough points to support its local quadratic evaluations;
+        // keep direct prediction for non-default options and tiny edge cases.
         let prediction_method = if self.span == LocalDispersionTrendOptions::default().span
             && self.degree == LocalDispersionTrendOptions::default().degree
-            && self.log_means.len() >= 100
+            && self.log_means.len() >= 4
         {
             PredictionMethod::LocfitHermiteApprox
         } else {

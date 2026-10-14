@@ -199,8 +199,10 @@ For `fitType="local"`, Rust evaluates the fitted local dispersion trend on the
 same `sinh(seq(asinh(0), asinh(max(q)), length.out=1000))[-1]` grid shape used
 by DESeq2, integrates `1 / sqrt(dispersion(q) * q^2 + xim * q)` with a
 trapezoid rule, and rescales the integral using type-7 95% and 99.9% quantiles
-of row means so high counts follow `log2(q)`. The interpolation is
-deterministic linear interpolation over the integrated grid. The `xim` term can
+of row means so high counts follow `log2(q)`. The integrated grid is evaluated
+with R `splinefun(method = "fmm")`-compatible cubic interpolation and endpoint
+polynomial extrapolation. A DESeq2-generated local-transform fixture covers
+values both within and beyond the spline knots. The `xim` term can
 be computed from size factors with `mean(1 / sizeFactors)`, or from
 normalization factors by DESeq2's local-VST approximation
 `sf = exp(colMeans(log(normalizationFactors)))` followed by `mean(1 / sf)`.
@@ -209,10 +211,14 @@ normalization-factor matrix directly and compute this local variance term
 internally; mean and parametric branches ignore the term after factor
 validation.
 
-For large counts all three transforms converge toward `log2(q)`. Unsupported
-VST behavior includes frozen dispersion-function reuse, exact DESeq2
-`splinefun` behavior for the local branch, complete object metadata, and
-high-level wrapper semantics. A lower-level
+For large counts all three transforms converge toward `log2(q)`. At the R
+dataset layer, full-data VST reuses an existing parametric or mean
+`dispersionFunction` by passing its fitted coefficients into Rust. DESeq2 stores
+local dispersion functions as R closures with interpolation state, so the
+wrapper evaluates that function on DESeq2's 999-point grid and Rust performs
+the local VST integration from those values. Fast `vst()` continues to fit its
+deterministic subset, as DESeq2 does. Design-aware `rlog()` reuses an existing
+`mcols(object)$dispFit`; blind `rlog()` refits the trend. A lower-level
 `vst_with_dispersion_trend` and its factor-aware variants mirror DESeq2's
 `getVarianceStabilizedData` branch selection once the caller already has a
 fitted `DispersionTrendFit`. `DeseqFit` also retains the implemented fitted
@@ -224,9 +230,9 @@ fitted trend, which is the reusable primitive for applying a fast-subset trend
 to the full normalized count matrix.
 
 The fast `vst()` wrapper in DESeq2 1.52.0 estimates the dispersion trend on a
-deterministic subset before applying the fitted transform to all rows. For
-inputs without observation weights, the Rust subset helper uses the same
-selection rule: compute ordinary row means of normalized counts, retain values
+deterministic subset before applying the fitted transform to all rows. The
+Rust dataset and builder paths use the same selection rule: compute ordinary
+row means of normalized counts, retain values
 above 5, order by those means, and select
 `round(seq(1, n, length.out=nsub))` positions using R-style half-to-even
 rounding. The exported `DEFAULT_FAST_VST_NSUB` constant is `1000`, matching the
@@ -238,34 +244,33 @@ normalization factors and observation weights, in one deterministic order.
 
 Observation-weighted fast-VST trend fitting reuses the design-preprocessed
 weight matrix and subsets those rows alongside counts and normalization data.
-For weighted builder inputs, Rust selects rows using its stored weighted
-`baseMean`, defined as the row mean of normalized counts multiplied
-elementwise by the raw observation weights. DESeq2 1.52.0 `vst()` instead
-selects rows using ordinary row means of normalized counts, without applying
-observation weights to the selection statistic. Weight propagation and
-weighted subset trend fitting are therefore implemented, but exact DESeq2
-subset-index parity is not claimed for weighted inputs.
+Both the Rust builder and R dataset wrapper select rows using ordinary means
+of normalized counts, without applying observation weights to the selection
+statistic, matching DESeq2 1.52.0. Observation weights remain aligned with the
+selected rows and are propagated into trend fitting.
 
 `DeseqBuilder::vst_glm_mu_auto` provides Rust-specific orchestration: it uses
 the fast subset when enough rows pass the Rust eligibility rule and otherwise
 fits the selected trend on all rows. DESeq2 1.52.0 `vst()` stops when fewer
 than `nsub` rows have ordinary mean normalized count above 5, so the Rust
-full-data fallback is not equivalent to that wrapper behavior. The returned
+builder's full-data fallback is not equivalent to that wrapper behavior. The
+Bioconductor dataset `vst()` route uses the strict fast-subset path and errors
+when fewer than `nsub` eligible genes are available. The returned
 `VstGlmMuOutput` records the trend source, requested `nsub`, eligible-row
 count, transform dimensions, trend-fit dimensions and type, and optional
 fast-subset indices. `blind_vst_glm_mu_auto` applies the same Rust decision
 with an intercept-only design. `CountMatrix::select_rows` preserves gene and
-sample names in the selected raw-count matrix. End-to-end weighted fast-VST
-parity with DESeq2 is not claimed.
+sample names in the selected raw-count matrix.
 
 ## Regularized Log
 
 The Rust core includes a low-level regularized-log sample-effect primitive.
 `rlog_with_size_factors()` and `rlog_with_normalization_factors()` build the
-same foundational design shape used by DESeq2 rlog: one intercept plus one
-indicator column per sample. The intercept receives a wide log2-scale prior
-variance, while every sample effect receives a shared caller-supplied
-log2-scale prior variance. The implementation reuses the existing
+DESeq2 learned-intercept design: one unpenalized intercept plus one sample
+indicator coefficient for each sample. The intercept receives a wide
+log2-scale prior variance, while each sample effect receives the shared
+caller-supplied log2-scale prior variance. The
+implementation reuses the existing
 negative-binomial beta-prior GLM machinery and returns a genes x samples matrix
 assembled as:
 
@@ -297,13 +302,13 @@ frozen-intercept transform: caller-supplied log2 intercepts are converted to
 gene-specific offsets, only sample-effect coefficients are fit, and the output
 is assembled as the frozen intercept plus the fitted sample effect.
 `DeseqFit::regularized_log_transform()` and the short `rlog()` alias expose
-the same composition from stored fit state after the implemented dispersion
-MAP stages have produced `dispFit` and final dispersions.
+the same composition from stored fit state using the fitted dispersion trend
+(`dispFit`) for the sample-effect GLM, matching DESeq2's `rlogData` path.
 `DeseqFit::regularized_log_transform_with_frozen_intercept()` and the short
 `frozen_rlog()` alias expose frozen-intercept reuse from the same fit state,
-using stored final dispersions and offsets. For one-call Rust workflows,
-`DeseqBuilder::rlog_glm_mu()` first runs the implemented GLM-mu MAP dispersion
-stages and then applies fit-state rlog. `blind_rlog_glm_mu()` uses a named
+using stored trend dispersions and offsets. For one-call Rust workflows,
+`DeseqBuilder::rlog_glm_mu()` fits gene-wise dispersions and their GLM-mu trend,
+then applies fit-state rlog. `blind_rlog_glm_mu()` uses a named
 intercept-only design for the same implemented `blind=TRUE` shape used by the
 CLI. `frozen_rlog_glm_mu_with_fit()` and
 `blind_frozen_rlog_glm_mu_with_fit()` learn the rlog intercept/prior, then run
@@ -317,9 +322,24 @@ unfiltered count matrices remain accepted. `RlogOutput` includes the
 transformed matrix, fitted per-gene intercepts, estimated sample-effect prior
 variance, the offset source, and a compact metadata view for wrappers and
 benchmark logs.
-The full high-level DESeq2 `rlog()` object workflow is not implemented.
-Low-level and builder APIs support frozen intercepts; full object dispatch and
-Bioconductor metadata are unsupported.
+The R package now routes DESeqDataSet-based `rlog()` through the Rust builder
+and returns a `DESeqTransform`, including optional frozen-intercept reuse.
+Dataset-based `vst()` and `varianceStabilizingTransformation()` use the same
+Rust fitting path and preserve the Bioconductor dataset metadata needed for a
+transform result. A seeded 1,200-gene, 12-sample fixture covers full and fast
+VST plus rlog across mean, parametric, and local trends; broader dataset
+coverage and every fast-VST subset edge case remain open. The R wrapper's
+`lfcShrink()` supports normal beta-prior
+shrinkage for named/indexed Wald coefficients and expanded-design factor-level,
+numeric, and list contrasts. The contrast route uses an expanded model and
+factor-level prior averaging; numeric contrasts require a supplied result
+table, and list contrasts need one when their names are absent from the
+unshrunk design. Optional `ashr` shrinkage returns posterior means/SDs and
+s-values; optional `apeglm` shrinkage handles named/indexed Wald coefficients
+with posterior SDs and s-values. Cleaned coefficient aliases work for
+transformed-factor formulas; factor-level contrast syntax remains unsupported
+when DESeq2 cannot resolve its coefficient names. Formula interactions are
+rejected for normal shrinkage.
 
 ## Gene-Wise Dispersion Objective
 
@@ -907,7 +927,9 @@ semantics, including `contrast` taking precedence over `name`. Stored
 `results_contrast_request()` dispatcher that selects Wald or LRT behavior from
 the fitted test state while preserving branch-specific contrast semantics and
 contrast-all-zero cleanup for character and two-sided numeric/list contrasts.
-High-level Bioconductor object mutation and metadata support and additional
+The R package now offers limited `DESeqDataSet` integration: it stores its Rust
+fit in metadata and updates fitted size or normalization factors. Complete
+Bioconductor object mutation and metadata support and additional
 contrast-aware Cook's/refit edge cases are not implemented.
 
 For primitive numeric contrasts with both positive and negative coefficients,
@@ -1037,10 +1059,11 @@ be traced back to `dispGeneEst`, `dispFit`, `dispMAP`, final dispersion
 estimates, beta estimates, beta optimizer starts, beta standard errors,
 iteration/convergence fields, deviance, or Cook's summaries.
 Full Bioconductor result objects and complete high-level object mutation are
-not implemented. The lightweight Rust fit/result metadata and primitive R wrapper
-already preserve implemented formula-aware contrast labels, sample-level
-metadata, factor levels, and explicit factor references for the supported
-already-fitted routes.
+not implemented. The R package can attach a Rust fit to a `DESeqDataSet` and
+dispatch supported result requests through its own helpers. Lightweight Rust
+fit/result metadata and primitive R routes preserve implemented formula-aware
+contrast labels, sample-level metadata, factor levels, and explicit factor
+references for supported already-fitted routes.
 
 ## Cook's Distances
 
@@ -1538,7 +1561,8 @@ estimates from the limited linear-mu or GLM-mu parametric/local/mean MAP
 subsets.
 Cook's outlier replacement/refitting, beta priors, exact R `lowess` parity, and
 contrast result-table handling are available for the workflows described
-above. High-level Bioconductor object attachment and some edge cases remain
+above. The R package does not attach the complete Cook's diagnostic and
+replacement/refit assays to `DESeqDataSet` objects, and some edge cases remain
 unsupported. Shared internal helpers
 skip all-zero rows during GLM fitting and expand compact outputs back to full
 gene order with `NaN` internal numeric values and `None` result-table values,

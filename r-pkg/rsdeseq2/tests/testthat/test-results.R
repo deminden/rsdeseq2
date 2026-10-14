@@ -1,4 +1,4 @@
-testthat::test_that("R wrapper results are explicit future work", {
+testthat::test_that("results rejects objects that were not fitted by a supported route", {
   testthat::expect_error(results(NULL))
 })
 
