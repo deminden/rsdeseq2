@@ -1,5 +1,5 @@
-use crate::errors::{invalid_dimensions, DeseqError};
-use crate::math::qr::{matrix_rank, DEFAULT_RANK_TOLERANCE};
+use crate::errors::{DeseqError, invalid_dimensions};
+use crate::math::qr::{DEFAULT_RANK_TOLERANCE, matrix_rank};
 use crate::matrix::RowMajorMatrix;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
@@ -7,10 +7,32 @@ use crate::matrix::RowMajorMatrix;
 /// Rows are samples and columns are coefficients. The Rust formula helper covers
 /// a primitive DESeq2-style subset; callers can still provide arbitrary matrices
 /// directly when they need richer formula semantics.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
 pub struct DesignMatrix {
     matrix: RowMajorMatrix<f64>,
     coefficient_names: Option<Vec<String>>,
+    // Immutable design products shared across row optimizers and clones.
+    cox_products: std::sync::OnceLock<Option<std::sync::Arc<SharedDesignProducts>>>,
+}
+
+pub(crate) struct SharedDesignProducts {
+    pub(crate) offsets: Vec<usize>,
+    pub(crate) products: Vec<(usize, usize, f64)>,
+}
+
+impl PartialEq for DesignMatrix {
+    fn eq(&self, other: &Self) -> bool {
+        self.matrix == other.matrix && self.coefficient_names == other.coefficient_names
+    }
+}
+
+impl std::fmt::Debug for DesignMatrix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DesignMatrix")
+            .field("matrix", &self.matrix)
+            .field("coefficient_names", &self.coefficient_names)
+            .finish()
+    }
 }
 
 /// Expanded and standard design matrices for one factor.
@@ -195,10 +217,7 @@ impl FormulaModelFrame {
     /// `reference`, then the first declared level, then the first observed
     /// sample level. `Ok(None)` means the model frame is valid but has no
     /// factor with that exact name.
-    pub fn resolved_factor_reference(
-        &self,
-        factor_name: &str,
-    ) -> Result<Option<&str>, DeseqError> {
+    pub fn resolved_factor_reference(&self, factor_name: &str) -> Result<Option<&str>, DeseqError> {
         self.validate()?;
         self.factors
             .iter()
@@ -330,6 +349,15 @@ impl FormulaModelFrame {
 }
 
 impl DesignMatrix {
+    pub(crate) fn cached_cox_products(
+        &self,
+        build: impl FnOnce() -> Option<SharedDesignProducts>,
+    ) -> Option<std::sync::Arc<SharedDesignProducts>> {
+        self.cox_products
+            .get_or_init(|| build().map(std::sync::Arc::new))
+            .clone()
+    }
+
     /// Create an intercept-only design matrix with one all-ones coefficient.
     pub fn intercept_only(n_samples: usize) -> Result<Self, DeseqError> {
         Self::from_row_major(
@@ -348,18 +376,20 @@ impl DesignMatrix {
         coefficient_names: Option<Vec<String>>,
     ) -> Result<Self, DeseqError> {
         if let Some(names) = &coefficient_names
-            && names.len() != n_coefficients {
-                return Err(invalid_dimensions(
-                    "design coefficient names",
-                    n_coefficients,
-                    names.len(),
-                ));
-            }
+            && names.len() != n_coefficients
+        {
+            return Err(invalid_dimensions(
+                "design coefficient names",
+                n_coefficients,
+                names.len(),
+            ));
+        }
         let matrix = RowMajorMatrix::from_row_major(n_samples, n_coefficients, values)?;
         matrix.validate_finite("design matrix")?;
         Ok(Self {
             matrix,
             coefficient_names,
+            cox_products: std::sync::OnceLock::new(),
         })
     }
 

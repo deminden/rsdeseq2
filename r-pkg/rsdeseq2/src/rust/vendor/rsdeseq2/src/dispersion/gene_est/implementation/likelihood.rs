@@ -334,6 +334,8 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
     }
     let inv_alpha = alpha.recip();
     let inv_alpha_squared = inv_alpha * inv_alpha;
+    let digamma_inv_alpha = dispersion_digamma(inv_alpha);
+    let mut trigamma_inv_alpha = None;
     let mut first_alpha_sum = 0.0;
     let mut second_alpha_sum = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
@@ -342,11 +344,19 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         let y = f64::from(count);
         let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective second derivative")?;
         let first_term =
-            dispersion_digamma(inv_alpha) + mu_alpha.log1p
+            digamma_inv_alpha + mu_alpha.log1p
                 - mu_alpha.ratio
                 - dispersion_digamma(y + inv_alpha)
                 + y * mu_alpha.alpha_over_one_plus;
-        let second_term = -inv_alpha_squared * trigamma(inv_alpha)?
+        let base_trigamma = match trigamma_inv_alpha {
+            Some(value) => value,
+            None => {
+                let value = trigamma(inv_alpha)?;
+                trigamma_inv_alpha = Some(value);
+                value
+            }
+        };
+        let second_term = -inv_alpha_squared * base_trigamma
             + mu_alpha.mu_squared_alpha_over_one_plus_squared
             + inv_alpha_squared * trigamma(y + inv_alpha)?
             + y * mu_alpha.inv_one_plus_squared;
@@ -387,8 +397,11 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
             "dispersion objective second derivative sum",
         )?;
     }
-    let first_log_alpha =
-        dispersion_nb_log_likelihood_kernel_derivative_weighted(counts, mu, log_alpha, weights)?;
+    let first_log_alpha = checked_log_alpha_first_derivative(
+        inv_alpha,
+        first_alpha_sum,
+        "dispersion objective log-alpha derivative",
+    )?;
     checked_log_alpha_second_derivative(
         second_alpha_sum,
         inv_alpha,

@@ -102,6 +102,7 @@ pub fn dispersion_log_posterior_with_prior_and_weights(
             prior,
             weights,
             weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+            prepared_cox: None,
         },
         log_alpha,
     )
@@ -126,12 +127,13 @@ fn dispersion_log_posterior_objective(
         };
         posterior = checked_add(
             posterior,
-            cox_reid_adjustment_weighted_with_threshold(
+            cox_reid_adjustment_weighted_with_threshold_prepared(
                 design,
                 input.mu,
                 log_alpha,
                 input.weights,
                 input.weight_threshold,
+                input.prepared_cox,
             )?,
             0,
             "dispersion log posterior Cox-Reid sum",
@@ -206,6 +208,7 @@ pub fn dispersion_log_posterior_derivative_with_prior_and_weights(
             prior,
             weights,
             weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+            prepared_cox: None,
         },
         log_alpha,
     )
@@ -230,12 +233,13 @@ fn dispersion_log_posterior_derivative_objective(
         };
         derivative = checked_add(
             derivative,
-            cox_reid_adjustment_derivative_weighted_with_threshold(
+            cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
                 design,
                 input.mu,
                 log_alpha,
                 input.weights,
                 input.weight_threshold,
+                input.prepared_cox,
             )?,
             0,
             "dispersion log posterior derivative Cox-Reid sum",
@@ -310,6 +314,7 @@ pub fn dispersion_log_posterior_second_derivative_with_prior_and_weights(
             prior,
             weights,
             weight_threshold: GeneWiseDispersionOptions::default().weight_threshold,
+            prepared_cox: None,
         },
         log_alpha,
     )
@@ -335,12 +340,13 @@ fn dispersion_log_posterior_second_derivative_objective(
         checked_scaled_sum(
             &[
                 likelihood,
-                cox_reid_adjustment_second_derivative_weighted_with_threshold(
+                cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
                     design,
                     input.mu,
                     log_alpha,
                     input.weights,
                     input.weight_threshold,
+                    input.prepared_cox,
                 )?,
             ],
             "dispersion log posterior second derivative Cox-Reid sum",

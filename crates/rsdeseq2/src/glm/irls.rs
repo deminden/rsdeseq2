@@ -1244,15 +1244,6 @@ fn fitted_mu(
     fitted_mu_impl(x, beta, nf, Some(min_mu))
 }
 
-#[cfg(test)]
-fn fitted_mu_unfloored(
-    x: &DMatrix<f64>,
-    beta: &DVector<f64>,
-    nf: &[f64],
-) -> Result<Vec<f64>, DeseqError> {
-    fitted_mu_impl(x, beta, nf, None)
-}
-
 fn fitted_mu_log2_unfloored(
     x: &DMatrix<f64>,
     beta: &[f64],
@@ -1407,11 +1398,6 @@ impl ScaledSum {
         }
         checked_product2(self.normalized_sum, self.scale)
     }
-}
-
-#[cfg(test)]
-fn finite_scaled_exp(factor: f64, eta: f64) -> Option<f64> {
-    finite_scaled_exp_with_log(factor, eta, None)
 }
 
 fn finite_scaled_exp_with_log(factor: f64, eta: f64, log_factor: Option<f64>) -> Option<f64> {

@@ -47,13 +47,24 @@ impl<'a> FixedDispersionLikelihood<'a> {
     pub(crate) fn new(counts: &'a [u32], dispersion: f64) -> Self {
         let size = dispersion.recip();
         let gamma_size = ln_gamma(size);
+        let gamma_one = ln_gamma(1.0);
         let gamma_terms = counts
             .iter()
             .copied()
             .map(|count| {
                 let y = f64::from(count);
                 // Preserve both subtractions before the mean-dependent terms.
-                ln_gamma(y + size) - gamma_size - ln_gamma(y + 1.0)
+                let gamma_y_size = if count == 0 {
+                    gamma_size
+                } else {
+                    ln_gamma(y + size)
+                };
+                let gamma_y_one = if count == 0 {
+                    gamma_one
+                } else {
+                    ln_gamma(y + 1.0)
+                };
+                gamma_y_size - gamma_size - gamma_y_one
             })
             .collect();
         Self {
@@ -103,6 +114,9 @@ fn nbinom_log_likelihood_with_cached_gamma(
         ));
     }
     validate_dispersion(dispersion, None)?;
+    let size = dispersion.recip();
+    let gamma_size = cached_gamma.is_none().then(|| ln_gamma(size));
+    let gamma_one = cached_gamma.is_none().then(|| ln_gamma(1.0));
     let mut log_like = 0.0;
     for (idx, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_mu(mu, Some(idx))?;
@@ -112,7 +126,26 @@ fn nbinom_log_likelihood_with_cached_gamma(
                 gamma_terms[idx] - size * log1p_mu_dispersion(mu, dispersion, mu_dispersion)
                     + count_log_term(f64::from(count), mu_dispersion)
             }
-            None => nbinom_log_pmf_unchecked(count, mu, dispersion),
+            None => {
+                let y = f64::from(count);
+                let mu_dispersion = mu * dispersion;
+                let gamma_size = gamma_size.expect("uncached likelihood computes gamma size");
+                let gamma_y_size = if count == 0 {
+                    gamma_size
+                } else {
+                    ln_gamma(y + size)
+                };
+                let gamma_y_one = if count == 0 {
+                    gamma_one.expect("uncached likelihood computes gamma one")
+                } else {
+                    ln_gamma(y + 1.0)
+                };
+                gamma_y_size
+                    - gamma_size
+                    - gamma_y_one
+                    - size * log1p_mu_dispersion(mu, dispersion, mu_dispersion)
+                    + count_log_term(y, mu_dispersion)
+            }
         };
         validate_log_pmf_term(term, Some(idx))?;
         let weighted_term = match weights {
