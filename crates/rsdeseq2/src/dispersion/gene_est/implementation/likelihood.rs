@@ -41,6 +41,7 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         });
     }
     let inv_alpha = alpha.recip();
+    let log_gamma_inv_alpha = dispersion_lgamma(inv_alpha);
     let mut total = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
@@ -54,7 +55,7 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
             "dispersion objective mean plus inverse alpha",
         )?;
         let term = dispersion_lgamma(y + inv_alpha)
-            - dispersion_lgamma(inv_alpha)
+            - log_gamma_inv_alpha
             - y * mu_plus_inv_alpha.ln()
             - inv_alpha * (1.0 + mu_alpha).ln();
         if !term.is_finite() {
