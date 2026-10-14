@@ -64,9 +64,9 @@ Validated on 2026-10-14 with R 4.6.1 / DESeq2 1.52.0:
 - Rust workspace: 1,064 tests passed; formatting and Clippy passed.
 - R Rust bridge: formatting and Clippy passed.
 - R source package: `R CMD check --no-manual --no-build-vignettes` reported
-  `Status: OK`, with 851 passing test assertions. One optional `apeglm` test
-  was skipped because that package is unavailable locally; the check used
-  `_R_CHECK_FORCE_SUGGESTS_=false`.
+  `Status: OK`, with 860 passing test assertions and no skipped tests.
+  `apeglm` 1.34.0 was installed in the pinned `deseq2-r461` R environment;
+  DESeq2 remained at 1.52.0. The final check required all suggested packages.
 - Python script tests: 18 passed.
 - Full GTEx replay: 121/121 per-contrast and 9/9 global checks passed; all
   22 result/diagnostic files matched `9acb44b` exactly.
