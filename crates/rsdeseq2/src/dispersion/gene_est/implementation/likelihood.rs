@@ -54,7 +54,12 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
             sample,
             "dispersion objective mean plus inverse alpha",
         )?;
-        let term = dispersion_lgamma(y + inv_alpha)
+        let log_gamma_y = if count == 0 {
+            log_gamma_inv_alpha
+        } else {
+            dispersion_lgamma(y + inv_alpha)
+        };
+        let term = log_gamma_y
             - log_gamma_inv_alpha
             - y * mu_plus_inv_alpha.ln()
             - inv_alpha * (1.0 + mu_alpha).ln();
