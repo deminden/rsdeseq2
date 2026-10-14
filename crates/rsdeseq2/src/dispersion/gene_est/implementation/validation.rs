@@ -407,6 +407,15 @@ fn mu_alpha_terms(
     index: usize,
     context: &str,
 ) -> Result<MuAlphaTerms, DeseqError> {
+    mu_alpha_terms_impl::<true>(mu, alpha, index, context)
+}
+
+fn mu_alpha_terms_impl<const NEED_LOG: bool>(
+    mu: f64,
+    alpha: f64,
+    index: usize,
+    context: &str,
+) -> Result<MuAlphaTerms, DeseqError> {
     let mu_alpha = mu * alpha;
     let terms = if mu_alpha.is_finite() {
         let one_plus = 1.0 + mu_alpha;
@@ -435,14 +444,14 @@ fn mu_alpha_terms(
             "mean curvature term",
         )?;
         MuAlphaTerms {
-            log1p: (1.0 + mu_alpha).ln(),
+            log1p: if NEED_LOG { (1.0 + mu_alpha).ln() } else { 0.0 },
             ratio,
             alpha_over_one_plus,
             mu_squared_alpha_over_one_plus_squared,
             inv_one_plus_squared,
         }
     } else {
-        let log1p = mu.ln() + alpha.ln();
+        let log1p = if NEED_LOG { mu.ln() + alpha.ln() } else { 0.0 };
         let alpha_over_one_plus = mu.recip();
         let mu_squared_alpha_over_one_plus_squared = alpha.recip();
         MuAlphaTerms {
@@ -502,7 +511,13 @@ fn cox_reid_weight_terms(
     alpha: f64,
     index: usize,
 ) -> Result<CoxReidWeightTerms, DeseqError> {
-    let mu_alpha = mu_alpha_terms(mu, alpha, index, "Cox-Reid working weight")?;
+    // Positive finite inputs make the unused logarithm finite. Keep all
+    // remaining curvature/weight checks and the original invalid-input path.
+    let mu_alpha = if mu.is_finite() && mu > 0.0 && alpha.is_finite() && alpha > 0.0 {
+        mu_alpha_terms_impl::<false>(mu, alpha, index, "Cox-Reid working weight")?
+    } else {
+        mu_alpha_terms(mu, alpha, index, "Cox-Reid working weight")?
+    };
     let weight = checked_mul(
         mu_alpha.ratio,
         alpha.recip(),
