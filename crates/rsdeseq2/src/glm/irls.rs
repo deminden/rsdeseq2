@@ -415,10 +415,12 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
     let mut iter = 0_usize;
     let mut converged = false;
 
+    let mut w = Vec::with_capacity(mu.len());
+    let mut z = Vec::with_capacity(mu.len());
     for t in 0..input.options.maxit {
         iter += 1;
-        let w = working_weights(&mu, dispersion, weight_row)?;
-        let z = working_response_with_log_factors(&mu, nf, &y, Some(&log_nf))?;
+        working_weights_into(&mu, dispersion, weight_row, &mut w)?;
+        working_response_into(&mu, nf, &y, Some(&log_nf), &mut z)?;
         let Some(next_beta) =
             solve_weighted_least_squares(input.x, &w, &z, input.ridge_lambda, input.options.solver)
         else {
@@ -433,12 +435,13 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
             iter = input.options.maxit;
             break;
         }
-        mu = fitted_mu_impl_with_logs(
+        fitted_mu_into(
             input.x,
             &beta,
             nf,
             Some(input.options.min_mu),
             Some(&log_nf),
+            &mut mu,
         )?;
         dev = -2.0 * likelihood.log_likelihood(&mu, weight_row)?;
         let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
@@ -1302,10 +1305,22 @@ fn fitted_mu_impl_with_logs(
     min_mu: Option<f64>,
     log_nf: Option<&[f64]>,
 ) -> Result<Vec<f64>, DeseqError> {
-    (0..x.nrows())
-        .zip(nf.iter().copied())
-        .enumerate()
-        .map(|(sample, (row, factor))| {
+    let mut output = Vec::with_capacity(x.nrows());
+    fitted_mu_into(x, beta, nf, min_mu, log_nf, &mut output)?;
+    Ok(output)
+}
+
+fn fitted_mu_into(
+    x: &DMatrix<f64>,
+    beta: &DVector<f64>,
+    nf: &[f64],
+    min_mu: Option<f64>,
+    log_nf: Option<&[f64]>,
+    output: &mut Vec<f64>,
+) -> Result<(), DeseqError> {
+    output.clear();
+    let values = (0..x.nrows()).zip(nf.iter().copied()).enumerate().map(
+        |(sample, (row, factor))| -> Result<f64, DeseqError> {
             validate_positive_finite(factor, "normalization factor", sample)?;
             let eta =
                 checked_row_dot_vector(x, row, beta).ok_or_else(|| DeseqError::NonFiniteValue {
@@ -1329,8 +1344,12 @@ fn fitted_mu_impl_with_logs(
                 });
             }
             Ok(min_mu.map_or(mu, |min_mu| mu.max(min_mu)))
-        })
-        .collect()
+        },
+    );
+    for value in values {
+        output.push(value?);
+    }
+    Ok(())
 }
 
 fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f64> {
@@ -1415,11 +1434,24 @@ fn working_weights(
     dispersion: f64,
     weights: Option<&[f64]>,
 ) -> Result<Vec<f64>, DeseqError> {
+    let mut output = Vec::with_capacity(mu.len());
+    working_weights_into(mu, dispersion, weights, &mut output)?;
+    Ok(output)
+}
+
+fn working_weights_into(
+    mu: &[f64],
+    dispersion: f64,
+    weights: Option<&[f64]>,
+    output: &mut Vec<f64>,
+) -> Result<(), DeseqError> {
     validate_positive_finite(dispersion, "dispersion", 0)?;
-    mu.iter()
+    output.clear();
+    let values = mu
+        .iter()
         .copied()
         .enumerate()
-        .map(|(sample, value)| {
+        .map(|(sample, value)| -> Result<f64, DeseqError> {
             validate_positive_finite(value, "mu", sample)?;
             let working_weight = stable_working_weight(value, dispersion).ok_or_else(|| {
                 DeseqError::NonFiniteValue {
@@ -1442,8 +1474,11 @@ fn working_weights(
                 }
                 None => working_weight,
             })
-        })
-        .collect()
+        });
+    for value in values {
+        output.push(value?);
+    }
+    Ok(())
 }
 
 fn stable_working_weight(mu: f64, dispersion: f64) -> Option<f64> {
@@ -1462,49 +1497,71 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
     working_response_with_log_factors(mu, nf, y, None)
 }
 
+#[cfg(test)]
 fn working_response_with_log_factors(
     mu: &[f64],
     nf: &[f64],
     y: &[f64],
     log_nf: Option<&[f64]>,
 ) -> Result<Vec<f64>, DeseqError> {
-    mu.iter()
+    let mut output = Vec::with_capacity(mu.len());
+    working_response_into(mu, nf, y, log_nf, &mut output)?;
+    Ok(output)
+}
+
+fn working_response_into(
+    mu: &[f64],
+    nf: &[f64],
+    y: &[f64],
+    log_nf: Option<&[f64]>,
+    output: &mut Vec<f64>,
+) -> Result<(), DeseqError> {
+    output.clear();
+    let values = mu
+        .iter()
         .copied()
         .zip(nf.iter().copied())
         .zip(y.iter().copied())
         .enumerate()
-        .map(|(sample, ((mu, factor), count))| {
-            validate_positive_finite(mu, "mu", sample)?;
-            validate_positive_finite(factor, "normalization factor", sample)?;
-            let normalized_mean = match log_nf {
-                Some(values) => checked_sum2(mu.ln(), -values[sample]),
-                None => stable_log_normalized_mean(mu, factor),
-            };
-            let log_normalized_mu = normalized_mean.ok_or_else(|| DeseqError::NonFiniteValue {
-                context: "IRLS working response normalized mean".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            let residual = checked_sum2(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
-                context: "IRLS working response residual".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            let scaled_residual =
-                checked_div2(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
-                    context: "IRLS working response scaled residual".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                })?;
-            checked_sum2(log_normalized_mu, scaled_residual).ok_or_else(|| {
-                DeseqError::NonFiniteValue {
-                    context: "IRLS working response".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                }
-            })
-        })
-        .collect()
+        .map(
+            |(sample, ((mu, factor), count))| -> Result<f64, DeseqError> {
+                validate_positive_finite(mu, "mu", sample)?;
+                validate_positive_finite(factor, "normalization factor", sample)?;
+                let normalized_mean = match log_nf {
+                    Some(values) => checked_sum2(mu.ln(), -values[sample]),
+                    None => stable_log_normalized_mean(mu, factor),
+                };
+                let log_normalized_mu =
+                    normalized_mean.ok_or_else(|| DeseqError::NonFiniteValue {
+                        context: "IRLS working response normalized mean".to_string(),
+                        index: Some(sample),
+                        value: f64::NAN,
+                    })?;
+                let residual =
+                    checked_sum2(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                        context: "IRLS working response residual".to_string(),
+                        index: Some(sample),
+                        value: f64::NAN,
+                    })?;
+                let scaled_residual =
+                    checked_div2(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                        context: "IRLS working response scaled residual".to_string(),
+                        index: Some(sample),
+                        value: f64::NAN,
+                    })?;
+                checked_sum2(log_normalized_mu, scaled_residual).ok_or_else(|| {
+                    DeseqError::NonFiniteValue {
+                        context: "IRLS working response".to_string(),
+                        index: Some(sample),
+                        value: f64::NAN,
+                    }
+                })
+            },
+        );
+    for value in values {
+        output.push(value?);
+    }
+    Ok(())
 }
 
 fn stable_log_normalized_mean(mu: f64, factor: f64) -> Option<f64> {
@@ -1558,9 +1615,9 @@ fn solve_weighted_least_squares_qr(
     }
     let (q, r) = augmented_x.qr().unpack();
     let rhs = q.transpose() * augmented_z;
-    let r_econ = r.view((0, 0), (p, p)).into_owned();
-    let rhs_econ = rhs.rows(0, p).into_owned();
-    r_econ.lu().solve(&rhs_econ)
+    // The augmented matrix has n+p >= p rows; unpack already returns an
+    // economic p-by-p R and a p-element transformed response.
+    r.lu().solve(&rhs)
 }
 
 fn covariance_and_hat_diagonal(
