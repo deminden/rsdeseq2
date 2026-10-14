@@ -1364,20 +1364,23 @@ fn working_weights(
         .enumerate()
         .map(|(sample, value)| {
             validate_positive_finite(value, "mu", sample)?;
-            let working_weight =
-                stable_working_weight(value, dispersion).ok_or(DeseqError::NonFiniteValue {
+            let working_weight = stable_working_weight(value, dispersion).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
                     context: "IRLS working weight".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
-                })?;
+                }
+            })?;
             Ok(match weights {
                 Some(weights) => {
                     let weight = weights[sample];
                     validate_nonnegative_finite(weight, "weight", sample)?;
-                    checked_product2(weight, working_weight).ok_or(DeseqError::NonFiniteValue {
-                        context: "IRLS weighted working weight".to_string(),
-                        index: Some(sample),
-                        value: f64::NAN,
+                    checked_product2(weight, working_weight).ok_or_else(|| {
+                        DeseqError::NonFiniteValue {
+                            context: "IRLS weighted working weight".to_string(),
+                            index: Some(sample),
+                            value: f64::NAN,
+                        }
                     })?
                 }
                 None => working_weight,
