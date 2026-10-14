@@ -1227,10 +1227,12 @@ fn fitted_mu_log2_unfloored(
     (0..x.nrows())
         .map(|sample| {
             validate_positive_finite(nf[sample], "normalization factor", sample)?;
-            let eta = checked_row_dot_slice(x, sample, beta).ok_or(DeseqError::NonFiniteValue {
-                context: "optim fallback linear predictor".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
+            let eta = checked_row_dot_slice(x, sample, beta).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "optim fallback linear predictor".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                }
             })?;
             let mu = nf[sample] * 2.0_f64.powf(eta);
             if !mu.is_finite() || mu <= 0.0 {
@@ -1256,12 +1258,13 @@ fn fitted_mu_impl(
         .enumerate()
         .map(|(sample, (row, factor))| {
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let eta = checked_row_dot_vector(x, row, beta).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS linear predictor".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            let mu = finite_scaled_exp(factor, eta).ok_or(DeseqError::NonFiniteValue {
+            let eta =
+                checked_row_dot_vector(x, row, beta).ok_or_else(|| DeseqError::NonFiniteValue {
+                    context: "IRLS linear predictor".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
+            let mu = finite_scaled_exp(factor, eta).ok_or_else(|| DeseqError::NonFiniteValue {
                 context: "IRLS fitted mean".to_string(),
                 index: Some(sample),
                 value: f64::NAN,
