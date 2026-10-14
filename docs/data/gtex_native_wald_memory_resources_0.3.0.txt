@@ -1,0 +1,440 @@
+## condition_blocked / rsdeseq2_rep01
+       16.68 real        16.55 user         0.10 sys
+           354025472  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21800  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                2579  involuntary context switches
+        477175363089  instructions retired
+         71740062301  cycles elapsed
+           265749152  peak memory footprint
+
+## condition_blocked / DESeq2_rep01
+       21.34 real        20.96 user         0.33 sys
+          1886633984  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              122314  page reclaims
+                  77  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                3874  involuntary context switches
+        477443427409  instructions retired
+         92265659413  cycles elapsed
+          1146193816  peak memory footprint
+
+## sex_female_vs_male / rsdeseq2_rep01
+       11.02 real        10.95 user         0.06 sys
+           308527104  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               19235  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                1488  involuntary context switches
+        344339845045  instructions retired
+         47543520707  cycles elapsed
+           245203568  peak memory footprint
+
+## sex_female_vs_male / DESeq2_rep01
+       16.24 real        15.92 user         0.30 sys
+          1805205504  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              130865  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                2317  involuntary context switches
+        357451736610  instructions retired
+         70306570390  cycles elapsed
+          1173538736  peak memory footprint
+
+## male_age4_vs_age3 / rsdeseq2_rep01
+       10.00 real         9.93 user         0.05 sys
+           249610240  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               15637  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                1534  involuntary context switches
+        297859135309  instructions retired
+         43099195545  cycles elapsed
+           202818112  peak memory footprint
+
+## male_age4_vs_age3 / DESeq2_rep01
+       15.04 real        14.70 user         0.31 sys
+          1715240960  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              117448  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                2337  involuntary context switches
+        327299095366  instructions retired
+         64975653836  cycles elapsed
+          1094436784  peak memory footprint
+
+## blocked_random_rep01 / rsdeseq2_rep01
+       16.78 real        16.67 user         0.09 sys
+           354041856  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21800  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                2356  involuntary context switches
+        473040847334  instructions retired
+         72384325853  cycles elapsed
+           265847456  peak memory footprint
+
+## blocked_random_rep01 / DESeq2_rep01
+       21.65 real        21.20 user         0.36 sys
+          1908015104  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              124743  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                6632  involuntary context switches
+        476957219129  instructions retired
+         92674251920  cycles elapsed
+          1151879088  peak memory footprint
+
+## blocked_random_rep02 / rsdeseq2_rep01
+       17.02 real        16.87 user         0.13 sys
+           353992704  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21798  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                2482  involuntary context switches
+        474127726465  instructions retired
+         73295795913  cycles elapsed
+           265601696  peak memory footprint
+
+## blocked_random_rep02 / DESeq2_rep01
+       21.70 real        21.25 user         0.38 sys
+          1962164224  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              125471  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                6157  involuntary context switches
+        477958542514  instructions retired
+         93328490434  cycles elapsed
+          1125042312  peak memory footprint
+
+## blocked_random_rep03 / rsdeseq2_rep01
+       17.02 real        16.84 user         0.12 sys
+           354025472  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21799  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                8164  involuntary context switches
+        472260626266  instructions retired
+         72654506647  cycles elapsed
+           265716384  peak memory footprint
+
+## blocked_random_rep03 / DESeq2_rep01
+       21.36 real        20.98 user         0.33 sys
+          1909227520  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              123553  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                3755  involuntary context switches
+        478286987484  instructions retired
+         92369418676  cycles elapsed
+          1134364592  peak memory footprint
+
+## blocked_random_rep04 / rsdeseq2_rep01
+       17.71 real        17.42 user         0.14 sys
+           353959936  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21795  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                9742  involuntary context switches
+        480588215697  instructions retired
+         74829932335  cycles elapsed
+           265700000  peak memory footprint
+
+## blocked_random_rep04 / DESeq2_rep01
+       22.08 real        21.56 user         0.38 sys
+          1934278656  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              125272  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                9546  involuntary context switches
+        478343579879  instructions retired
+         93988379375  cycles elapsed
+          1139607616  peak memory footprint
+
+## blocked_random_rep05 / rsdeseq2_rep01
+       17.30 real        17.08 user         0.14 sys
+           329973760  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               20330  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                5544  involuntary context switches
+        481499770921  instructions retired
+         73852981250  cycles elapsed
+           270369416  peak memory footprint
+
+## blocked_random_rep05 / DESeq2_rep01
+       21.65 real        21.24 user         0.37 sys
+          1893826560  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              122783  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                4431  involuntary context switches
+        478915159874  instructions retired
+         93400080495  cycles elapsed
+          1120929688  peak memory footprint
+
+## unblocked_random_rep01 / rsdeseq2_rep01
+       11.67 real        11.51 user         0.09 sys
+           283557888  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               17712  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                3375  involuntary context switches
+        338546446419  instructions retired
+         49808042806  cycles elapsed
+           236814960  peak memory footprint
+
+## unblocked_random_rep01 / DESeq2_rep01
+       16.43 real        16.07 user         0.33 sys
+          1853849600  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              128569  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                2736  involuntary context switches
+        358473034534  instructions retired
+         71031673444  cycles elapsed
+          1116587976  peak memory footprint
+
+## unblocked_random_rep02 / rsdeseq2_rep01
+       11.52 real        11.40 user         0.11 sys
+           308510720  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               19235  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                1728  involuntary context switches
+        336783956493  instructions retired
+         49622261362  cycles elapsed
+           245203592  peak memory footprint
+
+## unblocked_random_rep02 / DESeq2_rep01
+       16.40 real        16.04 user         0.32 sys
+          1797308416  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              126346  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                2635  involuntary context switches
+        358257155892  instructions retired
+         70919110047  cycles elapsed
+          1147291592  peak memory footprint
+
+## unblocked_random_rep03 / rsdeseq2_rep01
+       11.43 real        11.34 user         0.08 sys
+           308494336  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               19234  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   0  voluntary context switches
+                1702  involuntary context switches
+        340779187353  instructions retired
+         49248792756  cycles elapsed
+           245187208  peak memory footprint
+
+## unblocked_random_rep03 / DESeq2_rep01
+       16.39 real        16.03 user         0.33 sys
+          1854242816  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              129965  page reclaims
+                  25  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   9  voluntary context switches
+                2735  involuntary context switches
+        358333010982  instructions retired
+         70880111729  cycles elapsed
+          1151141856  peak memory footprint
+

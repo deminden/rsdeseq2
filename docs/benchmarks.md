@@ -2,11 +2,12 @@
 
 ## Current native Wald comparison
 
-The [0.3.0 GTEx parity and speed comparison](gtex-native-wald-benchmark.md)
+The [0.3.0 GTEx parity, speed and memory comparison](gtex-native-wald-benchmark.md)
 covers eleven full native Wald contrasts, including biological comparisons
 and blocked/unblocked random splits. It includes current measurements and
-committed contrast-generation and matched timing scripts. The primitive and
-earlier-release measurements below retain their recorded scope and dates.
+committed contrast-generation and matched time/peak-memory scripts. The
+primitive and earlier-release measurements below retain their recorded scope
+and dates.
 
 The benchmark suite compares supported CLI commands with the corresponding
 DESeq2 operations. It reports CLI-stage timings, memory, and

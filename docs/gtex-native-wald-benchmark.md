@@ -1,4 +1,4 @@
-# GTEx native Wald parity and speed: 0.3.0
+# GTEx native Wald parity, speed and memory: 0.3.0
 
 This comparison uses all 56,200 GTEx v8 Kidney Cortex genes in each of eleven
 contrasts. The native workflow estimates size factors, gene-wise dispersions,
@@ -47,9 +47,9 @@ finite/NA pattern. Base means are checked at floating-point precision.
 | Blocked random 03 | 48,683 | `1.31e-06` | `4.77e-06` | `9.78e-06` | `3.48e-09` |
 | Blocked random 04 | 48,683 | `1.97e-06` | `7.23e-06` | `9.63e-06` | `1.2e-09` |
 | Blocked random 05 | 48,683 | `7.15e-06` | `8.59e-06` | `1.25e-05` | `1.26e-05` |
-| UnBlocked random 01 | 48,683 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `4.44e-09` |
-| UnBlocked random 02 | 48,683 | `1.51e-09` | `1.37e-06` | `1.66e-06` | `2.11e-06` |
-| UnBlocked random 03 | 48,683 | `1.25e-09` | `3.1e-06` | `2.53e-06` | `2.87e-05` |
+| Unblocked random 01 | 48,683 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `4.44e-09` |
+| Unblocked random 02 | 48,683 | `1.51e-09` | `1.37e-06` | `1.66e-06` | `2.11e-06` |
+| Unblocked random 03 | 48,683 | `1.25e-09` | `3.1e-06` | `2.53e-06` | `2.87e-05` |
 
 [Machine-readable precision results](data/gtex_native_wald_parity_0.3.0.tsv)
 include LFC median, p99 and maximum errors, plus maximum SE, statistic,
@@ -75,9 +75,9 @@ runs. A ratio above one means less elapsed time for Rust.
 | Blocked random 03 | 17.05 | 21.51 | 1.26× |
 | Blocked random 04 | 16.99 | 21.59 | 1.27× |
 | Blocked random 05 | 17.14 | 21.64 | 1.26× |
-| UnBlocked random 01 | 11.53 | 16.41 | 1.42× |
-| UnBlocked random 02 | 11.68 | 16.33 | 1.40× |
-| UnBlocked random 03 | 11.46 | 16.62 | 1.45× |
+| Unblocked random 01 | 11.53 | 16.41 | 1.42× |
+| Unblocked random 02 | 11.68 | 16.33 | 1.40× |
+| Unblocked random 03 | 11.46 | 16.62 | 1.45× |
 
 The recorded run uses an Apple M5 on macOS 27.0.1, with Rust fitting limited to
 one Rayon thread and DESeq2 running without BiocParallel, with one BLAS thread.
@@ -104,6 +104,48 @@ match the validated outputs exactly. R under the explicit one-thread BLAS
 profile differs from the original frozen R run by at most `1.72e-9` in LFC
 and `9.00e-7` in p-value; the
 precision table above consistently uses the frozen oracle.
+
+## Memory
+
+Measured on 2026-10-14 in a separate pass over the same eleven contrasts, with
+the same binary, inputs, DESeq2 version, machine and one-thread settings used
+for the speed comparison. Peak resident memory was **5.33–6.87× higher
+for DESeq2**, equivalent to **81.2–85.4% less for Rust**.
+
+| Contrast | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | Memory ratio: DESeq2 / Rust |
+| --- | ---: | ---: | ---: |
+| Original blocked | 337.62 | 1799.23 | 5.33× |
+| Male vs female | 294.23 | 1721.58 | 5.85× |
+| Male age 4 vs 3 | 238.05 | 1635.78 | 6.87× |
+| Blocked random 01 | 337.64 | 1819.62 | 5.39× |
+| Blocked random 02 | 337.59 | 1871.27 | 5.54× |
+| Blocked random 03 | 337.62 | 1820.78 | 5.39× |
+| Blocked random 04 | 337.56 | 1844.67 | 5.46× |
+| Blocked random 05 | 314.69 | 1806.09 | 5.74× |
+| Unblocked random 01 | 270.42 | 1767.97 | 6.54× |
+| Unblocked random 02 | 294.22 | 1714.05 | 5.83× |
+| Unblocked random 03 | 294.20 | 1768.34 | 6.01× |
+
+Peak RSS is the maximum resident set size of the entire fitting process,
+including input matrices, native allocations, and interpreter/library memory.
+R startup and package loading are included. MiB means 2^20 bytes. This measures
+resident memory across the complete process lifetime. Each process was
+measured once, sequentially, on Apple M5/macOS 27.0.1. The ratio is DESeq2 peak
+RSS divided by Rust peak RSS. These measurements are specific to this workflow
+and machine and do not establish repeated-run uncertainty.
+
+[Per-contrast memory data](data/gtex_native_wald_memory_0.3.0.tsv),
+[raw process runs with byte values and result hashes](data/gtex_native_wald_memory_runs_0.3.0.tsv),
+[native resource reports](data/gtex_native_wald_memory_resources_0.3.0.txt),
+[hardware/thread provenance](data/gtex_native_wald_memory_provenance_0.3.0.json),
+[R session](data/gtex_native_wald_memory_R_session_0.3.0.txt), and
+[input/reference checksums](data/gtex_native_wald_memory_input_sha256_0.3.0.tsv)
+are committed. All eleven Rust memory-run results are
+[byte-identical to the validated `9acb44b` outputs](data/gtex_native_wald_memory_output_sha256_0.3.0.tsv).
+The [memory-run parity table](data/gtex_native_wald_memory_parity_0.3.0.tsv)
+records both tools against the frozen reference. Gene coverage and finite/NA
+patterns match for all runs. The original precision and speed tables retain
+their recorded provenance.
 
 ## Reproduce the contrasts and references
 
@@ -137,19 +179,26 @@ errors. Recreating a reference with a different R/BLAS build can change its
 last floating-point digits and stopping decisions; inspect those differences
 before treating that environment as the recorded oracle.
 
-## Reproduce the speed comparison
+## Reproduce the speed and memory comparison
 
 ```sh
 python3 scripts/benchmark_gtex_native_wald.py \
   --rscript /path/to/Rscript \
   --rust-threads 1 --blas-threads 1 --repeats 1 \
-  --output-dir results/benchmarks/release_0.3.0/speed
+  --output-dir results/benchmarks/release_0.3.0/speed_memory
 ```
 
 [`benchmark_gtex_native_wald.py`](../scripts/benchmark_gtex_native_wald.py) and
 its [R helper](../scripts/benchmark_gtex_native_wald.R) are committed. They
-write raw timings, per-contrast summaries, numeric comparisons to the frozen
+write raw timings and peak RSS in bytes/MiB, per-contrast summaries, native
+resource reports, numeric comparisons to the frozen
 reference, R session information, thread settings, hardware details and input,
 reference and binary hashes. The benchmark leaves all frozen references
 unchanged. Use `--repeats 3` for repeated measurements; odd/even repetitions
 alternate tool order. `--contrasts NAME ...` selects a named subset.
+
+Peak RSS is collected with `/usr/bin/time -l` on macOS (native byte units) or
+GNU `/usr/bin/time -v` on Linux (native KiB units), then normalized to MiB.
+Use `--time-bin /path/to/gtime` to select a GNU time executable on macOS.
+The original speed-only table predates the memory extension. Its raw timing
+data remain unchanged; the separate memory pass records its own elapsed times.

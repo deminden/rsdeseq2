@@ -48,7 +48,7 @@ Detailed status lives in
 
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex, including biological comparisons and reproducible blocked/unblocked
-random splits. The [current parity and matched speed comparison][gtex-benchmark]
+random splits. The [current parity, speed and memory comparison][gtex-benchmark]
 records measurements, settings, hardware, and reproduction commands. The
 [dispersion correction report][gtex-parity] documents the automatic mean-fitting
 correction and remaining error bounds.

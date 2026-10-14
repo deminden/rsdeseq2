@@ -50,12 +50,12 @@ integration tests cover fitted means, Cook's distances, replacement/refitting,
 and result metadata. See [R wrapper status](r-wrapper.md) for the supported
 scope and remaining limitations.
 
-### Current parity and speed evidence
+### Current parity, speed and memory evidence
 
 The [11-contrast native Wald benchmark](gtex-native-wald-benchmark.md) contains
-current parity results, matched Rust/DESeq2 process timings, and reproducible
-contrast-generation and benchmark commands. Detailed evidence lives in the
-documentation; the main README links to the current results.
+current parity results, matched Rust/DESeq2 process timings and peak resident
+memory, and reproducible contrast-generation and benchmark commands. Detailed
+evidence lives in the documentation; the main README links to the current results.
 
 ### Local release validation
 
@@ -74,6 +74,10 @@ Validated on 2026-10-14 with R 4.6.1 / DESeq2 1.52.0:
 - Matched native Wald timing: all 11 contrasts completed; time ratios were
   1.24–1.52× (DESeq2 time divided by Rust time), one process run per tool and
   contrast. Timed Rust results matched the validated outputs exactly.
+- Matched native Wald peak RSS: all 11 contrasts completed; memory ratios were
+  5.33–6.87× (DESeq2 peak RSS divided by Rust peak RSS), or
+  81.2–85.4% lower peak RSS for Rust. All Rust memory-run results matched
+  `9acb44b` exactly; frozen inputs and references were unchanged.
 - Rust crate packaging and verification passed with the locked dependencies.
 
 The current release comparison uses the complete 11-contrast GTEx suite.

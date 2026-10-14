@@ -1,7 +1,7 @@
 # Reproducibility
 
 Current full native Wald contrast generation, frozen parity checks, and matched
-speed runs are documented in the
+speed and peak-memory runs are documented in the
 [0.3.0 GTEx benchmark](gtex-native-wald-benchmark.md). Its biological designs,
 blocked/unblocked random splits and fixed seed are reproduced by the committed
 `scripts/generate_gtex_mode_contrasts.py` and R reference helper.

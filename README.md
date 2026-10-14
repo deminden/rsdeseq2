@@ -165,9 +165,27 @@ from **1.24× to 1.52×**. These single-run measurements are specific to this
 machine and workflow.
 
 
+### Memory
+
+| Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | Memory ratio: DESeq2 / Rust |
+| --- | ---: | ---: | ---: |
+| Original blocked | 337.62 | 1799.23 | 5.33× |
+| Male vs female | 294.23 | 1721.58 | 5.85× |
+| Male age 4 vs 3 | 238.05 | 1635.78 | 6.87× |
+| Blocked random splits | 337.59 | 1820.78 | 5.39× |
+| Unblocked random splits | 294.20 | 1767.97 | 6.01× |
+
+Peak whole-process resident memory, measured once per tool and contrast in a
+separate pass on the same machine and one-thread profile. Multiple-contrast
+groups show medians across their distinct contrasts; group ratios divide those
+medians. MiB = 2^20 bytes. R interpreter and package memory are included.
+Individual DESeq2/Rust memory ratios range from **5.33× to 6.87×**, or
+**81.2–85.4% less peak RSS for Rust**. All Rust results match the
+validated numerical outputs exactly.
+
 Full per-contrast results, hardware/settings, and the committed contrast and
 benchmark scripts are documented in the
-[current parity and matched speed comparison](docs/gtex-native-wald-benchmark.md).
+[current parity, speed and memory comparison](docs/gtex-native-wald-benchmark.md).
 The [dispersion correction report](docs/gtex-dispersion-improvement.md) records
 stage checks and remaining error bounds.
 
