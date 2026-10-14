@@ -319,6 +319,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             _ => return Err("parityMode must be strict, fast, or diagnostic".into()),
         };
         let mut builder = DeseqBuilder::new()
+            .automatic_dispersion_means()
             .fit_type(selected_fit_type)
             .test(selected_test_type)
             .execution_mode(selected_execution_mode)
@@ -920,6 +921,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
             _ => return Err("fitType must be parametric, local, or mean".into()),
         };
         let mut builder = DeseqBuilder::new()
+            .automatic_dispersion_means()
             .fit_type(selected_fit_type)
             .threads(threads.max(1));
         if !size_factors_values.is_null() {

@@ -57,6 +57,7 @@ pub use crate::dispersion::{
     dispersion_nb_log_likelihood_kernel_second_derivative_weighted,
     dispersion_nb_log_likelihood_kernel_weighted, dispersion_prior_derivative,
     dispersion_prior_log_density, dispersion_prior_second_derivative, estimate_dispersion_prior,
+    design_uses_linear_dispersion_means, estimate_gene_wise_dispersions_auto,
     estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_glm_mu,
     estimate_gene_wise_dispersions_linear_mu, estimate_low_df_prior_variance,
     estimate_map_dispersions, fit_dispersion_grid, fit_dispersion_grid_no_cr,

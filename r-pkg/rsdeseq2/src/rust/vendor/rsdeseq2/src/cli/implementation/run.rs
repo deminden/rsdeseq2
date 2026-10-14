@@ -89,7 +89,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
-            let mut builder = DeseqBuilder::new()
+            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into());
             builder = apply_cli_normalization_inputs(
@@ -137,7 +137,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
-            let mut builder = DeseqBuilder::new()
+            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into());
             builder = apply_cli_normalization_inputs(
@@ -267,7 +267,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             let beta_prior_observation_weights = observation_weights.clone();
             let beta_prior_geometric_means = geometric_means.clone();
             let beta_prior_control_genes = control_genes.clone();
-            let mut builder = DeseqBuilder::new()
+            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into())
                 .wald_lfc_threshold(lfc_threshold, alternative.into());
@@ -735,7 +735,7 @@ fn run(cli: Cli) -> Result<(), DeseqError> {
             let counts = read_count_matrix_tsv(counts)?;
             let design = read_cli_design_matrix(design, &counts)?;
             let reduced_design = read_cli_design_matrix(reduced_design, &counts)?;
-            let mut builder = DeseqBuilder::new()
+            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into());
             builder = apply_cli_result_options(

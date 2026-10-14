@@ -17,7 +17,8 @@ use crate::design::{
     formula_has_offset_terms, ExpandedAdditiveFactorDesign, ExpandedFormulaDesignWithOffsets,
 };
 use crate::dispersion::{
-    estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_glm_mu,
+    estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_auto,
+    estimate_gene_wise_dispersions_glm_mu,
     estimate_gene_wise_dispersions_linear_mu, estimate_map_dispersions, fit_local_dispersion_trend,
     fit_mean_dispersion_trend, fit_parametric_dispersion_trend, DispersionTrendFit,
     GeneWiseDispersionInput, GeneWiseDispersionOptions, LocalDispersionTrendOptions,

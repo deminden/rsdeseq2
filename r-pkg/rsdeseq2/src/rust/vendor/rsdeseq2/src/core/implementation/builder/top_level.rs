@@ -1,7 +1,7 @@
 impl DeseqBuilder {
     /// Run the currently implemented DESeq-like workflow.
     ///
-    /// For `test=Wald`, this follows the implemented GLM-mu native path and
+    /// For `test=Wald`, this selects DESeq2-compatible dispersion means and
     /// reports the last design coefficient, matching DESeq2's default
     /// coefficient selection shape. For `test=Lrt`, callers must first store a
     /// reduced design with [`DeseqBuilder::reduced_design`].
@@ -33,11 +33,11 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
-                self.fit_wald_glm_mu(counts, design, coefficient)
+                self.with_automatic_dispersion_means().fit_wald_glm_mu(counts, design, coefficient)
             }
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results(counts, design, reduced_design)
+                self.with_automatic_dispersion_means().fit_lrt_with_results(counts, design, reduced_design)
             }
         }
     }
@@ -65,11 +65,11 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
-                self.fit_wald_glm_mu(counts, design, coefficient)
+                self.with_automatic_dispersion_means().fit_wald_glm_mu(counts, design, coefficient)
             }
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_name(counts, design, reduced_design, coefficient_name)
+                self.with_automatic_dispersion_means().fit_lrt_with_results_name(counts, design, reduced_design, coefficient_name)
             }
         }
     }
@@ -113,7 +113,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
-                self.fit_wald_glm_mu_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_wald_glm_mu_with_cooks_replacement(
                     counts,
                     design,
                     coefficient,
@@ -154,7 +154,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
-                self.fit_wald_glm_mu_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_wald_glm_mu_with_cooks_replacement(
                     counts,
                     design,
                     coefficient,
@@ -203,7 +203,7 @@ impl DeseqBuilder {
                 .map(CooksReplacementTestOutput::Wald),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -253,7 +253,7 @@ impl DeseqBuilder {
                 .map(CooksReplacementTestOutput::Wald),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_name_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_name_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -297,10 +297,10 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_contrast(counts, design, contrast),
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_contrast(counts, design, reduced_design, contrast)
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast(counts, design, reduced_design, contrast)
             }
         }
     }
@@ -325,7 +325,7 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_with_cooks_replacement(
                 counts,
                 design,
                 contrast,
@@ -356,7 +356,7 @@ impl DeseqBuilder {
                 .map(CooksReplacementTestOutput::Wald),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_contrast_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -376,10 +376,10 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_contrast_spec(counts, design, contrast),
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_spec(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_contrast_spec(counts, design, reduced_design, contrast)
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec(counts, design, reduced_design, contrast)
             }
         }
     }
@@ -491,7 +491,7 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
                 counts,
                 design,
                 contrast,
@@ -523,7 +523,7 @@ impl DeseqBuilder {
                 .map(CooksReplacementTestOutput::Wald),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -599,7 +599,7 @@ impl DeseqBuilder {
             },
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_contrast_request_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_request_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -668,8 +668,7 @@ impl DeseqBuilder {
             }
             TestType::Lrt => {
                 let reduced_design = builder.reduced_design_for_top_level_lrt()?;
-                builder
-                    .fit_lrt_with_results_contrast_request_from_model_frame_with_cooks_replacement(
+                builder.with_automatic_dispersion_means().fit_lrt_with_results_contrast_request_from_model_frame_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -690,10 +689,10 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_factor_level_contrast(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
                     counts,
                     design,
                     reduced_design,
@@ -723,7 +722,7 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         match self.test {
-            TestType::Wald => self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+            TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
                 counts,
                 design,
                 contrast,
@@ -755,7 +754,7 @@ impl DeseqBuilder {
                 .map(CooksReplacementTestOutput::Wald),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                     counts,
                     design,
                     reduced_design,
@@ -777,7 +776,7 @@ impl DeseqBuilder {
         full_design: &DesignMatrix,
         reduced_design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.fit_lrt_with_results(counts, full_design, reduced_design)
+        self.with_automatic_dispersion_means().fit_lrt_with_results(counts, full_design, reduced_design)
             .map(|(fit, _results)| fit)
     }
 
@@ -802,7 +801,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let coefficient = default_results_coefficient(full_design)?;
-        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
 
     /// Build supported full and reduced formula designs from stored
@@ -833,7 +832,7 @@ impl DeseqBuilder {
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
-        self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
 
     /// Build supported full and reduced formula designs from stored
@@ -909,7 +908,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<DeseqFit, DeseqError> {
-        self.fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name)
+        self.with_automatic_dispersion_means().fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name)
             .map(|(fit, _results)| fit)
     }
 
@@ -940,7 +939,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
@@ -951,7 +950,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<DeseqFit, DeseqError> {
-        self.fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast)
+        self.with_automatic_dispersion_means().fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast)
             .map(|(fit, _results)| fit)
     }
 
@@ -963,7 +962,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
@@ -974,7 +973,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the top-level LRT workflow for a DESeq2 `results(contrast=...)` request.
@@ -988,7 +987,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if sample_levels.is_none()
             && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
-                return self.fit_lrt_with_results_factor_level_contrast(
+                return self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
                     counts,
                     full_design,
                     reduced_design,
@@ -1017,7 +1016,7 @@ impl DeseqBuilder {
                     reference.as_deref(),
                     &levels,
                 )?;
-                self.fit_lrt_with_results_factor_level_contrast(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
                     counts,
                     full_design,
                     reduced_design,
@@ -1026,7 +1025,7 @@ impl DeseqBuilder {
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
                 let contrast_spec = contrast.as_contrast_spec();
-                self.fit_lrt_with_results_contrast_spec(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec(
                     counts,
                     full_design,
                     reduced_design,
@@ -1049,7 +1048,7 @@ impl DeseqBuilder {
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return builder.fit_lrt_with_results_factor_level_contrast(
+            return builder.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
                 counts,
                 full_design,
                 reduced_design,
@@ -1095,7 +1094,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<DeseqFit, DeseqError> {
-        self.fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast)
+        self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast)
             .map(|(fit, _results)| fit)
     }
 
@@ -1107,7 +1106,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<DeseqFit, DeseqError> {
-        self.fit_lrt_with_results_factor_level_contrast(
+        self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
             counts,
             full_design,
             reduced_design,
@@ -1125,7 +1124,7 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         let coefficient = default_results_coefficient(full_design)?;
-        self.fit_lrt_glm_mu_with_cooks_replacement(
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,
@@ -1144,7 +1143,7 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
-        self.fit_lrt_glm_mu_with_cooks_replacement(
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,
@@ -1162,7 +1161,7 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,
@@ -1180,7 +1179,7 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,
@@ -1198,7 +1197,7 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+        self.with_automatic_dispersion_means().fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,
@@ -1219,7 +1218,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if sample_levels.is_none()
             && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)? {
-                return self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                return self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -1249,7 +1248,7 @@ impl DeseqBuilder {
                     reference.as_deref(),
                     &levels,
                 )?;
-                self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -1259,7 +1258,7 @@ impl DeseqBuilder {
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
                 let contrast_spec = contrast.as_contrast_spec();
-                self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(
+                self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -1284,7 +1283,7 @@ impl DeseqBuilder {
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return builder.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
+            return builder.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,

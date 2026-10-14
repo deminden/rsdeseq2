@@ -24,6 +24,7 @@ pub use gene_est::{
     dispersion_nb_log_likelihood_kernel_second_derivative_weighted,
     dispersion_nb_log_likelihood_kernel_weighted, dispersion_prior_derivative,
     dispersion_prior_log_density, dispersion_prior_second_derivative,
+    design_uses_linear_dispersion_means, estimate_gene_wise_dispersions_auto,
     estimate_gene_wise_dispersions_glm_mu, estimate_gene_wise_dispersions_linear_mu,
     fit_dispersion_grid, fit_dispersion_grid_no_cr, fit_dispersion_grid_no_cr_with_prior,
     fit_dispersion_grid_no_cr_with_prior_and_weights, fit_dispersion_grid_with_prior,

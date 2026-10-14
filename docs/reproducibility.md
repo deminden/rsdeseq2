@@ -26,6 +26,14 @@ the repository. See
 [`tests/data/gtex_v8_real_wald/README.md`](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md)
 for provenance and result details.
 
+## Automatic dispersion means and maximum-error reduction
+
+See [the GTEx dispersion correction](gtex-dispersion-improvement.md) for the
+branch-selection cause, the 664-fold minimum maximum-error reduction, frozen
+comparison tables, and commands for the biological and randomized contrasts.
+The compact `auto_dispersion` regression checks automatic, forced GLM, and
+weighted branches against DESeq2 1.52.0 references.
+
 ## Reference Generation
 
 Run:

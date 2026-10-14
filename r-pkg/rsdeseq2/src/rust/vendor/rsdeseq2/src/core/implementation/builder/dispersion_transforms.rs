@@ -81,7 +81,12 @@ impl DeseqBuilder {
     ) -> Result<DeseqFit, DeseqError> {
         design.validate_full_rank("GLM-mu dispersion")?;
         let stages = self.normalization_stages_for_design(counts, design)?;
-        let dispersion = estimate_gene_wise_dispersions_glm_mu(
+        let estimator = if self.automatic_dispersion_means {
+            estimate_gene_wise_dispersions_auto
+        } else {
+            estimate_gene_wise_dispersions_glm_mu
+        };
+        let dispersion = estimator(
             GeneWiseDispersionInput {
                 counts,
                 design,

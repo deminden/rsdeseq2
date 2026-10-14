@@ -388,7 +388,7 @@ fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
-    let builder = native_lrt_builder();
+    let builder = native_lrt_builder().automatic_dispersion_means();
     let levels = ["A", "A", "A", "A", "B", "B", "B", "B"];
     let model_frame = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -2076,11 +2076,11 @@ fn native_lrt_replacement_numeric_contrasts_do_not_infer_low_count_gate_from_mul
 }
 
 #[test]
-fn top_level_fit_lrt_runs_default_glm_mu_lrt_for_last_coefficient() {
+fn top_level_fit_lrt_runs_default_automatic_lrt_for_last_coefficient() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
-    let builder = native_lrt_builder();
+    let builder = native_lrt_builder().automatic_dispersion_means();
 
     let top_level_fit = builder.fit_lrt(&counts, &full, &reduced).unwrap();
     let (lrt_fit, _results) = builder.fit_lrt_glm_mu(&counts, &full, &reduced, 1).unwrap();
@@ -2120,7 +2120,7 @@ fn top_level_fit_lrt_with_results_returns_default_lrt_results() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
-    let builder = native_lrt_builder();
+    let builder = native_lrt_builder().automatic_dispersion_means();
 
     let (top_level_fit, top_level_results) = builder
         .fit_lrt_with_results(&counts, &full, &reduced)
@@ -2142,7 +2142,7 @@ fn top_level_fit_lrt_with_results_accepts_coefficient_name() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
-    let builder = native_lrt_builder();
+    let builder = native_lrt_builder().automatic_dispersion_means();
 
     let (named_fit, named_results) = builder
         .fit_lrt_with_results_name(&counts, &full, &reduced, "condition_B_vs_A")
@@ -2165,7 +2165,7 @@ fn top_level_fit_lrt_with_results_accepts_r_cleaned_coefficient_name_alias() {
     let counts = counts_with_zero_row();
     let full = full_design_with_r_cleaned_coefficient();
     let reduced = reduced_design();
-    let builder = native_lrt_builder();
+    let builder = native_lrt_builder().automatic_dispersion_means();
 
     let (named_fit, named_results) = builder
         .fit_lrt_with_results_name(&counts, &full, &reduced, "condition-B 1")
@@ -2944,7 +2944,7 @@ fn top_level_lrt_formula_list_contrast_cooks_replacement_accepts_cleaned_positiv
 }
 
 #[test]
-fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_glm_mu_lrt() {
+fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_automatic_lrt() {
     let counts = counts_with_zero_row();
     let full = full_design();
     let reduced = reduced_design();
@@ -2964,7 +2964,7 @@ fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_glm_mu_lrt() {
             values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
         }],
     };
-    let builder = native_lrt_builder().model_frame(model_frame);
+    let builder = native_lrt_builder().model_frame(model_frame).automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,
@@ -3110,7 +3110,7 @@ fn top_level_fit_lrt_with_results_cooks_replacement_accepts_coefficient_name() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = native_lrt_builder().model_frame(model_frame);
+    let builder = native_lrt_builder().model_frame(model_frame).automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,

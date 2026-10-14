@@ -128,9 +128,11 @@ gene1	1.0	0.8	1.0
 gene2	0.5	1.0	1.0
 ```
 
-The `wald` and `lrt` commands use the implemented GLM-mu native dispersion,
-MAP, Cook's cutoff, replacement/refit, independent-filtering, and result-table
-assembly path. `wald` and `lrt` can report a design coefficient by zero-based
+The `wald` and `lrt` commands select dispersion means as DESeq2 does:
+unweighted models with as many distinct design rows as coefficients use linear
+means; other models and weighted fits use GLM means. The resulting native
+pipeline includes MAP dispersions, Cook's cutoff, replacement/refit,
+independent filtering, and result-table assembly. `wald` and `lrt` can report a design coefficient by zero-based
 `--coefficient` or by `--coefficient-name`; coefficient-name selection uses
 exact design names first, then R-cleaned aliases and intercept aliases. They can also report a
 design-column contrast through `--contrast-name`, a positive/negative coefficient

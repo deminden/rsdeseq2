@@ -137,6 +137,7 @@ pub struct DeseqBuilder {
     model_frame: Option<FormulaModelFrame>,
     irls_options: IrlsOptions,
     gene_wise_dispersion_options: GeneWiseDispersionOptions,
+    automatic_dispersion_means: bool,
     wald_test_options: WaldTestOptions,
     cooks_cutoff: CooksCutoff,
     independent_filtering_options: IndependentFilteringOptions,

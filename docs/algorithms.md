@@ -404,6 +404,16 @@ DESeq2's gene-wise estimate stage. Prior-aware objective, derivative,
 curvature, line-search, and grid functions are used by the MAP dispersion
 stage; the low-level versions also accept normalized observation weights.
 
+The CLI, R workflows, and top-level Rust fits select the mean-fitting branch
+as DESeq2 does. If observation weights are absent and the number of distinct
+design rows equals the number of coefficients, normalized counts are projected
+through the design and scaled back by size or normalization factors. Otherwise,
+the means come from a negative-binomial GLM. Both automatic branches use the
+same dispersion likelihood, Cox-Reid correction, likelihood-improvement check,
+and grid fallback. Explicit GLM-mu primitives keep their forced GLM behavior;
+`DeseqBuilder::automatic_dispersion_means()` enables automatic selection for
+those stage helpers when desired.
+
 ## Parametric Dispersion Trend
 
 The implemented trend foundation follows DESeq2's

@@ -92,7 +92,68 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
     options: GeneWiseDispersionOptions,
     irls_options: IrlsOptions,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
+    estimate_gene_wise_dispersions_with_mean_fit(input, options, irls_options, false)
+}
+
+/// Estimate dispersions with DESeq2's automatic fitted-mean selection.
+///
+/// Unweighted designs with as many distinct rows as coefficients use linear
+/// fitted means. Other designs and all weighted fits use negative-binomial
+/// GLM means. Both branches share the same dispersion optimization, likelihood
+/// improvement check, and grid fallback.
+pub fn estimate_gene_wise_dispersions_auto(
+    input: GeneWiseDispersionInput<'_>,
+    options: GeneWiseDispersionOptions,
+    irls_options: IrlsOptions,
+) -> Result<GeneWiseDispersionOutput, DeseqError> {
+    let linear_mu =
+        input.observation_weights.is_none() && design_uses_linear_dispersion_means(input.design)?;
+    estimate_gene_wise_dispersions_with_mean_fit(input, options, irls_options, linear_mu)
+}
+
+/// Whether the design is saturated across its distinct sample groups.
+pub fn design_uses_linear_dispersion_means(design: &DesignMatrix) -> Result<bool, DeseqError> {
+    design.validate_full_rank("automatic dispersion mean selection")?;
+    let mut groups: Vec<&[f64]> = Vec::new();
+    for sample in 0..design.n_samples() {
+        let row = design.matrix().row(sample)?;
+        if !groups.contains(&row) {
+            groups.push(row);
+            if groups.len() > design.n_coefficients() {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(groups.len() == design.n_coefficients())
+}
+
+fn estimate_gene_wise_dispersions_with_mean_fit(
+    input: GeneWiseDispersionInput<'_>,
+    options: GeneWiseDispersionOptions,
+    irls_options: IrlsOptions,
+    linear_mu: bool,
+) -> Result<GeneWiseDispersionOutput, DeseqError> {
     validate_gene_est_inputs(&input, options)?;
+    let linear_means = if linear_mu {
+        let means = linear_model_mu(input.normalized_counts, input.design)?;
+        let mut values = means.as_slice().to_vec();
+        for gene in 0..input.counts.n_genes() {
+            for sample in 0..input.counts.n_samples() {
+                let factor = match input.normalization_factors {
+                    Some(factors) => factors.row(gene)?[sample],
+                    None => input.size_factors[sample],
+                };
+                values[gene * input.counts.n_samples() + sample] *= factor;
+            }
+        }
+        Some(RowMajorMatrix::from_row_major(
+            input.counts.n_genes(),
+            input.counts.n_samples(),
+            values,
+        )?)
+    } else {
+        None
+    };
     let max_disp = max_dispersion(options, input.counts.n_samples());
     let rough_disp = rough_dispersion_estimates(input.normalized_counts, input.design)?;
     let moments_disp = match input.normalization_factors {
@@ -148,26 +209,31 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
             .observation_weights
             .map(|weights| compact_matrix_rows(weights, &fit_genes))
             .transpose()?;
-        let fit = match input.normalization_factors {
-            Some(normalization_factors) => {
-                let compact_factors = compact_matrix_rows(normalization_factors, &fit_genes)?;
-                fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+        let fit_mu = if let Some(means) = &linear_means {
+            compact_matrix_rows(means, &fit_genes)?
+        } else {
+            let fit = match input.normalization_factors {
+                Some(normalization_factors) => {
+                    let compact_factors = compact_matrix_rows(normalization_factors, &fit_genes)?;
+                    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+                        &compact_counts,
+                        input.design,
+                        &compact_factors,
+                        &compact_disp,
+                        compact_weights.as_ref(),
+                        mean_options.clone(),
+                    )?
+                }
+                None => fit_fixed_dispersion_irls_with_weights(
                     &compact_counts,
                     input.design,
-                    &compact_factors,
+                    input.size_factors,
                     &compact_disp,
                     compact_weights.as_ref(),
                     mean_options.clone(),
-                )?
-            }
-            None => fit_fixed_dispersion_irls_with_weights(
-                &compact_counts,
-                input.design,
-                input.size_factors,
-                &compact_disp,
-                compact_weights.as_ref(),
-                mean_options.clone(),
-            )?,
+                )?,
+            };
+            fit.mu
         };
 
         let updates = fit_genes
@@ -179,7 +245,7 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
                     (usize, Vec<f64>, GeneDispersionFitDiagnostics),
                     DeseqError,
                 > {
-                    let fit_mu_raw = fit.mu.row(compact_row)?;
+                    let fit_mu_raw = fit_mu.row(compact_row)?;
                     let fit_mu = fit_mu_raw
                         .iter()
                         .copied()
@@ -444,13 +510,14 @@ pub fn moments_dispersion_estimates_with_normalization_factors(
         ));
     }
     if let Some(all_zero) = all_zero
-        && all_zero.len() != base_mean.len() {
-            return Err(invalid_dimensions(
-                "moments dispersion allZero",
-                base_mean.len(),
-                all_zero.len(),
-            ));
-        }
+        && all_zero.len() != base_mean.len()
+    {
+        return Err(invalid_dimensions(
+            "moments dispersion allZero",
+            base_mean.len(),
+            all_zero.len(),
+        ));
+    }
     let xim = normalization_factor_moments_xim(normalization_factors, all_zero)?;
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }

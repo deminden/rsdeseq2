@@ -20,9 +20,28 @@ impl DeseqBuilder {
             model_frame: None,
             irls_options: IrlsOptions::default(),
             gene_wise_dispersion_options: GeneWiseDispersionOptions::default(),
+            automatic_dispersion_means: false,
             wald_test_options: WaldTestOptions::default(),
             cooks_cutoff: CooksCutoff::default(),
             independent_filtering_options: IndependentFilteringOptions::default(),
+        }
+    }
+
+    /// Select fitted dispersion means automatically, as DESeq2 does.
+    ///
+    /// Unweighted designs saturated across distinct design rows use linear
+    /// means; other designs use GLM means. The CLI and top-level workflows
+    /// enable this. Explicit GLM-mu stage helpers otherwise retain GLM means.
+    pub fn automatic_dispersion_means(mut self) -> Self {
+        self.automatic_dispersion_means = true;
+        self
+    }
+
+    fn with_automatic_dispersion_means(&self) -> std::borrow::Cow<'_, Self> {
+        if self.automatic_dispersion_means {
+            std::borrow::Cow::Borrowed(self)
+        } else {
+            std::borrow::Cow::Owned(self.clone().automatic_dispersion_means())
         }
     }
 

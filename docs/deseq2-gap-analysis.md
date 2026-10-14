@@ -92,6 +92,12 @@ lfcSE tail:
 moved from `3.06e-08` to `1.57e-10`. Final MAP dispersions are bounded
 before storage, matching the reference workflow shape.
 
+The default dispersion mean selection now follows DESeq2's saturated-group
+rule. On the versioned GTEx unblocked contrast comparison, this removes the
+previous systematic gene-wise/trend/MAP gap and reduces each targeted maximum
+by at least 664-fold. Six blocked controls retain their existing error limits.
+See [the correction and measurements](gtex-dispersion-improvement.md).
+
 ### Full GLM Fitting
 
 Missing scope:
