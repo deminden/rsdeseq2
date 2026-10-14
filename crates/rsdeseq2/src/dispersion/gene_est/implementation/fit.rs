@@ -99,6 +99,7 @@ fn fit_dispersion_for_gene_detailed_with_weights(
                     prior: None,
                     weights,
                     weight_threshold: options.weight_threshold,
+                    prepared_cox: None,
                 },
                 dispersion.ln(),
             )?;
@@ -289,6 +290,7 @@ struct DispersionObjectiveInput<'a> {
     prior: Option<DispersionPrior>,
     weights: Option<&'a [f64]>,
     weight_threshold: f64,
+    prepared_cox: Option<&'a PreparedCoxReidDesign>,
 }
 
 fn fit_dispersion_line_search_inner(
@@ -324,6 +326,7 @@ fn fit_dispersion_line_search_inner(
 
     let min_log_alpha = (options.min_disp / 10.0).ln();
     let mut log_alpha = initial_dispersion.max(options.min_disp).ln();
+    let prepared_cox = prepare_unweighted_cox_reid_design(design, weights, options.use_cox_reid);
     let objective = DispersionObjectiveInput {
         counts,
         mu,
@@ -332,6 +335,7 @@ fn fit_dispersion_line_search_inner(
         prior,
         weights,
         weight_threshold: options.weight_threshold,
+        prepared_cox: prepared_cox.as_deref(),
     };
     let mut lp = dispersion_log_posterior_objective(objective, log_alpha)?;
     let mut dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
@@ -450,7 +454,7 @@ fn bounded_log_alpha_proposal(
         .ok()
         .and_then(|movement| {
             checked_add(log_alpha, movement, 0, "dispersion line-search proposal").ok()
-    })?;
+        })?;
     let clamped = unclamped.clamp(lower, upper);
     if clamped == unclamped {
         return Some((unclamped, step));
@@ -652,6 +656,7 @@ fn fit_dispersion_grid_inner(
     }
     let max_disp = max_dispersion(options, n_samples);
     validate_dispersion_bounds(options.min_disp, max_disp)?;
+    let prepared_cox = prepare_unweighted_cox_reid_design(design, weights, options.use_cox_reid);
     let objective = DispersionObjectiveInput {
         counts,
         mu,
@@ -660,6 +665,7 @@ fn fit_dispersion_grid_inner(
         prior,
         weights,
         weight_threshold: options.weight_threshold,
+        prepared_cox: prepared_cox.as_deref(),
     };
     let min_log = options.min_disp.ln();
     let max_log = max_disp.ln();
