@@ -1,3 +1,17 @@
+# rsdeseq2 0.3.1
+
+* Speed up native Wald quantification with shared Cox-Reid design products,
+  matrix-order specialization, reused IRLS vectors and design decompositions,
+  cached likelihood terms, and deferred error allocations.
+* Preserve the validated 0.3.0 numerical behavior and automatic dispersion
+  mean-fitting correction from `9acb44b`. The twenty accepted optimisation
+  rounds retain byte-identical results and diagnostics on all eleven frozen
+  GTEx contrasts.
+* Synchronize the R backend with the optimized Rust core and align package,
+  crate, backend, and vendored-core versions at 0.3.1.
+* Extend the reproducible GTEx process benchmark with an optional previous
+  Rust release, alternating tool order and direct time/peak-RSS ratios.
+
 # rsdeseq2 0.3.0
 
 * Native dispersion workflows select DESeq2's automatic mean-fitting branch.

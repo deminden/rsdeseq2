@@ -1,0 +1,8 @@
+{
+  "version": "0.3.0",
+  "tag": "v0.3.0",
+  "source_commit": "552909220985cd847dd10f3d692ad5147674dec7",
+  "archive": "results/benchmarks/release_0.3.0/artifacts/published/rsdeseq2-0.3.0-macos-aarch64.tar.gz",
+  "archive_sha256": "4945b9087076739e18ae61fd8f843aeeabff6aacd1040ba3e438bd3892942229",
+  "binary_sha256": "cd519a32be6612cacfcb20f79106e9f18fce7b7ea22287ea426007daf42e8401"
+}

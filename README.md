@@ -126,8 +126,9 @@ The public Rust API is pre-1.0 and can change between minor releases. See the
 
 ## Validation and Performance
 
-The 0.3.0 release combines the validated automatic dispersion correction with
-R dataset diagnostics, Cook's replacement/refitting, and result metadata.
+The 0.3.1 release adds twenty quantification speed optimisations while retaining
+the validated dispersion correction, R dataset diagnostics, Cook's
+replacement/refitting, and result metadata from 0.3.0.
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex: biological comparisons and reproducible blocked/unblocked random splits.
 
@@ -148,40 +149,35 @@ Gene coverage and finite/NA patterns match throughout.
 
 ### Speed
 
-| Contrast group | Rust (s) | DESeq2 (s) | Time ratio: DESeq2 / Rust |
-| --- | ---: | ---: | ---: |
-| Original blocked | 16.84 | 21.55 | 1.28× |
-| Male vs female | 11.13 | 16.46 | 1.48× |
-| Male age 4 vs 3 | 10.09 | 15.36 | 1.52× |
-| Blocked random splits | 17.14 | 21.59 | 1.26× |
-| Unblocked random splits | 11.53 | 16.41 | 1.42× |
+| Contrast group | Rust 0.3.1 (s) | DESeq2 (s) | DESeq2 / Rust | Rust 0.3.0 (s) | 0.3.0 / 0.3.1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original blocked | 4.01 | 21.62 | 5.40× | 17.64 | 4.40× |
+| Male vs female | 2.98 | 16.42 | 5.51× | 11.40 | 3.82× |
+| Male age 4 vs 3 | 2.30 | 15.31 | 6.66× | 10.32 | 4.49× |
+| Blocked random splits | 3.98 | 21.87 | 5.50× | 17.45 | 4.39× |
+| Unblocked random splits | 3.38 | 24.06 | 7.12× | 11.67 | 3.45× |
 
-Full native Wald process timings on Apple M5/macOS, with one Rust fitting
-thread and one DESeq2/BLAS thread. Each contrast was timed once; groups with
-multiple contrasts show medians across those distinct contrasts. Timings
-include startup, input loading, fitting and output. The ratio is DESeq2 time
-÷ Rust time; above 1 means Rust was faster. Individual contrast ratios range
-from **1.24× to 1.52×**. These single-run measurements are specific to this
-machine and workflow.
-
+One sequential process run per tool and contrast on Apple M5/macOS, with one
+fitting/BLAS thread. Multiple-contrast groups show medians across distinct
+contrasts. Timings include startup, input loading, fitting and result output.
+Across all eleven contrasts, summed times give **3.96× speed versus 0.3.0**
+and **5.45× versus DESeq2**. These direct measured ratios are specific to this
+workflow and machine.
 
 ### Memory
 
-| Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | Memory ratio: DESeq2 / Rust |
+| Contrast group | Rust 0.3.1 peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 337.62 | 1799.23 | 5.33× |
-| Male vs female | 294.23 | 1721.58 | 5.85× |
-| Male age 4 vs 3 | 238.05 | 1635.78 | 6.87× |
-| Blocked random splits | 337.59 | 1820.78 | 5.39× |
-| Unblocked random splits | 294.20 | 1767.97 | 6.01× |
+| Original blocked | 338.75 | 1824.30 | 5.39× |
+| Male vs female | 294.00 | 1796.38 | 6.11× |
+| Male age 4 vs 3 | 258.22 | 1668.02 | 6.46× |
+| Blocked random splits | 335.69 | 1812.73 | 5.40× |
+| Unblocked random splits | 295.36 | 1757.48 | 5.95× |
 
-Peak whole-process resident memory, measured once per tool and contrast in a
-separate pass on the same machine and one-thread profile. Multiple-contrast
-groups show medians across their distinct contrasts; group ratios divide those
-medians. MiB = 2^20 bytes. R interpreter and package memory are included.
-Individual DESeq2/Rust memory ratios range from **5.33× to 6.87×**, or
-**81.2–85.4% less peak RSS for Rust**. All Rust results match the
-validated numerical outputs exactly.
+Peak whole-process RSS from the same runs; MiB = 2^20 bytes, including R
+interpreter/library memory. Group values are medians across distinct contrasts.
+Rust peaks at **258–349 MiB**, using **80.8–84.5% less peak RSS than DESeq2**.
+Native results retain the validated output values exactly.
 
 Full per-contrast results, hardware/settings, and the committed contrast and
 benchmark scripts are documented in the

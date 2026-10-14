@@ -1,9 +1,10 @@
-# GTEx native Wald parity, speed and memory: 0.3.0
+# GTEx native Wald parity, speed and memory: 0.3.1
 
-This comparison uses all 56,200 GTEx v8 Kidney Cortex genes in each of eleven
-contrasts. The native workflow estimates size factors, gene-wise dispersions,
-the parametric trend, prior/MAP dispersions, and Wald results. The numerical
-correction is the validated implementation from `9acb44b`.
+The patch release preserves the validated numerical behavior from `9acb44b`
+and integrates twenty accepted optimisation rounds. Every contrast includes
+all 56,200 GTEx v8 Kidney Cortex genes. The native pipeline estimates size
+factors, gene-wise dispersions, the parametric trend, prior/MAP dispersions,
+and Wald results.
 
 ## Contrasts and settings
 
@@ -28,8 +29,8 @@ coefficient is male relative to female.
 References use R 4.6.1 and DESeq2 1.52.0, `fitType="parametric"`,
 `betaPrior=FALSE`, and `minReplicatesForReplace=Inf`. Cook's result filtering
 and independent filtering are disabled in both tools. No final dispersions
-are supplied to Rust. The public R wrapper's replacement feature is tested
-separately; it is disabled for this matched numerical comparison.
+are supplied to Rust. The public R wrapper's replacement feature has separate integration coverage;
+it is disabled for this matched numerical comparison.
 
 ## Precision
 
@@ -51,154 +52,124 @@ finite/NA pattern. Base means are checked at floating-point precision.
 | Unblocked random 02 | 48,683 | `1.51e-09` | `1.37e-06` | `1.66e-06` | `2.11e-06` |
 | Unblocked random 03 | 48,683 | `1.25e-09` | `3.1e-06` | `2.53e-06` | `2.87e-05` |
 
-[Machine-readable precision results](data/gtex_native_wald_parity_0.3.0.tsv)
+[Machine-readable precision results](data/gtex_native_wald_parity_0.3.1.tsv)
 include LFC median, p99 and maximum errors, plus maximum SE, statistic,
 p-value, adjusted p-value and final-dispersion errors. The
 [dispersion correction report](gtex-dispersion-improvement.md) contains the
 stage comparisons, remaining dispersion tails, and all 121 per-contrast and
-nine global maximum-error checks. The release's 22 result/diagnostic files
-match the saved `9acb44b` outputs exactly; their
-[SHA-256 comparison](data/release_0.3.0_gtex_output_sha256.tsv) records that check.
+nine global maximum-error checks. The 0.3.1 release's 22 result/diagnostic files
+match the validated 0.3.0 / `9acb44b` outputs exactly; their
+[SHA-256 comparison](data/release_0.3.1_gtex_output_sha256.tsv) records that check.
 
 ## Speed
 
-Measured on 2026-10-14. Rust is **1.24–1.52× faster** in these single-process
-runs. A ratio above one means less elapsed time for Rust.
+Measured on 2026-10-14 on Apple M5/macOS, with one fitting/BLAS thread and one
+process run per tool and contrast. The complete suite took **41.824 s**
+with Rust 0.3.1, **165.443 s** with the published Rust 0.3.0 binary, and
+**227.954 s** with DESeq2 1.52.0. Ratios of these summed times are
+**3.96×** for 0.3.0 / 0.3.1 and **5.45×** for DESeq2 / Rust.
+The direct release comparison corresponds to **74.7% less time**.
+Individual DESeq2 / Rust ratios range from **3.56× to 7.12×**.
 
-| Contrast | Rust (s) | DESeq2 (s) | Time ratio: DESeq2 / Rust |
-| --- | ---: | ---: | ---: |
-| Original blocked | 16.84 | 21.55 | 1.28× |
-| Male vs female | 11.13 | 16.46 | 1.48× |
-| Male age 4 vs 3 | 10.09 | 15.36 | 1.52× |
-| Blocked random 01 | 17.42 | 21.90 | 1.26× |
-| Blocked random 02 | 17.16 | 21.22 | 1.24× |
-| Blocked random 03 | 17.05 | 21.51 | 1.26× |
-| Blocked random 04 | 16.99 | 21.59 | 1.27× |
-| Blocked random 05 | 17.14 | 21.64 | 1.26× |
-| Unblocked random 01 | 11.53 | 16.41 | 1.42× |
-| Unblocked random 02 | 11.68 | 16.33 | 1.40× |
-| Unblocked random 03 | 11.46 | 16.62 | 1.45× |
+| Contrast | Rust 0.3.1 (s) | DESeq2 (s) | DESeq2 / Rust | Rust 0.3.0 (s) | 0.3.0 / 0.3.1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original blocked | 4.01 | 21.62 | 5.40× | 17.64 | 4.40× |
+| Male vs female | 2.98 | 16.42 | 5.51× | 11.40 | 3.82× |
+| Male age 4 vs 3 | 2.30 | 15.31 | 6.66× | 10.32 | 4.49× |
+| Blocked random 01 | 3.93 | 21.87 | 5.56× | 17.45 | 4.43× |
+| Blocked random 02 | 6.12 | 21.83 | 3.56× | 17.59 | 2.87× |
+| Blocked random 03 | 3.98 | 21.91 | 5.51× | 17.81 | 4.48× |
+| Blocked random 04 | 3.96 | 21.81 | 5.51× | 17.06 | 4.31× |
+| Blocked random 05 | 4.75 | 21.91 | 4.61× | 17.39 | 3.66× |
+| Unblocked random 01 | 3.89 | 24.65 | 6.33× | 15.57 | 4.00× |
+| Unblocked random 02 | 3.38 | 24.06 | 7.12× | 11.67 | 3.45× |
+| Unblocked random 03 | 2.54 | 16.58 | 6.54× | 11.56 | 4.56× |
 
-The recorded run uses an Apple M5 on macOS 27.0.1, with Rust fitting limited to
-one Rayon thread and DESeq2 running without BiocParallel, with one BLAS thread.
-Fits run sequentially, with no simultaneous benchmark fits. Each table entry
-is one process run per tool and contrast; these are single-run timings, not
-replicate medians or confidence intervals. The runner supports additional
-repetitions and reports their medians and ranges.
-
-Wall-clock time includes process startup, input parsing, full native Wald
-fitting, and result TSV serialization for both tools. R package loading is
-included. Compilation, contrast preparation, reference generation and the
-post-run parity comparison are excluded. Speedup is DESeq2 seconds divided by
-Rust seconds. This is a comparison of these CLI/R-script workflows on this
-machine, rather than an inner-loop or universal speed claim.
-
-[Per-contrast timing data](data/gtex_native_wald_speed_0.3.0.tsv),
-[raw process runs](data/gtex_native_wald_speed_runs_0.3.0.tsv),
-[hardware/thread provenance](data/gtex_native_wald_speed_provenance_0.3.0.json),
-[R session](data/gtex_native_wald_speed_R_session_0.3.0.txt), and
-[input/reference checksums](data/gtex_native_wald_speed_input_sha256_0.3.0.tsv)
-are committed. The [timed-run parity table](data/gtex_native_wald_timed_parity_0.3.0.tsv)
-records both tools against the frozen reference. Rust's timed result files
-match the validated outputs exactly. R under the explicit one-thread BLAS
-profile differs from the original frozen R run by at most `1.72e-9` in LFC
-and `9.00e-7` in p-value; the
-precision table above consistently uses the frozen oracle.
+All processes run sequentially. Tool order rotates across contrasts to balance
+which tool runs first. Timings include startup, count/design parsing, full
+fitting and result-table serialization. Reference comparison and separate fit-
+diagnostic validation are outside these timed processes. Inputs, result flags,
+thread counts and frozen references match across tools. R startup and package
+loading are included. These single-run measurements describe this machine and
+workflow; they do not estimate repeated-run uncertainty.
 
 ## Memory
 
-Measured on 2026-10-14 in a separate pass over the same eleven contrasts, with
-the same binary, inputs, DESeq2 version, machine and one-thread settings used
-for the speed comparison. Peak resident memory was **5.33–6.87× higher
-for DESeq2**, equivalent to **81.2–85.4% less for Rust**.
+Peak whole-process resident memory is recorded from the same timed processes.
+Rust 0.3.1 uses **258.22–348.86 MiB**.
+DESeq2 / Rust peak-RSS ratios are **5.20–6.46×**, equivalent to
+**80.8–84.5% lower RSS for Rust**.
+Relative to 0.3.0, per-contrast Rust RSS changes range from
+**-0.7% to +11.2%**. The speed improvements therefore
+include a modest memory increase on some contrasts.
 
-| Contrast | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | Memory ratio: DESeq2 / Rust |
-| --- | ---: | ---: | ---: |
-| Original blocked | 337.62 | 1799.23 | 5.33× |
-| Male vs female | 294.23 | 1721.58 | 5.85× |
-| Male age 4 vs 3 | 238.05 | 1635.78 | 6.87× |
-| Blocked random 01 | 337.64 | 1819.62 | 5.39× |
-| Blocked random 02 | 337.59 | 1871.27 | 5.54× |
-| Blocked random 03 | 337.62 | 1820.78 | 5.39× |
-| Blocked random 04 | 337.56 | 1844.67 | 5.46× |
-| Blocked random 05 | 314.69 | 1806.09 | 5.74× |
-| Unblocked random 01 | 270.42 | 1767.97 | 6.54× |
-| Unblocked random 02 | 294.22 | 1714.05 | 5.83× |
-| Unblocked random 03 | 294.20 | 1768.34 | 6.01× |
+| Contrast | Rust 0.3.1 peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust | Rust 0.3.0 peak RSS (MiB) |
+| --- | ---: | ---: | ---: | ---: |
+| Original blocked | 338.75 | 1824.30 | 5.39× | 338.56 |
+| Male vs female | 294.00 | 1796.38 | 6.11× | 270.47 |
+| Male age 4 vs 3 | 258.22 | 1668.02 | 6.46× | 258.97 |
+| Blocked random 01 | 335.69 | 1821.34 | 5.43× | 313.77 |
+| Blocked random 02 | 342.55 | 1871.52 | 5.46× | 338.59 |
+| Blocked random 03 | 335.62 | 1785.88 | 5.32× | 314.59 |
+| Blocked random 04 | 335.62 | 1808.97 | 5.39× | 337.72 |
+| Blocked random 05 | 348.86 | 1812.73 | 5.20× | 313.77 |
+| Unblocked random 01 | 295.36 | 1701.00 | 5.76× | 275.41 |
+| Unblocked random 02 | 296.08 | 1758.36 | 5.94× | 270.41 |
+| Unblocked random 03 | 292.72 | 1757.48 | 6.00× | 294.81 |
 
-Peak RSS is the maximum resident set size of the entire fitting process,
-including input matrices, native allocations, and interpreter/library memory.
-R startup and package loading are included. MiB means 2^20 bytes. This measures
-resident memory across the complete process lifetime. Each process was
-measured once, sequentially, on Apple M5/macOS 27.0.1. The ratio is DESeq2 peak
-RSS divided by Rust peak RSS. These measurements are specific to this workflow
-and machine and do not establish repeated-run uncertainty.
+RSS includes the interpreter/libraries, input matrices and native allocations
+throughout the entire process lifetime. MiB = 2^20 bytes. It is the native
+macOS maximum resident set size, not an R object-size or incremental allocation
+estimate. Both tools use one fitting/BLAS thread.
 
-[Per-contrast memory data](data/gtex_native_wald_memory_0.3.0.tsv),
-[raw process runs with byte values and result hashes](data/gtex_native_wald_memory_runs_0.3.0.tsv),
-[native resource reports](data/gtex_native_wald_memory_resources_0.3.0.txt),
-[hardware/thread provenance](data/gtex_native_wald_memory_provenance_0.3.0.json),
-[R session](data/gtex_native_wald_memory_R_session_0.3.0.txt), and
-[input/reference checksums](data/gtex_native_wald_memory_input_sha256_0.3.0.tsv)
-are committed. All eleven Rust memory-run results are
-[byte-identical to the validated `9acb44b` outputs](data/gtex_native_wald_memory_output_sha256_0.3.0.tsv).
-The [memory-run parity table](data/gtex_native_wald_memory_parity_0.3.0.tsv)
-records both tools against the frozen reference. Gene coverage and finite/NA
-patterns match for all runs. The original precision and speed tables retain
-their recorded provenance.
+## Evidence and optimisation history
 
-## Reproduce the contrasts and references
+Committed evidence:
 
-The generator and reference helper are committed in the repository:
+- [Per-contrast time, memory and direct release ratios](data/gtex_native_wald_speed_memory_0.3.1.tsv)
+- [All 33 raw process measurements and result hashes](data/gtex_native_wald_runs_0.3.1.tsv)
+- [Native resource reports](data/gtex_native_wald_resources_0.3.1.txt)
+- [Hardware, settings and binary hashes](data/gtex_native_wald_provenance_0.3.1.json)
+- [Published baseline archive and binary provenance](data/gtex_native_wald_baseline_provenance_0.3.1.json)
+- [R session](data/gtex_native_wald_R_session_0.3.1.txt)
+- [Input/reference hashes](data/gtex_native_wald_input_sha256_0.3.1.tsv)
+- [Timed parity against DESeq2](data/gtex_native_wald_timed_parity_0.3.1.tsv)
+- [All 121 precision gates](data/gtex_release_0.3.1_comparison.tsv) and [nine global gates](data/gtex_release_0.3.1_global_maxima.tsv)
+- [Result/diagnostic byte equality](data/release_0.3.1_gtex_output_sha256.tsv)
+- [Twenty accepted optimisation rounds](data/quant_speed_rounds_0.3.1.tsv)
 
-* [`generate_gtex_mode_contrasts.py`](../scripts/generate_gtex_mode_contrasts.py)
-  creates the biological designs and deterministic random splits from the
-  checked-in complete Kidney Cortex count matrix and sample metadata.
-* [`generate_gtex_mode_contrast_references.R`](../scripts/generate_gtex_mode_contrast_references.R)
-  generates the DESeq2 results, dispersion diagnostics and size factors offline.
+Each optimisation round passed a 2% total-throughput threshold in one paired
+pass across eleven contrasts, with byte-identical results and diagnostics.
+The product of those per-round ratios is 4.3407×. Host timing changed during
+the optimisation work; that cumulative estimate has a different provenance
+from the direct release ratio above. Optimisation timings also include fit-
+diagnostic output. [The 0.3.0 report](gtex-native-wald-benchmark-0.3.0.md)
+retains its original measurements.
 
-From the repository root, with the pinned R/DESeq2 environment available:
+## Reproduce
+
+The [contrast generator](../scripts/generate_gtex_mode_contrasts.py) is committed.
+It generates the original, biological, blocked random and unblocked random
+contrasts from the documented local GTEx source with seed `20261014`.
+For fixture generation and source-data paths, see the
+[dispersion correction report](gtex-dispersion-improvement.md#reproduction-and-regression-coverage).
+Keep frozen references unchanged for release replay:
 
 ```sh
-python3 scripts/generate_gtex_mode_contrasts.py \
-  --rscript /path/to/Rscript
 cargo build --release -p rsdeseq2 --locked
 python3 scripts/check_gtex_dispersion_improvement.py \
-  --output-dir results/benchmarks/release_0.3.0/gtex
-```
-
-Use `--counts-only` to generate designs and counts without calling R. The
-generator writes to ignored `results/benchmarks/gtex_mode_contrasts` by
-default. To prepare a separate reference bundle, supply `--output-dir PATH`
-and use that path as `--fixture-root` for the checker and benchmark. Full
-source URLs, matrix checksum and extraction instructions are in the
-[checked-in fixture notes](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md).
-
-The checker validates frozen input/reference hashes as well as numerical
-errors. Recreating a reference with a different R/BLAS build can change its
-last floating-point digits and stopping decisions; inspect those differences
-before treating that environment as the recorded oracle.
-
-## Reproduce the speed and memory comparison
-
-```sh
+  --workers 1 --output-dir results/benchmarks/release_0.3.1/gtex
 python3 scripts/benchmark_gtex_native_wald.py \
-  --rscript /path/to/Rscript \
-  --rust-threads 1 --blas-threads 1 --repeats 1 \
-  --output-dir results/benchmarks/release_0.3.0/speed_memory
+  --binary target/release/rsdeseq2 \
+  --baseline-binary /path/to/rsdeseq2-0.3.0 --baseline-label 0.3.0 \
+  --validated-results-root results/benchmarks/release_0.3.1/gtex \
+  --rscript /path/to/deseq2-r461/bin/Rscript \
+  --repeats 1 --rust-threads 1 --blas-threads 1 \
+  --output-dir results/benchmarks/release_0.3.1/speed_memory
 ```
 
-[`benchmark_gtex_native_wald.py`](../scripts/benchmark_gtex_native_wald.py) and
-its [R helper](../scripts/benchmark_gtex_native_wald.R) are committed. They
-write raw timings and peak RSS in bytes/MiB, per-contrast summaries, native
-resource reports, numeric comparisons to the frozen
-reference, R session information, thread settings, hardware details and input,
-reference and binary hashes. The benchmark leaves all frozen references
-unchanged. Use `--repeats 3` for repeated measurements; odd/even repetitions
-alternate tool order. `--contrasts NAME ...` selects a named subset.
-
-Peak RSS is collected with `/usr/bin/time -l` on macOS (native byte units) or
-GNU `/usr/bin/time -v` on Linux (native KiB units), then normalized to MiB.
-Use `--time-bin /path/to/gtime` to select a GNU time executable on macOS.
-The original speed-only table predates the memory extension. Its raw timing
-data remain unchanged; the separate memory pass records its own elapsed times.
+Use the platform CLI archive from the published v0.3.0 release for the baseline.
+Omit `--baseline-binary` for a two-tool Rust/DESeq2 comparison. The committed
+[Python benchmark](../scripts/benchmark_gtex_native_wald.py) and
+[R helper](../scripts/benchmark_gtex_native_wald.R) save all raw timings, peak
+RSS, result hashes, R/hardware provenance and frozen-input checksums.

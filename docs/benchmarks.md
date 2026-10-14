@@ -2,7 +2,7 @@
 
 ## Current native Wald comparison
 
-The [0.3.0 GTEx parity, speed and memory comparison](gtex-native-wald-benchmark.md)
+The [0.3.1 GTEx parity, speed and memory comparison](gtex-native-wald-benchmark.md)
 covers eleven full native Wald contrasts, including biological comparisons
 and blocked/unblocked random splits. It includes current measurements and
 committed contrast-generation and matched time/peak-memory scripts. The

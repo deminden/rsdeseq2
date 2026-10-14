@@ -3,6 +3,65 @@
 No production release should claim DESeq2 parity until stage-by-stage reference
 tests cover the implemented statistical pipeline.
 
+## Version 0.3.1
+
+This patch release integrates twenty accepted quantification speed improvements
+into the Rust core and R backend. It preserves the validated automatic
+mean-fitting correction from `9acb44b` and the 0.3.0 wrapper interface.
+All crate/package/backend versions and lockfiles are aligned at 0.3.1.
+
+### Optimisations
+
+- Reuse accepted line-search objectives and invariant gamma/digamma terms.
+- Share bounded, immutable Cox-Reid design products across gene optimizers.
+- Specialize Cox-Reid matrix construction and required working-weight terms,
+  retaining the original full checked path for extreme dispersions.
+- Reuse IRLS scratch vectors, initial design LU, covariance crossproducts,
+  fitted-mean offsets and fixed-dispersion likelihood terms.
+- Defer successful-path error allocation and inline checked scalar helpers.
+
+Each accepted round exceeded 2% in total native quantification throughput in
+one paired pass across eleven complete GTEx contrasts. The product of the
+per-round ratios is 4.3407x across both batches. This cumulative estimate is
+reported separately from the direct 0.3.0/0.3.1 release measurement in the
+[current benchmark](gtex-native-wald-benchmark.md).
+The optimization benchmark includes fit-diagnostic serialization; the release
+comparison times result-table serialization for each tool.
+
+### Precision and release evidence
+
+Validated locally on 2026-10-14 with R 4.6.1 / DESeq2 1.52.0:
+
+- All 121 per-contrast and nine global precision gates passed.
+- All 22 result/diagnostic exports match the validated 0.3.0 / `9acb44b`
+  outputs byte for byte. All eleven timed native results also match.
+- Frozen inputs and reference hashes are unchanged.
+- One sequential pass across all eleven contrasts and three tools measured
+  41.824 s for 0.3.1, 165.443 s for the published 0.3.0 binary, and
+  227.954 s for DESeq2: **3.96×** and **5.45×** total-time ratios,
+  respectively. This is **74.7% less elapsed time** than 0.3.0.
+- Peak RSS is **258.22–348.86 MiB**, or **80.8–84.5% lower** than DESeq2.
+  Per-contrast memory changes versus 0.3.0 range from **−0.7% to +11.2%**;
+  the largest increase is 35.09 MiB.
+- Rust core and R bridge formatting and all-target Clippy passed.
+- The locked release CLI build, Rust crate packaging/verification and
+  R source-package build/install passed, including package load checks.
+  All 100 vendored core source files match.
+
+The [current benchmark](gtex-native-wald-benchmark.md) records all raw runs,
+resource reports, hashes, settings and twenty accepted optimisation rounds.
+Broad Rust, R and Python test-suite counts in the 0.3.0 section are historical;
+those suites were not rerun during this preparation. CI retains its release
+validation before publication.
+
+### Publication preparation
+
+The local release branch is `codex/release-0.3.1`. Versions, documentation,
+vendored Rust code and evidence are prepared together. Local artifacts include
+the macOS ARM64 CLI, Rust crate, R source package, repository source archive,
+release notes and SHA-256 checksums. The existing tag-triggered workflow builds
+all five platform CLI archives when the release is published.
+
 ## Version 0.3.0
 
 This minor release combines the validated numerical correction in `9acb44b`
@@ -52,10 +111,9 @@ scope and remaining limitations.
 
 ### Current parity, speed and memory evidence
 
-The [11-contrast native Wald benchmark](gtex-native-wald-benchmark.md) contains
-current parity results, matched Rust/DESeq2 process timings and peak resident
-memory, and reproducible contrast-generation and benchmark commands. Detailed
-evidence lives in the documentation; the main README links to the current results.
+The [0.3.0 native Wald benchmark](gtex-native-wald-benchmark-0.3.0.md) contains
+the original parity results, Rust/DESeq2 timings and peak resident memory.
+The main README and current benchmark report describe the latest release.
 
 ### Local release validation
 
@@ -129,12 +187,12 @@ Before preparing a release commit:
 - Review staged files for accidental large artifacts or generated reference
   outputs.
 
-For 0.3.0, replay the frozen 11-contrast GTEx suite with the release binary:
+For 0.3.1, replay the frozen 11-contrast GTEx suite with the release binary:
 
 ```bash
 cargo build --release -p rsdeseq2 --locked
 python3 scripts/check_gtex_dispersion_improvement.py \
-  --output-dir results/benchmarks/release_0.3.0/gtex
+  --workers 1 --output-dir results/benchmarks/release_0.3.1/gtex
 ```
 
 Use the existing reference files and their recorded hashes. The release

@@ -87,5 +87,5 @@ implementation. Full DESeq2 diagnostic assays and every DESeq2 fitting option
 remain outside this package's implemented scope.
 
 The Rust core validation summary and benchmark scope are documented in the
-[repository README](../../README.md#validation) and
+[repository README](../../README.md#validation-and-performance) and
 [benchmark report](../../docs/benchmarks.md).
