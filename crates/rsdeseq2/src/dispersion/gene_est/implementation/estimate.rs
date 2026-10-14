@@ -190,7 +190,8 @@ fn estimate_gene_wise_dispersions_with_mean_fit(
 
     let mut mean_options = irls_options;
     mean_options.min_mu = options.min_mu;
-    mean_options.r_optim_compat = false;
+    // Mean refits use the caller's optimizer arithmetic, including the default
+    // R-compatible numerical-gradient fallback.
 
     for _ in 0..options.niter {
         let fit_genes = fitidx
