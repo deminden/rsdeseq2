@@ -248,7 +248,8 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
         if active_columns.is_empty() {
             continue;
         }
-        let weight_terms = cox_reid_weight_terms(mu, alpha, sample)?;
+        let weight_terms =
+            cox_reid_weight_terms_for_order::<DERIVATIVE, SECOND_DERIVATIVE>(mu, alpha, sample)?;
         for (left_pos, (left_idx, left_value)) in active_columns.iter().copied().enumerate() {
             for (right_idx, right_value) in active_columns.iter().copied().skip(left_pos) {
                 let x_product = checked_mul(
@@ -341,7 +342,8 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
         if products.is_empty() {
             continue;
         }
-        let weight_terms = cox_reid_weight_terms(mu, alpha, sample)?;
+        let weight_terms =
+            cox_reid_weight_terms_for_order::<DERIVATIVE, SECOND_DERIVATIVE>(mu, alpha, sample)?;
         for &(left_idx, right_idx, x_product) in products {
             if !x_product.is_finite() {
                 return Err(DeseqError::NonFiniteValue {
@@ -625,4 +627,51 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
     let second_alpha = 0.5 * (second_trace - trace_bi_d2b);
     let first_log_alpha = -0.5 * trace_product(&inverse, &d_xtwx)? * alpha;
     checked_cox_reid_log_alpha_second_derivative(second_alpha, alpha, first_log_alpha)
+}
+
+#[inline(always)]
+fn cox_reid_weight_terms_for_order<const DERIVATIVE: bool, const SECOND_DERIVATIVE: bool>(
+    mu: f64,
+    alpha: f64,
+    index: usize,
+) -> Result<CoxReidWeightTerms, DeseqError> {
+    // Both matrix loops validate mu first; their prefix validates alpha.
+    // For alpha >= 1e-100, 1/alpha < 2e100 and the positive ratio < 2.
+    // The omitted curvature is < 8e100, weight square < 16e200,
+    // and twice the weight cube < 128e300: all are below f64::MAX.
+    // Inverse denominator squared is <= 1 and alpha/denominator <= alpha.
+    // Thus every omitted check would succeed. Extreme dispersions retain the
+    // complete original checked helper, including its error precedence.
+    if alpha < 1e-100 {
+        return cox_reid_weight_terms(mu, alpha, index);
+    }
+    let product = mu * alpha;
+    let ratio = if product.is_finite() {
+        let one_plus = 1.0 + product;
+        let inverse = one_plus.recip();
+        product * inverse
+    } else {
+        1.0
+    };
+    let weight = checked_mul(ratio, alpha.recip(), index, "Cox-Reid working weight")?;
+    let square = if DERIVATIVE || SECOND_DERIVATIVE {
+        checked_mul(weight, weight, index, "Cox-Reid working weight square")?
+    } else {
+        0.0
+    };
+    let d2_weight = if SECOND_DERIVATIVE {
+        checked_mul(
+            2.0,
+            checked_mul(square, weight, index, "Cox-Reid working weight cube")?,
+            index,
+            "Cox-Reid working second derivative weight",
+        )?
+    } else {
+        0.0
+    };
+    Ok(CoxReidWeightTerms {
+        weight,
+        d_weight: if DERIVATIVE { -square } else { 0.0 },
+        d2_weight,
+    })
 }
