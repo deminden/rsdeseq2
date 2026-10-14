@@ -244,13 +244,14 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         });
     }
     let inv_alpha = alpha.recip();
+    let digamma_inv_alpha = dispersion_digamma(inv_alpha);
     let mut derivative_alpha = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective derivative")?;
-        let term = dispersion_digamma(inv_alpha)
+        let term = digamma_inv_alpha
             + mu_alpha.log1p
             - mu_alpha.ratio
             - dispersion_digamma(y + inv_alpha)
