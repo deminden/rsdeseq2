@@ -383,7 +383,9 @@ fn fit_dispersion_line_search_inner(
         if theta_kappa <= theta_hat_kappa {
             iter_accept += 1;
             log_alpha = proposed_log_alpha;
-            let lp_new = dispersion_log_posterior_objective(objective, proposed_log_alpha)?;
+            // The Armijo test already evaluated this exact point. Reuse its
+            // value without changing the accepted-step arithmetic.
+            let lp_new = -theta_kappa;
             last_change = checked_sub(
                 lp_new,
                 lp,

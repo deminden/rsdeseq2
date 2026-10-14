@@ -9,7 +9,9 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::fit_intercept_only_fixed_dispersion;
 use crate::glm::fallback::optim_fallback_rows;
-use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted};
+use crate::glm::nb::{
+    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
+};
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
@@ -397,6 +399,7 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
     let dispersion = input.dispersions[gene];
     let mut beta = initial_beta(input.x, &y, nf)?;
     let mut mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
+    let likelihood = FixedDispersionLikelihood::new(input.counts.row(gene)?, dispersion);
     let mut dev_old = 0.0;
     let mut dev = 0.0;
     let mut iter = 0_usize;
@@ -421,8 +424,7 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
             break;
         }
         mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
-        dev = -2.0
-            * nbinom_log_likelihood_weighted(input.counts.row(gene)?, &mu, dispersion, weight_row)?;
+        dev = -2.0 * likelihood.log_likelihood(&mu, weight_row)?;
         let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
             iter = input.options.maxit;
             break;
@@ -1227,10 +1229,12 @@ fn fitted_mu_log2_unfloored(
     (0..x.nrows())
         .map(|sample| {
             validate_positive_finite(nf[sample], "normalization factor", sample)?;
-            let eta = checked_row_dot_slice(x, sample, beta).ok_or(DeseqError::NonFiniteValue {
-                context: "optim fallback linear predictor".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
+            let eta = checked_row_dot_slice(x, sample, beta).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "optim fallback linear predictor".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                }
             })?;
             let mu = nf[sample] * 2.0_f64.powf(eta);
             if !mu.is_finite() || mu <= 0.0 {
@@ -1256,12 +1260,13 @@ fn fitted_mu_impl(
         .enumerate()
         .map(|(sample, (row, factor))| {
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let eta = checked_row_dot_vector(x, row, beta).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS linear predictor".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            let mu = finite_scaled_exp(factor, eta).ok_or(DeseqError::NonFiniteValue {
+            let eta =
+                checked_row_dot_vector(x, row, beta).ok_or_else(|| DeseqError::NonFiniteValue {
+                    context: "IRLS linear predictor".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
+            let mu = finite_scaled_exp(factor, eta).ok_or_else(|| DeseqError::NonFiniteValue {
                 context: "IRLS fitted mean".to_string(),
                 index: Some(sample),
                 value: f64::NAN,
@@ -1361,20 +1366,23 @@ fn working_weights(
         .enumerate()
         .map(|(sample, value)| {
             validate_positive_finite(value, "mu", sample)?;
-            let working_weight =
-                stable_working_weight(value, dispersion).ok_or(DeseqError::NonFiniteValue {
+            let working_weight = stable_working_weight(value, dispersion).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
                     context: "IRLS working weight".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
-                })?;
+                }
+            })?;
             Ok(match weights {
                 Some(weights) => {
                     let weight = weights[sample];
                     validate_nonnegative_finite(weight, "weight", sample)?;
-                    checked_product2(weight, working_weight).ok_or(DeseqError::NonFiniteValue {
-                        context: "IRLS weighted working weight".to_string(),
-                        index: Some(sample),
-                        value: f64::NAN,
+                    checked_product2(weight, working_weight).ok_or_else(|| {
+                        DeseqError::NonFiniteValue {
+                            context: "IRLS weighted working weight".to_string(),
+                            index: Some(sample),
+                            value: f64::NAN,
+                        }
                     })?
                 }
                 None => working_weight,
@@ -1403,26 +1411,30 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
         .map(|(sample, ((mu, factor), count))| {
             validate_positive_finite(mu, "mu", sample)?;
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let log_normalized_mu =
-                stable_log_normalized_mean(mu, factor).ok_or(DeseqError::NonFiniteValue {
+            let log_normalized_mu = stable_log_normalized_mean(mu, factor).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
                     context: "IRLS working response normalized mean".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
-                })?;
-            let residual = checked_sum2(count, -mu).ok_or(DeseqError::NonFiniteValue {
+                }
+            })?;
+            let residual = checked_sum2(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
                 context: "IRLS working response residual".to_string(),
                 index: Some(sample),
                 value: f64::NAN,
             })?;
-            let scaled_residual = checked_div2(residual, mu).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working response scaled residual".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            checked_sum2(log_normalized_mu, scaled_residual).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working response".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
+            let scaled_residual =
+                checked_div2(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                    context: "IRLS working response scaled residual".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
+            checked_sum2(log_normalized_mu, scaled_residual).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "IRLS working response".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                }
             })
         })
         .collect()

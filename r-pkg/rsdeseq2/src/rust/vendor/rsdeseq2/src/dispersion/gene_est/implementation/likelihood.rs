@@ -41,6 +41,7 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         });
     }
     let inv_alpha = alpha.recip();
+    let log_gamma_inv_alpha = dispersion_lgamma(inv_alpha);
     let mut total = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
@@ -53,8 +54,13 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
             sample,
             "dispersion objective mean plus inverse alpha",
         )?;
-        let term = dispersion_lgamma(y + inv_alpha)
-            - dispersion_lgamma(inv_alpha)
+        let log_gamma_y = if count == 0 {
+            log_gamma_inv_alpha
+        } else {
+            dispersion_lgamma(y + inv_alpha)
+        };
+        let term = log_gamma_y
+            - log_gamma_inv_alpha
             - y * mu_plus_inv_alpha.ln()
             - inv_alpha * (1.0 + mu_alpha).ln();
         if !term.is_finite() {
@@ -243,16 +249,22 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         });
     }
     let inv_alpha = alpha.recip();
+    let digamma_inv_alpha = dispersion_digamma(inv_alpha);
     let mut derivative_alpha = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective derivative")?;
-        let term = dispersion_digamma(inv_alpha)
+        let digamma_y = if count == 0 {
+            digamma_inv_alpha
+        } else {
+            dispersion_digamma(y + inv_alpha)
+        };
+        let term = digamma_inv_alpha
             + mu_alpha.log1p
             - mu_alpha.ratio
-            - dispersion_digamma(y + inv_alpha)
+            - digamma_y
             + y * mu_alpha.alpha_over_one_plus;
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
