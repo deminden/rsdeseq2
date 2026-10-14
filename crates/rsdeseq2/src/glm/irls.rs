@@ -9,7 +9,9 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::fit_intercept_only_fixed_dispersion;
 use crate::glm::fallback::optim_fallback_rows;
-use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted};
+use crate::glm::nb::{
+    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
+};
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
@@ -397,6 +399,7 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
     let dispersion = input.dispersions[gene];
     let mut beta = initial_beta(input.x, &y, nf)?;
     let mut mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
+    let likelihood = FixedDispersionLikelihood::new(input.counts.row(gene)?, dispersion);
     let mut dev_old = 0.0;
     let mut dev = 0.0;
     let mut iter = 0_usize;
@@ -421,8 +424,7 @@ fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutpu
             break;
         }
         mu = fitted_mu(input.x, &beta, nf, input.options.min_mu)?;
-        dev = -2.0
-            * nbinom_log_likelihood_weighted(input.counts.row(gene)?, &mu, dispersion, weight_row)?;
+        dev = -2.0 * likelihood.log_likelihood(&mu, weight_row)?;
         let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
             iter = input.options.maxit;
             break;

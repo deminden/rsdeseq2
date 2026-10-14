@@ -31,6 +31,61 @@ pub fn nbinom_log_likelihood_weighted(
     dispersion: f64,
     weights: Option<&[f64]>,
 ) -> Result<f64, DeseqError> {
+    nbinom_log_likelihood_with_cached_gamma(counts, mu, dispersion, weights, None)
+}
+
+/// Invariant NB terms for repeated fitted means at fixed counts/dispersion.
+/// All likelihood validation and the sample reduction retain the public path.
+pub(crate) struct FixedDispersionLikelihood<'a> {
+    counts: &'a [u32],
+    dispersion: f64,
+    size: f64,
+    gamma_terms: Vec<f64>,
+}
+
+impl<'a> FixedDispersionLikelihood<'a> {
+    pub(crate) fn new(counts: &'a [u32], dispersion: f64) -> Self {
+        let size = dispersion.recip();
+        let gamma_size = ln_gamma(size);
+        let gamma_terms = counts
+            .iter()
+            .copied()
+            .map(|count| {
+                let y = f64::from(count);
+                // Preserve both subtractions before the mean-dependent terms.
+                ln_gamma(y + size) - gamma_size - ln_gamma(y + 1.0)
+            })
+            .collect();
+        Self {
+            counts,
+            dispersion,
+            size,
+            gamma_terms,
+        }
+    }
+
+    pub(crate) fn log_likelihood(
+        &self,
+        mu: &[f64],
+        weights: Option<&[f64]>,
+    ) -> Result<f64, DeseqError> {
+        nbinom_log_likelihood_with_cached_gamma(
+            self.counts,
+            mu,
+            self.dispersion,
+            weights,
+            Some((&self.gamma_terms, self.size)),
+        )
+    }
+}
+
+fn nbinom_log_likelihood_with_cached_gamma(
+    counts: &[u32],
+    mu: &[f64],
+    dispersion: f64,
+    weights: Option<&[f64]>,
+    cached_gamma: Option<(&[f64], f64)>,
+) -> Result<f64, DeseqError> {
     if counts.len() != mu.len() {
         return Err(invalid_dimensions(
             "NB likelihood mu",
@@ -51,7 +106,14 @@ pub fn nbinom_log_likelihood_weighted(
     let mut log_like = 0.0;
     for (idx, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_mu(mu, Some(idx))?;
-        let term = nbinom_log_pmf_unchecked(count, mu, dispersion);
+        let term = match cached_gamma {
+            Some((gamma_terms, size)) => {
+                let mu_dispersion = mu * dispersion;
+                gamma_terms[idx] - size * log1p_mu_dispersion(mu, dispersion, mu_dispersion)
+                    + count_log_term(f64::from(count), mu_dispersion)
+            }
+            None => nbinom_log_pmf_unchecked(count, mu, dispersion),
+        };
         validate_log_pmf_term(term, Some(idx))?;
         let weighted_term = match weights {
             Some(weights) => {
