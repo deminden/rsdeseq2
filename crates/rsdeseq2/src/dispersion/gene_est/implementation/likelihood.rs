@@ -256,10 +256,15 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective derivative")?;
+        let digamma_y = if count == 0 {
+            digamma_inv_alpha
+        } else {
+            dispersion_digamma(y + inv_alpha)
+        };
         let term = digamma_inv_alpha
             + mu_alpha.log1p
             - mu_alpha.ratio
-            - dispersion_digamma(y + inv_alpha)
+            - digamma_y
             + y * mu_alpha.alpha_over_one_plus;
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
