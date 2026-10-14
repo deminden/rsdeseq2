@@ -741,9 +741,9 @@ upstream p-values.
   that stores Rust fit metadata and dispatches its own `results()` and
   `resultsNames()` helpers. Complete Bioconductor object semantics and
   additional contrast-aware Cook's/refit edge cases remain unsupported.
-- Full Cook's outlier replacement behavior for high-level Bioconductor assay
-  attachment, high-level wrapper-object metadata, and all remaining DESeq2 edge
-  cases.
+- Cook's outlier replacement behavior outside the documented wrapper routes
+  and remaining DESeq2 edge cases. Fitted dataset wrappers attach original and
+  replacement assays, row flags, and replacement/refit result metadata.
 - General Wald and LRT tests with native dispersion estimation beyond the
   supported limited linear-mu/GLM-mu branches and without generated DESeq2
   references for all native LRT intermediates.
@@ -754,7 +754,8 @@ upstream p-values.
   table-level scalar metadata, typed result-table output, regular and tidy TSV
   result export, result-metadata export, and independent-filtering metadata
   including paired `filterNumRej`- and `lo.fit`-shaped views plus scalar
-  metadata entries.
+  metadata entries. R dataset result tables also carry Bioconductor column
+  descriptions and independent-filtering/replacement metadata.
   Shared internal all-zero row expansion helpers exist for compact GLM outputs
   and full-length masked vectors.
 - Complete DESeq2 `results()` semantics for arbitrary `DESeqDataSet` objects.

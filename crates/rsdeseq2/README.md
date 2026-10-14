@@ -44,19 +44,19 @@ Detailed status lives in
 [docs/deseq2-gap-analysis.md][gap-analysis] and
 [docs/compatibility.md][compatibility].
 
-## Validation
+## Validation and Performance
 
-The test suite compares Rust stages with saved DESeq2 references. Its real-data
-Wald fixture contains all 56,200 genes for 61 GTEx v8 Kidney Cortex samples.
-Against DESeq2 1.52.0, all 48,683 finite Wald rows match with maximum absolute
-differences of `2.386e-7` for log2 fold change, `4.140e-10` for standard error,
-`3.734e-7` for the statistic, and `4.955e-8` for the p-value. The maximum
-relative size-factor difference is `5.551e-15`. Fixture provenance and the
-reproduction command are in the [real-data fixture notes](tests/data/gtex_v8_real_wald/README.md).
+Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
+Cortex, including biological comparisons and reproducible blocked/unblocked
+random splits. The [current parity and matched speed comparison][gtex-benchmark]
+records measurements, settings, hardware, and reproduction commands. The
+[dispersion correction report][gtex-parity] documents the automatic mean-fitting
+correction and remaining error bounds.
 
-Primitive CLI timings do not establish a complete DESeq2 workflow speed
-difference. See the repository [benchmark documentation][benchmarks] for
-measurements and interpretation.
+The test suite also covers documented normalization, GLM, Wald/LRT,
+transformation, shrinkage, and R-wrapper paths. These measurements establish
+behavior for the tested inputs and settings, rather than complete DESeq2
+workflow parity.
 
 ## Rust Usage
 
@@ -162,6 +162,9 @@ Run matched speed/RAM benchmarks for the supported primitives:
 scripts/benchmark_rsdeseq2.sh
 ```
 
-[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
-[compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
-[benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
+[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/deseq2-gap-analysis.md
+[compatibility]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/compatibility.md
+[benchmarks]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/benchmarks.md
+[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/gtex-dispersion-improvement.md
+
+[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/gtex-native-wald-benchmark.md

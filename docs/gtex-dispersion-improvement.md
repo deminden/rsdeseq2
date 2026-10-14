@@ -1,5 +1,9 @@
 # GTEx dispersion parity correction
 
+Included as the numerical correction in 0.3.0, originating in `9acb44b`.
+The release retains that validated core behavior. The R wrapper additions in
+0.3.0 are documented separately in [release notes](release.md#version-030).
+
 The target was a 100-fold reduction in maximum absolute errors against the
 same 11 GTEx contrasts. All nine relevant global maxima fell by at least
 596.7-fold. Within the five affected unblocked contrasts, every targeted

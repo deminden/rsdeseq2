@@ -1,0 +1,12 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.14.7",
+  "rust_threads": 1,
+  "blas_threads": 1,
+  "repeats": 1,
+  "binary_sha256": "978be15ea57f808f4b2de88693a960b3533b000f619995ce6bc98006834da5f7",
+  "rscript": "/Users/dendem/miniforge3/envs/deseq2-r461/bin/Rscript",
+  "timing_scope": "process startup, input parsing, full native Wald fit and result TSV output",
+  "cpu_model": "Apple M5"
+}

@@ -1425,7 +1425,9 @@ fn top_level_fit_with_results_cooks_replacement_runs_default_automatic_wald() {
             values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
         }],
     };
-    let builder = glm_mu_native_wald_builder().model_frame(model_frame).automatic_dispersion_means();
+    let builder = glm_mu_native_wald_builder()
+        .model_frame(model_frame)
+        .automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,
@@ -1597,7 +1599,9 @@ fn top_level_fit_with_results_cooks_replacement_accepts_coefficient_name() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = glm_mu_native_wald_builder().model_frame(model_frame).automatic_dispersion_means();
+    let builder = glm_mu_native_wald_builder()
+        .model_frame(model_frame)
+        .automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,
@@ -2516,7 +2520,8 @@ fn top_level_fit_uses_stored_reduced_design_for_lrt() {
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
     let builder = glm_mu_native_wald_builder()
         .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone()).automatic_dispersion_means();
+        .reduced_design(reduced_design.clone())
+        .automatic_dispersion_means();
 
     let top_level_fit = builder.fit(&counts, &full_design).unwrap();
     let (expected_fit, _expected_results) = builder
@@ -2541,7 +2546,8 @@ fn top_level_fit_with_results_name_uses_stored_reduced_design_for_lrt() {
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
     let builder = glm_mu_native_wald_builder()
         .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone()).automatic_dispersion_means();
+        .reduced_design(reduced_design.clone())
+        .automatic_dispersion_means();
 
     let (top_level_fit, top_level_results) = builder
         .fit_with_results_name(&counts, &full_design, "condition_B_vs_A")
@@ -2596,7 +2602,8 @@ fn top_level_lrt_contrast_methods_use_stored_reduced_design() {
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
     let builder = glm_mu_native_wald_builder()
         .test(TestType::Lrt)
-        .reduced_design(reduced_design.clone()).automatic_dispersion_means();
+        .reduced_design(reduced_design.clone())
+        .automatic_dispersion_means();
     let levels = ["A", "A", "A", "A", "B", "B", "B", "B"]
         .into_iter()
         .map(String::from)

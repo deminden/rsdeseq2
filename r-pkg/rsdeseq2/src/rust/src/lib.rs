@@ -5,8 +5,8 @@ use std::ptr;
 
 use rsdeseq2::prelude::{
     BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
-    BetaPriorVarianceOptions, CountMatrix, DeseqBuilder, DeseqResultRow, DeseqResults,
-    DesignMatrix, ExecutionMode, FitType, ParametricDispersionTrend, RowMajorMatrix,
+    BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DeseqResultRow,
+    DeseqResults, DesignMatrix, ExecutionMode, FitType, ParametricDispersionTrend, RowMajorMatrix,
     SizeFactorMethod, TestType, WaldAlternative, WaldTestOptions, apply_cooks_cutoff,
     apply_cooks_cutoff_with_low_count_heuristic, base_mean, base_mean_with_weights, base_variance,
     base_variance_with_weights, estimate_beta_prior_variance, estimate_size_factors_with_options,
@@ -158,6 +158,153 @@ unsafe fn copy_matrix_to_r(matrix: &RowMajorMatrix<f64>, output: *mut f64) -> Re
     Ok(())
 }
 
+unsafe fn copy_counts_to_r(counts: &CountMatrix, output: &mut [f64]) -> Result<(), String> {
+    if output.len() != counts.n_genes().saturating_mul(counts.n_samples()) {
+        return Err("replacement count output has an invalid length".into());
+    }
+    for gene in 0..counts.n_genes() {
+        for sample in 0..counts.n_samples() {
+            output[gene + sample * counts.n_genes()] =
+                f64::from(counts.as_slice()[gene * counts.n_samples() + sample]);
+        }
+    }
+    Ok(())
+}
+
+fn merge_vec<T: Clone>(
+    original: &mut [T],
+    refit: &[T],
+    rows: &[usize],
+    field: &str,
+) -> Result<(), String> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    if original.len() != refit.len() || rows.iter().any(|&row| row >= original.len()) {
+        return Err(format!("replacement refit {field} dimensions do not match"));
+    }
+    for &row in rows {
+        original[row] = refit[row].clone();
+    }
+    Ok(())
+}
+
+fn merge_optional_vec<T: Clone>(
+    original: &mut Option<Vec<T>>,
+    refit: &Option<Vec<T>>,
+    rows: &[usize],
+    field: &str,
+) -> Result<(), String> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let target = original
+        .as_mut()
+        .ok_or_else(|| format!("original fit is missing {field}"))?;
+    let source = refit
+        .as_ref()
+        .ok_or_else(|| format!("replacement refit is missing {field}"))?;
+    merge_vec(target, source, rows, field)
+}
+
+fn merge_option_matrix(
+    original: &mut Option<RowMajorMatrix<f64>>,
+    refit: &Option<RowMajorMatrix<f64>>,
+    rows: &[usize],
+    field: &str,
+) -> Result<(), String> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let target = original
+        .as_ref()
+        .ok_or_else(|| format!("original fit is missing {field}"))?;
+    let source = refit
+        .as_ref()
+        .ok_or_else(|| format!("replacement refit is missing {field}"))?;
+    if target.n_rows() != source.n_rows()
+        || target.n_cols() != source.n_cols()
+        || rows.iter().any(|&row| row >= target.n_rows())
+    {
+        return Err(format!("replacement refit {field} dimensions do not match"));
+    }
+    let mut values = target.as_slice().to_vec();
+    for &row in rows {
+        let start = row * target.n_cols();
+        values[start..start + target.n_cols()]
+            .clone_from_slice(&source.as_slice()[start..start + target.n_cols()]);
+    }
+    *original = Some(
+        RowMajorMatrix::from_row_major(target.n_rows(), target.n_cols(), values)
+            .map_err(|error| error.to_string())?,
+    );
+    Ok(())
+}
+
+fn merge_refit_fit_rows(
+    original: &mut rsdeseq2::prelude::DeseqFit,
+    refit: &rsdeseq2::prelude::DeseqFit,
+    rows: &[usize],
+) -> Result<(), String> {
+    macro_rules! merge_required_vec {
+        ($field:ident) => {
+            merge_vec(
+                &mut original.$field,
+                &refit.$field,
+                rows,
+                stringify!($field),
+            )?;
+        };
+    }
+    macro_rules! merge_optional_vec {
+        ($field:ident) => {
+            merge_optional_vec(
+                &mut original.$field,
+                &refit.$field,
+                rows,
+                stringify!($field),
+            )?;
+        };
+    }
+    macro_rules! merge_matrix {
+        ($field:ident) => {
+            merge_option_matrix(
+                &mut original.$field,
+                &refit.$field,
+                rows,
+                stringify!($field),
+            )?;
+        };
+    }
+    merge_required_vec!(base_mean);
+    merge_required_vec!(base_var);
+    merge_required_vec!(all_zero);
+    merge_optional_vec!(disp_gene_est);
+    merge_optional_vec!(disp_gene_iter);
+    merge_optional_vec!(disp_fit);
+    merge_optional_vec!(disp_map);
+    merge_optional_vec!(dispersion);
+    merge_optional_vec!(disp_iter);
+    merge_optional_vec!(disp_outlier);
+    merge_optional_vec!(dispersion_converged);
+    merge_matrix!(beta);
+    merge_matrix!(beta_se);
+    merge_matrix!(beta_covariance);
+    merge_optional_vec!(beta_converged);
+    merge_optional_vec!(beta_iter);
+    merge_optional_vec!(log_like);
+    merge_optional_vec!(full_deviance);
+    merge_matrix!(mu);
+    // Keep the original Cook's distances: DESeq2 records those before replacement.
+    Ok(())
+}
+
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
     n_genes: usize,
@@ -199,6 +346,12 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_normalized_counts(
     n_genes: usize,
@@ -222,6 +375,12 @@ pub unsafe extern "C" fn rsdeseq2_r_normalized_counts(
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_base_metadata(
     n_genes: usize,
@@ -259,13 +418,19 @@ pub unsafe extern "C" fn rsdeseq2_r_base_metadata(
         unsafe { output_slice(base_means, n_genes, "base means")? }.copy_from_slice(&means);
         unsafe { output_slice(base_vars, n_genes, "base variances")? }.copy_from_slice(&vars);
         let zero = unsafe { output_slice(all_zero, n_genes, "all-zero flags")? };
-        for gene in 0..n_genes {
-            zero[gene] = u8::from(counts.is_all_zero_gene(gene).map_err(|e| e.to_string())?);
+        for (gene, flag) in zero.iter_mut().enumerate() {
+            *flag = u8::from(counts.is_all_zero_gene(gene).map_err(|e| e.to_string())?);
         }
         Ok(())
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_fit(
     n_genes: usize,
@@ -280,15 +445,27 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     reduced_values: *const f64,
     fit_type: i32,
     test_type: i32,
+    min_replicates_for_replace: usize,
+    cooks_replacement_cutoff: f64,
     threads: usize,
     execution_mode: i32,
     result_output: *mut f64,
     beta_output: *mut f64,
     beta_se_output: *mut f64,
     covariance_output: *mut f64,
+    mu_output: *mut f64,
+    cooks_output: *mut f64,
+    replace_counts_output: *mut f64,
+    replace_output: *mut u8,
+    replaceable_samples_output: *mut u8,
+    refit_rows_output: *mut u8,
+    new_all_zero_rows_output: *mut u8,
+    n_refit_output: *mut usize,
     size_factors_output: *mut f64,
     dispersion_output: *mut f64,
     disp_fit_output: *mut f64,
+    base_var_output: *mut f64,
+    all_zero_output: *mut i32,
 ) -> i32 {
     run_backend(|| {
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
@@ -357,13 +534,35 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         } else {
             None
         };
-        let result = if selected_test_type == TestType::Wald {
-            builder.fit_with_results(&counts, &design)
+        let (fit, results, replacement) = if min_replicates_for_replace == 0 {
+            let result = if selected_test_type == TestType::Wald {
+                builder.fit_with_results(&counts, &design)
+            } else {
+                builder.fit_lrt_with_results(&counts, &design, reduced.as_ref().unwrap())
+            }
+            .map_err(|error| error.to_string())?;
+            (result.0, result.1, None)
         } else {
-            builder.fit_lrt_with_results(&counts, &design, reduced.as_ref().unwrap())
-        }
-        .map_err(|error| error.to_string())?;
-        let (fit, results) = result;
+            let mut replacement_options = CooksReplacementOptions::new(cooks_replacement_cutoff);
+            replacement_options.min_replicates = min_replicates_for_replace;
+            let output = builder
+                .fit_with_test_results_with_cooks_replacement(
+                    &counts,
+                    &design,
+                    &replacement_options,
+                )
+                .map_err(|error| error.to_string())?;
+            let mut merged_fit = output.original_fit().clone();
+            if let Some(refit_fit) = output.refit_fit() {
+                merge_refit_fit_rows(&mut merged_fit, refit_fit, &output.refit_plan().refit_rows)?;
+            }
+            for &row in &output.refit_plan().new_all_zero_rows {
+                merged_fit.base_mean[row] = 0.0;
+                merged_fit.base_var[row] = 0.0;
+                merged_fit.all_zero[row] = true;
+            }
+            (merged_fit, output.results().clone(), Some(output))
+        };
         const COLUMNS: usize = 11;
         let output = unsafe {
             output_slice(
@@ -408,6 +607,14 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             .beta_covariance
             .as_ref()
             .ok_or("Rust fit did not retain coefficient covariance")?;
+        let mu = fit
+            .mu
+            .as_ref()
+            .ok_or("Rust fit did not retain fitted means")?;
+        let cooks = fit
+            .cooks
+            .as_ref()
+            .ok_or("Rust fit did not retain Cook's distances")?;
         let beta_out = unsafe {
             output_slice(
                 beta_output,
@@ -447,6 +654,72 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 }
             }
         }
+        unsafe { copy_matrix_to_r(mu, mu_output)? };
+        unsafe { copy_matrix_to_r(cooks, cooks_output)? };
+        let replace_counts = unsafe {
+            output_slice(
+                replace_counts_output,
+                n_genes
+                    .checked_mul(n_samples)
+                    .ok_or("replacement count dimensions overflow")?,
+                "replacement counts",
+            )?
+        };
+        let replace = unsafe { output_slice(replace_output, n_genes, "replacement flags")? };
+        let replaceable_samples =
+            unsafe { output_slice(replaceable_samples_output, n_samples, "replaceable samples")? };
+        let refit_rows = unsafe { output_slice(refit_rows_output, n_genes, "refit rows")? };
+        let new_all_zero_rows =
+            unsafe { output_slice(new_all_zero_rows_output, n_genes, "new all-zero rows")? };
+        let n_refit = unsafe { output_slice(n_refit_output, 1, "replacement refit count")? };
+        if let Some(output) = &replacement {
+            let plan = output.refit_plan();
+            let has_replaceable_samples = plan
+                .replacement
+                .replaceable_samples
+                .iter()
+                .any(|&value| value);
+            n_refit[0] = if has_replaceable_samples {
+                plan.n_refit
+            } else {
+                0
+            };
+            for (gene, flag) in replace.iter_mut().enumerate() {
+                *flag = if has_replaceable_samples {
+                    match plan.replacement.replace[gene] {
+                        Some(value) => u8::from(value),
+                        None => 2,
+                    }
+                } else {
+                    2
+                };
+            }
+            for (sample, flag) in replaceable_samples.iter_mut().enumerate() {
+                *flag = u8::from(plan.replacement.replaceable_samples[sample]);
+            }
+            refit_rows.fill(0);
+            new_all_zero_rows.fill(0);
+            if has_replaceable_samples {
+                for &row in &plan.refit_rows {
+                    refit_rows[row] = 1;
+                }
+                for &row in &plan.new_all_zero_rows {
+                    new_all_zero_rows[row] = 1;
+                }
+            }
+            if has_replaceable_samples {
+                unsafe { copy_counts_to_r(&plan.replacement.replaced_counts, replace_counts)? };
+            } else {
+                unsafe { copy_counts_to_r(&counts, replace_counts)? };
+            }
+        } else {
+            n_refit[0] = 0;
+            replace.fill(2);
+            replaceable_samples.fill(0);
+            refit_rows.fill(0);
+            new_all_zero_rows.fill(0);
+            unsafe { copy_counts_to_r(&counts, replace_counts)? };
+        }
         unsafe { output_slice(size_factors_output, n_samples, "size factors")? }
             .copy_from_slice(&fit.size_factors);
         let dispersions = unsafe { output_slice(dispersion_output, n_genes, "dispersions")? };
@@ -459,10 +732,22 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             Some(values) => disp_fit.copy_from_slice(values),
             None => disp_fit.fill(f64::NAN),
         }
+        unsafe { output_slice(base_var_output, n_genes, "base variances")? }
+            .copy_from_slice(&fit.base_var);
+        let all_zero = unsafe { output_slice(all_zero_output, n_genes, "all-zero flags")? };
+        for (target, source) in all_zero.iter_mut().zip(&fit.all_zero) {
+            *target = i32::from(*source);
+        }
         Ok(())
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal(
     n_genes: usize,
@@ -617,6 +902,12 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal(
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
     n_genes: usize,
@@ -877,6 +1168,12 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_transform(
     n_genes: usize,
@@ -965,7 +1262,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
             }
             1 => {
                 let (fit, rlog) = if frozen_intercept_values.is_null() {
-                    let output = if !frozen_disp_fit_values.is_null() {
+                    if !frozen_disp_fit_values.is_null() {
                         let mut fit = builder
                             .fit_dispersion_trend_glm_mu(&counts, &design)
                             .map_err(|error| error.to_string())?;
@@ -985,8 +1282,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                         }
                         .map_err(|error| error.to_string())?;
                         (output.fit, output.rlog)
-                    };
-                    output
+                    }
                 } else {
                     if !sample_prior_variance.is_finite() || sample_prior_variance <= 0.0 {
                         return Err("sample prior variance must be positive and finite with frozen intercepts".into());
@@ -1128,6 +1424,12 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
     })
 }
 
+/// # Safety
+///
+/// Non-null input pointers must reference aligned, readable buffers of the
+/// lengths specified by the dimensions and the C bridge contract. Output
+/// pointers must reference writable buffers of those lengths, uniquely
+/// borrowed for this call. All buffers must remain valid until return.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
     n_genes: usize,

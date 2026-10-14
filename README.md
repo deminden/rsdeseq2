@@ -117,31 +117,64 @@ estimateSizeFactorsRust(counts, native = TRUE)
 | Wald and LRT result workflows | Supported for documented paths | Supplied-dispersion GLMs and implemented native-dispersion branches; coefficient, list, and numeric contrasts; Normal and t tails |
 | Diagnostics and result assembly | Supported for documented paths | Cook's diagnostics and replacement/refitting, independent filtering, adjusted p-values, and result metadata |
 | Transformations and priors | Supported for documented paths | Mean, parametric, and local VST; rlog; normal, `ashr`, and `apeglm` shrinkage; selected formula/model-frame workflows. Formula interactions and some transformed-factor contrast forms are unsupported |
-| R package | Partial | Matrix, list, and limited `DESeqDataSet` Wald/LRT fits; dataset transforms return Bioconductor transform objects and selected `lfcShrink` methods return `DESeqResults`. Full diagnostic and refit semantics are not implemented |
+| R package | Partial | Matrix, list, and limited `DESeqDataSet` Wald/LRT fits with fitted assays, row/result metadata, and eligible Cook's replacement/refits; dataset transforms return Bioconductor transform objects and selected `lfcShrink` methods return `DESeqResults`. Additional Bioconductor semantics remain unsupported |
 | Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, plotting, arbitrary R expressions, or complete object-mutation and metadata semantics |
 
 The public Rust API is pre-1.0 and can change between minor releases. See the
 [compatibility matrix](docs/compatibility.md) and
 [DESeq2 gap analysis](docs/deseq2-gap-analysis.md) for feature-level detail.
 
-## Validation
+## Validation and Performance
 
-Automated tests compare Rust stages with saved DESeq2 references for
-normalization, dispersion trends, GLM fitting, Wald/LRT results, and
-transformations. The real-data Wald test runs all 56,200 GTEx v8 genes across
-61 Kidney Cortex samples and compares Rust outputs with DESeq2 1.52.0. For the
-48,683 rows with finite Wald results, maximum absolute differences are
-`2.386e-7` for log2 fold change, `4.140e-10` for standard error, `3.734e-7`
-for the statistic, and `4.955e-8` for the p-value; size factors differ by at
-most `5.551e-15` relative. R integration tests also check `DESeqDataSet` fits,
-seeded full/fast VST and rlog workflows, and supported `lfcShrink()` methods.
-These tests establish behavior for their documented inputs, not complete
-DESeq2 workflow parity. See the [real-data fixture notes](crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md)
-for provenance and reproduction.
+The 0.3.0 release combines the validated automatic dispersion correction with
+R dataset diagnostics, Cook's replacement/refitting, and result metadata.
+Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
+Cortex: biological comparisons and reproducible blocked/unblocked random splits.
 
-See [Benchmarks](docs/benchmarks.md), [Compatibility](docs/compatibility.md),
-and [Reproducibility](docs/reproducibility.md) for fixture definitions,
-commands, and detailed results.
+### Precision
+
+All contrasts use all 56,200 genes. Errors below are maximum absolute
+differences from the frozen DESeq2 1.52.0 native Wald reference, including
+estimated dispersions. Group values are the maximum over all listed contrasts.
+Gene coverage and finite/NA patterns match throughout.
+
+| Contrast group | Contrasts | Max LFC error | Max SE error | Max p-value error | Max adjusted p-value error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original blocked | 1 | `7.84e-07` | `1.38e-06` | `4.35e-07` | `1.14e-06` |
+| Male vs female | 1 | `1.09e-09` | `1.35e-05` | `2.98e-05` | `7.31e-11` |
+| Male age 4 vs 3 | 1 | `1.47e-07` | `2.34e-05` | `2.16e-05` | `8.25e-07` |
+| Blocked random splits | 5 | `7.15e-06` | `2.75e-05` | `3.74e-05` | `1.26e-05` |
+| Unblocked random splits | 3 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `2.87e-05` |
+
+### Speed
+
+| Contrast group | Rust (s) | DESeq2 (s) | Time ratio: DESeq2 / Rust |
+| --- | ---: | ---: | ---: |
+| Original blocked | 16.84 | 21.55 | 1.28× |
+| Male vs female | 11.13 | 16.46 | 1.48× |
+| Male age 4 vs 3 | 10.09 | 15.36 | 1.52× |
+| Blocked random splits | 17.14 | 21.59 | 1.26× |
+| Unblocked random splits | 11.53 | 16.41 | 1.42× |
+
+Full native Wald process timings on Apple M5/macOS, with one Rust fitting
+thread and one DESeq2/BLAS thread. Each contrast was timed once; groups with
+multiple contrasts show medians across those distinct contrasts. Timings
+include startup, input loading, fitting and output. The ratio is DESeq2 time
+÷ Rust time; above 1 means Rust was faster. Individual contrast ratios range
+from **1.24× to 1.52×**. These single-run measurements are specific to this
+machine and workflow.
+
+
+Full per-contrast results, hardware/settings, and the committed contrast and
+benchmark scripts are documented in the
+[current parity and matched speed comparison](docs/gtex-native-wald-benchmark.md).
+The [dispersion correction report](docs/gtex-dispersion-improvement.md) records
+stage checks and remaining error bounds.
+
+Rust and R integration tests also cover documented normalization, GLM,
+Wald/LRT, transformation, shrinkage, and dataset-wrapper paths. This establishes
+behavior for the tested inputs and settings, rather than complete DESeq2
+workflow parity.
 
 ## Documentation
 

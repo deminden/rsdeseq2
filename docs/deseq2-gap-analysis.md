@@ -129,12 +129,12 @@ Missing scope:
 
 Missing scope:
 
-- full Cook's replacement-triggered refit for wrapper-object paths,
+- Cook's replacement-triggered refits outside the documented R wrapper and
+  primitive routes,
 - complete Bioconductor assay and object metadata around beta-prior
   replacement refits,
-- high-level metadata preservation around replacement counts and final result
-  tables beyond the implemented primitive replacement/refit metadata and assay
-  exports,
+- metadata preservation beyond the implemented wrapper fitted/replacement
+  assays, row metadata, result tables, and primitive replacement/refit exports,
 - broader formula-aware low-count Cook's heuristic selection outside the
   implemented supplied-dispersion fixed, limited GLM-mu two-level factor,
   and model-frame character contrast result/replacement-refit routes.
@@ -173,9 +173,13 @@ Rules for that wrapper:
 The R package now exposes this contract through `DESeq()` and `fitRust()` for
 matrix, list, and limited `DESeqDataSet` inputs. It prepares formula designs in
 R and delegates fitting to Rust. For dataset inputs it stores the fit in
-metadata and updates the fitted size or normalization factors; its own
-`results()` and `resultsNames()` functions read that fit. This does not provide
-the complete DESeq2 object workflow, diagnostic assays, or all DESeq2 options.
+metadata, updates fitted size or normalization factors, and attaches fitted
+means, Cook's distances, row metadata, and per-coefficient MLE/SE columns.
+Eligible Cook's outliers undergo replacement/refitting, with original and
+replacement assays and flags retained. Its own `results()` and `resultsNames()`
+functions read that fit; dataset result tables carry Bioconductor column and
+table metadata. The complete DESeq2 object workflow and all fitting/result
+options remain outside the supported scope.
 Dataset-based `vst()`, `varianceStabilizingTransformation()`, and `rlog()` return
 `DESeqTransform` objects using Rust transforms. `lfcShrink()` supports normal
 beta-prior shrinkage for named or indexed Wald coefficients and expanded-design

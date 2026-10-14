@@ -43,6 +43,7 @@ DESeq <- function(object,
                   sizeFactors = NULL,
                   normalizationFactors = NULL,
                   weights = NULL,
+                  minReplicatesForReplace = 7L,
                   ...) {
   isDataSet <- inherits(object, "DESeqDataSet")
   fitType <- match.arg(fitType)
@@ -60,6 +61,16 @@ DESeq <- function(object,
   }
   if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc != floor(nproc)) {
     stop("nproc must be a positive integer", call. = FALSE)
+  }
+  disableReplacement <- is.numeric(minReplicatesForReplace) &&
+    length(minReplicatesForReplace) == 1L &&
+    is.infinite(minReplicatesForReplace) && minReplicatesForReplace > 0
+  validReplacementMinimum <- is.numeric(minReplicatesForReplace) &&
+    length(minReplicatesForReplace) == 1L &&
+    is.finite(minReplicatesForReplace) && minReplicatesForReplace >= 3 &&
+    minReplicatesForReplace == floor(minReplicatesForReplace)
+  if (!disableReplacement && !validReplacementMinimum) {
+    stop("minReplicatesForReplace must be an integer of at least 3 or Inf", call. = FALSE)
   }
   colData <- NULL
   if (inherits(object, "DESeqDataSet")) {
@@ -173,6 +184,8 @@ DESeq <- function(object,
     weights,
     as.integer(match(fitType, c("parametric", "local", "mean")) - 1L),
     as.integer(match(test, c("Wald", "LRT")) - 1L),
+    if (disableReplacement) 0L else as.integer(minReplicatesForReplace),
+    stats::qf(0.99, ncol(design), nrow(design) - ncol(design)),
     as.integer(nproc),
     as.integer(match(parityMode, c("strict", "fast", "diagnostic")) - 1L),
     PACKAGE = "rsdeseq2"
@@ -181,6 +194,8 @@ DESeq <- function(object,
   rownames(results$betaSE) <- rownames(counts)
   names(results$dispersions) <- rownames(counts)
   names(results$dispFit) <- rownames(counts)
+  dimnames(results$mu) <- dimnames(counts)
+  dimnames(results$cooks) <- dimnames(counts)
   dimnames(results$betaCovariance)[[1L]] <- rownames(counts)
   fit <- structure(
     list(
@@ -189,6 +204,17 @@ DESeq <- function(object,
       beta = results$beta,
       betaSE = results$betaSE,
       betaCovariance = results$betaCovariance,
+      mu = results$mu,
+      cooks = results$cooks,
+      replaceCounts = if (results$nRefit > 0L) results$replaceCounts else NULL,
+      replace = results$replace,
+      replaceable = results$replaceable,
+      refitRows = results$refitRows,
+      newAllZeroRows = results$newAllZeroRows,
+      nRefit = results$nRefit,
+      baseVar = results$baseVar,
+      allZero = results$allZero,
+      minReplicatesForReplace = minReplicatesForReplace,
       sizeFactors = results$sizeFactors,
       dispersions = results$dispersions,
       dispFit = results$dispFit,
@@ -198,6 +224,7 @@ DESeq <- function(object,
       design = design,
       reduced = reduced,
       colData = colData,
+      isDataSet = isDataSet,
       fitType = fitType,
       test = test,
       resultsNames = colnames(design),
@@ -208,6 +235,36 @@ DESeq <- function(object,
     class = "rsdeseq2RustFit"
   )
   if (isDataSet) {
+    rowMetadata <- S4Vectors::mcols(object)
+    rowMetadata$baseMean <- fit$results$baseMean
+    rowMetadata$baseVar <- fit$baseVar
+    rowMetadata$allZero <- fit$allZero
+    rowMetadata$dispFit <- fit$dispFit
+    rowMetadata$dispersion <- fit$dispersions
+    rowMetadata$betaConv <- fit$results$converged
+    rowMetadata$maxCooks <- fit$results$maxCooks
+    if (any(fit$replaceable)) {
+      rowMetadata$replace <- fit$replace
+      colMetadata <- SummarizedExperiment::colData(object)
+      colMetadata$replaceable <- fit$replaceable
+      SummarizedExperiment::colData(object) <- colMetadata
+    } else {
+      rowMetadata$replace <- NULL
+    }
+    for (coefficient in seq_along(fit$resultsNames)) {
+      coefficient_name <- fit$resultsNames[[coefficient]]
+      rowMetadata[[paste0("MLE_", coefficient_name)]] <- fit$beta[, coefficient]
+      rowMetadata[[paste0("SE_", coefficient_name)]] <- fit$betaSE[, coefficient]
+    }
+    S4Vectors::mcols(object) <- rowMetadata
+    SummarizedExperiment::assay(object, "mu") <- fit$mu
+    SummarizedExperiment::assay(object, "cooks") <- fit$cooks
+    if (fit$nRefit > 0L) {
+      replaceCounts <- fit$replaceCounts
+      storage.mode(replaceCounts) <- storage.mode(counts)
+      SummarizedExperiment::assay(object, "replaceCounts") <- replaceCounts
+      SummarizedExperiment::assay(object, "replaceCooks") <- fit$cooks
+    }
     objectMetadata <- S4Vectors::metadata(object)
     objectMetadata$rsdeseq2RustFit <- fit
     S4Vectors::metadata(object) <- objectMetadata

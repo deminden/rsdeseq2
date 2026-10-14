@@ -17,11 +17,21 @@ returns the fitted dataset with the Rust fit stored in its metadata, and the
 package's `results()` and `resultsNames()` functions dispatch through that fit.
 Existing size factors, normalization factors, observation-weight assays, and
 formula offsets are passed through the fitting bridge; explicit matrices can
-also be provided for matrix or list inputs.
+also be provided for matrix or list inputs. Fitted datasets receive Rust
+`mu` and `cooks` assays, plus row metadata for `baseMean`, `baseVar`, `allZero`,
+`dispFit`, final `dispersion`, `betaConv`, `maxCooks`, and per-coefficient MLE
+and SE columns. These fitted means and Cook's distances are checked against
+DESeq2 on a seeded integration fixture.
 
-This is a limited dataset integration. The adapter does not populate the full
-set of DESeq2 assays and row metadata, perform Cook's outlier replacement, or
-implement every DESeq2 fitting and result option. Use `rsdeseq2::results()` and
+For rows with Cook's outliers, `DESeq()` replaces counts only in eligible
+replicate samples and refits those rows. The default eligibility threshold is
+seven replicates per design cell; `minReplicatesForReplace` can lower it to at
+least three or be set to `Inf` to disable replacement. The returned dataset
+retains original `counts` and original `cooks`; when rows are replaced, it adds
+`replaceCounts` and `replaceCooks` assays and a `replace` row-metadata flag.
+`results()` metadata records the threshold, eligible samples, and refit rows.
+The adapter still does not populate every DESeq2 diagnostic or implement every
+DESeq2 fitting and result option. Use `rsdeseq2::results()` and
 `rsdeseq2::resultsNames()` to read the stored Rust fit; this does not register a
 replacement method for `DESeq2::results()`.
 

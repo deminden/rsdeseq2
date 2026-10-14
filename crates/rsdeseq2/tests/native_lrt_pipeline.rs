@@ -2964,7 +2964,9 @@ fn top_level_fit_lrt_with_results_cooks_replacement_runs_default_automatic_lrt()
             values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
         }],
     };
-    let builder = native_lrt_builder().model_frame(model_frame).automatic_dispersion_means();
+    let builder = native_lrt_builder()
+        .model_frame(model_frame)
+        .automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,
@@ -3110,7 +3112,9 @@ fn top_level_fit_lrt_with_results_cooks_replacement_accepts_coefficient_name() {
         }],
         numeric_covariates: Vec::new(),
     };
-    let builder = native_lrt_builder().model_frame(model_frame).automatic_dispersion_means();
+    let builder = native_lrt_builder()
+        .model_frame(model_frame)
+        .automatic_dispersion_means();
     let replacement_options = CooksReplacementOptions {
         trim: 0.2,
         cooks_cutoff: 0.0,

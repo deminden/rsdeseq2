@@ -10,7 +10,7 @@
 extern int rsdeseq2_r_estimate_size_factors(size_t, size_t, const double *, int, const double *, const size_t *, size_t, double *);
 extern int rsdeseq2_r_normalized_counts(size_t, size_t, const double *, const double *, const double *, double *);
 extern int rsdeseq2_r_base_metadata(size_t, size_t, const double *, const double *, const double *, const double *, double *, double *, uint8_t *);
-extern int rsdeseq2_r_fit(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, size_t, const double *, int, int, size_t, int, double *, double *, double *, double *, double *, double *, double *);
+extern int rsdeseq2_r_fit(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, size_t, const double *, int, int, size_t, double, size_t, int, double *, double *, double *, double *, double *, double *, double *, uint8_t *, uint8_t *, uint8_t *, uint8_t *, size_t *, double *, double *, double *, double *, int *);
 extern int rsdeseq2_r_lfc_shrink_normal(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, const double *, const double *, const double *, size_t, ptrdiff_t, double, double *, double *, double *, double *, double *);
 extern int rsdeseq2_r_lfc_shrink_normal_contrast(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, size_t, const double *, const int32_t *, const int32_t *, const double *, const double *, const double *, const int32_t *, const double *, ptrdiff_t, ptrdiff_t, double, double *, double *, double *, double *, double *);
 extern int rsdeseq2_r_transform(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, int, int, uint8_t, size_t, size_t, const double *, double, int, const double *, const double *, const double *, double *, double *, double *, double *);
@@ -117,7 +117,7 @@ SEXP rsdeseq2_base_metadata(SEXP counts, SEXP size_factors, SEXP normalization_f
     UNPROTECT(6); return out;
 }
 
-SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_factors_input, SEXP normalization_factors, SEXP observation_weights, SEXP fit_type, SEXP test_type, SEXP threads, SEXP execution_mode) {
+SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_factors_input, SEXP normalization_factors, SEXP observation_weights, SEXP fit_type, SEXP test_type, SEXP min_replicates_for_replace, SEXP cooks_replacement_cutoff, SEXP threads, SEXP execution_mode) {
     SEXP count_dims = Rf_getAttrib(counts, R_DimSymbol);
     SEXP design_dims = Rf_getAttrib(design, R_DimSymbol);
     if (Rf_length(count_dims) != 2 || Rf_length(design_dims) != 2)
@@ -150,14 +150,39 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SEXP size_factors_out = PROTECT(Rf_allocVector(REALSXP, n_samples));
     SEXP dispersions_out = PROTECT(Rf_allocVector(REALSXP, n_genes));
     SEXP disp_fit_out = PROTECT(Rf_allocVector(REALSXP, n_genes));
+    SEXP base_var_out = PROTECT(Rf_allocVector(REALSXP, n_genes));
+    SEXP all_zero_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
+    SEXP mu_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
+    SEXP cooks_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
+    SEXP replace_counts_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
+    SEXP replace_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
+    SEXP replaceable_samples_out = PROTECT(Rf_allocVector(LGLSXP, n_samples));
+    SEXP refit_rows_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
+    SEXP new_all_zero_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
+    uint8_t *replace_values = (uint8_t *)R_alloc(n_genes, sizeof(uint8_t));
+    uint8_t *replaceable_values = (uint8_t *)R_alloc(n_samples, sizeof(uint8_t));
+    uint8_t *refit_rows_values = (uint8_t *)R_alloc(n_genes, sizeof(uint8_t));
+    uint8_t *new_all_zero_values = (uint8_t *)R_alloc(n_genes, sizeof(uint8_t));
+    SEXP n_refit_out = PROTECT(Rf_allocVector(INTSXP, 1));
+    size_t n_refit_value = 0;
     check_rust_backend(rsdeseq2_r_fit(n_genes, n_samples, REAL(counts),
         size_factors_input == R_NilValue ? NULL : REAL(size_factors_input),
         normalization_factors == R_NilValue ? NULL : REAL(normalization_factors),
         observation_weights == R_NilValue ? NULL : REAL(observation_weights),
         n_coefficients, REAL(design), reduced_coefficients, reduced_values,
-        Rf_asInteger(fit_type), Rf_asInteger(test_type), (size_t)Rf_asInteger(threads), Rf_asInteger(execution_mode), REAL(values),
-        REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(size_factors_out),
-        REAL(dispersions_out), REAL(disp_fit_out)));
+        Rf_asInteger(fit_type), Rf_asInteger(test_type), (size_t)Rf_asInteger(min_replicates_for_replace),
+        Rf_asReal(cooks_replacement_cutoff),
+        (size_t)Rf_asInteger(threads), Rf_asInteger(execution_mode), REAL(values),
+        REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out), REAL(replace_counts_out),
+        replace_values, replaceable_values, refit_rows_values, new_all_zero_values, &n_refit_value, REAL(size_factors_out),
+        REAL(dispersions_out), REAL(disp_fit_out), REAL(base_var_out), LOGICAL(all_zero_out)));
+    INTEGER(n_refit_out)[0] = (int)n_refit_value;
+    for (size_t gene = 0; gene < n_genes; ++gene) LOGICAL(replace_out)[gene] = replace_values[gene] == 2 ? NA_LOGICAL : (replace_values[gene] ? TRUE : FALSE);
+    for (size_t sample = 0; sample < n_samples; ++sample) LOGICAL(replaceable_samples_out)[sample] = replaceable_values[sample] ? TRUE : FALSE;
+    for (size_t gene = 0; gene < n_genes; ++gene) {
+        LOGICAL(refit_rows_out)[gene] = refit_rows_values[gene] ? TRUE : FALSE;
+        LOGICAL(new_all_zero_out)[gene] = new_all_zero_values[gene] ? TRUE : FALSE;
+    }
     SEXP out = PROTECT(Rf_allocVector(VECSXP, n_columns));
     for (size_t column = 0; column < n_columns; ++column) {
         const int logical_column = column == 7 || column == 9 || column == 10;
@@ -204,7 +229,22 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     Rf_setAttrib(beta_covariance, R_DimNamesSymbol, covariance_names);
     if (count_dimnames != R_NilValue && Rf_length(count_dimnames) >= 2)
         Rf_setAttrib(size_factors_out, R_NamesSymbol, VECTOR_ELT(count_dimnames, 1));
-    SEXP fit = PROTECT(Rf_allocVector(VECSXP, 7));
+    if (count_dimnames != R_NilValue && Rf_length(count_dimnames) >= 2) {
+        if (VECTOR_ELT(count_dimnames, 0) != R_NilValue)
+            Rf_setAttrib(replace_out, R_NamesSymbol, VECTOR_ELT(count_dimnames, 0));
+        if (VECTOR_ELT(count_dimnames, 0) != R_NilValue) {
+            Rf_setAttrib(refit_rows_out, R_NamesSymbol, VECTOR_ELT(count_dimnames, 0));
+            Rf_setAttrib(new_all_zero_out, R_NamesSymbol, VECTOR_ELT(count_dimnames, 0));
+        }
+        if (VECTOR_ELT(count_dimnames, 1) != R_NilValue)
+            Rf_setAttrib(replaceable_samples_out, R_NamesSymbol, VECTOR_ELT(count_dimnames, 1));
+    }
+    if (count_dimnames != R_NilValue) {
+        Rf_setAttrib(mu_out, R_DimNamesSymbol, count_dimnames);
+        Rf_setAttrib(cooks_out, R_DimNamesSymbol, count_dimnames);
+        Rf_setAttrib(replace_counts_out, R_DimNamesSymbol, count_dimnames);
+    }
+    SEXP fit = PROTECT(Rf_allocVector(VECSXP, 17));
     SET_VECTOR_ELT(fit, 0, out);
     SET_VECTOR_ELT(fit, 1, beta);
     SET_VECTOR_ELT(fit, 2, beta_se);
@@ -212,7 +252,17 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SET_VECTOR_ELT(fit, 4, size_factors_out);
     SET_VECTOR_ELT(fit, 5, dispersions_out);
     SET_VECTOR_ELT(fit, 6, disp_fit_out);
-    SEXP fit_names = PROTECT(Rf_allocVector(STRSXP, 7));
+    SET_VECTOR_ELT(fit, 7, mu_out);
+    SET_VECTOR_ELT(fit, 8, cooks_out);
+    SET_VECTOR_ELT(fit, 9, replace_counts_out);
+    SET_VECTOR_ELT(fit, 10, replace_out);
+    SET_VECTOR_ELT(fit, 11, replaceable_samples_out);
+    SET_VECTOR_ELT(fit, 12, n_refit_out);
+    SET_VECTOR_ELT(fit, 13, base_var_out);
+    SET_VECTOR_ELT(fit, 14, all_zero_out);
+    SET_VECTOR_ELT(fit, 15, refit_rows_out);
+    SET_VECTOR_ELT(fit, 16, new_all_zero_out);
+    SEXP fit_names = PROTECT(Rf_allocVector(STRSXP, 17));
     SET_STRING_ELT(fit_names, 0, Rf_mkChar("results"));
     SET_STRING_ELT(fit_names, 1, Rf_mkChar("beta"));
     SET_STRING_ELT(fit_names, 2, Rf_mkChar("betaSE"));
@@ -220,8 +270,18 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SET_STRING_ELT(fit_names, 4, Rf_mkChar("sizeFactors"));
     SET_STRING_ELT(fit_names, 5, Rf_mkChar("dispersions"));
     SET_STRING_ELT(fit_names, 6, Rf_mkChar("dispFit"));
+    SET_STRING_ELT(fit_names, 7, Rf_mkChar("mu"));
+    SET_STRING_ELT(fit_names, 8, Rf_mkChar("cooks"));
+    SET_STRING_ELT(fit_names, 9, Rf_mkChar("replaceCounts"));
+    SET_STRING_ELT(fit_names, 10, Rf_mkChar("replace"));
+    SET_STRING_ELT(fit_names, 11, Rf_mkChar("replaceable"));
+    SET_STRING_ELT(fit_names, 12, Rf_mkChar("nRefit"));
+    SET_STRING_ELT(fit_names, 13, Rf_mkChar("baseVar"));
+    SET_STRING_ELT(fit_names, 14, Rf_mkChar("allZero"));
+    SET_STRING_ELT(fit_names, 15, Rf_mkChar("refitRows"));
+    SET_STRING_ELT(fit_names, 16, Rf_mkChar("newAllZeroRows"));
     Rf_setAttrib(fit, R_NamesSymbol, fit_names);
-    UNPROTECT(16);
+    UNPROTECT(26);
     return fit;
 }
 
@@ -450,7 +510,7 @@ static const R_CallMethodDef call_methods[] = {
     {"rsdeseq2_normalized_counts", (DL_FUNC)&rsdeseq2_normalized_counts, 3},
     {"rsdeseq2_base_mean", (DL_FUNC)&rsdeseq2_base_mean, 3},
     {"rsdeseq2_base_metadata", (DL_FUNC)&rsdeseq2_base_metadata, 4},
-    {"rsdeseq2_fit", (DL_FUNC)&rsdeseq2_fit, 10},
+    {"rsdeseq2_fit", (DL_FUNC)&rsdeseq2_fit, 12},
     {"rsdeseq2_transform", (DL_FUNC)&rsdeseq2_transform, 16},
     {"rsdeseq2_lfc_shrink_normal", (DL_FUNC)&rsdeseq2_lfc_shrink_normal, 11},
     {"rsdeseq2_lfc_shrink_normal_contrast", (DL_FUNC)&rsdeseq2_lfc_shrink_normal_contrast, 16},

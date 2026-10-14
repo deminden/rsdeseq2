@@ -34,12 +34,14 @@ static library from the vendored Rust source using Cargo.
 DESeq(object, fitType = c("parametric", "local", "mean"),
   test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
   nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
-  normalizationFactors = NULL, weights = NULL, ...)
+  normalizationFactors = NULL, weights = NULL,
+  minReplicatesForReplace = 7L, ...)
 
 fitRust(object, fitType = c("parametric", "local", "mean"),
   test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
   nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
-  normalizationFactors = NULL, weights = NULL, ...)
+  normalizationFactors = NULL, weights = NULL,
+  minReplicatesForReplace = 7L, ...)
 
 estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"),
   geoMeans = NULL, controlGenes = NULL, native = TRUE)
@@ -91,7 +93,8 @@ rsdeseq2DiagnosticSchemaRust(native = FALSE)
 DESeq(object, fitType = c("parametric", "local", "mean"),
   test = c("Wald", "LRT"), engine = "rust",
   parityMode = "strict", nproc = 1, design = NULL, reduced = NULL,
-  sizeFactors = NULL, normalizationFactors = NULL, weights = NULL, ...)
+  sizeFactors = NULL, normalizationFactors = NULL, weights = NULL,
+  minReplicatesForReplace = 7L, ...)
 
 results(object, contrast = NULL, name = NULL, listValues = c(1, -1),
   reference = NULL, lfcThreshold = 0,
@@ -141,6 +144,9 @@ fitting, these are used when normalization factors are absent.}
 \code{counts}; these preempt size factors in high-level fitting.}
 \item{weights}{Optional finite non-negative observation-weight matrix for base
 metadata or high-level fitting.}
+\item{minReplicatesForReplace}{Minimum replicates per design cell required for
+Cook's count replacement and refitting. Must be at least 3; set to \code{Inf}
+to disable replacement. The default is 7.}
 \item{pvalue}{Numeric p-value vector with values in \code{[0, 1]} or \code{NA}.}
 \item{maxCooks}{Numeric vector of maximum Cook's distances, one per p-value.}
 \item{cooksCutoff}{Numeric cutoff, \code{FALSE}, or \code{NULL}.}

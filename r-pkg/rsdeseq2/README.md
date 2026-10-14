@@ -5,9 +5,15 @@ statically links the core from source, so Rust and Cargo are required to install
 the package. It supports matrix and formula-driven Wald/LRT workflows and
 selected DESeq2-shaped helpers, but not every Bioconductor object operation.
 
-Version 0.2.6 adds dataset-based VST/rlog and normal, `ashr`, and `apeglm`
-shrinkage workflows on top of the Rust-backed fit. See the sections below for
-the supported inputs and known boundaries.
+For `DESeqDataSet` inputs, the fit attaches Rust `mu` and original `cooks`
+assays, fitted row metadata, and per-coefficient MLE/SE columns. It performs
+Cook's outlier replacement and refits eligible rows by default when the design
+has samples with at least seven replicates. Set `minReplicatesForReplace = Inf`
+to disable replacement, or lower the threshold (minimum 3) for smaller designs.
+Original counts and Cook's distances are retained. When genes are replaced,
+the dataset also gets `replaceCounts` and `replaceCooks` assays.
+`results()` metadata includes the replacement threshold, eligible samples, and
+refit rows.
 
 The R package is tested with R 4.6.1. Numerical reference fixtures record the
 R/DESeq2 versions that generated them.
