@@ -46,6 +46,11 @@ Detailed status lives in
 
 ## Validation and Performance
 
+Version 0.3.1 preserves byte-identical results and diagnostics on the eleven
+frozen GTEx contrasts. The direct one-pass release comparison measured
+3.96× lower total time than 0.3.0 and 5.45× lower total time than DESeq2;
+Rust peak RSS ranged from 258 to 349 MiB.
+
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex, including biological comparisons and reproducible blocked/unblocked
 random splits. The [current parity, speed and memory comparison][gtex-benchmark]
@@ -162,9 +167,9 @@ Run matched speed/RAM benchmarks for the supported primitives:
 scripts/benchmark_rsdeseq2.sh
 ```
 
-[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/deseq2-gap-analysis.md
-[compatibility]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/compatibility.md
-[benchmarks]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/benchmarks.md
-[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/gtex-dispersion-improvement.md
+[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/v0.3.1/docs/deseq2-gap-analysis.md
+[compatibility]: https://github.com/deminden/rsdeseq2/blob/v0.3.1/docs/compatibility.md
+[benchmarks]: https://github.com/deminden/rsdeseq2/blob/v0.3.1/docs/benchmarks.md
+[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/v0.3.1/docs/gtex-dispersion-improvement.md
 
-[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/v0.3.0/docs/gtex-native-wald-benchmark.md
+[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/v0.3.1/docs/gtex-native-wald-benchmark.md

@@ -1,0 +1,21 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.14.7",
+  "rust_threads": 1,
+  "blas_threads": 1,
+  "repeats": 1,
+  "binary_sha256": "f759f546185f4c80b7b49001983fe8cc53c41c0cb595f9fcac81a58bc2b06b1f",
+  "rscript": "/Users/dendem/miniforge3/envs/deseq2-r461/bin/Rscript",
+  "baseline_binary_sha256": "cd519a32be6612cacfcb20f79106e9f18fce7b7ea22287ea426007daf42e8401",
+  "baseline_label": "0.3.0",
+  "tool_order": "alternates by contrast/repetition; rotates all three tools when a baseline is supplied",
+  "timing_scope": "process startup, input parsing, full native Wald fit and result TSV output",
+  "memory_metric": "per-process maximum resident set size, normalized to MiB (2^20 bytes)",
+  "memory_scope": "entire fitting process, including interpreter/libraries, input data and native allocations",
+  "time_command": [
+    "/usr/bin/time",
+    "-l"
+  ],
+  "cpu_model": "Apple M5"
+}

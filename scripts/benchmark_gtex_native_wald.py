@@ -36,6 +36,9 @@ def main():
     parser.add_argument('--output-dir',type=Path,default=ROOT/'results/benchmarks/gtex_native_wald_speed')
     parser.add_argument('--binary',type=Path,default=ROOT/'target/release/rsdeseq2')
     parser.add_argument('--rscript',default=shutil.which('Rscript'))
+    parser.add_argument('--baseline-binary',type=Path,help='Optional previous Rust release for a direct release comparison')
+    parser.add_argument('--baseline-label',default='previous release')
+    parser.add_argument('--validated-results-root',type=Path,help='Frozen native results directory; require exact hashes for the current Rust binary')
     parser.add_argument('--repeats',type=int,default=3)
     parser.add_argument('--rust-threads',type=int,default=1)
     parser.add_argument('--blas-threads',type=int,default=1)
@@ -65,6 +68,7 @@ def main():
             frozen.append(dict(contrast=d.name,file=name,sha256=sha256(d/name)))
     write_rows(args.output_dir/'input_reference_sha256.tsv',frozen)
     binary_hash = sha256(args.binary)
+    baseline_hash = sha256(args.baseline_binary) if args.baseline_binary else None
     subprocess.run([args.rscript,'--vanilla',str(ROOT/'scripts/benchmark_gtex_native_wald.R'),
                     '--provenance'],check=True,env=env,
                    stdout=(args.output_dir/'R-session.txt').open('w'))
@@ -72,6 +76,8 @@ def main():
         platform=platform.platform(),machine=platform.machine(),python=platform.python_version(),
         rust_threads=args.rust_threads,blas_threads=args.blas_threads,repeats=args.repeats,
         binary_sha256=binary_hash,rscript=args.rscript,
+        baseline_binary_sha256=baseline_hash,baseline_label=args.baseline_label if args.baseline_binary else None,
+        tool_order='alternates by contrast/repetition; rotates all three tools when a baseline is supplied',
         timing_scope='process startup, input parsing, full native Wald fit and result TSV output',
         memory_metric='per-process maximum resident set size, normalized to MiB (2^20 bytes)',
         memory_scope='entire fitting process, including interpreter/libraries, input data and native allocations',
@@ -79,14 +85,17 @@ def main():
         cpu_model=subprocess.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip()
                   if platform.system()=='Darwin' else platform.processor()),indent=2)+'\n')
     timings=[]; summary=[]; parity=[]
-    for d in contrasts:
+    for contrast_index,d in enumerate(contrasts):
         out=args.output_dir/d.name;out.mkdir(exist_ok=True)
         for repeat in range(1,args.repeats+1):
-            order=('rsdeseq2','DESeq2') if repeat%2 else ('DESeq2','rsdeseq2')
+            tools=('rsdeseq2','DESeq2','rsdeseq2_baseline') if args.baseline_binary else ('rsdeseq2','DESeq2')
+            offset=(contrast_index+repeat-1)%len(tools)
+            order=tools[offset:]+tools[:offset]
             for tool in order:
                 output=out/f'{tool}_rep{repeat:02d}.tsv'
-                if tool=='rsdeseq2':
-                    cmd=[str(args.binary.resolve()),'wald','--counts',str(d/'counts.tsv'),
+                if tool in ('rsdeseq2','rsdeseq2_baseline'):
+                    binary=args.binary if tool=='rsdeseq2' else args.baseline_binary
+                    cmd=[str(binary.resolve()),'wald','--counts',str(d/'counts.tsv'),
                          '--design',str(d/'design_matrix.tsv'),'--output',str(output),
                          '--disable-cooks-cutoff','--disable-independent-filtering']
                 else:
@@ -98,6 +107,10 @@ def main():
                     subprocess.run([args.time_bin,*time_args,'-o',str(resources),*cmd],
                                    env=env,check=True,stdout=log,stderr=subprocess.STDOUT)
                     elapsed=time.perf_counter()-start
+                if tool=='rsdeseq2' and args.validated_results_root:
+                    expected=args.validated_results_root/d.name/'results.tsv'
+                    if sha256(output)!=sha256(expected):
+                        raise ValueError('Numerical regression versus frozen native output: '+str(output))
                 rss=peak_rss_bytes(resources)
                 timings.append(dict(contrast=d.name,tool=tool,repetition=repeat,elapsed_s=elapsed,
                                     peak_rss_bytes=rss,peak_rss_mib=rss/(1024**2),
@@ -126,6 +139,14 @@ def main():
             rust_min_peak_rss_mib=min(rust_memory),rust_max_peak_rss_mib=max(rust_memory),
             deseq2_min_peak_rss_mib=min(reference_memory),deseq2_max_peak_rss_mib=max(reference_memory),
             rust_min_s=min(rust),rust_max_s=max(rust),deseq2_min_s=min(reference),deseq2_max_s=max(reference)))
+        if args.baseline_binary:
+            baseline=[r for r in timings if r['contrast']==d.name and r['tool']=='rsdeseq2_baseline']
+            baseline_s=statistics.median(r['elapsed_s'] for r in baseline)
+            baseline_rss=statistics.median(r['peak_rss_mib'] for r in baseline)
+            summary[-1].update(rust_baseline_median_s=baseline_s,
+                rust_release_speedup=baseline_s/statistics.median(rust),
+                rust_baseline_peak_rss_mib=baseline_rss,
+                rust_release_memory_ratio=baseline_rss/statistics.median(rust_memory))
         write_rows(args.output_dir/'summary.tsv',summary)
         write_rows(args.output_dir/'parity.tsv',parity)
     for row in frozen:
@@ -134,6 +155,8 @@ def main():
             raise ValueError('Frozen input/reference was modified')
     if sha256(args.binary)!=binary_hash:
         raise ValueError('Binary changed during timing')
+    if args.baseline_binary and sha256(args.baseline_binary)!=baseline_hash:
+        raise ValueError('Baseline binary changed during timing')
     print('All frozen inputs and references unchanged.',flush=True)
 
 if __name__=='__main__':
