@@ -1409,26 +1409,30 @@ fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
         .map(|(sample, ((mu, factor), count))| {
             validate_positive_finite(mu, "mu", sample)?;
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let log_normalized_mu =
-                stable_log_normalized_mean(mu, factor).ok_or(DeseqError::NonFiniteValue {
+            let log_normalized_mu = stable_log_normalized_mean(mu, factor).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
                     context: "IRLS working response normalized mean".to_string(),
                     index: Some(sample),
                     value: f64::NAN,
-                })?;
-            let residual = checked_sum2(count, -mu).ok_or(DeseqError::NonFiniteValue {
+                }
+            })?;
+            let residual = checked_sum2(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
                 context: "IRLS working response residual".to_string(),
                 index: Some(sample),
                 value: f64::NAN,
             })?;
-            let scaled_residual = checked_div2(residual, mu).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working response scaled residual".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            })?;
-            checked_sum2(log_normalized_mu, scaled_residual).ok_or(DeseqError::NonFiniteValue {
-                context: "IRLS working response".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
+            let scaled_residual =
+                checked_div2(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                    context: "IRLS working response scaled residual".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                })?;
+            checked_sum2(log_normalized_mu, scaled_residual).ok_or_else(|| {
+                DeseqError::NonFiniteValue {
+                    context: "IRLS working response".to_string(),
+                    index: Some(sample),
+                    value: f64::NAN,
+                }
             })
         })
         .collect()
