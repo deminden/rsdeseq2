@@ -1,5 +1,5 @@
-testthat::test_that("registered native bridge primitives are callable when package DLL is loaded", {
-  testthat::skip_if_not("rsdeseq2" %in% names(getLoadedDLLs()))
+testthat::test_that("registered native bridge primitives are callable from the installed package DLL", {
+  testthat::expect_true("rsdeseq2" %in% names(getLoadedDLLs()))
 
   schema <- .Call("rsdeseq2_diagnostic_schema", PACKAGE = "rsdeseq2")
   testthat::expect_identical(schema, rsdeseq2DiagnosticSchemaRust())

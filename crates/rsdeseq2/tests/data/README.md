@@ -125,8 +125,9 @@ Reference files should record:
   `cooks_replacement_rows.tsv` for DESeq2 `replaceOutliers` and
   `refitWithoutOutliers` bookkeeping checks.
 
-The Rust reference tests skip when the generated directory is absent. When the
-files are present, the tests compare implemented stages with the R references.
+The committed Rust reference fixtures are required. Missing, empty or malformed
+files fail the tests. Numerical values must be finite unless the field explicitly
+permits missingness; optional fields check missingness in both directions.
 
 By default, `scripts/generate_deseq2_references.R` writes deterministic fixtures
 for supported paths, including weighted fixed-dispersion Wald/LRT, weighted

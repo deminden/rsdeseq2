@@ -16,6 +16,11 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parity and benchmark integrity checks
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: README quick start
         run: |
           quickstart_output="$(mktemp)"

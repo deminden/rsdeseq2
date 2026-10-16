@@ -3,112 +3,46 @@ mod common;
 use common::*;
 use rsdeseq2::prelude::*;
 
-fn read_count_matrix(name: &str) -> Option<CountMatrix> {
-    let rows = read_optional_tsv(name)?;
-    let samples = reference_sample_names();
-    let genes = rows
-        .iter()
-        .map(|row| {
-            row.get("gene")
-                .unwrap_or_else(|| panic!("missing gene column in {name}"))
-                .to_string()
-        })
-        .collect::<Vec<_>>();
-    let values = rows
-        .iter()
-        .flat_map(|row| {
-            samples.iter().map(|sample| {
-                let value = parse_required_f64(row, sample);
-                assert!(value >= 0.0 && value.fract() == 0.0);
-                value as u32
-            })
-        })
-        .collect::<Vec<_>>();
-    Some(
-        CountMatrix::from_row_major_u32_with_names(
-            rows.len(),
-            samples.len(),
-            values,
-            Some(genes),
-            Some(samples),
-        )
-        .unwrap(),
-    )
+fn read_count_matrix(name: &str) -> CountMatrix {
+    rsdeseq2::io::read_count_matrix_tsv(reference_file(name)).unwrap()
 }
 
-fn read_design_matrix(name: &str) -> Option<DesignMatrix> {
-    let rows = read_optional_tsv(name)?;
-    let coefficient_names = rows[0]
-        .keys()
-        .filter(|name| name.as_str() != "sample")
-        .cloned()
-        .collect::<Vec<_>>();
-    let values = rows
-        .iter()
-        .flat_map(|row| {
-            coefficient_names
-                .iter()
-                .map(|coefficient| parse_required_f64(row, coefficient))
-        })
-        .collect::<Vec<_>>();
-    Some(
-        DesignMatrix::from_row_major(
-            rows.len(),
-            coefficient_names.len(),
-            values,
-            Some(coefficient_names),
-        )
-        .unwrap(),
-    )
+fn read_design_matrix(name: &str) -> DesignMatrix {
+    rsdeseq2::io::read_design_matrix_tsv(reference_file(name)).unwrap()
 }
 
-fn read_replacement_options() -> Option<CooksReplacementOptions> {
-    let rows = read_optional_tsv("cooks_replacement_options.tsv")?;
+fn read_replacement_options() -> CooksReplacementOptions {
+    let rows = read_reference_tsv("cooks_replacement_options.tsv");
     let row = &rows[0];
-    Some(CooksReplacementOptions {
+    CooksReplacementOptions {
         trim: parse_required_f64(row, "trim"),
         cooks_cutoff: parse_required_f64(row, "cooksCutoff"),
         min_replicates: parse_required_f64(row, "minReplicates") as usize,
-        which_samples: Some(read_replacement_size_factor_rows()?.1),
-    })
+        which_samples: Some(read_replacement_size_factor_rows().1),
+    }
 }
 
-fn read_replacement_size_factor_rows() -> Option<(Vec<f64>, Vec<bool>)> {
-    let rows = read_optional_tsv("cooks_replacement_size_factors.tsv")?;
-    Some((
+fn read_replacement_size_factor_rows() -> (Vec<f64>, Vec<bool>) {
+    let rows = read_reference_tsv("cooks_replacement_size_factors.tsv");
+    (
         rows.iter()
             .map(|row| parse_required_f64(row, "size_factor"))
             .collect(),
         rows.iter()
             .map(|row| parse_required_bool(row, "replaceable"))
             .collect(),
-    ))
+    )
 }
 
 #[test]
-fn cooks_replacement_counts_match_optional_deseq2_reference() {
-    let Some(counts) = read_count_matrix("cooks_replacement_counts.tsv") else {
-        return;
-    };
-    let Some(expected_candidates) = read_count_matrix("cooks_replacement_candidate_counts.tsv")
-    else {
-        return;
-    };
-    let Some(expected_replaced) = read_count_matrix("cooks_replacement_replaced_counts.tsv") else {
-        return;
-    };
-    let Some(cooks) = read_reference_matrix("cooks_replacement_cooks.tsv") else {
-        return;
-    };
-    let Some(design) = read_design_matrix("cooks_replacement_design.tsv") else {
-        return;
-    };
-    let Some((size_factors, replaceable)) = read_replacement_size_factor_rows() else {
-        return;
-    };
-    let Some(options) = read_replacement_options() else {
-        return;
-    };
+fn cooks_replacement_counts_match_deseq2_reference() {
+    let counts = read_count_matrix("cooks_replacement_counts.tsv");
+    let expected_candidates = read_count_matrix("cooks_replacement_candidate_counts.tsv");
+    let expected_replaced = read_count_matrix("cooks_replacement_replaced_counts.tsv");
+    let cooks = read_reference_matrix("cooks_replacement_cooks.tsv");
+    let design = read_design_matrix("cooks_replacement_design.tsv");
+    let (size_factors, replaceable) = read_replacement_size_factor_rows();
+    let options = read_replacement_options();
 
     let normalized = normalized_counts(&counts, &size_factors).unwrap();
     let output = replace_outlier_counts(
@@ -134,25 +68,13 @@ fn cooks_replacement_counts_match_optional_deseq2_reference() {
 }
 
 #[test]
-fn cooks_replacement_refit_plan_matches_optional_deseq2_reference() {
-    let Some(counts) = read_count_matrix("cooks_replacement_counts.tsv") else {
-        return;
-    };
-    let Some(rows) = read_optional_tsv("cooks_replacement_rows.tsv") else {
-        return;
-    };
-    let Some(cooks) = read_reference_matrix("cooks_replacement_cooks.tsv") else {
-        return;
-    };
-    let Some(design) = read_design_matrix("cooks_replacement_design.tsv") else {
-        return;
-    };
-    let Some((size_factors, _replaceable)) = read_replacement_size_factor_rows() else {
-        return;
-    };
-    let Some(options) = read_replacement_options() else {
-        return;
-    };
+fn cooks_replacement_refit_plan_matches_deseq2_reference() {
+    let counts = read_count_matrix("cooks_replacement_counts.tsv");
+    let rows = read_reference_tsv("cooks_replacement_rows.tsv");
+    let cooks = read_reference_matrix("cooks_replacement_cooks.tsv");
+    let design = read_design_matrix("cooks_replacement_design.tsv");
+    let (size_factors, _replaceable) = read_replacement_size_factor_rows();
+    let options = read_replacement_options();
 
     let normalized = normalized_counts(&counts, &size_factors).unwrap();
     let plan = prepare_cooks_replacement_refit(

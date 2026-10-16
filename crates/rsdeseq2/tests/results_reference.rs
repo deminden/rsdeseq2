@@ -74,13 +74,9 @@ fn assert_result_rows_match_reference(results: &DeseqResults, rows: &[TsvRow], l
 }
 
 #[test]
-fn normalization_stage_matches_optional_deseq2_reference() {
-    let Some(expected_size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(expected_base) = read_optional_tsv("base_metadata_ratio.tsv") else {
-        return;
-    };
+fn normalization_stage_matches_deseq2_reference() {
+    let expected_size_factors = read_size_factors("size_factors_ratio.tsv");
+    let expected_base = read_reference_tsv("base_metadata_ratio.tsv");
 
     let counts = reference_counts();
     let fit = DeseqBuilder::new()
@@ -129,13 +125,9 @@ fn normalization_stage_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn normalized_counts_match_optional_deseq2_reference() {
-    let Some(expected_size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(expected_counts) = read_optional_tsv("normalized_counts_ratio.tsv") else {
-        return;
-    };
+fn normalized_counts_match_deseq2_reference() {
+    let expected_size_factors = read_size_factors("size_factors_ratio.tsv");
+    let expected_counts = read_reference_tsv("normalized_counts_ratio.tsv");
 
     let counts = reference_counts();
     let normalized = normalized_counts(&counts, &expected_size_factors).unwrap();
@@ -160,16 +152,10 @@ fn normalized_counts_match_optional_deseq2_reference() {
 }
 
 #[test]
-fn normalization_factors_match_optional_deseq2_reference() {
-    let Some(factor_rows) = read_optional_tsv("normalization_factors.tsv") else {
-        return;
-    };
-    let Some(expected_counts) = read_optional_tsv("normalized_counts_nf.tsv") else {
-        return;
-    };
-    let Some(expected_base) = read_optional_tsv("base_metadata_nf.tsv") else {
-        return;
-    };
+fn normalization_factors_match_deseq2_reference() {
+    let factor_rows = read_reference_tsv("normalization_factors.tsv");
+    let expected_counts = read_reference_tsv("normalized_counts_nf.tsv");
+    let expected_base = read_reference_tsv("base_metadata_nf.tsv");
 
     let counts = reference_counts();
     let samples = reference_sample_names();
@@ -221,19 +207,11 @@ fn normalization_factors_match_optional_deseq2_reference() {
 }
 
 #[test]
-fn weighted_base_metadata_matches_optional_deseq2_reference() {
-    let Some(expected_base) = read_optional_tsv("base_metadata_weighted.tsv") else {
-        return;
-    };
-    let Some(expected_weights) = read_reference_matrix("observation_weights_normalized.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn weighted_base_metadata_matches_deseq2_reference() {
+    let expected_base = read_reference_tsv("base_metadata_weighted.tsv");
+    let expected_weights = read_reference_matrix("observation_weights_normalized.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let fit = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -279,13 +257,9 @@ fn weighted_base_metadata_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_mean_wald_results_match_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_mean_results_wald.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_mean_wald_results_match_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_mean_results_wald.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let (_, results) = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -304,13 +278,9 @@ fn native_glm_mu_mean_wald_results_match_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_mean_lrt_results_match_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_mean_results_lrt.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_mean_lrt_results_match_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_mean_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let (_, results) = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -334,16 +304,10 @@ fn native_glm_mu_mean_lrt_results_match_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_local_results_match_optional_deseq2_references() {
-    let Some(wald_rows) = read_optional_tsv("native_glm_mu_local_results_wald.tsv") else {
-        return;
-    };
-    let Some(lrt_rows) = read_optional_tsv("native_glm_mu_local_results_lrt.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_local_results_match_deseq2_references() {
+    let wald_rows = read_reference_tsv("native_glm_mu_local_results_wald.tsv");
+    let lrt_rows = read_reference_tsv("native_glm_mu_local_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let builder = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -377,16 +341,10 @@ fn native_glm_mu_local_results_match_optional_deseq2_references() {
 }
 
 #[test]
-fn native_glm_mu_local_cox_reid_results_match_optional_deseq2_references() {
-    let Some(wald_rows) = read_optional_tsv("native_glm_mu_local_cr_results_wald.tsv") else {
-        return;
-    };
-    let Some(lrt_rows) = read_optional_tsv("native_glm_mu_local_cr_results_lrt.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_local_cox_reid_results_match_deseq2_references() {
+    let wald_rows = read_reference_tsv("native_glm_mu_local_cr_results_wald.tsv");
+    let lrt_rows = read_reference_tsv("native_glm_mu_local_cr_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let builder = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -423,20 +381,11 @@ fn native_glm_mu_local_cox_reid_results_match_optional_deseq2_references() {
 }
 
 #[test]
-fn native_weighted_glm_mu_mean_cox_reid_results_match_optional_deseq2_references() {
-    let Some(wald_rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_results_wald.tsv")
-    else {
-        return;
-    };
-    let Some(lrt_rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_results_lrt.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_mean_cox_reid_results_match_deseq2_references() {
+    let wald_rows = read_reference_tsv("native_weighted_glm_mu_mean_cr_results_wald.tsv");
+    let lrt_rows = read_reference_tsv("native_weighted_glm_mu_mean_cr_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let builder = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -474,19 +423,11 @@ fn native_weighted_glm_mu_mean_cox_reid_results_match_optional_deseq2_references
 }
 
 #[test]
-fn native_weighted_glm_mu_local_results_match_optional_deseq2_references() {
-    let Some(wald_rows) = read_optional_tsv("native_weighted_glm_mu_local_results_wald.tsv") else {
-        return;
-    };
-    let Some(lrt_rows) = read_optional_tsv("native_weighted_glm_mu_local_results_lrt.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_local_results_match_deseq2_references() {
+    let wald_rows = read_reference_tsv("native_weighted_glm_mu_local_results_wald.tsv");
+    let lrt_rows = read_reference_tsv("native_weighted_glm_mu_local_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let builder = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -525,21 +466,11 @@ fn native_weighted_glm_mu_local_results_match_optional_deseq2_references() {
 }
 
 #[test]
-fn native_weighted_glm_mu_local_cox_reid_results_match_optional_deseq2_references() {
-    let Some(wald_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_results_wald.tsv")
-    else {
-        return;
-    };
-    let Some(lrt_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_results_lrt.tsv")
-    else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_local_cox_reid_results_match_deseq2_references() {
+    let wald_rows = read_reference_tsv("native_weighted_glm_mu_local_cr_results_wald.tsv");
+    let lrt_rows = read_reference_tsv("native_weighted_glm_mu_local_cr_results_lrt.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let builder = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -574,33 +505,4 @@ fn native_weighted_glm_mu_local_cox_reid_results_match_optional_deseq2_reference
         &lrt_rows,
         "native weighted GLM-mu Cox-Reid local LRT results",
     );
-}
-
-#[test]
-fn full_deseq2_results_reference_shape_is_documented() {
-    let Some(rows) = read_optional_tsv("results_wald_ratio.tsv") else {
-        return;
-    };
-    let genes = reference_gene_names();
-
-    assert_eq!(rows.len(), genes.len());
-    for (idx, row) in rows.iter().enumerate() {
-        assert_eq!(
-            row.get("gene").map(String::as_str),
-            Some(genes[idx].as_str())
-        );
-        for column in [
-            "baseMean",
-            "log2FoldChange",
-            "lfcSE",
-            "stat",
-            "pvalue",
-            "padj",
-        ] {
-            assert!(
-                row.contains_key(column),
-                "missing DESeq2 results column {column}"
-            );
-        }
-    }
 }

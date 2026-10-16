@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-16",
+  "baseline_commit": "304008f9945ae130fe145439ceaa5e8b92caab48",
+  "baseline": "local large-file refactor; numerical release 0.3.1 behavior",
+  "runtime_changes": false,
+  "binary_sha256": "72a85c9c7ddbcd19b5c2afdc9dfc2ebd88a7ae588a1e5112d59cbce964ab5043",
+  "binary_identical_to_baseline": true,
+  "rust": {
+    "passed": 1061,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_reason": "explicit full 56,200-gene GTEx fit; separately run and passed",
+    "full_gtex_passed": 1,
+    "bridge_passed": 1,
+    "format": "passed",
+    "clippy": "passed",
+    "package_verification": "passed"
+  },
+  "python": {
+    "passed": 31,
+    "failed": 0
+  },
+  "R": {
+    "assertions": 865,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "check_status": "OK"
+  },
+  "fixtures": {
+    "compact_genes": 512,
+    "full_genes": 56200,
+    "samples": 61,
+    "compact_count_bytes": 101218,
+    "full_count_bytes": 10644813,
+    "compact_counts_reference_manifest_and_optimizer_oracle_reproduce_byte_for_byte": true,
+    "vendored_source_and_oracle_files_identical": 127
+  },
+  "test_speed": {
+    "preceding_refactor_gtex_harness_seconds": 11.46,
+    "current_gtex_harness_seconds": 1.45,
+    "observed_ratio": 7.90344827586207,
+    "note": "cached debug harness times from separate validation runs; includes full normalization"
+  },
+  "precision": {
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "release_result_and_diagnostic_exports_byte_identical": 22,
+    "frozen_input_reference_hashes_verified": 44,
+    "existing_tolerances_relaxed": false,
+    "note": "Per-gene absolute R shrinkage bounds are stricter than prior vector-scaled checks; numerical runtime unchanged."
+  },
+  "speed_memory": {
+    "contrasts": 11,
+    "repeats": 1,
+    "rust_threads": 1,
+    "blas_threads": 1,
+    "baseline_sum_seconds": 44.97309274907457,
+    "current_sum_seconds": 43.91458182904171,
+    "sum_baseline_over_current": 1.0241038597191614,
+    "median_per_contrast_baseline_over_current_seconds": 1.010647160846176,
+    "median_per_contrast_baseline_over_current_peak_rss": 1.0,
+    "note": "Identical executable bytes; observed differences are process/system variation, not an optimization gain."
+  },
+  "commands": {
+    "rust": "cargo test --workspace",
+    "python": "python3 -m unittest discover -s scripts/tests -p 'test_*.py'",
+    "full_gtex": "cargo test -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald -- --ignored --nocapture",
+    "eleven_contrasts": "python3 scripts/check_gtex_dispersion_improvement.py --workers 1 --output-dir results/test_quality_cleanup/gtex",
+    "timing": "python3 scripts/benchmark_gtex_native_wald.py --binary target/release/rsdeseq2 --baseline-binary results/test_quality_cleanup/baseline/rsdeseq2 --baseline-label pre-test-cleanup --validated-results-root results/benchmarks/release_0.3.1/gtex --rscript /path/to/pinned/Rscript --repeats 1 --rust-threads 1 --blas-threads 1 --output-dir results/test_quality_cleanup/speed_memory"
+  },
+  "raw_evidence": "results/test_quality_cleanup/ (ignored local logs and outputs)"
+}

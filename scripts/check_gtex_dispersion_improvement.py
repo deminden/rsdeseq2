@@ -23,7 +23,13 @@ TARGET_CONTRASTS = ('sex_female_vs_male', 'male_age4_vs_age3',
 
 def read_rows(path):
     with path.open(newline='') as handle:
-        return list(csv.DictReader(handle, delimiter='\t'))
+        reader = csv.DictReader(handle, delimiter='\t')
+        if not reader.fieldnames or len(set(reader.fieldnames)) != len(reader.fieldnames):
+            raise ValueError(f'missing or duplicate columns: {path}')
+        rows = list(reader)
+        if not rows or any(None in row or None in row.values() for row in rows):
+            raise ValueError(f'empty or malformed table: {path}')
+        return rows
 
 def write_rows(path, rows):
     with path.open('w', newline='') as handle:
@@ -32,11 +38,37 @@ def write_rows(path, rows):
         writer.writerows(rows)
 
 def numeric(value):
-    return math.nan if value in ('NA', 'NaN', '') else float(value)
+    if value in ('NA', 'NaN', ''):
+        return math.nan
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f'invalid non-finite numeric value: {value}')
+    return number
+
+def gene_rows(path, columns):
+    rows = read_rows(path)
+    if any(not row.get('gene') or not set(columns) <= row.keys() for row in rows):
+        raise ValueError(f'missing gene or numerical column: {path}')
+    genes = {row['gene']: row for row in rows}
+    if len(genes) != len(rows):
+        raise ValueError(f'duplicate genes: {path}')
+    return genes
+
+def reduction_factor(before, after):
+    if not all(math.isfinite(x) and x >= 0 for x in (before, after)):
+        raise ValueError('error bounds must be finite and nonnegative')
+    return before/after if after > 0 else (math.inf if before > 0 else 1.0)
+
+def verify_reference_hashes(path, actual):
+    published_rows = read_rows(path)  # Missing manifest is a hard failure.
+    published = {(r['contrast'],r['file']):r['sha256'] for r in published_rows}
+    expected = {(r['contrast'],r['file']):r['sha256'] for r in actual}
+    if len(published) != len(published_rows) or len(expected) != len(actual) or published != expected:
+        raise ValueError('input/reference hashes differ from the frozen comparison')
 
 def compare(actual, reference, columns):
-    got = {row['gene']: row for row in read_rows(actual)}
-    expected = {row['gene']: row for row in read_rows(reference)}
+    got = gene_rows(actual, columns)
+    expected = gene_rows(reference, columns)
     if got.keys() != expected.keys():
         raise ValueError(f'gene coverage mismatch: {actual}')
     rows = []
@@ -44,7 +76,7 @@ def compare(actual, reference, columns):
         errors = []
         mismatches = 0
         worst_gene = ''
-        maximum = -1.0
+        maximum = 0.0
         for gene, row in expected.items():
             a, b = numeric(got[gene][column]), numeric(row[column])
             if math.isfinite(a) != math.isfinite(b):
@@ -64,16 +96,20 @@ def compare(actual, reference, columns):
     return rows
 
 def global_maxima(rows, required_reduction):
+    if not math.isfinite(required_reduction) or required_reduction <= 0:
+        raise ValueError('required reduction must be finite and positive')
     output=[]
     for category, columns in (('dispersion_stage',STAGE_COLUMNS),
                               ('result',('log2FoldChange','lfcSE','stat','pvalue','padj'))):
         for column in columns:
             selected=[r for r in rows if r['category']==category and r['column']==column]
+            for r in selected:
+                reduction_factor(float(r['before_max_abs']),float(r['after_max_abs']))
             before=max(float(r['before_max_abs']) for r in selected)
             after=max(float(r['after_max_abs']) for r in selected)
-            factor=before/after if after > 0 else math.inf
+            factor=reduction_factor(before,after)
             output.append(dict(category=category,column=column,before_global_max_abs=before,
-                after_global_max_abs=after,reduction_factor=factor,passed=factor >= required_reduction))
+                after_global_max_abs=after,reduction_factor=factor,passed=all(int(r["n_finite"]) > 0 and int(r["finite_na_mismatches"]) == 0 for r in selected) and factor >= required_reduction))
     return output
 
 def stage_routes(contrast, after_dir):
@@ -132,6 +168,8 @@ def main():
     parser.add_argument('--workers', type=int, default=2)
     parser.add_argument('--required-reduction', type=float, default=100.0)
     args = parser.parse_args()
+    if args.workers < 1 or not math.isfinite(args.required_reduction) or args.required_reduction <= 0:
+        parser.error('workers and required reduction must be positive and finite')
     args.output_dir.mkdir(parents=True, exist_ok=True)
     contrasts = [args.fixture_root/name for name in ('condition_blocked','sex_female_vs_male','male_age4_vs_age3')]
     contrasts += sorted((args.fixture_root/'random_splits').glob('*_random_rep*'))
@@ -152,12 +190,7 @@ def main():
             path = d/name
             frozen_hashes.append(dict(contrast=d.name, file=name, sha256=sha256(path)))
 
-    if args.reference_hashes.exists():
-        published = {(r['contrast'],r['file']):r['sha256'] for r in read_rows(args.reference_hashes)}
-        for row in frozen_hashes:
-            if published[(row['contrast'],row['file'])] != row['sha256']:
-                raise ValueError('input/reference hash differs from the frozen comparison: '
-                                 + row['contrast']+'/'+row['file'])
+    verify_reference_hashes(args.reference_hashes, frozen_hashes)
 
     def run(d):
         out = args.output_dir/d.name
@@ -176,9 +209,9 @@ def main():
                 key=(d.name,category,metrics['column'])
                 old=baseline[key]
                 new=metrics['max_abs']
-                factor=old/new if new > 0 else math.inf
+                factor=reduction_factor(old,new)
                 target=d.name in TARGET_CONTRASTS and metrics['column'] != 'baseMean'
-                coverage_ok=metrics['finite_na_mismatches'] == 0
+                coverage_ok=metrics['finite_na_mismatches'] == 0 and metrics['n_finite'] > 0
                 passed=coverage_ok and (factor >= args.required_reduction if target else new <= old*1.05+1e-10)
                 rows.append(dict(contrast=d.name,category=category,column=metrics['column'],
                     before_max_abs=old,after_max_abs=new,reduction_factor=factor,
