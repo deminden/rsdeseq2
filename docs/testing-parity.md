@@ -109,6 +109,56 @@ The replaced-test mapping, explicit cases and validation are recorded in
 and
 [`data/r_wrapper_test_consolidation_2026-10-16_validation.json`](data/r_wrapper_test_consolidation_2026-10-16_validation.json).
 
+## Remaining CLI options and R primitive routes
+
+The follow-up to `c308904` removes eleven default-versus-`native=TRUE`
+comparisons from normalization and Cook's tests. These invoked the same native
+implementation twice. Explicit numerical expectations and the registered-DLL
+bridge checks remain. The poscounts fixture now checks hand-computed values;
+its answers were also checked against DESeq2 1.52.0 during this review.
+
+Sixteen remaining CLI success/shape tests become six numerical groups with
+31 explicit cases. Together with the previous routing tables, the CLI suite
+now exercises 99 numerical cases in 44 test functions (previously 54).
+
+- Three beta-prior groups cover explicit expanded, generated factor and
+  generated additive designs. The oracle supplies explicit matrices, collapse
+  groups, dispersions and base means directly to the library. Existing
+  coefficient/contrast, normalization and weighting routes remain; additional
+  cases select nondefault coefficients and use weighted positive/negative lists.
+- Frozen rlog checks both blind modes, every transformed cell and shuffled
+  intercept labels. Its inputs distinguish ordinary rlog, another prior variance
+  and the other blind mode. Threshold tests distinguish both an ignored
+  threshold and an ignored alternative; t-tail tests distinguish normal tails,
+  scalar/residual degrees of freedom and shuffled nonuniform per-gene values.
+- Wald/LRT filtering uses four replicates per group, an actual Cook's outlier
+  and separated gene means. It checks complete results plus scalar, rejection
+  and lowess exports. Forced independent filtering and a zero Cook's cutoff
+  must change results. Active filtering checks alpha and theta numerically;
+  disabled cases still check BH/missingness and metadata.
+- Export comparisons retain 1e-12 absolute/relative tolerances, labels and
+  both directions of missingness, rejecting unexpected nonfinite values.
+  Counterfactual checks require differences above 1e-6 for the relevant options.
+  All 38 other CLI test bodies, including validation and replacement sidecars,
+  are byte-identical to the baseline.
+
+Seven R packaging/list/formula-selector blocks become three groups checking
+14 complete result tables. They retain supplied-SE packaging, chi-square LRT
+tails, direct and packaged list routes, contrast-over-name precedence, original
+formula coefficient names/weights, supplied LRT statistics and filtering
+metadata. The R suite has 91 blocks (previously 95). All 99 error assertions and
+both live DESeq2 parity files remain unchanged; the source package passes
+`R CMD check` with 1,252 assertions and no failures, warnings or skips.
+
+The full Rust suite passes 1,016 tests, with the existing full GTEx replay still
+explicitly ignored; all 31 Python tests, formatting and Clippy pass. Runtime
+R/Rust sources and the rebuilt release executable are unchanged. No new
+quantification speed or memory benchmark is claimed for these test-only edits.
+The mapping and validation are recorded in
+[`data/test_consolidation_followup_2026-10-16_cases.json`](data/test_consolidation_followup_2026-10-16_cases.json)
+and
+[`data/test_consolidation_followup_2026-10-16_validation.json`](data/test_consolidation_followup_2026-10-16_validation.json).
+
 ## GTEx without a full fit on every run
 
 The default fixed-dispersion replay uses **512 genes × all 61 samples**, selected

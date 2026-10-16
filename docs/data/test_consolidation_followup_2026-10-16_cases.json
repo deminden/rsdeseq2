@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-16",
+  "baseline_commit": "c3089047d07802348123022037ae8d1a3dc95a1b",
+  "CLI": {
+    "replaced_tests": [
+      "cli_rlog_accepts_frozen_intercepts_in_blind_mode",
+      "cli_rlog_accepts_frozen_intercepts_in_design_aware_mode",
+      "cli_wald_accepts_lfc_threshold_alternative",
+      "cli_wald_accepts_t_pvalue_options",
+      "cli_wald_accepts_result_filter_controls",
+      "cli_lrt_accepts_result_filter_controls",
+      "cli_wald_accepts_expanded_beta_prior_coefficient_workflow",
+      "cli_wald_accepts_expanded_beta_prior_contrast_workflow",
+      "cli_wald_accepts_expanded_beta_prior_normalization_factors",
+      "cli_wald_accepts_factor_expanded_beta_prior_coefficient_workflow",
+      "cli_wald_accepts_factor_expanded_beta_prior_contrast_workflow",
+      "cli_wald_accepts_factor_expanded_beta_prior_normalization_factors",
+      "cli_wald_accepts_additive_expanded_beta_prior_coefficient_workflow",
+      "cli_wald_accepts_additive_expanded_beta_prior_normalization_factors",
+      "cli_wald_accepts_additive_expanded_beta_prior_observation_weights",
+      "cli_wald_accepts_additive_expanded_beta_prior_list_contrast"
+    ],
+    "replacement_groups": {
+      "beta_prior_options.rs": [
+        "expanded_beta_prior_options_match_explicit_library_inputs",
+        "factor_beta_prior_options_match_explicit_library_inputs",
+        "additive_beta_prior_options_match_explicit_library_inputs"
+      ],
+      "statistical_options.rs": [
+        "frozen_rlog_options_match_library_and_change_transformed_values",
+        "wald_threshold_and_t_tail_options_match_library_numerically"
+      ],
+      "filter_options.rs": [
+        "wald_and_lrt_filter_controls_match_library_results_and_metadata"
+      ]
+    },
+    "executed_new_cases": [
+      "Factor: coefficient",
+      "Expanded: coefficient",
+      "Additive: coefficient",
+      "Factor: named contrast",
+      "Expanded: named contrast",
+      "Additive: named contrast",
+      "Factor: normalization factors",
+      "Expanded: normalization factors",
+      "Factor: nondefault coefficient",
+      "Expanded: nondefault coefficient",
+      "Additive: normalization factors",
+      "Additive: nondefault coefficient",
+      "wald: explicit cutoff and disabled filtering",
+      "wald: disabled Cook's and filtering",
+      "wald: forced independent filtering",
+      "Additive: observation weights",
+      "wald: zero Cook's cutoff",
+      "Additive: positive list",
+      "wald: active filtering grid and alpha",
+      "lrt: explicit cutoff and disabled filtering",
+      "Additive: weighted positive and negative list",
+      "lrt: disabled Cook's and filtering",
+      "lrt: forced independent filtering",
+      "lrt: zero Cook's cutoff",
+      "lrt: active filtering grid and alpha",
+      "frozen rlog blind=true",
+      "frozen rlog blind=false",
+      "threshold and greater alternative",
+      "residual t degrees of freedom",
+      "scalar t degrees of freedom",
+      "shuffled per-gene t degrees of freedom"
+    ],
+    "new_numerical_cases": 31,
+    "all_numerical_cases": 99,
+    "retained_identical_test_bodies": 38,
+    "numeric_tolerances": {
+      "absolute": 1e-12,
+      "relative": 1e-12,
+      "distinguishing_difference": 1e-06
+    },
+    "oracle": "Explicit in-memory library inputs; TSV cells compared independently of the writer. Existing R references validate the library arithmetic.",
+    "source_lines_including_helpers": {
+      "before": 3028,
+      "after": 3151
+    }
+  },
+  "R": {
+    "removed_duplicate_comparisons": [
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(\n    estimateSizeFactorsRust(counts, method = \"ratio\", native = TRUE),\n    estimateSizeFactorsRust(counts, method = \"ratio\"),\n    tolerance = 1e-12\n  )\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(nativeSf, sf, tolerance = 1e-12)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(nativeSf, sf, tolerance = 1e-12)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(nativeNormalized, normalized)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(baseMeanRust(counts, c(1, 2), native = TRUE), c(g1 = 10, g2 = 30))\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(nativeNormalized, normalized)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(\n    baseMeanRust(counts, normalizationFactors = normalizationFactors, native = TRUE),\n    c(g1 = 7.5, g2 = 20)\n  )\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-size-factors.R",
+        "source": "  testthat::expect_equal(nativeMeta, meta)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "source": "  testthat::expect_equal(nativeOut, out)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "source": "  testthat::expect_equal(nativeOut, out)\n"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "source": "  testthat::expect_equal(nativeOut, out)\n"
+      }
+    ],
+    "replaced_blocks": [
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-wald.R",
+        "test": "R wrapper Wald test packages primitive Wald fit inputs"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-wald.R",
+        "test": "R wrapper Wald test accepts list-like primitive objects"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+        "test": "R wrapper LRT packages primitive LRT fit inputs"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+        "test": "R wrapper LRT results reports selected contrast LFC with LRT p-values"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "test": "R results accepts list-like primitive Wald and LRT inputs"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "test": "R wrapper object list contrasts accept cleaned formula coefficient aliases"
+      },
+      {
+        "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+        "test": "R wrapper object results accept cleaned formula numeric coefficient aliases"
+      }
+    ],
+    "new_primitive_groups": [
+      "R primitive argument packaging preserves Wald and chi-square LRT answers",
+      "R primitive list dispatch and packaging preserve contrast answers and precedence",
+      "R cleaned formula selectors retain original coefficient names and method metadata"
+    ],
+    "new_complete_result_tables": 14,
+    "poscounts_expected": [
+      "9 / 324^(1/3)",
+      "1",
+      "sqrt(4 * 36 / 324^(1/3))"
+    ],
+    "source_lines_including_helpers": {
+      "before": 4136,
+      "after": 3895
+    }
+  }
+}

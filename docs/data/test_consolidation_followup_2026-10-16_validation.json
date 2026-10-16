@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-16",
+  "baseline_commit": "c3089047d07802348123022037ae8d1a3dc95a1b",
+  "scope": "R/CLI tests and documentation only",
+  "CLI": {
+    "tests_before": 54,
+    "tests_after": 44,
+    "replaced_tests": 16,
+    "replacement_numerical_groups": 6,
+    "new_numerical_cases": 31,
+    "all_numerical_cases": 99,
+    "retained_byte_identical_bodies": 38
+  },
+  "R": {
+    "blocks_before": 95,
+    "blocks_after": 91,
+    "replaced_blocks": 7,
+    "replacement_groups": 3,
+    "removed_duplicate_comparisons": 11,
+    "new_complete_result_tables": 14,
+    "assertions_before": 1137,
+    "assertions_passed": 1252,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "source_audit": {
+      "baseline_test_blocks": 95,
+      "current_test_blocks": 91,
+      "unchanged_test_bodies": 79,
+      "unchanged_error_assertions": 99,
+      "unchanged_live_DESeq2_calls": 112
+    },
+    "poscounts_independently_checked_against": "DESeq2 1.52.0 estimateSizeFactorsForMatrix(type=poscounts)",
+    "live_DESeq2_files_byte_identical": true
+  },
+  "validation": {
+    "Rust_passed": 1016,
+    "Rust_ignored_full_GTex_replay": 1,
+    "Python_passed": 31,
+    "R_CMD_check": "Status: OK",
+    "source_package_contains_exact_final_tests": true,
+    "format": "passed",
+    "Clippy_all_targets_deny_warnings": "passed",
+    "git_diff_check": "passed"
+  },
+  "precision": {
+    "runtime_R_Rust_sources_changed": false,
+    "existing_reference_files_changed": false,
+    "existing_tolerances_relaxed": false,
+    "runtime_hashes_verified": 290
+  },
+  "performance": {
+    "release_rebuilt": true,
+    "release_executable_sha256": "72a85c9c7ddbcd19b5c2afdc9dfc2ebd88a7ae588a1e5112d59cbce964ab5043",
+    "release_byte_identical_to_baseline": true,
+    "new_quantification_benchmark_run": false,
+    "conclusion": "Test-only changes, identical runtime sources and rebuilt executable; quantification precision, speed and memory behavior unchanged. No performance gain claimed."
+  },
+  "raw_evidence": "results/test_consolidation_followup/ (ignored local snapshots, logs, source audit and package archive)"
+}
