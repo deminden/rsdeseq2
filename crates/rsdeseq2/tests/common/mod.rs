@@ -11,21 +11,20 @@ pub fn reference_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/deseq2_reference")
 }
 
-pub fn optional_reference_file(name: &str) -> Option<PathBuf> {
+pub fn reference_file(name: &str) -> PathBuf {
     let path = reference_dir().join(name);
-    if path.exists() {
-        Some(path)
-    } else {
-        eprintln!(
-            "skipping optional DESeq2 golden test; generate {} with scripts/generate_deseq2_references.R",
-            path.display()
-        );
-        None
-    }
+    assert!(
+        path.is_file(),
+        "required DESeq2 reference missing: {}; regenerate with scripts/generate_deseq2_references.R",
+        path.display()
+    );
+    path
 }
 
-pub fn read_optional_tsv(name: &str) -> Option<Vec<TsvRow>> {
-    optional_reference_file(name).map(|path| read_tsv(&path))
+pub fn read_reference_tsv(name: &str) -> Vec<TsvRow> {
+    let rows = read_tsv(&reference_file(name));
+    assert!(!rows.is_empty(), "empty DESeq2 reference: {name}");
+    rows
 }
 
 pub fn read_tsv(path: &Path) -> Vec<TsvRow> {
@@ -37,6 +36,14 @@ pub fn read_tsv(path: &Path) -> Vec<TsvRow> {
         .headers()
         .unwrap_or_else(|error| panic!("failed to read headers from {}: {error}", path.display()))
         .clone();
+    assert!(!headers.is_empty(), "empty header: {}", path.display());
+    let unique = headers.iter().collect::<std::collections::HashSet<_>>();
+    assert_eq!(
+        unique.len(),
+        headers.len(),
+        "duplicate reference columns: {}",
+        path.display()
+    );
     reader
         .records()
         .map(|record| {
@@ -101,41 +108,44 @@ pub fn reference_sample_names() -> Vec<String> {
     (1..=4).map(|idx| format!("sample{idx}")).collect()
 }
 
-pub fn read_size_factors(name: &str) -> Option<Vec<f64>> {
-    let rows = read_optional_tsv(name)?;
-    Some(
-        rows.iter()
-            .map(|row| parse_required_f64(row, "size_factor"))
-            .collect(),
-    )
+pub fn read_size_factors(name: &str) -> Vec<f64> {
+    let rows = read_reference_tsv(name);
+
+    rows.iter()
+        .map(|row| parse_required_f64(row, "size_factor"))
+        .collect()
 }
 
-pub fn read_fixed_dispersions() -> Option<Vec<f64>> {
-    let rows = read_optional_tsv("fixed_dispersions.tsv")?;
-    Some(
-        rows.iter()
-            .map(|row| parse_required_f64(row, "dispersion"))
-            .collect(),
-    )
+pub fn read_fixed_dispersions() -> Vec<f64> {
+    let rows = read_reference_tsv("fixed_dispersions.tsv");
+
+    rows.iter()
+        .map(|row| parse_required_f64(row, "dispersion"))
+        .collect()
 }
 
-pub fn read_reference_matrix(name: &str) -> Option<RowMajorMatrix<f64>> {
-    let rows = read_optional_tsv(name)?;
+pub fn read_reference_matrix(name: &str) -> RowMajorMatrix<f64> {
+    let rows = read_reference_tsv(name);
     let samples = reference_sample_names();
     let values = rows
         .iter()
         .flat_map(|row| samples.iter().map(|sample| parse_required_f64(row, sample)))
         .collect::<Vec<_>>();
-    Some(RowMajorMatrix::from_row_major(rows.len(), samples.len(), values).unwrap())
+    RowMajorMatrix::from_row_major(rows.len(), samples.len(), values).unwrap()
 }
 
 pub fn parse_required_f64(row: &TsvRow, column: &str) -> f64 {
     let value = row
         .get(column)
         .unwrap_or_else(|| panic!("missing column {column} in reference row"));
-    value
+    let number = value
         .parse::<f64>()
-        .unwrap_or_else(|error| panic!("invalid float in column {column}: {value}: {error}"))
+        .unwrap_or_else(|error| panic!("invalid float in column {column}: {value}: {error}"));
+    assert!(
+        number.is_finite(),
+        "non-finite reference value in {column}: {value}"
+    );
+    number
 }
 
 pub fn parse_optional_f64(row: &TsvRow, column: &str) -> Option<f64> {
@@ -144,11 +154,7 @@ pub fn parse_optional_f64(row: &TsvRow, column: &str) -> Option<f64> {
         .unwrap_or_else(|| panic!("missing column {column} in reference row"));
     match value.as_str() {
         "" | "NA" | "NaN" => None,
-        _ => {
-            Some(value.parse::<f64>().unwrap_or_else(|error| {
-                panic!("invalid float in column {column}: {value}: {error}")
-            }))
-        }
+        _ => Some(parse_required_f64(row, column)),
     }
 }
 
@@ -178,6 +184,10 @@ pub fn assert_float_close(actual: f64, expected: f64, atol: f64, rtol: f64, labe
         assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
         return;
     }
+    assert!(
+        actual.is_finite() && expected.is_finite(),
+        "{label}: non-finite comparison {actual}, {expected}"
+    );
     let diff = (actual - expected).abs();
     let allowed = atol + rtol * expected.abs().max(1.0);
     assert!(

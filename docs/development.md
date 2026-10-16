@@ -37,6 +37,9 @@ editing core Rust sources.
 See the [large-file refactor report](refactoring-large-files.md) for the file
 inventory and precision/performance validation.
 
+The [test-quality report](testing-parity.md) describes required oracle checks,
+CLI routing assertions, the compact GTEx panel and full replay commands.
+
 ## Commands
 
 ```bash
@@ -67,9 +70,10 @@ evaluation counts. The 0.1.6 baseline matched endpoint plus objective in
 493/512 cases and the objective alone in 507/512 cases at practical tolerances,
 0/512 exactly, and 311/512 for exact evaluation counts.
 
-The reference tests skip when
-`crates/rsdeseq2/tests/data/deseq2_reference/` is absent. When present, the
-tests use these files to compare implemented Rust stages with generated DESeq2 outputs. Wald/LRT
+The committed references under
+`crates/rsdeseq2/tests/data/deseq2_reference/` are required. Missing, empty or
+malformed fixtures fail the tests; they never turn a numerical replay into a
+silent pass. These files compare implemented Rust stages with generated DESeq2 outputs. Wald/LRT
 golden checks use supplied dispersions and `DESeq2:::fitNbinomGLMs` to match the
 fixed-dispersion scope. The generated reference set includes
 DESeq2-backed beta-prior variance, refit, and estimated-prior refit references,

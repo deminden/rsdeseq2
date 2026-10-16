@@ -739,16 +739,16 @@ testthat::test_that("ashr lfcShrink matches DESeq2 posterior summaries and s-val
   )
 
   testthat::expect_s4_class(rust_shrunk, "DESeqResults")
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(
     rust_shrunk$log2FoldChange, reference_shrunk$log2FoldChange,
     tolerance = 1e-3
   )
-  testthat::expect_equal(rust_shrunk$lfcSE, reference_shrunk$lfcSE, tolerance = 1e-3)
-  testthat::expect_equal(rust_svalues$svalue, reference_svalues$svalue, tolerance = 0.02)
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(rust_shrunk$lfcSE, reference_shrunk$lfcSE, tolerance = 1e-3)
+  .rsdeseq2_expect_shrinkage_parity(rust_svalues$svalue, reference_svalues$svalue, tolerance = 0.02)
+  .rsdeseq2_expect_shrinkage_parity(
     rust_thresholded$svalue, reference_thresholded$svalue, tolerance = 0.02
   )
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(
     rust_thresholded$log2FoldChange,
     reference_thresholded$log2FoldChange,
     tolerance = 1e-3
@@ -794,20 +794,20 @@ testthat::test_that("apeglm lfcShrink matches DESeq2 coefficient posteriors and 
   )
 
   testthat::expect_s4_class(rust_shrunk, "DESeqResults")
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(
     unname(rust_shrunk$log2FoldChange), unname(reference_shrunk$log2FoldChange),
     tolerance = 0.01
   )
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(
     unname(rust_shrunk$lfcSE), unname(reference_shrunk$lfcSE), tolerance = 0.01
   )
-  testthat::expect_equal(rust_svalues$svalue, reference_svalues$svalue, tolerance = 0.02)
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(rust_svalues$svalue, reference_svalues$svalue, tolerance = 0.02)
+  .rsdeseq2_expect_shrinkage_parity(
     unname(rust_thresholded$log2FoldChange),
     unname(reference_thresholded$log2FoldChange),
     tolerance = 0.01
   )
-  testthat::expect_equal(
+  .rsdeseq2_expect_shrinkage_parity(
     rust_thresholded$svalue, reference_thresholded$svalue, tolerance = 0.05
   )
   testthat::expect_equal(

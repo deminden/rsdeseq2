@@ -25,10 +25,18 @@ def peak_rss_bytes(path):
     for line in path.read_text().splitlines():
         line = line.strip()
         if line.endswith('maximum resident set size'):
-            return int(line.split()[0])
+            value = int(line.split()[0])
+            if value <= 0: raise ValueError("nonpositive peak RSS")
+            return value
         if line.startswith('Maximum resident set size (kbytes):'):
-            return int(line.rsplit(':',1)[1].strip()) * 1024
+            value = int(line.rsplit(':',1)[1].strip()) * 1024
+            if value <= 0: raise ValueError('nonpositive peak RSS')
+            return value
     raise ValueError('Peak resident memory was not reported in '+str(path))
+
+def require_hash(path, expected, label):
+    if sha256(path) != expected:
+        raise ValueError(f'{label} hash differs: {path}')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -109,8 +117,7 @@ def main():
                     elapsed=time.perf_counter()-start
                 if tool=='rsdeseq2' and args.validated_results_root:
                     expected=args.validated_results_root/d.name/'results.tsv'
-                    if sha256(output)!=sha256(expected):
-                        raise ValueError('Numerical regression versus frozen native output: '+str(output))
+                    require_hash(output,sha256(expected),'validated numerical output')
                 rss=peak_rss_bytes(resources)
                 timings.append(dict(contrast=d.name,tool=tool,repetition=repeat,elapsed_s=elapsed,
                                     peak_rss_bytes=rss,peak_rss_mib=rss/(1024**2),
@@ -153,10 +160,9 @@ def main():
         d=next(d for d in contrasts if d.name==row['contrast'])
         if sha256(d/row['file'])!=row['sha256']:
             raise ValueError('Frozen input/reference was modified')
-    if sha256(args.binary)!=binary_hash:
-        raise ValueError('Binary changed during timing')
-    if args.baseline_binary and sha256(args.baseline_binary)!=baseline_hash:
-        raise ValueError('Baseline binary changed during timing')
+    require_hash(args.binary,binary_hash,'binary')
+    if args.baseline_binary:
+        require_hash(args.baseline_binary,baseline_hash,'baseline binary')
     print('All frozen inputs and references unchanged.',flush=True)
 
 if __name__=='__main__':

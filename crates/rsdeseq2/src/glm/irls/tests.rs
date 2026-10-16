@@ -5,7 +5,6 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use serde::Deserialize;
-    use std::{env, fs, path::PathBuf};
 
     #[test]
     fn log2_output_scaling_rejects_nonfinite_values() {
@@ -192,75 +191,76 @@ mod tests {
     }
 
     #[test]
-    fn optim_fallback_replays_objective_only_r_optim_hard_real_case_when_available() {
-        let Some(fixture) = optional_hard_real_r_optim_fixture() else {
-            return;
-        };
-        let contrast = fixture
-            .contrasts
-            .iter()
-            .find(|contrast| contrast.contrast == "heart_blocked_permutation_rep01")
-            .unwrap_or_else(|| fixture.contrasts.first().expect("hard fixture contrast"));
-        let case = contrast
-            .cases
-            .iter()
-            .find(|case| case.case_kind == "actual_or_rough_optimizer_row")
-            .unwrap_or_else(|| contrast.cases.first().expect("hard fixture case"));
-        assert_eq!(case.lower, vec![-30.0; contrast.coefficients]);
-        assert_eq!(case.upper, vec![30.0; contrast.coefficients]);
-        assert_eq!(case.control.maxit, 100);
-        assert_eq!(case.control.factr, 1.0e7);
-        assert_eq!(case.control.pgtol, 0.0);
-        assert_eq!(case.control.lmm, 5);
-        assert_eq!(case.control.ndeps, vec![1.0e-3; contrast.coefficients]);
-
-        let design_values = contrast
-            .design
-            .iter()
-            .flat_map(|row| row.iter().copied())
-            .collect::<Vec<_>>();
-        let x = DMatrix::from_row_slice(contrast.samples, contrast.coefficients, &design_values);
-        let counts = case
-            .counts
-            .iter()
-            .copied()
-            .map(|value| {
-                assert!(value.fract() == 0.0 && value >= 0.0 && value <= f64::from(u32::MAX));
-                value as u32
-            })
-            .collect::<Vec<_>>();
-        let ridge_lambda = vec![0.0; contrast.coefficients];
-        let input = BetaOptimInput {
-            x: &x,
-            counts: &counts,
-            nf: &contrast.size_factors,
-            dispersion: case.dispersion,
-            weights: None,
-            ridge_lambda: &ridge_lambda,
-        };
-
-        let output = minimize_beta_log2_lbfgsb(
-            input,
-            &case.initial_par,
-            case.lower[0],
-            case.upper[0],
-            case.control.maxit,
-            case.control.pgtol,
-            false,
-        )
+    fn optim_fallback_replays_portable_objective_only_r_optim_gtex_cases() {
+        let fixture: HardROptimFixture = serde_json::from_str(include_str!(
+            "fixtures/gtex_optim_reference.json"
+        ))
         .unwrap();
+        assert_eq!(fixture.contrasts.len(), 1);
+        let contrast = &fixture.contrasts[0];
+        assert_eq!(contrast.contrast, "GTEx_kidney_blocked");
+        assert_eq!(contrast.cases.len(), 6);
+        for case in &contrast.cases {
+            assert_eq!(case.case_kind, "GTEx_sparse_effect_expression_extreme");
+            assert_eq!(case.initial_par.len(), contrast.coefficients);
+            assert_eq!(case.result.par.len(), contrast.coefficients);
+            assert_eq!(case.lower, vec![-30.0; contrast.coefficients]);
+            assert_eq!(case.upper, vec![30.0; contrast.coefficients]);
+            assert_eq!(case.control.maxit, 100);
+            assert_eq!(case.control.factr, 1.0e7);
+            assert_eq!(case.control.pgtol, 0.0);
+            assert_eq!(case.control.lmm, 5);
+            assert_eq!(case.control.ndeps, vec![1.0e-3; contrast.coefficients]);
 
-        assert!(output.converged, "{}", case.fixture);
-        assert!(
-            output.iterations.abs_diff(case.result.counts.gradient) <= 4,
-            "{} optimizer count drift: actual={} expected={}",
-            case.fixture,
-            output.iterations,
-            case.result.counts.gradient
-        );
-        assert_relative_eq!(output.value, case.result.value, epsilon = 5e-6);
-        for (actual, expected) in output.parameters.iter().zip(case.result.par.iter()) {
-            assert_relative_eq!(*actual, *expected, epsilon = 2e-3);
+            let design_values = contrast
+                .design
+                .iter()
+                .flat_map(|row| row.iter().copied())
+                .collect::<Vec<_>>();
+            let x =
+                DMatrix::from_row_slice(contrast.samples, contrast.coefficients, &design_values);
+            let counts = case
+                .counts
+                .iter()
+                .copied()
+                .map(|value| {
+                    assert!(value.fract() == 0.0 && value >= 0.0 && value <= f64::from(u32::MAX));
+                    value as u32
+                })
+                .collect::<Vec<_>>();
+            let ridge_lambda = vec![0.0; contrast.coefficients];
+            let input = BetaOptimInput {
+                x: &x,
+                counts: &counts,
+                nf: &contrast.size_factors,
+                dispersion: case.dispersion,
+                weights: None,
+                ridge_lambda: &ridge_lambda,
+            };
+
+            let output = minimize_beta_log2_lbfgsb(
+                input,
+                &case.initial_par,
+                case.lower[0],
+                case.upper[0],
+                case.control.maxit,
+                case.control.pgtol,
+                case.r_optim_compat,
+            )
+            .unwrap();
+
+            assert!(output.converged, "{}", case.fixture);
+            assert!(
+                output.iterations.abs_diff(case.result.counts.gradient) <= 4,
+                "{} optimizer count drift: actual={} expected={}",
+                case.fixture,
+                output.iterations,
+                case.result.counts.gradient
+            );
+            assert_relative_eq!(output.value, case.result.value, epsilon = 5e-6);
+            for (actual, expected) in output.parameters.iter().zip(case.result.par.iter()) {
+                assert_relative_eq!(*actual, *expected, epsilon = 2e-3);
+            }
         }
     }
 
@@ -457,6 +457,7 @@ mod tests {
 
     #[derive(Debug, Deserialize)]
     struct HardROptimCase {
+        r_optim_compat: bool,
         fixture: String,
         case_kind: String,
         dispersion: f64,
@@ -487,30 +488,5 @@ mod tests {
     #[derive(Debug, Deserialize)]
     struct HardROptimCounts {
         gradient: usize,
-    }
-
-    fn optional_hard_real_r_optim_fixture() -> Option<HardROptimFixture> {
-        let mut candidates = Vec::new();
-        if let Some(path) = env::var_os("RSDESEQ2_RCOMPAT_HARD_OPTIM_FIXTURE") {
-            candidates.push(PathBuf::from(path));
-        }
-        candidates.push(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../rcompat-lbfgsb/fixtures/deseq_hard_real_subset/optim_cases.json"),
-        );
-
-        for path in candidates {
-            if path.exists() {
-                let text = fs::read_to_string(&path)
-                    .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-                return Some(serde_json::from_str(&text).unwrap_or_else(|error| {
-                    panic!("failed to parse {}: {error}", path.display())
-                }));
-            }
-        }
-        eprintln!(
-            "skipping hard real L-BFGS-B replay; set RSDESEQ2_RCOMPAT_HARD_OPTIM_FIXTURE or keep the rcompat-lbfgsb fixture bundle available"
-        );
-        None
     }
 }

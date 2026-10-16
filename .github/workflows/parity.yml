@@ -4,9 +4,30 @@ on:
   workflow_dispatch:
 
 jobs:
-  parity-placeholder:
+  frozen-oracles:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "DESeq2 parity workflow will run after references are versioned."
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Native and fixed-dispersion DESeq2 numerical references
+        run: >-
+          cargo test --locked -p rsdeseq2
+          --test gtex_real_wald_parity --test auto_dispersion
+          --test dispersion_reference --test wald_reference --test lrt_reference
+          --test results_reference --test glm_irls --test cooks_reference
+          --test thread_invariance
+      - name: Portable R optimizer oracles
+        run: cargo test --locked -p rsdeseq2 --lib optim_fallback_replays_portable
+      - name: Parity, fixture generation and benchmark integrity checks
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py'
+
+  full-gtex-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: All 56,200 genes and all six Wald result columns
+        run: cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald -- --ignored --nocapture

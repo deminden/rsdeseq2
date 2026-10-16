@@ -11,19 +11,11 @@ fn assert_f64_or_missing(actual: f64, expected: Option<f64>, label: &str) {
 }
 
 #[test]
-fn native_glm_mu_mean_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_mean_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_glm_mu_mean_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_glm_mu_mean_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_mean_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_mean_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_glm_mu_mean_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_glm_mu_mean_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -150,19 +142,11 @@ fn native_glm_mu_mean_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_local_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_local_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_glm_mu_local_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_glm_mu_local_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_local_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_local_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_glm_mu_local_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_glm_mu_local_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -289,19 +273,11 @@ fn native_glm_mu_local_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_mean_cox_reid_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_mean_cr_map_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_glm_mu_mean_cr_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_glm_mu_mean_cr_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_mean_cox_reid_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_mean_cr_map_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_glm_mu_mean_cr_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_glm_mu_mean_cr_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -427,19 +403,11 @@ fn native_glm_mu_mean_cox_reid_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_glm_mu_local_cox_reid_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_glm_mu_local_cr_map_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_glm_mu_local_cr_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_glm_mu_local_cr_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn native_glm_mu_local_cox_reid_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_glm_mu_local_cr_map_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_glm_mu_local_cr_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_glm_mu_local_cr_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -565,13 +533,9 @@ fn native_glm_mu_local_cox_reid_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn fixed_dispersion_wald_matches_optional_deseq2_internal_reference() {
-    let Some(rows) = read_optional_tsv("fixed_wald_reference.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn fixed_dispersion_wald_matches_deseq2_internal_reference() {
+    let rows = read_reference_tsv("fixed_wald_reference.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let dispersions = rows
         .iter()
@@ -670,13 +634,9 @@ fn fixed_dispersion_wald_matches_optional_deseq2_internal_reference() {
 }
 
 #[test]
-fn fixed_dispersion_wald_t_matches_optional_deseq2_internal_reference() {
-    let Some(rows) = read_optional_tsv("fixed_wald_t_reference.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn fixed_dispersion_wald_t_matches_deseq2_internal_reference() {
+    let rows = read_reference_tsv("fixed_wald_t_reference.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let dispersions = rows
         .iter()
@@ -726,19 +686,11 @@ fn fixed_dispersion_wald_t_matches_optional_deseq2_internal_reference() {
 }
 
 #[test]
-fn fixed_dispersion_force_optim_wald_matches_optional_deseq2_internal_reference() {
-    let Some(rows) = read_optional_tsv("fixed_force_optim_wald_reference.tsv") else {
-        return;
-    };
-    let Some(expected_mu) = read_optional_tsv("fixed_force_optim_mu_full.tsv") else {
-        return;
-    };
-    let Some(expected_hat) = read_optional_tsv("fixed_force_optim_hat_full.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn fixed_dispersion_force_optim_wald_matches_deseq2_internal_reference() {
+    let rows = read_reference_tsv("fixed_force_optim_wald_reference.tsv");
+    let expected_mu = read_reference_tsv("fixed_force_optim_mu_full.tsv");
+    let expected_hat = read_reference_tsv("fixed_force_optim_hat_full.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let dispersions = rows
         .iter()
@@ -857,16 +809,10 @@ fn fixed_dispersion_force_optim_wald_matches_optional_deseq2_internal_reference(
 }
 
 #[test]
-fn fixed_dispersion_cooks_match_optional_deseq2_internal_reference() {
-    let Some(expected_cooks) = read_optional_tsv("fixed_cooks_full.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(dispersions) = read_fixed_dispersions() else {
-        return;
-    };
+fn fixed_dispersion_cooks_match_deseq2_internal_reference() {
+    let expected_cooks = read_reference_tsv("fixed_cooks_full.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let dispersions = read_fixed_dispersions();
 
     let (fit, _results) = DeseqBuilder::new()
         .size_factors(size_factors)
@@ -897,16 +843,10 @@ fn fixed_dispersion_cooks_match_optional_deseq2_internal_reference() {
 }
 
 #[test]
-fn fixed_dispersion_weighted_wald_matches_optional_deseq2_internal_reference() {
-    let Some(rows) = read_optional_tsv("fixed_wald_weighted_reference.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn fixed_dispersion_weighted_wald_matches_deseq2_internal_reference() {
+    let rows = read_reference_tsv("fixed_wald_weighted_reference.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let dispersions = rows
         .iter()
@@ -985,22 +925,12 @@ fn fixed_dispersion_weighted_wald_matches_optional_deseq2_internal_reference() {
 }
 
 #[test]
-fn native_weighted_glm_mu_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_weighted_glm_mu_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_weighted_glm_mu_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_weighted_glm_mu_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_weighted_glm_mu_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_weighted_glm_mu_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_weighted_glm_mu_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -1149,22 +1079,12 @@ fn native_weighted_glm_mu_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_weighted_glm_mu_local_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_weighted_glm_mu_local_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_weighted_glm_mu_local_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_weighted_glm_mu_local_wald_hat.tsv") else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_local_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_weighted_glm_mu_local_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_weighted_glm_mu_local_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_weighted_glm_mu_local_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -1313,23 +1233,12 @@ fn native_weighted_glm_mu_local_wald_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn native_weighted_glm_mu_mean_cox_reid_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_map_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_wald_mu.tsv") else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_weighted_glm_mu_mean_cr_wald_hat.tsv")
-    else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_mean_cox_reid_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_weighted_glm_mu_mean_cr_map_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_weighted_glm_mu_mean_cr_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_weighted_glm_mu_mean_cr_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();
@@ -1474,24 +1383,12 @@ fn native_weighted_glm_mu_mean_cox_reid_wald_matches_optional_deseq2_reference()
 }
 
 #[test]
-fn native_weighted_glm_mu_local_cox_reid_wald_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_map_reference.tsv") else {
-        return;
-    };
-    let Some(wald_mu_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_wald_mu.tsv")
-    else {
-        return;
-    };
-    let Some(wald_hat_rows) = read_optional_tsv("native_weighted_glm_mu_local_cr_wald_hat.tsv")
-    else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(observation_weights) = read_reference_matrix("observation_weights.tsv") else {
-        return;
-    };
+fn native_weighted_glm_mu_local_cox_reid_wald_matches_deseq2_reference() {
+    let rows = read_reference_tsv("native_weighted_glm_mu_local_cr_map_reference.tsv");
+    let wald_mu_rows = read_reference_tsv("native_weighted_glm_mu_local_cr_wald_mu.tsv");
+    let wald_hat_rows = read_reference_tsv("native_weighted_glm_mu_local_cr_wald_hat.tsv");
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let observation_weights = read_reference_matrix("observation_weights.tsv");
 
     let counts = reference_counts();
     let design = reference_full_design();

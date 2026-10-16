@@ -317,19 +317,11 @@ fn beta_prior_variance_filters_large_betas_and_sets_intercept_wide() {
 }
 
 #[test]
-fn beta_prior_variance_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("beta_prior_variance_reference.tsv") else {
-        return;
-    };
-    let Some(fixed_dispersions) = read_fixed_dispersions() else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(base_metadata) = read_optional_tsv("base_metadata_ratio.tsv") else {
-        return;
-    };
+fn beta_prior_variance_matches_deseq2_reference() {
+    let rows = read_reference_tsv("beta_prior_variance_reference.tsv");
+    let fixed_dispersions = read_fixed_dispersions();
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let base_metadata = read_reference_tsv("base_metadata_ratio.tsv");
 
     let fit = fit_fixed_dispersion_irls(
         &reference_counts(),
@@ -800,25 +792,13 @@ fn beta_prior_refit_matches_manual_ridge_options() {
 }
 
 #[test]
-fn beta_prior_refit_matches_optional_deseq2_reference() {
-    let Some(rows) = read_optional_tsv("beta_prior_refit_reference.tsv") else {
-        return;
-    };
-    let Some(mu_rows) = read_optional_tsv("beta_prior_refit_mu.tsv") else {
-        return;
-    };
-    let Some(hat_rows) = read_optional_tsv("beta_prior_refit_hat.tsv") else {
-        return;
-    };
-    let Some(prior_rows) = read_optional_tsv("beta_prior_variance_reference.tsv") else {
-        return;
-    };
-    let Some(fixed_dispersions) = read_fixed_dispersions() else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
+fn beta_prior_refit_matches_deseq2_reference() {
+    let rows = read_reference_tsv("beta_prior_refit_reference.tsv");
+    let mu_rows = read_reference_tsv("beta_prior_refit_mu.tsv");
+    let hat_rows = read_reference_tsv("beta_prior_refit_hat.tsv");
+    let prior_rows = read_reference_tsv("beta_prior_variance_reference.tsv");
+    let fixed_dispersions = read_fixed_dispersions();
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
 
     let beta_prior_variance = prior_rows
         .iter()
@@ -905,22 +885,12 @@ fn beta_prior_refit_matches_optional_deseq2_reference() {
 }
 
 #[test]
-fn beta_prior_estimated_refit_matches_optional_deseq2_reference() {
-    let Some(prior_rows) = read_optional_tsv("beta_prior_variance_reference.tsv") else {
-        return;
-    };
-    let Some(refit_rows) = read_optional_tsv("beta_prior_refit_reference.tsv") else {
-        return;
-    };
-    let Some(fixed_dispersions) = read_fixed_dispersions() else {
-        return;
-    };
-    let Some(size_factors) = read_size_factors("size_factors_ratio.tsv") else {
-        return;
-    };
-    let Some(base_metadata) = read_optional_tsv("base_metadata_ratio.tsv") else {
-        return;
-    };
+fn beta_prior_estimated_refit_matches_deseq2_reference() {
+    let prior_rows = read_reference_tsv("beta_prior_variance_reference.tsv");
+    let refit_rows = read_reference_tsv("beta_prior_refit_reference.tsv");
+    let fixed_dispersions = read_fixed_dispersions();
+    let size_factors = read_size_factors("size_factors_ratio.tsv");
+    let base_metadata = read_reference_tsv("base_metadata_ratio.tsv");
 
     let base_mean = base_metadata
         .iter()

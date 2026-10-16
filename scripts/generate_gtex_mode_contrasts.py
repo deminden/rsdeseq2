@@ -3,6 +3,7 @@
 from __future__ import annotations
 import argparse
 import csv
+import filecmp
 import os
 import random
 import shutil
@@ -21,6 +22,8 @@ def write_design(folder, names, metadata, values):
             writer.writerow([row['sample'],*values(row)])
 
 def full_counts(source, destination):
+    if destination.exists() and not filecmp.cmp(source, destination, shallow=False):
+        raise ValueError(f'existing contrast counts differ from source: {destination}')
     if not destination.exists():
         try:
             os.link(source,destination)
@@ -37,6 +40,11 @@ def main():
     with (args.fixture_dir/'sample_metadata.tsv').open() as handle:
         metadata=list(csv.DictReader(handle,delimiter='\t'))
     count_source=args.fixture_dir/'counts.tsv'
+    samples=[r['sample'] for r in metadata]
+    with count_source.open() as handle:
+        header=next(csv.reader(handle,delimiter='\t'))[1:]
+    if not samples or len(set(samples)) != len(samples) or samples != header:
+        raise ValueError('metadata/count sample alignment must be unique and exact')
     contrasts=[]
     block_names=['Intercept','perm_blockmale_3','perm_blockmale_4','conditionB']
     block=lambda row:[1,int(row['perm_block']=='male_3'),int(row['perm_block']=='male_4')]

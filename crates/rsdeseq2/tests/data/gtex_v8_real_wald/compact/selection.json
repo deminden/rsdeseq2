@@ -1,0 +1,3698 @@
+{
+  "selection_version": 1,
+  "source_genes": 56200,
+  "selected_genes": 512,
+  "samples": 61,
+  "normalization": "full-cohort reference_size_factors.tsv; no subset re-estimation",
+  "padj": "R stats::p.adjust(method=\"BH\") on selected reference p-values",
+  "source_sha256": {
+    "counts.tsv": "761d2d0ae9dd9b376968c6203fa55c6aa838b3338f281e76ecbe43ef9d3831ff",
+    "reference_results.tsv": "471d7b5e84de96981987bdda48c851143d455f4228728882f1d24d3f68cfbfd2",
+    "reference_size_factors.tsv": "be86e46587903057faa4a6b06c58adaca74db0e2f86ff7c31b5b82486892f033",
+    "design_matrix.tsv": "d7c4ad73f032530cee1f81873742dbfc09bb34e8b388ba95da5c8ce35b2b213e"
+  },
+  "genes": [
+    {
+      "gene": "ENSG00000223972.5",
+      "source_row": 0,
+      "reasons": [
+        "background",
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000227232.5",
+      "source_row": 1,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000278267.1",
+      "source_row": 2,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000243485.5",
+      "source_row": 3,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000237613.2",
+      "source_row": 4,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000268020.3",
+      "source_row": 5,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000240361.1",
+      "source_row": 6,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000186092.4",
+      "source_row": 7,
+      "reasons": [
+        "missingness_000000"
+      ]
+    },
+    {
+      "gene": "ENSG00000222623.1",
+      "source_row": 14,
+      "reasons": [
+        "baseMean_quantile",
+        "baseMean_tail",
+        "maximum_count_quantile",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_quantile",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000241599.1",
+      "source_row": 15,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000273874.1",
+      "source_row": 18,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000283574.1",
+      "source_row": 40,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000234711.1",
+      "source_row": 51,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000241180.1",
+      "source_row": 55,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000225285.1",
+      "source_row": 108,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000233234.1",
+      "source_row": 165,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000231630.1",
+      "source_row": 166,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000283572.1",
+      "source_row": 170,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "missingness_101111",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000049247.13",
+      "source_row": 249,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000120948.16",
+      "source_row": 332,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000175206.10",
+      "source_row": 361,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000120937.8",
+      "source_row": 362,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000204501.7",
+      "source_row": 426,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000233929.1",
+      "source_row": 498,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000057757.9",
+      "source_row": 700,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000279179.1",
+      "source_row": 1016,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000188786.9",
+      "source_row": 1119,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000182109.7",
+      "source_row": 1156,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000277513.1",
+      "source_row": 1265,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000223956.2",
+      "source_row": 1615,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000234383.1",
+      "source_row": 1783,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000267272.5",
+      "source_row": 2007,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000137947.11",
+      "source_row": 2023,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213512.1",
+      "source_row": 2032,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000137970.7",
+      "source_row": 2172,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237460.2",
+      "source_row": 2281,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000226984.1",
+      "source_row": 2475,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000228217.1",
+      "source_row": 2550,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000196369.10",
+      "source_row": 2690,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000202408.2",
+      "source_row": 2799,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000275229.1",
+      "source_row": 2836,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000163155.11",
+      "source_row": 2916,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000143393.16",
+      "source_row": 2924,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000143436.10",
+      "source_row": 2948,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000159516.8",
+      "source_row": 3021,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000189171.14",
+      "source_row": 3048,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000246203.2",
+      "source_row": 3164,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000271890.1",
+      "source_row": 3317,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000143199.17",
+      "source_row": 3542,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000235736.1",
+      "source_row": 3566,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000117533.14",
+      "source_row": 3626,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000233537.1",
+      "source_row": 3815,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000225811.1",
+      "source_row": 3921,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000118200.14",
+      "source_row": 4028,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000229120.2",
+      "source_row": 4084,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000235449.2",
+      "source_row": 4093,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000065600.12",
+      "source_row": 4333,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000162769.12",
+      "source_row": 4350,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000276255.2",
+      "source_row": 4582,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000269890.1",
+      "source_row": 4595,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000154370.15",
+      "source_row": 4599,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000206803.1",
+      "source_row": 4778,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000224348.2",
+      "source_row": 4851,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000162851.7",
+      "source_row": 4938,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000225300.1",
+      "source_row": 4940,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000236856.1",
+      "source_row": 5065,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000228391.1",
+      "source_row": 5100,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000269976.1",
+      "source_row": 5349,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000207255.1",
+      "source_row": 5618,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000232604.1",
+      "source_row": 5867,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000230595.1",
+      "source_row": 6002,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000169605.5",
+      "source_row": 6116,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000168899.4",
+      "source_row": 6385,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000253998.3",
+      "source_row": 6505,
+      "reasons": [
+        "log2FoldChange_tail",
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000243264.2",
+      "source_row": 6534,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000242766.1",
+      "source_row": 6547,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000273305.1",
+      "source_row": 6634,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000144214.9",
+      "source_row": 6740,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000236877.2",
+      "source_row": 6883,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000282785.1",
+      "source_row": 6934,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000221055.1",
+      "source_row": 7029,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000088205.12",
+      "source_row": 7068,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213236.3",
+      "source_row": 7152,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000214081.8",
+      "source_row": 7263,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237772.1",
+      "source_row": 7401,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000226939.1",
+      "source_row": 7406,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000226674.8",
+      "source_row": 7457,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000150556.16",
+      "source_row": 7498,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000162989.4",
+      "source_row": 7553,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000236841.7",
+      "source_row": 7650,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000204311.12",
+      "source_row": 7895,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000163510.13",
+      "source_row": 7919,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000281131.1",
+      "source_row": 7922,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000155749.12",
+      "source_row": 8168,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000228380.1",
+      "source_row": 8332,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000232485.2",
+      "source_row": 8417,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000115461.4",
+      "source_row": 8424,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237479.1",
+      "source_row": 8432,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000234143.1",
+      "source_row": 8758,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000168395.15",
+      "source_row": 8919,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000226423.1",
+      "source_row": 8935,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000235158.1",
+      "source_row": 8952,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000224884.1",
+      "source_row": 9011,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000157014.10",
+      "source_row": 9062,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000233570.1",
+      "source_row": 9184,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000223965.2",
+      "source_row": 9318,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000164051.13",
+      "source_row": 9663,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000172046.18",
+      "source_row": 9702,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000243903.1",
+      "source_row": 9951,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000175105.6",
+      "source_row": 10200,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000241218.1",
+      "source_row": 10372,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000163611.11",
+      "source_row": 10469,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000273394.1",
+      "source_row": 10483,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000239608.1",
+      "source_row": 10718,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000242104.4",
+      "source_row": 10967,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000243069.7",
+      "source_row": 11157,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000163661.3",
+      "source_row": 11218,
+      "reasons": [
+        "pvalue_quantile",
+        "pvalue_tail",
+        "stat_quantile",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000118849.9",
+      "source_row": 11236,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000201957.1",
+      "source_row": 11470,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000239096.1",
+      "source_row": 11485,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000078081.7",
+      "source_row": 11542,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000236489.1",
+      "source_row": 11614,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000243991.3",
+      "source_row": 11734,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000216560.4",
+      "source_row": 11999,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000184160.7",
+      "source_row": 12003,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250040.2",
+      "source_row": 12163,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000178177.15",
+      "source_row": 12252,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000248654.1",
+      "source_row": 12318,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000277096.1",
+      "source_row": 12501,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000202358.1",
+      "source_row": 12657,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000242083.2",
+      "source_row": 12664,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000270228.1",
+      "source_row": 12770,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250026.5",
+      "source_row": 12784,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000152784.15",
+      "source_row": 13019,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000109323.8",
+      "source_row": 13268,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000271053.1",
+      "source_row": 13461,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000250183.2",
+      "source_row": 13503,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000164109.13",
+      "source_row": 13507,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000138741.10",
+      "source_row": 13532,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000109471.4",
+      "source_row": 13537,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000200520.1",
+      "source_row": 13694,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000151612.15",
+      "source_row": 13786,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000278978.1",
+      "source_row": 13863,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000250205.1",
+      "source_row": 13930,
+      "reasons": [
+        "baseMean_quantile",
+        "maximum_count_quantile",
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000270960.1",
+      "source_row": 14035,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000249747.1",
+      "source_row": 14304,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250056.5",
+      "source_row": 14478,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000250037.1",
+      "source_row": 14516,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000260515.1",
+      "source_row": 14553,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000224282.3",
+      "source_row": 14802,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000249069.7",
+      "source_row": 15071,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250461.1",
+      "source_row": 15187,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000172062.16",
+      "source_row": 15320,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250574.1",
+      "source_row": 15434,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000085365.17",
+      "source_row": 15467,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000164176.12",
+      "source_row": 15569,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000253584.1",
+      "source_row": 15813,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000248867.1",
+      "source_row": 15838,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000251014.1",
+      "source_row": 15882,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000202082.2",
+      "source_row": 16058,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000064651.13",
+      "source_row": 16087,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000249192.1",
+      "source_row": 16223,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000271792.1",
+      "source_row": 16336,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000022355.16",
+      "source_row": 16776,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000254173.1",
+      "source_row": 16779,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000253858.1",
+      "source_row": 16854,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000275038.1",
+      "source_row": 16862,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000145911.5",
+      "source_row": 17038,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000253480.1",
+      "source_row": 17103,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000206881.1",
+      "source_row": 17436,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000216718.7",
+      "source_row": 17534,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000272468.1",
+      "source_row": 17621,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000275126.1",
+      "source_row": 17660,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000206474.8",
+      "source_row": 17749,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213886.3",
+      "source_row": 17760,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213880.3",
+      "source_row": 17784,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000204614.8",
+      "source_row": 17815,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000233529.1",
+      "source_row": 17870,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000146197.8",
+      "source_row": 18119,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000170734.11",
+      "source_row": 18340,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000172348.14",
+      "source_row": 18388,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000217767.2",
+      "source_row": 18637,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000218459.1",
+      "source_row": 18691,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000111886.10",
+      "source_row": 18886,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000172469.15",
+      "source_row": 18939,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000271208.1",
+      "source_row": 19155,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000228624.7",
+      "source_row": 19179,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000112319.17",
+      "source_row": 19404,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000155918.7",
+      "source_row": 19653,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000181472.4",
+      "source_row": 19682,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000223485.2",
+      "source_row": 19922,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000271098.1",
+      "source_row": 20022,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000230333.6",
+      "source_row": 20171,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000228421.2",
+      "source_row": 20408,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000223437.1",
+      "source_row": 20420,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000229161.2",
+      "source_row": 20620,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000275295.1",
+      "source_row": 20689,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000199231.1",
+      "source_row": 20938,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000234234.1",
+      "source_row": 20995,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000176428.5",
+      "source_row": 21187,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000208014.1",
+      "source_row": 21456,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000284596.1",
+      "source_row": 21705,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000225329.3",
+      "source_row": 21747,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000227532.1",
+      "source_row": 21896,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000226680.2",
+      "source_row": 21954,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000236395.1",
+      "source_row": 22130,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000105887.10",
+      "source_row": 22185,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000243099.1",
+      "source_row": 22223,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000250591.3",
+      "source_row": 22376,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000204959.4",
+      "source_row": 22472,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000146926.10",
+      "source_row": 22597,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000126870.15",
+      "source_row": 22721,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000254556.1",
+      "source_row": 22963,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000255046.1",
+      "source_row": 22990,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000226430.6",
+      "source_row": 23010,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000271118.1",
+      "source_row": 23222,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000274988.1",
+      "source_row": 23239,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000253560.1",
+      "source_row": 23278,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000279302.3",
+      "source_row": 23279,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000207199.1",
+      "source_row": 23488,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000263372.1",
+      "source_row": 23516,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000253135.1",
+      "source_row": 23538,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000254274.1",
+      "source_row": 23700,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000243050.1",
+      "source_row": 23757,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000283188.1",
+      "source_row": 24006,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000254352.1",
+      "source_row": 24038,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000240509.1",
+      "source_row": 24255,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000280123.1",
+      "source_row": 24263,
+      "reasons": [
+        "log2FoldChange_quantile",
+        "log2FoldChange_tail",
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000254644.1",
+      "source_row": 24468,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000042832.11",
+      "source_row": 24773,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000181097.5",
+      "source_row": 24933,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000227518.5",
+      "source_row": 25022,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000147852.15",
+      "source_row": 25056,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000099219.13",
+      "source_row": 25115,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000137073.21",
+      "source_row": 25457,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000273945.1",
+      "source_row": 25540,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000222760.1",
+      "source_row": 25567,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000232827.2",
+      "source_row": 25789,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000227555.1",
+      "source_row": 26187,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000131669.9",
+      "source_row": 26255,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000271314.1",
+      "source_row": 26307,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000148123.14",
+      "source_row": 26423,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000207698.1",
+      "source_row": 26530,
+      "reasons": [
+        "baseMean_quantile",
+        "maximum_count_quantile",
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000274263.1",
+      "source_row": 26556,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000214669.3",
+      "source_row": 26614,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000238010.1",
+      "source_row": 26805,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000230536.1",
+      "source_row": 26845,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000107130.9",
+      "source_row": 26936,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000130560.8",
+      "source_row": 27074,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000213213.13",
+      "source_row": 27113,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000176978.13",
+      "source_row": 27146,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000232420.2",
+      "source_row": 27197,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000228353.1",
+      "source_row": 27245,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000198879.11",
+      "source_row": 27319,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000207453.1",
+      "source_row": 27323,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000165996.13",
+      "source_row": 27468,
+      "reasons": [
+        "log2FoldChange_tail",
+        "pvalue_quantile",
+        "pvalue_tail",
+        "stat_quantile",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000233642.1",
+      "source_row": 27572,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000283000.1",
+      "source_row": 27736,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000273008.1",
+      "source_row": 27841,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000224812.2",
+      "source_row": 27881,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000148541.12",
+      "source_row": 28090,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000166228.8",
+      "source_row": 28248,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000200294.1",
+      "source_row": 28267,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000272589.1",
+      "source_row": 28339,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000165424.6",
+      "source_row": 28426,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213613.2",
+      "source_row": 28572,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000198997.2",
+      "source_row": 28608,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000138182.14",
+      "source_row": 28613,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000120057.4",
+      "source_row": 28772,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000166169.16",
+      "source_row": 28857,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000156395.12",
+      "source_row": 28950,
+      "reasons": [
+        "pvalue_quantile",
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000107581.12",
+      "source_row": 29106,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000154473.17",
+      "source_row": 29180,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000270030.1",
+      "source_row": 29375,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000206976.1",
+      "source_row": 29538,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000183251.3",
+      "source_row": 29624,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000254444.1",
+      "source_row": 29683,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000254781.1",
+      "source_row": 29717,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000240454.1",
+      "source_row": 29873,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000110422.11",
+      "source_row": 30142,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000255271.1",
+      "source_row": 30167,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213607.4",
+      "source_row": 30391,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000172772.3",
+      "source_row": 30640,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000110031.12",
+      "source_row": 30654,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000172324.4",
+      "source_row": 30689,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000256116.1",
+      "source_row": 30909,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000255478.1",
+      "source_row": 30986,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000174669.11",
+      "source_row": 31055,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000162337.11",
+      "source_row": 31158,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000261594.3",
+      "source_row": 31370,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000272301.1",
+      "source_row": 31407,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000078124.11",
+      "source_row": 31423,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000254705.1",
+      "source_row": 31676,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000261098.1",
+      "source_row": 31881,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000137727.12",
+      "source_row": 31925,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000254892.1",
+      "source_row": 32174,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000197905.8",
+      "source_row": 32552,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000255836.1",
+      "source_row": 32692,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000251908.1",
+      "source_row": 32941,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000111341.9",
+      "source_row": 32959,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000256844.1",
+      "source_row": 33006,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000151233.10",
+      "source_row": 33323,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000257906.1",
+      "source_row": 33408,
+      "reasons": [
+        "log2FoldChange_tail",
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000258024.1",
+      "source_row": 33459,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000170545.16",
+      "source_row": 33590,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000249641.2",
+      "source_row": 33708,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000258345.1",
+      "source_row": 33834,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000255970.1",
+      "source_row": 34087,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000257526.2",
+      "source_row": 34226,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000184752.12",
+      "source_row": 34438,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000257169.1",
+      "source_row": 34475,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000222302.1",
+      "source_row": 34648,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000204856.11",
+      "source_row": 34724,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000111707.11",
+      "source_row": 34883,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000283389.1",
+      "source_row": 34993,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000111361.12",
+      "source_row": 35057,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000241129.3",
+      "source_row": 35099,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000200483.1",
+      "source_row": 35242,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000256875.2",
+      "source_row": 35272,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000238132.2",
+      "source_row": 35369,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000269099.2",
+      "source_row": 35491,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000187676.7",
+      "source_row": 35614,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000229696.1",
+      "source_row": 35760,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000080618.13",
+      "source_row": 35838,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000198384.8",
+      "source_row": 35971,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000118946.11",
+      "source_row": 36009,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000083544.13",
+      "source_row": 36029,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000226846.1",
+      "source_row": 36100,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000271395.1",
+      "source_row": 36258,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000068650.18",
+      "source_row": 36527,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000169385.2",
+      "source_row": 36726,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000248358.2",
+      "source_row": 36776,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000258657.5",
+      "source_row": 37025,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000258948.2",
+      "source_row": 37223,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000258608.1",
+      "source_row": 37294,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000252837.1",
+      "source_row": 37499,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000258685.2",
+      "source_row": 37527,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000242135.2",
+      "source_row": 37543,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000251393.3",
+      "source_row": 37792,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000266553.2",
+      "source_row": 37908,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000243225.2",
+      "source_row": 37909,
+      "reasons": [
+        "log2FoldChange_tail",
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000119720.17",
+      "source_row": 38061,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000100811.12",
+      "source_row": 38247,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000259031.1",
+      "source_row": 38262,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000272344.1",
+      "source_row": 38310,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000185567.6",
+      "source_row": 38488,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000211921.1",
+      "source_row": 38559,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000259383.1",
+      "source_row": 38749,
+      "reasons": [
+        "log2FoldChange_quantile",
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000271288.1",
+      "source_row": 38828,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000259993.1",
+      "source_row": 39077,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000166145.14",
+      "source_row": 39326,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000166887.15",
+      "source_row": 39377,
+      "reasons": [
+        "dispersion_quantile",
+        "dispersion_tail",
+        "lfcSE_quantile",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000261679.2",
+      "source_row": 39408,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000259554.1",
+      "source_row": 39516,
+      "reasons": [
+        "baseMean_quantile",
+        "maximum_count_quantile",
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000104064.16",
+      "source_row": 39572,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000266593.1",
+      "source_row": 39595,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000259557.2",
+      "source_row": 39814,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000028528.14",
+      "source_row": 39844,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000259410.5",
+      "source_row": 39949,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000278570.4",
+      "source_row": 40018,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000277391.1",
+      "source_row": 40093,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000259407.1",
+      "source_row": 40419,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000258787.1",
+      "source_row": 40590,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000280304.1",
+      "source_row": 40611,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000196364.9",
+      "source_row": 40860,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000251692.7",
+      "source_row": 40883,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000240311.1",
+      "source_row": 41065,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000257180.1",
+      "source_row": 41143,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000103489.11",
+      "source_row": 41378,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000103404.14",
+      "source_row": 41528,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000205609.12",
+      "source_row": 41627,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000260113.3",
+      "source_row": 41788,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000261541.1",
+      "source_row": 41907,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000260614.1",
+      "source_row": 42145,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000103037.11",
+      "source_row": 42394,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000157350.12",
+      "source_row": 42643,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000261176.1",
+      "source_row": 42912,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000260630.6",
+      "source_row": 43067,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000277349.1",
+      "source_row": 43142,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000262708.1",
+      "source_row": 43161,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000263164.1",
+      "source_row": 43368,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000263316.1",
+      "source_row": 43410,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000108452.1",
+      "source_row": 43657,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000227018.1",
+      "source_row": 43667,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000227782.2",
+      "source_row": 43679,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000225681.2",
+      "source_row": 43886,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000226521.7",
+      "source_row": 43928,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000007171.16",
+      "source_row": 44034,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000259928.1",
+      "source_row": 44177,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000274620.1",
+      "source_row": 44446,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000264314.1",
+      "source_row": 44695,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000200888.1",
+      "source_row": 44858,
+      "reasons": [
+        "dispersion_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000263503.1",
+      "source_row": 44888,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000263766.5",
+      "source_row": 44944,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000121053.5",
+      "source_row": 45213,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000120063.9",
+      "source_row": 45450,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000284242.1",
+      "source_row": 45462,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000207943.1",
+      "source_row": 45469,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237560.5",
+      "source_row": 45542,
+      "reasons": [
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000214140.10",
+      "source_row": 45711,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000266074.8",
+      "source_row": 45880,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000262814.7",
+      "source_row": 45901,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000235296.1",
+      "source_row": 45919,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000274370.1",
+      "source_row": 45980,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000173213.9",
+      "source_row": 45990,
+      "reasons": [
+        "dispersion_quantile",
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000267478.1",
+      "source_row": 46229,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000243303.1",
+      "source_row": 46359,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000264434.2",
+      "source_row": 46431,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000251702.1",
+      "source_row": 46478,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000266003.1",
+      "source_row": 46747,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000267269.1",
+      "source_row": 46854,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000265946.1",
+      "source_row": 46996,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000129911.8",
+      "source_row": 47245,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000263974.2",
+      "source_row": 47284,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000205784.2",
+      "source_row": 47400,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000269763.1",
+      "source_row": 47514,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000267387.1",
+      "source_row": 47624,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213290.4",
+      "source_row": 47763,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000269085.1",
+      "source_row": 47969,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000130303.12",
+      "source_row": 48012,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000268272.1",
+      "source_row": 48168,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000269373.1",
+      "source_row": 48177,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000267683.1",
+      "source_row": 48346,
+      "reasons": [
+        "log2FoldChange_tail",
+        "pvalue_tail",
+        "stat_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000126254.11",
+      "source_row": 48530,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000276846.1",
+      "source_row": 48621,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000105245.9",
+      "source_row": 48779,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000224476.3",
+      "source_row": 48806,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000007306.14",
+      "source_row": 48838,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000105429.12",
+      "source_row": 48869,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000189114.6",
+      "source_row": 49002,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000206758.1",
+      "source_row": 49174,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000126460.10",
+      "source_row": 49243,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000131409.12",
+      "source_row": 49297,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000238150.1",
+      "source_row": 49546,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000267265.5",
+      "source_row": 49638,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000229292.1",
+      "source_row": 49698,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000178591.6",
+      "source_row": 49875,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000229766.6",
+      "source_row": 50064,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000125869.9",
+      "source_row": 50074,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000132623.15",
+      "source_row": 50079,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000170369.3",
+      "source_row": 50313,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000225069.3",
+      "source_row": 50334,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000225344.1",
+      "source_row": 50336,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000088340.15",
+      "source_row": 50562,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000277708.1",
+      "source_row": 50753,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000204070.9",
+      "source_row": 50774,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000215452.4",
+      "source_row": 50831,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000267882.2",
+      "source_row": 50850,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000254419.1",
+      "source_row": 51042,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000229755.1",
+      "source_row": 51080,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000264490.3",
+      "source_row": 51115,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000278106.1",
+      "source_row": 51329,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000270139.1",
+      "source_row": 51411,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000233640.2",
+      "source_row": 51598,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000237646.1",
+      "source_row": 51756,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000275166.1",
+      "source_row": 51847,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000160299.16",
+      "source_row": 52022,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000220248.1",
+      "source_row": 52096,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000253752.1",
+      "source_row": 52342,
+      "reasons": [
+        "log2FoldChange_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000274422.1",
+      "source_row": 52365,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000100014.19",
+      "source_row": 52526,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000233574.1",
+      "source_row": 52614,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000232346.1",
+      "source_row": 52759,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000100362.12",
+      "source_row": 52863,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000228807.1",
+      "source_row": 53132,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000100429.17",
+      "source_row": 53251,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000272666.1",
+      "source_row": 53268,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000282306.1",
+      "source_row": 53381,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000214321.3",
+      "source_row": 53497,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000188408.5",
+      "source_row": 53607,
+      "reasons": [
+        "log2FoldChange_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000228345.2",
+      "source_row": 53630,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000229662.2",
+      "source_row": 53899,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000277516.1",
+      "source_row": 54148,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000204272.12",
+      "source_row": 54161,
+      "reasons": [
+        "lfcSE_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000165591.6",
+      "source_row": 54169,
+      "reasons": [
+        "stat_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213754.2",
+      "source_row": 54196,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000233833.1",
+      "source_row": 54216,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237311.1",
+      "source_row": 54219,
+      "reasons": [
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000213695.3",
+      "source_row": 54397,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000269405.6",
+      "source_row": 54666,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000174460.3",
+      "source_row": 54915,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000228819.1",
+      "source_row": 55120,
+      "reasons": [
+        "baseMean_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000227064.1",
+      "source_row": 55127,
+      "reasons": [
+        "baseMean_quantile",
+        "maximum_count_quantile",
+        "nonzero_samples_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000101928.12",
+      "source_row": 55164,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000183862.5",
+      "source_row": 55433,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000235001.3",
+      "source_row": 55663,
+      "reasons": [
+        "maximum_count_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000237563.1",
+      "source_row": 55682,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000185275.6",
+      "source_row": 55931,
+      "reasons": [
+        "background"
+      ]
+    },
+    {
+      "gene": "ENSG00000232522.1",
+      "source_row": 55942,
+      "reasons": [
+        "pvalue_quantile"
+      ]
+    },
+    {
+      "gene": "ENSG00000228786.5",
+      "source_row": 56096,
+      "reasons": [
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000172297.7",
+      "source_row": 56100,
+      "reasons": [
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000233619.1",
+      "source_row": 56105,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000235583.2",
+      "source_row": 56107,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000229238.3",
+      "source_row": 56142,
+      "reasons": [
+        "dispersion_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000188399.5",
+      "source_row": 56145,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000277146.1",
+      "source_row": 56146,
+      "reasons": [
+        "dispersion_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000224240.1",
+      "source_row": 56148,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000227629.1",
+      "source_row": 56149,
+      "reasons": [
+        "dispersion_tail",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000231514.1",
+      "source_row": 56151,
+      "reasons": [
+        "dispersion_quantile",
+        "dispersion_tail",
+        "lfcSE_quantile",
+        "lfcSE_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000210082.2",
+      "source_row": 56166,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198763.3",
+      "source_row": 56172,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198804.2",
+      "source_row": 56178,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198712.1",
+      "source_row": 56181,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198899.2",
+      "source_row": 56184,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198938.2",
+      "source_row": 56185,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198840.2",
+      "source_row": 56187,
+      "reasons": [
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000212907.2",
+      "source_row": 56189,
+      "reasons": [
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198886.2",
+      "source_row": 56190,
+      "reasons": [
+        "baseMean_quantile",
+        "baseMean_tail",
+        "maximum_count_quantile",
+        "maximum_count_tail",
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198786.2",
+      "source_row": 56194,
+      "reasons": [
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198695.2",
+      "source_row": 56195,
+      "reasons": [
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000210194.1",
+      "source_row": 56196,
+      "reasons": [
+        "nonzero_samples_tail"
+      ]
+    },
+    {
+      "gene": "ENSG00000198727.2",
+      "source_row": 56197,
+      "reasons": [
+        "baseMean_tail",
+        "maximum_count_tail",
+        "nonzero_samples_quantile",
+        "nonzero_samples_tail"
+      ]
+    }
+  ]
+}
