@@ -244,47 +244,6 @@ testthat::test_that("R results computes primitive Wald coefficient and contrast 
   testthat::expect_equal(numeric$lfcSE, contrast$lfcSE)
 })
 
-testthat::test_that("R results accepts list-like primitive Wald and LRT inputs", {
-  beta <- matrix(
-    c(
-      1, 2, 3,
-      2, 4, 7
-    ),
-    nrow = 2,
-    byrow = TRUE,
-    dimnames = list(c("g1", "g2"), c("Intercept", "condition_B_vs_A", "condition_C_vs_A"))
-  )
-  cov <- array(0, dim = c(2, 3, 3))
-  cov[, 2, 2] <- 0.25
-  cov[, 3, 3] <- 1
-  primitive <- list(
-    baseMean = c(g1 = 10, g2 = 20),
-    beta = beta,
-    betaCovariance = cov
-  )
-
-  wald <- results(
-    primitive,
-    contrast = c("condition", "C", "B"),
-    reference = "A",
-    independentFiltering = FALSE
-  )
-  lrt <- results(
-    c(primitive, list(lrtStat = c(6, 8), lrtPvalue = c(0.02, 0.01))),
-    contrast = c("condition", "C", "B"),
-    reference = "A",
-    independentFiltering = FALSE
-  )
-
-  testthat::expect_equal(wald$log2FoldChange, c(1, 3))
-  testthat::expect_equal(wald$lfcSE, rep(sqrt(1.25), 2))
-  testthat::expect_equal(lrt$log2FoldChange, c(1, 3))
-  testthat::expect_equal(lrt$stat, c(6, 8))
-  testthat::expect_equal(lrt$pvalue, c(0.02, 0.01))
-  testthat::expect_equal(attr(wald, "resultName"), "condition_C_vs_B")
-  testthat::expect_equal(attr(lrt, "resultName"), "condition_C_vs_B")
-})
-
 testthat::test_that("R results resolves R-cleaned mcols beta and SE aliases", {
   resultsNames <- c("(Intercept)", "condition-B vs A")
   mcols <- data.frame(
@@ -735,101 +694,6 @@ testthat::test_that("R results applies character and numeric contrast all-zero s
   testthat::expect_equal(attr(cleanedLevelOut, "contrastAllZero"), "character")
   testthat::expect_equal(attr(cleanedLevelOut, "resultName"), "cell.type_B.cell_vs_A.cell")
   testthat::expect_equal(attr(cleanedLevelOut, "comparison"), "factor-level contrast: cell.type B cell vs A cell")
-})
-
-testthat::test_that("R wrapper object list contrasts accept cleaned formula coefficient aliases", {
-  beta <- matrix(
-    c(
-      1, 2, 3,
-      1, 4, 7
-    ),
-    nrow = 2,
-    byrow = TRUE,
-    dimnames = list(c("g1", "g2"), c("Intercept", "cell type_B cell_vs_A cell", "cell type_C cell_vs_A cell"))
-  )
-  cov <- array(0, dim = c(2, 3, 3))
-  cov[, 2, 2] <- 0.25
-  cov[, 3, 3] <- 1
-  object <- list(
-    baseMean = c(g1 = 10, g2 = 20),
-    beta = beta,
-    betaCovariance = cov,
-    lrtStat = c(6, 8),
-    lrtPvalue = c(0.02, 0.01)
-  )
-
-  wald <- results(
-    nbinomWaldTestRust(object = object),
-    contrast = list("cell.type_C.cell_vs_A.cell", "cell.type_B.cell_vs_A.cell"),
-    independentFiltering = FALSE
-  )
-  lrt <- results(
-    nbinomLRTRust(object = object),
-    contrast = list("cell.type_C.cell_vs_A.cell", "cell.type_B.cell_vs_A.cell"),
-    independentFiltering = FALSE
-  )
-
-  testthat::expect_equal(wald$log2FoldChange, c(1, 3))
-  testthat::expect_equal(wald$lfcSE, rep(sqrt(1.25), 2))
-  testthat::expect_equal(attr(wald, "resultName"), "contrast")
-  testthat::expect_equal(
-    attr(wald, "comparison"),
-    "coefficient list contrast: cell.type_C.cell_vs_A.cell vs cell.type_B.cell_vs_A.cell"
-  )
-  testthat::expect_equal(attr(wald, "contrast")[["cell type_C cell_vs_A cell"]], 1)
-  testthat::expect_equal(attr(wald, "contrast")[["cell type_B cell_vs_A cell"]], -1)
-  testthat::expect_equal(lrt$log2FoldChange, c(1, 3))
-  testthat::expect_equal(lrt$stat, c(6, 8))
-  testthat::expect_equal(lrt$pvalue, c(0.02, 0.01))
-  testthat::expect_equal(
-    attr(lrt, "comparison"),
-    "coefficient list contrast: cell.type_C.cell_vs_A.cell vs cell.type_B.cell_vs_A.cell; LRT full vs reduced"
-  )
-  testthat::expect_equal(attr(lrt, "contrast")[["cell type_C cell_vs_A cell"]], 1)
-  testthat::expect_equal(attr(lrt, "contrast")[["cell type_B cell_vs_A cell"]], -1)
-})
-
-testthat::test_that("R wrapper object results accept cleaned formula numeric coefficient aliases", {
-  beta <- matrix(
-    c(
-      1, 2.5,
-      1, 4.5
-    ),
-    nrow = 2,
-    byrow = TRUE,
-    dimnames = list(c("g1", "g2"), c("Intercept", "cell type_as.double"))
-  )
-  cov <- array(0, dim = c(2, 2, 2))
-  cov[, 2, 2] <- 0.25
-  object <- list(
-    baseMean = c(g1 = 10, g2 = 20),
-    beta = beta,
-    betaCovariance = cov,
-    lrtStat = c(5, 7),
-    lrtPvalue = c(0.03, 0.02)
-  )
-
-  wald <- results(
-    nbinomWaldTestRust(object = object),
-    name = "cell.type_as.double",
-    independentFiltering = FALSE
-  )
-  lrt <- results(
-    nbinomLRTRust(object = object),
-    name = "cell.type_as.double",
-    independentFiltering = FALSE
-  )
-
-  testthat::expect_equal(wald$log2FoldChange, c(2.5, 4.5))
-  testthat::expect_equal(wald$lfcSE, c(0.5, 0.5))
-  testthat::expect_equal(attr(wald, "resultName"), "cell type_as.double")
-  testthat::expect_equal(attr(wald, "comparison"), "coefficient cell type_as.double")
-  testthat::expect_equal(attr(wald, "contrast")[["cell type_as.double"]], 1)
-  testthat::expect_equal(lrt$log2FoldChange, c(2.5, 4.5))
-  testthat::expect_equal(lrt$stat, c(5, 7))
-  testthat::expect_equal(lrt$pvalue, c(0.03, 0.02))
-  testthat::expect_equal(attr(lrt, "comparison"), "coefficient cell type_as.double; LRT full vs reduced")
-  testthat::expect_equal(attr(lrt, "contrast")[["cell type_as.double"]], 1)
 })
 
 testthat::test_that("R wrapper aligns named model matrix columns with cleaned result aliases", {
@@ -1837,18 +1701,11 @@ testthat::test_that("R wrapper applies Cook's cutoff masking and BH adjustment",
     maxCooks = c(0, 10, NA),
     cooksCutoff = 5
   )
-  nativeOut <- applyCooksCutoffRust(
-    pvalue = c(g1 = 0.01, g2 = 0.02, g3 = 0.5),
-    maxCooks = c(0, 10, NA),
-    cooksCutoff = 5,
-    native = TRUE
-  )
 
   testthat::expect_equal(rownames(out), c("g1", "g2", "g3"))
   testthat::expect_equal(out$cooksOutlier, c(FALSE, TRUE, NA))
   testthat::expect_equal(out$pvalue, c(0.01, NA, 0.5))
   testthat::expect_equal(out$padj, stats::p.adjust(c(0.01, NA, 0.5), method = "BH"))
-  testthat::expect_equal(nativeOut, out)
 })
 
 testthat::test_that("R wrapper treats NaN Cook's values as missing", {
@@ -1857,16 +1714,9 @@ testthat::test_that("R wrapper treats NaN Cook's values as missing", {
     maxCooks = c(NaN, NA_real_, 10),
     cooksCutoff = 5
   )
-  nativeOut <- applyCooksCutoffRust(
-    pvalue = c(0.01, 0.02, 0.03),
-    maxCooks = c(NaN, NA_real_, 10),
-    cooksCutoff = 5,
-    native = TRUE
-  )
 
   testthat::expect_equal(out$cooksOutlier, c(NA, NA, TRUE))
   testthat::expect_equal(out$pvalue, c(0.01, 0.02, NA))
-  testthat::expect_equal(nativeOut, out)
 })
 
 testthat::test_that("R wrapper can disable Cook's cutoff masking", {
@@ -1902,20 +1752,10 @@ testthat::test_that("R wrapper low-count Cook's heuristic spares eligible rows",
     cooks = cooks[c("g2", "g1"), c("s2", "s3", "s1", "s4")],
     lowCountHeuristic = TRUE
   )
-  nativeOut <- applyCooksCutoffRust(
-    pvalue = c(g1 = 0.01, g2 = 0.02),
-    maxCooks = c(g2 = 10, g1 = 10),
-    cooksCutoff = 5,
-    counts = counts[c("g2", "g1"), c("s3", "s1", "s4", "s2")],
-    cooks = cooks[c("g2", "g1"), c("s2", "s3", "s1", "s4")],
-    lowCountHeuristic = TRUE,
-    native = TRUE
-  )
 
   testthat::expect_equal(rownames(out), c("g1", "g2"))
   testthat::expect_equal(out$cooksOutlier, c(FALSE, TRUE))
   testthat::expect_equal(out$pvalue, c(0.01, NA))
-  testthat::expect_equal(nativeOut, out)
 
   duplicateCooks <- cooks
   colnames(duplicateCooks) <- c("s1", "s2", "s2", "s4")

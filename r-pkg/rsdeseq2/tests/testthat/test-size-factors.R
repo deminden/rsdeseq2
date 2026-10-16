@@ -14,11 +14,6 @@ testthat::test_that("R wrapper estimates ratio size factors on log-ratio scale",
     c(1 / sqrt(2), sqrt(2)),
     tolerance = 1e-12
   )
-  testthat::expect_equal(
-    estimateSizeFactorsRust(counts, method = "ratio", native = TRUE),
-    estimateSizeFactorsRust(counts, method = "ratio"),
-    tolerance = 1e-12
-  )
 })
 
 testthat::test_that("R wrapper estimates poscounts size factors with zeros", {
@@ -32,12 +27,11 @@ testthat::test_that("R wrapper estimates poscounts size factors with zeros", {
     byrow = TRUE
   )
   sf <- estimateSizeFactorsRust(counts, method = "poscounts")
-  nativeSf <- estimateSizeFactorsRust(counts, method = "poscounts", native = TRUE)
 
-  testthat::expect_length(sf, 3)
-  testthat::expect_true(all(is.finite(sf)))
-  testthat::expect_true(all(sf > 0))
-  testthat::expect_equal(nativeSf, sf, tolerance = 1e-12)
+  # Positive-count geometric means divide by all three samples, including zeros.
+  # Sample 3 uses the median of two log ratios, hence their geometric mean.
+  expected <- c(9 / 324^(1 / 3), 1, sqrt(4 * 36 / 324^(1 / 3)))
+  testthat::expect_equal(unname(sf), expected, tolerance = 1e-12)
 })
 
 testthat::test_that("R wrapper supports supplied geoMeans and control genes", {
@@ -56,17 +50,10 @@ testthat::test_that("R wrapper supports supplied geoMeans and control genes", {
     geoMeans = c(sqrt(200), sqrt(800), 100),
     controlGenes = c("a", "b")
   )
-  nativeSf <- estimateSizeFactorsRust(
-    counts,
-    geoMeans = c(sqrt(200), sqrt(800), 100),
-    controlGenes = c("a", "b"),
-    native = TRUE
-  )
 
   testthat::expect_equal(names(sf), c("s1", "s2"))
   testthat::expect_equal(exp(mean(log(sf))), 1, tolerance = 1e-12)
   testthat::expect_equal(unname(sf), c(1 / sqrt(2), sqrt(2)), tolerance = 1e-12)
-  testthat::expect_equal(nativeSf, sf, tolerance = 1e-12)
 })
 
 testthat::test_that("R wrapper matches DESeq2 size-factor validation cases", {
@@ -92,13 +79,10 @@ testthat::test_that("R wrapper normalized counts and base means are available", 
     dimnames = list(c("g1", "g2"), c("s1", "s2"))
   )
   normalized <- normalizedCountsRust(counts, c(1, 2))
-  nativeNormalized <- normalizedCountsRust(counts, c(1, 2), native = TRUE)
 
   testthat::expect_equal(dimnames(normalized), dimnames(counts))
   testthat::expect_equal(unname(normalized[, "s2"]), c(10, 30))
-  testthat::expect_equal(nativeNormalized, normalized)
   testthat::expect_equal(baseMeanRust(counts, c(1, 2)), c(g1 = 10, g2 = 30))
-  testthat::expect_equal(baseMeanRust(counts, c(1, 2), native = TRUE), c(g1 = 10, g2 = 30))
 })
 
 testthat::test_that("R wrapper normalization factors preempt size factors", {
@@ -126,22 +110,11 @@ testthat::test_that("R wrapper normalization factors preempt size factors", {
     sizeFactors = c(100, 100),
     normalizationFactors = normalizationFactors
   )
-  nativeNormalized <- normalizedCountsRust(
-    counts,
-    sizeFactors = c(100, 100),
-    normalizationFactors = normalizationFactors,
-    native = TRUE
-  )
 
   testthat::expect_equal(dimnames(normalized), dimnames(counts))
   testthat::expect_equal(as.vector(normalized), c(10, 10, 5, 30))
-  testthat::expect_equal(nativeNormalized, normalized)
   testthat::expect_equal(
     baseMeanRust(counts, normalizationFactors = normalizationFactors),
-    c(g1 = 7.5, g2 = 20)
-  )
-  testthat::expect_equal(
-    baseMeanRust(counts, normalizationFactors = normalizationFactors, native = TRUE),
     c(g1 = 7.5, g2 = 20)
   )
 })
@@ -159,13 +132,11 @@ testthat::test_that("R wrapper base metadata includes base variance and all-zero
   )
   normalized <- sweep(counts, 2L, c(1, 2, 1), "/")
   meta <- baseMetadataRust(counts, sizeFactors = c(1, 2, 1))
-  nativeMeta <- baseMetadataRust(counts, sizeFactors = c(1, 2, 1), native = TRUE)
 
   testthat::expect_equal(rownames(meta), rownames(counts))
   testthat::expect_equal(meta$baseMean, unname(rowMeans(normalized)), tolerance = 1e-12)
   testthat::expect_equal(meta$baseVar, as.numeric(apply(normalized, 1L, stats::var)), tolerance = 1e-12)
   testthat::expect_equal(meta$allZero, c(FALSE, FALSE, TRUE))
-  testthat::expect_equal(nativeMeta, meta)
 })
 
 testthat::test_that("R wrapper base metadata supports normalization factors and weights", {

@@ -162,3 +162,37 @@ pub(super) fn model_args(args: &mut Vec<String>, command: &str, design: &Path, r
         }
     }
 }
+
+pub(super) fn assert_matrix_export(
+    path: &Path,
+    counts: &CountMatrix,
+    expected: &RowMajorMatrix<f64>,
+    label: &str,
+) {
+    assert_eq!(expected.n_rows(), counts.n_genes(), "{label}: oracle rows");
+    assert_eq!(
+        expected.n_cols(),
+        counts.n_samples(),
+        "{label}: oracle columns"
+    );
+    let (headers, rows) = read_export(path);
+    assert_eq!(
+        headers,
+        std::iter::once("gene")
+            .chain(counts.sample_names().unwrap().iter().map(String::as_str))
+            .collect::<Vec<_>>(),
+        "{label}: columns"
+    );
+    assert_eq!(rows.len(), counts.n_genes(), "{label}: genes");
+    for (i, row) in rows.iter().enumerate() {
+        assert_eq!(row.len(), headers.len(), "{label}: row width");
+        assert_eq!(
+            &row[0],
+            &counts.gene_names().unwrap()[i],
+            "{label}: gene order"
+        );
+        for (actual, expected) in row.iter().skip(1).zip(expected.row(i).unwrap()) {
+            common::assert_option_close(number(actual), Some(*expected), 1e-12, 1e-12, label);
+        }
+    }
+}
