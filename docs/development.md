@@ -19,6 +19,24 @@ fixtures retain their recorded R versions.
 Public slice-like APIs prefer `RangeBounds` where range inputs are accepted, so
 callers can use legacy range syntax and the `core::range` types.
 
+## Source Organization
+
+The large integration suites keep one entry file and executable per suite;
+child modules under `tests/native_wald_pipeline/`, `tests/design/` and
+`tests/results/` group cases by workflow. Shared fixtures stay in the entry
+file rather than being copied into individual cases.
+
+The design implementation, GLM IRLS/beta modules and R Rust bridge use private
+`include!` files to keep existing public paths, helper scope and operation
+order. Edit the focused topic files referenced by each entry file. The R
+results wrapper is split across `R/results.R` and `R/results-*.R`; these files
+contain function definitions and must remain independent of collation order.
+Regenerate the R package's vendored core with `scripts/sync_r_vendor.sh` after
+editing core Rust sources.
+
+See the [large-file refactor report](refactoring-large-files.md) for the file
+inventory and precision/performance validation.
+
 ## Commands
 
 ```bash
