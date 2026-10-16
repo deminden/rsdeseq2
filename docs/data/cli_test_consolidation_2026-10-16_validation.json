@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-16",
+  "baseline_commit": "d2fdac0df57fbebdb15683262e79115278f84710",
+  "scope": "CLI numerical routing consolidation plus folded default-fallback/thread assertions",
+  "runtime_sources_changed": false,
+  "cli": {
+    "tests_before": 87,
+    "tests_after": 54,
+    "replaced_tests": 44,
+    "numerical_case_groups": 11,
+    "executed_numerical_cases": 68,
+    "retained_error_tests": 20,
+    "source_lines_before": 3422,
+    "source_lines_after_including_helpers": 3028,
+    "required_distinguishing_absolute_difference": 1e-06,
+    "comparison_absolute_and_relative_tolerances": 1e-12
+  },
+  "rust": {
+    "passed": 1026,
+    "failed": 0,
+    "explicit_slow_full_gtex_ignored": 1
+  },
+  "python": {
+    "passed": 31
+  },
+  "checks": {
+    "format": "passed",
+    "clippy": "passed",
+    "cargo_package_verification": "passed"
+  },
+  "precision": {
+    "full_native_gtex_contrasts": 11,
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "full_count_design_reference_hashes_verified": 44,
+    "release_exports_byte_identical": 22,
+    "existing_references_changed": false,
+    "tolerances_relaxed": false
+  },
+  "performance": {
+    "executable_sha256": "72a85c9c7ddbcd19b5c2afdc9dfc2ebd88a7ae588a1e5112d59cbce964ab5043",
+    "byte_identical_to_baseline": true,
+    "conclusion": "Identical runtime executable; quantification speed and memory behavior unchanged. No repeat timing pass needed for test-only edits."
+  },
+  "raw_evidence": "results/cli_test_consolidation/ (ignored local logs and outputs)"
+}

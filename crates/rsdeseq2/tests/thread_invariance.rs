@@ -1,28 +1,5 @@
+mod common;
 use rsdeseq2::prelude::*;
-
-#[test]
-fn strict_builder_is_deterministic_for_initial_stages() {
-    let counts = CountMatrix::from_row_major_u32(
-        4,
-        4,
-        vec![10, 12, 20, 24, 0, 0, 5, 7, 100, 80, 90, 120, 3, 6, 9, 12],
-    )
-    .unwrap();
-
-    let fit_a = DeseqBuilder::new()
-        .execution_mode(ExecutionMode::Strict)
-        .threads(1)
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
-    let fit_b = DeseqBuilder::new()
-        .execution_mode(ExecutionMode::Strict)
-        .threads(8)
-        .fit_size_factors_and_base_means(&counts)
-        .unwrap();
-
-    assert_eq!(fit_a.size_factors, fit_b.size_factors);
-    assert_eq!(fit_a.base_mean, fit_b.base_mean);
-}
 
 fn assert_numbers(a: &[f64], b: &[f64], label: &str) {
     assert_eq!(a.len(), b.len(), "{label}");
@@ -146,16 +123,22 @@ fn native_wald_and_lrt_are_identical_across_thread_counts_with_and_without_weigh
                 pool.install(|| {
                     assert_eq!(rayon::current_num_threads(), threads);
                     let b = builder.clone().threads(threads);
-                    if lrt {
+                    let normalization = DeseqBuilder::new()
+                        .threads(threads)
+                        .fit_size_factors_and_base_means(&common::reference_counts())
+                        .unwrap();
+                    let fitted = if lrt {
                         b.fit_lrt_with_results(&counts, &design, &reduced)
                     } else {
                         b.fit_with_results(&counts, &design)
                     }
-                    .unwrap()
+                    .unwrap();
+                    (normalization, fitted)
                 })
             };
-            let (a, ar) = run(1);
-            let (b, br) = run(4);
+            let (initial_a, (a, ar)) = run(1);
+            let (initial_b, (b, br)) = run(4);
+            assert_fit_equal(&initial_a, &initial_b);
             assert_fit_equal(&a, &b);
             // Results use None for missing fields, so structural equality also
             // checks all six numerical fields, filtering and Cook's metadata.

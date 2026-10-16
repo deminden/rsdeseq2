@@ -19,11 +19,6 @@ fn no_ridge_qr_options() -> IrlsOptions {
 }
 
 #[test]
-fn irls_default_refits_failed_rows_with_bounded_optimizer() {
-    assert!(IrlsOptions::default().use_optim);
-}
-
-#[test]
 fn irls_intercept_only_agrees_with_intercept_shortcut_for_equal_size_factors() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![4, 4, 8, 8]).unwrap();
     let design = DesignMatrix::from_row_major(
@@ -1399,7 +1394,7 @@ fn fit_with_dispersion_wraps_fixed_dispersion_irls() {
 }
 
 #[test]
-fn irls_optim_fallback_refits_nonconverged_rows_when_enabled() {
+fn irls_optim_fallback_refits_nonconverged_rows_by_default_and_can_be_disabled() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![10, 10, 20, 20]).unwrap();
     let design = DesignMatrix::from_row_major(
         4,
@@ -1435,7 +1430,6 @@ fn irls_optim_fallback_refits_nonconverged_rows_when_enabled() {
         IrlsOptions {
             maxit: 1,
             ridge_lambda: 0.0,
-            use_optim: true,
             ..IrlsOptions::default()
         },
     )
