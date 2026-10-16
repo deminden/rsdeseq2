@@ -36,6 +36,41 @@ The cleanup addresses failure detection and repeated setup:
   binary/output mutation, memory units, stale counts and deterministic blocked
   and unblocked random splits. Prior frozen-gene scorer tests remain.
 
+## CLI routing consolidation
+
+The follow-up to `d2fdac0` replaces 44 CLI smoke/shape tests with 11 numerical
+case groups: seven command-specific normalization tables and four Wald/LRT
+contrast tables. These execute 68 explicit routing cases. Distinct invalid
+input and ambiguous-alias tests remain. The CLI executable has 54 tests in total,
+down from 87; the case tables retain the input routes and add numerical checks.
+
+- Normalization tables compare every exported value, gene/sample label and
+  missingness with direct library inputs. A control subset, frozen geometric
+  means, supplied size factors, gene/sample normalization factors and weights
+  must change numerical output relative to the default by more than 1e-6.
+  Labeled input files deliberately have shuffled rows and columns. Both blind
+  and design-aware transforms must match their respective library results and
+  differ from one another.
+- Contrast fixtures have eight samples and three coefficients with distinct
+  effects. Requesting a nondefault coefficient therefore detects ignored
+  selectors. Canonical names, cleaned reserved aliases, weighted numeric/list
+  contrasts, factor levels and cleaned references check complete numerical
+  result tables and relevant contrast metadata. Reserved-name fixtures repeat
+  name-dependent routes; numeric-index coverage stays in the ordinary fixture.
+- Shared assertions compare in-memory answers directly with exported cells,
+  independently of the TSV writer. They reject unexpected non-finite cells and
+  missingness differences. Existing independent R oracles validate the library's
+  numerical implementation.
+- The old thread-hint-only check is folded into the actual one/four-thread pool
+  comparison, retaining size-factor estimation, base means and variance checks.
+  The one-line optimizer-default flag assertion is folded into a behavioral
+  test that verifies default fallback convergence and explicit disabling.
+
+Focused files under `tests/cli/` separate numerical assertions, normalization
+options and contrast options. Source plus helpers is smaller than the original
+CLI suite. The replaced-test mapping, executed cases and validation are recorded
+in `docs/data/cli_test_consolidation_2026-10-16_*`.
+
 ## GTEx without a full fit on every run
 
 The default fixed-dispersion replay uses **512 genes × all 61 samples**, selected
@@ -79,9 +114,15 @@ biological/random full-data contrasts using the commands in the
 complements that release gate; it does not establish parity for every gene,
 contrast or estimator by itself.
 
-## Validation of this cleanup
+## Validation evidence
 
-Validation evidence is recorded in
+The CLI follow-up's validation is recorded in
+[`data/cli_test_consolidation_2026-10-16_validation.json`](data/cli_test_consolidation_2026-10-16_validation.json).
+It checks the complete Rust/Python suites, all eleven native GTEx contrasts,
+exact release output hashes and executable identity. Runtime sources and the
+existing frozen reference files are unchanged.
+
+The initial cleanup's validation evidence is recorded in
 [`data/test_quality_cleanup_2026-10-16_validation.json`](data/test_quality_cleanup_2026-10-16_validation.json).
 It includes the executable hash, test results, full-reference gates and paired
 speed/memory measurements. The executable is byte-identical to the baseline;

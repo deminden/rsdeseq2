@@ -26,6 +26,10 @@ child modules under `tests/native_wald_pipeline/`, `tests/design/` and
 `tests/results/` group cases by workflow. Shared fixtures stay in the entry
 file rather than being copied into individual cases.
 
+CLI numerical routing cases live under `tests/cli/`, with shared assertions
+and separate normalization/contrast case tables. Use fixtures where ignoring a
+flag changes numerical results, and keep invalid-input/ambiguity cases distinct.
+
 The design implementation, GLM IRLS/beta modules and R Rust bridge use private
 `include!` files to keep existing public paths, helper scope and operation
 order. Edit the focused topic files referenced by each entry file. The R
