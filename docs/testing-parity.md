@@ -71,6 +71,44 @@ options and contrast options. Source plus helpers is smaller than the original
 CLI suite. The replaced-test mapping, executed cases and validation are recorded
 in `docs/data/cli_test_consolidation_2026-10-16_*`.
 
+## R wrapper consolidation
+
+The follow-up to `12b00fa` replaces 15 repetitive wrapper test blocks with five
+behavior groups covering 18 explicit cases and 30 complete numerical result
+tables. Including shared helpers, the R test suite shrinks from 4,678 to 4,136
+lines. The result, Wald and LRT test files share small primitive fixtures;
+object extraction and factor metadata now have focused test files.
+
+- List fields, matrix mcols, S4 slots, model-matrix attributes and their aliases
+  retain distinct cases. Unnamed count matrices still obtain gene labels from
+  mcols; shuffled model-matrix rows still align to sample names. The nested S4
+  assay/bracket-access case remains separate.
+- Each table checks all six numerical fields at an absolute tolerance of 1e-12,
+  gene/column labels, finite values and disabled independent-filter flags.
+  Expected effects and standard errors are explicit; Wald tails and BH values
+  come from base R. Coefficient alias fixtures request a nondefault coefficient
+  whose answers differ from the default.
+- Paired Wald/LRT cases share transformed/cleaned factor setup while retaining
+  their original method-specific inputs, both reference alias spellings,
+  coefficient names/weights and metadata. Direct constructors and object
+  packaging remain distinct. All-zero contrasts check Wald's zero statistic
+  and unit p-value, while LRT statistics/p-values remain supplied values.
+  Selecting a coefficient by name on LRT mcols also preserves LRT inference.
+- All 90 other test bodies and all 99 error assertions remain unchanged. Both
+  files containing live DESeq2 comparisons are byte-identical, including the
+  normalization, transformations, Cook's replacement and shrinkage parity
+  checks. Existing numerical tolerances and frozen reference files are retained.
+
+The source package passes `R CMD check` with 1,137 assertions and no failures,
+warnings or skips. Runtime R/Rust sources and the native executable are
+unchanged, so this consolidation does not change quantification precision,
+speed or memory behavior. Test counts are not performance benchmarks.
+
+The replaced-test mapping, explicit cases and validation are recorded in
+[`data/r_wrapper_test_consolidation_2026-10-16_cases.json`](data/r_wrapper_test_consolidation_2026-10-16_cases.json)
+and
+[`data/r_wrapper_test_consolidation_2026-10-16_validation.json`](data/r_wrapper_test_consolidation_2026-10-16_validation.json).
+
 ## GTEx without a full fit on every run
 
 The default fixed-dispersion replay uses **512 genes × all 61 samples**, selected

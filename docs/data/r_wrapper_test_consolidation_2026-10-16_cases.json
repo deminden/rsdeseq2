@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-16",
+  "baseline_commit": "12b00fa516e4a78be9aa8547d80672401f4b029f",
+  "replaced_tests": [
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+      "test": "R wrapper LRT preserves transformed factor metadata from objects",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 51,
+      "sha256": "544a10b8ecad55bc0cf28d7bb10d10c4cad7d3cc4017c17a95da9ec968630039"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+      "test": "R wrapper LRT preserves cleaned character contrast reference metadata",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 52,
+      "sha256": "aeb2e7c5c626411ad93902ba58e9d362ce2cb2257f35bede69b8c7d8d0b9bf60"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+      "test": "R wrapper LRT extracts factor reference aliases from fitted objects",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 42,
+      "sha256": "caf4adf7ca5f3fbe24f1a0f40da9cee11bfe4ee05124da1a24f823b54ebbb996"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-lrt.R",
+      "test": "R wrapper LRT resolves ordered formula-transform character contrasts",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 58,
+      "sha256": "b102f3e2812e1f0a41b0974ed743e678e8ca50301591d6859b77ed174c71d1ff"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results accepts DESeq2-shaped fitted list fields",
+      "replacement": "R fitted mcols representations preserve complete Wald and LRT results",
+      "source_lines": 50,
+      "sha256": "9b0aee2e3389fdeeec056c56e260cec72b83049bc616a2ba830bb3fbe1c18d9c"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R object extraction coerces DataFrame-like mcols before column lookup",
+      "replacement": "R fitted mcols representations preserve complete Wald and LRT results",
+      "source_lines": 41,
+      "sha256": "0d6cf5fc9ba16f9014357b5522ffb777bb6b633c8daa45af0f5e2820e82866b3"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R object extraction uses DESeq2-shaped model matrix attributes",
+      "replacement": "R model matrix access routes align samples and preserve numeric contrasts",
+      "source_lines": 51,
+      "sha256": "68d628b909b1d4ec2823ac00af9e20c7606b5f5d290b988a850f8c472f4628ce"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results accepts common object aliases for model matrices",
+      "replacement": "R model matrix access routes align samples and preserve numeric contrasts",
+      "source_lines": 102,
+      "sha256": "b832e27e6235d9e50af7a1628acdcdacbc903cfb590e27e35c2bd1a36b47fe18"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results accepts common object aliases for coefficient metadata",
+      "replacement": "R coefficient metadata aliases preserve selected coefficient numerics",
+      "source_lines": 59,
+      "sha256": "0de0614f796dc1f2323495f2ba35a79dc24c19cfd34a6877460da9b14cb82824"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results accepts common object aliases for factor levels",
+      "replacement": "R factor level aliases preserve nonreference contrast numerics",
+      "source_lines": 60,
+      "sha256": "ddde417583f0da12c451390924e6f13167bfb9b0ff35644440878a800dd4daa2"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results accepts S4-shaped fitted object slots",
+      "replacement": "R fitted mcols representations preserve complete Wald and LRT results",
+      "source_lines": 59,
+      "sha256": "de4a8012a04d589703d62224b956f099df700155d39e91d3cf1a59b6dde151c3"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-results.R",
+      "test": "R results resolves ordered formula-transform character contrasts",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 55,
+      "sha256": "f8f2b1c1651bdf4e4ca28411d17b614f9f73f80ece7b858b847eac4aa905ee25"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-wald.R",
+      "test": "R wrapper Wald test preserves transformed factor metadata from objects",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 48,
+      "sha256": "101a8bb9d4433cd14a627e1047d707c5721f9553e932872dcf6a8d743f72c2e9"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-wald.R",
+      "test": "R wrapper Wald test preserves cleaned character contrast reference metadata",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 48,
+      "sha256": "df718e505e6dfa4d4ccef51d869671f4285478d58adf8b013d9e152c22876124"
+    },
+    {
+      "path": "r-pkg/rsdeseq2/tests/testthat/test-wald.R",
+      "test": "R wrapper Wald test extracts factor reference aliases from fitted objects",
+      "replacement": "R factor metadata routes preserve Wald tails and supplied LRT tests",
+      "source_lines": 35,
+      "sha256": "d5d3cbde15c7d2d6188d3b0440dd505699f7b9c017b283453689f6be931b9ea0"
+    }
+  ],
+  "case_groups": {
+    "fitted_mcols": [
+      "list_fields",
+      "matrix_mcols",
+      "s4_slots"
+    ],
+    "model_matrix": [
+      "designMatrix_field",
+      "fullModelMatrix_slot",
+      "modelMatrix_attribute"
+    ],
+    "coefficient_aliases": [
+      "list_aliases",
+      "s4_aliases"
+    ],
+    "factor_level_aliases": [
+      "factorLevelNames_field",
+      "levelNames_slot"
+    ],
+    "factor_metadata": [
+      "transformed_object/Wald",
+      "transformed_object/LRT",
+      "cleaned_reference/Wald",
+      "cleaned_reference/LRT",
+      "reference_aliases/Wald",
+      "reference_aliases/LRT",
+      "transformed_constructor/Wald",
+      "transformed_constructor/LRT"
+    ]
+  },
+  "explicit_cases": 18,
+  "complete_numerical_result_tables": 30,
+  "result_fields": [
+    "baseMean",
+    "log2FoldChange",
+    "lfcSE",
+    "stat",
+    "pvalue",
+    "padj"
+  ],
+  "absolute_tolerance": 1e-12,
+  "oracles": {
+    "Wald": "Explicit effects and standard errors; two-sided base-R pnorm tails and BH p.adjust.",
+    "LRT": "Explicit effects/standard errors plus supplied statistics and p-values; base-R BH p.adjust."
+  },
+  "additional_checks": [
+    "Gene and column labels; finite numerical fields; disabled independent-filter flags.",
+    "Direct list/matrix/S4 dispatch and object packaging; numeric contrast sample alignment.",
+    "Coefficient selection differs from default; cleaned/transformed factor labels, reference aliases and contrast weights.",
+    "All-zero Wald rows have zero effects/statistics and unit p-values; supplied LRT tests remain unchanged.",
+    "Selecting an effect by name on LRT mcols retains LRT statistics."
+  ],
+  "preservation": {
+    "baseline_tests": 105,
+    "baseline_assertions": 865,
+    "baseline_failures": 0,
+    "baseline_errors": 0,
+    "baseline_warnings": 0,
+    "baseline_skips": 0,
+    "unchanged_test_bodies": 90,
+    "unchanged_error_assertions": 99,
+    "unchanged_live_DESeq2_calls": 112
+  },
+  "source_lines": {
+    "before_including_helpers": 4678,
+    "after_including_helpers": 4136
+  }
+}
