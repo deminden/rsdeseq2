@@ -1,13 +1,15 @@
 #include <R.h>
 #include <R_ext/Rdynload.h>
 #include <Rinternals.h>
-#include <Rmath.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
 #include "validation.h"
+extern SEXP rsdeseq2_wald_statistics(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rsdeseq2_lrt_pvalues(SEXP, SEXP);
+extern SEXP rsdeseq2_default_cooks_cutoff(SEXP, SEXP);
 extern SEXP rsdeseq2_bh_adjust(SEXP);
 extern SEXP rsdeseq2_independent_filtering(SEXP, SEXP, SEXP, SEXP, SEXP);
 
@@ -598,6 +600,9 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
 }
 
 static const R_CallMethodDef call_methods[] = {
+    {"rsdeseq2_wald_statistics", (DL_FUNC)&rsdeseq2_wald_statistics, 6},
+    {"rsdeseq2_lrt_pvalues", (DL_FUNC)&rsdeseq2_lrt_pvalues, 2},
+    {"rsdeseq2_default_cooks_cutoff", (DL_FUNC)&rsdeseq2_default_cooks_cutoff, 2},
     {"rsdeseq2_bh_adjust", (DL_FUNC)&rsdeseq2_bh_adjust, 1},
     {"rsdeseq2_independent_filtering", (DL_FUNC)&rsdeseq2_independent_filtering, 5},
     {"rsdeseq2_placeholder", (DL_FUNC)&rsdeseq2_placeholder, 0},

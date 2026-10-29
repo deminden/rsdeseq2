@@ -292,7 +292,7 @@ results <- function(object,
     out$pvalue[zero] <- 1
   }
   if (identical(cutoff, TRUE)) {
-    cutoff <- stats::qf(0.99, ncol(fit$design), nrow(fit$design) - ncol(fit$design))
+    cutoff <- .rsdeseq2_default_cooks_cutoff(fit$design)
   }
   if (is.null(cutoff) || identical(cutoff, FALSE)) {
     if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- rep(NA, nrow(out))

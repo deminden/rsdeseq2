@@ -18,6 +18,10 @@
   entry points, contrast handling and dispersion trends into private modules.
   Preserve numerical operations, public paths, fixtures and assertions.
 
+* Evaluate Wald hypotheses, primitive LRT probabilities and default Cook's
+  cutoffs in the standalone Rust engine. Improve Normal and large-df tails;
+  retain thresholded statistics when t degrees of freedom are missing.
+
 # rsdeseq2 0.3.1
 
 * Speed up native Wald quantification with shared Cox-Reid design products,

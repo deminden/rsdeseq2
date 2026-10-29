@@ -120,8 +120,82 @@ fn normalization(input: NormalizationInput) -> Result<serde_json::Value, Box<dyn
 }
 
 #[derive(Deserialize)]
+#[serde(tag = "operation", rename_all = "snake_case")]
+enum StatisticsInput {
+    Wald {
+        beta: Vec<String>,
+        se: Vec<String>,
+        threshold: String,
+        alternative: String,
+        df: Option<Vec<String>>,
+    },
+    Lrt {
+        statistics: Vec<String>,
+        df: Vec<String>,
+    },
+    Cooks {
+        samples: usize,
+        coefficients: usize,
+    },
+}
+
+fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error>> {
+    use rsdeseq2::glm::{
+        WaldAlternative, WaldTestOptions, lrt_pvalues_from_statistics, wald_test_from_estimates,
+    };
+    let parse = |values: Vec<String>| {
+        values
+            .into_iter()
+            .map(|v| v.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+    };
+    match input {
+        StatisticsInput::Wald {
+            beta,
+            se,
+            threshold,
+            alternative,
+            df,
+        } => {
+            let alternative = match alternative.as_str() {
+                "greaterAbs" => WaldAlternative::GreaterAbs,
+                "greaterAbsUPSHOT" => WaldAlternative::GreaterAbsUpshot,
+                "greaterAbs2014" => WaldAlternative::GreaterAbs2014,
+                "lessAbs" => WaldAlternative::LessAbs,
+                "greater" => WaldAlternative::Greater,
+                "less" => WaldAlternative::Less,
+                _ => return Err("unknown Wald alternative".into()),
+            };
+            let df = df.map(parse).transpose()?;
+            let options = match df {
+                None => WaldTestOptions::normal(),
+                Some(df) if df.len() == 1 => WaldTestOptions::t_degrees_of_freedom(df[0]),
+                Some(df) => WaldTestOptions::t_per_gene_degrees_of_freedom(df),
+            }
+            .with_lfc_threshold(threshold.parse()?, alternative);
+            let result = wald_test_from_estimates(&parse(beta)?, &parse(se)?, &options)?;
+            Ok(
+                json!({"stat": result.stat.into_iter().map(|v| v.map(bits)).collect::<Vec<_>>(),
+                "pvalue": result.pvalue.into_iter().map(|v| v.map(bits)).collect::<Vec<_>>() }),
+            )
+        }
+        StatisticsInput::Lrt { statistics, df } => {
+            let result = lrt_pvalues_from_statistics(&parse(statistics)?, &parse(df)?)?;
+            Ok(json!({"pvalue": result.into_iter().map(|v| v.map(bits)).collect::<Vec<_>>() }))
+        }
+        StatisticsInput::Cooks {
+            samples,
+            coefficients,
+        } => Ok(
+            json!({"cutoff": rsdeseq2::results::default_cooks_cutoff(samples, coefficients)?.map(bits)}),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Statistics(StatisticsInput),
     Filtering(FilteringInput),
     Normalization(NormalizationInput),
 }
@@ -132,6 +206,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Statistics(input) => statistics(input)?,
         Input::Filtering(input) => filtering(input)?,
         Input::Normalization(input) => normalization(input)?,
     };

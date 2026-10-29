@@ -191,6 +191,9 @@ include!("lib/contrast_shrinkage.rs");
 // VST/rlog transformation export and frozen fit inputs.
 include!("lib/transform.rs");
 
+// Standalone Wald/LRT probabilities and default Cook's cutoff.
+include!("lib/inference_statistics.rs");
+
 // Standalone result adjustment and filtering; no R numerical callbacks.
 include!("lib/result_filtering.rs");
 

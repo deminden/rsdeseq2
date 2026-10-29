@@ -436,6 +436,8 @@ testthat::test_that("R primitive LRT fits align named test vectors to beta rows"
 
   testthat::expect_equal(unname(fit$lrtStat), c(4, 8, 12))
   testthat::expect_equal(unname(fit$lrtDf), c(1, 2, 3))
+  testthat::expect_identical(names(fit$lrtPvalue), rownames(beta))
+  testthat::expect_identical(names(scalarDf$lrtPvalue), rownames(beta))
   testthat::expect_equal(unname(fit$lrtPvalue), stats::pchisq(c(4, 8, 12), df = c(1, 2, 3), lower.tail = FALSE))
   testthat::expect_equal(unname(explicit$lrtPvalue), c(0.04, 0.008, 0.003))
   testthat::expect_equal(unname(scalarDf$lrtDf), c(2, 2, 2))

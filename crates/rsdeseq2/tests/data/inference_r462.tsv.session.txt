@@ -1,0 +1,19 @@
+R version 4.6.2 (2026-10-29)
+Platform: aarch64-apple-darwin27.2.0
+Running under: macOS Golden Gate 27.2
+
+Matrix products: default
+BLAS/LAPACK: /Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib;  LAPACK version 3.12.0
+
+locale:
+[1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
+
+time zone: Europe/Dublin
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+loaded via a namespace (and not attached):
+[1] compiler_4.6.2
+R executable: /Users/dendem/miniforge3/envs/deseq2-r462-native/lib/R/bin/R

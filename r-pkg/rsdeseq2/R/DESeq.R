@@ -182,7 +182,7 @@ DESeq <- function(object,
     as.integer(match(fitType, c("parametric", "local", "mean")) - 1L),
     as.integer(match(test, c("Wald", "LRT")) - 1L),
     if (disableReplacement) 0L else as.integer(minReplicatesForReplace),
-    stats::qf(0.99, ncol(design), nrow(design) - ncol(design)),
+    .rsdeseq2_default_cooks_cutoff(design) %||% NA_real_,
     as.integer(nproc),
     as.integer(match(parityMode, c("strict", "fast", "diagnostic")) - 1L),
     PACKAGE = "rsdeseq2"

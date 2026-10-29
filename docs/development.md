@@ -64,6 +64,11 @@ file inventory and precision/performance validation, and the
 The [test-quality report](testing-parity.md) describes required oracle checks,
 CLI routing assertions, the compact GTEx panel and full replay commands.
 
+The [shared inference report](rust-only-inference-2026-10-29.md) documents the
+standalone probability kernels, the independent reference generator and the
+remaining Rust-only migration. New numerical changes must preserve independent
+bounds and direct standalone/wrapped equality.
+
 ## Commands
 
 ```bash

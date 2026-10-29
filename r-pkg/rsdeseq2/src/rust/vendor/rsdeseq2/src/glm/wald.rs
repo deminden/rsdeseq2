@@ -1,5 +1,5 @@
-use statrs::distribution::{Continuous, ContinuousCDF, Normal, StudentsT};
-use statrs::function::erf::erfc;
+use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
+use statrs::distribution::{Continuous, Normal};
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::inference::GlmInferenceView;
@@ -422,9 +422,7 @@ pub fn wald_stat_and_pvalue_with_options(
     let Some(default_stat) = wald_stat(beta, beta_se) else {
         return Ok(None);
     };
-    let Some(tail) = WaldTail::new(gene, options, degrees_of_freedom)? else {
-        return Ok(Some((default_stat, None)));
-    };
+    let tail = WaldTail::new(gene, options, degrees_of_freedom)?.unwrap_or(WaldTail::Missing);
     let threshold = options.lfc_threshold;
     let abs_beta = beta.abs();
     let (stat, pvalue) = match options.alternative {
@@ -447,7 +445,7 @@ pub fn wald_stat_and_pvalue_with_options(
         WaldAlternative::GreaterAbsUpshot => {
             let pvalue = match tail {
                 WaldTail::Normal => greater_abs_upshot_normal_pvalue(abs_beta, beta_se, threshold),
-                WaldTail::T { .. } => None,
+                WaldTail::T { .. } | WaldTail::Missing => None,
             };
             (default_stat, pvalue)
         }
@@ -512,7 +510,7 @@ pub fn two_sided_normal_pvalue(stat: f64) -> f64 {
     if stat.is_nan() {
         return 1.0;
     }
-    erfc(stat.abs() / std::f64::consts::SQRT_2).clamp(0.0, 1.0)
+    normal_two_sided_tail(stat)
 }
 
 /// Two-sided Student t p-value.
@@ -520,8 +518,7 @@ pub fn two_sided_t_pvalue(stat: f64, degrees_of_freedom: f64) -> Option<f64> {
     if !stat.is_finite() || !degrees_of_freedom.is_finite() || degrees_of_freedom <= 0.0 {
         return None;
     }
-    let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-    clamp_probability(2.0 * distribution.sf(stat.abs()))
+    clamp_probability(2.0 * student_t_upper_tail(stat.abs(), degrees_of_freedom)?)
 }
 
 fn resolve_wald_degrees_of_freedom(
@@ -551,7 +548,7 @@ fn resolve_wald_degrees_of_freedom(
     }
 }
 
-fn valid_t_df(df: f64) -> Option<f64> {
+pub(super) fn valid_t_df(df: f64) -> Option<f64> {
     (df.is_finite() && df > 0.0).then_some(df)
 }
 
@@ -585,8 +582,8 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
     let b = checked_shifted_stat(abs_beta, -threshold, beta_se)?;
     let denominator = checked_sub(b, a)?;
     let scale = checked_div(2.0, denominator)?;
-    let left_tail_a = distribution.sf(a);
-    let left_tail_b = distribution.sf(b);
+    let left_tail_a = normal_upper_tail(a);
+    let left_tail_b = normal_upper_tail(b);
     let value = checked_product2(
         scale,
         checked_scaled_sum(&[
@@ -635,6 +632,7 @@ fn checked_product3_ordered_by_magnitude(left: f64, middle: f64, right: f64) -> 
 
 #[derive(Clone, Copy, Debug)]
 enum WaldTail {
+    Missing,
     Normal,
     T { degrees_of_freedom: f64 },
 }
@@ -665,14 +663,9 @@ impl WaldTail {
             return None;
         }
         match self {
-            Self::Normal => {
-                let distribution = Normal::new(0.0, 1.0).ok()?;
-                clamp_probability(distribution.cdf(q))
-            }
-            Self::T { degrees_of_freedom } => {
-                let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-                clamp_probability(distribution.cdf(q))
-            }
+            Self::Missing => None,
+            Self::Normal => clamp_probability(normal_upper_tail(-q)),
+            Self::T { degrees_of_freedom } => student_t_upper_tail(-q, degrees_of_freedom),
         }
     }
 
@@ -681,19 +674,15 @@ impl WaldTail {
             return None;
         }
         match self {
-            Self::Normal => {
-                let distribution = Normal::new(0.0, 1.0).ok()?;
-                clamp_probability(distribution.sf(q))
-            }
-            Self::T { degrees_of_freedom } => {
-                let distribution = StudentsT::new(0.0, 1.0, degrees_of_freedom).ok()?;
-                clamp_probability(distribution.sf(q))
-            }
+            Self::Missing => None,
+            Self::Normal => clamp_probability(normal_upper_tail(q)),
+            Self::T { degrees_of_freedom } => student_t_upper_tail(q, degrees_of_freedom),
         }
     }
 
     fn two_sided(self, stat: f64) -> Option<f64> {
         match self {
+            Self::Missing => None,
             Self::Normal => Some(two_sided_normal_pvalue(stat)),
             Self::T { degrees_of_freedom } => two_sided_t_pvalue(stat, degrees_of_freedom),
         }
