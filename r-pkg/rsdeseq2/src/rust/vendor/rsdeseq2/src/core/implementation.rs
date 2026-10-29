@@ -43,7 +43,8 @@ include!("implementation/builder/fixed_lrt.rs");
 include!("implementation/builder/normalization_components.rs");
 
 // Public top-level builder workflows.
-include!("implementation/builder/top_level.rs");
+#[path = "implementation/builder/workflows/mod.rs"]
+mod workflows;
 
 // Shared validation, compaction, expansion, and metadata helpers.
 include!("implementation/helpers.rs");

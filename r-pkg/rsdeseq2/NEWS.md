@@ -14,6 +14,10 @@
 * Correct supplied geometric-mean transport and align the private native
   primitive with natural-scale inputs used by the public Rust and R APIs.
 
+* Split large Wald/LRT and R result tests by behavior, and organize builder
+  entry points, contrast handling and dispersion trends into private modules.
+  Preserve numerical operations, public paths, fixtures and assertions.
+
 # rsdeseq2 0.3.1
 
 * Speed up native Wald quantification with shared Cox-Reid design products,

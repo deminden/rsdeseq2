@@ -406,7 +406,7 @@ pub struct ExpandedAdditiveBetaPriorWaldNormalizedResultsInput<'a> {
 pub struct ExpandedFormulaBetaPriorWaldResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Primitive formula parsed by [`expanded_formula_design`].
+    /// Primitive formula parsed by [`expanded_formula_design`](crate::design::expanded_formula_design).
     pub formula: &'a str,
     /// Candidate factor metadata referenced by the formula.
     pub factors: &'a [ExpandedFactorSpec<'a>],
@@ -434,7 +434,7 @@ pub struct ExpandedFormulaBetaPriorWaldResultsInput<'a> {
 pub struct ExpandedFormulaModelFrameBetaPriorWaldResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`].
+    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`](crate::design::expanded_formula_design_from_model_frame).
     pub formula: &'a str,
     /// Owned factor and numeric covariates referenced by the formula.
     pub model_frame: &'a FormulaModelFrame,
@@ -459,7 +459,7 @@ pub struct ExpandedFormulaModelFrameBetaPriorWaldResultsInput<'a> {
 pub struct ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Primitive formula parsed by [`expanded_formula_design`].
+    /// Primitive formula parsed by [`expanded_formula_design`](crate::design::expanded_formula_design).
     pub formula: &'a str,
     /// Candidate factor metadata referenced by the formula.
     pub factors: &'a [ExpandedFactorSpec<'a>],
@@ -487,7 +487,7 @@ pub struct ExpandedFormulaBetaPriorWaldNormalizedResultsInput<'a> {
 pub struct ExpandedFormulaModelFrameBetaPriorWaldNormalizedResultsInput<'a> {
     /// Raw count matrix.
     pub counts: &'a CountMatrix,
-    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`].
+    /// Primitive formula parsed by [`expanded_formula_design_from_model_frame`](crate::design::expanded_formula_design_from_model_frame).
     pub formula: &'a str,
     /// Owned factor and numeric covariates referenced by the formula.
     pub model_frame: &'a FormulaModelFrame,
