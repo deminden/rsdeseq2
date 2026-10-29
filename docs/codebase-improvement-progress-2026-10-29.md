@@ -102,7 +102,15 @@ check pass there (Status: OK). Historical reference files remain unchanged.
 The new source installer also restored an isolated Rcpp/RcppProgress smoke
 environment successfully. The Python suite passes 42 tests.
 
-C14–C23 remain pending: representative stage/RSS profiling, borrowed ownership,
+C14 now has representative stage workloads, preserved executable/R package
+baselines and initial native-R workflow/RSS profiles. Their raw output is saved
+under `results/codebase_improvements/`; the [memory report](memory-improvements-2026-10-29.md)
+records the dimensions, budget and measured baseline. Benchmark smoke execution,
+Clippy and MSRV checks pass. An independent Pasilla panel and native R Wald/LRT
+references were frozen before memory optimization and are reserved for milestone
+validation. No speed/memory improvement is claimed yet.
+
+C15–C23 remain pending: borrowed ownership,
 bounded row storage, selective GLM retention, optional replacement buffers,
 shared Rust statistical requests, bulk R results, module consolidation, staged
 CLI output and final release documentation/evidence.
