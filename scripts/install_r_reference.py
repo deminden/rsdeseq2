@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -95,9 +96,16 @@ def main():
     with ordered.open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]), delimiter='\t')
         writer.writeheader(); writer.writerows(rows)
+    # R constructs its library search path before sourcing the installer. Check
+    # mode must honor --library too, while preserving any additional user paths.
+    env = dict(os.environ)
+    library_paths = [str(args.library.resolve())]
+    if env.get('R_LIBS_USER'):
+        library_paths.append(env['R_LIBS_USER'])
+    env['R_LIBS_USER'] = os.pathsep.join(library_paths)
     subprocess.run([args.rscript, '--vanilla', str(ROOT/'scripts/install_locked_r_packages.R'),
                     str(ordered.resolve()), str(args.library.resolve()), environment['r_version'],
-                    'check' if args.check_installed else 'install'], check=True)
+                    'check' if args.check_installed else 'install'], check=True, env=env)
 
 
 if __name__ == '__main__':

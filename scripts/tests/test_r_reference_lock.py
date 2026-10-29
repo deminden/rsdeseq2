@@ -1,14 +1,34 @@
 """Pinned R environments reject incomplete graphs and changed source archives."""
 from pathlib import Path
+import json
+import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import install_r_reference as reference
 
 
 class RReferenceLock(unittest.TestCase):
+    def test_check_only_uses_requested_library_without_dropping_existing_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root/'sources.tsv'
+            manifest.write_text('package\tversion\turl\tsha256\tdependencies\n' +
+                'brio\t1.1.5\thttps://example.org/brio.tar.gz\t'+'0'*64+'\t\n')
+            environment = root/'environment.json'
+            environment.write_text(json.dumps(dict(r_version='4.6.2')))
+            library = root/'requested library'
+            args = ['install_r_reference','--check-installed','--rscript','Rscript',
+                    '--manifest',str(manifest),'--environment',str(environment),
+                    '--library',str(library),'--cache',str(root/'cache')]
+            with mock.patch.object(sys,'argv',args), mock.patch.dict(os.environ,{'R_LIBS_USER':'existing-library'}), mock.patch.object(reference.subprocess,'run') as run:
+                reference.main()
+            self.assertEqual(run.call_args.kwargs['env']['R_LIBS_USER'],
+                             str(library.resolve())+os.pathsep+'existing-library')
+            self.assertEqual(run.call_args.args[0][-1], 'check')
     def test_install_order_respects_transitive_dependencies(self):
         rows = [dict(package='fit', dependencies='stats;matrix'),
                 dict(package='matrix', dependencies='stats'), dict(package='stats', dependencies='')]
