@@ -358,7 +358,10 @@ fn cli_wald_writes_result_and_cooks_sidecars() {
         assert_eq!(file["bytes"].as_u64().unwrap(), bytes.len() as u64);
         assert_eq!(
             file["sha256"].as_str().unwrap(),
-            format!("{:x}", Sha256::digest(&bytes))
+            Sha256::digest(&bytes)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
         );
     }
 }

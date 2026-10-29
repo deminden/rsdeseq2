@@ -1,0 +1,15 @@
+{
+  "baseline": {
+    "cases": 14,
+    "total_s": 59.4475808740026,
+    "max_rss_mib": 1129.265625
+  },
+  "candidate": {
+    "cases": 14,
+    "total_s": 60.192863749020034,
+    "max_rss_mib": 1129.78125
+  },
+  "elapsed_change_percent": 1.2536807453898735,
+  "speedup": 0.9876184180549215,
+  "byte_identical_payloads": 14
+}

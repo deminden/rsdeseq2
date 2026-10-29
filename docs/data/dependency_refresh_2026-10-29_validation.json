@@ -1,0 +1,95 @@
+{
+  "baseline_commit": "a6e376a",
+  "audit_date_utc": "2026-10-29",
+  "direct_dependencies_checked": 15,
+  "all_direct_dependencies_latest_stable": true,
+  "registry_crate_names_checked": 120,
+  "resolved_root_registry_entries": 124,
+  "transitive_older_version_families": 7,
+  "transitive_policy": "Latest compatible stable versions; upstream constraints recorded in the registry audit",
+  "root_and_r_backend_package_versions_aligned": true,
+  "root_lock_sha256": "b56c1ad70fd3d49dae69fd9db487a9d9e6542272f126d7910a77338092b926bf",
+  "r_backend_lock_sha256": "1c0d26a7018be8b0991e53e5eb57c4a82d2430c020eb84b5ec769fcfb8baafab",
+  "binary_sha256": "2041380c979a6c60e809d60628cded04d6da32bbf6dc34e3ffcff2463c4ad80b",
+  "conformance_driver_sha256": "d6b41ab4c8e1182fd0b1111df2915fe5288c466a0ff92c6c33b51dcb622c80cd",
+  "crate_archive_sha256": "e3bd2c44e8cffd3cdf697b5e83fc57e43c04cd17715e6887f8e13082c16e4e0e",
+  "crate_package_verification": "passed",
+  "r_source_package": {
+    "sha256": "87a81264dd060e593e2f81240369789f47d72500d81e82e5a705a0c55ea98033",
+    "files_verified": 242,
+    "changed_files": [],
+    "description_normalization": "Generated Packaged/NeedsCompilation fields and DCF whitespace only"
+  },
+  "rust_tests_passed": 1040,
+  "rust_tests_failed": 0,
+  "rust_existing_opt_in_ignored": 1,
+  "backend_tests_passed": 1,
+  "r_check_status": "OK",
+  "r_assertions_passed": 1426,
+  "r_failures": 0,
+  "r_warnings": 0,
+  "r_skipped": 0,
+  "standalone_wrapped_bit_equality_cases": 64,
+  "sanitizers": {
+    "status": "passed",
+    "c": "address,undefined",
+    "rust": "address",
+    "rust_stdlib_instrumented": false,
+    "r_interpreter_instrumented": false,
+    "preinstalled_r_dependencies_instrumented": false,
+    "leak_detection": false,
+    "asan_runtime": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/clang/23/lib/darwin/libclang_rt.asan_osx_dynamic.dylib",
+    "target": "aarch64-apple-darwin",
+    "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+    "rust_address_instrumentation_verified": true,
+    "asan_symbols_verified": true,
+    "ubsan_symbols_verified": true
+  },
+  "root_and_backend_msrv": "Rust 1.97.1 checks passed",
+  "gtex_precision": {
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "all_maximum_errors_unchanged": true,
+    "all_22_exports_byte_identical": true
+  },
+  "native_performance": {
+    "rsdeseq2": {
+      "contrasts": 11,
+      "total_s": 36.46921308099991,
+      "max_rss_mib": 302.328125
+    },
+    "rsdeseq2_baseline": {
+      "contrasts": 11,
+      "total_s": 36.064281335005944,
+      "max_rss_mib": 302.265625
+    },
+    "DESeq2": {
+      "contrasts": 11,
+      "total_s": 192.97054058199137,
+      "max_rss_mib": 1877.0
+    },
+    "native_elapsed_change_percent": 1.12280553224533,
+    "native_speedup": 0.988896614108602,
+    "deseq2_speedup": 5.29132723959232
+  },
+  "native_performance_acceptance": true,
+  "r_performance": {
+    "baseline": {
+      "cases": 14,
+      "total_s": 59.4475808740026,
+      "max_rss_mib": 1129.265625
+    },
+    "candidate": {
+      "cases": 14,
+      "total_s": 60.192863749020034,
+      "max_rss_mib": 1129.78125
+    },
+    "elapsed_change_percent": 1.2536807453898735,
+    "speedup": 0.9876184180549215,
+    "byte_identical_payloads": 14
+  },
+  "optimization_round_counted": false,
+  "original_reference_or_release_manifests_modified": false,
+  "larger_goal": "Rust-only numerical migration and remaining C01-C23 work remain active",
+  "python_support_tests_passed": 45
+}

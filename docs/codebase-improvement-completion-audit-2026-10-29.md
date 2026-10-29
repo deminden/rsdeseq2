@@ -48,6 +48,15 @@ That metadata error is corrected without changing the measurements.
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
 | C23 | Checkpoint-bound docs and source artifacts | Historical artifacts preserved. A final tested source package and documentation reconciliation are required after outstanding implementation. |
 
+The subsequent [stable dependency refresh](dependency-refresh-2026-10-29.md)
+uses locfit 0.2.0, L-BFGS-B 0.3.0, statrs 0.19.1 and sha2 0.11.1 across both
+Rust dependency graphs. All 15 direct dependencies are latest stable as audited;
+upstream-constrained transitive versions are listed explicitly. Numerical exports
+and all 14 paired R workflow payloads remain byte-identical to `a6e376a`.
+Single-pass native/R times increased 1.12%/1.25%, with essentially flat peak RSS;
+no optimization round is counted. This does not complete C19/C20 or the remaining
+Rust-only migration.
+
 ## Workflow defect and assertion inventory
 
 | Defect / contract | Interfaces | Independent reference | Exact assertion / test |
