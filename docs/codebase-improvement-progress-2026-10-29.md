@@ -36,7 +36,10 @@ batch; later execution, delivery, memory and consolidation work is still pending
 - R Rust bridge formatting and all-target Clippy with warnings denied pass.
 - The initial source-package check reported one duplicated Rd argument warning;
   its tests passed. The duplicate was corrected and package checks were repeated
-  without rerunning the unchanged numerical tests.
+  without rerunning the unchanged numerical tests: **Status: OK**. All 157
+  runtime source files are hash-identical between those checked packages.
+- The preserved CLI executable still has its original hash. No release/version
+  bump or publication has been performed.
 - Local raw evidence and the preserved pre-change executable/manifest are under
   `results/codebase_improvements/`. These generated files remain outside Git.
 
