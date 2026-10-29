@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Build a separate ASan/UBSan R bridge and run isolated malformed-call tests.
+
+Requires the selected R's Clang compiler and its dynamic ASan runtime. Rust
+address instrumentation uses RUSTC_BOOTSTRAP only in this disposable build;
+normal packages and the supported stable/MSRV build are unchanged. The R
+interpreter, preinstalled R dependencies and Rust standard library are not
+rebuilt with instrumentation. Leak detection is disabled for this R process.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--rscript', type=Path, required=True)
+    parser.add_argument('--r-library', type=Path, required=True)
+    parser.add_argument('--output-dir', type=Path, required=True)
+    args = parser.parse_args()
+    out = args.output_dir.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    report = dict(status='in_progress', c='address,undefined', rust='address',
+                  rust_stdlib_instrumented=False, r_interpreter_instrumented=False,
+                  preinstalled_r_dependencies_instrumented=False, leak_detection=False)
+    report_path = out/'sanitizers.json'
+    def record():
+        report_path.write_text(json.dumps(report, indent=2)+'\n')
+    record()
+    rscript = args.rscript.resolve()
+    r = rscript.with_name('R')
+    compiler = shlex.split(subprocess.check_output([str(r), 'CMD', 'config', 'CC'], text=True))
+    try:
+        resources = Path(subprocess.check_output([*compiler, '--print-resource-dir'], text=True).strip())
+    except subprocess.CalledProcessError:
+        report.update(status='unavailable', reason='Selected R compiler does not expose Clang sanitizer resources')
+        record()
+        raise
+    runtimes = sorted(resources.rglob('libclang_rt.asan*_dynamic.dylib'))
+    if not runtimes:
+        report.update(status='unavailable', reason='This driver requires the Darwin dynamic ASan runtime')
+        record()
+        raise RuntimeError(report['reason'])
+    report['asan_runtime'] = str(runtimes[0])
+    # An explicit target prevents Cargo from instrumenting host proc macros:
+    # loading their ASan dylibs into the ordinary rustc process is unsupported.
+    target = subprocess.check_output(['rustc', '-vV'], text=True)
+    target = next(line.split(': ', 1)[1] for line in target.splitlines() if line.startswith('host: '))
+    report['target'] = target
+    source = out/'source'
+    if source.exists():
+        raise ValueError('Use a new output directory; instrumented source is immutable per run')
+    shutil.copytree(ROOT/'r-pkg/rsdeseq2', source,
+                    ignore=shutil.ignore_patterns('target', 'Makevars', 'Makevars.win', '*.o', '*.so', '*.dll', '*.a'))
+    template = source/'src/Makevars.in'
+    template.write_text(template.read_text().replace('rust/target/release/', f'rust/target/{target}/release/'))
+    library = out/'library'
+    library.mkdir()
+    makevars = out/'Makevars.sanitizers'
+    makevars.write_text('CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer\n'
+                       'CXXFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer\n'
+                       'LDFLAGS += -fsanitize=address,undefined\n')
+    env = dict(os.environ, R_MAKEVARS_USER=str(makevars), RUSTC_BOOTSTRAP='1',
+               R_LIBS_USER=os.pathsep.join([str(library), str(args.r_library.resolve())]),
+               RUSTFLAGS='-Zsanitizer=address -Cforce-frame-pointers=yes', CARGO_BUILD_JOBS='2',
+               CARGO_BUILD_TARGET=target,
+               OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1', RAYON_NUM_THREADS='1')
+    report['rustflags'] = env['RUSTFLAGS']
+    record()
+    try:
+        with (out/'install.log').open('w') as log:
+            subprocess.run([str(r), 'CMD', 'INSTALL', '--preclean', '--no-test-load',
+                            '--library='+str(library), str(source)], env=env, check=True,
+                           stdout=log, stderr=subprocess.STDOUT, timeout=600)
+        fingerprints = list((source/f'src/rust/target/{target}/release/.fingerprint').rglob('lib-rsdeseq2_r.json'))
+        report['rust_address_instrumentation_verified'] = any(
+            '-Zsanitizer=address' in json.loads(p.read_text()).get('rustflags', []) for p in fingerprints)
+        dll = library/'rsdeseq2/libs/rsdeseq2.so'
+        symbols = subprocess.check_output(['nm', '-u', str(dll)], text=True)
+        report['asan_symbols_verified'] = '__asan_' in symbols
+        report['ubsan_symbols_verified'] = '__ubsan_' in symbols
+        if not all(report[key] for key in ['rust_address_instrumentation_verified', 'asan_symbols_verified', 'ubsan_symbols_verified']):
+            raise ValueError('Instrumentation was not present in the built artifact')
+        record()
+        r_home = subprocess.check_output([str(rscript), '--vanilla', '-e', 'cat(R.home())'], text=True).strip()
+        r_exec = Path(r_home)/'bin/exec/R'
+        library_paths = os.pathsep.join([str(Path(r_home)/'lib'), str(rscript.parent.parent/'lib')])
+        # Rscript enters R through its shell wrapper, where macOS strips DYLD_*.
+        # Enter the interpreter directly and use the same path for child tests.
+        env.update(DYLD_INSERT_LIBRARIES=str(runtimes[0]), R_HOME=r_home,
+                   DYLD_FALLBACK_LIBRARY_PATH=library_paths,
+                   RSDESEQ2_SANITIZER_LIBRARY_PATH=library_paths,
+                   RSDESEQ2_NATIVE_BOUNDARY_R_EXEC=str(r_exec),
+                   RSDESEQ2_SANITIZER_RUNTIME=str(runtimes[0]),
+                   ASAN_OPTIONS='detect_leaks=0:abort_on_error=1:detect_stack_use_after_return=1',
+                   UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
+        expression = ('library(rsdeseq2); testthat::test_dir(commandArgs(TRUE)[1], '
+                      'filter="native-boundary",load_package="installed",package="rsdeseq2",'
+                      'reporter="summary",stop_on_failure=TRUE)')
+        with (out/'tests.log').open('w') as log:
+            subprocess.run([str(r_exec), '--vanilla', '--slave', '-e', expression, '--args',
+                            str(ROOT/'r-pkg/rsdeseq2/tests/testthat')], env=env, check=True,
+                           stdout=log, stderr=subprocess.STDOUT, timeout=180)
+    except Exception as error:
+        report.update(status='failed', error=str(error))
+        record()
+        raise
+    report.update(status='passed')
+    record()
+    print('Instrumented native boundary tests passed; scope recorded in '+str(report_path))
+
+
+if __name__ == '__main__':
+    main()

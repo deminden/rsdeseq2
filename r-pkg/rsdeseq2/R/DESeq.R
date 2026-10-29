@@ -47,6 +47,7 @@ DESeq <- function(object,
                   ...) {
   explicitSize <- !missing(sizeFactors)
   explicitFactors <- !missing(normalizationFactors)
+  explicitWeights <- !missing(weights)
   normalizationState <- NULL
   isDataSet <- inherits(object, "DESeqDataSet")
   fitType <- match.arg(fitType)
@@ -55,13 +56,7 @@ DESeq <- function(object,
     stop("engine must be 'rust'", call. = FALSE)
   }
   parityMode <- match.arg(parityMode, c("strict", "fast", "diagnostic"))
-  dots <- list(...)
-  if (length(dots)) {
-    argumentNames <- names(dots)
-    if (is.null(argumentNames)) argumentNames <- rep("...", length(dots))
-    argumentNames[!nzchar(argumentNames)] <- "..."
-    stop(sprintf("unsupported DESeq arguments: %s", paste(argumentNames, collapse = ", ")), call. = FALSE)
-  }
+  .rsdeseq2_check_unused_arguments(list(...), "DESeq")
   if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc > .Machine$integer.max || nproc != floor(nproc)) {
     stop("nproc must be a positive integer", call. = FALSE)
   }
@@ -87,7 +82,7 @@ DESeq <- function(object,
       if (!explicitSize) sizeFactors <- DESeq2::sizeFactors(object)
       if (!explicitFactors) normalizationFactors <- DESeq2::normalizationFactors(object)
     }
-    if (is.null(weights) && "weights" %in% SummarizedExperiment::assayNames(object)) {
+    if (!explicitWeights && "weights" %in% SummarizedExperiment::assayNames(object)) {
       weights <- SummarizedExperiment::assay(object, "weights")
     }
     formula <- methods::slot(object, "design")
@@ -119,9 +114,9 @@ DESeq <- function(object,
     colData <- object$colData
     if (is.null(design)) design <- object$design
     if (is.null(reduced)) reduced <- object$reduced
-    if (is.null(sizeFactors)) sizeFactors <- object$sizeFactors
-    if (is.null(normalizationFactors)) normalizationFactors <- object$normalizationFactors
-    if (is.null(weights)) weights <- object$weights
+    if (!explicitSize) sizeFactors <- object$sizeFactors
+    if (!explicitFactors) normalizationFactors <- object$normalizationFactors
+    if (!explicitWeights) weights <- object$weights
   } else {
     counts <- object
   }
@@ -276,6 +271,13 @@ DESeq <- function(object,
     S4Vectors::mcols(object) <- rowMetadata
     SummarizedExperiment::assay(object, "mu") <- fit$mu
     SummarizedExperiment::assay(object, "cooks") <- fit$cooks
+    if (!is.null(fit$weights)) {
+      SummarizedExperiment::assay(object, "weights", withDimnames = FALSE) <- fit$weights
+    } else if ("weights" %in% SummarizedExperiment::assayNames(object)) {
+      assays <- SummarizedExperiment::assays(object)
+      assays[["weights"]] <- NULL
+      SummarizedExperiment::assays(object) <- assays
+    }
     if (fit$nRefit > 0L) {
       replaceCounts <- fit$replaceCounts
       storage.mode(replaceCounts) <- storage.mode(counts)

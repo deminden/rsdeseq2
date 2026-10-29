@@ -1,10 +1,12 @@
 # Codebase improvement execution — 2026-10-29
 
 Implementation follows the [detailed plan](codebase-improvement-plan-2026-10-22.md).
-The implementation cycle covers C01–C23, with the plan's conditional retention
-decisions documented below. The sections retain their batch-specific evidence.
-Current local numerical and source-package checks pass; remote target jobs remain
-part of the publication gate. Package versions have not been bumped or published.
+The sections below retain batch-specific evidence, rather than certifying every
+C01–C23 acceptance item. A [completion audit](codebase-improvement-completion-audit-2026-10-29.md)
+found additional correctness and verification gaps after the measured checkpoint;
+that ledger identifies what has been corrected and what remains. Earlier source
+package checks apply to their recorded source archives. Package versions have not
+been bumped or published; remote target jobs remain part of the publication gate.
 
 ## Implemented in the first batch
 

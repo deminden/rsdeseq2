@@ -216,15 +216,45 @@ class AcceptedBenchmarkContract(unittest.TestCase):
             root = Path(temp)
             d = root/'contrast'; d.mkdir()
             output = d/'results.tsv'; output.write_text('gene\tpvalue\ng1\t0.01\n')
+            diagnostics = d/'diagnostics.tsv'; diagnostics.write_text('gene\tconverged\ng1\ttrue\n')
             manifest = root/'hashes.tsv'
             with manifest.open('w', newline='') as handle:
                 writer = csv.DictWriter(handle, fieldnames=['contrast','file','release_sha256'], delimiter='\t')
                 writer.writeheader()
                 writer.writerow(dict(contrast='contrast', file='results.tsv', release_sha256=benchmark.sha256(output)))
+                writer.writerow(dict(contrast='contrast', file='diagnostics.tsv', release_sha256=benchmark.sha256(diagnostics)))
             benchmark.frozen_native_hashes(root, manifest, [d])
+            original = diagnostics.read_bytes()
+            diagnostics.unlink()
+            with self.assertRaises(FileNotFoundError):
+                benchmark.frozen_native_hashes(root, manifest, [d])
+            diagnostics.write_text('gene\tconverged\ng1\tfalse\n')
+            with self.assertRaisesRegex(ValueError, 'hash differs'):
+                benchmark.frozen_native_hashes(root, manifest, [d])
+            diagnostics.write_bytes(original)
             output.write_text('gene\tpvalue\ng1\t0.02\n')
             with self.assertRaisesRegex(ValueError, 'hash differs'):
                 benchmark.frozen_native_hashes(root, manifest, [d])
+
+    def test_candidate_must_emit_reviewed_diagnostics_in_untimed_preflight(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            expected = {}
+            for name in ('results.tsv', 'diagnostics.tsv'):
+                (root/name).write_text(name)
+                expected[name] = benchmark.sha256(root/name)
+            def fake_run(command, **kwargs):
+                Path(command[command.index('--output')+1]).write_text('results.tsv')
+                # A successful process that emits no diagnostics must still fail.
+            with mock.patch.object(benchmark.subprocess, 'run', side_effect=fake_run):
+                with self.assertRaises(FileNotFoundError):
+                    benchmark.verify_native_outputs(root/'binary', root, root/'missing', expected, {})
+            def wrong_diagnostics(command, **kwargs):
+                fake_run(command, **kwargs)
+                Path(command[command.index('--fit-diagnostics-output')+1]).write_text('wrong finite diagnostics')
+            with mock.patch.object(benchmark.subprocess, 'run', side_effect=wrong_diagnostics):
+                with self.assertRaisesRegex(ValueError, 'hash differs'):
+                    benchmark.verify_native_outputs(root/'binary', root, root/'wrong', expected, {})
 
 if __name__ == "__main__":
     unittest.main()

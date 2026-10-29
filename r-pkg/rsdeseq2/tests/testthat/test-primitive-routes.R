@@ -26,6 +26,25 @@ testthat::test_that("R primitive argument packaging preserves Wald and chi-squar
     testthat::expect_equal(attr(filtered, "comparison"), comparison, info = method)
     testthat::expect_equal(attr(filtered, "contrast"), c(Intercept = 0, condition_B_vs_A = 1), info = method)
     testthat::expect_true(attr(filtered, "independentFiltering")$enabled, info = method)
+    testthat::expect_identical(constructor(object = fit), fit)
+    testthat::expect_error(constructor(object = fit, misspelledOption = TRUE), "misspelledOption")
+    positional <- rep(list(NULL), length(formals(constructor)) - 1L)
+    positional[[1L]] <- fit
+    testthat::expect_error(do.call(constructor, c(positional, list(TRUE))), "unsupported.*arguments: \\.\\.\\.")
+    testthat::expect_error(constructor(object = fit, baseMean = NULL), "baseMean")
+    beta <- fit$beta; beta[, 2L] <- beta[, 2L] + 1
+    overridden <- constructor(object = fit, beta = beta)
+    selected <- results(overridden, name = "condition_B_vs_A", independentFiltering = FALSE)
+    if (method == "Wald") {
+      .rsdeseq2_expect_result(selected, c(3, 5), c(0.5, 0.5), info = "explicit primitive beta")
+    } else {
+      .rsdeseq2_expect_result(selected, c(3, 5), c(0.5, 0.5), c(6, 8),
+        stats::pchisq(c(6, 8), 1, lower.tail = FALSE), info = "explicit primitive beta")
+      changed <- constructor(object = fit, lrtDf = 2)
+      testthat::expect_equal(changed$lrtPvalue, stats::pchisq(c(6, 8), 2, lower.tail = FALSE), tolerance = 0)
+    }
+    contextual <- constructor(object = fit, counts = .rsdeseq2_count_fixture(1:8))
+    testthat::expect_null(constructor(object = contextual, counts = NULL)$counts)
   }
 })
 

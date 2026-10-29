@@ -8,11 +8,18 @@ test_that("fitted views map gene order and reject mutations of fitted inputs", {
   expect_identical(rownames(subset), rownames(ct)[c(3, 1)])
   expect_equal(subset$pvalue, full$pvalue[c(3, 1)], tolerance = 0)
   expect_equal(subset$padj, p.adjust(subset$pvalue, "BH"), tolerance = 0)
+  reversed <- as.data.frame(results(fit[nrow(fit):1L, ], independentFiltering = FALSE))
+  expect_equal(reversed, full[nrow(full):1L, ], tolerance = 0)
+  alteredSubset <- fit[c(3, 1), ]
+  SummarizedExperiment::assay(alteredSubset, "counts")[1, 1] <- ct[3, 1] + 1L
+  expect_error(results(alteredSubset), "counts changed")
   changed <- fit
   SummarizedExperiment::assay(changed, "counts")[1, 1] <- ct[1, 1] + 1L
-  expect_error(results(changed), "counts changed")
-  expect_error(resultsNames(changed), "counts changed")
-  expect_error(lfcShrink(changed, coef = 2, type = "normal"), "counts changed")
+  consumers <- list(results, resultsNames,
+    function(x) lfcShrink(x, coef = 2, type = "normal"),
+    function(x) lfcShrink(x, coef = 2, type = "ashr"),
+    function(x) lfcShrink(x, coef = 2, type = "apeglm"))
+  for (consumer in consumers) expect_error(consumer(changed), "counts changed")
   expect_error(results(fit[, 8:1]), "samples changed")
   changed <- fit
   DESeq2::sizeFactors(changed) <- DESeq2::sizeFactors(changed) * 2
@@ -20,4 +27,23 @@ test_that("fitted views map gene order and reject mutations of fitted inputs", {
   changed <- fit
   SummarizedExperiment::colData(changed)$condition <- rev(cd$condition)
   expect_error(results(changed), "design changed")
+  for (field in c("maxCooks", "betaConv")) {
+    changed <- fit
+    values <- S4Vectors::mcols(changed)[[field]]
+    values[[1L]] <- if (field == "betaConv") !isTRUE(values[[1L]]) else 100
+    S4Vectors::mcols(changed)[[field]] <- values
+    expect_error(results(changed), paste(field, "changed"))
+  }
+  reference <- DESeq2::DESeq(DESeq2::DESeqDataSetFromMatrix(ct, cd, ~ condition),
+    fitType = "mean", minReplicatesForReplace = Inf, quiet = TRUE)
+  rows <- seq.int(35L, 1L, by = -2L)
+  selectedFit <- fit[rows, ]; selectedReference <- reference[rows, ]
+  for (type in c("normal", "ashr", "apeglm")) {
+    actual <- suppressMessages(lfcShrink(selectedFit, coef = 2, type = type))
+    expected <- suppressMessages(DESeq2::lfcShrink(selectedReference, coef = 2, type = type, quiet = TRUE))
+    expect_identical(rownames(actual), rownames(ct)[rows], info = type)
+    expect_equal(as.numeric(actual$log2FoldChange), as.numeric(expected$log2FoldChange), tolerance = 1e-5, info = type)
+    expect_equal(as.numeric(actual$lfcSE), as.numeric(expected$lfcSE), tolerance = 1e-5, info = type)
+    expect_equal(actual$padj, p.adjust(actual$pvalue, "BH"), info = type)
+  }
 })

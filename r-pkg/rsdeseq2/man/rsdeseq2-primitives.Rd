@@ -254,6 +254,10 @@ not run Wald, LRT, outlier replacement, or independent filtering itself.
 \code{nbinomWaldTestRust} accepts those primitive fields, or a list-like
 primitive object containing them, and returns the same primitive Wald fit
 object.
+Explicit constructor arguments override extracted fields, including \code{NULL}
+when clearing an optional field. Unknown constructor arguments are rejected.
+Overriding an LRT statistic or degrees of freedom recomputes the p-value unless
+\code{lrtPvalue} is supplied explicitly.
 \code{lrtFitRust} and \code{nbinomLRTRust} package already-computed primitive
 LRT statistic/p-value diagnostics together with full-model beta/covariance
 outputs. For primitive LRT fits, \code{results} reports the selected
