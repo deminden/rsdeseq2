@@ -4,5 +4,6 @@
 //! existing `rsdeseq2::cli::*` paths remain source-compatible.
 
 mod implementation;
+mod output_transaction;
 
 pub use implementation::*;

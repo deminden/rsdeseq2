@@ -121,5 +121,14 @@ unchanged bounds and all eight exports match the baseline exactly. Rust passes
 panel and its limitations. Enabled replacement keeps the existing buffer contract;
 a complex opaque result handle is deferred unless a larger measured case earns it.
 
-C19–C23 remain pending: shared Rust statistical requests, bulk R results, module
-consolidation, staged CLI output and final release documentation/evidence.
+C22 is implemented as a private output-transaction module with an explicit path
+inventory. Existing file identity and filesystem name behavior are checked before
+fitting; destination-local temporary files are closed and hashed before any final
+file is published. A completion record is published last. Separate path renames
+remain non-atomic, and readers must verify the record for coherent generations.
+Tests cover hard links/symlinks, case aliases, missing destinations, sidecar
+failure, unwritten staging and injected publication failure. Existing CLI numeric
+comparisons remain exact. Workspace tests, Clippy, MSRV and 43 Python tests pass.
+
+C19–C21 and C23 remain pending: shared Rust statistical requests, bulk R results,
+module consolidation and final release documentation/evidence.

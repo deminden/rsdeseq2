@@ -348,6 +348,19 @@ fn cli_wald_writes_result_and_cooks_sidecars() {
     assert_tsv_contains(&filter_metadata, "alpha\t");
     assert_tsv_starts_with(&filter_num_rej, "theta\tnumRej\n");
     assert_tsv_starts_with(&filter_lowess, "x\ty\n");
+    let marker: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.join("wald.tsv.complete.json")).unwrap()).unwrap();
+    let files = marker["files"].as_array().unwrap();
+    assert_eq!(files.len(), 7);
+    for file in files {
+        use sha2::{Digest, Sha256};
+        let bytes = fs::read(file["path"].as_str().unwrap()).unwrap();
+        assert_eq!(file["bytes"].as_u64().unwrap(), bytes.len() as u64);
+        assert_eq!(
+            file["sha256"].as_str().unwrap(),
+            format!("{:x}", Sha256::digest(&bytes))
+        );
+    }
 }
 
 #[test]
@@ -409,6 +422,7 @@ fn cli_wald_rejects_replacement_sidecars_without_replacement_refit() {
     let dir = temp_dir("wald-replacement-sidecars-disabled");
     let output = dir.join("wald.tsv");
     let replacement_metadata = dir.join("replacement_metadata.tsv");
+    fs::write(&output, "previous result\n").unwrap();
 
     run_cli_failure_contains(
         &[
@@ -429,6 +443,50 @@ fn cli_wald_rejects_replacement_sidecars_without_replacement_refit() {
         ],
         "invalid options: Cook's replacement sidecar output requires Cook's replacement/refit to run",
     );
+    assert_eq!(fs::read_to_string(output).unwrap(), "previous result\n");
+    assert!(!replacement_metadata.exists());
+    assert!(!dir.join("wald.tsv.complete.json").exists());
+    assert_eq!(fs::read_dir(dir).unwrap().count(), 1);
+}
+
+#[test]
+fn cli_rejects_input_and_sidecar_collisions_before_writing() {
+    let dir = temp_dir("path-collisions");
+    let counts = dir.join("counts.tsv");
+    fs::copy(reference_data_path("counts.tsv"), &counts).unwrap();
+    let original = fs::read(&counts).unwrap();
+    let output = dir.join("results.tsv");
+    for (main, sidecar) in [(&counts, &output), (&output, &output)] {
+        run_cli_failure_contains(
+            &[
+                "wald",
+                "--counts",
+                counts.to_str().unwrap(),
+                "--design",
+                reference_data_path("design_full.tsv").to_str().unwrap(),
+                "--output",
+                main.to_str().unwrap(),
+                "--fit-diagnostics-output",
+                sidecar.to_str().unwrap(),
+            ],
+            "path collision",
+        );
+        assert_eq!(fs::read(&counts).unwrap(), original);
+        assert!(!output.exists());
+        assert!(!dir.join("results.tsv.complete.json").exists());
+    }
+    let error = Command::new(env!("CARGO_BIN_EXE_rsdeseq2"))
+        .args([
+            "size-factors",
+            "--counts",
+            counts.to_str().unwrap(),
+            "--output",
+            dir.join("missing/results.tsv").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!error.status.success());
+    assert_eq!(fs::read_dir(dir).unwrap().count(), 1);
 }
 
 #[test]

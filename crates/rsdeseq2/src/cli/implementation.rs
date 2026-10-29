@@ -5,6 +5,7 @@
 
 // CLI imports, argument definitions, output path types, and option conversions.
 include!("implementation/args.rs");
+include!("implementation/paths.rs");
 
 // Top-level CLI dispatch and command execution.
 include!("implementation/run.rs");
