@@ -315,6 +315,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_linear_mu(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
@@ -331,6 +332,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_linear_mu(counts, full_design)?;
         self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
     }
@@ -366,6 +368,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,
@@ -411,6 +414,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
@@ -426,6 +430,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_linear_mu_parametric(counts, full_design)?;
         self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
     }
@@ -461,6 +466,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,
@@ -506,6 +512,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
@@ -522,6 +529,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_glm_mu(counts, full_design)?;
         self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
     }
@@ -558,6 +566,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,
@@ -627,6 +636,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
         self.attach_native_lrt(counts, full_design, reduced_design, coefficient, fit)
     }
@@ -642,6 +652,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let fit = self.fit_map_dispersions_glm_mu_parametric(counts, full_design)?;
         self.attach_native_lrt_contrast(counts, full_design, reduced_design, contrast, None, fit)
     }
@@ -677,6 +688,7 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        validate_lrt_designs(full_design, reduced_design)?;
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,

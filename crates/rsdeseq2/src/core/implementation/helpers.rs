@@ -1,3 +1,26 @@
+// Validate global LRT subspaces before any expensive fitting stage.
+fn validate_lrt_designs(full: &DesignMatrix, reduced: &DesignMatrix) -> Result<(), DeseqError> {
+    if full.n_samples() != reduced.n_samples() {
+        return Err(invalid_dimensions("LRT reduced design samples", full.n_samples(), reduced.n_samples()));
+    }
+    if full.n_coefficients() <= reduced.n_coefficients() {
+        return Err(invalid_dimensions("LRT full/reduced coefficients", reduced.n_coefficients()+1, full.n_coefficients()));
+    }
+    full.validate_full_rank("LRT full")?;
+    reduced.validate_full_rank("LRT reduced")?;
+    let columns = full.n_coefficients().checked_add(reduced.n_coefficients()).ok_or_else(|| DeseqError::InvalidOptions { reason: "LRT combined design dimensions overflow".into() })?;
+    let mut values = Vec::new();
+    for row in 0..full.n_samples() {
+        values.extend_from_slice(full.matrix().row(row)?);
+        values.extend_from_slice(reduced.matrix().row(row)?);
+    }
+    let combined = DesignMatrix::from_row_major(full.n_samples(), columns, values, None)?;
+    if combined.rank()? != full.n_coefficients() {
+        return Err(DeseqError::InvalidOptions { reason: "LRT reduced design must be nested in the full design column space".into() });
+    }
+    Ok(())
+}
+
 fn default_results_coefficient(design: &DesignMatrix) -> Result<usize, DeseqError> {
     design
         .n_coefficients()
@@ -75,8 +98,7 @@ fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), Deseq
             actual: input.normalized.len(),
         });
     }
-    input.full_design.validate_full_rank("LRT full")?;
-    input.reduced_design.validate_full_rank("LRT reduced")?;
+    validate_lrt_designs(input.full_design, input.reduced_design)?;
     Ok(())
 }
 
@@ -715,4 +737,20 @@ fn validate_pipeline_wald_coefficient(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod nested_design_tests {
+    use super::*;
+
+    #[test]
+    fn nested_subspaces_accept_reparameterized_and_rescaled_bases() {
+        let full = DesignMatrix::from_row_major(8, 3,
+            (0..8).flat_map(|i| [1.0, (i / 4) as f64, (i % 2) as f64]).collect(), None).unwrap();
+        for scale in [1e-12, 1.0, 1e12] {
+            let reduced = DesignMatrix::from_row_major(8, 2,
+                (0..8).flat_map(|i| [2.0*scale, (3.0 + (i / 4) as f64)*scale]).collect(), None).unwrap();
+            validate_lrt_designs(&full, &reduced).unwrap();
+        }
+    }
 }

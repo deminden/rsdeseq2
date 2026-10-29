@@ -104,6 +104,53 @@ pub fn matrix_rank(
     Ok(rank)
 }
 
+/// Rank after scaling each nonzero column by its maximum absolute entry.
+///
+/// Scaling is confined to validation; fitting retains the caller's units.
+/// The tolerance is relative to each column's original scale.
+pub fn matrix_rank_relative(
+    values: &[f64],
+    n_rows: usize,
+    n_cols: usize,
+    tolerance: f64,
+) -> Result<usize, DeseqError> {
+    let expected = n_rows
+        .checked_mul(n_cols)
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "relative rank matrix shape overflow".into(),
+            expected: usize::MAX,
+            actual: values.len(),
+        })?;
+    if values.len() != expected {
+        return Err(DeseqError::InvalidDimensions {
+            context: "relative rank matrix values".into(),
+            expected,
+            actual: values.len(),
+        });
+    }
+    let mut scaled = values.to_vec();
+    for (index, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(DeseqError::NonFiniteValue {
+                context: "relative rank matrix".into(),
+                index: Some(index),
+                value,
+            });
+        }
+    }
+    for col in 0..n_cols {
+        let scale = (0..n_rows)
+            .map(|row| values[row * n_cols + col].abs())
+            .fold(0.0_f64, f64::max);
+        if scale > 0.0 {
+            for row in 0..n_rows {
+                scaled[row * n_cols + col] /= scale;
+            }
+        }
+    }
+    matrix_rank(&scaled, n_rows, n_cols, tolerance)
+}
+
 #[cfg(test)]
 mod tests {
     use super::matrix_rank;

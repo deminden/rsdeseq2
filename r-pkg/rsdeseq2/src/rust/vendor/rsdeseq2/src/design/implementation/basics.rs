@@ -1,5 +1,5 @@
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::qr::{DEFAULT_RANK_TOLERANCE, matrix_rank};
+use crate::math::qr::{DEFAULT_RANK_TOLERANCE, matrix_rank, matrix_rank_relative};
 use crate::matrix::RowMajorMatrix;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
@@ -449,9 +449,9 @@ impl DesignMatrix {
             })
     }
 
-    /// Numerical rank using the default deterministic tolerance.
+    /// Numerical rank using column-relative deterministic validation.
     pub fn rank(&self) -> Result<usize, DeseqError> {
-        self.rank_with_tolerance(DEFAULT_RANK_TOLERANCE)
+        matrix_rank_relative(self.matrix.as_slice(), self.n_samples(), self.n_coefficients(), DEFAULT_RANK_TOLERANCE)
     }
 
     /// Numerical rank using a caller-supplied absolute tolerance.
@@ -466,7 +466,7 @@ impl DesignMatrix {
 
     /// Whether the design has full column rank using the default tolerance.
     pub fn is_full_rank(&self) -> Result<bool, DeseqError> {
-        self.is_full_rank_with_tolerance(DEFAULT_RANK_TOLERANCE)
+        Ok(self.rank()? == self.n_coefficients())
     }
 
     /// Whether the design has full column rank using a caller-supplied tolerance.
@@ -476,7 +476,7 @@ impl DesignMatrix {
 
     /// Return an error if the design is not full column rank.
     pub fn validate_full_rank(&self, context: &str) -> Result<(), DeseqError> {
-        self.validate_full_rank_with_tolerance(context, DEFAULT_RANK_TOLERANCE)
+        self.validate_rank_result(context, self.rank()?, 0.0)
     }
 
     /// Return an error if the design is not full column rank.
@@ -485,7 +485,10 @@ impl DesignMatrix {
         context: &str,
         tolerance: f64,
     ) -> Result<(), DeseqError> {
-        let rank = self.rank_with_tolerance(tolerance)?;
+        self.validate_rank_result(context, self.rank_with_tolerance(tolerance)?, tolerance)
+    }
+
+    fn validate_rank_result(&self, context: &str, rank: usize, tolerance: f64) -> Result<(), DeseqError> {
         if rank == self.n_coefficients() {
             return Ok(());
         }
