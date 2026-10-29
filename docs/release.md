@@ -22,6 +22,18 @@ The GitHub release receives those records and the checked source artifacts.
 versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
+
+## Development validation checkpoint — 2026-10-29
+
+The [execution report](codebase-improvement-progress-2026-10-29.md) records the
+current local changes. Source-package tests/checks use native R 4.6.2 and the
+82-package source lock. Exact native exports, independent Pasilla and the full
+GTEx release oracle pass. Native throughput is unchanged within 0.2% in the final
+paired pass; memory and R query improvements are documented separately. These
+changes remain a development checkpoint with package versions unchanged; choose
+an unused version before creating another release tag. Local checks do not stand
+in for the five target jobs required by the coordinated publication workflow.
+
 ## Version 0.3.1
 
 This patch release integrates twenty accepted quantification speed improvements
@@ -192,17 +204,11 @@ Before preparing a release commit:
 - Keep the README scoped to validated workflows and avoid claiming full DESeq2
   workflow parity.
 - Run Rust formatting, linting, tests, package checks, and R wrapper checks.
-- Run the versioned 100-row parity benchmark and record its measurements. The
-  v0.2.5 median, mean, and maximum absolute errors are
-  `6.063612945084174e-10`, `1.260818774570247e-4`, and
-  `1.5259081158007781e-3`. The frozen v0.2.4 baseline measured
-  `1.4637657972313423e-4`, `3.793917566690452e-4`, and
-  `3.0938714191082184e-3`, respectively. The v0.2.5 median and mean are
-  241401.589x and 3.00909032x lower; the maximum is 50.6796531% lower, with a
-  v0.2.5-to-v0.2.4 ratio of `0.493203469`. In the fixed set, 89/100 rows
-  improved and 78/100 improved by at least 10x. The run includes compensated
-  accumulation of log counts when computing per-gene geometric means for
-  ratio size factors.
+- Run the portable optimizer oracle, full GTEx release replay and the eleven
+  contrast/result/diagnostic checks. Preserve the versioned R 4.6.1 stress
+  references; regenerate them only under their recorded environment. Historical
+  stress-benchmark figures are retained in the version records and
+  [reproducibility guide](reproducibility.md#versioned-high-error-benchmark).
 - Review staged files for accidental large artifacts or generated reference
   outputs.
 
@@ -258,14 +264,15 @@ the matching GitHub release.
 
 To release version `X.Y.Z`:
 
-1. Set `crates/rsdeseq2/Cargo.toml` to `version = "X.Y.Z"`.
+1. Select an unused version and align the Rust crate, R DESCRIPTION, R backend,
+   vendored core and lockfiles; read-only vendor/version checks must pass.
 2. Run the release checklist above locally.
 3. Commit the release changes.
 4. Push tag `vX.Y.Z`.
 
-The GitHub Actions publish job runs formatting, clippy, the full workspace test
-suite, and `cargo package -p rsdeseq2 --locked` before calling
-`cargo publish`. It refuses to publish if the pushed tag version does not match
-the crate version.
-The binary release job performs the same tag/version check before building and
-attaching release assets.
+The coordinated `release.yml` workflow first requires Rust/Python, pinned R,
+full GTEx and MSRV validation. It stages checked source artifacts and records
+source/hash identities. Only then may crate publication and the five target
+binary jobs proceed; each target runs release-profile numerical/CLI checks.
+Publishing verifies the checked artifact manifest and tag/version agreement;
+repackaging must reproduce the checked crate bytes. See the validation gate above.

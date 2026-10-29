@@ -1,5 +1,13 @@
 # Compatibility
 
+Current source changes and their gates are recorded in the
+[execution report](codebase-improvement-progress-2026-10-29.md). Fitted R
+`resultsList()` preserves ordinary result classes/metadata with one dataset
+validation per batch. Stored Rust `ResultRequest` supports explicit Wald options
+and rejects incompatible LRT options. R retains its established matrix and
+filtering arithmetic; supported gene subsets are checked against all three
+shrinkage reference methods.
+
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).
 

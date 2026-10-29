@@ -12,7 +12,10 @@ Use the selected environment's Rscript explicitly for comparisons:
 
 ```sh
 conda activate deseq2-r462-native
-python scripts/install_r_reference.py --check-installed --rscript "$CONDA_PREFIX/bin/Rscript"
+export R_LIBS_USER="$PWD/results/r-reference-library"
+python scripts/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
+python scripts/install_r_reference.py --check-installed \
+  --library "$R_LIBS_USER" --rscript "$CONDA_PREFIX/bin/Rscript"
 python scripts/benchmark_gtex_native_wald.py --repeats 1 \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
   --validated-results-root results/benchmarks/release_0.3.1/gtex
@@ -283,3 +286,17 @@ Final p-values can agree accidentally or disagree for reasons that are hard to
 diagnose. Comparing `sizeFactors`, normalized counts, dispersion estimates,
 coefficients, standard errors, Cook's distances, and filtering decisions gives a
 clear path to localizing drift.
+
+## Current checkpoints and independent validation
+
+The [current GTEx comparison](gtex-native-wald-benchmark.md) records the exact
+executable, eleven studies, native R 4.6.2 session, output hashes and reproduction
+commands. Its accepted pass preserves all historical input/reference identities;
+new exploratory references must use a separate directory.
+
+The independent Pasilla panel is committed with its source archive identity,
+selection rule, counts/design and pre-optimization R references. Its generator
+and `scripts/check_pasilla_holdout.py` are included. Keep its frozen references
+unchanged when checking a candidate; see the [memory report](memory-improvements-2026-10-29.md).
+The [R request report](results-improvements-2026-10-29.md) documents the exact
+bulk/individual output gate and the retained R BH arithmetic probe.

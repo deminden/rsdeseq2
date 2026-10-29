@@ -238,3 +238,24 @@ The initial cleanup's validation evidence is recorded in
 It includes the executable hash, test results, full-reference gates and paired
 speed/memory measurements. The executable is byte-identical to the baseline;
 no numerical runtime code or R wrapper functions changed.
+
+## Improvement checkpoint — 2026-10-29
+
+Native R 4.6.2 source-package validation passes 1,368 assertions with zero
+failures, warnings or skips and Status OK. The Rust workspace passes 1,027 tests
+with one opt-in full-GTEx case; that case also passes when run explicitly in the
+release profile. Python integrity tests pass 44 cases. MSRV, core/backend Clippy,
+read-only vendor checks and workflow lint pass locally. Remote target jobs remain
+required for publication and have not been executed by this local work.
+
+All 22 GTEx result/diagnostic exports remain byte-identical to the reviewed native
+baseline; 121 per-contrast and nine global precision gates pass. The independent
+Pasilla Wald/LRT panel passes unchanged absolute bounds and exact native export
+identity. R query tests reuse fitted fixtures to cover per-request alpha, t df,
+thresholds, replacement/new-zero rows, saved fits and subset shrinkage. They compare
+bulk and individual tables at zero tolerance and independently check DESeq2.
+
+The [execution report](codebase-improvement-progress-2026-10-29.md) links measured
+memory/query changes. R BH/filtering remains on its validated implementation
+because the current Rust arithmetic order fails an exact-output probe; this is a
+retained gate, not a widened tolerance or a changed reference.

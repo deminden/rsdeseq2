@@ -14,7 +14,8 @@ as an external reference generator for tests.
 
 The minimum supported toolchain is Rust 1.97.1, declared by `rust-version` in
 `Cargo.toml`; the workspace uses the Rust 2024 edition. Development and CI use
-that toolchain or newer. R package CI uses R 4.6.1, while numerical reference
+that toolchain or newer. R package CI requires the pinned R 4.6.2 reference lane and also runs an advisory
+current-R lane, while numerical reference
 fixtures retain their recorded R versions.
 Public slice-like APIs prefer `RangeBounds` where range inputs are accepted, so
 callers can use legacy range syntax and the `core::range` types.
@@ -133,3 +134,17 @@ practical:
 1. Hand-computable toy test.
 2. DESeq2 golden-reference comparison.
 3. Stress/property test for edge cases.
+
+## Current improvement cycle
+
+The [execution report](codebase-improvement-progress-2026-10-29.md) records the
+correctness, memory, result-query and output-publication changes. The primary
+native quantification gate is one paired eleven-contrast pass; count a speed
+round only at 2% higher summed throughput. Independent memory acceptance and R
+query improvements are reported separately. Keep `OPTIMISATION_LOG.md` untracked.
+
+Run source-package checks in `deseq2-r462-native`; use that Rscript explicitly and
+include the restored reference/test-tool library in `R_LIBS_USER`. The source
+installer's `--check-installed --library PATH` checks that path in addition to
+normal R libraries. Main README figures compare with DESeq2; previous-Rust deltas
+and per-stage figures belong in the detailed reports.
