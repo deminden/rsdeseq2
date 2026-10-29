@@ -403,7 +403,7 @@ pub fn lowess_fitted_values(
     Ok(fitted)
 }
 
-fn validate_alpha(alpha: f64) -> Result<(), DeseqError> {
+pub(crate) fn validate_alpha(alpha: f64) -> Result<(), DeseqError> {
     if alpha > 0.0 && alpha < 1.0 {
         Ok(())
     } else {
@@ -415,7 +415,7 @@ fn validate_alpha(alpha: f64) -> Result<(), DeseqError> {
     }
 }
 
-fn validate_theta(theta: &[f64]) -> Result<Vec<f64>, DeseqError> {
+pub(crate) fn validate_theta(theta: &[f64]) -> Result<Vec<f64>, DeseqError> {
     if theta.len() <= 1 {
         return Err(invalid_dimensions(
             "independent-filter theta",

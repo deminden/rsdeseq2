@@ -329,6 +329,20 @@ fn native_glm_mu_lrt_contrast_keeps_lrt_pvalues_and_reports_contrast_effect() {
     let (contrast_fit, contrast_results) = builder
         .fit_lrt_glm_mu_contrast(&counts, &full, &reduced, &contrast)
         .unwrap();
+    let invalid = ResultRequest::new(
+        ResultsContrast::Numeric(contrast.to_vec()),
+        WaldTestOptions::t_degrees_of_freedom(6.0),
+        CooksCutoff::Disabled,
+        IndependentFilteringOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        contrast_fit
+            .results_for_request(&counts, &invalid, None)
+            .unwrap_err()
+            .to_string()
+            .contains("cannot change a stored LRT")
+    );
     let final_dispersions = coefficient_fit.dispersion.as_ref().unwrap().clone();
     let (fixed_contrast_fit, fixed_contrast_results) = builder
         .fit_fixed_dispersion_lrt_contrast(&counts, &full, &reduced, &final_dispersions, &contrast)

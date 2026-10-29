@@ -58,8 +58,24 @@ pub fn build_wald_contrast_results(
     gene_names: Option<&[String]>,
     dispersions: Option<&[f64]>,
 ) -> Result<DeseqResults, DeseqError> {
+    build_wald_contrast_results_view(
+        base_mean,
+        &GlmInferenceView::from(fit),
+        contrast,
+        gene_names,
+        dispersions,
+    )
+}
+
+pub(crate) fn build_wald_contrast_results_view(
+    base_mean: &[f64],
+    fit: &GlmInferenceView<'_>,
+    contrast: &WaldContrastOutput,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
     let n_genes = fit.beta.n_rows();
-    validate_result_inputs(base_mean, fit, gene_names, dispersions)?;
+    validate_result_view(base_mean, fit, gene_names, dispersions)?;
     validate_wald_contrast_output(contrast, n_genes)?;
     let padj = bh_adjust(&contrast.wald.pvalue);
 
@@ -160,8 +176,26 @@ pub fn build_lrt_contrast_results(
     gene_names: Option<&[String]>,
     dispersions: Option<&[f64]>,
 ) -> Result<DeseqResults, DeseqError> {
+    build_lrt_contrast_results_view(
+        base_mean,
+        &GlmInferenceView::from(full_fit),
+        lrt,
+        contrast,
+        gene_names,
+        dispersions,
+    )
+}
+
+pub(crate) fn build_lrt_contrast_results_view(
+    base_mean: &[f64],
+    full_fit: &GlmInferenceView<'_>,
+    lrt: &LrtOutput,
+    contrast: &WaldContrastOutput,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
     let n_genes = full_fit.beta.n_rows();
-    validate_result_inputs(base_mean, full_fit, gene_names, dispersions)?;
+    validate_result_view(base_mean, full_fit, gene_names, dispersions)?;
     validate_lrt_output(lrt, n_genes)?;
     validate_wald_contrast_output(contrast, n_genes)?;
     let padj = bh_adjust(&lrt.pvalue);

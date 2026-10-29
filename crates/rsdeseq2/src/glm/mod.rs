@@ -3,6 +3,7 @@
 pub mod beta;
 pub mod dispersion_fit;
 pub mod fallback;
+pub(crate) mod inference;
 pub mod irls;
 pub mod lrt;
 pub mod nb;

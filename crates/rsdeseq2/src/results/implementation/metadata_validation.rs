@@ -65,6 +65,20 @@ fn validate_result_inputs(
     gene_names: Option<&[String]>,
     dispersions: Option<&[f64]>,
 ) -> Result<(), DeseqError> {
+    validate_result_view(
+        base_mean,
+        &GlmInferenceView::from(fit),
+        gene_names,
+        dispersions,
+    )
+}
+
+fn validate_result_view(
+    base_mean: &[f64],
+    fit: &GlmInferenceView<'_>,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<(), DeseqError> {
     let n_genes = fit.beta.n_rows();
     if base_mean.len() != n_genes {
         return Err(invalid_dimensions(
@@ -97,21 +111,23 @@ fn validate_result_inputs(
         ));
     }
     if let Some(names) = gene_names
-        && names.len() != n_genes {
-            return Err(invalid_dimensions(
-                "result gene names",
-                n_genes,
-                names.len(),
-            ));
-        }
+        && names.len() != n_genes
+    {
+        return Err(invalid_dimensions(
+            "result gene names",
+            n_genes,
+            names.len(),
+        ));
+    }
     if let Some(values) = dispersions
-        && values.len() != n_genes {
-            return Err(invalid_dimensions(
-                "result dispersions",
-                n_genes,
-                values.len(),
-            ));
-        }
+        && values.len() != n_genes
+    {
+        return Err(invalid_dimensions(
+            "result dispersions",
+            n_genes,
+            values.len(),
+        ));
+    }
     Ok(())
 }
 
@@ -203,13 +219,14 @@ fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(), DeseqError
 fn validate_optional_finite(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if let Some(value) = value
-            && !value.is_finite() {
-                return Err(DeseqError::NonFiniteValue {
-                    context: context.to_string(),
-                    index: Some(idx),
-                    value,
-                });
-            }
+            && !value.is_finite()
+        {
+            return Err(DeseqError::NonFiniteValue {
+                context: context.to_string(),
+                index: Some(idx),
+                value,
+            });
+        }
     }
     Ok(())
 }
@@ -220,11 +237,12 @@ fn validate_optional_positive_finite(
 ) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if let Some(value) = value
-            && (!value.is_finite() || value <= 0.0) {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!("{context} at index {idx} must be positive and finite"),
-                });
-            }
+            && (!value.is_finite() || value <= 0.0)
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} at index {idx} must be positive and finite"),
+            });
+        }
     }
     Ok(())
 }
@@ -232,11 +250,12 @@ fn validate_optional_positive_finite(
 fn validate_optional_probability(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if let Some(value) = value
-            && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
-                });
-            }
+            && (!value.is_finite() || !(0.0..=1.0).contains(&value))
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
+            });
+        }
     }
     Ok(())
 }

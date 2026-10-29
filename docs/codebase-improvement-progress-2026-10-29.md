@@ -130,5 +130,17 @@ Tests cover hard links/symlinks, case aliases, missing destinations, sidecar
 failure, unwritten staging and injected publication failure. Existing CLI numeric
 comparisons remain exact. Workspace tests, Clippy, MSRV and 43 Python tests pass.
 
-C19–C21 and C23 remain pending: shared Rust statistical requests, bulk R results,
-module consolidation and final release documentation/evidence.
+The Rust portion of C19 and the fitted-result boundary in C21 are implemented.
+Stored contrast queries borrow beta/SE/covariance and no longer clone full GLM
+means, hats, optimizer diagnostics or likelihood arrays. Existing public methods
+forward with their previous defaults; new explicit-option methods and validated
+`ResultRequest` carry Wald alternatives/t degrees of freedom, Cook's policy and
+filtering options. LRT rejects options that would silently reinterpret its test.
+The existing independent t-reference test now covers stored requests and masking
+without another fit. Numerical suites, Clippy and MSRV pass. Fitted-result policy
+has a real private module with explicit imports/access, separate from transforms
+and builder execution. Existing aliases and formula behavior are retained.
+
+The R statistical migration and C20 bulk bridge remain pending; R's validated
+tails/filtering are retained until the shared replacements pass their numerical
+gates. C23 final documentation and artifact checks also remain pending.
