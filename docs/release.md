@@ -25,14 +25,16 @@ are useful preparation; successful target jobs remain required for publication.
 
 ## Development validation checkpoint — 2026-10-29
 
-The [execution report](codebase-improvement-progress-2026-10-29.md) records the
-current local changes. Source-package tests/checks use native R 4.6.2 and the
-82-package source lock. Exact native exports, independent Pasilla and the full
-GTEx release oracle pass. Native throughput is unchanged within 0.2% in the final
-paired pass; memory and R query improvements are documented separately. These
-changes remain a development checkpoint with package versions unchanged; choose
-an unused version before creating another release tag. Local checks do not stand
-in for the five target jobs required by the coordinated publication workflow.
+The [execution report](codebase-improvement-progress-2026-10-29.md) records an
+earlier batch and binds its performance claims to its saved artifacts. The
+[Rust-only migration](rust-only-wrapper-migration.md) remains in progress.
+The latest [refactor checkpoint](refactoring-followup-2026-10-29.md) preserves
+all 22 standalone result/diagnostic exports and fourteen wrapped-workflow
+payloads exactly, with aggregate native time within 0.14% of `bfd0de8`.
+Native R 4.6.2 source-package tests, Rust tests, crate packaging and the full
+GTEx precision gates pass. Package versions remain unchanged; choose an unused
+version before creating another release tag. Local checks do not stand in for
+the five target jobs required by the coordinated publication workflow.
 
 ## Version 0.3.1
 

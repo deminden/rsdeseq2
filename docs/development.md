@@ -25,13 +25,25 @@ callers can use legacy range syntax and the `core::range` types.
 ## Source Organization
 
 The large integration suites keep one entry file and executable per suite;
-child modules under `tests/native_wald_pipeline/`, `tests/design/` and
-`tests/results/` group cases by workflow. Shared fixtures stay in the entry
+child modules under `tests/native_wald_pipeline/`, `tests/native_lrt_pipeline/`,
+`tests/wald_pipeline/`, `tests/design/` and `tests/results/` group cases by workflow. Shared fixtures stay in the entry
 file rather than being copied into individual cases.
 
 CLI numerical routing cases live under `tests/cli/`, with shared assertions
 and separate normalization/contrast case tables. Use fixtures where ignoring a
 flag changes numerical results, and keep invalid-input/ambiguity cases distinct.
+
+The R result tests are grouped into `test-results.R` and five
+`test-results-*.R` files for selectors, filtering, alignment, object inputs and
+all-zero contrasts. Run `testthat::test_dir(..., filter = "^results")` to select
+the complete result-contract group.
+
+Builder entry points use private modules under
+`core/implementation/builder/workflows/`. Contrast handling uses modules under
+`contrasts/`, and dispersion trends use modules under `dispersion/trend/`. The
+original public module paths re-export the same types and functions. Keep each
+trend model with its fitting implementation; only shared arithmetic and row
+selection cross these private module boundaries.
 
 The design implementation, GLM IRLS/beta modules and R Rust bridge use private
 `include!` files to keep existing public paths, helper scope and operation
@@ -45,8 +57,9 @@ read-only comparison against a temporary generated tree and checks the Rust/R
 versions. The vendored manifest is derived from Cargo metadata. CI checks the
 committed vendor and fails on drift instead of repairing it before testing.
 
-See the [large-file refactor report](refactoring-large-files.md) for the file
-inventory and precision/performance validation.
+See the [current refactor report](refactoring-followup-2026-10-29.md) for the
+file inventory and precision/performance validation, and the
+[earlier report](refactoring-large-files.md) for the October 16 restructuring.
 
 The [test-quality report](testing-parity.md) describes required oracle checks,
 CLI routing assertions, the compact GTEx panel and full replay commands.

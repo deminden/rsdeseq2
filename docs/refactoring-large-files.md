@@ -1,5 +1,8 @@
 # Large-file refactor
 
+The [October 29 follow-up](refactoring-followup-2026-10-29.md) covers the next
+six large files, using the standalone primitive checkpoint as its baseline.
+
 The 2026-10-16 refactor starts from `v0.3.1`
 (`a683dda9dc26d1e085e87f4beed87bb74ae35059`). It reorganizes the three largest
 integration-test suites, the R results wrapper, formula handling, IRLS, beta
