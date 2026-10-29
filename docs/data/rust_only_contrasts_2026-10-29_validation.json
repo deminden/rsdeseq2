@@ -1,0 +1,59 @@
+{
+  "baseline_commit": "52eaeaf",
+  "implementation": "shared standalone borrowed contrast projection; R transport only for effects/SEs and Wald inference",
+  "rust_tests_passed": 1040,
+  "rust_tests_failed": 0,
+  "rust_existing_opt_in_ignored": 1,
+  "backend_tests_passed": 1,
+  "r_assertions_passed": 1426,
+  "r_check_status": "OK",
+  "r_warnings": 0,
+  "r_skipped": 0,
+  "standalone_wrapped_bit_equality_cases": 64,
+  "independent_scalar_reference_cases_retained": 1169,
+  "existing_reference_manifests_modified": false,
+  "new_speed_or_memory_claim": false,
+  "performance_validation": "Deferred until bounded batches and remaining row policy are combined; no optimization round counted",
+  "source_package": {
+    "source_package_sha256": "4bb13d4e08ed03e1255613516a6fdc1a240207be84c5554f165e34d7f620aba6",
+    "files_verified": 242,
+    "changed_files": [],
+    "description_normalization": "Only generated Packaged/NeedsCompilation fields and DCF whitespace"
+  },
+  "sanitizers": {
+    "status": "passed",
+    "c": "address,undefined",
+    "rust": "address",
+    "rust_stdlib_instrumented": false,
+    "r_interpreter_instrumented": false,
+    "preinstalled_r_dependencies_instrumented": false,
+    "leak_detection": false,
+    "asan_runtime": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/clang/23/lib/darwin/libclang_rt.asan_osx_dynamic.dylib",
+    "target": "aarch64-apple-darwin",
+    "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+    "rust_address_instrumentation_verified": true,
+    "asan_symbols_verified": true,
+    "ubsan_symbols_verified": true
+  },
+  "binary_sha256": "c4483683e483022fa908f772761f39eef9bbae55cf840a4d9a96b79c7c470df0",
+  "conformance_driver_sha256": "5f36d260ef74069e7d70d5664a794791f19d9bba3d37db8a4cd639b929227050",
+  "gtex": {
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "checkpoint_exports_byte_identical": 22,
+    "minimum_target_reduction": 664,
+    "minimum_global_reduction": 597
+  },
+  "root_and_backend_msrv": "Rust1.97.1 check passed",
+  "source_check_log": "results/codebase_improvements/rust-only-contrasts-source-v2/check.log",
+  "native_boundary_evidence": "results/codebase_improvements/rust-only-contrasts-sanitizers-v2/sanitizers.json",
+  "remaining_scope": [
+    "Shared all-zero/Cooks row policy",
+    "Bounded multi-request bridge and resultsList",
+    "Remaining normalization offsets and formula calculations",
+    "Standalone ashr/apeglm and posterior calculations",
+    "Combined performance/RSS and final C01-C23 audit"
+  ],
+  "crate_archive_sha256": "683ba2b165083b21ca36aaf258dc01cc9d9f040f7fa6c02e280c4cb5144949c2",
+  "crate_archive_verification": "passed"
+}

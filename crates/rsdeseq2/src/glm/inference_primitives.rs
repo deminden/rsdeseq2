@@ -23,21 +23,35 @@ pub fn wald_test_from_estimates(
             beta_se.len(),
         ));
     }
+    wald_from_estimate_rows(
+        beta.iter().copied().zip(beta_se.iter().copied()),
+        options,
+        None,
+    )
+}
+
+pub(super) fn wald_from_estimate_rows(
+    rows: impl ExactSizeIterator<Item = (f64, f64)>,
+    options: &WaldTestOptions,
+    residual_df: Option<f64>,
+) -> Result<WaldOutput, DeseqError> {
+    let genes = rows.len();
     validate_wald_options(options)?;
     let degrees_of_freedom = match &options.pvalue_type {
         WaldPvalueType::Normal => None,
         WaldPvalueType::T { degrees_of_freedom } => Some(match degrees_of_freedom {
             WaldDegreesOfFreedom::Residual => {
-                return Err(DeseqError::InvalidOptions {
+                let df = residual_df.ok_or_else(|| DeseqError::InvalidOptions {
                     reason: "primitive Wald inference requires explicit degrees of freedom".into(),
-                });
+                })?;
+                vec![valid_t_df(df); genes]
             }
-            WaldDegreesOfFreedom::Scalar(df) => vec![valid_t_df(*df); beta.len()],
+            WaldDegreesOfFreedom::Scalar(df) => vec![valid_t_df(*df); genes],
             WaldDegreesOfFreedom::PerGene(df) => {
-                if df.len() != beta.len() {
+                if df.len() != genes {
                     return Err(invalid_dimensions(
                         "Wald per-gene degrees of freedom",
-                        beta.len(),
+                        genes,
                         df.len(),
                     ));
                 }
@@ -45,9 +59,9 @@ pub fn wald_test_from_estimates(
             }
         }),
     };
-    let mut stat = Vec::with_capacity(beta.len());
-    let mut pvalue = Vec::with_capacity(beta.len());
-    for (gene, (&beta, &se)) in beta.iter().zip(beta_se).enumerate() {
+    let mut stat = Vec::with_capacity(genes);
+    let mut pvalue = Vec::with_capacity(genes);
+    for (gene, (beta, se)) in rows.enumerate() {
         let result = wald_stat_and_pvalue_with_options(
             beta,
             se,

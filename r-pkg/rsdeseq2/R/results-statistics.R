@@ -1,26 +1,20 @@
-# Wald/LRT statistics, thresholds and contrast standard errors.
+# All numerical inference and projection runs in the standalone Rust engine.
 
 .rsdeseq2_wald_from_primitive_fit <- function(fit, numericContrast, options) {
-  beta <- fit$beta
-  lfc <- as.numeric(beta %*% numericContrast)
-  lfcSE <- .rsdeseq2_contrast_se_from_primitive_fit(fit, numericContrast)
-  thresholded <- .rsdeseq2_wald_stat_pvalue_with_options(lfc, lfcSE, options)
-  list(
-    log2FoldChange = lfc,
-    lfcSE = lfcSE,
-    stat = thresholded$stat,
-    pvalue = thresholded$pvalue
-  )
+  .Call("rsdeseq2_wald_contrast", fit$beta, fit$betaSE, fit$betaCovariance,
+    as.numeric(numericContrast), options$lfcThreshold,
+    .rsdeseq2_wald_alternative_code(options$altHypothesis),
+    options$useT, options$degreesOfFreedom, PACKAGE = "rsdeseq2")
 }
 
 .rsdeseq2_lrt_from_primitive_fit <- function(fit, numericContrast) {
-  beta <- fit$beta
-  lfc <- as.numeric(beta %*% numericContrast)
-  lfcSE <- .rsdeseq2_contrast_se_from_primitive_fit(fit, numericContrast)
-  list(
-    log2FoldChange = lfc,
-    lfcSE = lfcSE
-  )
+  .Call("rsdeseq2_project_contrast", fit$beta, fit$betaSE, fit$betaCovariance,
+    as.numeric(numericContrast), PACKAGE = "rsdeseq2")
+}
+
+.rsdeseq2_wald_alternative_code <- function(alternative) {
+  as.integer(match(alternative,
+    c("greaterAbs", "greaterAbsUPSHOT", "greaterAbs2014", "lessAbs", "greater", "less")) - 1L)
 }
 
 .rsdeseq2_validate_wald_result_options <- function(lfcThreshold,
@@ -67,36 +61,11 @@
 .rsdeseq2_wald_stat_pvalue_with_options <- function(beta, betaSE, options) {
   .Call("rsdeseq2_wald_statistics", as.numeric(beta), as.numeric(betaSE),
     options$lfcThreshold,
-    as.integer(match(options$altHypothesis,
-      c("greaterAbs", "greaterAbsUPSHOT", "greaterAbs2014", "lessAbs", "greater", "less")) - 1L),
+    .rsdeseq2_wald_alternative_code(options$altHypothesis),
     options$useT, options$degreesOfFreedom, PACKAGE = "rsdeseq2")
 }
 
 .rsdeseq2_default_cooks_cutoff <- function(design) {
   .Call("rsdeseq2_default_cooks_cutoff", as.integer(nrow(design)),
     as.integer(ncol(design)), PACKAGE = "rsdeseq2")
-}
-
-.rsdeseq2_contrast_se_from_primitive_fit <- function(fit, numericContrast) {
-  nonzero <- which(numericContrast != 0)
-  if (length(nonzero) == 1L && !is.null(fit$betaSE)) {
-    out <- abs(numericContrast[[nonzero]]) * fit$betaSE[, nonzero]
-    return(as.numeric(out))
-  }
-  if (is.null(fit$betaCovariance)) {
-    stop("betaCovariance is required for multi-coefficient or numeric contrast SEs", call. = FALSE)
-  }
-  cov <- fit$betaCovariance
-  out <- vapply(seq_len(dim(cov)[[1L]]), function(gene) {
-    geneCov <- cov[gene, , ]
-    if (anyNA(geneCov)) {
-      return(NA_real_)
-    }
-    variance <- as.numeric(t(numericContrast) %*% geneCov %*% numericContrast)
-    if (!is.finite(variance) || variance < 0) {
-      return(NA_real_)
-    }
-    sqrt(variance)
-  }, numeric(1L))
-  out
 }

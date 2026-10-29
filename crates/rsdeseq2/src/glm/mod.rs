@@ -1,6 +1,7 @@
 //! Negative-binomial GLM fitting primitives.
 
 pub mod beta;
+mod contrast_projection;
 pub mod dispersion_fit;
 pub mod fallback;
 pub(crate) mod inference;
@@ -32,6 +33,9 @@ pub use beta::{
     fit_intercept_only_fixed_dispersion_with_normalization_factors,
     fit_intercept_only_fixed_dispersion_with_weights, match_upper_quantile_for_variance,
     match_weighted_upper_quantile_for_variance,
+};
+pub use contrast_projection::{
+    ContrastProjection, CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
 };
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{OptimFallbackRows, optim_fallback_rows};

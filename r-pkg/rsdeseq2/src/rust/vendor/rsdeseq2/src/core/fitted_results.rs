@@ -199,9 +199,8 @@ impl DeseqFit {
             }
         };
         let numeric = resolve_contrast(fit.model_matrix, &numeric_contrast)?;
-        let output =
-            crate::glm::wald::wald_test_contrast_view(&fit, &numeric, &WaldTestOptions::default())?;
-        let mut results = crate::results::build_lrt_contrast_results_view(
+        let output = fit.estimates()?.project_contrast(&numeric)?;
+        let mut results = crate::results::build_lrt_projection_results_view(
             &self.base_mean,
             &fit,
             lrt,
@@ -247,9 +246,8 @@ impl DeseqFit {
             contrast.numerator,
             contrast.denominator,
         )?;
-        let output =
-            crate::glm::wald::wald_test_contrast_view(&fit, &numeric, &WaldTestOptions::default())?;
-        let mut results = crate::results::build_lrt_contrast_results_view(
+        let output = fit.estimates()?.project_contrast(&numeric)?;
+        let mut results = crate::results::build_lrt_projection_results_view(
             &self.base_mean,
             &fit,
             lrt,

@@ -23,3 +23,15 @@ impl<'a> From<&'a NbinomGlmFit> for GlmInferenceView<'a> {
         }
     }
 }
+
+impl<'a> GlmInferenceView<'a> {
+    pub(crate) fn estimates(
+        &self,
+    ) -> Result<super::InferenceEstimates<'a>, crate::errors::DeseqError> {
+        let covariance = self
+            .beta_covariance
+            .map(|matrix| super::CovarianceView::new(self.beta.n_cols(), matrix.into()))
+            .transpose()?;
+        super::InferenceEstimates::new(self.beta.into(), Some(self.beta_se.into()), covariance)
+    }
+}

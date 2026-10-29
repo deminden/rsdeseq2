@@ -85,5 +85,11 @@ completes shared filtering/BH and fixes supplied geometric-mean transport, with
 The [shared inference checkpoint](rust-only-inference-2026-10-29.md) additionally
 moves Wald statistics/tails, primitive LRT probabilities and default Cook's
 cutoffs into Rust, with 46 direct bit-equality cases and 1,169 independent
-scalar references. Contrast products/SEs and the remaining batch, zero/offset,
-formula and shrinkage work above are still pending.
+scalar references.
+
+The [shared contrast checkpoint](rust-only-contrast-projection-2026-10-29.md)
+additionally moves effect/SE projection into borrowed standalone Rust views and
+removes redundant Wald evaluation from native LRT display queries. It passes
+64 direct bit-equality cases, a checked R source package and unchanged full GTEx
+exports relative to the shared-probability checkpoint. All-zero/Cook's row policy,
+bounded batches, offsets/formula arithmetic and shrinkage remain pending.
