@@ -3,7 +3,14 @@ pub fn run_cli() -> Result<(), DeseqError> {
     run(Cli::parse())
 }
 
-fn run(cli: Cli) -> Result<(), DeseqError> {
+fn run(mut cli: Cli) -> Result<(), DeseqError> {
+    let (inputs, mut outputs) = cli.command.paths_mut();
+    let transaction = super::output_transaction::OutputTransaction::prepare(&inputs, &mut outputs)?;
+    run_staged(cli)?;
+    transaction.publish()
+}
+
+fn run_staged(cli: Cli) -> Result<(), DeseqError> {
     match cli.command {
         Commands::SizeFactors {
             counts,

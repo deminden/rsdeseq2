@@ -3,6 +3,27 @@
 The CLI exposes validated file-based entry points for implemented Rust stages.
 It accepts primitive TSV inputs and does not parse formulas.
 
+Outputs are staged in their destination directories. Before fitting, the CLI
+checks all input, output and sidecar paths for collisions, including symlinks,
+hard links and the destination filesystem's case/name behavior. Missing or
+unwritable destination directories fail before the analysis starts.
+
+After every requested file has been written successfully, the CLI publishes the
+files and writes `OUTPUT.complete.json` last, next to the resolved primary output.
+The record includes a generation ID, absolute file paths, byte lengths and
+SHA-256 hashes. From a checkout, verify a generation with:
+
+```sh
+python scripts/check_cli_completion.py results.tsv.complete.json
+```
+
+A failure during staging preserves previous outputs. A failure during publication
+can leave some new files present; the previous completion record is removed before
+publication begins, so that partial generation has no valid completion record.
+Separate file renames are not an atomic transaction. Consumers requiring a coherent
+generation must verify the record, and concurrent writers must use different output
+paths. Existing readers that ignore the record retain ordinary file-read semantics.
+
 ```bash
 rsdeseq2 size-factors \
   --counts counts.tsv \
