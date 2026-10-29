@@ -110,5 +110,25 @@ Run `scripts/check_pasilla_holdout.py --help` for milestone reproduction.
 
 The Rust workspace passed 1,022 tests with one existing ignored full-data case;
 the R suite passes in the native R 4.6.2 environment. A memory improvement does
-not count as a 2% total-quantification speed round. The one paired eleven-contrast
-throughput pass is recorded separately when complete.
+not count as a 2% total-quantification speed round. The one paired eleven-contrast pass completed against native DESeq2/R 4.6.2.
+Summed process times were 36.216 seconds candidate, 35.768 seconds preserved Rust
+baseline and 193.093 seconds DESeq2. The candidate is 5.33× DESeq2 and 1.24%
+slower than the Rust baseline in this single pass; this is not a counted speed
+round or evidence of a statistically established timing difference. Peak CLI RSS
+falls on all eleven contrasts, from baseline/candidate ratios of 1.040–1.213;
+candidate RSS is 213.02–301.95 MiB versus DESeq2 1,600.84–1,878.39 MiB.
+
+All eleven candidate result exports match the reviewed v0.3.1 output hashes.
+Direct native-R comparison has zero missingness mismatches in every column.
+Worst absolute differences across 618,200 gene/contrast rows are: baseMean
+5.59e-9, dispersion 1.24e-4, log2FC 7.15e-6, SE 2.75e-5, statistic 1.66e-4,
+p-value 3.74e-5 and adjusted p-value 2.87e-5. These are errors against DESeq2,
+not changes introduced by the memory candidate; native output bytes are unchanged.
+
+Raw committed evidence: [summary](data/memory_gtex_summary_2026-10-29.tsv),
+[timings](data/memory_gtex_timings_2026-10-29.tsv),
+[direct parity](data/memory_gtex_direct_parity_2026-10-29.tsv),
+[acceptance](data/memory_gtex_acceptance_2026-10-29.json),
+[provenance](data/memory_gtex_provenance_2026-10-29.json) and
+[R session](data/memory_gtex_R-session_2026-10-29.txt). The full frozen-reference
+comparison remains in [parity](data/memory_gtex_parity_2026-10-29.tsv).
