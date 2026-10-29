@@ -1,5 +1,7 @@
 # Development
 
+Python tooling/tests require Python 3.10 or newer; the validation run used Python 3.14.7.
+
 ## Repository Structure
 
 - `crates/rsdeseq2`: Rust numerical core and minimal CLI.

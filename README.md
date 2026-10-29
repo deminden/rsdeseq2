@@ -194,6 +194,8 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 
 ## Development
 
+Python tooling/tests require Python 3.10 or newer; the validation run used Python 3.14.7.
+
 The workspace requires Rust 1.97.1 or newer and uses the Rust 2024 edition, as
 declared by `rust-version` and `edition` in `Cargo.toml`. The R package is tested
 with native R 4.6.2. Each saved fixture records its generating environment.
