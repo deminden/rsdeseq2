@@ -1,5 +1,31 @@
 # Reproducibility
 
+## Current comparison environment
+
+New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0, apeglm
+1.34.0 and ashr 2.2-63. Historical R 4.6.1 references retain their recorded
+provenance and hashes. The [environment record](data/r-reference-environment-2026-10-29.json)
+includes the native compiler flags and BLAS configuration. Its 82 non-base R
+packages are pinned by [source URL and SHA-256](data/r-reference-sources-2026-10-29.tsv).
+
+Use the selected environment's Rscript explicitly for comparisons:
+
+```sh
+conda activate deseq2-r462-native
+python scripts/install_r_reference.py --check-installed --rscript "$CONDA_PREFIX/bin/Rscript"
+python scripts/benchmark_gtex_native_wald.py --repeats 1 \
+  --rscript "$CONDA_PREFIX/bin/Rscript" \
+  --validated-results-root results/benchmarks/release_0.3.1/gtex
+```
+
+To restore the pinned package sources into a separate library, run
+`scripts/install_r_reference.py --library PATH --rscript PATH/TO/Rscript`
+without `--check-installed`. The installer verifies source hashes and dependency
+order before installation. Its R version must match the environment record.
+Compiler/BLAS builds still need to be recorded when measuring another platform.
+`freeze_r_reference_sources.py` regenerates source metadata only when explicitly
+invoked for a new reference snapshot; installation never rewrites the lock.
+
 Current full native Wald contrast generation, frozen parity checks, and matched
 speed and peak-memory runs are documented in the
 [0.3.1 GTEx benchmark](gtex-native-wald-benchmark.md). Its biological designs,

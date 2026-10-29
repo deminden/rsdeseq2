@@ -78,8 +78,22 @@ identity; exploration runs remain explicitly unaccepted. Baseline/binary/manifes
 mutation and empty finite coverage fail acceptance. The Python suite passed
 37 tests, including drift, version mismatch and benchmark failure cases.
 
-C13 remains pending: combined artifact/publication gates and pinned delivery
-environments/platform checks.
+C13 is implemented: tag publication is coordinated by one validation workflow;
+Rust, pinned R, full GTEx and MSRV checks precede checked artifact staging.
+Publication verifies source/artifact identity, and target builds run numerical
+and CLI tests before packaging. The minimum Rust 1.97.1 build passes locally.
+Workflow lint passes except for the old linter's unrecognized pre-existing
+`macos-15-intel` runner label, which is excluded explicitly. Dependency failure
+simulation confirms that Rust/R/parity/MSRV failures block publication. Remote
+platform jobs have not been executed by this local implementation.
+
+At the user's request, current comparisons moved to `deseq2-r462-native`:
+R 4.6.2 with DESeq2 1.52.0, apeglm 1.34.0 and ashr 2.2-63. All 82 package sources
+were retrieved and hashed, their installed versions were verified, and rsdeseq2
+was rebuilt against that environment. The complete R suite and source-package
+check pass there (Status: OK). Historical reference files remain unchanged.
+The new source installer also restored an isolated Rcpp/RcppProgress smoke
+environment successfully. The Python suite passes 42 tests.
 
 C14–C23 remain pending: representative stage/RSS profiling, borrowed ownership,
 bounded row storage, selective GLM retention, optional replacement buffers,

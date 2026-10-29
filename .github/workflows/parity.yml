@@ -2,9 +2,19 @@ name: Parity
 
 on:
   workflow_dispatch:
+    inputs:
+      full_only:
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      full_only:
+        type: boolean
+        default: false
 
 jobs:
   frozen-oracles:
+    if: ${{ !inputs.full_only }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

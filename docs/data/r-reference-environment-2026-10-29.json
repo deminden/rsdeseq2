@@ -1,0 +1,24 @@
+{
+  "r_version": "4.6.2",
+  "bioconductor_version": "3.23",
+  "comparison_environment": "deseq2-r462-native",
+  "reference_packages": {
+    "DESeq2": "1.52.0",
+    "apeglm": "1.34.0",
+    "ashr": "2.2-63"
+  },
+  "recorded_platform": "aarch64-apple-darwin27.2.0",
+  "recorded_lapack_version": "3.12.0",
+  "recorded_blas": "OpenBLAS",
+  "source_lock": "r-reference-sources-2026-10-29.tsv",
+  "legacy_frozen_reference_r_version": "4.6.1",
+  "recorded_compiler_configuration": {
+    "CC": "$CONDA_PREFIX/bin/arm64-apple-darwin20.0.0-clang -std=gnu23",
+    "CXX": "$CONDA_PREFIX/bin/arm64-apple-darwin20.0.0-clang++ -std=gnu++20",
+    "CFLAGS": "-O3 -mcpu=native -fPIC",
+    "CXXFLAGS": "-O3 -mcpu=native -fPIC",
+    "FFLAGS": "-O3 -mcpu=native -fPIC",
+    "BLAS_LIBS": "-lblas",
+    "LAPACK_LIBS": ""
+  }
+}

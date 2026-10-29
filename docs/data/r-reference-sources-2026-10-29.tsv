@@ -1,0 +1,83 @@
+package	version	url	sha256	dependencies
+abind	1.4-8	https://cran.r-project.org/src/contrib/abind_1.4-8.tar.gz	264a051b523ceae1795a0879e7768949ea55c586ac8db0adf1f5ebeddd2623e1	
+apeglm	1.34.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/apeglm_1.34.0.tar.gz	78aae4deb507580a491204f5a9462dc154d48e96899c4f1a55a9205aea6d481a	emdbook;SummarizedExperiment;GenomicRanges;Rcpp;RcppEigen;RcppNumerical
+ashr	2.2-63	https://cran.r-project.org/src/contrib/ashr_2.2-63.tar.gz	7fa1957ed3cf0f1f20939b6ebf71fc04ab983ca77616f7b80ce9e9e6fad457c9	Matrix;Rcpp;truncnorm;mixsqp;SQUAREM;etrunct;invgamma
+bbmle	1.0.26	https://cran.r-project.org/src/contrib/bbmle_1.0.26.tar.gz	886589af4a6f161992a3605f2312589a00598435a7c78de7a128e0134bc44e2c	numDeriv;lattice;MASS;bdsmatrix;Matrix;mvtnorm
+bdsmatrix	1.3-7	https://cran.r-project.org/src/contrib/bdsmatrix_1.3-7.tar.gz	c3505e5ac06d5e01b3a6bad94177f8375cd9867bb0146cc9c63d92424ecb7922	
+BH	1.90.0-1	https://cran.r-project.org/src/contrib/BH_1.90.0-1.tar.gz	2e1fafb05938e81073561ae4892dc543ef15807e375e0ea8fa75e3ab79f0281b	
+Biobase	2.72.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/Biobase_2.72.0.tar.gz	d04af4c5850352f96a966285ea771b15777d2f009f7b86fa4b702de13f31bbdd	BiocGenerics
+BiocGenerics	0.58.1	https://bioconductor.org/packages/3.23/bioc/src/contrib/BiocGenerics_0.58.1.tar.gz	6911559f0b2b5a07081cd21b6738aa4c6048509b23425cc3ebafc0b4cb011a98	generics
+BiocParallel	1.46.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/BiocParallel_1.46.0.tar.gz	d06642f7b53517299a48ac68b074c28e03dd1de41159562fb8011117419e1038	futile.logger;snow;codetools;BH;cpp11
+brio	1.1.5	https://cran.r-project.org/src/contrib/brio_1.1.5.tar.gz	a9f22335ea39039de25bb27bccd5ff1ffb2b743579b31d150b6b91c9ea81d0b8	
+callr	3.8.0	https://cran.r-project.org/src/contrib/callr_3.8.0.tar.gz	a16b50e41ddbbf2bac236572e3e68c4ef9c76b88faf5cf840c79524c49000b06	otel;processx;R6
+cli	3.6.6	https://cran.r-project.org/src/contrib/cli_3.6.6.tar.gz	b2b58d6dd82f5798b335e39c00591686a01fd3e94399ef898e146173e36f18f9	
+coda	0.19-4.1	https://cran.r-project.org/src/contrib/coda_0.19-4.1.tar.gz	f4b451d86fbb56ff9ade043ddd6b0944368c37d0dad12d02837750ecdc708ad6	lattice
+codetools	0.2-20	https://cran.r-project.org/src/contrib/codetools_0.2-20.tar.gz	3be6f375ec178723ddfd559d1e8e85bfeee04a5fbaf9f53f2f844e1669fea863	
+cpp11	0.5.5	https://cran.r-project.org/src/contrib/cpp11_0.5.5.tar.gz	72486beb0605c1229bf3d422cd536224af8dc09bd389a3116f62f4c7705c62f4	
+crayon	1.5.3	https://cran.r-project.org/src/contrib/crayon_1.5.3.tar.gz	3e74a0685541efb5ea763b92cfd5c859df71c46b0605967a0b5dbb7326e9da69	
+DelayedArray	0.38.2	https://bioconductor.org/packages/3.23/bioc/src/contrib/DelayedArray_0.38.2.tar.gz	d9d3195f8f8e3ddf4aa9a47ac149413dc226761377e34d9320d09cbe8cefe3fd	Matrix;BiocGenerics;MatrixGenerics;S4Vectors;IRanges;S4Arrays;SparseArray
+desc	1.4.3	https://cran.r-project.org/src/contrib/desc_1.4.3.tar.gz	54468da73dd78fc9e7c565c41cfe3331802c2134b2e61a9ad197215317092f26	cli;R6
+DESeq2	1.52.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/DESeq2_1.52.0.tar.gz	8c91699286336350e66eec132ce6fdf5bb4af78e2a4d015a5a61224f62a95984	S4Vectors;IRanges;GenomicRanges;SummarizedExperiment;BiocGenerics;Biobase;BiocParallel;matrixStats;locfit;ggplot2;Rcpp;MatrixGenerics;RcppArmadillo
+diffobj	0.3.9	https://cran.r-project.org/src/contrib/diffobj_0.3.9.tar.gz	ac5502b9fb37b28dd2cd09061a0a973e7eeea66997b87a7f76f006499e5693bd	crayon
+emdbook	1.3.14	https://cran.r-project.org/src/contrib/emdbook_1.3.14.tar.gz	afca37687ff6ce9d93812ced12b3cd7627635a8654e2ee52ab7082e82cb0a0a2	MASS;lattice;plyr;coda;bbmle
+etrunct	0.1	https://cran.r-project.org/src/contrib/etrunct_0.1.tar.gz	19b36c739e382be2f19bdbe4107337935d52a1ab8eb301326612318afdfbca2b	
+evaluate	1.0.5	https://cran.r-project.org/src/contrib/evaluate_1.0.5.tar.gz	47aac79f889a828a5f8b4756cb972d7c2966bb984cbae17a4bd2389a73270794	
+farver	2.1.2	https://cran.r-project.org/src/contrib/farver_2.1.2.tar.gz	528823b95daab4566137711f1c842027a952bea1b2ae6ff098e2ca512b17fe25	
+formatR	1.14	https://cran.r-project.org/src/contrib/formatR_1.14.tar.gz	4ebaab2c3f8527871655246b62abd060bc75dae1cec7f962ca4752b8080f474c	
+fs	2.1.0	https://cran.r-project.org/src/contrib/fs_2.1.0.tar.gz	7088af1117d65c4ceb144b532e323f197fc8243b1d704bf6edf40774789829cd	
+futile.logger	1.4.9	https://cran.r-project.org/src/contrib/futile.logger_1.4.9.tar.gz	496bedbe2e52d06db22a4d659b8e7dd9ad0f1d1f95ead459ec02d05d0ac2b3d6	lambda.r;futile.options
+futile.options	1.0.1	https://cran.r-project.org/src/contrib/futile.options_1.0.1.tar.gz	7a9cc974e09598077b242a1069f7fbf4fa7f85ffe25067f6c4c32314ef532570	
+generics	0.1.4	https://cran.r-project.org/src/contrib/generics_0.1.4.tar.gz	bbe95a097792d38fc3b7e677738af1b95b66ea5e5017e33b8beac6a6088d0801	
+GenomicRanges	1.64.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/GenomicRanges_1.64.0.tar.gz	09fee555b60be2f54c8fa35b0a2238fea9a1b96dea24e9a8c52166b61d44f776	BiocGenerics;S4Vectors;IRanges;Seqinfo
+ggplot2	4.0.3	https://cran.r-project.org/src/contrib/ggplot2_4.0.3.tar.gz	690224bd61642b6222adb109470988e87f786e193cca77a15c0923cf9da73fa5	cli;gtable;isoband;lifecycle;rlang;S7;scales;vctrs;withr
+glue	1.8.1	https://cran.r-project.org/src/contrib/glue_1.8.1.tar.gz	1c55905d3efc3d5c199ceb0bd12218e97f0d4c64df6038ff41ecef415478a122	
+gtable	0.3.6	https://cran.r-project.org/src/contrib/gtable_0.3.6.tar.gz	d305a5fa11278b649d2d8edc5288bf28009be888a42be58ff8714018e49de0ef	cli;glue;lifecycle;rlang
+invgamma	1.2	https://cran.r-project.org/src/contrib/invgamma_1.2.tar.gz	f74229bad5f14cadb4e0b1acc85072a08dc8b6de1b93f1384fcb6c448ad56601	
+IRanges	2.46.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/IRanges_2.46.0.tar.gz	a61e97812b0357411b770c5886b684fc6c0b59c05441f7336e46404e6898b3e9	BiocGenerics;S4Vectors
+irlba	2.4.1	https://cran.r-project.org/src/contrib/irlba_2.4.1.tar.gz	00650af430b1549d54ee39c19a9cce125421c72b851ba2c4fbf6ddacccc3cad1	Matrix
+isoband	0.3.0	https://cran.r-project.org/src/contrib/isoband_0.3.0.tar.gz	fe8d3d58ca75bbee32f389152ac0058818f3f76f09c9867949531de7abc424ac	cli;rlang;cpp11
+jsonlite	2.0.0	https://cran.r-project.org/src/contrib/jsonlite_2.0.0.tar.gz	75eb910c82b350ec33f094779da0f87bff154c232e4ae39c9896a9b89f3ac82d	
+labeling	0.4.3	https://cran.r-project.org/src/contrib/labeling_0.4.3.tar.gz	c62f4fc2cc74377d7055903c5f1913b7295f7587456fe468592738a483e264f2	
+lambda.r	1.2.6	https://cran.r-project.org/src/contrib/lambda.r_1.2.6.tar.gz	0ad5ca078d86597a5527f781f10a669dc925f6b63e759cc43e0bccee77e69059	formatR
+lattice	0.23-1	https://cran.r-project.org/src/contrib/lattice_0.23-1.tar.gz	34e9b2fc023582c4246959b543c331233c62118efd922bcc1ba72b4888adc590	
+lifecycle	1.0.5	https://cran.r-project.org/src/contrib/lifecycle_1.0.5.tar.gz	61841e3e6edba056a88355a3f1d6698ab8d5d9cb3c05f2af0ec5a44ab516f8ee	cli;rlang
+locfit	1.5-9.12	https://cran.r-project.org/src/contrib/locfit_1.5-9.12.tar.gz	fa31b9d407f3557a6fcb7105cbd7b16a32a6fb868a7c60bc38a3e33cb7a39343	lattice
+magrittr	2.0.5	https://cran.r-project.org/src/contrib/magrittr_2.0.5.tar.gz	3f5b5b1d4e6d12807a95c50b6c88cb1d8af2c5eb5213f08bfe58f278eca2ed23	
+MASS	7.3-66	https://cran.r-project.org/src/contrib/MASS_7.3-66.tar.gz	59c619c70bfca653f1c74aef880e69405daefd0134e716a1862ecc5334b4e155	
+Matrix	1.7-6	https://cran.r-project.org/src/contrib/Matrix_1.7-6.tar.gz	694239dbe47e659d6d39a49af95157f46bd94977c283df00c4e8a016601cf143	lattice
+MatrixGenerics	1.24.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/MatrixGenerics_1.24.0.tar.gz	371d32bbd324ad6665465b5c54f66a9619c2958c5cad6f7aa65c6d533379005e	matrixStats
+matrixStats	1.5.0	https://cran.r-project.org/src/contrib/matrixStats_1.5.0.tar.gz	12996c5f3e6fc202a43e1087f16a71b7fa93d7e908f512542c7ee89cf95dcc15	
+mixsqp	0.3-54	https://cran.r-project.org/src/contrib/mixsqp_0.3-54.tar.gz	f7d0de918a221c58b3618dc3290a0ebe052256999ee3be35a19384f26b1dfb8e	irlba;Rcpp;RcppArmadillo
+mvtnorm	1.4-2	https://cran.r-project.org/src/contrib/mvtnorm_1.4-2.tar.gz	466302a08c9306d11384d85bf677893e4794541bde2991409be54e1f7b304b6e	
+numDeriv	2016.8-1.1	https://cran.r-project.org/src/contrib/numDeriv_2016.8-1.1.tar.gz	d8c4d19ff9aeb31b0c628bd4a16378e51c1c9a3813b525469a31fe89af00b345	
+otel	0.2.0	https://cran.r-project.org/src/contrib/otel_0.2.0.tar.gz	ef8afe5a1bc8074bbeb8a84134699ef348a1f8ac629ffba25ee43ea7bcd8dd17	
+pkgbuild	1.4.8	https://cran.r-project.org/src/contrib/pkgbuild_1.4.8.tar.gz	2e4259202ce90fc452f31ff36cfe14ff21a38e9fd71c3015e25018b9079924cb	callr;cli;desc;processx;R6
+pkgload	1.5.3	https://cran.r-project.org/src/contrib/pkgload_1.5.3.tar.gz	5e539f91ca36b8ed80933101baf2a57462b9342c68556f5d4dcb86c01639df28	cli;desc;fs;glue;lifecycle;pkgbuild;processx;rlang;rprojroot
+plyr	1.8.9	https://cran.r-project.org/src/contrib/plyr_1.8.9.tar.gz	15b5e7f711d53bf41b8687923983b8ef424563aa2f74c5195feb5b1df1aee103	Rcpp
+praise	1.0.0	https://cran.r-project.org/src/contrib/praise_1.0.0.tar.gz	5c035e74fd05dfa59b03afe0d5f4c53fbf34144e175e90c53d09c6baedf5debd	
+processx	3.9.0	https://cran.r-project.org/src/contrib/processx_3.9.0.tar.gz	cdfef9035405891d8b104b258a40f62656f215aba7dcdc9f3226203c4c8fb354	ps;R6
+ps	1.9.3	https://cran.r-project.org/src/contrib/ps_1.9.3.tar.gz	7b227f0627709a2073daf960ac612a0b87d03e18f7dd5c1938048ed440ef2e68	
+R6	2.6.1	https://cran.r-project.org/src/contrib/R6_2.6.1.tar.gz	59c6eba8b1b912eb7e104f65053235604be853425ee67c152ac4e86a1f2073b4	
+RColorBrewer	1.1-3	https://cran.r-project.org/src/contrib/RColorBrewer_1.1-3.tar.gz	4f42f5423c45688b39f492c7892d93f37b4541831c8ffb140364d2bd89031ac0	
+Rcpp	1.1.2	https://cran.r-project.org/src/contrib/Rcpp_1.1.2.tar.gz	2746cf2fb188e5f0a84dbf5c8f68915b54564ed33e5754572f174e7b32e7f4f3	
+RcppArmadillo	15.6.0-1	https://cran.r-project.org/src/contrib/Archive/RcppArmadillo/RcppArmadillo_15.6.0-1.tar.gz	6efa1bb020a5a0b791ce87234649d309a7144961221526846230b3ef6c0b12e3	Rcpp
+RcppEigen	0.3.4.0.2	https://cran.r-project.org/src/contrib/RcppEigen_0.3.4.0.2.tar.gz	ecad7ba2129fd48b7ebb825558d38492ed1f3a8934959e27fcd6688175e542bb	Rcpp
+RcppNumerical	0.7-0	https://cran.r-project.org/src/contrib/RcppNumerical_0.7-0.tar.gz	6e3717669ecbf3ed10fee3919630cd4899d6f534fee0ad9fedb9d4b006034e81	Rcpp;RcppEigen
+rlang	1.3.0	https://cran.r-project.org/src/contrib/rlang_1.3.0.tar.gz	80aa537d49e72265f443a15e8936128af583caa5e572086518b503cbf064279c	
+rprojroot	2.1.1	https://cran.r-project.org/src/contrib/rprojroot_2.1.1.tar.gz	473989bbef45fd9cd68f68dc317b14c9f42de5cea4b55fd6ba9011f25e0517e9	
+S4Arrays	1.12.1	https://bioconductor.org/packages/3.23/bioc/src/contrib/S4Arrays_1.12.1.tar.gz	7a11bafb0b9f495ae9bf4ed8b10fca2eeddd5e766aa870ad7fdc0ce11604e827	Matrix;abind;BiocGenerics;S4Vectors;IRanges
+S4Vectors	0.50.3	https://bioconductor.org/packages/3.23/bioc/src/contrib/S4Vectors_0.50.3.tar.gz	2faca526d6f2c69a6bbd75e6fcff2592b4f6b94e6792ced824a8f1e716590add	BiocGenerics
+S7	0.2.2	https://cran.r-project.org/src/contrib/S7_0.2.2.tar.gz	6f33245dde05b74265b1c4d379e034bc3a8923d41e7b52e6e75a75ce97d42af7	
+scales	1.4.0	https://cran.r-project.org/src/contrib/scales_1.4.0.tar.gz	d55ef5f08c92652d7a95cfa27584024723ab17873f1b2577dd488cb7c883ceee	cli;farver;glue;labeling;lifecycle;R6;RColorBrewer;rlang;viridisLite
+Seqinfo	1.2.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/Seqinfo_1.2.0.tar.gz	f86693fd96ff24dc4f79c340040d68256be53690fe14f06330af5c356ea3a073	BiocGenerics;S4Vectors;IRanges
+snow	0.4-4	https://cran.r-project.org/src/contrib/snow_0.4-4.tar.gz	84587f46f222a96f3e2fde10ad6ec6ddbd878f4e917cd926d632f61a87db13c9	
+SparseArray	1.12.3	https://bioconductor.org/packages/3.23/bioc/src/contrib/SparseArray_1.12.3.tar.gz	dee7681bc9f835bda9a2c8983327dd7f68dd972c23032eeab94de32a6c214787	Matrix;BiocGenerics;MatrixGenerics;S4Vectors;S4Arrays;matrixStats;IRanges;XVector
+SQUAREM	2026.1	https://cran.r-project.org/src/contrib/SQUAREM_2026.1.tar.gz	e9b32a384876b3a6646ea4262aedd738292220cd1852b2a289855606f56cfcad	
+SummarizedExperiment	1.42.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/SummarizedExperiment_1.42.0.tar.gz	40110b8dbb64e41e23adc8ac349a76a79e5cffcfd903eca2d6d9be344a24a71a	MatrixGenerics;GenomicRanges;Biobase;Matrix;BiocGenerics;S4Vectors;IRanges;Seqinfo;S4Arrays;DelayedArray
+testthat	3.3.2	https://cran.r-project.org/src/contrib/testthat_3.3.2.tar.gz	5d2e2fa2c3dcb523afb6898c02be9544c24c1c7e0789149c436fef768a409808	brio;callr;cli;desc;evaluate;jsonlite;lifecycle;magrittr;pkgload;praise;processx;ps;R6;rlang;waldo;withr
+truncnorm	1.0-9	https://cran.r-project.org/src/contrib/truncnorm_1.0-9.tar.gz	5156acc4d63243bf95326d6285b0ba3cdf710697d67c233a12ae56f3d87ec708	
+vctrs	0.7.3	https://cran.r-project.org/src/contrib/vctrs_0.7.3.tar.gz	b45078413e06ac624dddb7221a3a43908b405c8abec09822cb86638d30b0435b	cli;glue;lifecycle;rlang
+viridisLite	0.4.3	https://cran.r-project.org/src/contrib/viridisLite_0.4.3.tar.gz	433be9bde66234dc76301fb4ffbbc9fc74bab5c14f4548d8ef2fc0065e121ef5	
+waldo	0.6.2	https://cran.r-project.org/src/contrib/waldo_0.6.2.tar.gz	b22a746be625eec49736d2a0a18d96c45c14d97e30e42bc81a0740f3194e07fa	cli;diffobj;glue;rlang
+withr	3.0.3	https://cran.r-project.org/src/contrib/withr_3.0.3.tar.gz	d86c6454164fc85678bfc85e2a6cce42f7461d45fa9a87de71f376e7956c991e	
+XVector	0.52.0	https://bioconductor.org/packages/3.23/bioc/src/contrib/XVector_0.52.0.tar.gz	80b520c984e9da13fe06a2a6bdf712fffa6275705f3d0fb16af60eb5fb28609d	BiocGenerics;S4Vectors;IRanges
