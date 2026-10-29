@@ -351,3 +351,45 @@ pub fn fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and
         beta_prior_variance,
     })
 }
+
+pub(crate) fn fit_prior_sf_for_output(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+    requirements: crate::glm::irls::OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
+    crate::glm::irls::fit_sf_irls_for_output(
+        counts,
+        design,
+        size_factors,
+        dispersions,
+        None,
+        options,
+        requirements,
+    )
+}
+
+pub(crate) fn fit_prior_nf_for_output(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+    requirements: crate::glm::irls::OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
+    crate::glm::irls::fit_nf_irls_for_output(
+        counts,
+        design,
+        factors,
+        dispersions,
+        None,
+        options,
+        requirements,
+    )
+}

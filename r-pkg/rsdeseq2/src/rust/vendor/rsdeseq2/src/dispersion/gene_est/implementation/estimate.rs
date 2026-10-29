@@ -215,22 +215,24 @@ fn estimate_gene_wise_dispersions_with_mean_fit(
             let fit = match input.normalization_factors {
                 Some(normalization_factors) => {
                     let compact_factors = compact_matrix_rows(normalization_factors, &fit_genes)?;
-                    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+                    fit_nf_irls_for_output(
                         &compact_counts,
                         input.design,
                         &compact_factors,
                         &compact_disp,
                         compact_weights.as_ref(),
                         mean_options.clone(),
+                        OutputRequirements::Means,
                     )?
                 }
-                None => fit_fixed_dispersion_irls_with_weights(
+                None => fit_sf_irls_for_output(
                     &compact_counts,
                     input.design,
                     input.size_factors,
                     &compact_disp,
                     compact_weights.as_ref(),
                     mean_options.clone(),
+                    OutputRequirements::Means,
                 )?,
             };
             fit.mu

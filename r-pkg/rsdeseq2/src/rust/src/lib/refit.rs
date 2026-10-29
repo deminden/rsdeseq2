@@ -57,14 +57,18 @@ fn merge_option_matrix(
     {
         return Err(format!("replacement refit {field} dimensions do not match"));
     }
-    let mut values = target.as_slice().to_vec();
+    let n_rows = target.n_rows();
+    let n_cols = target.n_cols();
+    let owned = original
+        .take()
+        .ok_or_else(|| format!("original fit is missing {field}"))?;
+    let mut values = owned.into_values();
     for &row in rows {
-        let start = row * target.n_cols();
-        values[start..start + target.n_cols()]
-            .clone_from_slice(&source.as_slice()[start..start + target.n_cols()]);
+        let start = row * n_cols;
+        values[start..start + n_cols].copy_from_slice(&source.as_slice()[start..start + n_cols]);
     }
     *original = Some(
-        RowMajorMatrix::from_row_major(target.n_rows(), target.n_cols(), values)
+        RowMajorMatrix::from_row_major(n_rows, n_cols, values)
             .map_err(|error| error.to_string())?,
     );
     Ok(())
@@ -124,6 +128,33 @@ fn merge_refit_fit_rows(
     merge_optional_vec!(log_like);
     merge_optional_vec!(full_deviance);
     merge_matrix!(mu);
+    if let (Some(target), Some(source)) = (&mut original.wald, &refit.wald) {
+        merge_vec(&mut target.stat, &source.stat, rows, "Wald statistics")?;
+        merge_vec(&mut target.pvalue, &source.pvalue, rows, "Wald p-values")?;
+        if target.degrees_of_freedom.is_some() || source.degrees_of_freedom.is_some() {
+            merge_optional_vec(
+                &mut target.degrees_of_freedom,
+                &source.degrees_of_freedom,
+                rows,
+                "Wald df",
+            )?;
+        }
+    }
+    if let (Some(target), Some(source)) = (&mut original.lrt, &refit.lrt) {
+        merge_vec(
+            &mut target.deviance,
+            &source.deviance,
+            rows,
+            "LRT statistics",
+        )?;
+        merge_vec(&mut target.pvalue, &source.pvalue, rows, "LRT p-values")?;
+        merge_vec(
+            &mut target.reduced_converged,
+            &source.reduced_converged,
+            rows,
+            "LRT reduced convergence",
+        )?;
+    }
     // Keep the original Cook's distances: DESeq2 records those before replacement.
     Ok(())
 }

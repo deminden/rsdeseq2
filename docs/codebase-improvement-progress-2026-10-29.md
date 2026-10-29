@@ -110,7 +110,16 @@ Clippy and MSRV checks pass. An independent Pasilla panel and native R Wald/LRT
 references were frozen before memory optimization and are reserved for milestone
 validation. No speed/memory improvement is claimed yet.
 
-C15–C23 remain pending: borrowed ownership,
-bounded row storage, selective GLM retention, optional replacement buffers,
-shared Rust statistical requests, bulk R results, module consolidation, staged
-CLI output and final release documentation/evidence.
+C15–C17 and the disabled-buffer part of C18 are implemented. Consumed fit arrays
+move into their destination, temporary gene outputs are bounded and ordered, and
+internal mean/rlog consumers discard global covariance after identical checks.
+Thirteen paired R workflows retain exactly the same saved values and attributes.
+At 4,096 × 96, rlog peak RSS falls 55.31% with similar elapsed time; all measured
+processes stay within 2 GiB. The independent Pasilla Wald/LRT panel passes its
+unchanged bounds and all eight exports match the baseline exactly. Rust passes
+1,022 tests with one existing ignored case. See the memory report for the full
+panel and its limitations. Enabled replacement keeps the existing buffer contract;
+a complex opaque result handle is deferred unless a larger measured case earns it.
+
+C19–C23 remain pending: shared Rust statistical requests, bulk R results, module
+consolidation, staged CLI output and final release documentation/evidence.

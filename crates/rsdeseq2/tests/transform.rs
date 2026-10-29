@@ -373,6 +373,7 @@ fn rlog_estimated_prior_size_factor_path_matches_manual_two_step_path() {
     assert_eq!(output.intercept.len(), counts.n_genes());
     assert_eq!(output.metadata().intercept_len, counts.n_genes());
     assert_eq!(fit_output.fit.beta.n_cols(), counts.n_samples() + 1);
+    assert!(fit_output.fit.beta_covariance.is_some());
 }
 
 #[test]

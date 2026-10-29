@@ -2051,3 +2051,43 @@ fn irls_rejects_all_zero_rows() {
     .unwrap_err();
     assert!(err.to_string().contains("all zero"));
 }
+
+#[test]
+fn ordered_batches_report_the_lowest_failed_gene_at_one_and_four_workers() {
+    for early in [3, 2051] {
+        let mut values = vec![10_u32; 4097 * 8];
+        values[early * 8..(early + 1) * 8].fill(0);
+        values[3000 * 8..3001 * 8].fill(0);
+        let counts = CountMatrix::from_row_major_u32(4097, 8, values).unwrap();
+        let design = DesignMatrix::from_row_major(
+            8,
+            2,
+            (0..8).flat_map(|i| [1.0, (i / 4) as f64]).collect(),
+            None,
+        )
+        .unwrap();
+        for workers in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(workers)
+                .build()
+                .unwrap();
+            let error = pool
+                .install(|| {
+                    rsdeseq2::glm::fit_fixed_dispersion_irls(
+                        &counts,
+                        &design,
+                        &[1.0; 8],
+                        &vec![0.1; 4097],
+                        IrlsOptions::default(),
+                    )
+                })
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("gene {early} is all zero")),
+                "{error}"
+            );
+        }
+    }
+}

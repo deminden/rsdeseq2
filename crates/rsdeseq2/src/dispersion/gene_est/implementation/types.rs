@@ -4,10 +4,8 @@ use statrs::function::gamma::{digamma, ln_gamma};
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
-use crate::glm::{
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_fixed_dispersion_irls_with_weights, IrlsOptions,
-};
+use crate::glm::IrlsOptions;
+use crate::glm::irls::{fit_nf_irls_for_output, fit_sf_irls_for_output, OutputRequirements};
 use crate::math::trigamma;
 use crate::matrix::RowMajorMatrix;
 

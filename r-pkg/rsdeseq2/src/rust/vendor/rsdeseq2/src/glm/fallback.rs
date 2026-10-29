@@ -29,26 +29,47 @@ pub fn optim_fallback_rows(
 ) -> Result<OptimFallbackRows, DeseqError> {
     validate_fallback_inputs(beta_converged, beta, beta_covariance)?;
     let mut output = OptimFallbackRows::default();
-    let p = beta.n_cols();
 
     for (gene, converged) in beta_converged.iter().copied().enumerate() {
-        let stable = row_values_finite(beta.row(gene)?);
-        let variance_positive = covariance_diagonal_positive(beta_covariance.row(gene)?, p);
-        if !stable {
-            output.unstable_rows.push(gene);
-        }
-        if !variance_positive {
-            output.non_positive_variance_rows.push(gene);
-        }
-        if !converged {
-            output.non_converged_rows.push(gene);
-        }
-        if force_optim || !stable || !variance_positive || (use_optim && !converged) {
-            output.rows.push(gene);
-        }
+        record_optim_fallback_row(
+            &mut output,
+            gene,
+            converged,
+            beta.row(gene)?,
+            beta_covariance.row(gene)?,
+            use_optim,
+            force_optim,
+        );
     }
 
     Ok(output)
+}
+
+// Both retained and transient covariance paths use this exact routing policy.
+pub(crate) fn record_optim_fallback_row(
+    output: &mut OptimFallbackRows,
+    gene: usize,
+    converged: bool,
+    beta: &[f64],
+    covariance: &[f64],
+    use_optim: bool,
+    force_optim: bool,
+) {
+    debug_assert_eq!(covariance.len(), beta.len() * beta.len());
+    let stable = row_values_finite(beta);
+    let variance_positive = covariance_diagonal_positive(covariance, beta.len());
+    if !stable {
+        output.unstable_rows.push(gene);
+    }
+    if !variance_positive {
+        output.non_positive_variance_rows.push(gene);
+    }
+    if !converged {
+        output.non_converged_rows.push(gene);
+    }
+    if force_optim || !stable || !variance_positive || (use_optim && !converged) {
+        output.rows.push(gene);
+    }
 }
 
 fn validate_fallback_inputs(

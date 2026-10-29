@@ -8,13 +8,26 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::fit_intercept_only_fixed_dispersion;
-use crate::glm::fallback::optim_fallback_rows;
+use crate::glm::fallback::{OptimFallbackRows, optim_fallback_rows, record_optim_fallback_row};
 use crate::glm::nb::{
     FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
 };
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::RowMajorMatrix;
+
+/// Internal retention policy; fitting and fallback arithmetic are identical.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OutputRequirements {
+    Inference,
+    Means,
+    Transform,
+}
+impl OutputRequirements {
+    fn covariance(self) -> bool {
+        matches!(self, Self::Inference)
+    }
+}
 
 /// Fit a fixed-dispersion negative-binomial GLM with DESeq2-style dispatch.
 ///
@@ -220,6 +233,47 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
+    fit_nf_irls_for_output(
+        counts,
+        design,
+        normalization_factors,
+        dispersions,
+        weights,
+        options,
+        OutputRequirements::Inference,
+    )
+}
+
+pub(crate) fn fit_sf_irls_for_output(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
+    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
+    fit_nf_irls_for_output(
+        counts,
+        design,
+        &normalization_factors,
+        dispersions,
+        weights,
+        options,
+        requirements,
+    )
+}
+
+pub(crate) fn fit_nf_irls_for_output(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
     validate_nf_irls_inputs(
         counts,
         design,
@@ -237,12 +291,20 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let initial_lu = (x.transpose() * &x).lu();
     let p = design.n_coefficients();
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;
-    let mut beta_values = Vec::with_capacity(counts.n_genes() * p);
-    let mut beta_var_values = Vec::with_capacity(counts.n_genes() * p);
-    let mut beta_optim_start_values = vec![f64::NAN; counts.n_genes() * p];
-    let mut beta_covariance_values = Vec::with_capacity(counts.n_genes() * p * p);
-    let mut mu_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
-    let mut hat_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let n_beta = checked_output_elements(counts.n_genes(), p)?;
+    let covariance_columns = checked_output_elements(p, p)?;
+    let n_covariance = if requirements.covariance() {
+        checked_output_elements(counts.n_genes(), covariance_columns)?
+    } else {
+        0
+    };
+    let n_means = checked_output_elements(counts.n_genes(), counts.n_samples())?;
+    let mut beta_values = Vec::with_capacity(n_beta);
+    let mut beta_var_values = Vec::with_capacity(n_beta);
+    let mut beta_optim_start_values = vec![f64::NAN; n_beta];
+    let mut beta_covariance_values = Vec::with_capacity(n_covariance);
+    let mut mu_values = Vec::with_capacity(n_means);
+    let mut hat_values = Vec::with_capacity(n_means);
     let mut beta_iter = Vec::with_capacity(counts.n_genes());
     let mut beta_converged = Vec::with_capacity(counts.n_genes());
     let mut beta_optim_iter = vec![f64::NAN; counts.n_genes()];
@@ -250,44 +312,78 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let mut beta_optim_objective = vec![f64::NAN; counts.n_genes()];
     let mut beta_optim_gradient_norm = vec![f64::NAN; counts.n_genes()];
 
-    let row_outputs = (0..counts.n_genes())
-        .into_par_iter()
-        .map(|gene| {
-            fit_fixed_dispersion_irls_row(IrlsRowInput {
-                gene,
-                counts,
-                x: &x,
-                initial_lu: &initial_lu,
-                normalization_factors,
-                dispersions,
-                weights,
-                ridge_lambda: &ridge_lambda,
-                options: &options,
+    // Bound temporary output storage, retaining each gene's arithmetic and order.
+    let row_bytes = covariance_columns
+        .saturating_add(2 * p)
+        .saturating_add(2 * counts.n_samples())
+        .saturating_mul(std::mem::size_of::<f64>())
+        .saturating_add(std::mem::size_of::<Result<IrlsRowOutput, DeseqError>>());
+    let batch_rows = (8 * 1024 * 1024 / row_bytes.max(1)).clamp(1, 2048);
+    let mut transient_fallback = OptimFallbackRows::default();
+    for first in (0..counts.n_genes()).step_by(batch_rows) {
+        let last = first.saturating_add(batch_rows).min(counts.n_genes());
+        let row_outputs = (first..last)
+            .into_par_iter()
+            .map(|gene| {
+                fit_fixed_dispersion_irls_row(IrlsRowInput {
+                    gene,
+                    counts,
+                    x: &x,
+                    initial_lu: &initial_lu,
+                    normalization_factors,
+                    dispersions,
+                    weights,
+                    ridge_lambda: &ridge_lambda,
+                    options: &options,
+                })
             })
-        })
-        .collect::<Result<Vec<_>, DeseqError>>()?;
-
-    for row in row_outputs {
-        beta_values.extend(row.beta);
-        beta_var_values.extend(row.beta_se);
-        beta_covariance_values.extend(row.beta_covariance);
-        mu_values.extend(row.mu);
-        hat_values.extend(row.hat);
-        beta_iter.push(row.iter);
-        beta_converged.push(row.converged);
+            .collect::<Vec<_>>();
+        // Indexed collection plus ordered extraction reports the lowest failed gene.
+        for (offset, row) in row_outputs.into_iter().enumerate() {
+            let row = row?;
+            if !requirements.covariance() {
+                record_optim_fallback_row(
+                    &mut transient_fallback,
+                    first + offset,
+                    row.converged,
+                    &row.beta,
+                    &row.beta_covariance,
+                    options.use_optim,
+                    options.force_optim,
+                );
+            }
+            beta_values.extend(row.beta);
+            beta_var_values.extend(row.beta_se);
+            if requirements.covariance() {
+                beta_covariance_values.extend(row.beta_covariance);
+            }
+            mu_values.extend(row.mu);
+            hat_values.extend(row.hat);
+            beta_iter.push(row.iter);
+            beta_converged.push(row.converged);
+        }
     }
 
-    let beta_for_routing =
-        RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values.clone())?;
-    let covariance_for_routing =
-        RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values.clone())?;
-    let fallback_rows = optim_fallback_rows(
-        &beta_converged,
-        &beta_for_routing,
-        &covariance_for_routing,
-        options.use_optim,
-        options.force_optim,
-    )?;
+    let (mut beta_values, mut beta_covariance_values, fallback_rows) = if requirements.covariance()
+    {
+        let beta_for_routing = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values)?;
+        let covariance_for_routing =
+            RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values)?;
+        let rows = optim_fallback_rows(
+            &beta_converged,
+            &beta_for_routing,
+            &covariance_for_routing,
+            options.use_optim,
+            options.force_optim,
+        )?;
+        (
+            beta_for_routing.into_values(),
+            covariance_for_routing.into_values(),
+            rows,
+        )
+    } else {
+        (beta_values, beta_covariance_values, transient_fallback)
+    };
     let mut optim_log_like = vec![None; counts.n_genes()];
     if !fallback_rows.rows.is_empty() {
         refit_optim_fallback_rows(
@@ -319,8 +415,15 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     let beta_se = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_var_values)?;
     let beta_optim_start =
         RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_optim_start_values)?;
-    let beta_covariance =
-        RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values)?;
+    let beta_covariance = if requirements.covariance() {
+        Some(RowMajorMatrix::from_row_major(
+            counts.n_genes(),
+            p * p,
+            beta_covariance_values,
+        )?)
+    } else {
+        None
+    };
     let mu = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), mu_values)?;
     let hat_diagonal =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), hat_values)?;
@@ -337,7 +440,7 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
         beta,
         beta_se,
         beta_optim_start,
-        beta_covariance: Some(beta_covariance),
+        beta_covariance,
         mu,
         beta_iter,
         beta_optim_iter,
@@ -348,6 +451,16 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
         n_terms: p,
         hat_diagonal,
     })
+}
+
+fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqError> {
+    rows.checked_mul(columns)
+        .filter(|&length| length <= isize::MAX as usize / std::mem::size_of::<f64>())
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: "IRLS output allocation overflow".into(),
+            expected: isize::MAX as usize / std::mem::size_of::<f64>(),
+            actual: rows.saturating_mul(columns),
+        })
 }
 
 struct OptimFallbackInput<'a> {

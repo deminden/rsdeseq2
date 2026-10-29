@@ -7,6 +7,68 @@ mod tests {
     use serde::Deserialize;
 
     #[test]
+    fn transient_covariance_preserves_all_retained_fields_and_fallbacks() {
+        let counts = CountMatrix::from_row_major_u32(
+            3,
+            6,
+            vec![
+                4, 7, 5, 11, 13, 9, 1, 0, 2, 90, 105, 87, 20, 15, 23, 6, 9, 5,
+            ],
+        )
+        .unwrap();
+        let design = DesignMatrix::from_row_major(
+            6,
+            2,
+            vec![1., 0., 1., 0., 1., 0., 1., 1., 1., 1., 1., 1.],
+            None,
+        )
+        .unwrap();
+        let weights = RowMajorMatrix::from_row_major(
+            3,
+            6,
+            vec![
+                1., 0.4, 0.8, 1., 1., 0.9, 0.1, 1., 1., 1., 0.5, 1., 1., 1., 0.6, 1., 1., 1.,
+            ],
+        )
+        .unwrap();
+        for weights in [None, Some(&weights)] {
+            for force_optim in [false, true] {
+                let options = IrlsOptions {
+                    force_optim,
+                    ..IrlsOptions::default()
+                };
+                let mut full = fit_sf_irls_for_output(
+                    &counts,
+                    &design,
+                    &[0.8, 1., 1.2, 0.9, 1.1, 1.],
+                    &[0.1, 0.2, 0.3],
+                    weights,
+                    options.clone(),
+                    OutputRequirements::Inference,
+                )
+                .unwrap();
+                assert!(full.beta_covariance.take().is_some());
+                for requirements in [OutputRequirements::Means, OutputRequirements::Transform] {
+                    let transient = fit_sf_irls_for_output(
+                        &counts,
+                        &design,
+                        &[0.8, 1., 1.2, 0.9, 1.1, 1.],
+                        &[0.1, 0.2, 0.3],
+                        weights,
+                        options.clone(),
+                        requirements,
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        transient, full,
+                        "{requirements:?}, force_optim={force_optim}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn log2_output_scaling_rejects_nonfinite_values() {
         assert!(matches!(
             checked_log2_scale(f64::MAX, 0, "test beta scale"),
@@ -192,10 +254,8 @@ mod tests {
 
     #[test]
     fn optim_fallback_replays_portable_objective_only_r_optim_gtex_cases() {
-        let fixture: HardROptimFixture = serde_json::from_str(include_str!(
-            "fixtures/gtex_optim_reference.json"
-        ))
-        .unwrap();
+        let fixture: HardROptimFixture =
+            serde_json::from_str(include_str!("fixtures/gtex_optim_reference.json")).unwrap();
         assert_eq!(fixture.contrasts.len(), 1);
         let contrast = &fixture.contrasts[0];
         assert_eq!(contrast.contrast, "GTEx_kidney_blocked");

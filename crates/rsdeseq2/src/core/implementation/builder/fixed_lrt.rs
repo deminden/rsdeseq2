@@ -41,11 +41,11 @@ impl DeseqBuilder {
         fit.dispersion = Some(lrt_output.expanded_dispersions);
         fit.cooks = Some(lrt_output.cooks.cooks);
         fit.max_cooks = Some(lrt_output.cooks.max_cooks);
-        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
-        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
-        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
-        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
-        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like);
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged);
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter);
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu);
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal);
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
@@ -215,11 +215,11 @@ impl DeseqBuilder {
         fit.dispersion = Some(lrt_output.expanded_dispersions);
         fit.cooks = Some(lrt_output.cooks.cooks);
         fit.max_cooks = Some(lrt_output.cooks.max_cooks);
-        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
-        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
-        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
-        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
-        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like);
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged);
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter);
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu);
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal);
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
@@ -702,11 +702,11 @@ impl DeseqBuilder {
         fit.dispersion = Some(lrt_output.expanded_dispersions);
         fit.cooks = Some(lrt_output.cooks.cooks);
         fit.max_cooks = Some(lrt_output.cooks.max_cooks);
-        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like.clone());
-        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged.clone());
-        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter.clone());
-        fit.reduced_mu = Some(lrt_output.reduced_fit.mu.clone());
-        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal.clone());
+        fit.reduced_log_like = Some(lrt_output.reduced_fit.log_like);
+        fit.reduced_beta_converged = Some(lrt_output.reduced_fit.beta_converged);
+        fit.reduced_beta_iter = Some(lrt_output.reduced_fit.beta_iter);
+        fit.reduced_mu = Some(lrt_output.reduced_fit.mu);
+        fit.reduced_hat_diagonal = Some(lrt_output.reduced_fit.hat_diagonal);
         attach_glm_fit(&mut fit, lrt_output.full_fit);
         fit.lrt = Some(lrt_output.lrt);
         Ok((fit, lrt_output.results))
