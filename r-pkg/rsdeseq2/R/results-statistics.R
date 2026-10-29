@@ -65,115 +65,16 @@
 }
 
 .rsdeseq2_wald_stat_pvalue_with_options <- function(beta, betaSE, options) {
-  stat <- rep(NA_real_, length(beta))
-  pvalue <- rep(NA_real_, length(beta))
-  valid <- !is.na(beta) & !is.na(betaSE) & is.finite(beta) & is.finite(betaSE) & betaSE > 0
-  if (!any(valid)) {
-    return(list(stat = stat, pvalue = pvalue))
-  }
-  for (idx in which(valid)) {
-    one <- .rsdeseq2_wald_one_with_options(
-      beta = beta[[idx]],
-      betaSE = betaSE[[idx]],
-      gene = idx,
-      options = options
-    )
-    stat[[idx]] <- one$stat
-    pvalue[[idx]] <- one$pvalue
-  }
-  list(stat = stat, pvalue = pvalue)
+  .Call("rsdeseq2_wald_statistics", as.numeric(beta), as.numeric(betaSE),
+    options$lfcThreshold,
+    as.integer(match(options$altHypothesis,
+      c("greaterAbs", "greaterAbsUPSHOT", "greaterAbs2014", "lessAbs", "greater", "less")) - 1L),
+    options$useT, options$degreesOfFreedom, PACKAGE = "rsdeseq2")
 }
 
-.rsdeseq2_wald_one_with_options <- function(beta, betaSE, gene, options) {
-  defaultStat <- beta / betaSE
-  threshold <- options$lfcThreshold
-  absBeta <- abs(beta)
-  tail <- .rsdeseq2_wald_tail(options, gene)
-  alt <- options$altHypothesis
-
-  if (identical(alt, "greaterAbs") && threshold == 0) {
-    return(list(stat = defaultStat, pvalue = tail$twoSided(defaultStat)))
-  }
-  if (identical(alt, "greaterAbs")) {
-    q1 <- (-absBeta + threshold) / betaSE
-    q2 <- (-absBeta - threshold) / betaSE
-    return(list(stat = defaultStat, pvalue = .rsdeseq2_clamp_probability(tail$lower(q1) + tail$lower(q2))))
-  }
-  if (identical(alt, "greaterAbsUPSHOT") && threshold == 0) {
-    return(list(stat = defaultStat, pvalue = tail$twoSided(defaultStat)))
-  }
-  if (identical(alt, "greaterAbsUPSHOT")) {
-    return(list(
-      stat = defaultStat,
-      pvalue = .rsdeseq2_greater_abs_upshot_normal_pvalue(absBeta, betaSE, threshold)
-    ))
-  }
-  if (identical(alt, "greaterAbs2014")) {
-    shifted <- (absBeta - threshold) / betaSE
-    return(list(
-      stat = sign(beta) * max(shifted, 0),
-      pvalue = .rsdeseq2_clamp_probability(2 * tail$upper(shifted))
-    ))
-  }
-  if (identical(alt, "lessAbs")) {
-    aboveShift <- (threshold - beta) / betaSE
-    belowShift <- (beta + threshold) / betaSE
-    return(list(
-      stat = min(max(aboveShift, 0), max(belowShift, 0)),
-      pvalue = max(tail$upper(aboveShift), tail$upper(belowShift))
-    ))
-  }
-  if (identical(alt, "greater")) {
-    shifted <- (beta - threshold) / betaSE
-    return(list(stat = max(shifted, 0), pvalue = tail$upper(shifted)))
-  }
-  shiftedStat <- (beta + threshold) / betaSE
-  shiftedPvalue <- (-threshold - beta) / betaSE
-  list(stat = min(shiftedStat, 0), pvalue = tail$upper(shiftedPvalue))
-}
-
-.rsdeseq2_wald_tail <- function(options, gene) {
-  if (isTRUE(options$useT)) {
-    df <- options$degreesOfFreedom[[gene]]
-    if (is.na(df)) {
-      return(list(
-        twoSided = function(q) NA_real_,
-        upper = function(q) NA_real_,
-        lower = function(q) NA_real_
-      ))
-    }
-    return(list(
-      twoSided = function(q) .rsdeseq2_clamp_probability(2 * stats::pt(abs(q), df = df, lower.tail = FALSE)),
-      upper = function(q) .rsdeseq2_clamp_probability(stats::pt(q, df = df, lower.tail = FALSE)),
-      lower = function(q) .rsdeseq2_clamp_probability(stats::pt(q, df = df, lower.tail = TRUE))
-    ))
-  }
-  list(
-    twoSided = function(q) .rsdeseq2_clamp_probability(2 * stats::pnorm(abs(q), lower.tail = FALSE)),
-    upper = function(q) .rsdeseq2_clamp_probability(stats::pnorm(q, lower.tail = FALSE)),
-    lower = function(q) .rsdeseq2_clamp_probability(stats::pnorm(q, lower.tail = TRUE))
-  )
-}
-
-.rsdeseq2_greater_abs_upshot_normal_pvalue <- function(absBeta, betaSE, threshold) {
-  a <- (absBeta - threshold) / betaSE
-  b <- (absBeta + threshold) / betaSE
-  denominator <- b - a
-  if (!is.finite(denominator) || denominator == 0) {
-    return(NA_real_)
-  }
-  value <- (2 / denominator) * (-a * stats::pnorm(a, lower.tail = FALSE) +
-    stats::dnorm(a) +
-    b * stats::pnorm(b, lower.tail = FALSE) -
-    stats::dnorm(b))
-  .rsdeseq2_clamp_probability(value)
-}
-
-.rsdeseq2_clamp_probability <- function(value) {
-  if (!is.finite(value)) {
-    return(NA_real_)
-  }
-  max(0, min(1, value))
+.rsdeseq2_default_cooks_cutoff <- function(design) {
+  .Call("rsdeseq2_default_cooks_cutoff", as.integer(nrow(design)),
+    as.integer(ncol(design)), PACKAGE = "rsdeseq2")
 }
 
 .rsdeseq2_contrast_se_from_primitive_fit <- function(fit, numericContrast) {

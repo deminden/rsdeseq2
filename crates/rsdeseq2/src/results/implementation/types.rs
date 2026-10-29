@@ -26,7 +26,6 @@ use crate::matrix::RowMajorMatrix;
 use crate::multiple_testing::bh_adjust;
 use crate::normalization::{normalized_counts, normalized_counts_with_factors};
 use crate::options::{CooksCutoff, TestType};
-use statrs::distribution::{ContinuousCDF, FisherSnedecor};
 
 /// Core DESeq2 `results()` column names emitted by the current Rust result rows.
 pub const DESEQ2_RESULT_CORE_COLUMNS: [&str; 6] = [

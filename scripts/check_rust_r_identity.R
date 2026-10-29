@@ -17,7 +17,7 @@ hex <- function(value) {
 hexVector <- function(values) lapply(unname(values), hex)
 withoutRCalculations <- function(expression) {
   # Fail at runtime if the production wrapper reintroduces statistical R calls.
-  functions <- list(stats = c("p.adjust", "quantile", "lowess"), base = "mean")
+  functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = "mean")
   on.exit(for (package in names(functions)) for (name in functions[[package]])
     suppressMessages(untrace(name, where = asNamespace(package))), add = TRUE)
   for (package in names(functions)) for (name in functions[[package]])
@@ -130,3 +130,43 @@ for (name in names(normalizationCases)) {
   })
 }
 capture.output(sessionInfo(), file = file.path(output, "R-session.txt"))
+
+# Inference primitives exercise every alternative, invalid/missing rows, scalar
+# and per-gene t df, LRT tails and both present/absent Cook's cutoff metadata.
+values <- c(-4,-.25,0,.25,2,NaN,Inf,1e308)
+errors <- c(.25,.5,1,.5,1,1,1,1e-308)
+strings <- function(values) as.list(sprintf("%.17g",values))
+alternatives <- c("greaterAbs","greaterAbsUPSHOT","greaterAbs2014","lessAbs","greater","less")
+for (t in c(FALSE,TRUE)) for (alternative in alternatives) {
+  if (t && alternative=="greaterAbsUPSHOT") next
+  df <- if (t) c(.5,1,5,10,25,NA_real_,-1,Inf) else NULL
+  # Represent missing df as IEEE NaN for both transports, independently of JSON null.
+  if (t) df[is.na(df)] <- NaN
+  input <- list(operation="wald",beta=strings(values),se=strings(errors),threshold="0.75",
+                alternative=alternative,df=if(t) strings(df) else NULL)
+  actual <- withoutRCalculations(rsdeseq2:::.rsdeseq2_wald_stat_pvalue_with_options(values,errors,
+    list(lfcThreshold=.75,altHypothesis=alternative,useT=t,degreesOfFreedom=df)))
+  compareIdentity(paste0("wald_",alternative,"_",t),input,
+    list(stat=hexVector(actual$stat),pvalue=hexVector(actual$pvalue)))
+}
+for (df in c(.5,2,10,100,1e6,1e12)) {
+  input <- list(operation="wald",beta=strings(values),se=strings(errors),threshold="0",
+                alternative="greaterAbs",df=strings(df))
+  actual <- withoutRCalculations(.Call("rsdeseq2_wald_statistics",values,errors,0,0L,TRUE,df,PACKAGE="rsdeseq2"))
+  compareIdentity(paste0("wald_scalar_df_",df),input,list(stat=hexVector(actual$stat),pvalue=hexVector(actual$pvalue)))
+}
+for (df in list(2,c(.5,1,2,3,10,100,1e6,NaN))) {
+  stat <- c(0,.1,2,6,40,100,1e6,NaN)
+  input <- list(operation="lrt",statistics=strings(stat),df=strings(df))
+  actual <- withoutRCalculations(.Call("rsdeseq2_lrt_pvalues",stat,df,PACKAGE="rsdeseq2"))
+  compareIdentity(paste0("lrt_",length(df)),input,list(pvalue=hexVector(actual)))
+}
+for (pair in list(c(8L,2L),c(4L,4L),c(61L,3L),c(52L,2L),c(1000L,500L),c(1000000L,500000L))) {
+  input <- list(operation="cooks",samples=pair[1],coefficients=pair[2])
+  actual <- withoutRCalculations(.Call("rsdeseq2_default_cooks_cutoff",pair[1],pair[2],PACKAGE="rsdeseq2"))
+  compareIdentity(paste0("cooks_",pair[1],"_",pair[2]),input,list(cutoff=if(is.null(actual)) NULL else hex(actual)))
+}
+
+emptyInput <- list(operation="wald",beta=list(),se=list(),threshold="0",alternative="greaterAbs",df=list())
+emptyActual <- withoutRCalculations(.Call("rsdeseq2_wald_statistics",numeric(),numeric(),0,0L,TRUE,numeric(),PACKAGE="rsdeseq2"))
+compareIdentity("wald_empty_t",emptyInput,list(stat=hexVector(emptyActual$stat),pvalue=hexVector(emptyActual$pvalue)))

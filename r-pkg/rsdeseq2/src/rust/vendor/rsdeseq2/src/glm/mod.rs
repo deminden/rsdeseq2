@@ -4,6 +4,7 @@ pub mod beta;
 pub mod dispersion_fit;
 pub mod fallback;
 pub(crate) mod inference;
+mod inference_primitives;
 pub mod irls;
 pub mod lrt;
 pub mod nb;
@@ -34,13 +35,14 @@ pub use beta::{
 };
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{OptimFallbackRows, optim_fallback_rows};
+pub use inference_primitives::wald_test_from_estimates;
 pub use irls::{
     IrlsOptions, IrlsSolver, fit_fixed_dispersion_irls,
     fit_fixed_dispersion_irls_with_normalization_factors,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
     fit_fixed_dispersion_irls_with_weights, fit_irls,
 };
-pub use lrt::lrt_test;
+pub use lrt::{lrt_pvalues_from_statistics, lrt_test};
 pub use nb::{
     nbinom_log_likelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
     nbinom_log_pmf, nbinom_negative_twice_log_likelihood,

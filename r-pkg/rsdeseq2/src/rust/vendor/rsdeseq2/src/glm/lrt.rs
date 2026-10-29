@@ -75,8 +75,53 @@ fn lrt_deviance_statistic(full_log_like: f64, reduced_log_like: f64) -> Option<f
 }
 
 fn lrt_pvalue(distribution: &ChiSquared, statistic: f64) -> Option<f64> {
-    let pvalue = distribution.sf(statistic.max(0.0));
+    let pvalue = if distribution.freedom() == 2.0 {
+        (-0.5 * statistic.max(0.0)).exp()
+    } else if distribution.freedom() >= 64.0 {
+        crate::probability::large_shape_chi_square_tail(statistic, distribution.freedom())
+    } else {
+        distribution.sf(statistic.max(0.0))
+    };
     pvalue.is_finite().then_some(pvalue.clamp(0.0, 1.0))
+}
+
+/// Evaluate the fitted-LRT chi-square tail from borrowed statistics and df.
+///
+/// Degrees of freedom may be scalar or one per statistic. Nonfinite statistics
+/// and missing/nonpositive df produce missing p-values. Finite negative
+/// statistics evaluate at zero, as in the fitted likelihood-ratio test.
+pub fn lrt_pvalues_from_statistics(
+    statistics: &[f64],
+    degrees_of_freedom: &[f64],
+) -> Result<Vec<Option<f64>>, DeseqError> {
+    if degrees_of_freedom.len() != 1 && degrees_of_freedom.len() != statistics.len() {
+        return Err(invalid_dimensions(
+            "LRT statistic degrees of freedom",
+            statistics.len(),
+            degrees_of_freedom.len(),
+        ));
+    }
+    let mut cached: Option<(f64, ChiSquared)> = None;
+    let mut pvalues = Vec::with_capacity(statistics.len());
+    for (gene, &statistic) in statistics.iter().enumerate() {
+        let df = degrees_of_freedom[if degrees_of_freedom.len() == 1 {
+            0
+        } else {
+            gene
+        }];
+        if !statistic.is_finite() || !df.is_finite() || df <= 0.0 {
+            pvalues.push(None);
+            continue;
+        }
+        if cached.as_ref().is_none_or(|(previous, _)| *previous != df) {
+            let distribution = ChiSquared::new(df).map_err(|error| DeseqError::InvalidOptions {
+                reason: format!("invalid LRT chi-square distribution: {error}"),
+            })?;
+            cached = Some((df, distribution));
+        }
+        pvalues.push(lrt_pvalue(&cached.as_ref().unwrap().1, statistic));
+    }
+    Ok(pvalues)
 }
 
 fn checked_sub(left: f64, right: f64) -> Option<f64> {

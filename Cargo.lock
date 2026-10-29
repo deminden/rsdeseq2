@@ -788,6 +788,7 @@ dependencies = [
  "clap",
  "criterion",
  "csv",
+ "libm",
  "nalgebra 0.35.0",
  "rayon",
  "rcompat-lbfgsb",

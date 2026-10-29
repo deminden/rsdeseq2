@@ -32,6 +32,7 @@ pub mod multiple_testing;
 pub mod normalization;
 pub mod options;
 pub mod prelude;
+mod probability;
 pub mod results;
 pub mod transform;
 

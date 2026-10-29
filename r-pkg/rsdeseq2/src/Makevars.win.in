@@ -11,6 +11,7 @@ FORCE:
 .PHONY: FORCE
 
 entrypoint.o: $(RUST_BACKEND) validation.h
+inference_statistics.o: $(RUST_BACKEND) validation.h inference_statistics.h
 result_filtering.o: $(RUST_BACKEND) validation.h result_filtering.h
 
 PKG_LIBS = $(RUST_BACKEND)

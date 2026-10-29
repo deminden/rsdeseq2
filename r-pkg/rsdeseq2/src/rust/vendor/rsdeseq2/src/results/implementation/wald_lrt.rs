@@ -254,6 +254,9 @@ pub fn resolve_cooks_cutoff(
 }
 
 /// DESeq2 default Cook's cutoff, `qf(.99, p, m - p)`.
+///
+/// Includes R's established extreme-df chi-square limit policy, evaluated by
+/// the same standalone Rust probability implementation for both interfaces.
 pub fn default_cooks_cutoff(
     n_samples: usize,
     n_coefficients: usize,
@@ -270,13 +273,7 @@ pub fn default_cooks_cutoff(
             actual: n_coefficients,
         });
     }
-    let distribution =
-        FisherSnedecor::new(df1, df2).map_err(|error| DeseqError::InvalidDimensions {
-            context: format!("Cook's cutoff F distribution: {error}"),
-            expected: n_samples,
-            actual: n_coefficients,
-        })?;
-    let cutoff = distribution.inverse_cdf(0.99);
+    let cutoff = crate::probability::f_99_quantile(df1, df2);
     if !cutoff.is_finite() {
         return Err(DeseqError::NonFiniteValue {
             context: "Cook's default cutoff".to_string(),

@@ -81,3 +81,9 @@ mean the older R calculations listed above have already been removed.
 The [first standalone primitive checkpoint](rust-only-primitives-2026-10-29.md)
 completes shared filtering/BH and fixes supplied geometric-mean transport, with
 20 direct bit-equality cases. The remaining stages above are still required.
+
+The [shared inference checkpoint](rust-only-inference-2026-10-29.md) additionally
+moves Wald statistics/tails, primitive LRT probabilities and default Cook's
+cutoffs into Rust, with 46 direct bit-equality cases and 1,169 independent
+scalar references. Contrast products/SEs and the remaining batch, zero/offset,
+formula and shrinkage work above are still pending.

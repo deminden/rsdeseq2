@@ -90,8 +90,7 @@ lrtFitRust <- function(baseMean,
     if (is.null(lrtDf)) {
       stop("lrtDf is required when lrtPvalue is NULL", call. = FALSE)
     }
-    lrtPvalue <- stats::pchisq(lrtStat, df = lrtDf, lower.tail = FALSE)
-    lrtPvalue[is.na(lrtStat) | is.na(lrtDf)] <- NA_real_
+    lrtPvalue <- .Call("rsdeseq2_lrt_pvalues", lrtStat, as.numeric(lrtDf), PACKAGE = "rsdeseq2")
   } else {
     lrtPvalue <- .rsdeseq2_align_named_gene_vector(lrtPvalue, geneNames, "lrtPvalue")
     lrtPvalue <- .rsdeseq2_validate_result_pvalues(lrtPvalue, nGenes)
