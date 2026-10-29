@@ -298,5 +298,6 @@ The independent Pasilla panel is committed with its source archive identity,
 selection rule, counts/design and pre-optimization R references. Its generator
 and `scripts/check_pasilla_holdout.py` are included. Keep its frozen references
 unchanged when checking a candidate; see the [memory report](memory-improvements-2026-10-29.md).
-The [R request report](results-improvements-2026-10-29.md) documents the exact
-bulk/individual output gate and the retained R BH arithmetic probe.
+The [Rust-only wrapper migration](rust-only-wrapper-migration.md) records the
+replacement contract and its required direct cross-interface equality checks.
+The previous R-backed request implementation and its acceptance claims were withdrawn.

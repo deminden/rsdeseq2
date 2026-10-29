@@ -1,12 +1,12 @@
 # Compatibility
 
 Current source changes and their gates are recorded in the
-[execution report](codebase-improvement-progress-2026-10-29.md). Fitted R
-`resultsList()` preserves ordinary result classes/metadata with one dataset
-validation per batch. Stored Rust `ResultRequest` supports explicit Wald options
-and rejects incompatible LRT options. R retains its established matrix and
-filtering arithmetic; supported gene subsets are checked against all three
-shrinkage reference methods.
+[execution report](codebase-improvement-progress-2026-10-29.md). Stored Rust
+`ResultRequest` supports explicit Wald options and rejects incompatible LRT
+options. The experimental R-backed batch implementation has been removed.
+The replacement must move statistical calculations out of the R wrapper and
+use the standalone Rust engine identically; see the
+[Rust-only implementation contract](rust-only-wrapper-migration.md).
 
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).

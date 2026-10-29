@@ -1,6 +1,7 @@
 # Current GTEx native Wald comparison — 2026-10-29
 
-The measured numerical/CLI source checkpoint is `807a107`. The executable
+This historical development measurement used checkpoint `807a107`, whose
+R-backed changes have since been removed from the active branch. Its executable
 SHA-256 is `813b8552d62760150bd23dad8c22fc6f4dbe365e87af1f585c2aa0dd2968e678`.
 This is development-checkout evidence; package versions remain 0.3.1 and this work
 has not created a new release.
@@ -74,8 +75,8 @@ scope includes output staging, hashing and completion-record publication.
 Native peak RSS is 211.42–301.95 MiB, versus DESeq2 1,600.14–1,763.56 MiB.
 Whole-process RSS includes input/interpreter/libraries; it is not just fitted
 buffer storage. Groups show medians across distinct contrasts. Internal memory
-and R workflow changes are recorded in the [memory report](memory-improvements-2026-10-29.md)
-and [result-workflow report](results-improvements-2026-10-29.md).
+and earlier R workflow changes are recorded in the [memory report](memory-improvements-2026-10-29.md).
+These figures do not validate the pending [Rust-only wrapper migration](rust-only-wrapper-migration.md).
 
 ## Committed evidence
 
