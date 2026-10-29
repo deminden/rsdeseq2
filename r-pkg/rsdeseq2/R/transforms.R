@@ -20,7 +20,7 @@
   blind <- isTRUE(blind)
   counts <- SummarizedExperiment::assay(object, "counts")
   counts <- .rsdeseq2_validate_counts(counts)
-  if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc != floor(nproc)) {
+  if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc > .Machine$integer.max || nproc != floor(nproc)) {
     stop("nproc must be a positive integer", call. = FALSE)
   }
   fitType <- match.arg(fitType, c("parametric", "local", "mean"))
@@ -111,23 +111,11 @@
   if (!is.null(weights)) {
     weights <- .rsdeseq2_align_fit_observations(weights, counts, "weights")
   }
-  if (!blind && !is.null(formulaOffsets)) {
-    if (any(!is.finite(formulaOffsets))) {
-      stop("formula offsets must be finite", call. = FALSE)
-    }
-    offsetFactors <- matrix(
-      rep(exp(formulaOffsets), each = nrow(counts)),
-      nrow = nrow(counts),
-      ncol = ncol(counts),
-      dimnames = dimnames(counts)
-    )
-    normalizationFactors <- if (is.null(normalizationFactors)) {
-      offsetFactors
-    } else {
-      normalizationFactors * offsetFactors
-    }
-    normalizationFactors <- .rsdeseq2_validate_normalization_factors(normalizationFactors, counts)
-  }
+  normalizationFrame <- stats::model.frame(methods::slot(object, "design"), data = colData)
+  prepared <- .rsdeseq2_prepare_normalization(
+    object, counts, sizeFactors, normalizationFactors, stats::model.offset(normalizationFrame))
+  sizeFactors <- prepared$sizeFactors
+  normalizationFactors <- prepared$normalizationFactors
   if (is.null(normalizationFactors) && !is.null(sizeFactors)) {
     if (!is.null(names(sizeFactors)) && !is.null(colnames(counts))) {
       if (anyDuplicated(names(sizeFactors)) || anyDuplicated(colnames(counts))) {

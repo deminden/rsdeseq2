@@ -147,7 +147,7 @@
       !requireNamespace("DESeq2", quietly = TRUE)) {
     stop("SummarizedExperiment, S4Vectors, and DESeq2 are required for DESeqDataSet shrinkage", call. = FALSE)
   }
-  fit <- S4Vectors::metadata(dds)$rsdeseq2RustFit
+  fit <- .rsdeseq2_fitted_view(dds)
   if (is.null(fit) || !inherits(fit, "rsdeseq2RustFit")) {
     stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling lfcShrink()", call. = FALSE)
   }
@@ -375,7 +375,7 @@
       stop(sprintf("type='apeglm' requires package '%s'", package), call. = FALSE)
     }
   }
-  fit <- S4Vectors::metadata(dds)$rsdeseq2RustFit
+  fit <- .rsdeseq2_fitted_view(dds)
   if (is.null(fit) || !inherits(fit, "rsdeseq2RustFit")) {
     stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling lfcShrink()", call. = FALSE)
   }
@@ -548,7 +548,7 @@
   if (!requireNamespace("ashr", quietly = TRUE)) {
     stop("type='ashr' requires installing the optional package 'ashr'", call. = FALSE)
   }
-  fit <- S4Vectors::metadata(dds)$rsdeseq2RustFit
+  fit <- .rsdeseq2_fitted_view(dds)
   if (is.null(fit) || !inherits(fit, "rsdeseq2RustFit")) {
     stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling lfcShrink()", call. = FALSE)
   }

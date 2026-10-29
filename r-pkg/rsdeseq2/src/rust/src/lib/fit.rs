@@ -138,7 +138,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             }
             (merged_fit, output.results().clone(), Some(output))
         };
-        const COLUMNS: usize = 11;
+        const COLUMNS: usize = 13;
         let output = unsafe {
             output_slice(
                 result_output,
@@ -148,7 +148,33 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 "result table",
             )?
         };
+        let mut refitted = vec![false; n_genes];
+        let mut newly_zero = vec![false; n_genes];
+        if let Some(replacement) = &replacement {
+            for &gene in &replacement.refit_plan().new_all_zero_rows {
+                newly_zero[gene] = true;
+            }
+            for &gene in &replacement.refit_plan().refit_rows {
+                refitted[gene] = true;
+            }
+        }
         for (gene, row) in results.rows.iter().enumerate() {
+            let raw_fit = if refitted[gene] {
+                replacement.as_ref().and_then(|value| value.refit_fit()).unwrap_or(&fit)
+            } else {
+                &fit
+            };
+            let (raw_stat, raw_pvalue) = if newly_zero[gene] {
+                (Some(0.0), Some(1.0))
+            } else if fit.all_zero[gene] {
+                (None, None)
+            } else if let Some(lrt) = &raw_fit.lrt {
+                (lrt.deviance[gene], lrt.pvalue[gene])
+            } else if let Some(wald) = &raw_fit.wald {
+                (wald.stat[gene], wald.pvalue[gene])
+            } else {
+                return Err("fit is missing raw test statistics".into());
+            };
             let values = [
                 row.base_mean,
                 row.log2_fold_change.unwrap_or(f64::NAN),
@@ -165,6 +191,8 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                     .map_or(f64::NAN, |value| f64::from(value as u8)),
                 row.filtered
                     .map_or(f64::NAN, |value| f64::from(value as u8)),
+                raw_pvalue.unwrap_or(f64::NAN),
+                raw_stat.unwrap_or(f64::NAN),
             ];
             for (column, value) in values.into_iter().enumerate() {
                 output[gene + column * n_genes] = value;

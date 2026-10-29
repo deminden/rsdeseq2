@@ -49,6 +49,8 @@ fn run_backend(operation: impl FnOnce() -> Result<(), String>) -> i32 {
     }
 }
 
+// SAFETY: the C entry point must validate the allocated buffer's element count,
+// type and lifetime before passing a pointer. Null checks cannot prove length.
 unsafe fn input_slice<'a, T>(
     pointer: *const T,
     length: usize,
