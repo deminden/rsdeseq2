@@ -3,6 +3,7 @@
 //! Public items are re-exported from a split private implementation so
 //! existing `rsdeseq2::core::*` paths remain source-compatible.
 
+mod execution;
 mod implementation;
 
 pub use implementation::*;

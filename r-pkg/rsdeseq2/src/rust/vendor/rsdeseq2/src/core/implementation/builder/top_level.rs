@@ -6,6 +6,10 @@ impl DeseqBuilder {
     /// coefficient selection shape. For `test=Lrt`, callers must first store a
     /// reduced design with [`DeseqBuilder::reduced_design`].
     pub fn fit(&self, counts: &CountMatrix, design: &DesignMatrix) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit(counts, design));
+        }
+
         self.fit_with_results(counts, design)
             .map(|(fit, _results)| fit)
     }
@@ -18,6 +22,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         formula: &str,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula(counts, formula));
+        }
+
         self.fit_formula_with_results(counts, formula)
             .map(|(fit, _results)| fit)
     }
@@ -30,6 +38,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results(counts, design));
+        }
+
         match self.test {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
@@ -50,6 +62,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         formula: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_results(counts, formula));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results(counts, &formula_design.design.standard_design)
@@ -62,6 +78,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_name(counts, design, coefficient_name));
+        }
+
         match self.test {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
@@ -82,6 +102,10 @@ impl DeseqBuilder {
         formula: &str,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_results_name(counts, formula, coefficient_name));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_name(
@@ -99,6 +123,10 @@ impl DeseqBuilder {
         formula: &str,
         coefficient_name: &str,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_name(counts, formula, coefficient_name));
+        }
+
         self.fit_formula_with_results_name(counts, formula, coefficient_name)
             .map(|(fit, _results)| fit)
     }
@@ -110,6 +138,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_with_cooks_replacement(counts, design, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
@@ -134,6 +166,10 @@ impl DeseqBuilder {
         formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_results_with_cooks_replacement(counts, formula, replacement_options));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_with_cooks_replacement(
@@ -151,6 +187,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_name_with_cooks_replacement(counts, design, coefficient_name, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
@@ -177,6 +217,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_results_name_with_cooks_replacement(counts, formula, coefficient_name, replacement_options));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_name_with_cooks_replacement(
@@ -197,6 +241,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_with_cooks_replacement(counts, design, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self
                 .fit_with_results_with_cooks_replacement(counts, design, replacement_options)
@@ -222,6 +270,10 @@ impl DeseqBuilder {
         formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_test_results_with_cooks_replacement(counts, formula, replacement_options));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_with_cooks_replacement(
@@ -242,6 +294,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_name_with_cooks_replacement(counts, design, coefficient_name, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self
                 .fit_with_results_name_with_cooks_replacement(
@@ -274,6 +330,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_test_results_name_with_cooks_replacement(counts, formula, coefficient_name, replacement_options));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_name_with_cooks_replacement(
@@ -296,6 +356,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_contrast(counts, design, contrast));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast(counts, design, contrast),
             TestType::Lrt => {
@@ -312,6 +376,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_contrast(counts, design, contrast));
+        }
+
         self.fit_with_results_contrast(counts, design, contrast)
             .map(|(fit, _results)| fit)
     }
@@ -324,6 +392,10 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_with_cooks_replacement(
                 counts,
@@ -345,6 +417,10 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self
                 .fit_with_results_contrast_with_cooks_replacement(
@@ -375,6 +451,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_contrast_spec(counts, design, contrast));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_spec(counts, design, contrast),
             TestType::Lrt => {
@@ -440,6 +520,10 @@ impl DeseqBuilder {
         formula: &str,
         contrast: &ResultsContrast,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_results_contrast_request(counts, formula, contrast));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_contrast_request::<String>(
@@ -463,6 +547,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_contrast_request_from_model_frame(counts, design, contrast, model_frame));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
@@ -478,6 +566,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_contrast_spec(counts, design, contrast));
+        }
+
         self.fit_with_results_contrast_spec(counts, design, contrast)
             .map(|(fit, _results)| fit)
     }
@@ -490,6 +582,10 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_contrast_spec_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
                 counts,
@@ -512,6 +608,10 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_contrast_spec_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self
                 .fit_with_results_contrast_spec_with_cooks_replacement(
@@ -622,6 +722,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_formula_with_test_results_contrast_request_with_cooks_replacement(counts, formula, contrast, replacement_options));
+        }
+
         let formula_design = self.expanded_formula_design_with_offsets(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_test_results_contrast_request_with_cooks_replacement::<String>(
@@ -643,6 +747,10 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(counts, design, contrast, model_frame, replacement_options));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         match self.test {
             TestType::Wald => {
@@ -688,6 +796,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_factor_level_contrast(counts, design, contrast));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
             TestType::Lrt => {
@@ -709,6 +821,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_factor_level_contrast(counts, design, contrast));
+        }
+
         self.fit_with_results_factor_level_contrast(counts, design, contrast)
             .map(|(fit, _results)| fit)
     }
@@ -721,6 +837,10 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_results_factor_level_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self.with_automatic_dispersion_means().fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
                 counts,
@@ -743,6 +863,10 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_with_test_results_factor_level_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+        }
+
         match self.test {
             TestType::Wald => self
                 .fit_with_results_factor_level_contrast_with_cooks_replacement(
@@ -776,6 +900,10 @@ impl DeseqBuilder {
         full_design: &DesignMatrix,
         reduced_design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt(counts, full_design, reduced_design));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_with_results(counts, full_design, reduced_design)
             .map(|(fit, _results)| fit)
     }
@@ -789,6 +917,10 @@ impl DeseqBuilder {
         full_formula: &str,
         reduced_formula: &str,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula(counts, full_formula, reduced_formula));
+        }
+
         self.fit_lrt_formula_with_results(counts, full_formula, reduced_formula)
             .map(|(fit, _results)| fit)
     }
@@ -800,6 +932,10 @@ impl DeseqBuilder {
         full_design: &DesignMatrix,
         reduced_design: &DesignMatrix,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results(counts, full_design, reduced_design));
+        }
+
         let coefficient = default_results_coefficient(full_design)?;
         self.with_automatic_dispersion_means().fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
@@ -813,6 +949,10 @@ impl DeseqBuilder {
         full_formula: &str,
         reduced_formula: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results(counts, full_formula, reduced_formula));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
@@ -831,6 +971,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name));
+        }
+
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
         self.with_automatic_dispersion_means().fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
     }
@@ -845,6 +989,10 @@ impl DeseqBuilder {
         reduced_formula: &str,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results_name(counts, full_formula, reduced_formula, coefficient_name));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
@@ -866,6 +1014,10 @@ impl DeseqBuilder {
         reduced_formula: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results_with_cooks_replacement(counts, full_formula, reduced_formula, replacement_options));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
@@ -888,6 +1040,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results_name_with_cooks_replacement(counts, full_formula, reduced_formula, coefficient_name, replacement_options));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
@@ -908,6 +1064,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_name(counts, full_design, reduced_design, coefficient_name));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_with_results_name(counts, full_design, reduced_design, coefficient_name)
             .map(|(fit, _results)| fit)
     }
@@ -922,6 +1082,10 @@ impl DeseqBuilder {
         reduced_formula: &str,
         coefficient_name: &str,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_name(counts, full_formula, reduced_formula, coefficient_name));
+        }
+
         self.fit_lrt_formula_with_results_name(
             counts,
             full_formula,
@@ -939,6 +1103,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
     }
 
@@ -950,6 +1118,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_contrast(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_with_results_contrast(counts, full_design, reduced_design, contrast)
             .map(|(fit, _results)| fit)
     }
@@ -962,6 +1134,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
     }
 
@@ -973,6 +1149,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_factor_level_contrast(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
     }
 
@@ -1045,6 +1225,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast_request_from_model_frame(counts, full_design, reduced_design, contrast, model_frame));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
@@ -1074,6 +1258,10 @@ impl DeseqBuilder {
         reduced_formula: &str,
         contrast: &ResultsContrast,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results_contrast_request(counts, full_formula, reduced_formula, contrast));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
@@ -1094,6 +1282,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_contrast_spec(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_with_results_contrast_spec(counts, full_design, reduced_design, contrast)
             .map(|(fit, _results)| fit)
     }
@@ -1106,6 +1298,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_factor_level_contrast(counts, full_design, reduced_design, contrast));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_with_results_factor_level_contrast(
             counts,
             full_design,
@@ -1123,6 +1319,10 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_with_cooks_replacement(counts, full_design, reduced_design, replacement_options));
+        }
+
         let coefficient = default_results_coefficient(full_design)?;
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_with_cooks_replacement(
             counts,
@@ -1142,6 +1342,10 @@ impl DeseqBuilder {
         coefficient_name: &str,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_name_with_cooks_replacement(counts, full_design, reduced_design, coefficient_name, replacement_options));
+        }
+
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_with_cooks_replacement(
             counts,
@@ -1161,6 +1365,10 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_with_cooks_replacement(
             counts,
             full_design,
@@ -1179,6 +1387,10 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast_spec_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
             counts,
             full_design,
@@ -1197,6 +1409,10 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_factor_level_contrast_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+        }
+
         self.with_automatic_dispersion_means().fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
             counts,
             full_design,
@@ -1280,6 +1496,10 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_with_results_contrast_request_from_model_frame_with_cooks_replacement(counts, full_design, reduced_design, contrast, model_frame, replacement_options));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
@@ -1312,6 +1532,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(counts, full_formula, reduced_formula, contrast, replacement_options));
+        }
+
         let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
         let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?

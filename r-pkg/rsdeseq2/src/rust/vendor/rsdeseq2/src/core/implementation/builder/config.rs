@@ -16,6 +16,9 @@ impl DeseqBuilder {
             observation_weight_options: ObservationWeightOptions::default(),
             execution_mode: ExecutionMode::default(),
             threads: None,
+            execution_context: ExecutionContext::default(),
+            #[cfg(test)]
+            execution_observer: None,
             reduced_design: None,
             model_frame: None,
             irls_options: IrlsOptions::default(),
@@ -128,10 +131,23 @@ impl DeseqBuilder {
         self
     }
 
-    /// Set the desired worker thread count for future parallel stages.
+    /// Set the worker count for fitting, transforms and refits.
     pub fn threads(mut self, threads: usize) -> Self {
+        self.execution_context = ExecutionContext::default();
         self.threads = Some(threads);
         self
+    }
+
+    /// Run additional fitted-state work in this builder's reusable worker context.
+    /// An unspecified worker count inherits the caller's Rayon context.
+    pub fn with_execution_context<T: Send>(
+        &self,
+        operation: impl FnOnce() -> T + Send,
+    ) -> Result<T, DeseqError> {
+        match self.execution_context.pool_for_entry(self.threads)? {
+            Some(pool) => Ok(pool.install(operation)),
+            None => Ok(operation()),
+        }
     }
 
     /// Store a reduced design matrix for top-level LRT workflows.
@@ -174,6 +190,10 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.expanded_formula_design(formula));
+        }
+
         let model_frame = self.model_frame.as_ref().ok_or_else(|| {
             DeseqError::InvalidOptions {
                 reason: "formula design construction requires builder model-frame metadata"
@@ -188,6 +208,10 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.expanded_formula_design_with_offsets(formula));
+        }
+
         let model_frame = self.model_frame.as_ref().ok_or_else(|| {
             DeseqError::InvalidOptions {
                 reason: "formula design construction requires builder model-frame metadata"
@@ -691,5 +715,37 @@ fn resolve_sample_level_alias_for_builder<'a>(
                 "factor '{factor}' {role} level '{requested}' resolves ambiguously after R-style cleanup"
             ),
         }),
+    }
+}
+
+#[cfg(test)]
+mod execution_control_tests {
+    use super::*;
+    use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+
+    #[test]
+    fn public_worker_request_applies_inside_fitting_and_reuses_cloned_context() {
+        let counts = CountMatrix::from_row_major_u32(3, 8, vec![
+            10,12,9,11,20,22,19,21, 30,27,32,31,18,20,17,21, 8,9,7,10,12,11,14,13,
+        ]).unwrap();
+        let design = DesignMatrix::from_row_major(8, 2,
+            (0..8).flat_map(|i| [1.0, (i/4) as f64]).collect(), None).unwrap();
+        for workers in [1,4] {
+            let observed = Arc::new(AtomicUsize::new(0));
+            let mut builder = DeseqBuilder::new().threads(workers).size_factors(vec![1.0;8]);
+            builder.execution_observer = Some(Arc::clone(&observed));
+            let ambient = rayon::ThreadPoolBuilder::new().num_threads(if workers == 1 {4} else {1}).build().unwrap();
+            ambient.install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1;3], 1)).unwrap();
+            assert_eq!(observed.load(Ordering::SeqCst), workers);
+            let cloned = builder.clone();
+            assert_eq!(cloned.with_execution_context(rayon::current_num_threads).unwrap(), workers);
+            assert!(Arc::ptr_eq(
+                &builder.execution_context.pool_for_entry(Some(workers)).unwrap().unwrap(),
+                &cloned.execution_context.pool_for_entry(Some(workers)).unwrap().unwrap()));
+        }
+        assert!(DeseqBuilder::new().threads(0).with_execution_context(|| ()).is_err());
+        assert!(DeseqBuilder::new().threads(usize::MAX).with_execution_context(|| ()).is_err());
+        let ambient = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+        assert_eq!(ambient.install(|| DeseqBuilder::new().with_execution_context(rayon::current_num_threads)).unwrap(), 2);
     }
 }

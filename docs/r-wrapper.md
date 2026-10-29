@@ -9,6 +9,11 @@ gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
 are composed from retained base normalization once; repeated fitting reuses that
 provenance. Older offset fits without it may require the original input.
 
+`nproc` controls a reusable local worker pool for fitting, replacement refits and
+transforms, including frozen rlog. The `strict`, `fast` and `diagnostic` mode
+names currently share the strict numerical algorithm; they do not select
+different precision settings.
+
 The R package builds and statically links the Rust crate used by the CLI.
 Cargo is required when installing the package from source. The core crate is
 vendored under `src/rust/vendor/rsdeseq2`; regenerate that copy from the

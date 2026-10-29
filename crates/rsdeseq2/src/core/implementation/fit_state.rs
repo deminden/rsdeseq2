@@ -133,6 +133,9 @@ pub struct DeseqBuilder {
     observation_weight_options: ObservationWeightOptions,
     execution_mode: ExecutionMode,
     threads: Option<usize>,
+    execution_context: ExecutionContext,
+    #[cfg(test)]
+    execution_observer: Option<std::sync::Arc<std::sync::atomic::AtomicUsize>>,
     reduced_design: Option<DesignMatrix>,
     model_frame: Option<FormulaModelFrame>,
     irls_options: IrlsOptions,
