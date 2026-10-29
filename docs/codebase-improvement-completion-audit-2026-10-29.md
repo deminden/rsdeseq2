@@ -7,6 +7,13 @@ It corrects its earlier suggestion that all acceptance items were complete.
 The implementation remains in progress. No tolerance, frozen oracle or package
 version has changed to close a gate.
 
+The user subsequently required [one standalone Rust numerical engine](rust-only-wrapper-migration.md)
+for both interfaces and removal of the R-backed commits. The three experimental
+commits were removed from the active history; independent audit fixes were
+replayed. Older R statistical calculations are still present and must be
+migrated. Earlier sanitizer/workflow artifacts below certify their recorded
+historical source, rather than the not-yet-built replacement engine.
+
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
 apeglm 1.34.0 and ashr 2.2-63. Historical benchmark results retain their original
 checkpoint and executable identity. The measured M4 executable is SHA-256
@@ -35,8 +42,8 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit storage remains. Need assess a representative larger case before closing the conditional handle decision. |
-| C19 | Borrowed Rust request/view, shared Wald hypothesis policy | Covariance/SE and filtering/BH still use R production arithmetic. Shared migration remains incomplete; a one-ulp BH probe alone does not close this requirement. |
-| C20 | Bounded resultsList batch; one fitted-view validation per batch | Shared policy batch exists, but currently borrows precomputed effect/SE columns rather than coefficient/covariance primitives. Remaining migration depends on C19 precision gates. |
+| C19 | Borrowed standalone Rust request/view | R-backed Wald/covariance/filter implementations were removed. All result calculations must now migrate to the standalone engine with direct interface equality. |
+| C20 | Standalone-engine batch bridge pending | The experimental resultsList implementation was removed with its R-backed commit. Restore it on the standalone engine with primitive borrowing and bounded batches. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
 | C23 | Checkpoint-bound docs and source artifacts | Historical artifacts preserved. A final tested source package and documentation reconciliation are required after outstanding implementation. |
@@ -49,7 +56,7 @@ That metadata error is corrected without changing the measurements.
 | Constructors must honor explicit arguments | Primitive Wald/LRT constructors | Supplied beta/SE; R pnorm/pchisq | `test-primitive-routes.R`: changed LFC and statistic; recomputed LRT df p-value; explicit NULL clearing; named/unnamed unused arguments error |
 | Offsets compose once after alignment | Dataset/list fit, refit, transform preparation | Explicit normalization-factor matrix and equivalent offset-free design | `test-normalization-state.R`, `test-fit-integration.R`: exact effective factors/results, repeated-fit idempotence and transform comparisons |
 | Explicit NULL clears inherited normalization/weights | Dataset/list fit | Fresh fit with absent factors/weights | `test-normalization-state.R`: exact result equality and absent weights assay |
-| Cached state must reflect mutable dataset | Results, resultsNames, resultsList, normal/ashr/apeglm shrinkage, design-aware transforms | Original cached inputs plus direct reference shrinkage | `test-fitted-view.R`, `test-fit-integration.R`: same-size edits reject, reversal/subset values map correctly, subset BH recomputed |
+| Cached state must reflect mutable dataset | Results, resultsNames, normal/ashr/apeglm shrinkage, design-aware transforms | Original cached inputs plus direct reference shrinkage | `test-fitted-view.R`, `test-fit-integration.R`: same-size edits reject, reversal/subset values map correctly, subset BH recomputed |
 | Replacement metadata and arrays must be coherent | Fitted Wald/LRT queries | Existing actual replacement fixtures | `test-fit-integration.R`: replaceCounts/replaceCooks edits reject; original numerical reference assertions retained |
 | Native buffers must be validated before reads/writes | Registered .Call functions | Known malformed shapes/types/ranges and valid matrix arithmetic | `test-native-boundary.R`: child survives errors, valid normalization and Normal/t tails exact, disabled buffer absent |
 | Rank validity should ignore units without accepting aliases | Rust design/fit entry points | Frozen R 4.6.2 default and scaled QR ranks | `model_validity.rs`, `data/rank_r462.tsv`: frozen relative decisions, original matrix bits unchanged, explicit absolute tolerance retained |
