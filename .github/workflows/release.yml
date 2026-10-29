@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  deployments: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate-release.yml
+  crate:
+    needs: validate
+    uses: ./.github/workflows/publish-crates.yml
+    secrets: inherit
+  binaries:
+    needs: validate
+    uses: ./.github/workflows/release-binaries.yml
+    secrets: inherit

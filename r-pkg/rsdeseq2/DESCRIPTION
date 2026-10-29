@@ -3,9 +3,9 @@ Title: Rust Backend for DESeq2-Compatible Workflows
 Version: 0.3.1
 Authors@R:
     person(given = "rsdeseq2", family = "contributors",
-           role = c("aut", "cre"), email = "maintainers@example.com")
+           role = c("aut", "cre"), email = "denisdeminbio@gmail.com")
 Author: rsdeseq2 contributors
-Maintainer: rsdeseq2 contributors <maintainers@example.com>
+Maintainer: rsdeseq2 contributors <denisdeminbio@gmail.com>
 Description: R access layer for a Rust implementation of DESeq2-compatible
     differential expression workflow stages and result-table semantics.
 License: MIT + file LICENSE

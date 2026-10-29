@@ -3,6 +3,25 @@
 No production release should claim DESeq2 parity until stage-by-stage reference
 tests cover the implemented statistical pipeline.
 
+## Validation and artifact gate
+
+Tag publication is coordinated by `release.yml`. The shared validation workflow
+requires Rust/Python checks, the pinned R reference package check, the full GTEx
+oracle and the advertised minimum compiler build. The current-package R lane is
+advisory; the pinned R reference lane is required. Each binary target also runs
+compact numerical/CLI tests in its release profile before its archive is saved.
+
+The R source tarball checked by CI and the verified crate archive are uploaded
+with a manifest binding their hashes to the triggering revision. Publication
+verifies that manifest. Crate publishing stages the same README links and checks
+that repackaging reproduces the checked archive before invoking Cargo publication.
+Target provenance records the compiler, source commit and binary/archive hashes.
+The GitHub release receives those records and the checked source artifacts.
+
+`sync_r_vendor.sh --check` must succeed without repairing the checkout. Package
+versions and the tag must agree. Local workflow lint and dependency simulations
+are useful preparation; successful target jobs remain required for publication.
+
 ## Version 0.3.1
 
 This patch release integrates twenty accepted quantification speed improvements

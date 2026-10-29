@@ -1,0 +1,48 @@
+name: Validate release source
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    uses: ./.github/workflows/rust.yml
+  r:
+    uses: ./.github/workflows/r.yml
+  parity:
+    uses: ./.github/workflows/parity.yml
+    with:
+      full_only: true
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.97.1'
+      - run: cargo check --locked --workspace --all-targets
+  artifacts:
+    needs: [rust, r, parity, msrv]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with:
+          name: r-source-${{ github.sha }}
+          path: validated
+      - name: Prepare checked crate source
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/stage_release_crate.py
+          cargo package -p rsdeseq2 --locked --allow-dirty
+          cp target/package/rsdeseq2-*.crate validated/
+          python3 scripts/release_artifact_manifest.py write validated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validated-source-${{ github.sha }}
+          path: validated/*
+          if-no-files-found: error

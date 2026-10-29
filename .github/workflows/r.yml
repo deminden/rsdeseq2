@@ -2,25 +2,67 @@ name: R
 
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   r:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.lane == 'current' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: reference
+            r-version: '4.6.2'
+          - lane: current
+            r-version: release
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.r-library-${{ matrix.lane }}
+      MAKEFLAGS: -j2
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.6.1'
+          r-version: ${{ matrix.r-version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
       - name: Check committed Rust vendor and package versions
         run: scripts/sync_r_vendor.sh --check
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libuv1-dev
-      - name: Install test dependencies
-        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("testthat", quietly = TRUE)) install.packages("testthat"); if (!requireNamespace("ashr", quietly = TRUE)) install.packages("ashr"); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager"); needed <- c("DESeq2", "apeglm")[!vapply(c("DESeq2", "apeglm"), requireNamespace, logical(1), quietly = TRUE)]; if (length(needed)) BiocManager::install(needed, ask = FALSE, update = FALSE)'
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran
+      - run: mkdir -p "$R_LIBS_USER"
+      - name: Cache exact reference packages
+        id: reference-cache
+        if: matrix.lane == 'reference'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
+      - name: Restore verified numerical reference environment
+        if: matrix.lane == 'reference'
+        run: python scripts/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
+      - name: Install current compatibility dependencies
+        if: matrix.lane == 'current'
+        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("testthat", "ashr", "BiocManager")); BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)'
+      - name: Record environment
+        run: Rscript -e 'print(sessionInfo())' > R-reference-session.txt
       - name: Build package
         run: R CMD build r-pkg/rsdeseq2
       - name: Package check
         run: R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
+      - name: Save checked source package
+        if: matrix.lane == 'reference'
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-source-${{ github.sha }}
+          path: |
+            rsdeseq2_*.tar.gz
+            R-reference-session.txt
+          if-no-files-found: error

@@ -1,9 +1,7 @@
 name: Release binaries
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_call:
 
 permissions:
   contents: write
@@ -54,6 +52,14 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: validated-source-${{ github.sha }}
+          path: validated
+      - name: Verify successful source validation
+        shell: bash
+        run: python3 scripts/release_artifact_manifest.py verify validated
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -73,6 +79,13 @@ jobs:
 
       - name: Build
         run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
+
+      - name: Numerical checks on shipped target and release profile
+        run: >-
+          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }}
+          --test model_validity --test wald_reference --test lrt_reference
+          --test dispersion_reference --test gtex_real_wald_parity
+          --test thread_invariance --test cli
 
       - name: Stage files
         shell: bash
@@ -99,11 +112,24 @@ jobs:
           $packageDir = "rsdeseq2-$version-${{ matrix.asset_suffix }}"
           Compress-Archive -Path "dist/$packageDir/*" -DestinationPath "dist/$packageDir.zip"
 
+      - name: Record tested binary identity
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
+          python3 scripts/record_binary_build.py \
+            --binary "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" \
+            --archive "dist/${package_dir}.${{ matrix.archive_ext }}" \
+            --target "${{ matrix.target }}" \
+            --output "dist/${package_dir}.build.json"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rsdeseq2-${{ env.RELEASE_TAG }}-${{ matrix.asset_suffix }}
-          path: dist/*.${{ matrix.archive_ext }}
+          path: |
+            dist/*.${{ matrix.archive_ext }}
+            dist/*.build.json
           if-no-files-found: error
 
   release:
@@ -115,7 +141,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: rsdeseq2-${{ env.RELEASE_TAG }}-*
           merge-multiple: true
+
+      - uses: actions/checkout@v4
+      - name: Download checked source artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-source-${{ github.sha }}
+          path: validated
+      - name: Verify checked source artifacts
+        run: |
+          python3 scripts/release_artifact_manifest.py verify validated
+          cp validated/* dist/
 
       - name: Generate checksums
         run: |
