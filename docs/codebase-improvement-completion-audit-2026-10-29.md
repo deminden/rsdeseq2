@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit storage remains. Need assess a representative larger case before closing the conditional handle decision. |
-| C19 | Borrowed standalone Rust request/view | R-backed Wald/covariance/filter implementations were removed. All result calculations must now migrate to the standalone engine with direct interface equality. |
+| C19 | Borrowed standalone Rust request/view and shared filtering/BH | Standalone filtering/BH now serves both interfaces with bit-equality coverage. Wald/LRT tails, contrast calculations and the rest of the Rust-only migration remain pending. See the primitive checkpoint report. |
 | C20 | Standalone-engine batch bridge pending | The experimental resultsList implementation was removed with its R-backed commit. Restore it on the standalone engine with primitive borrowing and bounded batches. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |

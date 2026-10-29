@@ -14,11 +14,13 @@ testthat::test_that("registered native bridge primitives are callable from the i
     byrow = TRUE,
     dimnames = list(c("g1", "g2", "g0"), c("s1", "s2"))
   )
-  logGeoMeans <- c(mean(log(c(10, 20))), mean(log(c(20, 40))), -Inf)
+  # The private bridge now uses the same natural-scale input as both public APIs.
+  # Keep the numerical expectation and legacy logical method flag unchanged.
+  geoMeans <- c(sqrt(200), sqrt(800), 0)
   sizeFactors <- .Call(
     "rsdeseq2_estimate_size_factors",
     counts,
-    logGeoMeans,
+    geoMeans,
     as.integer(seq_len(nrow(counts))),
     FALSE,
     PACKAGE = "rsdeseq2"

@@ -54,6 +54,15 @@ testthat::test_that("R wrapper supports supplied geoMeans and control genes", {
   testthat::expect_equal(names(sf), c("s1", "s2"))
   testthat::expect_equal(exp(mean(log(sf))), 1, tolerance = 1e-12)
   testthat::expect_equal(unname(sf), c(1 / sqrt(2), sqrt(2)), tolerance = 1e-12)
+
+  # Non-proportional rows expose an accidental exp(geoMeans) in the bridge;
+  # proportional controls above can hide it through final scale stabilization.
+  varied <- matrix(c(10L,40L,90L,30L,40L,50L,20L,200L,100L), 3L, byrow = TRUE)
+  for (geo in list(c(5,25,50), c(0,25,50), c(5,Inf,50), c(1000,2000,3000))) {
+    expected <- DESeq2::estimateSizeFactorsForMatrix(varied, geoMeans = geo)
+    actual <- estimateSizeFactorsRust(varied, geoMeans = geo)
+    testthat::expect_equal(unname(actual), unname(expected), tolerance = 1e-12)
+  }
 })
 
 testthat::test_that("R wrapper matches DESeq2 size-factor validation cases", {

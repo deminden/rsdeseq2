@@ -7,8 +7,7 @@ estimateSizeFactorsRust <- function(counts,
   counts <- .rsdeseq2_validate_counts(counts)
   controlIdx <- .rsdeseq2_control_gene_indices(controlGenes, counts)
   if (!is.null(geoMeans)) {
-    .rsdeseq2_validate_geo_means(geoMeans, nrow(counts))
-    geoMeans <- as.double(geoMeans)
+    geoMeans <- .rsdeseq2_validate_geo_means(geoMeans, nrow(counts))
   }
   if (is.null(controlIdx)) controlIdx <- seq_len(nrow(counts))
   sizeFactors <- .Call(

@@ -77,3 +77,7 @@ between the two interfaces.
 
 The migration is **in progress**. Removing the experimental commits does not
 mean the older R calculations listed above have already been removed.
+
+The [first standalone primitive checkpoint](rust-only-primitives-2026-10-29.md)
+completes shared filtering/BH and fixes supplied geometric-mean transport, with
+20 direct bit-equality cases. The remaining stages above are still required.

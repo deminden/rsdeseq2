@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <limits.h>
 #include "validation.h"
+extern SEXP rsdeseq2_bh_adjust(SEXP);
+extern SEXP rsdeseq2_independent_filtering(SEXP, SEXP, SEXP, SEXP, SEXP);
 
 extern int rsdeseq2_r_estimate_size_factors(size_t, size_t, const double *, int, const double *, const size_t *, size_t, double *);
 extern int rsdeseq2_r_normalized_counts(size_t, size_t, const double *, const double *, const double *, double *);
@@ -46,6 +48,7 @@ SEXP rsdeseq2_diagnostic_schema(void) {
     return out;
 }
 
+/* geo_means is on the natural scale, matching the public Rust and R APIs. */
 SEXP rsdeseq2_estimate_size_factors(SEXP counts, SEXP geo_means, SEXP control_genes, SEXP method) {
     validate_matrix(counts, "counts");
     validate_optional_vector(geo_means, REALSXP, matrix_rows(counts), "geo_means");
@@ -595,6 +598,8 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
 }
 
 static const R_CallMethodDef call_methods[] = {
+    {"rsdeseq2_bh_adjust", (DL_FUNC)&rsdeseq2_bh_adjust, 1},
+    {"rsdeseq2_independent_filtering", (DL_FUNC)&rsdeseq2_independent_filtering, 5},
     {"rsdeseq2_placeholder", (DL_FUNC)&rsdeseq2_placeholder, 0},
     {"rsdeseq2_diagnostic_schema", (DL_FUNC)&rsdeseq2_diagnostic_schema, 0},
     {"rsdeseq2_estimate_size_factors", (DL_FUNC)&rsdeseq2_estimate_size_factors, 4},
