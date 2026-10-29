@@ -25,6 +25,10 @@
   }
   fitType <- match.arg(fitType, c("parametric", "local", "mean"))
   requestedFitType <- fitType
+  fittedState <- NULL
+  if (!blind && !is.null(S4Vectors::metadata(object)$rsdeseq2RustFit)) {
+    fittedState <- .rsdeseq2_fitted_view(object)
+  }
   frozenTrendType <- -1L
   frozenTrendParameters <- NULL
   frozenTrendSource <- "estimated"
@@ -80,7 +84,8 @@
       frozenDispersionFunction <- attr(
         DESeq2::dispersionFunction(object), "fitType", exact = TRUE
       )
-      if (frozenDispersionFunction %in% c("parametric", "local", "mean")) {
+      frozenDispersionFunction <- frozenDispersionFunction %||% fittedState$fitType
+      if (length(frozenDispersionFunction) == 1L && frozenDispersionFunction %in% c("parametric", "local", "mean")) {
         fitType <- frozenDispersionFunction
       }
     }

@@ -37,6 +37,9 @@
   for (name in c("mu", "cooks")) {
     if (!equal(SummarizedExperiment::assay(object, name), fit[[name]][rows, , drop = FALSE])) invalid(name)
   }
+  for (name in c("dispFit", "baseMean", "baseVar", "allZero")) {
+    if (!equal(S4Vectors::mcols(object)[[name]], fit[[name]][rows])) invalid(name)
+  }
   vectors <- c("baseMean", "baseVar", "allZero", "replace", "refitRows", "newAllZeroRows",
                "dispersions", "dispFit", "rawPvalue", "rawStat", "lrtStat", "lrtPvalue")
   matrices <- c("beta", "betaSE", "mu", "cooks", "replaceCounts", "normalizationFactors", "weights", "counts")

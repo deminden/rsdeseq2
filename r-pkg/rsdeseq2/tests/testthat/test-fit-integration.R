@@ -460,6 +460,18 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
   for (fit_type in names(tolerances)) {
     rust_rlog <- rsdeseq2::rlog(rust_dds, blind = FALSE, fitType = fit_type)
     reference_rlog <- DESeq2::rlog(reference_dds, blind = FALSE, fitType = fit_type)
+    if (fit_type == "mean") {
+      native_fit <- rsdeseq2::DESeq(rust_dds, fitType = "mean", minReplicatesForReplace = Inf)
+      reused <- rsdeseq2::rlog(native_fit, blind = FALSE, fitType = "local")
+      testthat::expect_lt(max(abs(SummarizedExperiment::assay(reused) - SummarizedExperiment::assay(reference_rlog))), 0.007)
+      testthat::expect_equal(S4Vectors::metadata(reused)$rsdeseq2Transform$fitType, "mean")
+      changed <- native_fit
+      SummarizedExperiment::assay(changed, "counts")[1L, 1L] <- fixture$counts[1L, 1L] + 1L
+      testthat::expect_error(rsdeseq2::rlog(changed, blind = FALSE), "counts changed")
+      changed <- native_fit
+      S4Vectors::mcols(changed)$dispFit[1L] <- S4Vectors::mcols(changed)$dispFit[1L] * 2
+      testthat::expect_error(rsdeseq2::rlog(changed, blind = FALSE), "dispFit changed")
+    }
     testthat::expect_lt(
       max(abs(
         SummarizedExperiment::assay(rust_rlog) -

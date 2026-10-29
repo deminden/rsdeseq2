@@ -53,6 +53,13 @@ M1 follow-through includes the larger selector/replacement/threshold matrix,
 legacy save/load cases, explicit subset-shrinkage reference cases and broader
 transform reuse checks. Existing integration coverage is retained.
 
+Profiling exposed and corrected another native-fit reuse case: rlog no longer
+requires a DESeq2 dispersion-function attribute when its fitted trend type is
+already retained. Design-aware transforms validate native cached state, including
+stored dispFit/base summaries, before reuse. The existing large transform fixture
+now checks native-fit rlog against the existing mean-trend DESeq2 reference and
+rejects edited counts/dispFit without repeating reference setup.
+
 C09–C10 are implemented: default rank validation scales temporary columns while
 preserving original fitting units and explicit absolute-tolerance calls. LRT
 entry paths check reduced-model subspace membership before dispersion fitting.
