@@ -143,7 +143,7 @@ resolveResultsContrastRust <- function(contrast,
 
 resultsNamesRust <- function(object) {
   if (inherits(object, "DESeqDataSet")) {
-    fit <- S4Vectors::metadata(object)$rsdeseq2RustFit
+    fit <- .rsdeseq2_fitted_view(object)
     if (!is.null(fit)) return(.rsdeseq2_validate_results_names(fit$resultsNames))
   }
   if (inherits(object, c("rsdeseq2PrimitiveWaldFit", "rsdeseq2PrimitiveLrtFit"))) {

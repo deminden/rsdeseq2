@@ -101,7 +101,7 @@ results(object, contrast = NULL, name = NULL, listValues = c(1, -1),
   altHypothesis = c("greaterAbs", "lessAbs", "greater", "less",
   "greaterAbs2014", "greaterAbsUPSHOT"), useT = FALSE,
   degreesOfFreedom = NULL, alpha = 0.1,
-  independentFiltering = TRUE, ...)
+  independentFiltering = TRUE, cooksCutoff = TRUE, ...)
 
 estimateDispersionsRust(counts, design,
   fitType = c("parametric", "local", "mean"), nproc = 1L)
@@ -149,7 +149,7 @@ Cook's count replacement and refitting. Must be at least 3; set to \code{Inf}
 to disable replacement. The default is 7.}
 \item{pvalue}{Numeric p-value vector with values in \code{[0, 1]} or \code{NA}.}
 \item{maxCooks}{Numeric vector of maximum Cook's distances, one per p-value.}
-\item{cooksCutoff}{Numeric cutoff, \code{FALSE}, or \code{NULL}.}
+\item{cooksCutoff}{For fitted objects, TRUE uses the automatic Cook's cutoff, FALSE or NULL disables masking, and a non-negative finite number sets the cutoff. Explicit masking requires retained fitted Cook's context.}
 \item{cooks}{Optional Cook's distance matrix for the low-count heuristic.}
 \item{lowCountHeuristic}{Whether to apply the explicit two-group low-count Cook's heuristic.}
 \item{baseMean}{Numeric base mean vector, one per gene.}

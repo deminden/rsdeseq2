@@ -45,6 +45,9 @@ DESeq <- function(object,
                   weights = NULL,
                   minReplicatesForReplace = 7L,
                   ...) {
+  explicitSize <- !missing(sizeFactors)
+  explicitFactors <- !missing(normalizationFactors)
+  normalizationState <- NULL
   isDataSet <- inherits(object, "DESeqDataSet")
   fitType <- match.arg(fitType)
   test <- match.arg(test)
@@ -59,7 +62,7 @@ DESeq <- function(object,
     argumentNames[!nzchar(argumentNames)] <- "..."
     stop(sprintf("unsupported DESeq arguments: %s", paste(argumentNames, collapse = ", ")), call. = FALSE)
   }
-  if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc != floor(nproc)) {
+  if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc > .Machine$integer.max || nproc != floor(nproc)) {
     stop("nproc must be a positive integer", call. = FALSE)
   }
   disableReplacement <- is.numeric(minReplicatesForReplace) &&
@@ -68,6 +71,7 @@ DESeq <- function(object,
   validReplacementMinimum <- is.numeric(minReplicatesForReplace) &&
     length(minReplicatesForReplace) == 1L &&
     is.finite(minReplicatesForReplace) && minReplicatesForReplace >= 3 &&
+    minReplicatesForReplace <= .Machine$integer.max &&
     minReplicatesForReplace == floor(minReplicatesForReplace)
   if (!disableReplacement && !validReplacementMinimum) {
     stop("minReplicatesForReplace must be an integer of at least 3 or Inf", call. = FALSE)
@@ -80,8 +84,8 @@ DESeq <- function(object,
     counts <- SummarizedExperiment::assay(object, "counts")
     colData <- as.data.frame(SummarizedExperiment::colData(object))
     if (requireNamespace("DESeq2", quietly = TRUE)) {
-      if (is.null(sizeFactors)) sizeFactors <- DESeq2::sizeFactors(object)
-      if (is.null(normalizationFactors)) normalizationFactors <- DESeq2::normalizationFactors(object)
+      if (!explicitSize) sizeFactors <- DESeq2::sizeFactors(object)
+      if (!explicitFactors) normalizationFactors <- DESeq2::normalizationFactors(object)
     }
     if (is.null(weights) && "weights" %in% SummarizedExperiment::assayNames(object)) {
       weights <- SummarizedExperiment::assay(object, "weights")
@@ -93,24 +97,22 @@ DESeq <- function(object,
     modelFrame <- stats::model.frame(formula, data = colData)
     design <- stats::model.matrix(formula, data = modelFrame)
     formulaOffsets <- stats::model.offset(modelFrame)
-    if (!is.null(formulaOffsets)) {
-      offsetFactors <- matrix(
-        rep(exp(formulaOffsets), each = nrow(counts)),
-        nrow = nrow(counts),
-        ncol = ncol(counts),
-        dimnames = dimnames(counts)
-      )
-      normalizationFactors <- if (is.null(normalizationFactors)) {
-        offsetFactors
-      } else {
-        normalizationFactors * offsetFactors
-      }
-    }
+    prepared <- .rsdeseq2_prepare_normalization(
+      object, .rsdeseq2_validate_counts(counts), sizeFactors, normalizationFactors,
+      formulaOffsets, explicitSize, explicitFactors)
+    sizeFactors <- prepared$sizeFactors
+    normalizationFactors <- prepared$normalizationFactors
+    normalizationState <- prepared$state
     if (test == "LRT") {
       if (is.null(reduced) || !inherits(reduced, "formula")) {
         stop("LRT requires reduced = a formula", call. = FALSE)
       }
-      reduced <- stats::model.matrix(reduced, data = colData)
+      reducedFrame <- stats::model.frame(reduced, data = colData)
+      reducedOffsets <- stats::model.offset(reducedFrame)
+      if (!is.null(reducedOffsets) && !identical(as.numeric(reducedOffsets), as.numeric(formulaOffsets))) {
+        stop("LRT full and reduced formulas must use the same normalization offsets", call. = FALSE)
+      }
+      reduced <- stats::model.matrix(reduced, data = reducedFrame)
     }
   } else if (is.list(object) && !is.null(object$counts)) {
     counts <- object$counts
@@ -190,6 +192,10 @@ DESeq <- function(object,
     as.integer(match(parityMode, c("strict", "fast", "diagnostic")) - 1L),
     PACKAGE = "rsdeseq2"
   )
+  rawPvalue <- results$results$rawPvalue
+  rawStat <- results$results$rawStat
+  results$results$rawPvalue <- NULL
+  results$results$rawStat <- NULL
   rownames(results$beta) <- rownames(counts)
   rownames(results$betaSE) <- rownames(counts)
   names(results$dispersions) <- rownames(counts)
@@ -199,6 +205,9 @@ DESeq <- function(object,
   dimnames(results$betaCovariance)[[1L]] <- rownames(counts)
   fit <- structure(
     list(
+      schemaVersion = 1L,
+      rawPvalue = rawPvalue,
+      rawStat = rawStat,
       results = results$results,
       baseMean = results$results$baseMean,
       beta = results$beta,
@@ -228,14 +237,19 @@ DESeq <- function(object,
       fitType = fitType,
       test = test,
       resultsNames = colnames(design),
-      lrtStat = if (test == "LRT") results$results$stat else NULL,
-      lrtPvalue = if (test == "LRT") results$results$pvalue else NULL,
+      lrtStat = if (test == "LRT") rawStat else NULL,
+      lrtPvalue = if (test == "LRT") rawPvalue else NULL,
       lrtDf = if (test == "LRT") ncol(design) - ncol(reduced) else NULL
     ),
     class = "rsdeseq2RustFit"
   )
   if (isDataSet) {
     rowMetadata <- S4Vectors::mcols(object)
+    previousFit <- S4Vectors::metadata(object)$rsdeseq2RustFit
+    if (!is.null(previousFit$resultsNames)) {
+      previousColumns <- c(paste0("MLE_", previousFit$resultsNames), paste0("SE_", previousFit$resultsNames))
+      for (column in intersect(previousColumns, names(rowMetadata))) rowMetadata[[column]] <- NULL
+    }
     rowMetadata$baseMean <- fit$results$baseMean
     rowMetadata$baseVar <- fit$baseVar
     rowMetadata$allZero <- fit$allZero
@@ -250,6 +264,9 @@ DESeq <- function(object,
       SummarizedExperiment::colData(object) <- colMetadata
     } else {
       rowMetadata$replace <- NULL
+      colMetadata <- SummarizedExperiment::colData(object)
+      colMetadata$replaceable <- NULL
+      SummarizedExperiment::colData(object) <- colMetadata
     }
     for (coefficient in seq_along(fit$resultsNames)) {
       coefficient_name <- fit$resultsNames[[coefficient]]
@@ -265,13 +282,27 @@ DESeq <- function(object,
       SummarizedExperiment::assay(object, "replaceCounts") <- replaceCounts
       SummarizedExperiment::assay(object, "replaceCooks") <- fit$cooks
     }
+    if (fit$nRefit == 0L) {
+      assays <- SummarizedExperiment::assays(object)
+      for (name in intersect(c("replaceCounts", "replaceCooks"), names(assays))) assays[[name]] <- NULL
+      SummarizedExperiment::assays(object) <- assays
+    }
     objectMetadata <- S4Vectors::metadata(object)
+    normalizationState$writtenSizeFactors <- fit$sizeFactors
+    if (is.null(normalizationState$baseFactors) && is.null(normalizationState$baseSizeFactors)) {
+      normalizationState$baseSizeFactors <- fit$sizeFactors
+    }
+    objectMetadata$rsdeseq2Normalization <- normalizationState
     objectMetadata$rsdeseq2RustFit <- fit
     S4Vectors::metadata(object) <- objectMetadata
     if (requireNamespace("DESeq2", quietly = TRUE)) {
       DESeq2::sizeFactors(object) <- fit$sizeFactors
       if (!is.null(fit$normalizationFactors)) {
         DESeq2::normalizationFactors(object) <- fit$normalizationFactors
+      } else if ("normalizationFactors" %in% SummarizedExperiment::assayNames(object)) {
+        assays <- SummarizedExperiment::assays(object)
+        assays[["normalizationFactors"]] <- NULL
+        SummarizedExperiment::assays(object) <- assays
       }
     }
     return(object)

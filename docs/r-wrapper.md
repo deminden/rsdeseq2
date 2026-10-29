@@ -1,5 +1,14 @@
 # R Backend
 
+Unreleased correctness changes are recorded in the
+[implementation progress report](codebase-improvement-progress-2026-10-29.md).
+Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
+(disabled), or a non-negative finite cutoff, and rejects unused arguments.
+Dataset result/shrinkage access validates retained fit inputs and maps unique
+gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
+are composed from retained base normalization once; repeated fitting reuses that
+provenance. Older offset fits without it may require the original input.
+
 The R package builds and statically links the Rust crate used by the CLI.
 Cargo is required when installing the package from source. The core crate is
 vendored under `src/rust/vendor/rsdeseq2`; regenerate that copy from the

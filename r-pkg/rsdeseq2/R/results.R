@@ -11,13 +11,29 @@ results <- function(object,
                     degreesOfFreedom = NULL,
                     alpha = 0.1,
                     independentFiltering = TRUE,
+                    cooksCutoff = TRUE,
                     ...) {
+  dots <- list(...)
+  if (length(dots)) {
+    labels <- names(dots)
+    if (is.null(labels)) labels <- rep("...", length(dots))
+    labels[is.na(labels) | !nzchar(labels)] <- "..."
+    stop(sprintf("unsupported results arguments: %s", paste(labels, collapse = ", ")), call. = FALSE)
+  }
+  if (!identical(cooksCutoff, TRUE)) {
+    cutoff <- .rsdeseq2_validate_cooks_cutoff(cooksCutoff)
+    if (!is.null(cutoff) && cutoff < 0) stop("cooksCutoff must be non-negative", call. = FALSE)
+  }
+  if (!inherits(object, c("DESeqDataSet", "rsdeseq2RustFit")) &&
+      !missing(cooksCutoff) && !identical(cooksCutoff, FALSE) && !is.null(cooksCutoff)) {
+    stop("Cook's filtering requires a fitted dataset with retained Cook's context", call. = FALSE)
+  }
   altHypothesis <- match.arg(
     altHypothesis,
     c("greaterAbs", "lessAbs", "greater", "less", "greaterAbs2014", "greaterAbsUPSHOT")
   )
   if (inherits(object, "DESeqDataSet")) {
-    fit <- S4Vectors::metadata(object)$rsdeseq2RustFit
+    fit <- .rsdeseq2_fitted_view(object)
     if (is.null(fit)) {
       stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling results()", call. = FALSE)
     }
@@ -33,6 +49,7 @@ results <- function(object,
       degreesOfFreedom = degreesOfFreedom,
       alpha = alpha,
       independentFiltering = independentFiltering,
+      cooksCutoff = cooksCutoff,
       ...
     ))
   }
@@ -41,7 +58,7 @@ results <- function(object,
         identical(as.numeric(lfcThreshold), 0) && identical(altHypothesis, "greaterAbs") &&
         !isTRUE(useT) && is.null(degreesOfFreedom)) {
       out <- applyIndependentFilteringRust(
-        object$results,
+        .rsdeseq2_fit_cooks_policy(object$results, object, cooksCutoff, cached = TRUE),
         alpha = alpha,
         enabled = independentFiltering
       )
@@ -84,8 +101,11 @@ results <- function(object,
       useT = useT,
       degreesOfFreedom = degreesOfFreedom,
       alpha = alpha,
-      independentFiltering = independentFiltering
+      independentFiltering = FALSE,
+      cooksCutoff = FALSE
     )
+    out <- .rsdeseq2_fit_cooks_policy(out, object, cooksCutoff)
+    out <- applyIndependentFilteringRust(out, alpha = alpha, enabled = independentFiltering)
     metadata <- attr(out, "metadata")
     if (is.null(metadata)) {
       metadata <- list(
@@ -102,6 +122,7 @@ results <- function(object,
         independentFiltering = attr(out, "independentFiltering")
       )
     }
+    metadata$independentFiltering <- attr(out, "independentFiltering")
     metadata$cooksReplacement <- .rsdeseq2_cooks_replacement_metadata(object)
     return(.rsdeseq2_finalize_result_metadata(out, metadata, object))
   }
@@ -256,4 +277,50 @@ results <- function(object,
     attr(result, attribute) <- attr(out, attribute)
   }
   result
+}
+
+# Mask presentation p-values before the single final filtering/BH step.
+.rsdeseq2_fit_cooks_policy <- function(out, fit, cutoff, cached = FALSE) {
+  if (cached) {
+    if (!is.null(fit$rawPvalue)) {
+      out$pvalue <- fit$rawPvalue
+    } else if (!identical(cutoff, TRUE)) {
+      stop("This saved fit lacks raw p-values; refit before changing cooksCutoff", call. = FALSE)
+    }
+  } else if (identical(fit$test, "LRT") && is.null(fit$schemaVersion)) {
+    stop("This saved LRT fit lacks verified raw statistics; refit before selecting results", call. = FALSE)
+  }
+  zero <- which(fit$newAllZeroRows %||% logical())
+  if (length(zero)) {
+    out$log2FoldChange[zero] <- 0
+    out$lfcSE[zero] <- 0
+    out$stat[zero] <- 0
+    out$pvalue[zero] <- 1
+  }
+  if (identical(cutoff, TRUE)) {
+    cutoff <- stats::qf(0.99, ncol(fit$design), nrow(fit$design) - ncol(fit$design))
+  }
+  if (is.null(cutoff) || identical(cutoff, FALSE)) {
+    if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- rep(NA, nrow(out))
+    return(out)
+  }
+  maxCooks <- fit$results$maxCooks
+  if (is.null(maxCooks)) stop("The fit lacks Cook's context; refit", call. = FALSE)
+  # Successfully refitted rows must not be masked using the original outlier.
+  if (!is.null(fit$refitRows)) maxCooks[which(fit$refitRows)] <- 0
+  if (length(zero)) maxCooks[zero] <- 0
+  lowCount <- FALSE
+  if (ncol(fit$design) == 2L && !is.null(fit$colData)) {
+    groups <- fit$design[, 2L]
+    lowCount <- any(vapply(fit$colData, function(x) {
+      is.factor(x) && nlevels(x) == 2L &&
+        identical(outer(unname(as.character(x)), unname(as.character(x)), "=="), outer(unname(groups), unname(groups), "=="))
+    }, logical(1)))
+  }
+  masked <- applyCooksCutoffRust(out$pvalue, maxCooks, cutoff,
+                                counts = fit$counts, cooks = fit$cooks,
+                                lowCountHeuristic = lowCount)
+  out$pvalue <- masked$pvalue
+  if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- masked$cooksOutlier
+  out
 }

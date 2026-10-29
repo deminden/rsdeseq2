@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <limits.h>
+#include "validation.h"
 
 extern int rsdeseq2_r_estimate_size_factors(size_t, size_t, const double *, int, const double *, const size_t *, size_t, double *);
 extern int rsdeseq2_r_normalized_counts(size_t, size_t, const double *, const double *, const double *, double *);
@@ -45,6 +47,17 @@ SEXP rsdeseq2_diagnostic_schema(void) {
 }
 
 SEXP rsdeseq2_estimate_size_factors(SEXP counts, SEXP geo_means, SEXP control_genes, SEXP method) {
+    validate_matrix(counts, "counts");
+    validate_optional_vector(geo_means, REALSXP, matrix_rows(counts), "geo_means");
+    if (TYPEOF(method) == LGLSXP) validate_boolean(method, "method");
+    else validate_integer_scalar(method, 0, 1, "method");
+    if (control_genes != R_NilValue) {
+        if (TYPEOF(control_genes) != INTSXP) Rf_error("control_genes must be integer");
+        for (R_xlen_t i = 0; i < XLENGTH(control_genes); ++i)
+            if (INTEGER(control_genes)[i] == NA_INTEGER || INTEGER(control_genes)[i] < 1 || INTEGER(control_genes)[i] > matrix_rows(counts))
+                Rf_error("control_genes indices are out of range");
+    }
+
     SEXP dims = Rf_getAttrib(counts, R_DimSymbol);
     if (Rf_length(dims) != 2) Rf_error("counts must be a matrix");
     const size_t n_genes = (size_t)INTEGER(dims)[0], n_samples = (size_t)INTEGER(dims)[1];
@@ -61,6 +74,9 @@ SEXP rsdeseq2_estimate_size_factors(SEXP counts, SEXP geo_means, SEXP control_ge
     UNPROTECT(1); return out;
 }
 SEXP rsdeseq2_normalized_counts(SEXP counts, SEXP size_factors, SEXP normalization_factors) {
+    validate_matrix(counts, "counts");
+    validate_normalization(counts, size_factors, normalization_factors, R_NilValue);
+
     SEXP dims = Rf_getAttrib(counts, R_DimSymbol);
     if (Rf_length(dims) != 2) Rf_error("counts must be a matrix");
     const size_t n_genes = (size_t)INTEGER(dims)[0], n_samples = (size_t)INTEGER(dims)[1];
@@ -73,6 +89,9 @@ SEXP rsdeseq2_normalized_counts(SEXP counts, SEXP size_factors, SEXP normalizati
     UNPROTECT(1); return out;
 }
 SEXP rsdeseq2_base_mean(SEXP counts, SEXP size_factors, SEXP normalization_factors) {
+    validate_matrix(counts, "counts");
+    validate_normalization(counts, size_factors, normalization_factors, R_NilValue);
+
     SEXP dims = Rf_getAttrib(counts, R_DimSymbol);
     if (Rf_length(dims) != 2) Rf_error("counts must be a matrix");
     const size_t n_genes = (size_t)INTEGER(dims)[0], n_samples = (size_t)INTEGER(dims)[1];
@@ -89,6 +108,9 @@ SEXP rsdeseq2_base_mean(SEXP counts, SEXP size_factors, SEXP normalization_facto
     UNPROTECT(3); return out;
 }
 SEXP rsdeseq2_base_metadata(SEXP counts, SEXP size_factors, SEXP normalization_factors, SEXP weights) {
+    validate_matrix(counts, "counts");
+    validate_normalization(counts, size_factors, normalization_factors, weights);
+
     SEXP dims = Rf_getAttrib(counts, R_DimSymbol);
     if (Rf_length(dims) != 2) Rf_error("counts must be a matrix");
     const size_t n_genes = (size_t)INTEGER(dims)[0], n_samples = (size_t)INTEGER(dims)[1];
@@ -118,6 +140,19 @@ SEXP rsdeseq2_base_metadata(SEXP counts, SEXP size_factors, SEXP normalization_f
 }
 
 SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_factors_input, SEXP normalization_factors, SEXP observation_weights, SEXP fit_type, SEXP test_type, SEXP min_replicates_for_replace, SEXP cooks_replacement_cutoff, SEXP threads, SEXP execution_mode) {
+    validate_matrix(counts, "counts");
+    validate_design(design, matrix_cols(counts), "design");
+    if (reduced_design != R_NilValue) validate_design(reduced_design, matrix_cols(counts), "reduced design");
+    validate_normalization(counts, size_factors_input, normalization_factors, observation_weights);
+    validate_integer_scalar(fit_type, 0, 2, "fit_type");
+    validate_integer_scalar(test_type, 0, 1, "test_type");
+    validate_integer_scalar(min_replicates_for_replace, 0, INT_MAX, "min_replicates_for_replace");
+    validate_real_scalar(cooks_replacement_cutoff, "cooks_replacement_cutoff");
+    validate_integer_scalar(threads, 1, INT_MAX, "threads");
+    validate_integer_scalar(execution_mode, 0, 2, "execution_mode");
+    checked_product(matrix_rows(counts), 13);
+    checked_product(checked_product(matrix_rows(counts), matrix_cols(design)), matrix_cols(design));
+
     SEXP count_dims = Rf_getAttrib(counts, R_DimSymbol);
     SEXP design_dims = Rf_getAttrib(design, R_DimSymbol);
     if (Rf_length(count_dims) != 2 || Rf_length(design_dims) != 2)
@@ -135,7 +170,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         reduced_coefficients = (size_t)INTEGER(reduced_dims)[1];
         reduced_values = REAL(reduced_design);
     }
-    const char *columns[] = {"baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj", "dispersion", "converged", "maxCooks", "cooksOutlier", "filtered"};
+    const char *columns[] = {"baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj", "dispersion", "converged", "maxCooks", "cooksOutlier", "filtered", "rawPvalue", "rawStat"};
     const size_t n_columns = sizeof(columns) / sizeof(columns[0]);
     const size_t n_coefficients = (size_t)INTEGER(design_dims)[1];
     SEXP values = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_columns));
@@ -292,6 +327,23 @@ SEXP rsdeseq2_transform(SEXP counts, SEXP design, SEXP size_factors_input,
                         SEXP sample_prior_variance, SEXP frozen_trend_type,
                         SEXP frozen_trend_parameters, SEXP frozen_disp_fit,
                         SEXP frozen_local_curve) {
+    validate_matrix(counts, "counts");
+    validate_design(design, matrix_cols(counts), "design");
+    validate_normalization(counts, size_factors_input, normalization_factors, observation_weights);
+    validate_integer_scalar(fit_type, 0, 2, "fit_type");
+    validate_integer_scalar(transform_type, 0, 2, "transform_type");
+    validate_boolean(blind, "blind");
+    validate_integer_scalar(nsub, 0, INT_MAX, "nsub");
+    validate_integer_scalar(threads, 1, INT_MAX, "threads");
+    validate_optional_vector(frozen_intercept, REALSXP, matrix_rows(counts), "frozen_intercept");
+    if (sample_prior_variance != R_NilValue) validate_real_scalar(sample_prior_variance, "sample_prior_variance");
+    int trend = validate_integer_scalar(frozen_trend_type, -1, 2, "frozen_trend_type");
+    validate_optional_vector(frozen_trend_parameters, REALSXP, 2, "frozen_trend_parameters");
+    validate_optional_vector(frozen_disp_fit, REALSXP, matrix_rows(counts), "frozen_disp_fit");
+    validate_optional_vector(frozen_local_curve, REALSXP, 1998, "frozen_local_curve");
+    if (trend == 0 || trend == 2) validate_vector(frozen_trend_parameters, REALSXP, 2, "frozen_trend_parameters");
+    if (trend == 1) validate_vector(frozen_local_curve, REALSXP, 1998, "frozen_local_curve");
+
     SEXP count_dims = Rf_getAttrib(counts, R_DimSymbol);
     SEXP design_dims = Rf_getAttrib(design, R_DimSymbol);
     if (Rf_length(count_dims) != 2 || Rf_length(design_dims) != 2)
@@ -347,6 +399,16 @@ SEXP rsdeseq2_lfc_shrink_normal(SEXP counts, SEXP design,
                                 SEXP observation_weights, SEXP dispersions,
                                 SEXP base_mean, SEXP disp_fit, SEXP coefficient,
                                 SEXP intercept_index, SEXP lfc_threshold) {
+    validate_matrix(counts, "counts");
+    validate_design(design, matrix_cols(counts), "design");
+    validate_normalization(counts, size_factors, normalization_factors, observation_weights);
+    validate_vector(dispersions, REALSXP, matrix_rows(counts), "dispersions");
+    validate_vector(base_mean, REALSXP, matrix_rows(counts), "base_mean");
+    validate_vector(disp_fit, REALSXP, matrix_rows(counts), "disp_fit");
+    validate_integer_scalar(coefficient, 1, matrix_cols(design), "coefficient");
+    validate_integer_scalar(intercept_index, -1, matrix_cols(design) - 1, "intercept_index");
+    validate_real_scalar(lfc_threshold, "lfc_threshold");
+
     SEXP count_dims = Rf_getAttrib(counts, R_DimSymbol);
     SEXP design_dims = Rf_getAttrib(design, R_DimSymbol);
     if (Rf_length(count_dims) != 2 || Rf_length(design_dims) != 2)
@@ -403,6 +465,21 @@ SEXP rsdeseq2_lfc_shrink_normal_contrast(SEXP counts, SEXP design,
                                          SEXP contrast, SEXP intercept_index,
                                          SEXP standard_intercept_index,
                                          SEXP lfc_threshold) {
+    validate_matrix(counts, "counts");
+    validate_design(design, matrix_cols(counts), "design");
+    validate_design(standard_beta, matrix_rows(counts), "standard_beta");
+    validate_normalization(counts, size_factors, normalization_factors, observation_weights);
+    validate_vector(dispersions, REALSXP, matrix_rows(counts), "dispersions");
+    validate_vector(base_mean, REALSXP, matrix_rows(counts), "base_mean");
+    validate_vector(disp_fit, REALSXP, matrix_rows(counts), "disp_fit");
+    validate_vector(standard_factor_groups, INTSXP, matrix_cols(standard_beta), "standard_factor_groups");
+    validate_vector(expanded_prior_map, INTSXP, matrix_cols(design), "expanded_prior_map");
+    validate_vector(factor_groups, INTSXP, matrix_cols(design), "factor_groups");
+    validate_vector(contrast, REALSXP, matrix_cols(design), "contrast");
+    validate_integer_scalar(intercept_index, 0, matrix_cols(design), "intercept_index");
+    validate_integer_scalar(standard_intercept_index, 0, matrix_cols(standard_beta), "standard_intercept_index");
+    validate_real_scalar(lfc_threshold, "lfc_threshold");
+
     SEXP count_dims = Rf_getAttrib(counts, R_DimSymbol);
     SEXP design_dims = Rf_getAttrib(design, R_DimSymbol);
     if (Rf_length(count_dims) != 2 || Rf_length(design_dims) != 2)
@@ -460,6 +537,17 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
                                  SEXP counts,
                                  SEXP cooks,
                                  SEXP low_count_heuristic) {
+    validate_vector(pvalue, REALSXP, XLENGTH(pvalue), "pvalue");
+    validate_vector(max_cooks, REALSXP, XLENGTH(pvalue), "max_cooks");
+    validate_vector(cooks_cutoff, REALSXP, 1, "cooks_cutoff");
+    validate_boolean(low_count_heuristic, "low_count_heuristic");
+    if (LOGICAL(low_count_heuristic)[0]) {
+        validate_matrix(counts, "counts");
+        validate_matrix(cooks, "cooks");
+        if (matrix_rows(counts) != XLENGTH(pvalue) || matrix_rows(cooks) != XLENGTH(pvalue) || matrix_cols(cooks) != matrix_cols(counts))
+            Rf_error("counts and cooks must have matching p-value/sample dimensions");
+    }
+
     const R_xlen_t n_genes = Rf_xlength(pvalue);
     const int use_low_count = LOGICAL(low_count_heuristic)[0] == TRUE;
     size_t n_samples = 0;
