@@ -1,0 +1,65 @@
+{
+  "numerical_code_checkpoint": "807a107",
+  "comparison_environment": "deseq2-r462-native",
+  "r_version": "4.6.2",
+  "reference_packages": {
+    "DESeq2": "1.52.0",
+    "apeglm": "1.34.0",
+    "ashr": "2.2-63"
+  },
+  "locked_packages_verified": 82,
+  "rust_tests": {
+    "passed": 1027,
+    "ignored": 1,
+    "full_ignored_case_explicitly_passed": true
+  },
+  "r_source_package": {
+    "status": "OK",
+    "assertions_passed": 1368,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "full_test_archive_sha256": "c4e6053c0093a5375a5464c93147a32145645acb6cbf8dbb2d37d6f33da480b8",
+    "runtime_files_verified_against_checked_archive": 175,
+    "runtime_tree_sha256": "83d939233d925ec4ef626dc06409579d2270583204e4a7acbb9469d532697e51"
+  },
+  "python_tests": {
+    "passed": 44
+  },
+  "msrv": "1.97.1",
+  "checks": [
+    "format",
+    "core_and_backend_clippy",
+    "read_only_vendor",
+    "workflow_lint_except_old_tool_runner_label"
+  ],
+  "remote_target_jobs": "not run locally; required by the publication gate",
+  "cli_sha256": "eabec0286dfd6f8cd8036391d215d04384565f818918a0d4b2050b2ac2ce1769",
+  "gtex": {
+    "contrasts": 11,
+    "genes_per_contrast": 56200,
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "unchanged_native_exports": 22,
+    "rust_total_s": 36.22540449900407,
+    "deseq2_total_s": 195.03513891700277
+  },
+  "independent_panel": {
+    "dataset": "Pasilla",
+    "genes": 2048,
+    "samples": 7,
+    "tests": [
+      "Wald",
+      "LRT"
+    ],
+    "status": "passed",
+    "unchanged_native_exports": 8
+  },
+  "r_workflow_pairs_exact": 5,
+  "retained_precision_gates": [
+    "R matrix/BH/filtering arithmetic",
+    "existing enabled-replacement buffer contract"
+  ],
+  "version_bump": false,
+  "publication": false
+}

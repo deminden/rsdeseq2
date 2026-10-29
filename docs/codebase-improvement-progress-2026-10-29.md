@@ -1,8 +1,10 @@
 # Codebase improvement execution — 2026-10-29
 
 Implementation follows the [detailed plan](codebase-improvement-plan-2026-10-22.md).
-The full plan remains in progress. This document records the first correctness
-batch; later execution, delivery, memory and consolidation work is still pending.
+The implementation cycle covers C01–C23, with the plan's conditional retention
+decisions documented below. The sections retain their batch-specific evidence.
+Current local numerical and source-package checks pass; remote target jobs remain
+part of the publication gate. Package versions have not been bumped or published.
 
 ## Implemented in the first batch
 
@@ -47,7 +49,7 @@ No new full-GTEx timing/RSS result is claimed. The primary Rust core and CLI
 source have not changed in this batch. R validation overhead and the broader
 workflow/transform performance panel still need measurement.
 
-## Remaining work
+## Later implementation and validation
 
 M1 follow-through includes the larger selector/replacement/threshold matrix,
 legacy save/load cases, explicit subset-shrinkage reference cases and broader
@@ -141,6 +143,10 @@ without another fit. Numerical suites, Clippy and MSRV pass. Fitted-result polic
 has a real private module with explicit imports/access, separate from transforms
 and builder execution. Existing aliases and formula behavior are retained.
 
-The R statistical migration and C20 bulk bridge remain pending; R's validated
-tails/filtering are retained until the shared replacements pass their numerical
-gates. C23 final documentation and artifact checks also remain pending.
+The R statistical migration and C20 bulk bridge remain pending. The previous
+R-backed implementation was removed at the user's request: statistical
+calculations must live in the standalone Rust engine, and its R interface must
+return identical results. R-specific probability/arithmetic backends are outside
+that contract. Previously saved measurements and source archives remain historical
+evidence of their recorded checkpoints, not validation of the replacement path.
+C23 final documentation and artifact checks remain pending.
