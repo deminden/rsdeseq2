@@ -2,6 +2,7 @@ use statrs::distribution::{Continuous, ContinuousCDF, Normal, StudentsT};
 use statrs::function::erf::erfc;
 
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::glm::inference::GlmInferenceView;
 use crate::glm::{NbinomGlmFit, WaldOutput};
 
 /// Options controlling Wald p-value calculation.
@@ -164,6 +165,14 @@ pub fn wald_test_contrast_with_options(
     contrast: &[f64],
     options: &WaldTestOptions,
 ) -> Result<WaldContrastOutput, DeseqError> {
+    wald_test_contrast_view(&GlmInferenceView::from(fit), contrast, options)
+}
+
+pub(crate) fn wald_test_contrast_view(
+    fit: &GlmInferenceView<'_>,
+    contrast: &[f64],
+    options: &WaldTestOptions,
+) -> Result<WaldContrastOutput, DeseqError> {
     validate_contrast_inputs(fit, contrast)?;
     validate_wald_options(options)?;
     let degrees_of_freedom = resolve_wald_degrees_of_freedom(fit, options)?;
@@ -258,7 +267,8 @@ pub fn wald_test_coefficient_with_options(
         ));
     }
     validate_wald_options(options)?;
-    let degrees_of_freedom = resolve_wald_degrees_of_freedom(fit, options)?;
+    let degrees_of_freedom =
+        resolve_wald_degrees_of_freedom(&GlmInferenceView::from(fit), options)?;
 
     let mut stat = Vec::with_capacity(fit.beta.n_rows());
     let mut pvalue = Vec::with_capacity(fit.beta.n_rows());
@@ -289,7 +299,10 @@ pub fn wald_test_coefficient_with_options(
     })
 }
 
-fn validate_contrast_inputs(fit: &NbinomGlmFit, contrast: &[f64]) -> Result<(), DeseqError> {
+fn validate_contrast_inputs(
+    fit: &GlmInferenceView<'_>,
+    contrast: &[f64],
+) -> Result<(), DeseqError> {
     if contrast.len() != fit.beta.n_cols() {
         return Err(invalid_dimensions(
             "Wald contrast coefficients",
@@ -512,7 +525,7 @@ pub fn two_sided_t_pvalue(stat: f64, degrees_of_freedom: f64) -> Option<f64> {
 }
 
 fn resolve_wald_degrees_of_freedom(
-    fit: &NbinomGlmFit,
+    fit: &GlmInferenceView<'_>,
     options: &WaldTestOptions,
 ) -> Result<Option<Vec<Option<f64>>>, DeseqError> {
     match &options.pvalue_type {
@@ -542,7 +555,7 @@ fn valid_t_df(df: f64) -> Option<f64> {
     (df.is_finite() && df > 0.0).then_some(df)
 }
 
-fn validate_wald_options(options: &WaldTestOptions) -> Result<(), DeseqError> {
+pub(crate) fn validate_wald_options(options: &WaldTestOptions) -> Result<(), DeseqError> {
     if !options.lfc_threshold.is_finite() || options.lfc_threshold < 0.0 {
         return Err(DeseqError::InvalidOptions {
             reason: "Wald LFC threshold must be finite and non-negative".to_string(),

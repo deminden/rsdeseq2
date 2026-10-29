@@ -350,22 +350,6 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
     }
 }
 
-fn factor_level_result_metadata(contrast: FactorLevelContrast<'_>) -> (String, String) {
-    let spec = match contrast.reference {
-        Some(reference) => ContrastSpec::factor_level_with_reference(
-            contrast.factor,
-            contrast.numerator,
-            contrast.denominator,
-            reference,
-        ),
-        None => ContrastSpec::factor_level(
-            contrast.factor,
-            contrast.numerator,
-            contrast.denominator,
-        ),
-    };
-    (spec.result_name(), spec.comparison())
-}
 
 fn apply_cooks_cutoff_for_factor_level_metadata(
     results: &mut DeseqResults,
@@ -640,55 +624,7 @@ fn mask_wald_degrees_of_freedom_for_all_zero_rows(
     Ok(())
 }
 
-fn apply_contrast_all_zero_to_wald_contrast(
-    contrast: &mut WaldContrastOutput,
-    contrast_all_zero: &[bool],
-    all_zero: &[bool],
-) -> Result<(), DeseqError> {
-    let n_genes = contrast.log2_fold_change.len();
-    if contrast_all_zero.len() != n_genes {
-        return Err(invalid_dimensions(
-            "contrastAllZero rows",
-            n_genes,
-            contrast_all_zero.len(),
-        ));
-    }
-    if all_zero.len() != n_genes {
-        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
-    }
-    for gene in 0..n_genes {
-        if contrast_all_zero[gene] && !all_zero[gene] {
-            contrast.log2_fold_change[gene] = Some(0.0);
-            contrast.wald.stat[gene] = Some(0.0);
-            contrast.wald.pvalue[gene] = Some(1.0);
-        }
-    }
-    Ok(())
-}
 
-fn apply_contrast_all_zero_to_lrt_results(
-    results: &mut DeseqResults,
-    contrast_all_zero: &[bool],
-    all_zero: &[bool],
-) -> Result<(), DeseqError> {
-    let n_genes = results.rows.len();
-    if contrast_all_zero.len() != n_genes {
-        return Err(invalid_dimensions(
-            "contrastAllZero rows",
-            n_genes,
-            contrast_all_zero.len(),
-        ));
-    }
-    if all_zero.len() != n_genes {
-        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
-    }
-    for gene in 0..n_genes {
-        if contrast_all_zero[gene] && !all_zero[gene] {
-            results.rows[gene].log2_fold_change = Some(0.0);
-        }
-    }
-    Ok(())
-}
 
 fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     let full_deviance = glm_fit

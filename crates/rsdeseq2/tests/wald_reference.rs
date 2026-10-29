@@ -655,6 +655,56 @@ fn fixed_dispersion_wald_t_matches_deseq2_internal_reference() {
         )
         .unwrap();
 
+    let request = ResultRequest::new(
+        ResultsContrast::Numeric(vec![0.0, 1.0]),
+        WaldTestOptions::t_residual_degrees_of_freedom(),
+        CooksCutoff::Disabled,
+        IndependentFilteringOptions {
+            enabled: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let selected = fit
+        .results_for_request(&reference_counts(), &request, None)
+        .unwrap();
+    let mut inference_only = fit.clone();
+    inference_only.mu = None;
+    inference_only.hat_diagonal = None;
+    inference_only.log_like = None;
+    inference_only.beta_optim_start = None;
+    assert_eq!(
+        selected,
+        inference_only
+            .results_for_request(&reference_counts(), &request, None)
+            .unwrap()
+    );
+    let masked_request = ResultRequest::new(
+        ResultsContrast::Numeric(vec![0.0, 1.0]),
+        WaldTestOptions::t_residual_degrees_of_freedom(),
+        CooksCutoff::Threshold(0.0),
+        IndependentFilteringOptions::default(),
+    )
+    .unwrap();
+    inference_only.max_cooks = Some(vec![Some(1.0); rows.len()]);
+    let masked = inference_only
+        .results_for_request(&reference_counts(), &masked_request, None)
+        .unwrap();
+    assert!(
+        masked
+            .rows
+            .iter()
+            .all(|row| row.pvalue.is_none() && row.padj.is_none())
+    );
+    assert!(
+        ResultRequest::new(
+            ResultsContrast::Numeric(vec![0.0, 1.0]),
+            WaldTestOptions::normal(),
+            CooksCutoff::Threshold(-1.0),
+            IndependentFilteringOptions::default()
+        )
+        .is_err()
+    );
     let wald = fit.wald.as_ref().unwrap();
     let degrees_of_freedom = wald.degrees_of_freedom.as_ref().unwrap();
 
@@ -682,6 +732,13 @@ fn fixed_dispersion_wald_t_matches_deseq2_internal_reference() {
             &format!("t-Wald p-value gene {gene}"),
         );
         assert_eq!(results.rows[gene].pvalue, wald.pvalue[gene]);
+        assert_option_close(
+            selected.rows[gene].pvalue,
+            Some(parse_required_f64(row, "pvalue_conditionB")),
+            1e-7,
+            1e-5,
+            &format!("stored request t-Wald p-value gene {gene}"),
+        );
     }
 }
 

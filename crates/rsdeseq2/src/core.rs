@@ -4,6 +4,7 @@
 //! existing `rsdeseq2::core::*` paths remain source-compatible.
 
 mod execution;
+mod fitted_results;
 mod implementation;
 
 pub use implementation::*;

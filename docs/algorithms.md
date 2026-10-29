@@ -1578,3 +1578,16 @@ skip all-zero rows during GLM fitting and expand compact outputs back to full
 gene order with `NaN` internal numeric values and `None` result-table values,
 matching the intent of DESeq2's `buildMatrixWithNARows` and
 `buildDataFrameWithNARows` helpers without copying their implementation.
+
+## Stored-fit result requests
+
+`DeseqFit::wald_results_contrast_request_with_options` and its factor-level
+counterpart accept explicit `WaldTestOptions`. Existing methods keep their default
+options. `ResultRequest::new` validates statistical/filter options, and
+`DeseqFit::results_for_request` resolves the contrast using borrowed inference
+arrays, applies Cook's masking, then recomputes independent filtering/BH for that
+request. LRT requests retain their stored model-level statistics and reject
+nondefault Wald options. Ordinary stored-fit requests and replacement-output
+merge policies retain their separate required context; no absent replacement
+state is synthesized. The R layer keeps its validated probability functions
+until a shared bridge meets the same precision limits.

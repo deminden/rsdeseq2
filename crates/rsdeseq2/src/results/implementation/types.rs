@@ -1,3 +1,4 @@
+use crate::glm::inference::GlmInferenceView;
 use crate::cooks::{
     calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
     CooksReplacementOptions,
