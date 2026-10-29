@@ -71,8 +71,15 @@ checks clone reuse and rejects zero/unsupported counts. Existing one/four-worker
 numerical invariance passes. The workspace passed 1,020 tests with the existing
 single ignored case; R tests and core/backend Clippy pass.
 
-C12–C13 remain pending: accuracy-enforced benchmark acceptance, deterministic
-vendor checks and combined artifact/publication gates.
+C12 is implemented: read-only vendor/version checks derive the manifest from
+Cargo metadata, and Rust/R CI reject committed drift. Accepted benchmarks require
+a native baseline verified against reviewed output hashes and frozen reference
+identity; exploration runs remain explicitly unaccepted. Baseline/binary/manifest
+mutation and empty finite coverage fail acceptance. The Python suite passed
+37 tests, including drift, version mismatch and benchmark failure cases.
+
+C13 remains pending: combined artifact/publication gates and pinned delivery
+environments/platform checks.
 
 C14–C23 remain pending: representative stage/RSS profiling, borrowed ownership,
 bounded row storage, selective GLM retention, optional replacement buffers,

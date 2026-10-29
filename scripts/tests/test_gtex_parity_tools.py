@@ -188,4 +188,43 @@ class ContrastGenerationTests(unittest.TestCase):
             target.write_bytes(b'correct');contrasts.full_counts(source,target)
 
 
-if __name__=='__main__':unittest.main()
+class AcceptedBenchmarkContract(unittest.TestCase):
+    def test_missing_accuracy_baseline_errors_before_running_tools(self):
+        with mock.patch.object(sys, 'argv', ['benchmark', '--rscript', '/mock/Rscript']), mock.patch.object(benchmark.subprocess, 'run') as run:
+            with self.assertRaises(SystemExit) as raised:
+                benchmark.main()
+            self.assertEqual(raised.exception.code, 2)
+            run.assert_not_called()
+
+    def test_wrong_finite_output_cannot_match_accepted_baseline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/'result.tsv'
+            path.write_text('gene\tpvalue\ng1\t0.01\n')
+            expected = benchmark.sha256(path)
+            path.write_text('gene\tpvalue\ng1\t0.02\n')
+            with self.assertRaisesRegex(ValueError, 'hash differs'):
+                benchmark.require_hash(path, expected, 'validated numerical output')
+
+    def test_all_missing_and_mismatched_metrics_are_not_accepted(self):
+        for finite, missing in [(0, 0), (1, 1)]:
+            with self.subTest(finite=finite, missing=missing), self.assertRaises(ValueError):
+                benchmark.validate_parity_metrics([dict(n_finite=finite, finite_na_mismatches=missing)])
+        benchmark.validate_parity_metrics([dict(n_finite=10, finite_na_mismatches=0)])
+
+    def test_native_baseline_is_checked_against_its_reviewed_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            d = root/'contrast'; d.mkdir()
+            output = d/'results.tsv'; output.write_text('gene\tpvalue\ng1\t0.01\n')
+            manifest = root/'hashes.tsv'
+            with manifest.open('w', newline='') as handle:
+                writer = csv.DictWriter(handle, fieldnames=['contrast','file','release_sha256'], delimiter='\t')
+                writer.writeheader()
+                writer.writerow(dict(contrast='contrast', file='results.tsv', release_sha256=benchmark.sha256(output)))
+            benchmark.frozen_native_hashes(root, manifest, [d])
+            output.write_text('gene\tpvalue\ng1\t0.02\n')
+            with self.assertRaisesRegex(ValueError, 'hash differs'):
+                benchmark.frozen_native_hashes(root, manifest, [d])
+
+if __name__ == "__main__":
+    unittest.main()

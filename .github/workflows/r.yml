@@ -14,8 +14,8 @@ jobs:
         with:
           r-version: '4.6.1'
       - uses: dtolnay/rust-toolchain@stable
-      - name: Sync Rust core into the R source package
-        run: scripts/sync_r_vendor.sh
+      - name: Check committed Rust vendor and package versions
+        run: scripts/sync_r_vendor.sh --check
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libuv1-dev
       - name: Install test dependencies

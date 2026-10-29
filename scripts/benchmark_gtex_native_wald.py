@@ -16,7 +16,7 @@ import statistics
 import subprocess
 import time
 from pathlib import Path
-from check_gtex_dispersion_improvement import compare, RESULT_COLUMNS, write_rows, sha256
+from check_gtex_dispersion_improvement import compare, RESULT_COLUMNS, write_rows, sha256, verify_reference_hashes, read_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,6 +38,25 @@ def require_hash(path, expected, label):
     if sha256(path) != expected:
         raise ValueError(f'{label} hash differs: {path}')
 
+def frozen_native_hashes(root, manifest, contrasts):
+    rows = read_rows(manifest)
+    hashes = {(row['contrast'], row['file']): row['release_sha256'] for row in rows}
+    if len(hashes) != len(rows):
+        raise ValueError('Duplicate native baseline manifest entries')
+    selected = {}
+    for contrast in contrasts:
+        expected = hashes[(contrast.name, 'results.tsv')]
+        require_hash(root/contrast.name/'results.tsv', expected, 'frozen native baseline')
+        selected[contrast.name] = expected
+    return selected
+
+
+def validate_parity_metrics(metrics):
+    for metric in metrics:
+        if metric['finite_na_mismatches'] or metric['n_finite'] <= 0:
+            raise ValueError('Numerical comparison has missingness drift or no finite coverage')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture-root',type=Path,default=ROOT/'results/benchmarks/gtex_mode_contrasts')
@@ -47,7 +66,10 @@ def main():
     parser.add_argument('--baseline-binary',type=Path,help='Optional previous Rust release for a direct release comparison')
     parser.add_argument('--baseline-label',default='previous release')
     parser.add_argument('--validated-results-root',type=Path,help='Frozen native results directory; require exact hashes for the current Rust binary')
-    parser.add_argument('--repeats',type=int,default=3)
+    parser.add_argument('--validated-output-hashes', type=Path, default=ROOT/'docs/data/release_0.3.1_gtex_output_sha256.tsv', help='Reviewed native output manifest with release_sha256 entries')
+    parser.add_argument('--exploration', action='store_true', help='Report-only measurements, never accepted optimization/release evidence')
+    parser.add_argument('--reference-hashes', type=Path, default=ROOT/'docs/data/gtex_dispersion_reference_sha256.tsv')
+    parser.add_argument('--repeats',type=int,default=1)
     parser.add_argument('--rust-threads',type=int,default=1)
     parser.add_argument('--blas-threads',type=int,default=1)
     parser.add_argument('--time-bin',default='/usr/bin/time',
@@ -56,10 +78,17 @@ def main():
     args = parser.parse_args()
     if not args.rscript or min(args.repeats,args.rust_threads,args.blas_threads) < 1:
         parser.error('Rscript and positive repeat/thread counts are required')
+    if not args.exploration and not args.validated_results_root:
+        parser.error('Accepted runs require --validated-results-root; use --exploration for report-only measurements')
     contrasts = [args.fixture_root/n for n in ('condition_blocked','sex_female_vs_male','male_age4_vs_age3')]
     contrasts += sorted((args.fixture_root/'random_splits').glob('*_random_rep*'))
     if len(contrasts) != 11:
         parser.error('Generate all eleven contrasts with generate_gtex_mode_contrasts.py first')
+    all_contrasts = list(contrasts)
+    frozen = [dict(contrast=d.name, file=name, sha256=sha256(d/name))
+              for d in all_contrasts for name in ('counts.tsv','design_matrix.tsv','reference_results.tsv','reference_fit_diagnostics.tsv')]
+    if not args.exploration:
+        verify_reference_hashes(args.reference_hashes, frozen)
     if args.contrasts:
         selected = set(args.contrasts)
         if not selected <= {d.name for d in contrasts}:
@@ -70,10 +99,12 @@ def main():
     env = os.environ.copy()
     env.update(RAYON_NUM_THREADS=str(args.rust_threads),OPENBLAS_NUM_THREADS=str(args.blas_threads),
                OMP_NUM_THREADS=str(args.blas_threads),MKL_NUM_THREADS=str(args.blas_threads))
-    frozen = []
-    for d in contrasts:
-        for name in ('counts.tsv','design_matrix.tsv','reference_results.tsv','reference_fit_diagnostics.tsv'):
-            frozen.append(dict(contrast=d.name,file=name,sha256=sha256(d/name)))
+    validated = frozen_native_hashes(args.validated_results_root, args.validated_output_hashes, contrasts) if args.validated_results_root else {}
+    acceptance = dict(accepted=False, status='in_progress', mode='exploration' if args.exploration else 'accepted',
+                      validated_result_sha256=validated,
+                      validated_output_manifest_sha256=sha256(args.validated_output_hashes) if validated else None,
+                      reference_manifest_sha256=sha256(args.reference_hashes) if not args.exploration else None)
+    (args.output_dir/'acceptance.json').write_text(json.dumps(acceptance, indent=2)+'\n')
     write_rows(args.output_dir/'input_reference_sha256.tsv',frozen)
     binary_hash = sha256(args.binary)
     baseline_hash = sha256(args.baseline_binary) if args.baseline_binary else None
@@ -116,16 +147,15 @@ def main():
                                    env=env,check=True,stdout=log,stderr=subprocess.STDOUT)
                     elapsed=time.perf_counter()-start
                 if tool=='rsdeseq2' and args.validated_results_root:
-                    expected=args.validated_results_root/d.name/'results.tsv'
-                    require_hash(output,sha256(expected),'validated numerical output')
+                    require_hash(output,validated[d.name],'validated numerical output')
                 rss=peak_rss_bytes(resources)
                 timings.append(dict(contrast=d.name,tool=tool,repetition=repeat,elapsed_s=elapsed,
                                     peak_rss_bytes=rss,peak_rss_mib=rss/(1024**2),
                                     result_sha256=sha256(output)))
                 write_rows(args.output_dir/'timings.tsv',timings)
-                for metric in compare(output,d/'reference_results.tsv',RESULT_COLUMNS):
-                    if metric['finite_na_mismatches']:
-                        raise ValueError('finite/NA mismatch in '+str(output))
+                metrics = compare(output,d/'reference_results.tsv',RESULT_COLUMNS)
+                validate_parity_metrics(metrics)
+                for metric in metrics:
                     parity.append(dict(contrast=d.name,tool=tool,repetition=repeat,**metric))
                 print(f'{d.name}: {tool} repeat {repeat}/{args.repeats}: '
                       f'{elapsed:.2f}s, peak RSS {rss/(1024**2):.2f} MiB',flush=True)
@@ -157,12 +187,20 @@ def main():
         write_rows(args.output_dir/'summary.tsv',summary)
         write_rows(args.output_dir/'parity.tsv',parity)
     for row in frozen:
-        d=next(d for d in contrasts if d.name==row['contrast'])
+        d=next(d for d in all_contrasts if d.name==row['contrast'])
         if sha256(d/row['file'])!=row['sha256']:
             raise ValueError('Frozen input/reference was modified')
     require_hash(args.binary,binary_hash,'binary')
     if args.baseline_binary:
         require_hash(args.baseline_binary,baseline_hash,'baseline binary')
+    for name, expected in validated.items():
+        require_hash(args.validated_results_root/name/'results.tsv', expected, 'frozen native baseline')
+    if validated:
+        require_hash(args.validated_output_hashes, acceptance['validated_output_manifest_sha256'], 'native output manifest')
+    if not args.exploration:
+        require_hash(args.reference_hashes, acceptance['reference_manifest_sha256'], 'reference manifest')
+    acceptance.update(accepted=not args.exploration, status='complete')
+    (args.output_dir/'acceptance.json').write_text(json.dumps(acceptance, indent=2)+'\n')
     print('All frozen inputs and references unchanged.',flush=True)
 
 if __name__=='__main__':

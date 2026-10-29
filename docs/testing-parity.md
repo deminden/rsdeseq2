@@ -1,5 +1,28 @@
 # Numerical tests and parity checks
 
+## Accepted benchmark runs
+
+`benchmark_gtex_native_wald.py` defaults to one sequential pass. An accepted run
+requires `--validated-results-root` and verifies that directory against the
+reviewed `--validated-output-hashes` manifest (default: the v0.3.1 native-output
+manifest). It also verifies the frozen 44 input/reference hashes. For example:
+
+```sh
+python3 scripts/benchmark_gtex_native_wald.py --repeats 1 \
+  --validated-results-root results/benchmarks/release_0.3.1/gtex \
+  --output-dir results/benchmarks/current-accepted
+```
+
+Use the documented pinned R environment. A finite but inaccurate candidate
+cannot pass the native output hash check. Missing finite coverage, missingness
+drift, altered binaries, changed baselines and mutated manifests fail the run.
+`acceptance.json` is accepted only after successful completion. Companion stage
+and diagnostic parity checks remain required when claiming preserved routes.
+
+Explicit `--exploration` permits reporting without that acceptance baseline;
+its completed report remains unaccepted for optimization/release evidence.
+Historical timing files retain their original provenance and are not relabeled.
+
 ## Changes from the test-quality review
 
 The numerical implementation and existing full reference files are unchanged.
