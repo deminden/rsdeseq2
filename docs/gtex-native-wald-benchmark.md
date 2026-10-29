@@ -113,7 +113,11 @@ python scripts/benchmark_gtex_native_wald.py --exploration --repeats 1 \
 Use native R 4.6.2; `CONDA_PREFIX` above points to its environment. Newly generated
 references may differ in last bits and remain exploration evidence until reviewed.
 Accepted optimization evidence instead requires the preserved reviewed native
-result directory, its committed SHA manifest and unchanged frozen references:
+result and diagnostic directory, its committed SHA manifest and unchanged frozen
+references. Accepted runs verify result/diagnostic exports in separate untimed
+native fits before recording the result-only timing scope. A missing or changed
+diagnostic export fails acceptance; these verification fits are excluded from
+the reported fit process time and RSS:
 
 ```sh
 python scripts/benchmark_gtex_native_wald.py --repeats 1 \

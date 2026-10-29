@@ -20,7 +20,9 @@
   design <- stats::model.matrix(methods::slot(object, "design"), data = frame)
   if (!identical(dimnames(design), dimnames(fit$design)) || !equal(design, fit$design)) invalid("design")
   state <- S4Vectors::metadata(object)$rsdeseq2Normalization
-  if (!is.null(state) && !equal(stats::model.offset(frame), state$offsets)) invalid("offsets")
+  offsets <- stats::model.offset(frame)
+  if (is.null(state) && !is.null(offsets)) invalid("offset provenance")
+  if (!is.null(state) && !equal(offsets, state$offsets)) invalid("offsets")
   nf <- DESeq2::normalizationFactors(object)
   storedNF <- if (is.null(fit$normalizationFactors)) NULL else fit$normalizationFactors[rows, , drop = FALSE]
   if (!equal(nf, storedNF)) invalid("normalization factors")
@@ -39,6 +41,22 @@
   }
   for (name in c("dispFit", "baseMean", "baseVar", "allZero")) {
     if (!equal(S4Vectors::mcols(object)[[name]], fit[[name]][rows])) invalid(name)
+  }
+  for (name in c("betaConv", "maxCooks")) {
+    stored <- if (name == "betaConv") fit$results$converged else fit$results$maxCooks
+    if (!equal(S4Vectors::mcols(object)[[name]], stored[rows])) invalid(name)
+  }
+  eligible <- any(fit$replaceable)
+  if (!equal(S4Vectors::mcols(object)$replace,
+             if (eligible) fit$replace[rows] else NULL)) invalid("replacement flags")
+  if (!equal(SummarizedExperiment::colData(object)$replaceable,
+             if (eligible) fit$replaceable else NULL)) invalid("replacement eligibility")
+  for (name in c("replaceCounts", "replaceCooks")) {
+    current <- if (name %in% SummarizedExperiment::assayNames(object)) SummarizedExperiment::assay(object, name) else NULL
+    stored <- if (fit$nRefit > 0L) {
+      if (name == "replaceCounts") fit$replaceCounts[rows, , drop = FALSE] else fit$cooks[rows, , drop = FALSE]
+    } else NULL
+    if (!equal(current, stored)) invalid(name)
   }
   vectors <- c("baseMean", "baseVar", "allZero", "replace", "refitRows", "newAllZeroRows",
                "dispersions", "dispFit", "rawPvalue", "rawStat", "lrtStat", "lrtPvalue")

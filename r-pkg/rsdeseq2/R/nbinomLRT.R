@@ -15,27 +15,31 @@ nbinomLRTRust <- function(baseMean = NULL,
                           rowNames = NULL,
                           object = NULL,
                           ...) {
+  .rsdeseq2_check_unused_arguments(list(...), "nbinomLRTRust")
+  supplied <- names(match.call(expand.dots = FALSE))
   if (!is.null(object)) {
-    if (inherits(object, "rsdeseq2PrimitiveLrtFit")) {
+    fieldsSupplied <- setdiff(supplied, c("", "object", "..."))
+    if (inherits(object, "rsdeseq2PrimitiveLrtFit") && !length(fieldsSupplied)) {
       return(object)
     }
     fields <- .rsdeseq2_extract_lrt_fit_fields(object)
-    baseMean <- baseMean %||% fields$baseMean
-    beta <- beta %||% fields$beta
-    betaCovariance <- betaCovariance %||% fields$betaCovariance
-    betaSE <- betaSE %||% fields$betaSE
-    lrtStat <- lrtStat %||% fields$lrtStat
-    lrtPvalue <- lrtPvalue %||% fields$lrtPvalue
-    lrtDf <- lrtDf %||% fields$lrtDf
-    resultsNames <- resultsNames %||% fields$resultsNames
-    counts <- counts %||% fields$counts
-    sampleLevels <- sampleLevels %||% fields$sampleLevels
-    factorLevels <- factorLevels %||% fields$factorLevels
-    factorReferences <- factorReferences %||% fields$factorReferences
-    modelMatrix <- modelMatrix %||% fields$modelMatrix
-    colData <- colData %||% fields$colData
-    rowNames <- rowNames %||% fields$rowNames
+    if (!"baseMean" %in% supplied) baseMean <- fields$baseMean
+    if (!"beta" %in% supplied) beta <- fields$beta
+    if (!"betaCovariance" %in% supplied) betaCovariance <- fields$betaCovariance
+    if (!"betaSE" %in% supplied) betaSE <- fields$betaSE
+    if (!"lrtStat" %in% supplied) lrtStat <- fields$lrtStat
+    if (!"lrtPvalue" %in% supplied) lrtPvalue <- fields$lrtPvalue
+    if (!"lrtDf" %in% supplied) lrtDf <- fields$lrtDf
+    if (!"resultsNames" %in% supplied) resultsNames <- fields$resultsNames
+    if (!"counts" %in% supplied) counts <- fields$counts
+    if (!"sampleLevels" %in% supplied) sampleLevels <- fields$sampleLevels
+    if (!"factorLevels" %in% supplied) factorLevels <- fields$factorLevels
+    if (!"factorReferences" %in% supplied) factorReferences <- fields$factorReferences
+    if (!"modelMatrix" %in% supplied) modelMatrix <- fields$modelMatrix
+    if (!"colData" %in% supplied) colData <- fields$colData
+    if (!"rowNames" %in% supplied) rowNames <- fields$rowNames
   }
+  if (any(c("lrtStat", "lrtDf") %in% supplied) && !"lrtPvalue" %in% supplied) lrtPvalue <- NULL
   if (is.null(baseMean) || is.null(beta) || is.null(lrtStat)) {
     stop("baseMean, beta, and lrtStat are required for primitive nbinomLRTRust", call. = FALSE)
   }

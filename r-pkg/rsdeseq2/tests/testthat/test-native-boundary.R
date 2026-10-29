@@ -33,7 +33,14 @@ test_that("registered native calls reject malformed buffers in a child process",
     'fit <- call("rsdeseq2_fit",ct,dm,NULL,rep(1,8),NULL,NULL,2L,0L,0L,10,1L,0L)',
     'stopifnot(is.null(fit$replaceCounts),fit$nRefit==0L,identical(dim(fit$mu),dim(ct)))'
   ), script)
-  output <- system2(file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(script)),
+  direct <- Sys.getenv("RSDESEQ2_NATIVE_BOUNDARY_R_EXEC")
+  runtime <- Sys.getenv("RSDESEQ2_SANITIZER_RUNTIME")
+  libraries <- Sys.getenv("RSDESEQ2_SANITIZER_LIBRARY_PATH")
+  executable <- if (nzchar(direct)) direct else file.path(R.home("bin"), "Rscript")
+  arguments <- if (nzchar(direct)) c("--vanilla", "--slave", "-f") else "--vanilla"
+  output <- system2(executable, c(arguments, shQuote(script)),
+                    env = c(if (nzchar(runtime)) paste0("DYLD_INSERT_LIBRARIES=", shQuote(runtime)),
+                            if (nzchar(libraries)) paste0("DYLD_FALLBACK_LIBRARY_PATH=", shQuote(libraries))),
                     stdout = TRUE, stderr = TRUE, timeout = 60)
   expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
 })

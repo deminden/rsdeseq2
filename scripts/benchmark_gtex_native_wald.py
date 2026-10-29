@@ -45,10 +45,28 @@ def frozen_native_hashes(root, manifest, contrasts):
         raise ValueError('Duplicate native baseline manifest entries')
     selected = {}
     for contrast in contrasts:
-        expected = hashes[(contrast.name, 'results.tsv')]
-        require_hash(root/contrast.name/'results.tsv', expected, 'frozen native baseline')
-        selected[contrast.name] = expected
+        selected[contrast.name] = {}
+        for name in ('results.tsv', 'diagnostics.tsv'):
+            if (contrast.name, name) not in hashes:
+                raise ValueError(f'Missing reviewed native {name} hash for {contrast.name}')
+            expected = hashes[(contrast.name, name)]
+            require_hash(root/contrast.name/name, expected, 'frozen native baseline')
+            selected[contrast.name][name] = expected
     return selected
+
+
+def verify_native_outputs(binary, contrast, output_dir, expected, env):
+    """Verify diagnostics outside the measured result-only process scope."""
+    output_dir.mkdir(parents=True, exist_ok=False)
+    with (output_dir/'command.log').open('w') as log:
+        subprocess.run([str(binary.resolve()), 'wald', '--counts', str(contrast/'counts.tsv'),
+                        '--design', str(contrast/'design_matrix.tsv'),
+                        '--output', str(output_dir/'results.tsv'),
+                        '--fit-diagnostics-output', str(output_dir/'diagnostics.tsv'),
+                        '--disable-cooks-cutoff', '--disable-independent-filtering'],
+                       env=env, check=True, stdout=log, stderr=subprocess.STDOUT)
+    for name in ('results.tsv', 'diagnostics.tsv'):
+        require_hash(output_dir/name, expected[name], 'validated native '+name)
 
 
 def validate_parity_metrics(metrics):
@@ -118,6 +136,7 @@ def main():
         baseline_binary_sha256=baseline_hash,baseline_label=args.baseline_label if args.baseline_binary else None,
         tool_order='alternates by contrast/repetition; rotates all three tools when a baseline is supplied',
         timing_scope='process startup, input parsing, full native Wald fit and result TSV output',
+        diagnostic_validation_scope='separate untimed native fits; exact result and diagnostic hashes required',
         memory_metric='per-process maximum resident set size, normalized to MiB (2^20 bytes)',
         memory_scope='entire fitting process, including interpreter/libraries, input data and native allocations',
         time_command=[args.time_bin,*time_args],
@@ -126,6 +145,10 @@ def main():
     timings=[]; summary=[]; parity=[]
     for contrast_index,d in enumerate(contrasts):
         out=args.output_dir/d.name;out.mkdir(exist_ok=True)
+        if validated:
+            verify_native_outputs(args.binary, d, out/'accuracy-preflight', validated[d.name], env)
+            if args.baseline_binary:
+                verify_native_outputs(args.baseline_binary, d, out/'baseline-accuracy-preflight', validated[d.name], env)
         for repeat in range(1,args.repeats+1):
             tools=('rsdeseq2','DESeq2','rsdeseq2_baseline') if args.baseline_binary else ('rsdeseq2','DESeq2')
             offset=(contrast_index+repeat-1)%len(tools)
@@ -146,8 +169,8 @@ def main():
                     subprocess.run([args.time_bin,*time_args,'-o',str(resources),*cmd],
                                    env=env,check=True,stdout=log,stderr=subprocess.STDOUT)
                     elapsed=time.perf_counter()-start
-                if tool=='rsdeseq2' and args.validated_results_root:
-                    require_hash(output,validated[d.name],'validated numerical output')
+                if tool in ('rsdeseq2', 'rsdeseq2_baseline') and validated:
+                    require_hash(output,validated[d.name]['results.tsv'],'validated numerical output')
                 rss=peak_rss_bytes(resources)
                 timings.append(dict(contrast=d.name,tool=tool,repetition=repeat,elapsed_s=elapsed,
                                     peak_rss_bytes=rss,peak_rss_mib=rss/(1024**2),
@@ -193,8 +216,9 @@ def main():
     require_hash(args.binary,binary_hash,'binary')
     if args.baseline_binary:
         require_hash(args.baseline_binary,baseline_hash,'baseline binary')
-    for name, expected in validated.items():
-        require_hash(args.validated_results_root/name/'results.tsv', expected, 'frozen native baseline')
+    for contrast_name, outputs in validated.items():
+        for name, expected in outputs.items():
+            require_hash(args.validated_results_root/contrast_name/name, expected, 'frozen native baseline')
     if validated:
         require_hash(args.validated_output_hashes, acceptance['validated_output_manifest_sha256'], 'native output manifest')
     if not args.exploration:

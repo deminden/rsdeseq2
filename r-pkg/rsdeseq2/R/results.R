@@ -13,13 +13,7 @@ results <- function(object,
                     independentFiltering = TRUE,
                     cooksCutoff = TRUE,
                     ...) {
-  dots <- list(...)
-  if (length(dots)) {
-    labels <- names(dots)
-    if (is.null(labels)) labels <- rep("...", length(dots))
-    labels[is.na(labels) | !nzchar(labels)] <- "..."
-    stop(sprintf("unsupported results arguments: %s", paste(labels, collapse = ", ")), call. = FALSE)
-  }
+  .rsdeseq2_check_unused_arguments(list(...), "results")
   if (!identical(cooksCutoff, TRUE)) {
     cutoff <- .rsdeseq2_validate_cooks_cutoff(cooksCutoff)
     if (!is.null(cutoff) && cutoff < 0) stop("cooksCutoff must be non-negative", call. = FALSE)

@@ -201,6 +201,13 @@ testthat::test_that("DESeqDataSet Cook's replacement refits match DESeq2", {
     testthat::expect_equal(result_metadata$cooksReplacement$nRefit, 2L)
     testthat::expect_equal(result_metadata$cooksReplacement$refitRows, rownames(counts)[1L])
     testthat::expect_equal(result_metadata$cooksReplacement$newAllZeroRows, rownames(counts)[2L])
+    for (assayName in c("replaceCounts", "replaceCooks")) {
+      edited <- fitted
+      SummarizedExperiment::assay(edited, assayName)[1, 1] <-
+        SummarizedExperiment::assay(edited, assayName)[1, 1] + 1
+      testthat::expect_error(results(edited), paste(assayName, "changed"))
+    }
+
   }
 
   filtered_result <- results(fitted)
