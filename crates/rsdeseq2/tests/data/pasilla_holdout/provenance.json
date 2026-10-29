@@ -1,0 +1,18 @@
+{
+  "source": "https://bioconductor.org/packages/3.23/data/experiment/src/contrib/pasilla_1.40.0.tar.gz",
+  "source_sha256": "75122d45eb2c415d3e94d1b9bc9e4f6978c4504ef7e70f6bfeccb20547cb3db5",
+  "source_package": "pasilla 1.40.0",
+  "source_license": "LGPL",
+  "genes": 2048,
+  "samples": [
+    "untreated1",
+    "untreated2",
+    "untreated3",
+    "untreated4",
+    "treated1",
+    "treated2",
+    "treated3"
+  ],
+  "selection": "Expression strata 0/(0,10)/[10,100)/[100,1000)/[1000,infinity); SHA256(20261029:gene) within each stratum; quotas 64/496/496/496/496",
+  "purpose": "Independent validation; not used for optimization tuning"
+}

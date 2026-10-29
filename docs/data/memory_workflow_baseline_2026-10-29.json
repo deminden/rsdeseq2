@@ -1,0 +1,15 @@
+{
+  "source_commit": "ff863e20fc9a182bdd65bd9c0e08fc5fb004d5cb",
+  "comparison_environment": "deseq2-r462-native",
+  "workers": 1,
+  "repetitions": 1,
+  "peak_rss_budget_mib": 2048,
+  "profiling_only": true,
+  "workflow_script_sha256": "8841ac7a8a603df3e621ad05131c12e4edc2e354268945ad40eb8695fdcef1cc",
+  "baseline_cli_sha256": "5ae62cb74d098af8d1a7251ee6ea2506cfb8db795bfd3a9585651ca6f3871bae",
+  "covariance_retention_estimate": {
+    "genes": 2048,
+    "samples": 64,
+    "bytes_per_covariance_array": 69222400
+  }
+}
