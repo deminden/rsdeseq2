@@ -3,6 +3,8 @@
 //! The source is split by workflow so the public module can stay small
 //! while preserving existing paths through re-exports.
 
+use super::execution::ExecutionContext;
+
 // Count matrix storage, row access, and count summaries.
 include!("implementation/counts.rs");
 

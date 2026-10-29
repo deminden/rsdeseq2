@@ -102,8 +102,9 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                             input_slice(frozen_disp_fit_values, n_genes, "frozen rlog dispFit")?
                                 .to_vec()
                         });
-                        let rlog = fit
-                            .regularized_log_transform(&counts)
+                        let rlog = builder
+                            .with_execution_context(|| fit.regularized_log_transform(&counts))
+                            .and_then(|result| result)
                             .map_err(|error| error.to_string())?;
                         (fit, rlog)
                     } else {
@@ -125,8 +126,9 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                     let fit = builder
                         .fit_dispersion_trend_glm_mu(&counts, &design)
                         .map_err(|error| error.to_string())?;
-                    let rlog = fit
-                        .frozen_rlog(&counts, frozen_intercept, sample_prior_variance)
+                    let rlog = builder
+                        .with_execution_context(|| fit.frozen_rlog(&counts, frozen_intercept, sample_prior_variance))
+                        .and_then(|result| result)
                         .map_err(|error| error.to_string())?;
                     (fit, rlog)
                 };

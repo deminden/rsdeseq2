@@ -4,6 +4,10 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_size_factors_and_base_means(counts));
+        }
+
         let stages = self.normalization_stages(counts)?;
         Ok(self.base_fit(counts, None, stages.into_base_fit_input()))
     }
@@ -20,6 +24,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_size_factors_and_base_means_with_design(counts, design));
+        }
+
         let stages = self.normalization_stages_for_design(counts, design)?;
         Ok(self.base_fit(
             counts,
@@ -40,6 +48,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_gene_wise_dispersions_linear_mu(counts, design));
+        }
+
         self.ensure_no_observation_weights("native linear-mu dispersion estimation")?;
         design.validate_full_rank("linear-mu dispersion")?;
         let stages = self.normalization_stages(counts)?;
@@ -79,6 +91,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_gene_wise_dispersions_glm_mu(counts, design));
+        }
+
         design.validate_full_rank("GLM-mu dispersion")?;
         let stages = self.normalization_stages_for_design(counts, design)?;
         let estimator = if self.automatic_dispersion_means {
@@ -120,6 +136,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_parametric_dispersion_trend_linear_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
         self.attach_parametric_dispersion_trend(fit)
     }
@@ -136,6 +156,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_mean_dispersion_trend_linear_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
         self.attach_mean_dispersion_trend(fit)
     }
@@ -149,6 +173,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_parametric_dispersion_trend_glm_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
         self.attach_parametric_dispersion_trend(fit)
     }
@@ -159,6 +187,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_mean_dispersion_trend_glm_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
         self.attach_mean_dispersion_trend(fit)
     }
@@ -169,6 +201,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_local_dispersion_trend_linear_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_linear_mu(counts, design)?;
         self.attach_local_dispersion_trend(fit)
     }
@@ -179,6 +215,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_local_dispersion_trend_glm_mu(counts, design));
+        }
+
         let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
         self.attach_local_dispersion_trend(fit)
     }
@@ -266,6 +306,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_dispersion_trend_linear_mu(counts, design));
+        }
+
         match self.fit_type {
             FitType::Parametric => self.fit_parametric_dispersion_trend_linear_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_linear_mu(counts, design),
@@ -286,6 +330,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_dispersion_trend_glm_mu(counts, design));
+        }
+
         match self.fit_type {
             FitType::Parametric => self.fit_parametric_dispersion_trend_glm_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_glm_mu(counts, design),
@@ -312,6 +360,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub));
+        }
+
         if nsub == 0 {
             return Err(DeseqError::InvalidOptions {
                 reason: "fast VST subset size must be positive".to_string(),
@@ -344,6 +396,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_default_fast_vst_dispersion_trend_glm_mu(counts, design));
+        }
+
         self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
     }
 
@@ -359,6 +415,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<FastVstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fast_vst_glm_mu(counts, design, nsub));
+        }
+
         let (subset_fit, subset) =
             self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub)?;
         let trend_fit =
@@ -398,6 +458,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<FastVstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.default_fast_vst_glm_mu(counts, design));
+        }
+
         self.fast_vst_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
     }
 
@@ -417,6 +481,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<VstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.vst_glm_mu_auto(counts, design, nsub));
+        }
+
         if nsub == 0 {
             return Err(DeseqError::InvalidOptions {
                 reason: "automatic VST subset size must be positive".to_string(),
@@ -460,6 +528,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<VstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.default_vst_glm_mu_auto(counts, design));
+        }
+
         self.vst_glm_mu_auto(counts, design, DEFAULT_FAST_VST_NSUB)
     }
 
@@ -474,6 +546,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         nsub: usize,
     ) -> Result<VstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_vst_glm_mu_auto(counts, nsub));
+        }
+
         let design = DesignMatrix::intercept_only(counts.n_samples())?;
         self.vst_glm_mu_auto(counts, &design, nsub)
     }
@@ -483,6 +559,10 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<VstGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.default_blind_vst_glm_mu_auto(counts));
+        }
+
         self.blind_vst_glm_mu_auto(counts, DEFAULT_FAST_VST_NSUB)
     }
 
@@ -497,6 +577,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<RlogOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.rlog_glm_mu(counts, design));
+        }
+
         self.rlog_glm_mu_with_fit(counts, design)
             .map(|output| output.rlog)
     }
@@ -508,6 +592,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.rlog_glm_mu_with_options(counts, design, rlog_irls_options));
+        }
+
         self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
             .map(|output| output.rlog)
     }
@@ -518,6 +606,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.rlog_glm_mu_with_fit(counts, design));
+        }
+
         self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
     }
 
@@ -528,6 +620,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options));
+        }
+
         let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
         let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
         Ok(RlogGlmMuOutput {
@@ -543,6 +639,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.frozen_rlog_glm_mu_with_fit(counts, design));
+        }
+
         self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
     }
 
@@ -553,6 +653,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options));
+        }
+
         let source = self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)?;
         let frozen_rlog = source.fit.frozen_rlog(
             counts,
@@ -573,6 +677,10 @@ impl DeseqBuilder {
     /// dispersion fitting and rlog prior estimation ignore sample groups by
     /// using a one-column all-ones design.
     pub fn blind_rlog_glm_mu(&self, counts: &CountMatrix) -> Result<RlogOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_rlog_glm_mu(counts));
+        }
+
         self.blind_rlog_glm_mu_with_fit(counts)
             .map(|output| output.rlog)
     }
@@ -583,6 +691,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_rlog_glm_mu_with_options(counts, rlog_irls_options));
+        }
+
         self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
             .map(|output| output.rlog)
     }
@@ -592,6 +704,10 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_rlog_glm_mu_with_fit(counts));
+        }
+
         self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
     }
 
@@ -601,6 +717,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options));
+        }
+
         let design = DesignMatrix::intercept_only(counts.n_samples())?;
         let mut output =
             self.rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
@@ -613,6 +733,10 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_frozen_rlog_glm_mu_with_fit(counts));
+        }
+
         self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
     }
 
@@ -622,6 +746,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options));
+        }
+
         let design = DesignMatrix::intercept_only(counts.n_samples())?;
         let mut output =
             self.frozen_rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
@@ -642,6 +770,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_map_dispersions_linear_mu(counts, design));
+        }
+
         let fit = self.fit_dispersion_trend_linear_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
@@ -655,6 +787,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_map_dispersions_linear_mu_parametric(counts, design));
+        }
+
         let fit = self.fit_parametric_dispersion_trend_linear_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
@@ -670,6 +806,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_map_dispersions_glm_mu(counts, design));
+        }
+
         let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
@@ -683,6 +823,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_map_dispersions_glm_mu_parametric(counts, design));
+        }
+
         let fit = self.fit_parametric_dispersion_trend_glm_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }

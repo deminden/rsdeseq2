@@ -19,6 +19,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: Option<&DesignMatrix>,
     ) -> Result<NormalizationStages, DeseqError> {
+        #[cfg(test)]
+        if let Some(observer) = &self.execution_observer {
+            observer.store(rayon::current_num_threads(), std::sync::atomic::Ordering::SeqCst);
+        }
         // DESeq2 gives assay-shaped normalization factors precedence over
         // size-factor estimation; supplied size factors are kept only for APIs
         // that still need sample-scale metadata.

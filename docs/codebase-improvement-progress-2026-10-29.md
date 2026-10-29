@@ -63,7 +63,15 @@ The R suite also passed with the synchronized core. Full GTEx replay passed all
 121 per-contrast and nine global gates; all 22 exports matched saved v0.3.1
 result/diagnostic files byte for byte. This is precision evidence, not a speed run.
 
-C11–C13 remain pending: effective worker contexts, accuracy-enforced benchmark acceptance, deterministic
+C11 is implemented: a private execution context shares a local pool across builder
+clones/stages/refits. Public entry routes install that context, and frozen R rlog
+calls use it too. Unspecified workers inherit the caller's context. A test
+observes the requested worker count inside fitting in a conflicting ambient pool,
+checks clone reuse and rejects zero/unsupported counts. Existing one/four-worker
+numerical invariance passes. The workspace passed 1,020 tests with the existing
+single ignored case; R tests and core/backend Clippy pass.
+
+C12–C13 remain pending: accuracy-enforced benchmark acceptance, deterministic
 vendor checks and combined artifact/publication gates.
 
 C14–C23 remain pending: representative stage/RSS profiling, borrowed ownership,

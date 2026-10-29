@@ -14,6 +14,10 @@ impl DeseqBuilder {
         dispersions: &[f64],
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald(counts, design, dispersions, coefficient));
+        }
+
         let stages = self.normalization_stages_for_design(counts, design)?;
         let wald_output = self.fixed_dispersion_wald_components(WaldPipelineInput {
             counts,
@@ -48,6 +52,10 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_contrast(counts, design, dispersions, contrast));
+        }
+
         let stages = self.normalization_stages_for_design(counts, design)?;
         let wald_output = self.fixed_dispersion_wald_contrast_components(
             FixedDispersionGlmInput {
@@ -175,6 +183,10 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_results_contrast_from_model_frame(counts, design, dispersions, contrast, model_frame));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
@@ -208,6 +220,10 @@ impl DeseqBuilder {
         coefficient: usize,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_with_cooks_replacement(counts, design, dispersions, coefficient, replacement_options));
+        }
+
         let raw_builder = self
             .clone()
             .disable_cooks_cutoff()
@@ -288,6 +304,10 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(counts, design, dispersions, contrast, replacement_options));
+        }
+
         let raw_builder = self
             .clone()
             .disable_cooks_cutoff()
@@ -372,6 +392,10 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(counts, design, dispersions, contrast, replacement_options));
+        }
+
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let mut output = self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
             counts,
@@ -463,6 +487,10 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(counts, design, dispersions, contrast, model_frame, replacement_options));
+        }
+
         let builder = self.clone().try_model_frame(model_frame.clone())?;
         if let Some(factor_contrast) = factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
@@ -496,6 +524,10 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_contrast_spec(counts, design, dispersions, contrast));
+        }
+
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) = self.fit_fixed_dispersion_wald_contrast(
             counts,
@@ -524,6 +556,10 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_factor_level_contrast(counts, design, dispersions, contrast));
+        }
+
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,
@@ -604,6 +640,10 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
+            return pool.install(|| self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(counts, design, dispersions, contrast, replacement_options));
+        }
+
         let contrast_spec = match contrast.reference {
             Some(reference) => ContrastSpec::factor_level_with_reference(
                 contrast.factor,
