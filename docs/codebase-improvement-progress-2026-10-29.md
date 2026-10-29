@@ -53,8 +53,17 @@ M1 follow-through includes the larger selector/replacement/threshold matrix,
 legacy save/load cases, explicit subset-shrinkage reference cases and broader
 transform reuse checks. Existing integration coverage is retained.
 
-C09–C13 remain pending: scale-aware rank decisions, nested LRT validation,
-effective worker contexts, accuracy-enforced benchmark acceptance, deterministic
+C09–C10 are implemented: default rank validation scales temporary columns while
+preserving original fitting units and explicit absolute-tolerance calls. LRT
+entry paths check reduced-model subspace membership before dispersion fitting.
+New tests cover mixed units, aliases, alternate nested bases and early invalid
+model rejection. The existing Rust suite passed 1,016 tests with one pre-existing
+ignored test; the three new cases passed separately. Workspace Clippy passed.
+The R suite also passed with the synchronized core. Full GTEx replay passed all
+121 per-contrast and nine global gates; all 22 exports matched saved v0.3.1
+result/diagnostic files byte for byte. This is precision evidence, not a speed run.
+
+C11–C13 remain pending: effective worker contexts, accuracy-enforced benchmark acceptance, deterministic
 vendor checks and combined artifact/publication gates.
 
 C14–C23 remain pending: representative stage/RSS profiling, borrowed ownership,
