@@ -94,7 +94,7 @@ and [result-workflow report](results-improvements-2026-10-29.md).
 The [Python contrast generator](../scripts/generate_gtex_mode_contrasts.py),
 [offline reference generator](../scripts/generate_gtex_mode_contrast_references.R)
 and [process benchmark](../scripts/benchmark_gtex_native_wald.py) are committed.
-From a fresh checkout, restore the pinned R environment and generate a separate
+With Python 3.10 or newer, restore the pinned R environment and generate a separate
 exploratory panel; do not overwrite historical frozen references:
 
 ```sh
