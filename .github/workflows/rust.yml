@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check committed Rust vendor and package versions
+        run: scripts/sync_r_vendor.sh --check
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy

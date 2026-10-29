@@ -37,6 +37,10 @@ results wrapper is split across `R/results.R` and `R/results-*.R`; these files
 contain function definitions and must remain independent of collation order.
 Regenerate the R package's vendored core with `scripts/sync_r_vendor.sh` after
 editing core Rust sources.
+Run `scripts/sync_r_vendor.sh --check` before testing or packaging. This is a
+read-only comparison against a temporary generated tree and checks the Rust/R
+versions. The vendored manifest is derived from Cargo metadata. CI checks the
+committed vendor and fails on drift instead of repairing it before testing.
 
 See the [large-file refactor report](refactoring-large-files.md) for the file
 inventory and precision/performance validation.
