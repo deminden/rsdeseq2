@@ -15,7 +15,7 @@ CASES = [
     ('wald',1200,16), ('multi_results',1200,16), ('lrt',1200,16),
     ('shrink_normal',1200,16), ('shrink_ashr',1200,16), ('shrink_apeglm',1200,16),
     ('vst',1200,16), ('replacement',40,8), ('replacement_none',1200,16),
-    ('rlog',1024,16), ('rlog',2048,32), ('rlog',2048,64),
+    ('rlog',1024,16), ('rlog',2048,32), ('rlog',2048,64), ('rlog',4096,96),
 ]
 
 

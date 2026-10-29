@@ -27,7 +27,11 @@ test_that("registered native calls reject malformed buffers in a child process",
     '  stopifnot(grepl("required type and length|dimensions|indices|integer range", conditionMessage(ans)))',
     '}',
     'answer <- call("rsdeseq2_normalized_counts", ct, rep(2,4), NULL)',
-    'stopifnot(identical(answer, ct / 2))'
+    'stopifnot(identical(answer, ct / 2))',
+    'set.seed(42); ct <- matrix(as.double(rnbinom(320, mu=50, size=5)),40,8)',
+    'dm <- cbind(1, rep(c(0,1),each=4))',
+    'fit <- call("rsdeseq2_fit",ct,dm,NULL,rep(1,8),NULL,NULL,2L,0L,0L,10,1L,0L)',
+    'stopifnot(is.null(fit$replaceCounts),fit$nRefit==0L,identical(dim(fit$mu),dim(ct)))'
   ), script)
   output <- system2(file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(script)),
                     stdout = TRUE, stderr = TRUE, timeout = 60)

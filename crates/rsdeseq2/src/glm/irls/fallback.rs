@@ -81,11 +81,12 @@ fn refit_optim_fallback_rows(
             )?;
         }
         for (idx, value) in beta_covariance.into_iter().enumerate() {
-            beta_covariance_values[gene * p * p + idx] = checked_log2_covariance(
+            let scaled = checked_log2_covariance(
                 value,
                 gene * p * p + idx,
                 "optim fallback beta covariance log2 scale",
             )?;
+            if !beta_covariance_values.is_empty() { beta_covariance_values[gene * p * p + idx] = scaled; }
         }
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;

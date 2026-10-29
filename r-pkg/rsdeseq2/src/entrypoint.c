@@ -189,7 +189,8 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SEXP all_zero_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
     SEXP mu_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
     SEXP cooks_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
-    SEXP replace_counts_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
+    SEXP replace_counts_out = PROTECT(Rf_asInteger(min_replicates_for_replace) == 0
+        ? R_NilValue : Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
     SEXP replace_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
     SEXP replaceable_samples_out = PROTECT(Rf_allocVector(LGLSXP, n_samples));
     SEXP refit_rows_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
@@ -208,7 +209,8 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         Rf_asInteger(fit_type), Rf_asInteger(test_type), (size_t)Rf_asInteger(min_replicates_for_replace),
         Rf_asReal(cooks_replacement_cutoff),
         (size_t)Rf_asInteger(threads), Rf_asInteger(execution_mode), REAL(values),
-        REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out), REAL(replace_counts_out),
+        REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out),
+        replace_counts_out == R_NilValue ? NULL : REAL(replace_counts_out),
         replace_values, replaceable_values, refit_rows_values, new_all_zero_values, &n_refit_value, REAL(size_factors_out),
         REAL(dispersions_out), REAL(disp_fit_out), REAL(base_var_out), LOGICAL(all_zero_out)));
     INTEGER(n_refit_out)[0] = (int)n_refit_value;
@@ -277,7 +279,8 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     if (count_dimnames != R_NilValue) {
         Rf_setAttrib(mu_out, R_DimNamesSymbol, count_dimnames);
         Rf_setAttrib(cooks_out, R_DimNamesSymbol, count_dimnames);
-        Rf_setAttrib(replace_counts_out, R_DimNamesSymbol, count_dimnames);
+        if (replace_counts_out != R_NilValue)
+            Rf_setAttrib(replace_counts_out, R_DimNamesSymbol, count_dimnames);
     }
     SEXP fit = PROTECT(Rf_allocVector(VECSXP, 17));
     SET_VECTOR_ELT(fit, 0, out);

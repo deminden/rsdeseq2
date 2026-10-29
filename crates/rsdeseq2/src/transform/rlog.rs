@@ -1,11 +1,9 @@
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::glm::{
-    IrlsOptions, NbinomGlmFit, fit_glms_with_beta_prior_variance,
-    fit_glms_with_beta_prior_variance_and_normalization_factors,
-    match_weighted_upper_quantile_for_variance,
-};
+use crate::glm::beta::{fit_prior_nf_for_output, fit_prior_sf_for_output};
+use crate::glm::irls::OutputRequirements;
+use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{normalized_counts, normalized_counts_with_factors};
 
@@ -109,12 +107,13 @@ pub fn rlog_with_size_factors(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    rlog_fit_with_size_factors(
+    rlog_fit_with_size_factors_for_output(
         counts,
         size_factors,
         dispersions,
         sample_prior_variance,
         options,
+        OutputRequirements::Transform,
     )
     .map(|output| output.transformed)
 }
@@ -127,15 +126,34 @@ pub fn rlog_fit_with_size_factors(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RlogFitOutput, DeseqError> {
+    rlog_fit_with_size_factors_for_output(
+        counts,
+        size_factors,
+        dispersions,
+        sample_prior_variance,
+        options,
+        OutputRequirements::Inference,
+    )
+}
+
+fn rlog_fit_with_size_factors_for_output(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<RlogFitOutput, DeseqError> {
     let design = rlog_sample_design(counts.n_samples())?;
     let beta_prior_variance = rlog_beta_prior_variance(counts.n_samples(), sample_prior_variance)?;
-    let fit = fit_glms_with_beta_prior_variance(
+    let fit = fit_prior_sf_for_output(
         counts,
         &design,
         size_factors,
         dispersions,
         &beta_prior_variance,
         options,
+        requirements,
     )?;
     rlog_output_from_fit(fit, counts.n_samples())
 }
@@ -191,12 +209,13 @@ pub fn rlog_with_estimated_prior_and_size_factors(
     let normalized = normalized_counts(counts, size_factors)?;
     let sample_prior_variance =
         estimate_rlog_sample_prior_variance(&normalized, base_mean, disp_fit)?;
-    let fit_output = rlog_fit_with_size_factors(
+    let fit_output = rlog_fit_with_size_factors_for_output(
         counts,
         size_factors,
         dispersions,
         sample_prior_variance,
         options,
+        OutputRequirements::Transform,
     )?;
     Ok(RlogOutput {
         transformed: fit_output.transformed,
@@ -305,12 +324,13 @@ pub fn rlog_with_normalization_factors(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    rlog_fit_with_normalization_factors(
+    rlog_fit_with_normalization_factors_for_output(
         counts,
         normalization_factors,
         dispersions,
         sample_prior_variance,
         options,
+        OutputRequirements::Transform,
     )
     .map(|output| output.transformed)
 }
@@ -323,15 +343,34 @@ pub fn rlog_fit_with_normalization_factors(
     sample_prior_variance: f64,
     options: IrlsOptions,
 ) -> Result<RlogFitOutput, DeseqError> {
+    rlog_fit_with_normalization_factors_for_output(
+        counts,
+        normalization_factors,
+        dispersions,
+        sample_prior_variance,
+        options,
+        OutputRequirements::Inference,
+    )
+}
+
+fn rlog_fit_with_normalization_factors_for_output(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<RlogFitOutput, DeseqError> {
     let design = rlog_sample_design(counts.n_samples())?;
     let beta_prior_variance = rlog_beta_prior_variance(counts.n_samples(), sample_prior_variance)?;
-    let fit = fit_glms_with_beta_prior_variance_and_normalization_factors(
+    let fit = fit_prior_nf_for_output(
         counts,
         &design,
         normalization_factors,
         dispersions,
         &beta_prior_variance,
         options,
+        requirements,
     )?;
     rlog_output_from_fit(fit, counts.n_samples())
 }
@@ -357,13 +396,14 @@ pub fn rlog_frozen_with_normalization_factors(
         rlog_sample_effect_prior_variance(counts.n_samples(), sample_prior_variance)?;
     let frozen_factors =
         rlog_frozen_normalization_factors(normalization_factors, frozen_intercept)?;
-    let fit = fit_glms_with_beta_prior_variance_and_normalization_factors(
+    let fit = fit_prior_nf_for_output(
         counts,
         &design,
         &frozen_factors,
         dispersions,
         &beta_prior_variance,
         options,
+        OutputRequirements::Transform,
     )?;
     let transformed = rlog_transform_from_sample_effect_fit(&fit.beta, frozen_intercept)?;
     Ok(RlogOutput {
@@ -386,12 +426,13 @@ pub fn rlog_with_estimated_prior_and_normalization_factors(
     let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
     let sample_prior_variance =
         estimate_rlog_sample_prior_variance(&normalized, base_mean, disp_fit)?;
-    let fit_output = rlog_fit_with_normalization_factors(
+    let fit_output = rlog_fit_with_normalization_factors_for_output(
         counts,
         normalization_factors,
         dispersions,
         sample_prior_variance,
         options,
+        OutputRequirements::Transform,
     )?;
     Ok(RlogOutput {
         transformed: fit_output.transformed,

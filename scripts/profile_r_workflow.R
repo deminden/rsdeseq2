@@ -26,6 +26,7 @@ counts <- matrix(rnbinom(genes * samples, mu = as.vector(means), size = rep(1/di
 rownames(counts) <- paste0("gene", seq_len(genes)); colnames(counts) <- paste0("sample", seq_len(samples))
 if (workflow == "replacement") {
   script <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[[1L]])
+  script <- gsub("~+~", " ", script, fixed = TRUE)
   source(file.path(dirname(normalizePath(script)), "..", "r-pkg/rsdeseq2/tests/testthat/helper-fit-data.R"))
   counts <- .rsdeseq2_test_counts(); counts[1L, 8L] <- 2000L
   counts[2L, ] <- 0L; counts[2L, 8L] <- 1000L

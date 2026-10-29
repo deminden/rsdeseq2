@@ -127,16 +127,29 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                     &replacement_options,
                 )
                 .map_err(|error| error.to_string())?;
-            let mut merged_fit = output.original_fit().clone();
-            if let Some(refit_fit) = output.refit_fit() {
-                merge_refit_fit_rows(&mut merged_fit, refit_fit, &output.refit_plan().refit_rows)?;
+            let (mut merged_fit, refit_fit, plan, results) = match output {
+                rsdeseq2::prelude::CooksReplacementTestOutput::Wald(output) => (
+                    output.original_fit,
+                    output.refit_fit,
+                    output.refit_plan,
+                    output.results,
+                ),
+                rsdeseq2::prelude::CooksReplacementTestOutput::Lrt(output) => (
+                    output.original_fit,
+                    output.refit_fit,
+                    output.refit_plan,
+                    output.results,
+                ),
+            };
+            if let Some(refit_fit) = &refit_fit {
+                merge_refit_fit_rows(&mut merged_fit, refit_fit, &plan.refit_rows)?;
             }
-            for &row in &output.refit_plan().new_all_zero_rows {
+            for &row in &plan.new_all_zero_rows {
                 merged_fit.base_mean[row] = 0.0;
                 merged_fit.base_var[row] = 0.0;
                 merged_fit.all_zero[row] = true;
             }
-            (merged_fit, output.results().clone(), Some(output))
+            (merged_fit, results, Some(plan))
         };
         const COLUMNS: usize = 13;
         let output = unsafe {
@@ -148,22 +161,14 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 "result table",
             )?
         };
-        let mut refitted = vec![false; n_genes];
         let mut newly_zero = vec![false; n_genes];
         if let Some(replacement) = &replacement {
-            for &gene in &replacement.refit_plan().new_all_zero_rows {
+            for &gene in &replacement.new_all_zero_rows {
                 newly_zero[gene] = true;
-            }
-            for &gene in &replacement.refit_plan().refit_rows {
-                refitted[gene] = true;
             }
         }
         for (gene, row) in results.rows.iter().enumerate() {
-            let raw_fit = if refitted[gene] {
-                replacement.as_ref().and_then(|value| value.refit_fit()).unwrap_or(&fit)
-            } else {
-                &fit
-            };
+            let raw_fit = &fit;
             let (raw_stat, raw_pvalue) = if newly_zero[gene] {
                 (Some(0.0), Some(1.0))
             } else if fit.all_zero[gene] {
@@ -259,14 +264,19 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         }
         unsafe { copy_matrix_to_r(mu, mu_output)? };
         unsafe { copy_matrix_to_r(cooks, cooks_output)? };
-        let replace_counts = unsafe {
-            output_slice(
-                replace_counts_output,
-                n_genes
-                    .checked_mul(n_samples)
-                    .ok_or("replacement count dimensions overflow")?,
-                "replacement counts",
-            )?
+        // A null replacement buffer is valid only when replacement is disabled.
+        let replace_counts = if min_replicates_for_replace == 0 {
+            None
+        } else {
+            Some(unsafe {
+                output_slice(
+                    replace_counts_output,
+                    n_genes
+                        .checked_mul(n_samples)
+                        .ok_or("replacement count dimensions overflow")?,
+                    "replacement counts",
+                )?
+            })
         };
         let replace = unsafe { output_slice(replace_output, n_genes, "replacement flags")? };
         let replaceable_samples =
@@ -276,7 +286,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             unsafe { output_slice(new_all_zero_rows_output, n_genes, "new all-zero rows")? };
         let n_refit = unsafe { output_slice(n_refit_output, 1, "replacement refit count")? };
         if let Some(output) = &replacement {
-            let plan = output.refit_plan();
+            let plan = output;
             let has_replaceable_samples = plan
                 .replacement
                 .replaceable_samples
@@ -310,10 +320,12 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                     new_all_zero_rows[row] = 1;
                 }
             }
-            if has_replaceable_samples {
-                unsafe { copy_counts_to_r(&plan.replacement.replaced_counts, replace_counts)? };
-            } else {
-                unsafe { copy_counts_to_r(&counts, replace_counts)? };
+            if let Some(replace_counts) = replace_counts {
+                if has_replaceable_samples {
+                    unsafe { copy_counts_to_r(&plan.replacement.replaced_counts, replace_counts)? };
+                } else {
+                    unsafe { copy_counts_to_r(&counts, replace_counts)? };
+                }
             }
         } else {
             n_refit[0] = 0;
@@ -321,7 +333,9 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             replaceable_samples.fill(0);
             refit_rows.fill(0);
             new_all_zero_rows.fill(0);
-            unsafe { copy_counts_to_r(&counts, replace_counts)? };
+            if let Some(replace_counts) = replace_counts {
+                unsafe { copy_counts_to_r(&counts, replace_counts)? };
+            }
         }
         unsafe { output_slice(size_factors_output, n_samples, "size factors")? }
             .copy_from_slice(&fit.size_factors);
