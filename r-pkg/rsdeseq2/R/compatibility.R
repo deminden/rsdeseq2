@@ -129,18 +129,7 @@
   if (all(geoMeans == 0)) {
     stop("geoMeans must contain at least one positive value", call. = FALSE)
   }
-  logGeoMeans <- rep(-Inf, nGenes)
-  positive <- geoMeans > 0
-  logGeoMeans[positive] <- log(geoMeans[positive])
-  logGeoMeans
-}
-
-.rsdeseq2_stabilize_size_factors <- function(sizeFactors) {
-  scale <- exp(mean(log(sizeFactors)))
-  if (!is.finite(scale) || scale <= 0) {
-    stop("cannot stabilize size factors to geometric mean one", call. = FALSE)
-  }
-  sizeFactors / scale
+  as.double(geoMeans)
 }
 
 .rsdeseq2_validate_n_genes <- function(nGenes) {
@@ -281,37 +270,11 @@
   if (any(!is.finite(filter))) {
     stop("baseMean must contain finite values for independent filtering", call. = FALSE)
   }
-  if (is.null(theta)) {
-    lower <- sum(filter == 0) / length(filter)
-    upper <- if (lower < 0.95) 0.95 else 1.0
-    return(seq(lower, upper, length.out = 50L))
-  }
+  if (is.null(theta)) return(NULL)
   if (!is.numeric(theta) || length(theta) <= 1L || any(!is.finite(theta)) || any(theta < 0 | theta > 1)) {
     stop("theta must be a numeric vector of at least two values in [0, 1]", call. = FALSE)
   }
   as.numeric(theta)
-}
-
-.rsdeseq2_select_independent_filter_index <- function(numRej, lowessFit) {
-  if (length(numRej) == 0L || max(numRej) <= 10L) {
-    return(1L)
-  }
-  residuals <- numRej[numRej > 0L] - lowessFit[numRej > 0L]
-  rmse <- if (length(residuals) == 0L) 0 else sqrt(mean(residuals^2))
-  maxFit <- max(lowessFit)
-  selected <- which(numRej > (maxFit - rmse))[1]
-  if (!is.na(selected)) {
-    return(selected)
-  }
-  selected <- which(numRej > (0.9 * maxFit))[1]
-  if (!is.na(selected)) {
-    return(selected)
-  }
-  selected <- which(numRej > (0.8 * maxFit))[1]
-  if (!is.na(selected)) {
-    return(selected)
-  }
-  1L
 }
 
 .rsdeseq2_validate_optional_numeric_vector <- function(value, n, name) {
@@ -363,7 +326,7 @@
 .rsdeseq2_cooks_cutoff_output <- function(pvalue, maxCooks, cooksOutlier) {
   out <- data.frame(
     pvalue = pvalue,
-    padj = stats::p.adjust(pvalue, method = "BH"),
+    padj = .rsdeseq2_bh_adjust(pvalue),
     maxCooks = maxCooks,
     cooksOutlier = cooksOutlier,
     check.names = FALSE

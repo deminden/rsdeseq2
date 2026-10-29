@@ -5,32 +5,75 @@ use crate::errors::DeseqError;
 /// `None`, non-finite values, and values outside `[0, 1]` are omitted from
 /// ranking and returned as `None`.
 pub fn bh_adjust(pvalues: &[Option<f64>]) -> Vec<Option<f64>> {
-    let mut indexed = pvalues
-        .iter()
-        .copied()
-        .enumerate()
-        .filter_map(|(idx, value)| {
-            value.and_then(|pvalue| {
-                if pvalue.is_finite() && (0.0..=1.0).contains(&pvalue) {
-                    Some((idx, pvalue))
-                } else {
-                    None
-                }
-            })
-        })
-        .collect::<Vec<_>>();
+    PreparedBh::new(pvalues).adjusted()
+}
 
-    indexed.sort_by(|left, right| left.1.total_cmp(&right.1));
-    let m = indexed.len();
-    let mut adjusted = vec![None; pvalues.len()];
-    let mut running_min = 1.0_f64;
-    for (rank_from_zero, (idx, pvalue)) in indexed.into_iter().enumerate().rev() {
-        let rank = rank_from_zero + 1;
-        let raw_adjusted = pvalue * m as f64 / rank as f64;
-        running_min = running_min.min(raw_adjusted);
-        adjusted[idx] = Some(running_min.min(1.0));
+/// A stable global p-value order can be reused for any filtered population.
+/// Filtering preserves the relative order and ranks of each retained subset.
+pub(crate) struct PreparedBh {
+    indexed: Vec<(usize, f64)>,
+    length: usize,
+}
+
+impl PreparedBh {
+    pub(crate) fn new(pvalues: &[Option<f64>]) -> Self {
+        let mut indexed = pvalues
+            .iter()
+            .copied()
+            .enumerate()
+            .filter_map(|(index, value)| {
+                value
+                    .filter(|p| p.is_finite() && (0.0..=1.0).contains(p))
+                    .map(|p| (index, p))
+            })
+            .collect::<Vec<_>>();
+        indexed.sort_by(|left, right| left.1.total_cmp(&right.1));
+        Self {
+            indexed,
+            length: pvalues.len(),
+        }
     }
-    adjusted
+
+    fn visit_population(&self, keep: impl Fn(usize) -> bool, mut visit: impl FnMut(usize, f64)) {
+        let m = self
+            .indexed
+            .iter()
+            .filter(|(index, _)| keep(*index))
+            .count();
+        let mut rank = m;
+        let mut running_min = 1.0_f64;
+        for &(index, pvalue) in self.indexed.iter().rev().filter(|(index, _)| keep(*index)) {
+            // One canonical order for every frontend, matching DESeq2's p.adjust.
+            let raw_adjusted = (m as f64 / rank as f64) * pvalue;
+            running_min = running_min.min(raw_adjusted);
+            visit(index, running_min.min(1.0));
+            rank -= 1;
+        }
+    }
+
+    fn adjusted(&self) -> Vec<Option<f64>> {
+        let mut adjusted = vec![None; self.length];
+        self.visit_population(|_| true, |index, pvalue| adjusted[index] = Some(pvalue));
+        adjusted
+    }
+
+    pub(crate) fn adjusted_for_filter(&self, filter: &[f64], cutoff: f64) -> Vec<Option<f64>> {
+        let mut adjusted = vec![None; self.length];
+        self.visit_population(
+            |index| filter[index] >= cutoff,
+            |index, pvalue| adjusted[index] = Some(pvalue),
+        );
+        adjusted
+    }
+
+    pub(crate) fn rejections_for_filter(&self, filter: &[f64], cutoff: f64, alpha: f64) -> usize {
+        let mut count = 0;
+        self.visit_population(
+            |index| filter[index] >= cutoff,
+            |_, pvalue| count += usize::from(pvalue < alpha),
+        );
+        count
+    }
 }
 
 /// Benjamini-Hochberg adjusted p-values for fully observed `f64` p-values.

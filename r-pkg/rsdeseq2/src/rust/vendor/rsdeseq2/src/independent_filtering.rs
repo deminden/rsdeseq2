@@ -1,6 +1,6 @@
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::multiple_testing::bh_adjust;
-use crate::results::{DeseqResults, recompute_padj};
+use crate::multiple_testing::{PreparedBh, bh_adjust};
+use crate::results::DeseqResults;
 
 /// One filtered adjusted-p-value column.
 pub type FilteredPadjColumn = Vec<Option<f64>>;
@@ -153,26 +153,6 @@ pub fn apply_independent_filtering(
     results: &mut DeseqResults,
     options: &IndependentFilteringOptions,
 ) -> Result<IndependentFilteringOutput, DeseqError> {
-    validate_alpha(options.alpha)?;
-    if !options.enabled {
-        recompute_padj(results)?;
-        for row in &mut results.rows {
-            row.filtered = None;
-        }
-        let output = IndependentFilteringOutput {
-            enabled: false,
-            theta: Vec::new(),
-            num_rejections: Vec::new(),
-            selected_index: None,
-            filter_theta: None,
-            filter_threshold: None,
-            lowess_fit: None,
-            alpha: options.alpha,
-        };
-        results.independent_filtering = Some(output.clone());
-        return Ok(output);
-    }
-
     let filter = results
         .rows
         .iter()
@@ -183,44 +163,113 @@ pub fn apply_independent_filtering(
         .iter()
         .map(|row| row.pvalue)
         .collect::<Vec<_>>();
+    let evaluated = evaluate_independent_filtering(&filter, &pvalues, options)?;
+    for ((row, adjusted), filtered) in results
+        .rows
+        .iter_mut()
+        .zip(evaluated.padj)
+        .zip(evaluated.filtered)
+    {
+        row.padj = adjusted;
+        row.filtered = filtered;
+    }
+    results.independent_filtering = Some(evaluated.metadata.clone());
+    Ok(evaluated.metadata)
+}
+
+/// Array-oriented output shared by the standalone library and language bridges.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IndependentFilteringEvaluation {
+    /// BH-adjusted p-values from the selected population.
+    pub padj: Vec<Option<f64>>,
+    /// Whether a nonmissing row was removed by the selected cutoff.
+    pub filtered: Vec<Option<bool>>,
+    /// All numerical filtering decisions and curve values.
+    pub metadata: IndependentFilteringOutput,
+}
+
+/// Evaluate the same filtering engine without constructing fitted result rows.
+/// Language bridges supply primitives and format the returned values only.
+pub fn evaluate_independent_filtering(
+    filter: &[f64],
+    pvalues: &[Option<f64>],
+    options: &IndependentFilteringOptions,
+) -> Result<IndependentFilteringEvaluation, DeseqError> {
+    validate_alpha(options.alpha)?;
+    if filter.len() != pvalues.len() {
+        return Err(invalid_dimensions(
+            "independent-filter p-values",
+            filter.len(),
+            pvalues.len(),
+        ));
+    }
+    for (index, value) in pvalues.iter().enumerate() {
+        if let Some(value) = value
+            && (!value.is_finite() || !(0.0..=1.0).contains(value))
+        {
+            return Err(DeseqError::NonFiniteValue {
+                context: "independent-filter p-value".into(),
+                index: Some(index),
+                value: *value,
+            });
+        }
+    }
+    if !options.enabled {
+        return Ok(IndependentFilteringEvaluation {
+            padj: bh_adjust(pvalues),
+            filtered: vec![None; filter.len()],
+            metadata: IndependentFilteringOutput {
+                enabled: false,
+                theta: Vec::new(),
+                num_rejections: Vec::new(),
+                selected_index: None,
+                filter_theta: None,
+                filter_threshold: None,
+                lowess_fit: None,
+                alpha: options.alpha,
+            },
+        });
+    }
     let theta = match &options.theta {
         Some(theta) => validate_theta(theta)?,
-        None => default_theta(&filter)?,
+        None => default_theta(filter)?,
     };
+    validate_filter(filter)?;
+    let mut sorted = filter.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    if sorted.is_empty() {
+        return Err(invalid_dimensions("quantile values", 1, 0));
+    }
     let cutoffs = theta
         .iter()
-        .copied()
-        .map(|value| quantile_type7(&filter, value))
+        .map(|&probability| quantile_type7_sorted(&sorted, probability))
         .collect::<Result<Vec<_>, _>>()?;
-    let (columns, num_rejections) =
-        filtered_p_adjustments(&filter, &pvalues, &cutoffs, options.alpha)?;
+    let ordering = PreparedBh::new(pvalues);
+    let num_rejections = cutoffs
+        .iter()
+        .map(|&cutoff| ordering.rejections_for_filter(filter, cutoff, options.alpha))
+        .collect::<Vec<_>>();
     let (selected_index, lowess_fit) = select_filter_index_with_lowess(&theta, &num_rejections)?;
-    let selected_padj = columns.get(selected_index).ok_or_else(|| {
-        invalid_dimensions(
-            "independent-filter columns",
-            selected_index + 1,
-            columns.len(),
-        )
-    })?;
     let filter_threshold = cutoffs[selected_index];
-
-    for (row, adjusted) in results.rows.iter_mut().zip(selected_padj.iter().copied()) {
-        row.padj = adjusted;
-        row.filtered = row.pvalue.map(|_| row.base_mean < filter_threshold);
-    }
-
-    let output = IndependentFilteringOutput {
-        enabled: true,
-        theta: theta.clone(),
-        num_rejections,
-        selected_index: Some(selected_index),
-        filter_theta: Some(theta[selected_index]),
-        filter_threshold: Some(filter_threshold),
-        lowess_fit: Some(lowess_fit),
-        alpha: options.alpha,
-    };
-    results.independent_filtering = Some(output.clone());
-    Ok(output)
+    let selected_padj = ordering.adjusted_for_filter(filter, filter_threshold);
+    Ok(IndependentFilteringEvaluation {
+        padj: selected_padj,
+        filtered: filter
+            .iter()
+            .zip(pvalues)
+            .map(|(&value, p)| p.map(|_| value < filter_threshold))
+            .collect(),
+        metadata: IndependentFilteringOutput {
+            enabled: true,
+            filter_theta: Some(theta[selected_index]),
+            theta,
+            num_rejections,
+            selected_index: Some(selected_index),
+            filter_threshold: Some(filter_threshold),
+            lowess_fit: Some(lowess_fit),
+            alpha: options.alpha,
+        },
+    })
 }
 
 /// Construct the DESeq2 default theta grid from filter values.
@@ -257,6 +306,7 @@ pub fn filtered_p_adjustments(
         ));
     }
 
+    let ordering = PreparedBh::new(pvalues);
     let mut columns = Vec::with_capacity(cutoffs.len());
     let mut num_rejections = Vec::with_capacity(cutoffs.len());
     for cutoff in cutoffs {
@@ -267,24 +317,7 @@ pub fn filtered_p_adjustments(
                 value: *cutoff,
             });
         }
-        let mut selected = Vec::new();
-        let mut selected_indices = Vec::new();
-        for (idx, (filter_value, pvalue)) in filter
-            .iter()
-            .copied()
-            .zip(pvalues.iter().copied())
-            .enumerate()
-        {
-            if filter_value >= *cutoff {
-                selected.push(pvalue);
-                selected_indices.push(idx);
-            }
-        }
-        let selected_padj = bh_adjust(&selected);
-        let mut full = vec![None; filter.len()];
-        for (idx, adjusted) in selected_indices.into_iter().zip(selected_padj) {
-            full[idx] = adjusted;
-        }
+        let full = ordering.adjusted_for_filter(filter, *cutoff);
         let rejections = full
             .iter()
             .filter(|value| value.is_some_and(|adjusted| adjusted < alpha))
@@ -450,20 +483,7 @@ fn validate_filter(filter: &[f64]) -> Result<(), DeseqError> {
     Ok(())
 }
 
-fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
-    validate_filter(values)?;
-    if values.is_empty() {
-        return Err(invalid_dimensions("quantile values", 1, 0));
-    }
-    if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
-        return Err(DeseqError::NonFiniteValue {
-            context: "quantile probability".to_string(),
-            index: None,
-            value: probability,
-        });
-    }
-    let mut sorted = values.to_vec();
-    sorted.sort_by(f64::total_cmp);
+fn quantile_type7_sorted(sorted: &[f64], probability: f64) -> Result<f64, DeseqError> {
     if sorted.len() == 1 {
         return Ok(sorted[0]);
     }

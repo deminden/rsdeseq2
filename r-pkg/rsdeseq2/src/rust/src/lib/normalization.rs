@@ -1,4 +1,5 @@
 // Size factors, normalized counts and base metadata exports.
+// Optional geometric means use natural-scale units, as in the standalone API.
 
 /// # Safety
 ///
@@ -22,13 +23,7 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
         let geo = if geo_means.is_null() {
             None
         } else {
-            let log_means = unsafe { input_slice(geo_means, n_genes, "log geometric means")? };
-            Some(
-                log_means
-                    .iter()
-                    .map(|value| value.exp())
-                    .collect::<Vec<_>>(),
-            )
+            Some(unsafe { input_slice(geo_means, n_genes, "geometric means")? })
         };
         let controls = if control_genes.is_null() {
             None
@@ -40,7 +35,7 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
             1 => SizeFactorMethod::PosCounts,
             _ => return Err("unknown size-factor method".into()),
         };
-        let factors = estimate_size_factors_with_options(&counts, method, geo.as_deref(), controls)
+        let factors = estimate_size_factors_with_options(&counts, method, geo, controls)
             .map_err(|e| e.to_string())?;
         unsafe { output_slice(output, n_samples, "size factors")? }.copy_from_slice(&factors);
         Ok(())

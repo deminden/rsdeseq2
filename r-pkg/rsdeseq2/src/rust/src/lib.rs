@@ -191,5 +191,8 @@ include!("lib/contrast_shrinkage.rs");
 // VST/rlog transformation export and frozen fit inputs.
 include!("lib/transform.rs");
 
-// Cook's filtering and stable diagnostic schema exports.
+// Standalone result adjustment and filtering; no R numerical callbacks.
+include!("lib/result_filtering.rs");
+
+// Cook's filtering and stable diagnostic schema exports; test module is last.
 include!("lib/diagnostics.rs");

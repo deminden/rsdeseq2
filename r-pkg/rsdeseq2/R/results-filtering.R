@@ -24,7 +24,7 @@ resultsTableRust <- function(baseMean,
     pvalue <- .rsdeseq2_validate_result_pvalues(pvalue, nGenes)
     pvalue <- .rsdeseq2_align_named_gene_vector(pvalue, rowNames, "pvalue")
     if (is.null(padj)) {
-      padj <- stats::p.adjust(pvalue, method = "BH")
+      padj <- .rsdeseq2_bh_adjust(pvalue)
     } else {
       padj <- .rsdeseq2_validate_result_pvalues(padj, nGenes, name = "padj")
       padj <- .rsdeseq2_align_named_gene_vector(padj, rowNames, "padj")
@@ -88,53 +88,22 @@ applyIndependentFilteringRust <- function(results,
   results <- .rsdeseq2_validate_result_table(results)
   alpha <- .rsdeseq2_validate_independent_filter_alpha(alpha)
 
-  if (!isTRUE(enabled)) {
-    results$padj <- stats::p.adjust(results$pvalue, method = "BH")
-    results$filtered <- rep(NA, nrow(results))
-    attr(results, "independentFiltering") <- list(
-      enabled = FALSE,
-      theta = numeric(),
-      numRej = integer(),
-      selected = NA_integer_,
-      filterTheta = NA_real_,
-      filterThreshold = NA_real_,
-      lo.fit = NULL,
-      alpha = alpha
-    )
-    return(results)
-  }
-
-  filter <- results$baseMean
-  theta <- .rsdeseq2_validate_independent_filter_theta(theta, filter)
-  cutoffs <- as.numeric(stats::quantile(filter, probs = theta, names = FALSE, type = 7))
-  filteredPadj <- vector("list", length(cutoffs))
-  numRej <- integer(length(cutoffs))
-
-  for (idx in seq_along(cutoffs)) {
-    selected <- filter >= cutoffs[[idx]]
-    adjusted <- rep(NA_real_, length(filter))
-    adjusted[selected] <- stats::p.adjust(results$pvalue[selected], method = "BH")
-    filteredPadj[[idx]] <- adjusted
-    numRej[[idx]] <- sum(adjusted < alpha, na.rm = TRUE)
-  }
-
-  loFit <- stats::lowess(theta, numRej, f = 1 / 5)
-  selectedIndex <- .rsdeseq2_select_independent_filter_index(numRej, loFit$y)
-  filterThreshold <- cutoffs[[selectedIndex]]
-
-  results$padj <- filteredPadj[[selectedIndex]]
-  results$filtered <- ifelse(is.na(results$pvalue), NA, filter < filterThreshold)
+  active <- isTRUE(enabled)
+  if (active) theta <- .rsdeseq2_validate_independent_filter_theta(theta, results$baseMean)
+  output <- .Call("rsdeseq2_independent_filtering", as.numeric(results$baseMean),
+    as.numeric(results$pvalue), theta, alpha, active, PACKAGE = "rsdeseq2")
+  results$padj <- output$padj
+  results$filtered <- output$filtered
   attr(results, "independentFiltering") <- list(
-    enabled = TRUE,
-    theta = theta,
-    numRej = numRej,
-    selected = selectedIndex,
-    filterTheta = theta[[selectedIndex]],
-    filterThreshold = filterThreshold,
-    lo.fit = loFit,
-    alpha = alpha
+    enabled = active, theta = output$theta, numRej = output$numRej,
+    selected = output$selected, filterTheta = output$scalars[[1L]],
+    filterThreshold = output$scalars[[2L]], lo.fit = output$lo.fit, alpha = alpha
   )
   results
+}
+
+.rsdeseq2_bh_adjust <- function(pvalue) {
+  .Call("rsdeseq2_bh_adjust", pvalue, PACKAGE = "rsdeseq2")
 }
 
 applyCooksCutoffRust <- function(pvalue,

@@ -9,6 +9,10 @@
   global covariance from mean/rlog consumers. Public full-fit fields are retained.
 * Remove the experimental R-backed statistical bridge. A replacement using one
   standalone Rust numerical path for both interfaces is under development.
+* Move BH and independent-filter calculations into the standalone Rust engine;
+  require direct bit equality between standalone and wrapped primitive results.
+* Correct supplied geometric-mean transport and align the private native
+  primitive with natural-scale inputs used by the public Rust and R APIs.
 
 # rsdeseq2 0.3.1
 
