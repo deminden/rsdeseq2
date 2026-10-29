@@ -194,10 +194,59 @@ pub(crate) fn build_lrt_contrast_results_view(
     gene_names: Option<&[String]>,
     dispersions: Option<&[f64]>,
 ) -> Result<DeseqResults, DeseqError> {
+    validate_wald_contrast_output(contrast, full_fit.beta.n_rows())?;
+    build_lrt_effect_results_view(
+        base_mean,
+        full_fit,
+        lrt,
+        &contrast.log2_fold_change,
+        &contrast.lfc_se,
+        gene_names,
+        dispersions,
+    )
+}
+
+pub(crate) fn build_lrt_projection_results_view(
+    base_mean: &[f64],
+    full_fit: &GlmInferenceView<'_>,
+    lrt: &LrtOutput,
+    projection: &crate::glm::ContrastProjection,
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
+    build_lrt_effect_results_view(
+        base_mean,
+        full_fit,
+        lrt,
+        &projection.log2_fold_change,
+        &projection.lfc_se,
+        gene_names,
+        dispersions,
+    )
+}
+
+fn build_lrt_effect_results_view(
+    base_mean: &[f64],
+    full_fit: &GlmInferenceView<'_>,
+    lrt: &LrtOutput,
+    effect: &[Option<f64>],
+    se: &[Option<f64>],
+    gene_names: Option<&[String]>,
+    dispersions: Option<&[f64]>,
+) -> Result<DeseqResults, DeseqError> {
     let n_genes = full_fit.beta.n_rows();
     validate_result_view(base_mean, full_fit, gene_names, dispersions)?;
     validate_lrt_output(lrt, n_genes)?;
-    validate_wald_contrast_output(contrast, n_genes)?;
+    if effect.len() != n_genes {
+        return Err(invalid_dimensions(
+            "LRT contrast effects",
+            n_genes,
+            effect.len(),
+        ));
+    }
+    if se.len() != n_genes {
+        return Err(invalid_dimensions("LRT contrast SEs", n_genes, se.len()));
+    }
     let padj = bh_adjust(&lrt.pvalue);
 
     let mut rows = Vec::with_capacity(n_genes);
@@ -205,8 +254,8 @@ pub(crate) fn build_lrt_contrast_results_view(
         rows.push(DeseqResultRow {
             gene: gene_names.and_then(|names| names.get(gene)).cloned(),
             base_mean: base_mean[gene],
-            log2_fold_change: contrast.log2_fold_change[gene],
-            lfc_se: contrast.lfc_se[gene],
+            log2_fold_change: effect[gene],
+            lfc_se: se[gene],
             stat: lrt.deviance[gene],
             pvalue: lrt.pvalue[gene],
             padj: padj[gene],

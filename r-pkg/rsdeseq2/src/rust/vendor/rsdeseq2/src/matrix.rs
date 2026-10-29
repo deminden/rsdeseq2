@@ -1,3 +1,6 @@
+pub mod borrowed;
+pub use borrowed::{MatrixOrder, MatrixView};
+
 use core::ops::{Bound, RangeBounds};
 
 use crate::errors::{DeseqError, invalid_dimensions};

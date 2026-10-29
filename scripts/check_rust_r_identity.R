@@ -15,9 +15,10 @@ hex <- function(value) {
   paste(format(writeBin(as.double(value), raw(), size = 8, endian = "big")), collapse = "")
 }
 hexVector <- function(values) lapply(unname(values), hex)
-withoutRCalculations <- function(expression) {
+withoutRCalculations <- function(expression, projection = FALSE) {
   # Fail at runtime if the production wrapper reintroduces statistical R calls.
   functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = "mean")
+  if (projection) functions$base <- c(functions$base, "%*%", "sqrt")
   on.exit(for (package in names(functions)) for (name in functions[[package]])
     suppressMessages(untrace(name, where = asNamespace(package))), add = TRUE)
   for (package in names(functions)) for (name in functions[[package]])
@@ -170,3 +171,39 @@ for (pair in list(c(8L,2L),c(4L,4L),c(61L,3L),c(52L,2L),c(1000L,500L),c(1000000L
 emptyInput <- list(operation="wald",beta=list(),se=list(),threshold="0",alternative="greaterAbs",df=list())
 emptyActual <- withoutRCalculations(.Call("rsdeseq2_wald_statistics",numeric(),numeric(),0,0L,TRUE,numeric(),PACKAGE="rsdeseq2"))
 compareIdentity("wald_empty_t",emptyInput,list(stat=hexVector(emptyActual$stat),pvalue=hexVector(emptyActual$pvalue)))
+
+# The standalone input is row-major; the wrapper borrows R's column-major
+# beta/covariance storage. Logical operation order must agree exactly.
+projectionBeta <- matrix(c(1,2,4,-2,1,3,5,-1,2,7,2,-3),4,3,byrow=TRUE)
+projectionSE <- matrix(rep(c(.5,.75,1),4),4,3,byrow=TRUE)
+projectionCov <- array(0,c(4,3,3))
+for(gene in 1:4) projectionCov[gene,,] <- matrix(c(1,.125,-.25,.125,2,.375,-.25,.375,3),3,3)*gene
+projectionCases <- list(
+  covariance=list(contrast=c(0,-1,1)),
+  fractional=list(contrast=c(.25,-.5,2)),
+  marginal=list(contrast=c(0,-2,0)),
+  covariance_only=list(contrast=c(0,-2,0),noSE=TRUE),
+  se_only=list(contrast=c(0,-2,0),noCov=TRUE),
+  invalid_marginal=list(contrast=c(0,-2,0),invalidSE=TRUE)
+)
+for(name in names(projectionCases)) {
+  case <- projectionCases[[name]]
+  se <- if(isTRUE(case$noSE)) NULL else projectionSE
+  covariance <- if(isTRUE(case$noCov)) NULL else projectionCov
+  if(isTRUE(case$invalidSE)) se[,2] <- c(.75,0,NaN,2)
+  packedCov <- if(is.null(covariance)) NULL else unlist(lapply(1:4,function(gene)as.vector(t(covariance[gene,,]))))
+  for(mode in c("raw","normal","t")) {
+    useT <- identical(mode,"t")
+    df <- if(useT) c(.5,10,NaN,100) else NULL
+    options <- list(lfcThreshold=.75,altHypothesis="greater",useT=useT,degreesOfFreedom=df)
+    fit <- list(beta=projectionBeta,betaSE=se,betaCovariance=covariance)
+    input <- list(operation="projection",genes=4L,coefficients=3L,
+      beta=strings(as.vector(t(projectionBeta))),se=if(is.null(se))NULL else strings(as.vector(t(se))),
+      covariance=if(is.null(packedCov))NULL else strings(packedCov),contrast=strings(case$contrast),
+      threshold=if(mode=="raw")NULL else ".75",alternative="greater",df=if(useT)strings(df)else NULL)
+    actual <- withoutRCalculations(if(mode=="raw")
+      rsdeseq2:::.rsdeseq2_lrt_from_primitive_fit(fit,case$contrast) else
+      rsdeseq2:::.rsdeseq2_wald_from_primitive_fit(fit,case$contrast,options), projection=TRUE)
+    compareIdentity(paste0("projection_",name,"_",mode),input,lapply(actual,hexVector))
+  }
+}

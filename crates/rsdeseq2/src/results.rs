@@ -10,5 +10,5 @@ pub use implementation::*;
 pub use request::ResultRequest;
 
 pub(crate) use implementation::{
-    build_lrt_contrast_results_view, build_wald_contrast_results_view,
+    build_lrt_projection_results_view, build_wald_contrast_results_view,
 };

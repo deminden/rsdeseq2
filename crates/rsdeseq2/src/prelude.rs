@@ -77,10 +77,11 @@ pub use crate::errors::DeseqError;
 pub use crate::glm::{
     BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
     BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
-    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, IrlsOptions, IrlsSolver,
-    LrtOutput, NbinomGlmFit, ObservationWeightOptions, ObservationWeights, OptimFallbackRows,
-    WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldOutput, WaldPvalueType,
-    WaldTestOptions, average_expanded_model_coefficients, average_expanded_model_covariances,
+    ContrastProjection, CovarianceView, ExpandedModelBetaPriorDesignInput,
+    ExpandedModelBetaPriorGlmFit, InferenceEstimates, IrlsOptions, IrlsSolver, LrtOutput,
+    NbinomGlmFit, ObservationWeightOptions, ObservationWeights, OptimFallbackRows, WaldAlternative,
+    WaldContrastOutput, WaldDegreesOfFreedom, WaldOutput, WaldPvalueType, WaldTestOptions,
+    average_expanded_model_coefficients, average_expanded_model_covariances,
     beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
     estimate_beta_prior_variance, expanded_model_group_contrast,
     fit_expanded_glms_with_estimated_beta_prior_variance,
@@ -104,8 +105,8 @@ pub use crate::glm::{
     nbinom_negative_twice_log_likelihood, optim_fallback_rows, preprocess_observation_weights,
     preprocess_observation_weights_with_options, two_sided_normal_pvalue, two_sided_t_pvalue,
     wald_stat_and_pvalue, wald_stat_and_pvalue_with_options, wald_test, wald_test_coefficient,
-    wald_test_coefficient_with_options, wald_test_contrast, wald_test_contrast_with_options,
-    wald_test_from_estimates,
+    wald_test_coefficient_with_options, wald_test_contrast, wald_test_contrast_from_estimates,
+    wald_test_contrast_with_options, wald_test_from_estimates,
 };
 pub use crate::independent_filtering::{
     IndependentFilterLowessRow, IndependentFilterMetadataEntry, IndependentFilterNumRejRow,
@@ -223,3 +224,5 @@ pub use crate::transform::{
     vst_with_dispersion_trend_and_normalization_factors,
     vst_with_dispersion_trend_and_size_factors,
 };
+
+pub use crate::matrix::{MatrixOrder, MatrixView};

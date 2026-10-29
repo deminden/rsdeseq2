@@ -48,7 +48,7 @@ use crate::options::{
 };
 use crate::results::{
     apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic,
-    build_lrt_contrast_results, build_lrt_results, build_wald_contrast_results,
+    build_lrt_projection_results_view, build_lrt_results, build_wald_contrast_results,
     build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
 use crate::transform::{

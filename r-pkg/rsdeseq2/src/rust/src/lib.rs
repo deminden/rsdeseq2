@@ -192,10 +192,14 @@ include!("lib/contrast_shrinkage.rs");
 include!("lib/transform.rs");
 
 // Standalone Wald/LRT probabilities and default Cook's cutoff.
-include!("lib/inference_statistics.rs");
+#[path = "lib/inference_statistics.rs"]
+mod inference_statistics;
 
 // Standalone result adjustment and filtering; no R numerical callbacks.
 include!("lib/result_filtering.rs");
 
 // Cook's filtering and stable diagnostic schema exports; test module is last.
 include!("lib/diagnostics.rs");
+
+#[path = "lib/contrast_inference.rs"]
+mod contrast_inference;

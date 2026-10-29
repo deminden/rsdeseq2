@@ -150,7 +150,8 @@ pub fn wald_test_coefficient(
 /// Compute DESeq2-style Wald statistics for an explicit coefficient contrast.
 ///
 /// The contrast vector must have one finite value per coefficient. The fit must
-/// contain per-gene beta covariance matrices on log2 scale.
+/// contain per-gene beta covariance matrices on log2 scale for multi-coefficient
+/// contrasts. A single active coefficient uses its supplied marginal SE.
 pub fn wald_test_contrast(
     fit: &NbinomGlmFit,
     contrast: &[f64],
@@ -173,77 +174,10 @@ pub(crate) fn wald_test_contrast_view(
     contrast: &[f64],
     options: &WaldTestOptions,
 ) -> Result<WaldContrastOutput, DeseqError> {
-    validate_contrast_inputs(fit, contrast)?;
-    validate_wald_options(options)?;
-    let degrees_of_freedom = resolve_wald_degrees_of_freedom(fit, options)?;
-    let covariance =
-        fit.beta_covariance
-            .as_ref()
-            .ok_or_else(|| DeseqError::UnsupportedFeature {
-                feature: "Wald contrast requires beta covariance matrices".to_string(),
-            })?;
-
-    let mut log2_fold_change = Vec::with_capacity(fit.beta.n_rows());
-    let mut lfc_se = Vec::with_capacity(fit.beta.n_rows());
-    let mut stat = Vec::with_capacity(fit.beta.n_rows());
-    let mut pvalue = Vec::with_capacity(fit.beta.n_rows());
-    let p = fit.beta.n_cols();
-
-    for gene in 0..fit.beta.n_rows() {
-        let beta = fit.beta.row(gene)?;
-        let covariance = covariance.row(gene)?;
-        let Some(estimate) = contrast_estimate(contrast, beta) else {
-            log2_fold_change.push(None);
-            lfc_se.push(None);
-            stat.push(None);
-            pvalue.push(None);
-            continue;
-        };
-        let Some(variance) = contrast_variance(contrast, covariance, p) else {
-            log2_fold_change.push(None);
-            lfc_se.push(None);
-            stat.push(None);
-            pvalue.push(None);
-            continue;
-        };
-        let Some(se) = valid_contrast_se(estimate, variance) else {
-            log2_fold_change.push(None);
-            lfc_se.push(None);
-            stat.push(None);
-            pvalue.push(None);
-            continue;
-        };
-        match wald_stat_and_pvalue_with_options(
-            estimate,
-            se,
-            gene,
-            options,
-            degrees_of_freedom.as_deref(),
-        )? {
-            Some((gene_stat, gene_pvalue)) => {
-                log2_fold_change.push(Some(estimate));
-                lfc_se.push(Some(se));
-                stat.push(Some(gene_stat));
-                pvalue.push(gene_pvalue);
-            }
-            None => {
-                log2_fold_change.push(None);
-                lfc_se.push(None);
-                stat.push(None);
-                pvalue.push(None);
-            }
-        }
-    }
-
-    Ok(WaldContrastOutput {
-        log2_fold_change,
-        lfc_se,
-        wald: WaldOutput {
-            stat,
-            pvalue,
-            degrees_of_freedom,
-        },
-    })
+    use super::contrast_projection::wald_contrast_with_context;
+    let estimates = fit.estimates()?;
+    let residual = fit.model_matrix.n_samples() as f64 - fit.model_matrix.n_coefficients() as f64;
+    wald_contrast_with_context(&estimates, contrast, options, Some(residual))
 }
 
 /// Compute DESeq2-style Wald statistics for one coefficient with explicit p-value options.
@@ -266,121 +200,16 @@ pub fn wald_test_coefficient_with_options(
             fit.beta_se.len(),
         ));
     }
-    validate_wald_options(options)?;
-    let degrees_of_freedom =
-        resolve_wald_degrees_of_freedom(&GlmInferenceView::from(fit), options)?;
-
-    let mut stat = Vec::with_capacity(fit.beta.n_rows());
-    let mut pvalue = Vec::with_capacity(fit.beta.n_rows());
-    for gene in 0..fit.beta.n_rows() {
-        let beta = fit.beta.row(gene)?[coefficient];
-        let se = fit.beta_se.row(gene)?[coefficient];
-        match wald_stat_and_pvalue_with_options(
-            beta,
-            se,
-            gene,
-            options,
-            degrees_of_freedom.as_deref(),
-        )? {
-            Some((gene_stat, gene_pvalue)) => {
-                stat.push(Some(gene_stat));
-                pvalue.push(gene_pvalue);
-            }
-            None => {
-                stat.push(None);
-                pvalue.push(None);
-            }
-        }
-    }
-    Ok(WaldOutput {
-        stat,
-        pvalue,
-        degrees_of_freedom,
-    })
+    let p = fit.beta.n_cols();
+    let beta = fit.beta.as_slice();
+    let se = fit.beta_se.as_slice();
+    let rows = (0..fit.beta.n_rows())
+        .map(|gene| (beta[gene * p + coefficient], se[gene * p + coefficient]));
+    let residual = fit.model_matrix.n_samples() as f64 - fit.model_matrix.n_coefficients() as f64;
+    super::inference_primitives::wald_from_estimate_rows(rows, options, Some(residual))
 }
 
-fn validate_contrast_inputs(
-    fit: &GlmInferenceView<'_>,
-    contrast: &[f64],
-) -> Result<(), DeseqError> {
-    if contrast.len() != fit.beta.n_cols() {
-        return Err(invalid_dimensions(
-            "Wald contrast coefficients",
-            fit.beta.n_cols(),
-            contrast.len(),
-        ));
-    }
-    if fit.beta.n_rows() != fit.beta_se.n_rows() || fit.beta.n_cols() != fit.beta_se.n_cols() {
-        return Err(invalid_dimensions(
-            "Wald beta/betaSE matrix values",
-            fit.beta.len(),
-            fit.beta_se.len(),
-        ));
-    }
-    if let Some(covariance) = &fit.beta_covariance
-        && (covariance.n_rows() != fit.beta.n_rows()
-            || covariance.n_cols() != fit.beta.n_cols() * fit.beta.n_cols())
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "Wald beta covariance matrix".to_string(),
-            expected: fit.beta.n_rows() * fit.beta.n_cols() * fit.beta.n_cols(),
-            actual: covariance.len(),
-        });
-    }
-    let mut any_nonzero = false;
-    for (idx, value) in contrast.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: "Wald contrast".to_string(),
-                index: Some(idx),
-                value,
-            });
-        }
-        any_nonzero |= value != 0.0;
-    }
-    if !any_nonzero {
-        return Err(DeseqError::InvalidOptions {
-            reason: "Wald contrast must contain at least one non-zero coefficient".to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn contrast_estimate(contrast: &[f64], beta: &[f64]) -> Option<f64> {
-    let mut terms = Vec::with_capacity(contrast.len());
-    for (contrast, beta) in contrast.iter().copied().zip(beta.iter().copied()) {
-        let term = contrast * beta;
-        if !term.is_finite() {
-            return None;
-        }
-        terms.push(term);
-    }
-    checked_scaled_sum(&terms)
-}
-
-fn contrast_variance(contrast: &[f64], covariance: &[f64], p: usize) -> Option<f64> {
-    let mut terms = Vec::with_capacity(p * p);
-    for row in 0..p {
-        for col in 0..p {
-            terms.push(checked_product3_ordered_by_magnitude(
-                contrast[row],
-                covariance[row * p + col],
-                contrast[col],
-            )?);
-        }
-    }
-    checked_scaled_sum(&terms)
-}
-
-fn valid_contrast_se(estimate: f64, variance: f64) -> Option<f64> {
-    if !estimate.is_finite() || !variance.is_finite() || variance <= 0.0 {
-        return None;
-    }
-    let se = variance.sqrt();
-    se.is_finite().then_some(se)
-}
-
-fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
+pub(super) fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
     let mut scale = 0.0_f64;
     for value in values.iter().copied() {
         if !value.is_finite() {
@@ -521,33 +350,6 @@ pub fn two_sided_t_pvalue(stat: f64, degrees_of_freedom: f64) -> Option<f64> {
     clamp_probability(2.0 * student_t_upper_tail(stat.abs(), degrees_of_freedom)?)
 }
 
-fn resolve_wald_degrees_of_freedom(
-    fit: &GlmInferenceView<'_>,
-    options: &WaldTestOptions,
-) -> Result<Option<Vec<Option<f64>>>, DeseqError> {
-    match &options.pvalue_type {
-        WaldPvalueType::Normal => Ok(None),
-        WaldPvalueType::T { degrees_of_freedom } => match degrees_of_freedom {
-            WaldDegreesOfFreedom::Residual => {
-                let df =
-                    fit.model_matrix.n_samples() as f64 - fit.model_matrix.n_coefficients() as f64;
-                Ok(Some(vec![valid_t_df(df); fit.beta.n_rows()]))
-            }
-            WaldDegreesOfFreedom::Scalar(df) => Ok(Some(vec![valid_t_df(*df); fit.beta.n_rows()])),
-            WaldDegreesOfFreedom::PerGene(df) => {
-                if df.len() != fit.beta.n_rows() {
-                    return Err(invalid_dimensions(
-                        "Wald per-gene degrees of freedom",
-                        fit.beta.n_rows(),
-                        df.len(),
-                    ));
-                }
-                Ok(Some(df.iter().copied().map(valid_t_df).collect()))
-            }
-        },
-    }
-}
-
 pub(super) fn valid_t_df(df: f64) -> Option<f64> {
     (df.is_finite() && df > 0.0).then_some(df)
 }
@@ -624,7 +426,11 @@ fn checked_product2(left: f64, right: f64) -> Option<f64> {
     (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
 }
 
-fn checked_product3_ordered_by_magnitude(left: f64, middle: f64, right: f64) -> Option<f64> {
+pub(super) fn checked_product3_ordered_by_magnitude(
+    left: f64,
+    middle: f64,
+    right: f64,
+) -> Option<f64> {
     let mut factors = [left, middle, right];
     factors.sort_by(|a, b| a.abs().total_cmp(&b.abs()));
     checked_product2(checked_product2(factors[0], factors[1])?, factors[2])

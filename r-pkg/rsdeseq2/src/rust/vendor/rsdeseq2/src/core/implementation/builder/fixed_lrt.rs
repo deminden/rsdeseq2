@@ -172,14 +172,11 @@ impl DeseqBuilder {
             dispersions,
             coefficient: default_results_coefficient(full_design)?,
         })?;
-        let contrast_output = wald_test_contrast_with_options(
-            &lrt_output.full_fit,
-            contrast,
-            &self.wald_test_options,
-        )?;
-        lrt_output.results = build_lrt_contrast_results(
+        let view = crate::glm::inference::GlmInferenceView::from(&lrt_output.full_fit);
+        let contrast_output = view.estimates()?.project_contrast(contrast)?;
+        lrt_output.results = build_lrt_projection_results_view(
             &stages.base_mean,
-            &lrt_output.full_fit,
+            &view,
             &lrt_output.lrt,
             &contrast_output,
             counts.gene_names(),
@@ -648,14 +645,11 @@ impl DeseqBuilder {
             dispersions,
             coefficient: default_results_coefficient(full_design)?,
         })?;
-        let contrast_output = wald_test_contrast_with_options(
-            &lrt_output.full_fit,
-            &numeric_contrast,
-            &self.wald_test_options,
-        )?;
-        lrt_output.results = build_lrt_contrast_results(
+        let view = crate::glm::inference::GlmInferenceView::from(&lrt_output.full_fit);
+        let contrast_output = view.estimates()?.project_contrast(&numeric_contrast)?;
+        lrt_output.results = build_lrt_projection_results_view(
             &stages.base_mean,
-            &lrt_output.full_fit,
+            &view,
             &lrt_output.lrt,
             &contrast_output,
             counts.gene_names(),

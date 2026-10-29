@@ -165,3 +165,50 @@ fn fitted_lrt_object_applies_numeric_contrast_all_zero_from_stored_design() {
     assert_ne!(numeric_results.rows[0].pvalue, Some(1.0));
     assert_eq!(numeric_results.rows[2].log2_fold_change, None);
 }
+
+#[test]
+fn lrt_effect_projection_does_not_require_a_valid_wald_test() {
+    let counts = counts_with_zero_row();
+    let (mut fit, _) = native_lrt_builder()
+        .fit_fixed_dispersion_lrt(
+            &counts,
+            &full_design(),
+            &reduced_design(),
+            &vec![0.2; counts.n_genes()],
+            1,
+        )
+        .unwrap();
+    let beta = fit.beta.as_ref().unwrap().row(1).unwrap().to_vec();
+    let lrt = fit.lrt.as_ref().unwrap().clone();
+    let se = fit.beta_se.as_ref().unwrap();
+    let mut values = se.as_slice().to_vec();
+    values[3] = 0.0;
+    fit.beta_se = Some(RowMajorMatrix::from_row_major(counts.n_genes(), 2, values).unwrap());
+    let covariance = fit.beta_covariance.as_ref().unwrap();
+    let mut values = covariance.as_slice().to_vec();
+    values[4..8].fill(f64::NAN);
+    fit.beta_covariance =
+        Some(RowMajorMatrix::from_row_major(counts.n_genes(), 4, values).unwrap());
+    for (contrast, effect, se) in [
+        (vec![0., 1.], beta[1], Some(0.)),
+        (vec![1., 1.], beta[0] + beta[1], None),
+    ] {
+        let result = fit
+            .lrt_results_contrast_request(
+                &counts,
+                &ResultsContrast::numeric(contrast),
+                counts.gene_names(),
+            )
+            .unwrap();
+        assert_relative_eq!(
+            result.rows[1].log2_fold_change.unwrap(),
+            effect,
+            epsilon = 1e-14
+        );
+        assert_eq!(result.rows[1].lfc_se, se);
+        for (gene, row) in result.rows.iter().enumerate() {
+            assert_eq!(row.stat, lrt.deviance[gene]);
+            assert_eq!(row.pvalue, lrt.pvalue[gene]);
+        }
+    }
+}

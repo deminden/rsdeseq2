@@ -129,6 +129,17 @@ enum StatisticsInput {
         alternative: String,
         df: Option<Vec<String>>,
     },
+    Projection {
+        genes: usize,
+        coefficients: usize,
+        beta: Vec<String>,
+        se: Option<Vec<String>>,
+        covariance: Option<Vec<String>>,
+        contrast: Vec<String>,
+        threshold: Option<String>,
+        alternative: Option<String>,
+        df: Option<Vec<String>>,
+    },
     Lrt {
         statistics: Vec<String>,
         df: Vec<String>,
@@ -178,6 +189,80 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
                 json!({"stat": result.stat.into_iter().map(|v| v.map(bits)).collect::<Vec<_>>(),
                 "pvalue": result.pvalue.into_iter().map(|v| v.map(bits)).collect::<Vec<_>>() }),
             )
+        }
+        StatisticsInput::Projection {
+            genes,
+            coefficients,
+            beta,
+            se,
+            covariance,
+            contrast,
+            threshold,
+            alternative,
+            df,
+        } => {
+            use rsdeseq2::glm::{
+                CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
+            };
+            use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+            let beta = parse(beta)?;
+            let se = se.map(parse).transpose()?;
+            let covariance = covariance.map(parse).transpose()?;
+            let matrix =
+                |values| MatrixView::new(genes, coefficients, values, MatrixOrder::RowMajor);
+            let covariance = covariance
+                .as_deref()
+                .map(|values| {
+                    CovarianceView::new(
+                        coefficients,
+                        MatrixView::new(
+                            genes,
+                            coefficients
+                                .checked_mul(coefficients)
+                                .ok_or("covariance shape overflow")?,
+                            values,
+                            MatrixOrder::RowMajor,
+                        )?,
+                    )
+                    .map_err(|e| -> Box<dyn Error> { Box::new(e) })
+                })
+                .transpose()?;
+            let estimates = InferenceEstimates::new(
+                matrix(&beta)?,
+                se.as_deref().map(matrix).transpose()?,
+                covariance,
+            )?;
+            let contrast = parse(contrast)?;
+            if let Some(threshold) = threshold {
+                let alternative = match alternative.as_deref().unwrap_or("greaterAbs") {
+                    "greaterAbs" => WaldAlternative::GreaterAbs,
+                    "greaterAbsUPSHOT" => WaldAlternative::GreaterAbsUpshot,
+                    "greaterAbs2014" => WaldAlternative::GreaterAbs2014,
+                    "lessAbs" => WaldAlternative::LessAbs,
+                    "greater" => WaldAlternative::Greater,
+                    "less" => WaldAlternative::Less,
+                    _ => return Err("unknown Wald alternative".into()),
+                };
+                let options = match df.map(parse).transpose()? {
+                    None => WaldTestOptions::normal(),
+                    Some(df) if df.len() == 1 => WaldTestOptions::t_degrees_of_freedom(df[0]),
+                    Some(df) => WaldTestOptions::t_per_gene_degrees_of_freedom(df),
+                }
+                .with_lfc_threshold(threshold.parse()?, alternative);
+                let output = wald_test_contrast_from_estimates(&estimates, &contrast, &options)?;
+                Ok(
+                    json!({"log2FoldChange":output.log2_fold_change.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
+                    "lfcSE":output.lfc_se.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
+                    "stat":output.wald.stat.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
+                    "pvalue":output.wald.pvalue.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>() }),
+                )
+            } else {
+                let output = estimates.project_contrast(&contrast)?;
+                Ok(
+                    json!({"log2FoldChange":output.log2_fold_change.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
+                    "lfcSE":output.lfc_se.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>() }),
+                )
+            }
         }
         StatisticsInput::Lrt { statistics, df } => {
             let result = lrt_pvalues_from_statistics(&parse(statistics)?, &parse(df)?)?;
