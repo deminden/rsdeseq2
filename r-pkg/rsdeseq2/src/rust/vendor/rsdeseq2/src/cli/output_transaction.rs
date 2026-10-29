@@ -117,7 +117,14 @@ fn hash_file(path: &Path) -> Result<(u64, String), DeseqError> {
         hash.update(&buffer[..count]);
         bytes += count as u64;
     }
-    Ok((bytes, format!("{:x}", hash.finalize())))
+    let digest = hash.finalize();
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in digest {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    Ok((bytes, encoded))
 }
 
 impl OutputTransaction {

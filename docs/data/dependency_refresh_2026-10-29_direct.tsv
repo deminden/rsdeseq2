@@ -1,0 +1,16 @@
+name	resolved_before	resolved_after	latest_stable	rust_version	checksum	published	source
+approx	0.5.1	0.5.1	0.5.1		cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6	2022-01-23T10:15:35.118590Z	https://crates.io/api/v1/crates/approx
+clap	4.6.7	4.6.7	4.6.7	1.85	aa8876b300ab35ba921adea3dfd70157a46249b33f95c9084ae5709785478946	2026-09-14T18:40:28.474794Z	https://crates.io/api/v1/crates/clap
+criterion	0.8.2	0.8.2	0.8.2	1.86	950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3	2026-02-04T10:43:03.398729Z	https://crates.io/api/v1/crates/criterion
+csv	1.4.0	1.4.0	1.4.0	1.73	52cd9d68cf7efc6ddfaaee42e7288d3a99d613d4b50f76ce9827ae0c6e14f938	2025-10-17T13:56:07.013801Z	https://crates.io/api/v1/crates/csv
+libm	0.2.16	0.2.16	0.2.16	1.63	b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981	2026-01-24T03:14:21.229132Z	https://crates.io/api/v1/crates/libm
+nalgebra	0.35.0	0.35.0	0.35.0	1.89.0	adc43a60c217b0c6ff46e47f26911015ad8d2e5a8be1af668c67e370d99a4346	2026-05-24T16:12:14.939059Z	https://crates.io/api/v1/crates/nalgebra
+rayon	1.12.0	1.12.0	1.12.0	1.80	fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d	2026-04-14T00:56:56.454086Z	https://crates.io/api/v1/crates/rayon
+rcompat-locfit	0.1.5	0.2.0	0.2.0	1.85	242a0ea0fc186cafd47b36676c3f6393a81683463174decd0163a9ceefa4d94b	2026-10-29T23:10:55.104215Z	https://crates.io/api/v1/crates/rcompat-locfit
+rcompat-lbfgsb	0.2.2	0.3.0	0.3.0	1.87	995aceddb3232cec7a6fc46ccb5770a4661b8d4efc55c72f38ec435eba3147b5	2026-10-29T23:25:12.264200Z	https://crates.io/api/v1/crates/rcompat-lbfgsb
+serde	1.0.229	1.0.229	1.0.229	1.56	4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba	2026-07-18T23:05:13.266456Z	https://crates.io/api/v1/crates/serde
+serde_json	1.0.154	1.0.154	1.0.154	1.71	e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6	2026-10-11T15:31:46.076577Z	https://crates.io/api/v1/crates/serde_json
+sha2	0.10.9	0.11.1	0.11.1	1.88	47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19	2026-10-12T18:58:22.836567Z	https://crates.io/api/v1/crates/sha2
+same-file	1.0.6	1.0.6	1.0.6		93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502	2020-01-11T17:02:30.960838Z	https://crates.io/api/v1/crates/same-file
+statrs	0.18.0	0.19.1	0.19.1	1.89.0	c1837f9a1bd13dabbdbb04489c39451482d3cdd35a6e1a0d0f3570dea2b8c8be	2026-08-11T16:50:16.525087Z	https://crates.io/api/v1/crates/statrs
+thiserror	2.0.21	2.0.21	2.0.21	1.77	09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e	2026-09-23T20:24:07.771104Z	https://crates.io/api/v1/crates/thiserror
