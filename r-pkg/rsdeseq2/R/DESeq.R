@@ -72,6 +72,7 @@ DESeq <- function(object,
     stop("minReplicatesForReplace must be an integer of at least 3 or Inf", call. = FALSE)
   }
   colData <- NULL
+  designOrigin <- list(kind="matrix",variables=character())
   if (inherits(object, "DESeqDataSet")) {
     if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
       stop("SummarizedExperiment is required for DESeqDataSet input", call. = FALSE)
@@ -89,6 +90,7 @@ DESeq <- function(object,
     if (!inherits(formula, "formula")) {
       stop("DESeqDataSet design must be a formula", call. = FALSE)
     }
+    designOrigin <- .rsdeseq2_formula_origin(formula)
     modelFrame <- stats::model.frame(formula, data = colData)
     design <- stats::model.matrix(formula, data = modelFrame)
     formulaOffsets <- stats::model.offset(modelFrame)
@@ -112,7 +114,10 @@ DESeq <- function(object,
   } else if (is.list(object) && !is.null(object$counts)) {
     counts <- object$counts
     colData <- object$colData
-    if (is.null(design)) design <- object$design
+    if (is.null(design)) {
+      design <- object$design
+      if(!is.null(object$designOrigin)) designOrigin <- object$designOrigin
+    }
     if (is.null(reduced)) reduced <- object$reduced
     if (!explicitSize) sizeFactors <- object$sizeFactors
     if (!explicitFactors) normalizationFactors <- object$normalizationFactors
@@ -121,6 +126,7 @@ DESeq <- function(object,
     counts <- object
   }
   counts <- .rsdeseq2_validate_counts(counts)
+  designOrigin <- .rsdeseq2_result_design_origin(list(schemaVersion=2L,designOrigin=designOrigin))
   if (!is.null(rownames(counts)) && anyDuplicated(rownames(counts))) {
     stop("count row names must be unique", call. = FALSE)
   }
@@ -200,7 +206,8 @@ DESeq <- function(object,
   dimnames(results$betaCovariance)[[1L]] <- rownames(counts)
   fit <- structure(
     list(
-      schemaVersion = 1L,
+      schemaVersion = 2L,
+      designOrigin = designOrigin,
       rawPvalue = rawPvalue,
       rawStat = rawStat,
       results = results$results,

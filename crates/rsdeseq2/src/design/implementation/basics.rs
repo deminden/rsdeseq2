@@ -1,3 +1,4 @@
+use super::DesignOrigin;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::qr::{DEFAULT_RANK_TOLERANCE, matrix_rank, matrix_rank_relative};
 use crate::matrix::RowMajorMatrix;
@@ -6,11 +7,14 @@ use crate::matrix::RowMajorMatrix;
 ///
 /// Rows are samples and columns are coefficients. The Rust formula helper covers
 /// a primitive DESeq2-style subset; callers can still provide arbitrary matrices
-/// directly when they need richer formula semantics.
+/// directly when they need richer formula semantics. Equality compares numeric
+/// values and coefficient names; compare [`Self::origin`] separately when
+/// formula-dependent result policy is relevant.
 #[derive(Clone)]
 pub struct DesignMatrix {
     matrix: RowMajorMatrix<f64>,
     coefficient_names: Option<Vec<String>>,
+    origin: DesignOrigin,
     // Immutable design products shared across row optimizers and clones.
     cox_products: std::sync::OnceLock<Option<std::sync::Arc<SharedDesignProducts>>>,
 }
@@ -389,8 +393,21 @@ impl DesignMatrix {
         Ok(Self {
             matrix,
             coefficient_names,
+            origin: DesignOrigin::matrix(),
             cox_products: std::sync::OnceLock::new(),
         })
+    }
+
+    /// Attach explicit provenance without altering numerical design equality,
+    /// coefficients, rank checks or cached numeric products.
+    pub fn with_origin(mut self, origin: DesignOrigin) -> Self {
+        self.origin = origin;
+        self
+    }
+
+    /// Formula/matrix provenance used by formula-specific result policy.
+    pub fn origin(&self) -> &DesignOrigin {
+        &self.origin
     }
 
     /// Number of samples.
@@ -451,7 +468,12 @@ impl DesignMatrix {
 
     /// Numerical rank using column-relative deterministic validation.
     pub fn rank(&self) -> Result<usize, DeseqError> {
-        matrix_rank_relative(self.matrix.as_slice(), self.n_samples(), self.n_coefficients(), DEFAULT_RANK_TOLERANCE)
+        matrix_rank_relative(
+            self.matrix.as_slice(),
+            self.n_samples(),
+            self.n_coefficients(),
+            DEFAULT_RANK_TOLERANCE,
+        )
     }
 
     /// Numerical rank using a caller-supplied absolute tolerance.
@@ -488,7 +510,12 @@ impl DesignMatrix {
         self.validate_rank_result(context, self.rank_with_tolerance(tolerance)?, tolerance)
     }
 
-    fn validate_rank_result(&self, context: &str, rank: usize, tolerance: f64) -> Result<(), DeseqError> {
+    fn validate_rank_result(
+        &self,
+        context: &str,
+        rank: usize,
+        tolerance: f64,
+    ) -> Result<(), DeseqError> {
         if rank == self.n_coefficients() {
             return Ok(());
         }

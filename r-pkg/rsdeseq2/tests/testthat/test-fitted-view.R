@@ -47,3 +47,38 @@ test_that("fitted views map gene order and reject mutations of fitted inputs", {
     expect_equal(actual$padj, p.adjust(actual$pvalue, "BH"), info = type)
   }
 })
+
+test_that("saved fit origin distinguishes formula semantics from identical numeric designs", {
+  ct <- .rsdeseq2_test_counts()
+  cd <- data.frame(condition=factor(rep(c("A","B"),each=4)),nuisance=seq_len(8),row.names=colnames(ct))
+  fit <- DESeq(DESeq2::DESeqDataSetFromMatrix(ct,cd,~condition),fitType="mean",minReplicatesForReplace=Inf)
+  state <- S4Vectors::metadata(fit)$rsdeseq2RustFit
+  expect_identical(state$schemaVersion,2L)
+  expect_identical(state$designOrigin,list(kind="formula",variables="condition"))
+  path <- tempfile(fileext=".rds");on.exit(unlink(path))
+  saveRDS(fit,path)
+  expected <- as.data.frame(results(fit,independentFiltering=FALSE))
+  expect_identical(as.data.frame(results(readRDS(path),independentFiltering=FALSE)),expected)
+  changed <- fit
+  DESeq2::design(changed) <- ~condition+nuisance-nuisance
+  expect_identical(unname(model.matrix(DESeq2::design(changed),cd)),unname(model.matrix(~condition,cd)))
+  expect_error(results(changed),"formula origin changed")
+  for(bad in list(NULL,list(kind="legacy",variables=character()),
+      list(kind="formula",variables=c("condition","condition")),
+      list(kind="matrix",variables="condition"))) {
+    changed <- fit; metadata <- S4Vectors::metadata(changed)
+    metadata$rsdeseq2RustFit$designOrigin <- bad;S4Vectors::metadata(changed) <- metadata
+    expect_error(results(changed),"origin")
+  }
+  legacy <- fit; metadata <- S4Vectors::metadata(legacy)
+  metadata$rsdeseq2RustFit$designOrigin <- NULL
+  metadata$rsdeseq2RustFit$schemaVersion <- 1L
+  S4Vectors::metadata(legacy) <- metadata
+  expect_identical(as.data.frame(results(legacy,independentFiltering=FALSE)),expected)
+  expect_null(S4Vectors::metadata(legacy)$rsdeseq2RustFit$designOrigin)
+  metadata$rsdeseq2RustFit$schemaVersion <- 3L
+  S4Vectors::metadata(legacy) <- metadata
+  expect_error(results(legacy),"Unsupported fitted schema")
+  matrixFit <- DESeq(ct,design=model.matrix(~condition,cd),fitType="mean",minReplicatesForReplace=Inf)
+  expect_identical(matrixFit$designOrigin,list(kind="matrix",variables=character()))
+})

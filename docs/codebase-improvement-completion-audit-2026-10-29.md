@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Shared Cook's masks and replacement-row values now pass 101 direct bit cases, a 1,510-assertion source check, instrumented boundary tests and unchanged GTEx exports. Native eligibility now requires a matching two-column design; stored requests infer matching formula context. See the [Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md). Exact Cook's tie/formula-origin parity, remaining shrinkage zero flags, offsets/formula and posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Shared tie/origin correction matches twelve original-DESeq2 cases, 113 direct interface cases and a 1,584-assertion source check; see the [origin checkpoint](cooks-origin-parity-2026-10-30.md). Older native builder helper selection, remaining shrinkage zero flags, offsets/formula and posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -117,3 +117,13 @@ All 18 R workflow payloads are byte-identical and below 2 GiB; the targeted
 two-group ten-result stage improves 14.84% and peak RSS falls 27 MiB. The R
 process total changes +0.19%, with slower controls reported explicitly. The
 observed native timing cost and final combined performance audit remain open.
+
+The [formula-origin correction](cooks-origin-parity-2026-10-30.md) subsequently
+resolves the shared kernel's first-tie and original-variable classification
+issues using twelve independently generated original-DESeq2 cases. The preceding
+implementation disagrees on 20 controlled missingness decisions; the corrected
+shared paths match reference p-value/adjustment bits. New fitted origins use
+schema 2 with explicit legacy compatibility. The source check passes 1,584
+assertions and 113 direct interface cases pass. All 121+9 GTEx gates and 22
+unchanged exports pass. Older builder contrast-dependent helper selection,
+remaining R arithmetic and the final combined performance audit remain open.

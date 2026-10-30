@@ -135,6 +135,8 @@ mod tests {
             .collect::<Vec<_>>();
         let design =
             DesignMatrix::from_row_major(4, 2, vec![1., 0., 1., 0., 1., 1., 1., 1.], None).unwrap();
+        let design = design
+            .with_origin(crate::design::DesignOrigin::formula(vec!["condition".into()]).unwrap());
         let mut two_level_results = one_cooks_result();
         apply_cooks_cutoff_for_factor_level_metadata(
             &mut two_level_results,
@@ -142,6 +144,7 @@ mod tests {
             &counts,
             &cooks,
             &design,
+            None,
             FactorLevelContrast::new("condition", "B", "A", &two_levels),
         )
         .unwrap();
@@ -156,6 +159,9 @@ mod tests {
             None,
         )
         .unwrap();
+        let additive = additive.with_origin(
+            crate::design::DesignOrigin::formula(vec!["batch".into(), "condition".into()]).unwrap(),
+        );
         let mut additive_results = one_cooks_result();
         apply_cooks_cutoff_for_factor_level_metadata(
             &mut additive_results,
@@ -163,6 +169,7 @@ mod tests {
             &counts,
             &cooks,
             &additive,
+            None,
             FactorLevelContrast::new("condition", "B", "A", &two_levels),
         )
         .unwrap();
@@ -180,6 +187,7 @@ mod tests {
             &counts,
             &cooks,
             &design,
+            None,
             FactorLevelContrast::new("condition", "B", "A", &extra_level),
         )
         .unwrap();

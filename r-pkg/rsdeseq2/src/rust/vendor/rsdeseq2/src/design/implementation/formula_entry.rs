@@ -53,15 +53,18 @@ pub fn expanded_formula_design_with_offsets<'a>(
     let rhs = formula_rhs(formula)?;
     let (rhs, offsets) = extract_formula_offsets(rhs, factors, numeric_covariates)?;
     let (rhs, derived_factor_covariates) = expand_formula_factor_transform_terms(&rhs, factors)?;
-    let mut all_factors =
-        Vec::with_capacity(factors.len() + derived_factor_covariates.len());
+    let mut all_factors = Vec::with_capacity(factors.len() + derived_factor_covariates.len());
     all_factors.extend(factors.iter().cloned());
-    all_factors.extend(derived_factor_covariates.iter().map(|factor| ExpandedFactorSpec {
-        factor: factor.name.as_str(),
-        sample_levels: factor.sample_levels.as_slice(),
-        reference: factor.reference.as_str(),
-        levels: factor.levels.as_deref(),
-    }));
+    all_factors.extend(
+        derived_factor_covariates
+            .iter()
+            .map(|factor| ExpandedFactorSpec {
+                factor: factor.name.as_str(),
+                sample_levels: factor.sample_levels.as_slice(),
+                reference: factor.reference.as_str(),
+                levels: factor.levels.as_deref(),
+            }),
+    );
     validate_formula_factor_name_collisions(&all_factors)?;
     let (rhs, derived_numeric_covariates) =
         expand_formula_numeric_transform_terms(&rhs, &all_factors, numeric_covariates)?;
@@ -129,8 +132,11 @@ pub fn expanded_formula_design_with_offsets<'a>(
     }
 
     let model_frame = formula_model_frame_from_specs(&all_factors, &all_numeric_covariates);
-    let design =
+    let mut design =
         expanded_formula_design_from_state(&state, &all_factors, &all_numeric_covariates)?;
+    let origin = DesignOrigin::formula(super::formula_origin::formula_variables(formula)?)?;
+    design.standard_design = design.standard_design.with_origin(origin.clone());
+    design.expanded_design = design.expanded_design.with_origin(origin);
     Ok(ExpandedFormulaDesignWithOffsets {
         design,
         offsets,

@@ -10,11 +10,19 @@ pub(super) struct Input {
 }
 #[derive(Deserialize)]
 struct Factor {
+    #[serde(default)]
+    name: String,
     codes: Vec<i32>,
     levels: usize,
 }
 #[derive(Deserialize)]
+struct Origin {
+    kind: String,
+    variables: Vec<String>,
+}
+#[derive(Deserialize)]
 struct Policy {
+    origin: Option<Origin>,
     mode: String,
     samples: usize,
     pvalue: Vec<Option<String>>,
@@ -64,6 +72,15 @@ pub(super) fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let cooks = parse(p.cooks)?;
     let cooks = MatrixView::new(genes, p.samples, &cooks, MatrixOrder::RowMajor)?;
     let design = p.design.map(parse).transpose()?;
+    let origin = match p.origin {
+        None => DesignOrigin::legacy(),
+        Some(o) => match o.kind.as_str() {
+            "legacy" if o.variables.is_empty() => DesignOrigin::legacy(),
+            "matrix" if o.variables.is_empty() => DesignOrigin::matrix(),
+            "formula" => DesignOrigin::formula(o.variables)?,
+            _ => return Err("invalid conformance design origin".into()),
+        },
+    };
     let mut eligible = false;
     if let Some(values) = &design {
         let design = MatrixView::new(p.samples, p.coefficients, values, MatrixOrder::RowMajor)?;
@@ -71,7 +88,8 @@ pub(super) fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
             if factor.codes.contains(&i32::MIN) {
                 continue;
             }
-            eligible |= two_level_design_matches(design, &factor.codes, factor.levels)?;
+            eligible |=
+                low_count_eligible(&origin, design, &factor.name, &factor.codes, factor.levels)?;
         }
     }
     let heuristic = if p.low_count.unwrap_or(eligible) {

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
+#include <string.h>
 #include "validation.h"
 #include "result_policy.h"
 
@@ -13,6 +14,37 @@ static const int32_t *row_flags(SEXP values, R_xlen_t genes, const char *name) {
     if (values == R_NilValue) return NULL;
     validate_vector(values, LGLSXP, genes, name);
     return (const int32_t *)LOGICAL(values);
+}
+
+static const char *origin_string(SEXP values, R_xlen_t index) {
+    if (TYPEOF(values) != STRSXP || index >= XLENGTH(values) || STRING_ELT(values,index) == NA_STRING)
+        Rf_error("design origin identifiers must be nonmissing strings");
+    const char *value = Rf_translateCharUTF8(STRING_ELT(values,index));
+    if (!*value) Rf_error("design origin identifiers must be nonempty strings");
+    return value;
+}
+
+static void result_origin(SEXP origin, Rsdeseq2ResultContext *native) {
+    native->origin_kind = 2; /* compatibility for old direct-call contexts */
+    if (origin == R_NilValue) return;
+    SEXP kind = named_list_field(origin,"kind","design origin");
+    validate_vector(kind,STRSXP,1,"design origin kind");
+    const char *name = origin_string(kind,0);
+    if (!strcmp(name,"matrix")) native->origin_kind = 0;
+    else if (!strcmp(name,"formula")) native->origin_kind = 1;
+    else if (strcmp(name,"legacy")) Rf_error("unsupported design origin kind");
+    SEXP variables = named_list_field(origin,"variables","design origin");
+    if (variables == R_NilValue && native->origin_kind != 1) return;
+    validate_vector(variables,STRSXP,XLENGTH(variables),"design origin variables");
+    if (native->origin_kind != 1 && XLENGTH(variables)) Rf_error("only formula origin can carry variables");
+    checked_product(XLENGTH(variables),sizeof(const char *));
+    const char **names = XLENGTH(variables) ? (const char **)R_alloc((size_t)XLENGTH(variables),sizeof(*names)) : NULL;
+    for (R_xlen_t i=0;i<XLENGTH(variables);++i) {
+        names[i]=origin_string(variables,i);
+        for (R_xlen_t j=0;j<i;++j) if (!strcmp(names[i],names[j]))
+            Rf_error("duplicate design origin variable");
+    }
+    native->variables_len=(size_t)XLENGTH(variables);native->variables=names;
 }
 
 SEXP rsdeseq2_present_results(SEXP columns, SEXP context, SEXP cutoff) {
@@ -27,6 +59,7 @@ SEXP rsdeseq2_present_results(SEXP columns, SEXP context, SEXP cutoff) {
     Rsdeseq2ResultContext native = {0};
     native.refitted = row_flags(named_list_field(context, "refitRows", "result context"), genes, "refitRows");
     native.new_zero = row_flags(named_list_field(context, "newAllZeroRows", "result context"), genes, "newAllZeroRows");
+    result_origin(named_list_field(context,"origin","result context"),&native);
     if (active) {
         SEXP maximum = named_list_field(context, "maxCooks", "result context");
         if (maximum == R_NilValue) Rf_error("The fit lacks Cook's context; refit");
@@ -55,9 +88,13 @@ SEXP rsdeseq2_present_results(SEXP columns, SEXP context, SEXP cutoff) {
         if (factors != R_NilValue) {
             if (TYPEOF(factors) != VECSXP) Rf_error("Cook's factors must be a list");
             R_xlen_t count = XLENGTH(factors); checked_product(count, sizeof(Rsdeseq2FactorCodes));
+            SEXP factor_names = Rf_getAttrib(factors,R_NamesSymbol);
+            if (native.origin_kind == 1 && count && (TYPEOF(factor_names)!=STRSXP || XLENGTH(factor_names)!=count))
+                Rf_error("formula Cook's factors require names");
             Rsdeseq2FactorCodes *codes = count ? (Rsdeseq2FactorCodes *)R_alloc((size_t)count, sizeof(*codes)) : NULL;
             for (R_xlen_t i = 0; i < count; ++i) {
                 SEXP factor = VECTOR_ELT(factors, i);
+                codes[i].name = TYPEOF(factor_names)==STRSXP ? origin_string(factor_names,i) : NULL;
                 SEXP values = named_list_field(factor, "codes", "Cook's factor");
                 validate_vector(values, INTSXP, (R_xlen_t)native.samples, "Cook's factor codes");
                 codes[i].codes = (const int32_t *)INTEGER(values);

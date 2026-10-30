@@ -28,6 +28,8 @@ fn native_glm_mu_factor_level_contrast_applies_low_count_cooks_gate() {
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -90,6 +92,8 @@ fn native_formula_wald_default_uses_stored_formula_low_count_cooks_gate() {
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -163,6 +167,8 @@ fn native_formula_wald_default_uses_cleaned_stored_reference_for_cooks_gate() {
         ]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
     let levels = ["A cell", "A cell", "A cell", "B cell", "B cell", "B cell"]
         .into_iter()
         .map(String::from)
@@ -261,6 +267,8 @@ fn native_replacement_named_contrasts_use_stored_formula_low_count_cooks_gate() 
     )
     .unwrap();
     let reduced_design = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)

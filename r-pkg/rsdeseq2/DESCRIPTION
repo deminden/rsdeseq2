@@ -16,6 +16,7 @@ RoxygenNote: 7.3.0
 Imports:
     methods
 Suggests:
+    jsonlite,
     testthat (>= 3.0.0),
     SummarizedExperiment,
     S4Vectors,

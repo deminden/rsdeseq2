@@ -709,6 +709,8 @@ fn native_glm_mu_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
         Some(vec!["Intercept".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)

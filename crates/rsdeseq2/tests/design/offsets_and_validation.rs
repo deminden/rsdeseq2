@@ -41,6 +41,28 @@ fn expanded_formula_design_with_offsets_extracts_formula_offsets() {
     let without_offsets =
         expanded_formula_design("~ condition + dose", &factors, &numeric).unwrap();
     assert_eq!(with_offsets.design, without_offsets);
+    assert_eq!(
+        with_offsets
+            .design
+            .standard_design
+            .origin()
+            .variables()
+            .unwrap(),
+        &["condition", "dose", "exposure", "batch_offset"]
+    );
+    assert_eq!(
+        with_offsets.design.standard_design.clone().origin(),
+        with_offsets.design.expanded_design.origin()
+    );
+    assert_eq!(
+        without_offsets
+            .standard_design
+            .origin()
+            .variables()
+            .unwrap(),
+        &["condition", "dose"]
+    );
+
     assert_eq!(with_offsets.offsets, vec![0.6, 1.2, 1.8, 2.4]);
 
     let intercept_only =

@@ -343,6 +343,7 @@ impl DeseqBuilder {
             counts,
             cooks,
             design,
+            self.model_frame.as_ref(),
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
@@ -715,6 +716,7 @@ impl DeseqBuilder {
             counts,
             cooks,
             full_design,
+            self.model_frame.as_ref(),
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;

@@ -1,7 +1,7 @@
 //! Validated result policy, independent of fit execution and presentation.
 use super::{
-    CooksPolicy, DeseqResults, LowCountHeuristic, mask_cooks_policy_rows, resolve_cooks_cutoff,
-    two_level_design_matches,
+    CooksPolicy, DeseqResults, LowCountHeuristic, low_count_eligible, mask_cooks_policy_rows,
+    resolve_cooks_cutoff,
 };
 use crate::contrasts::ResultsContrast;
 use crate::core::{CountMatrix, DeseqFit};
@@ -54,8 +54,9 @@ impl ResultRequest {
         })
     }
 
-    /// Override the two-group heuristic. By default, stored formula factors and
-    /// a matching two-column design establish eligibility automatically.
+    /// Override the two-group heuristic. Automatic scope requires an original
+    /// single-variable factor formula; numerical partition matching alone does
+    /// not establish formula provenance.
     pub fn low_count_heuristic(mut self, enabled: bool) -> Self {
         self.low_count_heuristic = Some(enabled);
         self
@@ -124,8 +125,13 @@ impl DeseqFit {
                     },
                     Vec::len,
                 );
-                if two_level_design_matches(design.matrix().into(), &factor.sample_levels, levels)?
-                {
+                if low_count_eligible(
+                    design.origin(),
+                    design.matrix().into(),
+                    &factor.name,
+                    &factor.sample_levels,
+                    levels,
+                )? {
                     low_count = true;
                     break;
                 }
