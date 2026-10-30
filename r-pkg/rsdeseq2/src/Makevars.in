@@ -8,6 +8,7 @@ FORCE:
 .PHONY: FORCE
 
 entrypoint.o: $(RUST_BACKEND) validation.h
+row_preparation.o: $(RUST_BACKEND) validation.h
 contrast_batch.o: $(RUST_BACKEND) validation.h contrast_inference.h contrast_zero.h
 contrast_inference.o: $(RUST_BACKEND) validation.h contrast_inference.h contrast_zero.h
 contrast_zero.o: $(RUST_BACKEND) validation.h contrast_zero.h

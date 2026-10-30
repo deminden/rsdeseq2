@@ -36,10 +36,18 @@ if (workflow == "replacement") {
 }
 cd <- data.frame(condition = condition, batch = batch, row.names = colnames(counts))
 formula <- if (workflow %in% c("rlog", "vst", "replacement", "two_group_results")) ~ condition else ~ batch + condition
+if(workflow %in% c("offsets_size","offsets_matrix")) {
+  cd$exposure <- exp(seq(log(.5),log(2),length.out=samples))
+  formula <- ~batch+condition+offset(log(exposure))
+}
 dds <- DESeq2::DESeqDataSetFromMatrix(counts, cd, formula)
 fitArgs <- list(object = dds, fitType = "mean", sizeFactors = sizeFactors, nproc = 1L,
                 minReplicatesForReplace = if (workflow == "replacement") 3L else if (workflow == "replacement_none") 7L else Inf)
 if (workflow == "lrt") { fitArgs$test <- "LRT"; fitArgs$reduced <- ~ batch }
+if(workflow=="offsets_matrix") {
+  fitArgs$normalizationFactors <- outer(seq(.9,1.1,length.out=genes),sizeFactors)
+  dimnames(fitArgs$normalizationFactors) <- dimnames(counts)
+}
 fit <- timed("fit", do.call(rsdeseq2::DESeq, fitArgs))
 state <- S4Vectors::metadata(fit)$rsdeseq2RustFit
 if (workflow == "replacement") stopifnot(state$nRefit > 0L)

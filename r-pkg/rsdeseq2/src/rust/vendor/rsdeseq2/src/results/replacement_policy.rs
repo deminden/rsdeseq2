@@ -24,13 +24,13 @@ impl<'a> RowFlags<'a> {
         }
         Ok(Self(Flags::Integer(values)))
     }
-    fn len(self) -> usize {
+    pub(crate) fn len(self) -> usize {
         match self.0 {
             Flags::Boolean(v) => v.len(),
             Flags::Integer(v) => v.len(),
         }
     }
-    fn at(self, gene: usize) -> bool {
+    pub(crate) fn at(self, gene: usize) -> bool {
         match self.0 {
             Flags::Boolean(v) => v[gene],
             Flags::Integer(v) => v[gene] == 1,

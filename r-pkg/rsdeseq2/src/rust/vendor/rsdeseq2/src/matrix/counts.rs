@@ -32,13 +32,22 @@ impl<'a> CountView<'a> {
         mut visit: impl FnMut(usize, u32),
     ) -> Result<Self, DeseqError> {
         for (index, &value) in values.as_slice().iter().enumerate() {
-            if !value.is_finite()
-                || value < 0.0
-                || value.fract() != 0.0
-                || value > f64::from(u32::MAX)
-            {
+            let reason = if !value.is_finite() {
+                Some("counts must be finite")
+            } else if value < 0.0 {
+                Some("counts must be non-negative")
+            } else if value.fract() != 0.0 {
+                Some("counts must contain integer-valued entries")
+            } else if value > f64::from(u32::MAX) {
+                Some("counts must not exceed u32::MAX")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
                 return Err(DeseqError::InvalidCounts {
-                    reason: format!("count at storage index {index} is not a valid u32 count"),
+                    reason: format!(
+                        "count at storage index {index} is not a valid u32 count: {reason}"
+                    ),
                 });
             }
             visit(index, value as u32);
@@ -90,5 +99,51 @@ impl<'a> From<&'a CountMatrix> for CountView<'a> {
             )
             .expect("CountMatrix has validated shape"),
         )
+    }
+}
+
+/// Borrowed validated counts and one reusable raw-zero flag per gene.
+/// Global-zero detection uses the physical storage scan; doubles are validated
+/// in that same scan. No gene-by-sample matrix is copied.
+#[derive(Debug)]
+pub struct CountRows<'a> {
+    counts: CountView<'a>,
+    all_zero: Vec<bool>,
+}
+impl<'a> CountRows<'a> {
+    /// Prepare row flags from unsigned counts in either layout.
+    pub fn from_unsigned(values: MatrixView<'a, u32>) -> Self {
+        let mut all_zero = vec![true; values.n_rows()];
+        for (index, &value) in values.as_slice().iter().enumerate() {
+            let gene = match values.order() {
+                MatrixOrder::RowMajor => index / values.n_cols(),
+                MatrixOrder::ColumnMajor => index % values.n_rows(),
+            };
+            all_zero[gene] &= value == 0;
+        }
+        Self {
+            counts: CountView::from_unsigned(values),
+            all_zero,
+        }
+    }
+    /// Validate doubles and prepare row flags in one physical-order scan.
+    pub fn from_doubles(values: MatrixView<'a, f64>) -> Result<Self, DeseqError> {
+        let mut all_zero = vec![true; values.n_rows()];
+        let counts = CountView::from_doubles_with(values, |index, count| {
+            let gene = match values.order() {
+                MatrixOrder::RowMajor => index / values.n_cols(),
+                MatrixOrder::ColumnMajor => index % values.n_rows(),
+            };
+            all_zero[gene] &= count == 0;
+        })?;
+        Ok(Self { counts, all_zero })
+    }
+    /// Validated count view; no storage is retained beyond its borrow.
+    pub fn counts(&self) -> CountView<'a> {
+        self.counts
+    }
+    /// Raw zero counts, independent of observation-weight failure flags.
+    pub fn all_zero(&self) -> &[bool] {
+        &self.all_zero
     }
 }

@@ -432,72 +432,24 @@ impl DeseqBuilder {
             return Ok(self.clone().model_frame(formula_design.model_frame.clone()));
         }
         if formula_design.offsets.len() != counts.n_samples() {
-            return Err(invalid_dimensions(
-                "formula offsets",
-                counts.n_samples(),
-                formula_design.offsets.len(),
-            ));
+            return Err(invalid_dimensions("formula offsets", counts.n_samples(), formula_design.offsets.len()));
         }
-        let offset_multipliers = formula_design
-            .offsets
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(sample, offset)| {
-                let multiplier = offset.exp();
-                if multiplier.is_finite() && multiplier > 0.0 {
-                    Ok(multiplier)
-                } else {
-                    Err(DeseqError::InvalidOptions {
-                        reason: format!(
-                            "formula offset exponentiated to non-finite factor at sample {sample}"
-                        ),
-                    })
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
         let mut builder = self.clone().model_frame(formula_design.model_frame.clone());
-        let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
-        match &self.normalization_factors {
-            Some(factors) => {
-                validate_normalization_factors(counts, factors)?;
-                for gene in 0..counts.n_genes() {
-                    let row = factors.row(gene)?;
-                    for (sample, multiplier) in offset_multipliers.iter().copied().enumerate() {
-                        values.push(row[sample] * multiplier);
-                    }
-                }
-            }
-            None => {
-                let control_gene_indices = self
-                    .size_factor_options
-                    .control_genes
-                    .as_ref()
-                    .map(|control_genes| control_genes.to_indices(counts.n_genes()))
-                    .transpose()?;
-                let size_factors = match &self.size_factor_options.supplied_size_factors {
-                    Some(size_factors) => size_factors.clone(),
-                    None => estimate_size_factors_with_options(
-                        counts,
-                        self.size_factor_options.method,
-                        self.size_factor_options.geo_means.as_deref(),
-                        control_gene_indices.as_deref(),
-                    )?,
-                };
-                normalized_counts(counts, &size_factors)?;
-                for _gene in 0..counts.n_genes() {
-                    for (sample, multiplier) in offset_multipliers.iter().copied().enumerate() {
-                        values.push(size_factors[sample] * multiplier);
-                    }
-                }
-                builder.size_factor_options.supplied_size_factors = Some(size_factors);
-            }
+        if self.normalization_factors.is_none() {
+            let control_gene_indices = self.size_factor_options.control_genes.as_ref()
+                .map(|control| control.to_indices(counts.n_genes())).transpose()?;
+            let size_factors = match &self.size_factor_options.supplied_size_factors {
+                Some(values) => values.clone(),
+                None => estimate_size_factors_with_options(counts, self.size_factor_options.method,
+                    self.size_factor_options.geo_means.as_deref(), control_gene_indices.as_deref())?,
+            };
+            builder.size_factor_options.supplied_size_factors = Some(size_factors);
         }
-        builder.normalization_factors = Some(RowMajorMatrix::from_row_major(
-            counts.n_genes(),
-            counts.n_samples(),
-            values,
+        builder.normalization_factors = Some(crate::normalization::normalization_factors_with_offsets(
+            counts.n_genes(), counts.n_samples(),
+            builder.size_factor_options.supplied_size_factors.as_deref(),
+            self.normalization_factors.as_ref().map(Into::into),
+            &formula_design.offsets,
         )?);
         Ok(builder)
     }

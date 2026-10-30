@@ -39,11 +39,9 @@
   baseFactors <- normalizationFactors
   if (!is.null(offsets)) {
     if (length(offsets) != ncol(counts) || any(!is.finite(offsets))) stop("formula offsets must be finite with one value per sample", call. = FALSE)
-    if (is.null(baseFactors)) {
-      if (is.null(sizeFactors)) sizeFactors <- estimateSizeFactorsRust(counts)
-      base <- matrix(rep(sizeFactors, each = nrow(counts)), nrow(counts), dimnames = dimnames(counts))
-    } else base <- baseFactors
-    normalizationFactors <- sweep(base, 2L, exp(offsets), "*")
+    if (is.null(baseFactors) && is.null(sizeFactors)) sizeFactors <- estimateSizeFactorsRust(counts)
+    normalizationFactors <- .Call("rsdeseq2_offset_factors", counts,
+      sizeFactors, baseFactors, as.numeric(offsets), PACKAGE="rsdeseq2")
     normalizationFactors <- .rsdeseq2_validate_normalization_factors(normalizationFactors, counts)
   }
   list(sizeFactors = sizeFactors, normalizationFactors = normalizationFactors,

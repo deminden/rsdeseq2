@@ -17,7 +17,7 @@ pub mod weights;
 pub use beta::{
     BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
     BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
-    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit,
+    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, NormalShrinkageRows,
     average_expanded_model_coefficients, average_expanded_model_covariances,
     beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
     estimate_beta_prior_variance, expanded_model_group_contrast,

@@ -383,11 +383,24 @@ fn apply_cooks_cutoff_for_design(
     let eligible = if let Some(frame) = model_frame {
         crate::results::low_count_eligible_for_frame(design, frame)?
     } else if let Some(contrast) = explicit_factor {
+        // Explicit primitive imports may name the factor by its accepted R
+        // alias. Canonicalize only against the sole original formula variable.
+        let factor = design
+            .origin()
+            .variables()
+            .filter(|v| v.len() == 1)
+            .and_then(|v| {
+                design_name_candidates(&v[0])
+                    .iter()
+                    .any(|name| name == contrast.factor)
+                    .then_some(v[0].as_str())
+            })
+            .unwrap_or(contrast.factor);
         factor_level_contrast_is_single_two_level_condition(contrast)
             && crate::results::low_count_eligible(
                 design.origin(),
                 design.matrix().into(),
-                contrast.factor,
+                factor,
                 contrast.sample_levels,
                 2,
             )?

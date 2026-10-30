@@ -2,7 +2,7 @@
 use super::all_zero::{factor_level_samples, numeric_samples};
 use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::matrix::{CountView, MatrixOrder, MatrixView};
+use crate::matrix::{MatrixOrder, MatrixView};
 
 /// Validated borrowed counts with one cached global-zero flag per gene.
 ///
@@ -10,54 +10,37 @@ use crate::matrix::{CountView, MatrixOrder, MatrixView};
 /// once; the same view can evaluate multiple numeric or factor contrasts.
 #[derive(Debug)]
 pub struct ContrastCounts<'a> {
-    counts: CountView<'a>,
-    all_zero: Vec<bool>,
+    rows: crate::matrix::CountRows<'a>,
 }
 
 impl<'a> ContrastCounts<'a> {
     /// Borrow unsigned counts and cache global-zero rows.
     pub fn from_unsigned(values: MatrixView<'a, u32>) -> Self {
-        let mut all_zero = vec![true; values.n_rows()];
-        for (index, value) in values.as_slice().iter().enumerate() {
-            let gene = match values.order() {
-                MatrixOrder::RowMajor => index / values.n_cols(),
-                MatrixOrder::ColumnMajor => index % values.n_rows(),
-            };
-            all_zero[gene] &= *value == 0;
-        }
         Self {
-            counts: CountView::from_unsigned(values),
-            all_zero,
+            rows: crate::matrix::CountRows::from_unsigned(values),
         }
     }
 
-    /// Borrow doubles representing finite, nonnegative integer u32 counts.
-    /// Validate the complete buffer and cache global-zero rows in one pass.
+    /// Borrow/validate doubles and cache global-zero rows in the same scan.
     pub fn from_doubles(values: MatrixView<'a, f64>) -> Result<Self, DeseqError> {
-        let mut all_zero = vec![true; values.n_rows()];
-        let counts = CountView::from_doubles_with(values, |index, count| {
-            let gene = match values.order() {
-                MatrixOrder::RowMajor => index / values.n_cols(),
-                MatrixOrder::ColumnMajor => index % values.n_rows(),
-            };
-            all_zero[gene] &= count == 0;
-        })?;
-        Ok(Self { counts, all_zero })
+        Ok(Self {
+            rows: crate::matrix::CountRows::from_doubles(values)?,
+        })
     }
 
     /// Gene count.
     pub fn n_genes(&self) -> usize {
-        self.all_zero.len()
+        self.rows.all_zero().len()
     }
 
     /// Sample count.
     pub fn n_samples(&self) -> usize {
-        self.counts.n_samples()
+        self.rows.counts().n_samples()
     }
 
     /// Cached flags for genes with zero counts in every sample.
     pub fn all_zero(&self) -> &[bool] {
-        &self.all_zero
+        self.rows.all_zero()
     }
 
     /// Numeric-contrast zero flags, including globally zero rows when the
@@ -96,10 +79,9 @@ impl<'a> ContrastCounts<'a> {
         }
         Ok((0..self.n_genes())
             .map(|gene| {
-                selected
-                    .iter()
-                    .enumerate()
-                    .all(|(sample, &selected)| !selected || self.counts.at(gene, sample) == 0)
+                selected.iter().enumerate().all(|(sample, &selected)| {
+                    !selected || self.rows.counts().at(gene, sample) == 0
+                })
             })
             .collect())
     }

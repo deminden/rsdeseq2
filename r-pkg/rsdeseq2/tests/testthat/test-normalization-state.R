@@ -50,3 +50,27 @@ test_that("formula normalization is aligned and composed exactly once", {
   expect_false("weights" %in% SummarizedExperiment::assayNames(unweighted))
   expect_equal(as.data.frame(results(unweighted)), as.data.frame(results(fit)), tolerance = 0)
 })
+
+test_that("unnamed base factors and anonymous genes retain offset provenance", {
+  ct <- .rsdeseq2_test_counts()
+  cd <- data.frame(condition=factor(rep(c("A","B"),each=4)),exposure=seq(.8,1.2,length.out=8),row.names=colnames(ct))
+  base <- matrix(rep(seq(.7,1.4,length.out=8),each=nrow(ct)),nrow(ct))
+  for(anonymous in c(FALSE,TRUE)) {
+    input <- ct;if(anonymous)rownames(input) <- NULL
+    dds <- DESeq2::DESeqDataSetFromMatrix(input,cd,~condition+offset(log(exposure)))
+    original <- dds
+    fit <- DESeq(dds,fitType="mean",normalizationFactors=base,minReplicatesForReplace=Inf)
+    again <- DESeq(fit,fitType="mean",minReplicatesForReplace=Inf)
+    expect_identical(dds,original)
+    expect_identical(DESeq2::normalizationFactors(again),DESeq2::normalizationFactors(fit))
+    expect_identical(as.data.frame(results(again)),as.data.frame(results(fit)))
+    expectedNames <- if(anonymous)as.character(seq_len(nrow(ct)))else rownames(ct)
+    expect_identical(rownames(fit),expectedNames)
+    expect_identical(rownames(results(fit[c(3,1),])),expectedNames[c(3,1)])
+    manual <- DESeq2::DESeqDataSetFromMatrix(input,cd,~condition)
+    DESeq2::normalizationFactors(manual) <- sweep(base,2,exp(log(cd$exposure)),"*")
+    reference <- DESeq2::DESeq(manual,fitType="mean",minReplicatesForReplace=Inf,quiet=TRUE)
+    actual <- results(fit,independentFiltering=FALSE);expected <- DESeq2::results(reference,independentFiltering=FALSE)
+    for(field in c("log2FoldChange","lfcSE","pvalue","padj"))expect_equal(as.numeric(actual[[field]]),as.numeric(expected[[field]]),tolerance=1e-5,info=paste(anonymous,field))
+  }
+})

@@ -242,19 +242,13 @@
     fit$dispersions <- fit$dispersions[geneOrder]
     fit$dispFit <- fit$dispFit[geneOrder]
     fit$baseMean <- fit$baseMean[geneOrder]
+    if (!is.null(fit$allZero)) fit$allZero <- fit$allZero[geneOrder]
     if (!is.null(fit$normalizationFactors)) fit$normalizationFactors <- fit$normalizationFactors[geneOrder, , drop = FALSE]
     if (!is.null(fit$weights)) fit$weights <- fit$weights[geneOrder, , drop = FALSE]
   }
-  allZero <- rowSums(counts) == 0
-  invalidDispersion <- !is.finite(fit$dispersions) | fit$dispersions <= 0 |
-    !is.finite(fit$dispFit) | fit$dispFit <= 0
-  if (any(invalidDispersion & !allZero)) {
-    stop("normal lfcShrink requires finite positive dispersions and fitted trends for non-zero genes", call. = FALSE)
-  }
-  useGene <- which(!allZero)
-  if (!length(useGene)) {
-    stop("normal lfcShrink cannot estimate a beta prior when every gene is all zero", call. = FALSE)
-  }
+  useGene <- .Call("rsdeseq2_normal_shrinkage_rows", counts,
+    as.numeric(fit$dispersions), as.numeric(fit$dispFit), fit$allZero,
+    PACKAGE="rsdeseq2")
   shrinkCounts <- counts[useGene, , drop = FALSE]
   shrinkNormalizationFactors <- if (is.null(fit$normalizationFactors)) NULL else {
     fit$normalizationFactors[useGene, , drop = FALSE]
@@ -309,7 +303,6 @@
   posteriorSE[names(shrunk$betaSE)] <- shrunk$betaSE
   res$log2FoldChange <- posteriorBeta
   res$lfcSE <- posteriorSE
-  independentFilteringInfo <- attr(res, "independentFiltering")
   independentFilteringInfo <- attr(res, "independentFiltering")
   if (lfcThreshold > 0) {
     posteriorStat <- stats::setNames(rep(NA_real_, nrow(res)), rownames(res))

@@ -18,17 +18,8 @@
   if (!is.numeric(counts) && !is.integer(counts)) {
     stop("counts must be an integer or numeric matrix", call. = FALSE)
   }
-  if (any(!is.finite(counts))) {
-    stop("counts must be finite", call. = FALSE)
-  }
-  if (any(counts < 0)) {
-    stop("counts must be non-negative", call. = FALSE)
-  }
-  if (any(counts != floor(counts))) {
-    stop("counts must contain integer-valued entries", call. = FALSE)
-  }
   storage.mode(counts) <- "double"
-  counts
+  .Call("rsdeseq2_validate_counts", counts, PACKAGE="rsdeseq2")
 }
 
 .rsdeseq2_validate_size_factors <- function(sizeFactors, nSamples) {
