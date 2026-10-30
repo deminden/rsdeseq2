@@ -170,3 +170,14 @@ kernels, while production R model-frame expression evaluation still needs to
 adopt the shared evaluator. The full previous 130-case matrix sweep and all
 22 native GTEx exports remain exact. This numerical foundation does not close
 the formula migration or the other remaining items above.
+
+The [conditional replacement-storage checkpoint](conditional-replacement-storage-2026-10-30.md)
+subsequently completes C18's local gate: unused R replacement arrays are omitted,
+needed arrays are copied from short-lived owned Rust output under R unwind
+cleanup, and native Cook's factor temporaries are avoided. Four injected real-fit
+errors release owners and recover exactly. All-zero-only Wald/LRT updates retain
+their replacement counts; the checked source passes 1,988 assertions, 189 direct
+interface cases and twenty exact paired R payloads. The combined target no-refit
+pair reduces RSS 1.016 MiB. Its earlier unsuccessful memory attempt remains
+recorded. The formula/VST/posterior ports, initial redundant native adjustment
+and final combined performance/memory/source reconciliation above remain open.

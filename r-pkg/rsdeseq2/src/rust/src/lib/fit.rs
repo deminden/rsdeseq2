@@ -5,7 +5,9 @@
 /// Non-null input pointers must reference aligned, readable buffers of the
 /// lengths specified by the dimensions and the C bridge contract. Output
 /// pointers must reference writable buffers of those lengths, uniquely
-/// borrowed for this call. All buffers must remain valid until return.
+/// borrowed for this call. All buffers must remain valid until return. The
+/// replacement output is a distinct writable owner-pointer slot. On success it
+/// receives NULL or an owned result which C must drop on success or R unwinding.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_fit(
     n_genes: usize,
@@ -30,7 +32,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     covariance_output: *mut f64,
     mu_output: *mut f64,
     cooks_output: *mut f64,
-    replace_counts_output: *mut f64,
+    replacement_output: *mut *mut replacement_counts::ReplacementCounts,
     replace_output: *mut u8,
     replaceable_samples_output: *mut u8,
     refit_rows_output: *mut u8,
@@ -42,7 +44,10 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     base_var_output: *mut f64,
     all_zero_output: *mut i32,
 ) -> i32 {
-    run_backend(|| {
+    let mut pending = None;
+    let status = run_backend(|| {
+        if replacement_output.is_null() { return Err("replacement owner output pointer is null".into()); }
+        unsafe { *replacement_output = ptr::null_mut(); }
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_matrix =
             unsafe { row_major_from_column_major(n_samples, n_coefficients, design_values)? };
@@ -264,20 +269,6 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         }
         unsafe { copy_matrix_to_r(mu, mu_output)? };
         unsafe { copy_matrix_to_r(cooks, cooks_output)? };
-        // A null replacement buffer is valid only when replacement is disabled.
-        let replace_counts = if min_replicates_for_replace == 0 {
-            None
-        } else {
-            Some(unsafe {
-                output_slice(
-                    replace_counts_output,
-                    n_genes
-                        .checked_mul(n_samples)
-                        .ok_or("replacement count dimensions overflow")?,
-                    "replacement counts",
-                )?
-            })
-        };
         let replace = unsafe { output_slice(replace_output, n_genes, "replacement flags")? };
         let replaceable_samples =
             unsafe { output_slice(replaceable_samples_output, n_samples, "replaceable samples")? };
@@ -320,22 +311,13 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                     new_all_zero_rows[row] = 1;
                 }
             }
-            if let Some(replace_counts) = replace_counts {
-                if has_replaceable_samples {
-                    unsafe { copy_counts_to_r(&plan.replacement.replaced_counts, replace_counts)? };
-                } else {
-                    unsafe { copy_counts_to_r(&counts, replace_counts)? };
-                }
-            }
         } else {
             n_refit[0] = 0;
             replace.fill(2);
             replaceable_samples.fill(0);
             refit_rows.fill(0);
             new_all_zero_rows.fill(0);
-            if let Some(replace_counts) = replace_counts {
-                unsafe { copy_counts_to_r(&counts, replace_counts)? };
-            }
+
         }
         unsafe { output_slice(size_factors_output, n_samples, "size factors")? }
             .copy_from_slice(&fit.size_factors);
@@ -355,6 +337,15 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         for (target, source) in all_zero.iter_mut().zip(&fit.all_zero) {
             *target = i32::from(*source);
         }
+        if n_refit[0] > 0 {
+            let plan = replacement.ok_or("replacement refit count has no plan")?;
+            pending = Some(Box::new(replacement_counts::ReplacementCounts::new(plan.replacement.replaced_counts)));
+        }
         Ok(())
-    })
+    });
+    // Publish only after borrowed R buffers and the fit frame have been released.
+    if status == 0 {
+        unsafe { *replacement_output = pending.map_or(ptr::null_mut(), Box::into_raw); }
+    }
+    status
 }

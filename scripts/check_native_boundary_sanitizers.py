@@ -28,7 +28,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     report = dict(status='in_progress', c='address,undefined', rust='address',
                   rust_stdlib_instrumented=False, r_interpreter_instrumented=False,
-                  preinstalled_r_dependencies_instrumented=False, leak_detection=False)
+                  preinstalled_r_dependencies_instrumented=False, leak_detection=False, replacement_unwind_hooks=True)
     report_path = out/'sanitizers.json'
     def record():
         report_path.write_text(json.dumps(report, indent=2)+'\n')
@@ -63,7 +63,7 @@ def main():
     library = out/'library'
     library.mkdir()
     makevars = out/'Makevars.sanitizers'
-    makevars.write_text('CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer\n'
+    makevars.write_text('CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -DRSDESEQ2_TEST_REPLACEMENT_UNWIND\n'
                        'CXXFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer\n'
                        'LDFLAGS += -fsanitize=address,undefined\n')
     env = dict(os.environ, R_MAKEVARS_USER=str(makevars), RUSTC_BOOTSTRAP='1',
@@ -98,6 +98,7 @@ def main():
                    RSDESEQ2_SANITIZER_LIBRARY_PATH=library_paths,
                    RSDESEQ2_NATIVE_BOUNDARY_R_EXEC=str(r_exec),
                    RSDESEQ2_SANITIZER_RUNTIME=str(runtimes[0]),
+                   RSDESEQ2_REQUIRE_REPLACEMENT_HOOKS='1',
                    ASAN_OPTIONS='detect_leaks=0:abort_on_error=1:detect_stack_use_after_return=1',
                    UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
         expression = ('library(rsdeseq2); testthat::test_dir(commandArgs(TRUE)[1], '
@@ -111,6 +112,12 @@ def main():
         report.update(status='failed', error=str(error))
         record()
         raise
+    tests_log = (out/'tests.log').read_text()
+    if 'Replacement unwind: 4 forced errors released their owners' not in tests_log:
+        report.update(status='failed', error='Replacement unwind controls were not exercised')
+        record()
+        raise ValueError(report['error'])
+    report['replacement_unwind_error_cases_passed'] = 4
     report.update(status='passed')
     record()
     print('Instrumented native boundary tests passed; scope recorded in '+str(report_path))

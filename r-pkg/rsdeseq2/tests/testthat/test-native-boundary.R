@@ -2,6 +2,16 @@ test_that("registered native calls reject malformed buffers in a child process",
   dll <- normalizePath(getLoadedDLLs()[["rsdeseq2"]][["path"]])
   script <- tempfile(fileext = ".R")
   on.exit(unlink(script), add = TRUE)
+  replacementCounts <- .rsdeseq2_test_counts()
+  zeroOnlyCounts <- replacementCounts
+  zeroOnlyCounts[2L,] <- 0
+  zeroOnlyCounts[2L,8L] <- 1000
+  replacementCounts[1L,8L] <- 2000
+  replacementCounts[2L,] <- 0
+  replacementCounts[2L,8L] <- 1000
+  replacementFile <- tempfile(fileext=".rds")
+  on.exit(unlink(replacementFile),add=TRUE)
+  saveRDS(list(mixed=replacementCounts,zero=zeroOnlyCounts),replacementFile)
   writeLines(c(
     sprintf("dyn.load(%s)", deparse(dll)),
     'ct <- matrix(as.double(1:12), 3, 4)',
@@ -187,7 +197,38 @@ test_that("registered native calls reject malformed buffers in a child process",
     'set.seed(42); ct <- matrix(as.double(rnbinom(320, mu=50, size=5)),40,8)',
     'dm <- cbind(1, rep(c(0,1),each=4))',
     'fit <- call("rsdeseq2_fit",ct,dm,NULL,rep(1,8),NULL,NULL,2L,0L,0L,10,1L,0L)',
-    'stopifnot(is.null(fit$replaceCounts),fit$nRefit==0L,identical(dim(fit$mu),dim(ct)))'
+    'stopifnot(is.null(fit$replaceCounts),fit$nRefit==0L,identical(dim(fit$mu),dim(ct)))',
+    'noRefit <- call("rsdeseq2_fit",ct,dm,NULL,rep(1,8),NULL,NULL,2L,0L,3L,1e10,1L,0L)',
+    'stopifnot(is.null(noRefit$replaceCounts),noRefit$nRefit==0L,any(noRefit$replaceable),!any(noRefit$refitRows),!any(noRefit$newAllZeroRows))',
+    'for(field in c("beta","betaSE","betaCovariance","mu","cooks","dispersions","dispFit","baseVar","allZero")) stopifnot(identical(noRefit[[field]],fit[[field]]))',
+    'notEligible <- call("rsdeseq2_fit",ct,dm,NULL,rep(1,8),NULL,NULL,2L,0L,7L,1e10,1L,0L)',
+    'stopifnot(is.null(notEligible$replaceCounts),notEligible$nRefit==0L,!any(notEligible$replaceable),all(is.na(notEligible$replace)))',
+    sprintf('replacementInputs <- readRDS(%s)',deparse(replacementFile)),
+    'replacementCounts <- replacementInputs$mixed',
+    'inputCounts <- replacementCounts',
+    'replacementFit <- function(test=0L,counts=replacementCounts) call("rsdeseq2_fit",counts,dm,if(test==1L)matrix(1,8,1)else NULL,NULL,NULL,NULL,2L,test,3L,qf(.99,2,6),1L,0L)',
+    'replaced <- replacementFit()',
+    'stopifnot(replaced$nRefit==2L,sum(replaced$refitRows)==1L,sum(replaced$newAllZeroRows)==1L,replaced$newAllZeroRows[2],all(replaced$replaceCounts[2,]==0),replaced$replaceCounts[1,8]!=replacementCounts[1,8],identical(inputCounts,replacementCounts),identical(dimnames(replaced$replaceCounts),dimnames(replacementCounts)))',
+    'replacedLrt <- replacementFit(1L)',
+    'stopifnot(replacedLrt$nRefit==2L,identical(replacedLrt$replaceCounts,replaced$replaceCounts),identical(replacedLrt$refitRows,replaced$refitRows),identical(replacedLrt$newAllZeroRows,replaced$newAllZeroRows))',
+    'for(test in 0:1) {',
+    '  zeroOnly <- replacementFit(test,replacementInputs$zero)',
+    '  stopifnot(zeroOnly$nRefit==1L,!any(zeroOnly$refitRows),sum(zeroOnly$newAllZeroRows)==1L,zeroOnly$newAllZeroRows[2],all(zeroOnly$replaceCounts[2,]==0),zeroOnly$results$rawStat[2]==0,zeroOnly$results$rawPvalue[2]==1)',
+    '}',
+    'hooks <- is.loaded("rsdeseq2_test_replacement_transport",PACKAGE="rsdeseq2")',
+    'if(Sys.getenv("RSDESEQ2_REQUIRE_REPLACEMENT_HOOKS")=="1" && !hooks) stop("Replacement unwind hooks missing")',
+    'if(hooks) {',
+    '  probe <- function(stage=0L) call("rsdeseq2_test_replacement_transport",as.integer(stage))',
+    '  before <- probe(); stopifnot(before[3]==0)',
+    '  for(stage in 1:4) {',
+    '    before <- probe(stage)',
+    '    failed <- tryCatch(replacementFit(),error=identity)',
+    '    stopifnot(inherits(failed,"error"),grepl("injected replacement transport|replacement output dimensions",conditionMessage(failed)))',
+    '    after <- probe(); stopifnot(after[1]==before[1]+1,after[2]==before[2]+1,after[3]==0)',
+    '    recovered <- replacementFit(); stopifnot(identical(recovered,replaced),probe()[3]==0)',
+    '  }',
+    '  cat("Replacement unwind: 4 forced errors released their owners\\n")',
+    '}'
   ), script)
   direct <- Sys.getenv("RSDESEQ2_NATIVE_BOUNDARY_R_EXEC")
   runtime <- Sys.getenv("RSDESEQ2_SANITIZER_RUNTIME")
@@ -198,5 +239,6 @@ test_that("registered native calls reject malformed buffers in a child process",
                     env = c(if (nzchar(runtime)) paste0("DYLD_INSERT_LIBRARIES=", shQuote(runtime)),
                             if (nzchar(libraries)) paste0("DYLD_FALLBACK_LIBRARY_PATH=", shQuote(libraries))),
                     stdout = TRUE, stderr = TRUE, timeout = 60)
+  if(Sys.getenv("RSDESEQ2_REQUIRE_REPLACEMENT_HOOKS")=="1") cat(paste(output,collapse="\n"),"\n")
   expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
 })

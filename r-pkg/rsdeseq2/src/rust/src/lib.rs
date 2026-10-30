@@ -209,3 +209,5 @@ mod result_policy;
 
 mod model_matrix;
 mod row_preparation;
+
+mod replacement_counts;
