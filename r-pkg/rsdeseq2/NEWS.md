@@ -1,26 +1,24 @@
-# Development
+# rsdeseq2 0.4.0
 
-* Harden native argument validation and preserve unmasked/refitted Wald/LRT state.
-* Apply result masking before filtering/BH, make normalization-offset reuse
-  idempotent, and validate cached inputs and gene-subset mapping.
-* Honor requested worker pools; validate design rank by scale and reduced-model
-  nesting before fitting.
-* Remove redundant fit copies, bound temporary gene outputs and omit internal
-  global covariance from mean/rlog consumers. Public full-fit fields are retained.
-* Remove the experimental R-backed statistical bridge. A replacement using one
-  standalone Rust numerical path for both interfaces is under development.
-* Move BH and independent-filter calculations into the standalone Rust engine;
-  require direct bit equality between standalone and wrapped primitive results.
-* Correct supplied geometric-mean transport and align the private native
-  primitive with natural-scale inputs used by the public Rust and R APIs.
-
-* Split large Wald/LRT and R result tests by behavior, and organize builder
-  entry points, contrast handling and dispersion trends into private modules.
-  Preserve numerical operations, public paths, fixtures and assertions.
-
-* Evaluate Wald hypotheses, primitive LRT probabilities and default Cook's
-  cutoffs in the standalone Rust engine. Improve Normal and large-df tails;
-  retain thresholded statistics when t degrees of freedom are missing.
+* Share formula arithmetic, model-frame preparation, offsets and model-matrix
+  calculations between the standalone Rust core and the R interface. Reject
+  custom formula functions before execution; supported built-ins use Rust.
+* Correct ordered-factor polynomial coding, factor conversion and unused-level
+  handling, higher-order interaction coding and multiplication order. Reject
+  treatment-style level selectors for ordered factors; use polynomial coefficient
+  names or numeric contrasts. Move expanded-factor recoding into Rust.
+* Evaluate Wald hypotheses, LRT probabilities, Cook's cutoffs, independent
+  filtering and multiple-testing adjustments in the shared Rust engine. Preserve
+  unmasked/refitted state, validate cached inputs, and apply masking before BH.
+* Harden input, rank, reduced-model, normalization-offset and worker validation.
+  Reduce fit copies, bound temporary results and defer replacement-count output
+  allocation until a refit actually produces it.
+* Refactor large implementation and test modules, consolidate repetitive tests,
+  and add independent original-R fixtures plus direct cross-interface bit checks.
+  Upgrade locfit, L-BFGS-B and other dependencies to the audited stable versions.
+* This release does not complete the Rust-only R-wrapper migration. Frozen local
+  VST reuse and optional ashr/apeglm posterior calculations still involve R.
+  See the repository migration plan for the remaining work and supported scope.
 
 # rsdeseq2 0.3.1
 

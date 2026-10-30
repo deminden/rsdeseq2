@@ -80,6 +80,7 @@ pub(crate) struct PlannedColumn {
     pub assignment: usize,
     pub pieces: Vec<ColumnPiece>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ColumnPiece {
     pub variable: usize,
     pub column: usize,
@@ -99,6 +100,29 @@ pub struct ModelMatrixPlan<'a> {
     response_dropped: bool,
 }
 impl<'a> ModelMatrixPlan<'a> {
+    pub(crate) fn column_layout(&self) -> Vec<Vec<ColumnPiece>> {
+        self.columns
+            .iter()
+            .map(|column| {
+                column
+                    .iter()
+                    .map(|piece| ColumnPiece {
+                        variable: piece.variable,
+                        column: piece.column,
+                        full: piece.full,
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+    pub(crate) fn piece_name(&self, piece: &ColumnPiece) -> String {
+        let variable = &self.variables[piece.variable];
+        let suffix = match &variable.data {
+            VariableData::Factor { levels, .. } if piece.full => &levels[piece.column],
+            _ => &variable.suffixes[piece.column],
+        };
+        format!("{}{suffix}", variable.name)
+    }
     pub(crate) fn from_columns(
         samples: usize,
         variables: &[ModelMatrixVariable<'a>],
@@ -320,14 +344,11 @@ impl<'a> ModelMatrixPlan<'a> {
                 let name = pieces
                     .iter()
                     .map(|piece| {
-                        let variable = &plan.variables[piece.variable];
-                        let suffix = match &variable.data {
-                            VariableData::Factor { levels, .. } if piece.full => {
-                                &levels[piece.column]
-                            }
-                            _ => &variable.suffixes[piece.column],
-                        };
-                        format!("{}{suffix}", variable.name)
+                        plan.piece_name(&ColumnPiece {
+                            variable: piece.variable,
+                            column: piece.column,
+                            full: piece.full,
+                        })
                     })
                     .collect::<Vec<_>>()
                     .join(":");

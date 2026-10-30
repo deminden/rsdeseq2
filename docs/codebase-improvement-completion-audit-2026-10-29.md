@@ -63,6 +63,15 @@ WebAssembly transitive packages in the root lock. Native dependency trees and
 the backend lock are unchanged. Locked checks, vendor integrity and crate
 packaging verification pass; this inactive update adds no timing claim.
 
+## Version 0.4.0 preparation
+
+The [candidate report](release-0.4.0.md) consolidates subsequent checkpoints into
+0.4.0, with new independent factor/class references and the final source and
+paired measurement evidence. This version change does not close the unfinished
+Rust-only wrapper, general method/warning, C21 authority or C23 combined/platform
+audit gates. The earlier statement about unchanged package versions describes the
+historical audit above.
+
 ## Workflow defect and assertion inventory
 
 | Defect / contract | Interfaces | Independent reference | Exact assertion / test |

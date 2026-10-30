@@ -5,7 +5,10 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Source {
     Matrix,
-    Formula(Arc<[String]>),
+    Formula {
+        variables: Arc<[String]>,
+        ordered_factors: Arc<[String]>,
+    },
     Legacy,
 }
 
@@ -46,12 +49,35 @@ impl DesignOrigin {
                 unique.push(variable);
             }
         }
-        Ok(Self(Source::Formula(unique.into())))
+        Ok(Self(Source::Formula {
+            variables: unique.into(),
+            ordered_factors: Arc::from([]),
+        }))
+    }
+    pub(crate) fn with_ordered_factors(mut self, factors: Vec<String>) -> Self {
+        if let Source::Formula {
+            ordered_factors, ..
+        } = &mut self.0
+        {
+            *ordered_factors = factors.into();
+        }
+        self
+    }
+    /// Evaluated ordered-factor identifiers retained by the native formula
+    /// plan. These use polynomial coding, so treatment-style level selectors
+    /// must not interpret their column suffixes as level indicators.
+    pub fn ordered_factors(&self) -> &[String] {
+        match &self.0 {
+            Source::Formula {
+                ordered_factors, ..
+            } => ordered_factors,
+            _ => &[],
+        }
     }
     /// Original formula identifiers, or None for matrix/legacy origins.
     pub fn variables(&self) -> Option<&[String]> {
         match &self.0 {
-            Source::Formula(v) => Some(v),
+            Source::Formula { variables, .. } => Some(variables),
             _ => None,
         }
     }

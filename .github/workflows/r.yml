@@ -61,6 +61,9 @@ jobs:
         run: |
           cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
           Rscript --vanilla scripts/check_rust_r_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-primitives
+          Rscript --vanilla scripts/check_formula_expression_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-expressions
+          Rscript --vanilla scripts/check_native_formula_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-formulas
+          Rscript --vanilla scripts/check_native_factor_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-factors
       - name: Save checked source package
         if: matrix.lane == 'reference'
         uses: actions/upload-artifact@v4

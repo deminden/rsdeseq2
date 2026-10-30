@@ -1,0 +1,268 @@
+{
+  "cases": 51,
+  "disagreeing_cases": 40,
+  "differences": [
+    {
+      "case": "factor(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 30,
+      "names_changed": true
+    },
+    {
+      "case": "ordered(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 42,
+      "names_changed": true
+    },
+    {
+      "case": "as.ordered(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 42,
+      "names_changed": true
+    },
+    {
+      "case": "ordered(q)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 24,
+      "names_changed": true
+    },
+    {
+      "case": "as.factor(ordered(g))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 42,
+      "names_changed": true
+    },
+    {
+      "case": "factor(as.ordered(g))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 42,
+      "names_changed": true
+    },
+    {
+      "case": "droplevels(as.ordered(g))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 24,
+      "names_changed": true
+    },
+    {
+      "case": "ordered(relevel(g,ref='B'))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 45,
+      "names_changed": true
+    },
+    {
+      "case": "ordered(g,levels=c('C','B','A'))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 24,
+      "names_changed": true
+    },
+    {
+      "case": "factor(g,labels=c('a','b','c'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "ordered(g,labels=c('a','b','c'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "factor(g,labels=c('AB','AB','C'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "ordered(g,labels=c('AB','AB','C'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "factor(g,labels=c('P'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "ordered(g,labels=c('P'))",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "ordered(g,levels=c('unused','A','B','C'))",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 36,
+      "names_changed": true
+    },
+    {
+      "case": "scalar_label",
+      "previous_ok": false,
+      "reference_ok": true
+    },
+    {
+      "case": "no_intercept_ordered(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 27,
+      "names_changed": true
+    },
+    {
+      "case": "no_intercept_factor(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 27,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)+x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 55,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)*x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 91,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g):x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 41,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)+h+ordered(g):h",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 83,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g):h",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 57,
+      "names_changed": true
+    },
+    {
+      "case": "~0+ordered(g):h",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 43,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)+ordered(h)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 55,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)*ordered(h)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 92,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)+h:x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 65,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g):h:x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 67,
+      "names_changed": true
+    },
+    {
+      "case": "~ordered(g)+h+x+ordered(g):h:x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 95,
+      "names_changed": true
+    },
+    {
+      "case": "~0+ordered(g)+h",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 34,
+      "names_changed": true
+    },
+    {
+      "case": "~0+h+ordered(g)",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 45,
+      "names_changed": true
+    },
+    {
+      "case": "numeric_first",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 55,
+      "names_changed": true
+    },
+    {
+      "case": "numeric_first_product",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 67,
+      "names_changed": true
+    },
+    {
+      "case": "~relevel(ordered(g),ref='B')",
+      "previous_ok": true,
+      "reference_ok": false
+    },
+    {
+      "case": "~relevel(as.factor(ordered(g)),ref='B')",
+      "previous_ok": true,
+      "reference_ok": false
+    },
+    {
+      "case": "unordered_higher_x",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 131,
+      "names_changed": true
+    },
+    {
+      "case": "unordered_higher_x:y",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 137,
+      "names_changed": true
+    },
+    {
+      "case": "numeric_product_frame_order",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 7,
+      "names_changed": false
+    },
+    {
+      "case": "droplevels_resets_contrasts",
+      "previous_ok": true,
+      "reference_ok": true,
+      "matrix_different_entries": 12,
+      "names_changed": true
+    }
+  ]
+}

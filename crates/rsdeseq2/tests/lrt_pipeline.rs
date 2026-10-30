@@ -821,7 +821,7 @@ fn fixed_dispersion_lrt_model_frame_contrast_accepts_cleaned_factor_name_alias()
 }
 
 #[test]
-fn fixed_dispersion_lrt_formula_ordered_contrast_uses_formula_local_metadata() {
+fn fixed_dispersion_lrt_formula_ordered_contrast_requires_polynomial_selectors() {
     let counts = CountMatrix::from_row_major_u32(
         2,
         4,
@@ -854,49 +854,44 @@ fn fixed_dispersion_lrt_formula_ordered_contrast_uses_formula_local_metadata() {
         .unwrap();
     let full = &formula_design.design.standard_design;
     let model_frame = &formula_design.model_frame;
-    let derived = model_frame
-        .factors
-        .iter()
-        .find(|factor| factor.name == "ordered(condition, levels = c(\"B\", \"A\"))")
-        .unwrap();
     let dispersions = [0.1, 0.1];
-
-    let (_explicit_fit, explicit_results) = builder
+    let invalid = ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
+    let error = builder
         .clone()
-        .fit_fixed_dispersion_lrt_factor_level_contrast(
-            &counts,
-            full,
-            &reduced,
-            &dispersions,
-            FactorLevelContrast::with_reference(
-                &derived.name,
-                "A",
-                "B",
-                "B",
-                &derived.sample_levels,
-            ),
-        )
-        .unwrap();
-    let (_model_frame_fit, model_frame_results) = builder
         .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
             &counts,
             full,
             &reduced,
             &dispersions,
-            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &invalid,
+            model_frame,
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("ordered factor"));
+    let numeric = ResultsContrast::numeric(vec![0.0, 1.0]);
+    let named = ResultsContrast::list(vec![full.coefficient_names().unwrap()[1].clone()], vec![]);
+    let (_, numerical) = builder
+        .clone()
+        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
+            &counts,
+            full,
+            &reduced,
+            &dispersions,
+            &numeric,
             model_frame,
         )
         .unwrap();
-
-    assert_eq!(model_frame_results, explicit_results);
-    assert_eq!(
-        model_frame_results.metadata.result_name.as_deref(),
-        Some("ordered.condition..levels...c..B....A..._A_vs_B")
-    );
-    assert_eq!(
-        model_frame_results.metadata.comparison.as_deref(),
-        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
-    );
+    let (_, selected) = builder
+        .fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
+            &counts,
+            full,
+            &reduced,
+            &dispersions,
+            &named,
+            model_frame,
+        )
+        .unwrap();
+    assert_eq!(numerical.rows, selected.rows);
 }
 
 #[test]

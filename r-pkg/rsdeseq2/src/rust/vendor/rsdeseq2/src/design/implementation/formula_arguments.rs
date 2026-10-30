@@ -166,6 +166,11 @@ fn parse_formula_string_vector_argument(
     expression: &str,
 ) -> Result<Vec<String>, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?.trim();
+    if value.starts_with('\'') || value.starts_with('"') {
+        return Ok(vec![parse_formula_string_argument(
+            value, transform, argument, expression,
+        )?]);
+    }
     let Some(inner) = value
         .strip_prefix("c(")
         .and_then(|candidate| candidate.strip_suffix(')'))
@@ -179,7 +184,7 @@ fn parse_formula_string_vector_argument(
     let mut levels = Vec::new();
     for level in split_formula_transform_arguments(inner)? {
         let parsed = parse_formula_string_argument(&level, transform, argument, expression)?;
-        if levels.iter().any(|candidate| candidate == &parsed) {
+        if argument != "labels" && levels.iter().any(|candidate| candidate == &parsed) {
             return Err(DeseqError::InvalidOptions {
                 reason: format!(
                     "formula transform '{transform}({expression})' argument '{argument}' contains duplicate level '{parsed}'"

@@ -15,7 +15,7 @@ the dataset also gets `replaceCounts` and `replaceCooks` assays.
 `results()` metadata includes the replacement threshold, eligible samples, and
 refit rows.
 
-The R package is tested with R 4.6.1. Numerical reference fixtures record the
+The R package is tested with R 4.6.2 / DESeq2 1.52.0. Numerical reference fixtures record the
 R/DESeq2 versions that generated them.
 
 ## Install and Run an Analysis
@@ -43,7 +43,9 @@ results(fit, independentFiltering = FALSE)
 
 `DESeq()` also accepts a numeric model matrix through `design`, and a
 Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. Formula
-designs are expanded by R and fitted by Rust. LRT calls require a reduced design
+design metadata is parsed in R; supported formula expressions, frames, offsets,
+and model matrices are calculated in the shared Rust core. Custom formula
+functions are rejected before execution. LRT calls require a reduced design
 matrix or formula. The returned `rsdeseq2RustFit` stores coefficient estimates,
 covariance, size factors, the Rust result table, count matrix, and design
 metadata. `results()` supports named coefficients and DESeq2-style contrasts.
@@ -57,7 +59,7 @@ from the same Rust workflow.
 For `DESeqDataSet` inputs, `vst()` and
 `varianceStabilizingTransformation()` return `DESeqTransform` objects, while
 `rlog()` also supports reuse of supplied frozen gene intercepts and a shared
-sample-effect prior variance. These transformations run in Rust and honor
+sample-effect prior variance. The main transformation fits run in Rust and honor
 design/blind mode, normalization factors, observation weights, and formula
 offsets. `lfcShrink()` supports `type="normal"` for a named or indexed Wald
 coefficient or an expanded-design factor-level, numeric, or list contrast from
@@ -72,6 +74,12 @@ named/indexed coefficients and returns posterior SDs and s-values. Formula
 interactions are rejected for normal shrinkage. Cleaned coefficient aliases
 work for transformed-factor formulas; factor-level contrast syntax remains
 unsupported when DESeq2 cannot resolve its coefficient names.
+
+Frozen local VST reuse and optional `ashr`/`apeglm` posterior calculations still
+involve R. The Rust-only wrapper migration is unfinished; see the
+[migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use
+polynomial coordinates; select their named coefficients or supply numeric
+contrasts rather than treatment-style factor-level contrasts.
 
 ## Supported Helpers
 

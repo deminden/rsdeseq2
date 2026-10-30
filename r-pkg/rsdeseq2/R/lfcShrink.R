@@ -50,12 +50,11 @@
     stop("a formula factor already uses the reserved expanded-model level '_null_level_'", call. = FALSE)
   }
   expandedData <- rbind(colData, colData[nrow(colData), , drop = FALSE])
-  for (name in factorNames) {
-    value <- expandedData[[name]]
-    levels(value) <- c(levels(value), nullLevel)
-    value <- stats::relevel(value, ref = nullLevel)
-    value[nrow(value)] <- nullLevel
-    expandedData[[name]] <- value
+  if (length(factorNames)) {
+    values <- .rsdeseq2_formula_request(list(operation="expanded_factors",
+      values=unname(expandedData[factorNames]),null_level=nullLevel,
+      collation=.rsdeseq2_formula_collation()))
+    for (i in seq_along(factorNames)) expandedData[[factorNames[[i]]]] <- values[[i]]
   }
   expanded <- .rsdeseq2_model_matrix(formula, data = expandedData)
   nullColumns <- grepl(nullLevel, colnames(expanded), fixed = TRUE)

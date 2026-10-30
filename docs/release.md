@@ -23,18 +23,22 @@ versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
 
-## Development validation checkpoint — 2026-10-29
+## Version 0.4.0 preparation
 
-The [execution report](codebase-improvement-progress-2026-10-29.md) records an
-earlier batch and binds its performance claims to its saved artifacts. The
-[Rust-only migration](rust-only-wrapper-migration.md) remains in progress.
-The latest [refactor checkpoint](refactoring-followup-2026-10-29.md) preserves
-all 22 standalone result/diagnostic exports and fourteen wrapped-workflow
-payloads exactly, with aggregate native time within 0.14% of `bfd0de8`.
-Native R 4.6.2 source-package tests, Rust tests, crate packaging and the full
-GTEx precision gates pass. Package versions remain unchanged; choose an unused
-version before creating another release tag. Local checks do not stand in for
-the five target jobs required by the coordinated publication workflow.
+The [0.4.0 candidate report](release-0.4.0.md) gathers the validated changes since
+0.3.1. The minor version reflects formula-coding, input-validation and fitted-state
+corrections. It includes independent original-R references, direct standalone/R
+identity checks, current GTEx precision/speed/RSS evidence and a checked source
+package. All package and lockfile versions agree at 0.4.0.
+
+The Rust-only wrapper migration remains in progress. Frozen local VST and optional
+ashr/apeglm calculations still involve R; this candidate does not claim otherwise.
+Local checks prepare the release; the coordinated five-target publication workflow
+must still pass before publication. No tag or upload is created by local preparation.
+
+The [earlier development report](codebase-improvement-progress-2026-10-29.md)
+and [refactor checkpoint](refactoring-followup-2026-10-29.md) retain their original
+artifact-bound evidence. Earlier release records below are historical.
 
 ## Version 0.3.1
 
@@ -57,7 +61,7 @@ Each accepted round exceeded 2% in total native quantification throughput in
 one paired pass across eleven complete GTEx contrasts. The product of the
 per-round ratios is 4.3407x across both batches. This cumulative estimate is
 reported separately from the direct 0.3.0/0.3.1 release measurement in the
-[current benchmark](gtex-native-wald-benchmark.md).
+[current benchmark](gtex-native-wald-benchmark-0.3.1.md).
 The optimization benchmark includes fit-diagnostic serialization; the release
 comparison times result-table serialization for each tool.
 
@@ -81,7 +85,7 @@ Validated locally on 2026-10-14 with R 4.6.1 / DESeq2 1.52.0:
   R source-package build/install passed, including package load checks.
   All 100 vendored core source files match.
 
-The [current benchmark](gtex-native-wald-benchmark.md) records all raw runs,
+The [current benchmark](gtex-native-wald-benchmark-0.3.1.md) records all raw runs,
 resource reports, hashes, settings and twenty accepted optimisation rounds.
 Broad Rust, R and Python test-suite counts in the 0.3.0 section are historical;
 those suites were not rerun during this preparation. CI retains its release
@@ -214,12 +218,12 @@ Before preparing a release commit:
 - Review staged files for accidental large artifacts or generated reference
   outputs.
 
-For 0.3.1, replay the frozen 11-contrast GTEx suite with the release binary:
+For 0.4.0, replay the frozen 11-contrast GTEx suite with the candidate binary:
 
 ```bash
 cargo build --release -p rsdeseq2 --locked
 python3 scripts/check_gtex_dispersion_improvement.py \
-  --workers 1 --output-dir results/benchmarks/release_0.3.1/gtex
+  --workers 1 --output-dir results/benchmarks/release_0.4.0/gtex
 ```
 
 Use the existing reference files and their recorded hashes. The release

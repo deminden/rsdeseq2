@@ -108,7 +108,7 @@ fn formula_factor_transform_term(
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     match transform.label {
         "relevel" => formula_relevel_transform_term(expression, factors),
-        "droplevels" => formula_droplevels_transform_term(transform, expression, factors),
+        "droplevels" => formula_factor_identity_transform_term(transform, expression, factors),
         "factor" | "as.factor" | "ordered" | "as.ordered" => {
             formula_factor_identity_transform_term(transform, expression, factors)
         }
@@ -118,36 +118,6 @@ fn formula_factor_transform_term(
 
 fn formula_factor_transform_accepts_levels(transform: FormulaFactorTransform) -> bool {
     matches!(transform.label, "factor" | "ordered")
-}
-
-fn formula_droplevels_transform_term(
-    transform: FormulaFactorTransform,
-    expression: &str,
-    factors: &[ExpandedFactorSpec<'_>],
-) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
-    let mut factor = formula_factor_identity_transform_term(transform, expression, factors)?;
-    let dropped_levels = formula_observed_levels_for_factor(&factor);
-    let reference = if dropped_levels.iter().any(|level| level == &factor.reference) {
-        factor.reference
-    } else {
-        dropped_levels
-            .first()
-            .cloned()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'droplevels({expression})' requires at least one observed factor level"
-                ),
-            })?
-    };
-    validate_factor_design_inputs_with_levels(
-        &factor.name,
-        &factor.sample_levels,
-        &reference,
-        Some(&dropped_levels),
-    )?;
-    factor.reference = reference;
-    factor.levels = Some(dropped_levels);
-    Ok(factor)
 }
 
 fn formula_factor_identity_transform_term(
@@ -264,100 +234,36 @@ fn formula_factor_identity_transform_term(
             ),
         });
     };
-    let mut factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
-    let (levels_label, labels_label) = if let Some(levels) = levels {
-        if let Some(labels) = labels {
-            if labels.len() != levels.len() {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform '{}({expression})' arguments 'levels' and 'labels' must have the same length",
-                        transform.label
-                    ),
-                });
-            }
-            validate_factor_design_inputs_with_levels(
-                &factor.name,
-                &factor.sample_levels,
-                levels.first().expect("parsed levels are non-empty"),
-                Some(&levels),
-            )?;
-            let label = formula_string_vector_label(&labels);
-            factor.sample_levels = relabel_formula_factor_sample_levels(
-                &factor.name,
-                &factor.sample_levels,
-                &levels,
-                &labels,
-            )?;
-            factor.reference = labels
-                .first()
-                .expect("parsed labels are non-empty")
-                .to_string();
-            factor.levels = Some(labels);
-            (
-                format!(", levels = {}", formula_string_vector_label(&levels)),
-                format!(", labels = {label}"),
-            )
-        } else {
-            let reference = levels
-                .first()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform '{}({expression})' argument 'levels' must contain at least one level",
-                        transform.label
-                    ),
-                })?
-                .clone();
-            validate_factor_design_inputs_with_levels(
-                &factor.name,
-                &factor.sample_levels,
-                &reference,
-                Some(&levels),
-            )?;
-            let label = formula_string_vector_label(&levels);
-            factor.reference = reference;
-            factor.levels = Some(levels);
-            (format!(", levels = {label}"), String::new())
-        }
-    } else {
-        if labels.is_some() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform '{}({expression})' argument 'labels' requires explicit levels",
-                    transform.label
-                ),
-            });
-        }
-        (String::new(), String::new())
-    };
-    Ok(FormulaDerivedFactorCovariate {
-        name: format!(
+    let factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
+    let mut arguments = vec![(Some("x"), factor.primitive.clone())];
+    let levels_label = levels
+        .as_ref()
+        .map(|v| format!(", levels = {}", formula_string_vector_label(v)))
+        .unwrap_or_default();
+    let labels_label = labels
+        .as_ref()
+        .map(|v| format!(", labels = {}", formula_string_vector_label(v)))
+        .unwrap_or_default();
+    if let Some(levels) = levels {
+        arguments.push((Some("levels"), formula_text_value(&levels)));
+    }
+    if let Some(labels) = labels {
+        arguments.push((Some("labels"), formula_text_value(&labels)));
+    }
+    let primitive = formula_call_value(
+        transform.name,
+        arguments,
+        &format!("{}({expression})", transform.label),
+    )?;
+    let reference = (transform.name == "as.factor").then_some(factor.reference.as_str());
+    formula_factor_result(
+        format!(
             "{}({}{levels_label}{labels_label})",
             transform.label, factor.name
         ),
-        ..factor
-    })
-}
-
-fn relabel_formula_factor_sample_levels(
-    factor_name: &str,
-    sample_levels: &[String],
-    levels: &[String],
-    labels: &[String],
-) -> Result<Vec<String>, DeseqError> {
-    sample_levels
-        .iter()
-        .map(|sample| {
-            levels
-                .iter()
-                .position(|level| level == sample)
-                .map(|idx| labels[idx].clone())
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula factor '{factor_name}' has sample level '{sample}' outside declared levels"
-                    ),
-                })
-        })
-        .collect()
+        primitive,
+        reference,
+    )
 }
 
 fn formula_relevel_transform_term(
@@ -433,9 +339,7 @@ fn formula_relevel_transform_term(
     }
     let Some(factor_text) = factor_text else {
         return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'relevel({expression})' must provide a factor"
-            ),
+            reason: format!("formula transform 'relevel({expression})' must provide a factor"),
         });
     };
     let Some(reference) = reference else {
@@ -445,18 +349,22 @@ fn formula_relevel_transform_term(
     };
     let factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
     let reference = resolve_formula_factor_reference_alias(&factor, &reference)?;
-    validate_factor_design_inputs_with_levels(
-        &factor.name,
-        &factor.sample_levels,
-        &reference,
-        factor.levels.as_deref(),
+    let primitive = formula_call_value(
+        "relevel",
+        vec![
+            (Some("x"), factor.primitive.clone()),
+            (
+                Some("ref"),
+                formula_text_value(std::slice::from_ref(&reference)),
+            ),
+        ],
+        &format!("relevel({expression})"),
     )?;
-    Ok(FormulaDerivedFactorCovariate {
-        name: format!("relevel({}, ref = \"{reference}\")", factor.name),
-        sample_levels: factor.sample_levels,
-        reference,
-        levels: factor.levels,
-    })
+    formula_factor_result(
+        format!("relevel({}, ref = \"{reference}\")", factor.name),
+        primitive,
+        Some(&reference),
+    )
 }
 
 fn resolve_formula_factor_reference_alias(
@@ -492,12 +400,16 @@ fn formula_factor_argument_covariate(
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     if let Ok(factor_name) = formula_variable_name(expression) {
         let factor = find_formula_factor(factor_name, factors)?;
-        return Ok(FormulaDerivedFactorCovariate {
-            name: factor.factor.to_string(),
-            sample_levels: factor.sample_levels.to_vec(),
-            reference: factor.reference.to_string(),
-            levels: factor.levels.map(|levels| levels.to_vec()),
-        });
+        let levels = formula_factor_code_levels(factor);
+        let primitive = formula_call_value(
+            "factor",
+            vec![
+                (Some("x"), formula_text_value(factor.sample_levels)),
+                (Some("levels"), formula_text_value(&levels)),
+            ],
+            factor.factor,
+        )?;
+        return formula_factor_result(factor.factor.to_string(), primitive, Some(factor.reference));
     }
     for transform in FORMULA_FACTOR_TRANSFORMS {
         let Some(inner) = formula_transform_inner_expression(expression, transform) else {
@@ -560,22 +472,4 @@ fn find_formula_factor<'a>(
             ),
         }),
     }
-}
-
-fn formula_observed_levels_for_factor(factor: &FormulaDerivedFactorCovariate) -> Vec<String> {
-    let mut levels = Vec::new();
-    if let Some(declared) = factor.levels.as_ref() {
-        for level in declared {
-            if factor.sample_levels.iter().any(|sample| sample == level) {
-                levels.push(level.clone());
-            }
-        }
-        return levels;
-    }
-    for level in &factor.sample_levels {
-        if !levels.iter().any(|candidate| candidate == level) {
-            levels.push(level.clone());
-        }
-    }
-    levels
 }

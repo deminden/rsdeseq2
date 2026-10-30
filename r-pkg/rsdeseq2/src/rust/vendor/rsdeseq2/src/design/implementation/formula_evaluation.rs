@@ -12,6 +12,15 @@ fn formula_call_values(
     arguments: Vec<(Option<&str>, super::expression::Value)>,
     context: &str,
 ) -> Result<Vec<f64>, DeseqError> {
+    let result = formula_call_value(function, arguments, context)?;
+    formula_value_numbers(result, context)
+}
+
+fn formula_call_value(
+    function: &str,
+    arguments: Vec<(Option<&str>, super::expression::Value)>,
+    context: &str,
+) -> Result<super::expression::Value, DeseqError> {
     use super::expression::{Argument, Expression};
     let expression = Expression::Call {
         function: function.to_string(),
@@ -23,24 +32,38 @@ fn formula_call_values(
             })
             .collect(),
     };
-    formula_expression_values(&expression, context)
+    formula_evaluate_expression(&expression, context)
 }
 
 fn formula_expression_values(
     expression: &super::expression::Expression,
     context: &str,
 ) -> Result<Vec<f64>, DeseqError> {
-    use super::expression::{Data, EvaluationOptions};
-    let result = super::expression::evaluate(
+    formula_value_numbers(formula_evaluate_expression(expression, context)?, context)
+}
+
+fn formula_evaluate_expression(
+    expression: &super::expression::Expression,
+    context: &str,
+) -> Result<super::expression::Value, DeseqError> {
+    use super::expression::EvaluationOptions;
+    super::expression::evaluate(
         expression,
         &[],
         &EvaluationOptions {
-            collation: "C".to_string(),
+            collation: "C".into(),
         },
     )
     .map_err(|error| DeseqError::InvalidOptions {
         reason: format!("formula transform '{context}': {error}"),
-    })?;
+    })
+}
+
+fn formula_value_numbers(
+    result: super::expression::Value,
+    context: &str,
+) -> Result<Vec<f64>, DeseqError> {
+    use super::expression::Data;
     let Data::Number { values, .. } = result.data else {
         return Err(DeseqError::InvalidOptions {
             reason: format!("formula transform '{context}' must produce numeric values"),

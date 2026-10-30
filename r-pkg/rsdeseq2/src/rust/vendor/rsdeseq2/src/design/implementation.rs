@@ -17,6 +17,7 @@ include!("implementation/formula_model_frame.rs");
 
 // Private state and derived-covariate types shared by the formula implementation.
 include!("implementation/formula_types.rs");
+include!("implementation/formula_coding.rs");
 
 // Formula right-hand sides and offset extraction.
 include!("implementation/formula_offsets.rs");
@@ -45,6 +46,7 @@ include!("implementation/formula_numeric_arithmetic.rs");
 
 // Formula factor transforms such as factor(), relevel(), and droplevels().
 include!("implementation/formula_factors.rs");
+include!("implementation/formula_factor_evaluation.rs");
 
 // Formula term splitting and parenthesized-term expansion.
 include!("implementation/formula_terms.rs");
@@ -57,6 +59,7 @@ include!("implementation/formula_assembly.rs");
 
 // Compatibility labels/order translated to the shared matrix product plan.
 include!("implementation/formula_matrix_plan.rs");
+include!("implementation/formula_ordered_plan.rs");
 
 // Formula-specific validation helpers.
 include!("implementation/formula_validation.rs");

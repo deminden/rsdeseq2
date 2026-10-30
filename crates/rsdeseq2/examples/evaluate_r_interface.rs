@@ -3,6 +3,8 @@
 mod batch;
 #[path = "evaluate_r_interface/cooks.rs"]
 mod cooks;
+#[path = "evaluate_r_interface/factor_expansion.rs"]
+mod factor_expansion;
 #[path = "evaluate_r_interface/formula.rs"]
 mod formula;
 #[path = "evaluate_r_interface/model_matrix.rs"]

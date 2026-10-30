@@ -254,7 +254,7 @@ fn expanded_formula_design_with_offsets_carries_formula_local_model_frame() {
     );
     assert_eq!(
         parsed.model_frame.factors[1].levels.as_deref(),
-        Some(&["B".to_string(), "A".to_string()][..])
+        Some(&["A".to_string(), "B".to_string()][..])
     );
     assert_eq!(
         parsed.model_frame.factors[1].reference.as_deref(),
@@ -449,22 +449,7 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(
         expanded_formula_design("~ factor(condition, levels='A')", &factors, &numeric).is_err()
     );
-    assert!(
-        expanded_formula_design(
-            "~ factor(condition, labels=c('control','treated'))",
-            &factors,
-            &numeric
-        )
-        .is_err()
-    );
-    assert!(
-        expanded_formula_design(
-            "~ factor(condition, levels=c('A','B'), labels=c('control'))",
-            &factors,
-            &numeric
-        )
-        .is_err()
-    );
+
     assert!(
         expanded_formula_design(
             "~ factor(condition, levels=c('A','B'), labels=c('group','group'))",

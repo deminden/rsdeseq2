@@ -171,6 +171,13 @@ fn dispatch(request: &Value) -> Result<Value, String> {
             .map(|v| Value::new(Data::List(v)))
             .map_err(|e| e.to_string())
         }
+        "expanded_factors" => frame::expanded_factors(
+            list(get(request, "values")?)?,
+            text(get(request, "null_level")?)?,
+            &options(request)?,
+        )
+        .map(|values| Value::new(Data::List(values)))
+        .map_err(|e| e.to_string()),
         "offsets" => {
             let values = list(get(request, "values")?)?;
             let Data::Number {
