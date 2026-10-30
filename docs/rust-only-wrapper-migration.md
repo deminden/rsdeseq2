@@ -91,6 +91,15 @@ on those paths. It adds 188 direct expression identity cases and strict live
 whole-frame checks. Legacy parser adoption, general warning/method semantics,
 VST/posterior ports and the other completion gates below remain open.
 
+The [native-parser consolidation](native-parser-shared-evaluation-2026-10-30.md)
+subsequently routes the compatibility parser's numeric transforms, coercions,
+offsets and matrix products through the shared evaluator and matrix plan.
+Fifty-four actual-parser/R-wrapper cases agree with original R after explicit
+column mapping; a previous-source control disagrees in thirteen cases. Remaining
+native factor/class semantics include ordered coding and rejection of relevel
+on ordered factors. Those corrections, warning/method parity and the VST/posterior
+and final authority/audit work remain required.
+
 The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both
 interfaces share the numerical projection/zero/inference kernels, with 87 direct

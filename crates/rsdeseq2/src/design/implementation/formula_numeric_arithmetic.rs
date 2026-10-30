@@ -65,28 +65,30 @@ fn formula_numeric_scalar_expression_term(
     let right_name = formula_variable_name(right).ok();
     let left_covariate = maybe_formula_numeric_covariate(left_name, numeric_covariates)?;
     let right_covariate = maybe_formula_numeric_covariate(right_name, numeric_covariates)?;
-    let (numeric_name, scalar_text, scalar_on_left, covariate) =
-        match (left_covariate, right_covariate) {
-            (Some(covariate), None) => (covariate.name, right, false, covariate),
-            (None, Some(covariate)) => (covariate.name, left, true, covariate),
-            (Some(left_covariate), Some(right_covariate)) => {
-                return formula_numeric_binary_expression_term(
-                    expression,
-                    left_covariate.name,
-                    op,
-                    right_covariate.name,
-                    left_covariate,
-                    right_covariate,
-                );
-            }
-            (None, None) => {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform 'I({expression})' must contain one supplied numeric covariate"
-                    ),
-                });
-            }
-        };
+    let (numeric_name, scalar_text, scalar_on_left, covariate) = match (
+        left_covariate,
+        right_covariate,
+    ) {
+        (Some(covariate), None) => (covariate.name, right, false, covariate),
+        (None, Some(covariate)) => (covariate.name, left, true, covariate),
+        (Some(left_covariate), Some(right_covariate)) => {
+            return formula_numeric_binary_expression_term(
+                expression,
+                left_covariate.name,
+                op,
+                right_covariate.name,
+                left_covariate,
+                right_covariate,
+            );
+        }
+        (None, None) => {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!(
+                    "formula transform 'I({expression})' must contain one supplied numeric covariate"
+                ),
+            });
+        }
+    };
     let scalar = parse_formula_scalar(scalar_text, expression)?;
     if op == '/' && !scalar_on_left && scalar == 0.0 {
         return Err(DeseqError::InvalidOptions {
@@ -95,33 +97,14 @@ fn formula_numeric_scalar_expression_term(
             ),
         });
     }
-    let mut values = Vec::with_capacity(covariate.values.len());
-    for (idx, value) in covariate.values.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' received non-finite value at sample {idx}"
-                ),
-            });
-        }
-        let transformed = match (scalar_on_left, op) {
-            (_, '+') => value + scalar,
-            (false, '-') => value - scalar,
-            (true, '-') => scalar - value,
-            (_, '*') => value * scalar,
-            (false, '/') => value / scalar,
-            (true, '/') => scalar / value,
-            _ => unreachable!("validated formula scalar operator"),
-        };
-        if !transformed.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' produced non-finite value at sample {idx}"
-                ),
-            });
-        }
-        values.push(transformed);
-    }
+    let input = formula_numeric_value(covariate.values);
+    let scalar_value = super::expression::Value::scalar(scalar);
+    let arguments = if scalar_on_left {
+        vec![(None, scalar_value), (None, input)]
+    } else {
+        vec![(None, input), (None, scalar_value)]
+    };
+    let values = formula_call_values(&op.to_string(), arguments, &format!("I({expression})"))?;
     Ok((
         format!(
             "{}_{}_{}",
@@ -148,32 +131,14 @@ fn formula_numeric_binary_expression_term(
             ),
         });
     }
-    let mut values = Vec::with_capacity(left.values.len());
-    for (idx, (&left_value, &right_value)) in left.values.iter().zip(right.values.iter()).enumerate()
-    {
-        if !left_value.is_finite() || !right_value.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' received non-finite value at sample {idx}"
-                ),
-            });
-        }
-        let transformed = match op {
-            '+' => left_value + right_value,
-            '-' => left_value - right_value,
-            '*' => left_value * right_value,
-            '/' => left_value / right_value,
-            _ => unreachable!("validated formula binary operator"),
-        };
-        if !transformed.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' produced non-finite value at sample {idx}"
-                ),
-            });
-        }
-        values.push(transformed);
-    }
+    let values = formula_call_values(
+        &op.to_string(),
+        vec![
+            (None, formula_numeric_value(left.values)),
+            (None, formula_numeric_value(right.values)),
+        ],
+        &format!("I({expression})"),
+    )?;
     Ok((
         format!(
             "{}_{}_{}",
@@ -248,17 +213,11 @@ fn formula_numeric_identity_term(
     let numeric_name = formula_variable_name(numeric_term)?;
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;
-    let mut values = Vec::with_capacity(covariate.values.len());
-    for (idx, value) in covariate.values.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' received non-finite value at sample {idx}"
-                ),
-            });
-        }
-        values.push(sign * value);
-    }
+    let values = formula_call_values(
+        if sign < 0.0 { "-" } else { "+" },
+        vec![(None, formula_numeric_value(covariate.values))],
+        &format!("I({expression})"),
+    )?;
     Ok((format!("{numeric_name}_{label}"), values))
 }
 
@@ -282,18 +241,14 @@ fn formula_numeric_power_term(
     }
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;
-    let mut values = Vec::with_capacity(covariate.values.len());
-    for (idx, value) in covariate.values.iter().copied().enumerate() {
-        let transformed = value.powi(exponent);
-        if !transformed.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' produced non-finite value at sample {idx}"
-                ),
-            });
-        }
-        values.push(transformed);
-    }
+    let values = formula_call_values(
+        "^",
+        vec![
+            (None, formula_numeric_value(covariate.values)),
+            (None, super::expression::Value::scalar(exponent as f64)),
+        ],
+        &format!("I({expression})"),
+    )?;
     Ok((format!("{numeric_name}_pow_{exponent}"), values))
 }
 

@@ -1,0 +1,87 @@
+{
+  "baseline_commit": "6456690",
+  "cases": 54,
+  "disagreeing_cases": 13,
+  "failures": [
+    {
+      "case": "power_3",
+      "differences": {
+        "values": 1
+      }
+    },
+    {
+      "case": "power_4",
+      "differences": {
+        "values": 4
+      }
+    },
+    {
+      "case": "power_5",
+      "differences": {
+        "values": 5
+      }
+    },
+    {
+      "case": "power_7",
+      "differences": {
+        "values": 9
+      }
+    },
+    {
+      "case": "power_8",
+      "differences": {
+        "values": 6
+      }
+    },
+    {
+      "case": "power_11",
+      "differences": {
+        "values": 5
+      }
+    },
+    {
+      "case": "power_16",
+      "differences": {
+        "values": 6
+      }
+    },
+    {
+      "case": "p_log_base_2",
+      "differences": {
+        "values": 3
+      }
+    },
+    {
+      "case": "p_log_base_10",
+      "differences": {
+        "values": 4
+      }
+    },
+    {
+      "case": "z_log1p",
+      "differences": {
+        "values": 1
+      }
+    },
+    {
+      "case": "duplicate_offset",
+      "differences": {
+        "offsets": 10
+      }
+    },
+    {
+      "case": "duplicate_offset_backticks",
+      "differences": {
+        "offsets": 10
+      }
+    },
+    {
+      "case": "duplicate_offset_number",
+      "differences": {
+        "offsets": 11
+      }
+    }
+  ],
+  "baseline_source_archive_sha256": "13113605227f267cc6a75e1d094c6553803c90f171973b0e390e13b5295df493",
+  "probe_source_sha256": "94471e3f44ce4b153eee15f533aaea40a0134554922beae2bef33d3b87755596"
+}

@@ -1,5 +1,10 @@
 // Formula right-hand sides and offset extraction.
 
+struct FormulaOffsets {
+    values: Vec<f64>,
+    seen: Vec<Vec<FormulaOffsetToken>>,
+}
+
 fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
     let trimmed = formula.trim();
     let Some(rhs) = trimmed.strip_prefix('~') else {
@@ -26,8 +31,10 @@ fn extract_formula_offsets(
         .first()
         .map(|covariate| covariate.values.len())
         .unwrap_or(0);
-    let mut offsets = vec![0.0; n_samples];
-    let mut saw_offset = false;
+    let mut offsets = FormulaOffsets {
+        values: vec![0.0; n_samples],
+        seen: Vec::new(),
+    };
     let mut remaining_terms = Vec::new();
     for (sign, term) in signed_terms {
         extract_formula_offset_term(
@@ -36,17 +43,16 @@ fn extract_formula_offsets(
             factors,
             numeric_covariates,
             &mut offsets,
-            &mut saw_offset,
             &mut remaining_terms,
         )?;
     }
     if remaining_terms.is_empty() {
         remaining_terms.push("1".to_string());
     }
-    if !saw_offset {
-        offsets.clear();
+    if offsets.seen.is_empty() {
+        offsets.values.clear();
     }
-    Ok((join_formula_terms(&remaining_terms), offsets))
+    Ok((join_formula_terms(&remaining_terms), offsets.values))
 }
 
 fn formula_term_has_offset(term: &str) -> Result<bool, DeseqError> {
@@ -70,8 +76,7 @@ fn extract_formula_offset_term(
     term: &str,
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
-    offsets: &mut Vec<f64>,
-    saw_offset: &mut bool,
+    offsets: &mut FormulaOffsets,
     remaining_terms: &mut Vec<String>,
 ) -> Result<(), DeseqError> {
     let term = term.trim();
@@ -83,7 +88,6 @@ fn extract_formula_offset_term(
                 factors,
                 numeric_covariates,
                 offsets,
-                saw_offset,
                 remaining_terms,
             )?;
         }
@@ -103,30 +107,40 @@ fn extract_formula_offset_term(
             reason: "formula offset terms cannot be subtracted".to_string(),
         });
     }
-    *saw_offset = true;
-    if offsets.is_empty() {
-        offsets.resize(offset_values.len(), 0.0);
+    let key = formula_offset_key(term)?;
+    if offsets.seen.contains(&key) {
+        return Ok(());
     }
-    if offset_values.len() != offsets.len() {
+    offsets.seen.push(key);
+    if offsets.values.is_empty() {
+        offsets.values.resize(offset_values.len(), 0.0);
+    }
+    if offset_values.len() != offsets.values.len() {
         return Err(invalid_dimensions(
             "formula offset values",
-            offsets.len(),
+            offsets.values.len(),
             offset_values.len(),
         ));
     }
-    for (idx, value) in offset_values.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula offset '{term}' is non-finite at sample {idx}"),
-            });
-        }
-        offsets[idx] += value;
-        if !offsets[idx].is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula offsets sum to a non-finite value at sample {idx}"),
-            });
-        }
+    if let Some(idx) = offset_values.iter().position(|value| !value.is_finite()) {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula offset '{term}' is non-finite at sample {idx}"),
+        });
     }
+    let values = [formula_numeric_value(&offset_values)];
+    let base = formula_numeric_value(&offsets.values);
+    let total = super::expression::frame::offsets(&values, &[0], Some(&base))?
+        .expect("one offset always produces values");
+    let super::expression::Data::Number { values, .. } = total.data else {
+        unreachable!("numeric offset addition produces numeric values");
+    };
+    if let Some(idx) = values.iter().position(|value| !value.is_finite()) {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula offsets sum to a non-finite value at sample {idx}"),
+        });
+    }
+    offsets.values = values;
+
     Ok(())
 }
 

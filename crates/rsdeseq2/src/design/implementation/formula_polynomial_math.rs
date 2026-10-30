@@ -25,10 +25,21 @@ fn formula_polynomial_columns(
     degree: i32,
     raw: bool,
 ) -> Result<FormulaNumericTransformExpansion, DeseqError> {
-    let basis = super::numeric_transform::polynomial_basis(values, degree as usize, raw, None)
-        .map_err(|error| DeseqError::InvalidOptions {
-            reason: format!("formula transform 'poly({expression})': {error}"),
-        })?;
+    let basis = formula_call_values(
+        "poly",
+        vec![
+            (Some("x"), formula_numeric_value(values)),
+            (
+                Some("degree"),
+                super::expression::Value::scalar(degree as f64),
+            ),
+            (
+                Some("raw"),
+                super::expression::Value::new(super::expression::Data::Logical(vec![Some(raw)])),
+            ),
+        ],
+        &format!("poly({expression})"),
+    )?;
     let mut replacements = Vec::with_capacity(degree as usize);
     let mut derived = Vec::with_capacity(degree as usize);
     for column in 0..degree as usize {
@@ -38,7 +49,12 @@ fn formula_polynomial_columns(
             format!("poly({numeric_name}, {degree}){}", column + 1)
         };
         replacements.push(formula_variable_term(&name));
-        derived.push((name, (0..values.len()).map(|row| basis.values.as_slice()[row * degree as usize + column]).collect()));
+        derived.push((
+            name,
+            (0..values.len())
+                .map(|row| basis[row * degree as usize + column])
+                .collect(),
+        ));
     }
     Ok((format!("({})", replacements.join(" + ")), derived))
 }

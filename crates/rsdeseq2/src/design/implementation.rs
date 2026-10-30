@@ -20,9 +20,13 @@ include!("implementation/formula_types.rs");
 
 // Formula right-hand sides and offset extraction.
 include!("implementation/formula_offsets.rs");
+include!("implementation/formula_offset_keys.rs");
 
 // Numeric transform discovery, parsing and covariate resolution.
 include!("implementation/formula_numeric_transforms.rs");
+
+// Translation of validated parser arguments into the shared evaluator.
+include!("implementation/formula_evaluation.rs");
 
 // Numeric scaling transforms and their options.
 include!("implementation/formula_scaling.rs");
@@ -50,6 +54,9 @@ include!("implementation/formula_state.rs");
 
 // Formula design matrix assembly.
 include!("implementation/formula_assembly.rs");
+
+// Compatibility labels/order translated to the shared matrix product plan.
+include!("implementation/formula_matrix_plan.rs");
 
 // Formula-specific validation helpers.
 include!("implementation/formula_validation.rs");
