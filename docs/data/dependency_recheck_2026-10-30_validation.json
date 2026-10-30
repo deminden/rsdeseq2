@@ -118,5 +118,47 @@
   "crate_sha256": "8a5e50c4ff139370538b86621c8babd57eb8e41191b28c51885f18a6ea6451d9",
   "minimum_rust_version": "1.97.1",
   "package_versions_changed": false,
-  "optimization_round_counted": false
+  "optimization_round_counted": false,
+  "follow_up_confirmation": {
+    "checked_at": "2026-10-30T09:45:13.533475+00:00",
+    "baseline_commit": "8fec875",
+    "registry_names": 119,
+    "resolved_root_registry_entries": 123,
+    "direct_count": 15,
+    "latest_stable_versions_changed": [],
+    "outdated_direct_dependencies": [],
+    "yanked_resolved_releases": [],
+    "registry_checksum_mismatches": [],
+    "direct_resolved_latest_stable": {
+      "approx": "0.5.1",
+      "clap": "4.6.7",
+      "criterion": "0.8.2",
+      "csv": "1.4.0",
+      "libm": "0.2.16",
+      "nalgebra": "0.35.0",
+      "rayon": "1.12.0",
+      "rcompat-lbfgsb": "0.3.0",
+      "rcompat-locfit": "0.2.0",
+      "same-file": "1.0.6",
+      "serde": "1.0.229",
+      "serde_json": "1.0.154",
+      "sha2": "0.11.1",
+      "statrs": "0.19.1",
+      "thiserror": "2.0.21"
+    },
+    "lock_sha256": {
+      "Cargo.lock": "8a65fb741c162518eb1ca58a21091ac1b7cf3f618ba255055cc837d296d364ed",
+      "r-pkg/rsdeseq2/src/rust/Cargo.lock": "1c0d26a7018be8b0991e53e5eb57c4a82d2430c020eb84b5ec769fcfb8baafab"
+    },
+    "checks": {
+      "root_locked_tests_passed": 1063,
+      "root_existing_opt_in_tests_ignored": 1,
+      "root_failed_tests": 0,
+      "backend_locked_tests_passed": 1,
+      "vendor_integrity": "passed"
+    },
+    "dependency_or_numerical_source_changed": false,
+    "timings_repeated": false,
+    "r_reference_environment_changed": false
+  }
 }
