@@ -360,3 +360,32 @@ fn invalid_frame_is_rejected_before_normalization_even_when_filtering_is_disable
         assert!(error.contains(message), "{error}");
     }
 }
+
+#[test]
+fn explicit_factor_alias_without_a_frame_preserves_original_formula_scope() {
+    let counts = counts();
+    let design = DesignMatrix::from_row_major(
+        6,
+        2,
+        vec![1., 0., 1., 0., 1., 0., 1., 1., 1., 1., 1., 1.],
+        Some(vec!["Intercept".into(), "cell.type_B_vs_A".into()]),
+    )
+    .unwrap()
+    .with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
+    let levels = frame().factors.remove(0).sample_levels;
+    for factor in ["cell type", "cell.type"] {
+        let (_, result) = DeseqBuilder::new()
+            .size_factors(vec![1.; 6])
+            .cooks_cutoff_threshold(0.)
+            .disable_independent_filtering()
+            .fit_fixed_dispersion_wald_factor_level_contrast(
+                &counts,
+                &design,
+                &[0.2; 3],
+                FactorLevelContrast::new(factor, "B", "A", &levels),
+            )
+            .unwrap();
+        assert_eq!(result.rows[0].cooks_outlier, Some(false), "{factor}");
+        assert!(result.rows[0].pvalue.is_some());
+    }
+}

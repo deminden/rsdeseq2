@@ -40,7 +40,7 @@ impl DeseqBuilder {
                 validate_normalization_factors(counts, factors)?;
                 let size_factors = match &self.size_factor_options.supplied_size_factors {
                     Some(size_factors) => {
-                        normalized_counts(counts, size_factors)?;
+                        crate::normalization::validate_size_factors(size_factors, counts.n_samples())?;
                         size_factors.clone()
                     }
                     None => vec![1.0; counts.n_samples()],

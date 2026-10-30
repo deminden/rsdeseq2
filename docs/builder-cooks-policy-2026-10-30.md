@@ -6,6 +6,10 @@ all older native builder masking routes. Package versions remain 0.3.1. The
 scientific rule using twelve independent original-DESeq2 cases; the broader
 [Rust-only migration](rust-only-wrapper-migration.md) remains in progress.
 
+The subsequent [shared preparation checkpoint](rust-only-preparation-2026-10-30.md)
+also corrects the explicit no-frame cleaned factor alias and records its
+independent regression alongside count, shrinkage-row and offset preparation.
+
 ## Confirmed mismatch and correction
 
 On a six-sample `~ condition` model with a two-level factor and Cook's cutoff 0,

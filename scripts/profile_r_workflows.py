@@ -16,6 +16,7 @@ CASES = [
     ('multi_results',56200,16),
     ('batch_results',1200,16), ('batch_results',56200,16),
     ('two_group_results',56200,16),
+    ('offsets_size',56200,16), ('offsets_matrix',56200,16),
     ('shrink_normal',1200,16), ('shrink_ashr',1200,16), ('shrink_apeglm',1200,16),
     ('vst',1200,16), ('replacement',40,8), ('replacement_none',1200,16),
     ('replacement_none',56200,16),

@@ -94,22 +94,20 @@ unsafe fn counts_from_r(
             "counts",
         )?
     };
+    rsdeseq2::matrix::CountView::from_doubles(
+        rsdeseq2::matrix::MatrixView::new(
+            n_genes,
+            n_samples,
+            column_major,
+            rsdeseq2::matrix::MatrixOrder::ColumnMajor,
+        )
+        .map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     let mut row_major = Vec::with_capacity(column_major.len());
     for gene in 0..n_genes {
         for sample in 0..n_samples {
-            let value = column_major[gene + sample * n_genes];
-            if !value.is_finite()
-                || value < 0.0
-                || value.fract() != 0.0
-                || value > f64::from(u32::MAX)
-            {
-                return Err(format!(
-                    "count at row {}, column {} is not a valid u32 count",
-                    gene + 1,
-                    sample + 1
-                ));
-            }
-            row_major.push(value as u32);
+            row_major.push(column_major[gene + sample * n_genes] as u32);
         }
     }
     CountMatrix::from_row_major_u32(n_genes, n_samples, row_major)
@@ -208,3 +206,5 @@ mod contrast_zero;
 
 #[path = "lib/result_policy.rs"]
 mod result_policy;
+
+mod row_preparation;

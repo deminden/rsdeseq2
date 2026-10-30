@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Original formula scope now also governs all 21 native builder masking sites; 56 fit/query/context comparisons preserve fitted state. See the [builder checkpoint](builder-cooks-policy-2026-10-30.md). Initial row adjustment, remaining shrinkage row preparation, offsets/formula and posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation and offset products | The [preparation checkpoint](rust-only-preparation-2026-10-30.md) adds shared raw/fitted exclusion handling and base × exp(offset), with 131 direct identity cases and independent weighted-shrinkage checks. Initial row adjustment, formula/expanded-design and optional posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -135,3 +135,16 @@ fitted state. Shared metadata preflight preserves alias/shape validation, and
 mask-stage BH is omitted before final filtering. The full Rust suite passes
 1,055 tests; the R source check remains 1,584 assertions with 113 direct interface
 cases. The remaining initial adjustment and Rust-only ports are still required.
+
+The [count/normalization preparation checkpoint](rust-only-preparation-2026-10-30.md)
+then shares count validation, raw-zero caching, normal-shrinkage row selection
+and offset products with standalone Rust. Independent cases correct weighted
+exclusions, unnamed-factor double offsets, anonymous gene identities and an
+explicit factor alias. The full Rust suite passes 1,060 tests; the R source check
+passes 1,668 assertions and 131 direct interface cases agree. All 121+9 GTEx
+gates, 22 native exports and twenty complete paired R payloads are preserved.
+One native paired pass improves throughput 1.61%, below the 2% round threshold;
+R process total falls 1.41%. Maximum R RSS rises 9.22 MiB, with individual costs
+of 89.97 MiB for large batches and 61.03 MiB for the 64-sample rlog retained for
+the final combined audit. Eliminating an unused native counts/base-SF matrix
+does not complete C18's enabled-but-no-refit replacement-buffer work.

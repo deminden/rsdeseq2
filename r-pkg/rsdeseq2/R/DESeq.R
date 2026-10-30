@@ -77,6 +77,9 @@ DESeq <- function(object,
     if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
       stop("SummarizedExperiment is required for DESeqDataSet input", call. = FALSE)
     }
+    # Anonymous genes need stable identities for fitted-state/subset mapping.
+    # This is interface metadata; the caller's dataset remains unchanged.
+    if (is.null(rownames(object))) rownames(object) <- as.character(seq_len(nrow(object)))
     counts <- SummarizedExperiment::assay(object, "counts")
     colData <- as.data.frame(SummarizedExperiment::colData(object))
     if (requireNamespace("DESeq2", quietly = TRUE)) {

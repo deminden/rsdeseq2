@@ -17,7 +17,7 @@ hex <- function(value) {
 hexVector <- function(values) lapply(unname(values), hex)
 withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE) {
   # Fail at runtime if the production wrapper reintroduces statistical R calls.
-  functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = "mean")
+  functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = c("mean","exp"))
   if (projection) functions$base <- c(functions$base, "%*%", "sqrt")
   if (zeros) functions$base <- c(functions$base, "rowSums", "colSums", "sum")
   on.exit(for (package in names(functions)) for (name in functions[[package]])
@@ -29,6 +29,8 @@ withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE) 
 }
 guard <- tryCatch(withoutRCalculations(stats::p.adjust(c(.1, .2))), error = identity)
 stopifnot(inherits(guard, "error"), grepl("Production wrapper executed", conditionMessage(guard)))
+guard <- tryCatch(withoutRCalculations(base::exp(0)),error=identity)
+stopifnot(inherits(guard,"error"),grepl("Production wrapper executed",conditionMessage(guard)))
 set.seed(20261029)
 n <- 2002L
 filter <- c(rep(0, 102), seq_len(n - 102L))
@@ -361,4 +363,29 @@ for(case in reference$cases) {
   compareIdentity(paste0("cooks_origin_",case$name),input,c(
     lapply(as.list(actual[c("log2FoldChange","lfcSE","stat","pvalue")]),hexVector),
     list(cooksOutlier=lapply(actual$cooksOutlier,function(v)if(is.na(v))NULL else v))))
+}
+
+# Offset products and normal-shrink preparation share the standalone kernels.
+preparationReference <- jsonlite::fromJSON(file.path(dirname(normalizePath(script)),"..",
+  "crates/rsdeseq2/tests/data/row_preparation_r462.json"),simplifyVector=FALSE)
+preparationNumbers <- function(values)vapply(values,function(value)
+  readBin(as.raw(strtoi(substring(value,seq(1,15,2),seq(2,16,2)),16L)),"double",n=1,size=8,endian="big"),numeric(1))
+for(case in preparationReference$offsets) {
+  counts <- matrix(1,case$genes,case$samples)
+  sf <- if(is.null(case$size_factors))NULL else preparationNumbers(case$size_factors)
+  nf <- if(is.null(case$factors))NULL else matrix(preparationNumbers(case$factors),case$genes,case$samples,byrow=TRUE)
+  actual <- tryCatch(withoutRCalculations(.Call("rsdeseq2_offset_factors",counts,sf,nf,
+    preparationNumbers(case$offsets),PACKAGE="rsdeseq2"),projection=TRUE,zeros=TRUE),error=identity)
+  stopifnot(inherits(actual,"error")==is.null(case$expected))
+  actual <- if(inherits(actual,"error"))list(error=TRUE)else list(factors=hexVector(as.vector(t(actual))))
+  compareIdentity(paste0("offset_",case$name),list(preparation=c(list(kind="Offset"),case)),actual)
+}
+for(case in preparationReference$rows) {
+  counts <- matrix(as.double(unlist(case$counts)),case$genes,case$samples,byrow=TRUE)
+  actual <- tryCatch(withoutRCalculations(.Call("rsdeseq2_normal_shrinkage_rows",counts,
+    preparationNumbers(case$dispersions),preparationNumbers(case$fitted),
+    if(is.null(case$excluded))NULL else as.logical(unlist(case$excluded)),PACKAGE="rsdeseq2"),projection=TRUE,zeros=TRUE),error=identity)
+  stopifnot(inherits(actual,"error")==is.null(case$expected))
+  actual <- if(inherits(actual,"error"))list(error=TRUE)else list(indices=as.list(actual))
+  compareIdentity(paste0("shrink_rows_",case$name),list(preparation=c(list(kind="Rows"),case)),actual)
 }

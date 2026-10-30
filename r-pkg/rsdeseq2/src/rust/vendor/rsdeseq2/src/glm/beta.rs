@@ -1,3 +1,6 @@
+mod row_preparation;
+pub use row_preparation::NormalShrinkageRows;
+
 use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};

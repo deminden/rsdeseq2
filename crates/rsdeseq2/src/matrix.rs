@@ -1,7 +1,7 @@
 pub mod borrowed;
 mod counts;
 pub use borrowed::{MatrixOrder, MatrixView};
-pub use counts::CountView;
+pub use counts::{CountRows, CountView};
 
 use core::ops::{Bound, RangeBounds};
 

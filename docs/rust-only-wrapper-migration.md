@@ -135,3 +135,16 @@ context combinations match stored requests without changing fitted state. Shared
 metadata preflight retains validation; internal masking omits an unused BH pass
 before final filtering. Initial row adjustments and the remaining Rust-only
 normalization/formula/shrinkage ports remain open.
+
+The [shared preparation checkpoint](rust-only-preparation-2026-10-30.md) then
+moves count validation, raw-zero caching, normal-shrinkage row selection and
+base-factor × exp(offset) composition into Rust. Both interfaces share the
+same kernels, with 131 direct bit-equality cases and a checked source package
+passing 1,668 assertions. Independent original-DESeq2 checks also correct
+weight-excluded shrinkage and anonymous gene inputs; repeated unnamed-factor
+offset fits now preserve effective factors exactly. All twenty paired workflow
+payloads and 22 native GTEx exports remain byte-identical on existing valid
+inputs. Formula/model-matrix, expanded-contrast and optional posterior/s-value
+arithmetic still need standalone paths. Initial native adjustment, C18's
+remaining replacement allocation and final combined speed/memory reconciliation
+are also still open; the measured individual memory increases remain recorded.

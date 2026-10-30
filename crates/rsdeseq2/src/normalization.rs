@@ -1,3 +1,6 @@
+mod offsets;
+pub use offsets::normalization_factors_with_offsets;
+
 use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::median::median;
@@ -598,7 +601,10 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
     Ok(())
 }
 
-fn validate_size_factors(size_factors: &[f64], n_samples: usize) -> Result<(), DeseqError> {
+pub(crate) fn validate_size_factors(
+    size_factors: &[f64],
+    n_samples: usize,
+) -> Result<(), DeseqError> {
     if size_factors.len() != n_samples {
         return Err(invalid_dimensions(
             "size factors",
