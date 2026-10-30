@@ -220,3 +220,8 @@ optional ashr/apeglm and posterior calculations still need the standalone path.
 C18's enabled-but-no-refit allocation remains; no native ownership handle is
 introduced. The final combined performance audit must also retain previous
 observed timing costs rather than declaring every workflow faster.
+
+The later [formula-origin correction](cooks-origin-parity-2026-10-30.md) resolves
+the shared kernel's first-tie and original-formula scope issues recorded here.
+It preserves this checkpoint's artifacts and timing observations and uses a
+separate, independently generated enabled-filtering reference panel.

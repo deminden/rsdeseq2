@@ -923,6 +923,8 @@ fn fixed_dispersion_lrt_factor_level_contrast_applies_low_count_cooks_gate() {
         Some(vec!["Intercept".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -970,6 +972,8 @@ fn fixed_dispersion_lrt_coefficient_uses_stored_formula_low_count_cooks_gate() {
         Some(vec!["Intercept".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -992,6 +996,15 @@ fn fixed_dispersion_lrt_coefficient_uses_stored_formula_low_count_cooks_gate() {
         .clone()
         .fit_fixed_dispersion_lrt(&counts, &full, &reduced, &[0.1], 1)
         .unwrap();
+    // A model frame alone cannot give a primitive matrix formula semantics.
+    let matrix_design = full.clone().with_origin(DesignOrigin::matrix());
+    let (_, matrix_results) = builder
+        .clone()
+        .model_frame(model_frame.clone())
+        .fit_fixed_dispersion_lrt(&counts, &matrix_design, &reduced, &[0.1], 1)
+        .unwrap();
+    assert_eq!(matrix_results.rows[0].cooks_outlier, Some(true));
+    assert_eq!(matrix_results.rows[0].pvalue, None);
     let formula_builder = builder.clone().model_frame(model_frame);
     let (_formula_fit, formula_results) = formula_builder
         .clone()
@@ -1038,6 +1051,8 @@ fn fixed_dispersion_lrt_coefficient_uses_cleaned_stored_reference_for_cooks_gate
     )
     .unwrap();
     let reduced = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
     let levels = ["A cell", "A cell", "A cell", "B cell", "B cell", "B cell"]
         .into_iter()
         .map(String::from)
@@ -1102,6 +1117,8 @@ fn fixed_dispersion_lrt_named_replacement_uses_stored_formula_low_count_cooks_ga
     )
     .unwrap();
     let reduced = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -1174,6 +1191,8 @@ fn fixed_dispersion_lrt_reverse_numeric_replacement_uses_stored_formula_low_coun
     )
     .unwrap();
     let reduced = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)

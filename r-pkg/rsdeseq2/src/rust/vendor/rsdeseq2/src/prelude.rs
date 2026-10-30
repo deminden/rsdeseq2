@@ -20,7 +20,7 @@ pub use crate::core::{
     VstTrendSource,
 };
 pub use crate::design::{
-    DesignMatrix, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
+    DesignMatrix, DesignOrigin, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
     ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec,
     ExpandedFormulaDesignWithOffsets, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
     FormulaFactorColumn, FormulaModelFrame, FormulaNumericColumn, ResolvedFormulaFactorReference,
@@ -207,8 +207,8 @@ pub use crate::results::{
     fit_expanded_formula_model_frame_beta_prior_wald_results_with_cooks_replacement,
     fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights,
     fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement,
-    recompute_padj, resolve_cooks_cutoff, rsdeseq2_result_diagnostic_column_names,
-    two_level_design_matches,
+    low_count_eligible, recompute_padj, resolve_cooks_cutoff,
+    rsdeseq2_result_diagnostic_column_names, two_level_design_matches,
 };
 pub use crate::transform::{
     FastVstSubset, FastVstSubsetMetadata, RLOG_INTERCEPT_PRIOR_VARIANCE, RLOG_PRIOR_UPPER_QUANTILE,

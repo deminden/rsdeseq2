@@ -209,6 +209,8 @@ fn native_formula_lrt_default_uses_cleaned_stored_reference_for_cooks_gate() {
     )
     .unwrap();
     let reduced = DesignMatrix::intercept_only(counts.n_samples()).unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let full = full.with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
     let levels = ["A cell", "A cell", "A cell", "B cell", "B cell", "B cell"]
         .into_iter()
         .map(String::from)

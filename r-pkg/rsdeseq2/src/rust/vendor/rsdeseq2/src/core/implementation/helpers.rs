@@ -372,15 +372,45 @@ fn apply_cooks_cutoff_for_factor_level_metadata(
     counts: &CountMatrix,
     cooks: &RowMajorMatrix<f64>,
     design: &DesignMatrix,
+    model_frame: Option<&FormulaModelFrame>,
     contrast: FactorLevelContrast<'_>,
 ) -> Result<(), DeseqError> {
-    if factor_level_contrast_is_single_two_level_condition(contrast)
-        && crate::results::two_level_design_matches(
+    let original_factor = design
+        .origin()
+        .variables()
+        .filter(|v| v.len() == 1)
+        .and_then(|v| model_frame.and_then(|frame| frame.factors.iter().find(|f| f.name == v[0])));
+    let eligible = if let Some(factor) = original_factor {
+        let levels = factor.levels.as_ref().map_or_else(
+            || {
+                factor
+                    .sample_levels
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+            },
+            Vec::len,
+        );
+        crate::results::low_count_eligible(
+            design.origin(),
             design.matrix().into(),
-            contrast.sample_levels,
-            2,
+            &factor.name,
+            &factor.sample_levels,
+            levels,
         )?
-    {
+    } else if design.origin().variables().is_some() && model_frame.is_some() {
+        false
+    } else {
+        factor_level_contrast_is_single_two_level_condition(contrast)
+            && crate::results::low_count_eligible(
+                design.origin(),
+                design.matrix().into(),
+                contrast.factor,
+                contrast.sample_levels,
+                2,
+            )?
+    };
+    if eligible {
         apply_cooks_cutoff_with_low_count_heuristic(results, cutoff, counts, cooks)
     } else {
         apply_cooks_cutoff(results, cutoff)

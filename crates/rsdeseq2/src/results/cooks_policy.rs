@@ -29,12 +29,16 @@ impl<'a> LowCountHeuristic<'a> {
         Ok(Self { counts, cooks })
     }
     fn spares(self, gene: usize) -> bool {
-        // Keep the established finite-only total ordering and last-tie choice.
-        let Some((sample, _)) = (0..self.counts.n_samples())
-            .map(|i| (i, *self.cooks.at(gene, i)))
-            .filter(|(_, v)| v.is_finite())
-            .max_by(|(_, a), (_, b)| a.total_cmp(b))
-        else {
+        // R's which.max chooses the first numerically equal maximum (including
+        // signed zero). Preserve the native primitive's finite-only contract.
+        let mut maximum = None;
+        for sample in 0..self.counts.n_samples() {
+            let value = *self.cooks.at(gene, sample);
+            if value.is_finite() && maximum.is_none_or(|(_, old)| value > old) {
+                maximum = Some((sample, value));
+            }
+        }
+        let Some((sample, _)) = maximum else {
             return false;
         };
         let outlier_count = self.counts.at(gene, sample);
@@ -43,6 +47,35 @@ impl<'a> LowCountHeuristic<'a> {
             .take(3)
             .count()
             == 3
+    }
+}
+
+/// Establish formula-only low-count scope from explicit source metadata.
+/// An ordinary matrix never implicitly becomes a factor formula. The legacy
+/// mode preserves partition inference for old saved objects lacking provenance.
+pub fn low_count_eligible<T: Eq>(
+    origin: &crate::design::DesignOrigin,
+    design: MatrixView<'_, f64>,
+    factor: &str,
+    labels: &[T],
+    declared_levels: usize,
+) -> Result<bool, DeseqError> {
+    if let Some(variables) = origin.variables() {
+        if variables.len() == 1 && variables[0] == factor && declared_levels == 2 {
+            if labels.len() != design.n_rows() {
+                return Err(invalid_dimensions(
+                    "Cook's factor samples",
+                    design.n_rows(),
+                    labels.len(),
+                ));
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    } else if origin.is_legacy() {
+        two_level_design_matches(design, labels, declared_levels)
+    } else {
+        Ok(false)
     }
 }
 

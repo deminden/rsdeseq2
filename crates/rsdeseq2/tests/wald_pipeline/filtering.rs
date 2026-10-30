@@ -38,6 +38,8 @@ fn fixed_dispersion_wald_factor_level_contrast_applies_low_count_cooks_gate() {
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -77,6 +79,8 @@ fn fixed_dispersion_wald_coefficient_uses_stored_formula_low_count_cooks_gate() 
         Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let levels = ["A", "A", "A", "B", "B", "B"]
         .into_iter()
         .map(String::from)
@@ -132,6 +136,8 @@ fn fixed_dispersion_wald_coefficient_uses_cleaned_stored_reference_for_cooks_gat
         ]),
     )
     .unwrap();
+    // This numerical fixture represents the stated original factor formula.
+    let design = design.with_origin(DesignOrigin::formula(vec!["cell type".into()]).unwrap());
     let levels = ["A cell", "A cell", "A cell", "B cell", "B cell", "B cell"]
         .into_iter()
         .map(String::from)

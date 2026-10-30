@@ -30,6 +30,8 @@ def main():
     parser.add_argument('--candidate-library', type=Path)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--cases', nargs='+', help='WORKFLOW_GENESxSAMPLES case names')
+    parser.add_argument('--allow-design-origin-migration', action='store_true',
+                        help='Validate formula origin and normalize only the schema 1→2 metadata addition')
     parser.add_argument('--time-bin', default='/usr/bin/time')
     parser.add_argument('--max-rss-mib', type=float, default=2048)
     args = parser.parse_args()
@@ -46,6 +48,8 @@ def main():
     env = dict(os.environ, RAYON_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
     provenance = dict(rscript=args.rscript, libraries={k:str(v) for k,v in libraries.items()}, repeats=1,
                       max_rss_mib=args.max_rss_mib, status='in_progress', paired=bool(args.candidate_library),
+                      allow_design_origin_migration=args.allow_design_origin_migration,
+                      comparison_script_sha256=sha256(ROOT/'scripts/compare_r_workflow_payloads.R'),
                       workflow_script_sha256=sha256(ROOT/'scripts/profile_r_workflow.R'),
                       package_files={label:{str(p.relative_to(lib)):sha256(p) for p in (lib/'rsdeseq2').rglob('*') if p.is_file()} for label,lib in libraries.items()})
     (args.output_dir/'provenance.json').write_text(json.dumps(provenance,indent=2)+'\n')
@@ -76,8 +80,10 @@ def main():
             outputs[label] = output
             print(f'{name}: {label} {elapsed:.3f}s {rss:.2f} MiB',flush=True)
         if len(outputs) == 2:
-            expression = 'a<-readRDS(commandArgs(TRUE)[1]);b<-readRDS(commandArgs(TRUE)[2]);stopifnot(isTRUE(all.equal(a,b,tolerance=0,check.attributes=TRUE)))'
-            subprocess.run([args.rscript,'--vanilla','-e',expression,str(outputs['baseline']),str(outputs['candidate'])],check=True,env=env)
+            subprocess.run([args.rscript,'--vanilla',str(ROOT/'scripts/compare_r_workflow_payloads.R'),
+                            str(outputs['baseline']),str(outputs['candidate']),workflow,
+                            'ORIGIN_V2' if args.allow_design_origin_migration else 'STRICT',
+                            str(args.output_dir/f'{name}_comparison.tsv')],check=True,env=env)
         with (args.output_dir/'runs.tsv').open('w',newline='') as handle:
             writer=csv.DictWriter(handle,fieldnames=list(rows[0]),delimiter='\t');writer.writeheader();writer.writerows(rows)
     provenance['status']='complete'

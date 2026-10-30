@@ -5,7 +5,7 @@ fn matrix<T>(rows: usize, columns: usize, values: &[T], order: MatrixOrder) -> M
 }
 
 #[test]
-fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_layouts() {
+fn borrowed_mask_retains_low_count_threshold_missing_and_first_tie_rules_in_both_layouts() {
     let counts = [
         1, 5, 6, 7, 0, 1, 5, 6, 0, 0, 1, 9, 5, 6, 7, 1, 5, 6, 7, 0, 9, 5, 6, 7, 0, 1, 2, 3, 4, 5,
     ];
@@ -44,7 +44,7 @@ fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_
     let pvalues = [
         Some(0.01),
         Some(0.02),
-        None,
+        Some(0.03),
         Some(0.04),
         Some(0.05),
         Some(0.06),
@@ -78,7 +78,7 @@ fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_
             vec![
                 Some(false),
                 Some(true),
-                Some(true),
+                Some(false),
                 Some(true),
                 Some(false),
                 None
@@ -86,7 +86,7 @@ fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_
         );
         assert_eq!(
             actual.pvalue,
-            vec![Some(0.01), None, None, None, Some(0.05), Some(0.06)]
+            vec![Some(0.01), None, Some(0.03), None, Some(0.05), Some(0.06)]
         );
         let refitted = [false, true, false, false, false, false];
         let zeros = [0, 0, 0, 1, 0, 0];
@@ -106,7 +106,7 @@ fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_
             vec![
                 Some(false),
                 Some(false),
-                Some(true),
+                Some(false),
                 Some(false),
                 Some(false),
                 None
@@ -117,7 +117,7 @@ fn borrowed_mask_retains_low_count_threshold_missing_and_last_tie_rules_in_both_
             vec![
                 Some(0.01),
                 Some(0.02),
-                None,
+                Some(0.03),
                 Some(1.),
                 Some(0.05),
                 Some(0.06)
@@ -199,6 +199,8 @@ fn stored_requests_infer_matching_formula_context_and_preserve_explicit_override
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![1, 5, 6, 7]).unwrap();
     let design =
         DesignMatrix::from_row_major(4, 2, vec![1., 0., 1., 0., 1., 1., 1., 1.], None).unwrap();
+    let matrix_origin = design.clone();
+    let design = design.with_origin(DesignOrigin::formula(vec!["condition".into()]).unwrap());
     let (mut fit, raw) = DeseqBuilder::new()
         .size_factors(vec![1.; 4])
         .disable_cooks_cutoff()
@@ -235,12 +237,10 @@ fn stored_requests_infer_matching_formula_context_and_preserve_explicit_override
         .unwrap();
     assert_eq!(forced.rows[0].pvalue, None);
     assert_eq!(forced.rows[0].padj, None);
-    fit.model_frame.as_mut().unwrap().factors[0]
-        .sample_levels
-        .swap(1, 2);
-    let mismatched = fit.results_for_request(&counts, &request, None).unwrap();
-    assert_eq!(mismatched.rows[0].pvalue, None);
-    assert_eq!(mismatched.rows[0].cooks_outlier, Some(true));
+    fit.design = Some(matrix_origin);
+    let matrix = fit.results_for_request(&counts, &request, None).unwrap();
+    assert_eq!(matrix.rows[0].pvalue, None);
+    assert_eq!(matrix.rows[0].cooks_outlier, Some(true));
     fit.model_frame = None;
     assert_eq!(
         fit.results_for_request(&counts, &request, None)
@@ -249,4 +249,23 @@ fn stored_requests_infer_matching_formula_context_and_preserve_explicit_override
             .pvalue,
         None
     );
+}
+
+#[test]
+fn signed_zero_maxima_keep_the_first_numerically_equal_sample() {
+    let counts = [9, 1, 5, 6, 7];
+    for cooks in [[-0., 0., -1., -2., -3.], [0., -0., -1., -2., -3.]] {
+        let heuristic = LowCountHeuristic::new(
+            CountView::from_unsigned(matrix(1, 5, &counts, MatrixOrder::RowMajor)),
+            matrix(1, 5, &cooks, MatrixOrder::RowMajor),
+        )
+        .unwrap();
+        // Selecting the second sample would spare this row. First-sample
+        // selection must mask it, regardless of the sign of either zero.
+        let mask = CooksPolicy::new(Some(-0.5), Some(heuristic))
+            .unwrap()
+            .evaluate([Some(0.1)], [Some(0.)])
+            .unwrap();
+        assert_eq!(mask.pvalue, vec![None]);
+    }
 }

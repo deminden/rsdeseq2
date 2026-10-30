@@ -116,3 +116,13 @@ selection to stored requests, with 101 direct bit-equality cases, 1,510 R
 assertions and unchanged full GTEx exports. Normal shrinkage's global-zero check,
 remaining offsets/formula arithmetic, optional posterior routes and final
 performance reconciliation remain open.
+
+The [formula-origin parity correction](cooks-origin-parity-2026-10-30.md) then
+fixes first-tied Cook's maxima and scopes the shared policy by original formula
+variables/types, using twelve actual DESeq2 fits/results. New fits persist
+validated origin metadata; stored Rust requests and the R presentation adapter
+use the same classifier, with 113 direct bit-equality cases. The independently
+frozen panel eliminates 20 prior missingness disagreements. Some older native
+builder routes still select a helper from the result contrast and need to adopt
+the contrast-independent policy. The remaining normalization/formula/shrinkage
+ports above continue to be required.

@@ -16,6 +16,13 @@
   }
   if (!equal(counts, fit$counts[rows, , drop = FALSE])) invalid("counts")
   cd <- as.data.frame(SummarizedExperiment::colData(object))
+  currentOrigin <- .rsdeseq2_formula_origin(methods::slot(object,"design"))
+  if(is.null(fit$designOrigin)&&!identical(fit$schemaVersion,2L)) {
+    # Older dataset objects still carry their live formula; raw legacy fit
+    # lists without that context keep the explicit legacy policy instead.
+    .rsdeseq2_result_design_origin(fit)
+    fit$designOrigin <- currentOrigin
+  } else if(!identical(.rsdeseq2_result_design_origin(fit),currentOrigin)) invalid("formula origin")
   frame <- stats::model.frame(methods::slot(object, "design"), data = cd)
   design <- stats::model.matrix(methods::slot(object, "design"), data = frame)
   if (!identical(dimnames(design), dimnames(fit$design)) || !equal(design, fit$design)) invalid("design")

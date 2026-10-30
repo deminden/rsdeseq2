@@ -75,9 +75,10 @@ pub fn expanded_factor_design<S: AsRef<str>>(
         coefficient_groups.push(vec![expanded_column]);
     }
 
+    let origin = DesignOrigin::formula(vec![factor.to_string()])?;
     Ok(ExpandedFactorDesign {
-        expanded_design,
-        standard_design,
+        expanded_design: expanded_design.with_origin(origin.clone()),
+        standard_design: standard_design.with_origin(origin),
         coefficient_groups,
         levels,
     })
@@ -423,9 +424,15 @@ pub fn expanded_additive_design_with_all_interactions(
         coefficient_groups.push(vec![expanded_offset + idx]);
     }
 
+    let variables = factors
+        .iter()
+        .map(|f| f.factor.to_string())
+        .chain(numeric_covariates.iter().map(|v| v.name.to_string()))
+        .collect();
+    let origin = DesignOrigin::formula(variables)?;
     Ok(ExpandedAdditiveFactorDesign {
-        expanded_design,
-        standard_design,
+        expanded_design: expanded_design.with_origin(origin.clone()),
+        standard_design: standard_design.with_origin(origin),
         coefficient_groups,
         factor_levels,
         numeric_covariates: numeric_covariates

@@ -228,12 +228,12 @@ results <- function(object,
   }
   if (identical(cutoff, TRUE)) cutoff <- .rsdeseq2_default_cooks_cutoff(fit$design)
   active <- !is.null(cutoff) && !identical(cutoff, FALSE)
-  factors <- if (!active || is.null(fit$colData)) list() else lapply(Filter(is.factor, fit$colData),
-    function(x) list(codes = as.integer(x), levels = nlevels(x)))
+  origin <- .rsdeseq2_result_design_origin(fit)
+  factors <- if(active) .rsdeseq2_cooks_factor_metadata(fit$colData,origin) else list()
   context <- list(refitRows = fit$refitRows, newAllZeroRows = fit$newAllZeroRows,
     maxCooks = if (active) fit$results$maxCooks else NULL,
     counts = if (active) fit$counts else NULL, cooks = if (active) fit$cooks else NULL,
-    design = if (active) fit$design else NULL, factors = factors)
+    design = if (active) fit$design else NULL, factors = factors, origin = origin)
   presented <- .Call("rsdeseq2_present_results",
     as.list(out[c("log2FoldChange", "lfcSE", "stat", "pvalue")]), context,
     if (active) cutoff else NULL, PACKAGE = "rsdeseq2")

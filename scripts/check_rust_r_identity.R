@@ -295,7 +295,7 @@ compareIdentity("public_batch_65",publicInput,list(results=lapply(publicActual,f
 cpCounts <- matrix(c(1,5,6,7,0, 1,5,6,0,0, 1,9,5,6,7, 1,5,6,7,0, 9,5,6,7,0, 1,2,3,4,5),6,5,byrow=TRUE)
 cpCooks <- matrix(c(10,.1,.2,.3,.4,10,.1,.2,.3,.4,10,10,.2,.3,.4,
   NaN,NaN,NaN,NaN,NaN,5,.1,.2,.3,.4,10,.1,.2,.3,.4),6,5,byrow=TRUE)
-cpP <- c(.01,.02,NA_real_,.04,.05,.06);cpMax <- c(10,10,10,10,5,NA_real_)
+cpP <- c(.01,.02,.03,.04,.05,.06);cpMax <- c(10,10,10,10,5,NA_real_)
 cpDesign <- cbind(1,c(0,0,1,1,1))
 cpTable <- data.frame(log2FoldChange=as.double(1:6),lfcSE=rep(.5,6),stat=as.double(2*(1:6)),pvalue=cpP,cooksOutlier=rep(FALSE,6))
 cpBase <- list(test="Wald",schemaVersion=1L,results=list(maxCooks=cpMax),counts=cpCounts,cooks=cpCooks,design=cpDesign,
@@ -327,4 +327,38 @@ for(name in names(cpVariants)) for(enabled in if(name %in% c("matching","additiv
   actual <- c(lapply(as.list(actual[c("log2FoldChange","lfcSE","stat","pvalue")]),hexVector),
     list(cooksOutlier=lapply(actual$cooksOutlier,function(v)if(is.na(v))NULL else v)))
   compareIdentity(paste0("cooks_present_",name,"_",enabled),cpInput(fit,if(enabled)5 else NULL,"present"),actual)
+}
+
+# Strict formula-origin policies share the same original-DESeq2 oracle as the
+# standalone and installed R tests. No R numerical routines may run in policy.
+script <- sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
+script <- gsub("~+~"," ",script,fixed=TRUE)
+reference <- jsonlite::fromJSON(file.path(dirname(normalizePath(script)),"..",
+  "crates/rsdeseq2/tests/data/cooks_policy_r462.json"),simplifyVector=FALSE)
+decodeProbability <- function(x) vapply(x,function(v) {
+  if(is.null(v)) return(NA_real_)
+  readBin(as.raw(strtoi(substring(v,seq(1,15,2),seq(2,16,2)),16L)),"double",n=1,size=8,endian="big")
+},numeric(1))
+for(case in reference$cases) {
+  matrixRows <- function(x,ncol) matrix(as.double(unlist(x)),ncol=ncol,byrow=TRUE)
+  fields <- lapply(case$factors,function(f)factor(as.integer(unlist(f$codes)),levels=seq_len(f$levels)))
+  names(fields) <- vapply(case$factors,`[[`,character(1),"name")
+  p <- decodeProbability(case$raw_pvalue)
+  table <- data.frame(log2FoldChange=rep(1,reference$genes),lfcSE=rep(.5,reference$genes),stat=rep(2,reference$genes),pvalue=p,cooksOutlier=rep(FALSE,reference$genes))
+  fit <- list(test="Wald",schemaVersion=2L,
+    designOrigin=list(kind=case$kind,variables=as.character(unlist(case$variables))),
+    design=matrixRows(case$design,case$coefficients),colData=as.data.frame(fields),
+    counts=matrixRows(reference$counts,reference$samples),cooks=matrixRows(reference$cooks,reference$samples),
+    results=list(maxCooks=as.double(unlist(reference$maximum))))
+  actual <- withoutRCalculations(rsdeseq2:::.rsdeseq2_fit_cooks_policy(table,fit,5),projection=TRUE,zeros=TRUE)
+  stopifnot(identical(hexVector(actual$pvalue),hexVector(decodeProbability(case$pvalue))))
+  input <- list(cooks_policy=list(mode="present",samples=reference$samples,
+    origin=list(kind=case$kind,variables=case$variables),
+    pvalue=lapply(p,function(v)if(is.na(v))NULL else sprintf("%.17g",v)),
+    maximum=reference$maximum,effect=strings(table$log2FoldChange),se=strings(table$lfcSE),stat=strings(table$stat),cutoff="5",
+    counts=reference$counts,cooks=reference$cooks,design=case$design,coefficients=case$coefficients,
+    factors=case$factors,low_count=NULL,refitted=as.list(rep(FALSE,reference$genes)),new_zero=as.list(rep(FALSE,reference$genes))))
+  compareIdentity(paste0("cooks_origin_",case$name),input,c(
+    lapply(as.list(actual[c("log2FoldChange","lfcSE","stat","pvalue")]),hexVector),
+    list(cooksOutlier=lapply(actual$cooksOutlier,function(v)if(is.na(v))NULL else v))))
 }

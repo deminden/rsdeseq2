@@ -205,6 +205,7 @@ impl DeseqBuilder {
                 input.counts,
                 &cooks.cooks,
                 input.design,
+                self.model_frame.as_ref(),
                 contrast,
             )?;
         } else {
@@ -381,6 +382,7 @@ impl DeseqBuilder {
                 input.counts,
                 &cooks.cooks,
                 input.full_design,
+                self.model_frame.as_ref(),
                 contrast,
             )?;
         } else {

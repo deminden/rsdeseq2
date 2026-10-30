@@ -3,13 +3,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct { const int32_t *codes; size_t levels; } Rsdeseq2FactorCodes;
+typedef struct { const char *name; const int32_t *codes; size_t levels; } Rsdeseq2FactorCodes;
 typedef struct {
     const double *max_cooks;
     const int32_t *refitted;
     const int32_t *new_zero;
     size_t samples;
     size_t coefficients;
+    uint8_t origin_kind;
+    size_t variables_len;
+    const char *const *variables;
     const double *design;
     const double *counts;
     const double *cooks;

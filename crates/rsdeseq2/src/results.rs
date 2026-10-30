@@ -8,7 +8,9 @@ mod implementation;
 mod replacement_policy;
 mod request;
 
-pub use cooks_policy::{CooksMask, CooksPolicy, LowCountHeuristic, two_level_design_matches};
+pub use cooks_policy::{
+    CooksMask, CooksPolicy, LowCountHeuristic, low_count_eligible, two_level_design_matches,
+};
 pub use implementation::*;
 pub use replacement_policy::{ReplacementRows, RowFlags};
 pub use request::ResultRequest;

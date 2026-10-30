@@ -1,10 +1,13 @@
 //! Synchronous borrowed fitted-result policy. No R APIs or retained pointers.
 use super::{borrowed_cooks_heuristic, input_slice, output_slice, run_backend};
+use rsdeseq2::design::DesignOrigin;
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
-use rsdeseq2::results::{CooksPolicy, ReplacementRows, RowFlags, two_level_design_matches};
+use rsdeseq2::results::{CooksPolicy, ReplacementRows, RowFlags, low_count_eligible};
+use std::ffi::{CStr, c_char};
 
 #[repr(C)]
 pub(super) struct FactorCodes {
+    name: *const c_char,
     codes: *const i32,
     levels: usize,
 }
@@ -15,11 +18,44 @@ pub(super) struct ResultContext {
     new_zero: *const i32,
     samples: usize,
     coefficients: usize,
+    origin_kind: u8,
+    variables_len: usize,
+    variables: *const *const c_char,
     design: *const f64,
     counts: *const f64,
     cooks: *const f64,
     factors_len: usize,
     factors: *const FactorCodes,
+}
+
+unsafe fn identifier<'a>(pointer: *const c_char) -> Result<&'a str, String> {
+    if pointer.is_null() {
+        return Err("design origin identifier is null".into());
+    }
+    unsafe { CStr::from_ptr(pointer) }
+        .to_str()
+        .map_err(|e| e.to_string())
+}
+unsafe fn design_origin(context: &ResultContext) -> Result<DesignOrigin, String> {
+    match context.origin_kind {
+        0 => Ok(DesignOrigin::matrix()),
+        2 => Ok(DesignOrigin::legacy()),
+        1 => {
+            let pointers = unsafe {
+                input_slice(
+                    context.variables,
+                    context.variables_len,
+                    "formula variables",
+                )?
+            };
+            let variables = pointers
+                .iter()
+                .map(|&v| unsafe { identifier(v) }.map(str::to_owned))
+                .collect::<Result<Vec<_>, _>>()?;
+            DesignOrigin::formula(variables).map_err(|e| e.to_string())
+        }
+        _ => Err("unsupported design origin kind".into()),
+    }
 }
 
 unsafe fn replacement_rows<'a>(
@@ -81,6 +117,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
         }
         let context = unsafe { context.as_ref() }.ok_or("result context is null")?;
         let rows = unsafe { replacement_rows(genes, context.refitted, context.new_zero)? };
+        let origin = unsafe { design_origin(context)? };
         let needs_zero = rows.has_new_zero();
         // C only copies columns that Rust may modify. Untouched columns remain
         // shared R inputs and are never borrowed mutably here.
@@ -114,7 +151,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
         let factors =
             unsafe { input_slice(context.factors, context.factors_len, "Cook's factors")? };
         let mut low_count = false;
-        if !context.design.is_null() && context.coefficients == 2 {
+        if !context.design.is_null() {
             let length = context
                 .samples
                 .checked_mul(context.coefficients)
@@ -140,7 +177,12 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                 if codes.iter().any(|&v| v < 1 || v as usize > factor.levels) {
                     return Err("invalid Cook's factor code".into());
                 }
-                if two_level_design_matches(design, codes, factor.levels)
+                let name = if factor.name.is_null() {
+                    ""
+                } else {
+                    unsafe { identifier(factor.name)? }
+                };
+                if low_count_eligible(&origin, design, name, codes, factor.levels)
                     .map_err(|e| e.to_string())?
                 {
                     low_count = true;

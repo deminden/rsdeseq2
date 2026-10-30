@@ -4,7 +4,7 @@ test_that("fitted row policy matches independent masks without R reductions or i
   cooks <- matrix(c(10,.1,.2,.3,.4, 10,.1,.2,.3,.4, 10,10,.2,.3,.4,
     NaN,NaN,NaN,NaN,NaN, 5,.1,.2,.3,.4, 10,.1,.2,.3,.4),6,5,byrow=TRUE)
   table <- data.frame(log2FoldChange=seq_len(6)*1.,lfcSE=rep(.5,6),
-    stat=seq_len(6)*2.,pvalue=c(.01,.02,NA_real_,.04,.05,.06),cooksOutlier=rep(FALSE,6))
+    stat=seq_len(6)*2.,pvalue=c(.01,.02,.03,.04,.05,.06),cooksOutlier=rep(FALSE,6))
   design <- cbind(1,c(0,0,1,1,1))
   groups <- factor(c("A","A","B","B","B"))
   base <- list(test="Wald",schemaVersion=1L,counts=counts,cooks=cooks,design=design,
@@ -33,7 +33,7 @@ test_that("fitted row policy matches independent masks without R reductions or i
       flag <- maximum[gene]>cutoff
       if(flag&&eligible) {
         finite <- which(is.finite(cooks[gene,]))
-        index <- if(length(finite)) tail(finite[cooks[gene,finite]==max(cooks[gene,finite])],1) else integer()
+        index <- if(length(finite)) finite[which.max(cooks[gene,finite])] else integer()
         if(length(index)&&sum(counts[gene,]>counts[gene,index])>=3L) flag <- FALSE
       }
       out$cooksOutlier[gene] <- flag
@@ -59,9 +59,9 @@ test_that("fitted row policy matches independent masks without R reductions or i
   fit <- modifyList(base,variants$matching)
   corrupt <- fit; corrupt$cooks[1,1] <- Inf
   expect_error(policy(table,corrupt,5),"cooks must contain finite")
-  expect_equal(policy(table,fit,5)$cooksOutlier,c(FALSE,FALSE,TRUE,FALSE,FALSE,NA))
+  expect_equal(policy(table,fit,5)$cooksOutlier,c(FALSE,FALSE,FALSE,FALSE,FALSE,NA))
   cached <- fit; cached$rawPvalue <- table$pvalue/2
-  expect_equal(policy(table,cached,FALSE,cached=TRUE)$pvalue,c(.005,.01,NA,1,.025,.03))
+  expect_equal(policy(table,cached,FALSE,cached=TRUE)$pvalue,c(.005,.01,.015,1,.025,.03))
   legacy <- fit; legacy$rawPvalue <- NULL
   expect_error(policy(table,legacy,FALSE,cached=TRUE),"lacks raw p-values")
   legacy$test <- "LRT"; legacy$schemaVersion <- NULL
@@ -84,4 +84,38 @@ test_that("fitted policy validates probabilities and maxima after replacement ov
   fit$newAllZeroRows <- FALSE
   expect_identical(policy(out,fit,FALSE),before)
   expect_identical(out,before)
+})
+
+test_that("shared fitted policy matches frozen original DESeq2 formula and matrix decisions", {
+  r <- jsonlite::fromJSON(test_path("data", "cooks_policy_r462.json"), simplifyVector=FALSE)
+  values <- function(x) as.double(unlist(x))
+  matrixRows <- function(x, ncol) matrix(values(x), ncol=ncol, byrow=TRUE)
+  decode <- function(x) vapply(x,function(v) {
+    if(is.null(v)) return(NA_real_)
+    bytes <- as.raw(strtoi(substring(v,seq(1,15,2),seq(2,16,2)),16L))
+    readBin(bytes,"double",n=1,size=8,endian="big")
+  },numeric(1))
+  bits <- function(x) lapply(x,function(v) if(is.na(v))NULL else writeBin(v,raw(),size=8,endian="big"))
+  expect_length(r$cases,12L)
+  for(case in r$cases) {
+    fields <- lapply(case$factors,function(f) factor(as.integer(unlist(f$codes)),levels=seq_len(f$levels)))
+    names(fields) <- vapply(case$factors,`[[`,character(1),"name")
+    cd <- as.data.frame(fields)
+    # Original numeric fields are absent from this factor-only context. They
+    # must never acquire eligibility from an unrelated two-level factor.
+    fit <- list(test="Wald",schemaVersion=2L,
+      designOrigin=list(kind=case$kind,variables=as.character(unlist(case$variables))),
+      colData=cd,design=matrixRows(case$design,case$coefficients),
+      counts=matrixRows(r$counts,r$samples),cooks=matrixRows(r$cooks,r$samples),
+      results=list(maxCooks=values(r$maximum)))
+    table <- data.frame(log2FoldChange=rep(1,r$genes),lfcSE=rep(.5,r$genes),
+      stat=rep(2,r$genes),pvalue=decode(case$raw_pvalue),cooksOutlier=rep(FALSE,r$genes))
+    original <- table
+    actual <- rsdeseq2:::.rsdeseq2_fit_cooks_policy(table,fit,as.double(r$cutoff))
+    expect_identical(bits(actual$pvalue),bits(decode(case$pvalue)),info=case$name)
+    expect_identical(bits(rsdeseq2:::.rsdeseq2_bh_adjust(actual$pvalue)),bits(decode(case$padj)),info=case$name)
+    expect_identical(is.na(actual$pvalue)&!is.na(table$pvalue),as.logical(unlist(case$masked)),info=case$name)
+    expect_identical(actual$cooksOutlier,as.logical(unlist(case$masked)),info=case$name)
+    expect_identical(table,original,info=case$name)
+  }
 })
