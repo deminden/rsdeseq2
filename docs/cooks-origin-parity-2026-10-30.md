@@ -177,3 +177,8 @@ no-intercept, mixed/scaled numeric and transformed-factor routes need the same
 contrast-independent origin classification now used by stored `ResultRequest`
 and the fitted R policy. This checkpoint does not claim those older builders
 already have complete policy parity.
+
+The subsequent [builder-policy correction](builder-cooks-policy-2026-10-30.md)
+resolves the contrast-dependent dispatch gap recorded above across all 21 native
+builder masking sites, while preserving this checkpoint's artifacts and measured
+costs.

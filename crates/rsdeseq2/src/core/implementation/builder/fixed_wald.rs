@@ -262,29 +262,15 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        if let Some(factor_contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(design, coefficient)?
-        {
-            let original_cooks =
-                original_fit
-                    .cooks
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "Cook's distances are required before replacement refit"
-                            .to_string(),
-                    })?;
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                design,
-                self.model_frame.as_ref(),
-                factor_contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_fit.cooks.as_ref(),
+            design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -352,29 +338,15 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        if let Some(factor_contrast) =
-            self.model_frame_factor_level_contrast_for_numeric_contrast(design, contrast)?
-        {
-            let original_cooks =
-                original_fit
-                    .cooks
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "Cook's distances are required before replacement refit"
-                            .to_string(),
-                    })?;
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                design,
-                self.model_frame.as_ref(),
-                factor_contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_fit.cooks.as_ref(),
+            design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -609,14 +581,14 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut wald_output.results,
             cooks_cutoff,
             counts,
-            &wald_output.cooks.cooks,
+            Some(&wald_output.cooks.cooks),
             design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(
             &mut wald_output.results,
@@ -714,14 +686,14 @@ impl DeseqBuilder {
                 .ok_or_else(|| DeseqError::InvalidOptions {
                     reason: "Cook's distances are required before replacement refit".to_string(),
                 })?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            original_cooks,
+            Some(original_cooks),
             design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);

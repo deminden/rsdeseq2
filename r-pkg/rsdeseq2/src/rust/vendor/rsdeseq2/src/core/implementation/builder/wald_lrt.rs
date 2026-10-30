@@ -337,14 +337,14 @@ impl DeseqBuilder {
                 reason: "Cook's distances are required before factor-level Cook's filtering"
                     .to_string(),
             })?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            cooks,
+            Some(cooks),
             design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);
@@ -710,14 +710,14 @@ impl DeseqBuilder {
                 reason: "Cook's distances are required before factor-level Cook's filtering"
                     .to_string(),
             })?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            cooks,
+            Some(cooks),
             full_design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
         let (result_name, comparison) = factor_level_result_metadata(contrast);

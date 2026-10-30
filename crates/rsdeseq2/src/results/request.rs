@@ -1,7 +1,7 @@
 //! Validated result policy, independent of fit execution and presentation.
 use super::{
-    CooksPolicy, DeseqResults, LowCountHeuristic, low_count_eligible, mask_cooks_policy_rows,
-    resolve_cooks_cutoff,
+    CooksPolicy, DeseqResults, LowCountHeuristic, low_count_eligible_for_frame,
+    mask_cooks_policy_rows, resolve_cooks_cutoff,
 };
 use crate::contrasts::ResultsContrast;
 use crate::core::{CountMatrix, DeseqFit};
@@ -114,29 +114,9 @@ impl DeseqFit {
             && request.low_count_heuristic.is_none()
             && let Some(frame) = &self.model_frame
         {
-            for factor in &frame.factors {
-                let levels = factor.levels.as_ref().map_or_else(
-                    || {
-                        factor
-                            .sample_levels
-                            .iter()
-                            .collect::<std::collections::BTreeSet<_>>()
-                            .len()
-                    },
-                    Vec::len,
-                );
-                if low_count_eligible(
-                    design.origin(),
-                    design.matrix().into(),
-                    &factor.name,
-                    &factor.sample_levels,
-                    levels,
-                )? {
-                    low_count = true;
-                    break;
-                }
-            }
+            low_count = low_count_eligible_for_frame(design, frame)?;
         }
+
         let heuristic = if low_count && cutoff.is_some() {
             let cooks = self
                 .cooks

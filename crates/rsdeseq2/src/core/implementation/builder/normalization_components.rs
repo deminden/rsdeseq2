@@ -23,6 +23,15 @@ impl DeseqBuilder {
         if let Some(observer) = &self.execution_observer {
             observer.lock().unwrap().push(rayon::current_num_threads());
         }
+        if let Some(frame) = &self.model_frame {
+            frame.validate()?;
+            let samples = frame.n_samples()?;
+            if samples != counts.n_samples() {
+                return Err(invalid_dimensions(
+                    "formula model frame samples", counts.n_samples(), samples,
+                ));
+            }
+        }
         // DESeq2 gives assay-shaped normalization factors precedence over
         // size-factor estimation; supplied size factors are kept only for APIs
         // that still need sample-scale metadata.
@@ -196,21 +205,15 @@ impl DeseqBuilder {
             input.design.n_samples(),
             input.design.n_coefficients(),
         )?;
-        if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(input.design, input.coefficient)?
-        {
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                input.counts,
-                &cooks.cooks,
-                input.design,
-                self.model_frame.as_ref(),
-                contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            input.counts,
+            Some(&cooks.cooks),
+            input.design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(WaldPipelineOutput {
@@ -282,7 +285,15 @@ impl DeseqBuilder {
             input.design.n_samples(),
             input.design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut results, cooks_cutoff)?;
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            input.counts,
+            Some(&cooks.cooks),
+            input.design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(WaldContrastPipelineOutput {
@@ -373,21 +384,15 @@ impl DeseqBuilder {
             input.full_design.n_samples(),
             input.full_design.n_coefficients(),
         )?;
-        if let Some(contrast) = self
-            .model_frame_factor_level_contrast_for_coefficient(input.full_design, input.coefficient)?
-        {
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                input.counts,
-                &cooks.cooks,
-                input.full_design,
-                self.model_frame.as_ref(),
-                contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            input.counts,
+            Some(&cooks.cooks),
+            input.full_design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(LrtPipelineOutput {

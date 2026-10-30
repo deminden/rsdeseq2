@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Shared tie/origin correction matches twelve original-DESeq2 cases, 113 direct interface cases and a 1,584-assertion source check; see the [origin checkpoint](cooks-origin-parity-2026-10-30.md). Older native builder helper selection, remaining shrinkage zero flags, offsets/formula and posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Original formula scope now also governs all 21 native builder masking sites; 56 fit/query/context comparisons preserve fitted state. See the [builder checkpoint](builder-cooks-policy-2026-10-30.md). Initial row adjustment, remaining shrinkage row preparation, offsets/formula and posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -127,3 +127,11 @@ schema 2 with explicit legacy compatibility. The source check passes 1,584
 assertions and 113 direct interface cases pass. All 121+9 GTEx gates and 22
 unchanged exports pass. Older builder contrast-dependent helper selection,
 remaining R arithmetic and the final combined performance audit remain open.
+
+The [native builder correction](builder-cooks-policy-2026-10-30.md) then removes
+contrast-dependent Cook dispatch across all 21 builder masking sites. Fifty-six
+actual fit/query/context comparisons agree with stored requests, with unchanged
+fitted state. Shared metadata preflight preserves alias/shape validation, and
+mask-stage BH is omitted before final filtering. The full Rust suite passes
+1,055 tests; the R source check remains 1,584 assertions with 113 direct interface
+cases. The remaining initial adjustment and Rust-only ports are still required.

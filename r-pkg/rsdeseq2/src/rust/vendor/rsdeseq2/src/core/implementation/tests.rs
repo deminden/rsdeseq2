@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::{
-        CountMatrix, apply_cooks_cutoff_for_factor_level_metadata,
+        CountMatrix, apply_cooks_cutoff_for_design,
         factor_level_contrast_is_single_two_level_condition, full_deviance_from_log_like,
     };
     use crate::contrasts::FactorLevelContrast;
@@ -138,20 +138,20 @@ mod tests {
         let design = design
             .with_origin(crate::design::DesignOrigin::formula(vec!["condition".into()]).unwrap());
         let mut two_level_results = one_cooks_result();
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut two_level_results,
             Some(5.0),
             &counts,
-            &cooks,
+            Some(&cooks),
             &design,
             None,
-            FactorLevelContrast::new("condition", "B", "A", &two_levels),
+            Some(FactorLevelContrast::new("condition", "B", "A", &two_levels)),
         )
         .unwrap();
         assert_eq!(two_level_results.rows[0].pvalue, Some(0.01));
         assert_eq!(two_level_results.rows[0].cooks_outlier, Some(false));
-        // Two labels alone do not establish a single-factor design. A third
-        // design column must disable the special low-count exception.
+        // Original formula variables, including another factor, determine scope.
+        // The number of numeric design columns alone is not the predicate.
         let additive = DesignMatrix::from_row_major(
             4,
             3,
@@ -163,14 +163,14 @@ mod tests {
             crate::design::DesignOrigin::formula(vec!["batch".into(), "condition".into()]).unwrap(),
         );
         let mut additive_results = one_cooks_result();
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut additive_results,
             Some(5.),
             &counts,
-            &cooks,
+            Some(&cooks),
             &additive,
             None,
-            FactorLevelContrast::new("condition", "B", "A", &two_levels),
+            Some(FactorLevelContrast::new("condition", "B", "A", &two_levels)),
         )
         .unwrap();
         assert_eq!(additive_results.rows[0].pvalue, None);
@@ -181,14 +181,19 @@ mod tests {
             .map(String::from)
             .collect::<Vec<_>>();
         let mut extra_level_results = one_cooks_result();
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut extra_level_results,
             Some(5.0),
             &counts,
-            &cooks,
+            Some(&cooks),
             &design,
             None,
-            FactorLevelContrast::new("condition", "B", "A", &extra_level),
+            Some(FactorLevelContrast::new(
+                "condition",
+                "B",
+                "A",
+                &extra_level,
+            )),
         )
         .unwrap();
         assert_eq!(extra_level_results.rows[0].pvalue, None);

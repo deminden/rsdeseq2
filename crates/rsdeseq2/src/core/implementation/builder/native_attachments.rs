@@ -314,7 +314,15 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        apply_cooks_cutoff(&mut lrt_output.results, cooks_cutoff)?;
+        apply_cooks_cutoff_for_design(
+            &mut lrt_output.results,
+            cooks_cutoff,
+            counts,
+            Some(&lrt_output.cooks.cooks),
+            full_design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
         lrt_output.results.set_resolved_contrast_metadata(
             "contrast",

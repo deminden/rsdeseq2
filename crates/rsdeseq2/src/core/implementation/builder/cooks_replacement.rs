@@ -83,21 +83,15 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(design, coefficient)?
-        {
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                design,
-                self.model_frame.as_ref(),
-                contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            Some(original_cooks),
+            design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -175,29 +169,15 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        if let Some(factor_contrast) =
-            self.model_frame_factor_level_contrast_for_numeric_contrast(design, contrast)?
-        {
-            let original_cooks =
-                original_fit
-                    .cooks
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "Cook's distances are required before replacement refit"
-                            .to_string(),
-                    })?;
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                design,
-                self.model_frame.as_ref(),
-                factor_contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_fit.cooks.as_ref(),
+            design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementWaldOutput {
@@ -339,14 +319,14 @@ impl DeseqBuilder {
                 .ok_or_else(|| DeseqError::InvalidOptions {
                     reason: "Cook's distances are required before replacement refit".to_string(),
                 })?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            original_cooks,
+            Some(original_cooks),
             design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
@@ -453,21 +433,15 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        if let Some(contrast) =
-            self.model_frame_factor_level_contrast_for_coefficient(full_design, coefficient)?
-        {
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                full_design,
-                self.model_frame.as_ref(),
-                contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            Some(original_cooks),
+            full_design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -542,29 +516,15 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        if let Some(factor_contrast) =
-            self.model_frame_factor_level_contrast_for_numeric_contrast(full_design, contrast)?
-        {
-            let original_cooks =
-                original_fit
-                    .cooks
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "Cook's distances are required before replacement refit"
-                            .to_string(),
-                    })?;
-            apply_cooks_cutoff_for_factor_level_metadata(
-                &mut results,
-                cooks_cutoff,
-                counts,
-                original_cooks,
-                full_design,
-                self.model_frame.as_ref(),
-                factor_contrast,
-            )?;
-        } else {
-            apply_cooks_cutoff(&mut results, cooks_cutoff)?;
-        }
+        apply_cooks_cutoff_for_design(
+            &mut results,
+            cooks_cutoff,
+            counts,
+            original_fit.cooks.as_ref(),
+            full_design,
+            self.model_frame.as_ref(),
+            None,
+        )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
         Ok(CooksReplacementLrtOutput {
@@ -684,14 +644,14 @@ impl DeseqBuilder {
                 .ok_or_else(|| DeseqError::InvalidOptions {
                     reason: "Cook's distances are required before replacement refit".to_string(),
                 })?;
-        apply_cooks_cutoff_for_factor_level_metadata(
+        apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            original_cooks,
+            Some(original_cooks),
             full_design,
             self.model_frame.as_ref(),
-            contrast,
+            Some(contrast),
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;
 
