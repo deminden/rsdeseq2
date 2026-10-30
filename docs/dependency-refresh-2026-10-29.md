@@ -1,5 +1,9 @@
 # Stable Rust dependency refresh
 
+The [2026-10-30 registry recheck](dependency-recheck-2026-10-30.md) confirms all
+direct versions below remain latest stable and updates six subsequently released
+WebAssembly transitive packages. The historical measurements here are preserved.
+
 The 2026-10-29 refresh updates both the standalone and R-wrapper Rust dependency
 graphs. The baseline is `a6e376a`. Package versions remain 0.3.1, the declared
 minimum Rust version remains 1.97.1, and the larger Rust-only migration continues.
