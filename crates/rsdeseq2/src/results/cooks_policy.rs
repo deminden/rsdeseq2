@@ -79,6 +79,46 @@ pub fn low_count_eligible<T: Eq>(
     }
 }
 
+// Shared by stored requests and every builder presentation route. Preserve
+// original factor types/declared levels even when derived or unused columns
+// also occur in the model frame.
+pub(crate) fn low_count_eligible_for_frame(
+    design: &crate::design::DesignMatrix,
+    frame: &crate::design::FormulaModelFrame,
+) -> Result<bool, DeseqError> {
+    frame.validate()?;
+    let samples = frame.n_samples()?;
+    if samples != design.n_samples() {
+        return Err(invalid_dimensions(
+            "formula model frame samples",
+            design.n_samples(),
+            samples,
+        ));
+    }
+    for factor in &frame.factors {
+        let levels = factor.levels.as_ref().map_or_else(
+            || {
+                factor
+                    .sample_levels
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+            },
+            Vec::len,
+        );
+        if low_count_eligible(
+            design.origin(),
+            design.matrix().into(),
+            &factor.name,
+            &factor.sample_levels,
+            levels,
+        )? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Masked p-values and diagnostic flags; no BH/filtering is performed here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CooksMask {

@@ -126,3 +126,12 @@ frozen panel eliminates 20 prior missingness disagreements. Some older native
 builder routes still select a helper from the result contrast and need to adopt
 the contrast-independent policy. The remaining normalization/formula/shrinkage
 ports above continue to be required.
+
+The [builder-policy checkpoint](builder-cooks-policy-2026-10-30.md) subsequently
+unifies all 21 native builder masking sites with the original-design classifier.
+Intercepts, scaled/mixed contrasts, no-intercept designs and derived/unused frame
+columns no longer bypass the low-count exception. Fifty-six actual fit/query/
+context combinations match stored requests without changing fitted state. Shared
+metadata preflight retains validation; internal masking omits an unused BH pass
+before final filtering. Initial row adjustments and the remaining Rust-only
+normalization/formula/shrinkage ports remain open.

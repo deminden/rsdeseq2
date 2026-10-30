@@ -8,6 +8,7 @@ mod implementation;
 mod replacement_policy;
 mod request;
 
+pub(crate) use cooks_policy::low_count_eligible_for_frame;
 pub use cooks_policy::{
     CooksMask, CooksPolicy, LowCountHeuristic, low_count_eligible, two_level_design_matches,
 };

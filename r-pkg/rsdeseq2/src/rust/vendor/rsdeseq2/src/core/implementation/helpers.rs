@@ -366,41 +366,23 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
     }
 }
 
-fn apply_cooks_cutoff_for_factor_level_metadata(
+// Policy depends on original model context, never the displayed contrast.
+// Explicit factor metadata remains usable when no model frame was supplied.
+fn apply_cooks_cutoff_for_design(
     results: &mut DeseqResults,
     cutoff: Option<f64>,
     counts: &CountMatrix,
-    cooks: &RowMajorMatrix<f64>,
+    cooks: Option<&RowMajorMatrix<f64>>,
     design: &DesignMatrix,
     model_frame: Option<&FormulaModelFrame>,
-    contrast: FactorLevelContrast<'_>,
+    explicit_factor: Option<FactorLevelContrast<'_>>,
 ) -> Result<(), DeseqError> {
-    let original_factor = design
-        .origin()
-        .variables()
-        .filter(|v| v.len() == 1)
-        .and_then(|v| model_frame.and_then(|frame| frame.factors.iter().find(|f| f.name == v[0])));
-    let eligible = if let Some(factor) = original_factor {
-        let levels = factor.levels.as_ref().map_or_else(
-            || {
-                factor
-                    .sample_levels
-                    .iter()
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len()
-            },
-            Vec::len,
-        );
-        crate::results::low_count_eligible(
-            design.origin(),
-            design.matrix().into(),
-            &factor.name,
-            &factor.sample_levels,
-            levels,
-        )?
-    } else if design.origin().variables().is_some() && model_frame.is_some() {
-        false
-    } else {
+    if cutoff.is_none() {
+        return Ok(());
+    }
+    let eligible = if let Some(frame) = model_frame {
+        crate::results::low_count_eligible_for_frame(design, frame)?
+    } else if let Some(contrast) = explicit_factor {
         factor_level_contrast_is_single_two_level_condition(contrast)
             && crate::results::low_count_eligible(
                 design.origin(),
@@ -409,12 +391,26 @@ fn apply_cooks_cutoff_for_factor_level_metadata(
                 contrast.sample_levels,
                 2,
             )?
-    };
-    if eligible {
-        apply_cooks_cutoff_with_low_count_heuristic(results, cutoff, counts, cooks)
     } else {
-        apply_cooks_cutoff(results, cutoff)
-    }
+        false
+    };
+    let heuristic = if eligible {
+        let cooks = cooks.ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "low-count filtering requires retained Cook's distances".into(),
+        })?;
+        Some(crate::results::LowCountHeuristic::new(
+            crate::matrix::CountView::from(counts),
+            cooks.into(),
+        )?)
+    } else {
+        None
+    };
+    // Every builder caller follows this with final independent filtering/BH.
+    // Keep public standalone masking adapters' adjusted-output contract intact.
+    crate::results::mask_cooks_policy_rows(
+        results,
+        crate::results::CooksPolicy::new(cutoff, heuristic)?,
+    )
 }
 
 fn factor_level_contrast_is_single_two_level_condition(contrast: FactorLevelContrast<'_>) -> bool {
