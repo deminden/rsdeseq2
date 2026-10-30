@@ -57,6 +57,12 @@ Single-pass native/R times increased 1.12%/1.25%, with essentially flat peak RSS
 no optimization round is counted. This does not complete C19/C20 or the remaining
 Rust-only migration.
 
+The [2026-10-30 registry recheck](dependency-recheck-2026-10-30.md) confirms all
+15 direct dependencies remain latest stable and updates six newly released
+WebAssembly transitive packages in the root lock. Native dependency trees and
+the backend lock are unchanged. Locked checks, vendor integrity and crate
+packaging verification pass; this inactive update adds no timing claim.
+
 ## Workflow defect and assertion inventory
 
 | Defect / contract | Interfaces | Independent reference | Exact assertion / test |
