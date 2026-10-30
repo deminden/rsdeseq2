@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation and offset products | The [preparation checkpoint](rust-only-preparation-2026-10-30.md) adds shared raw/fitted exclusion handling and base × exp(offset), with 131 direct identity cases and independent weighted-shrinkage checks. Initial row adjustment, formula/expanded-design and optional posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation, offset products and formula matrix assembly | The [matrix checkpoint](rust-only-model-matrix-2026-10-30.md) adds shared factor/interaction construction and expanded list-contrast means, with 189 direct identity cases and all 94 supported ordered-level counts matching original R bits. Initial row adjustment, formula-expression evaluation, frozen-local VST and optional posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -154,3 +154,16 @@ R process total falls 1.41%. Maximum R RSS rises 9.22 MiB, with individual costs
 of 89.97 MiB for large batches and 61.03 MiB for the 64-sample rlog retained for
 the final combined audit. Eliminating an unused native counts/base-SF matrix
 does not complete C18's enabled-but-no-refit replacement-buffer work.
+
+The [formula-matrix checkpoint](rust-only-model-matrix-2026-10-30.md) then replaces
+production R model-matrix assembly and expanded list-contrast averaging with
+standalone Rust. Forty-eight independent matrices, ten mean-contrast cases and
+the exhaustive 2–95 ordered-level sweep preserve exact reference bits; 189 direct
+interface cases agree. The source package passes 1,933 assertions and the Rust
+suite 1,063 tests. All twenty R workflow payloads and 22 native GTEx exports
+remain byte-identical. One native timing pass increases total elapsed 1.26%,
+with the blocked random third split retained as the dominant outlier; R time
+falls 0.67%, and maximum RSS changes +0.03/−0.53 MiB for native/R. No optimization
+round is counted. R expression evaluation and frozen-local VST numerical work
+are explicitly still required alongside optional posterior routes and the
+previously recorded allocation/performance follow-ups.

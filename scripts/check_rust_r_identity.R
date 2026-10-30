@@ -15,11 +15,12 @@ hex <- function(value) {
   paste(format(writeBin(as.double(value), raw(), size = 8, endian = "big")), collapse = "")
 }
 hexVector <- function(values) lapply(unname(values), hex)
-withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE) {
+withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE, model = FALSE) {
   # Fail at runtime if the production wrapper reintroduces statistical R calls.
   functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = c("mean","exp"))
   if (projection) functions$base <- c(functions$base, "%*%", "sqrt")
   if (zeros) functions$base <- c(functions$base, "rowSums", "colSums", "sum")
+  if (model) functions$stats <- c(functions$stats,"model.matrix","model.matrix.default","contr.treatment","contr.sum","contr.helmert","contr.poly","contr.SAS")
   on.exit(for (package in names(functions)) for (name in functions[[package]])
     suppressMessages(untrace(name, where = asNamespace(package))), add = TRUE)
   for (package in names(functions)) for (name in functions[[package]])
@@ -30,6 +31,8 @@ withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE) 
 guard <- tryCatch(withoutRCalculations(stats::p.adjust(c(.1, .2))), error = identity)
 stopifnot(inherits(guard, "error"), grepl("Production wrapper executed", conditionMessage(guard)))
 guard <- tryCatch(withoutRCalculations(base::exp(0)),error=identity)
+stopifnot(inherits(guard,"error"),grepl("Production wrapper executed",conditionMessage(guard)))
+guard <- tryCatch(withoutRCalculations(stats::model.matrix(~1,data.frame(x=1:2)),model=TRUE),error=identity)
 stopifnot(inherits(guard,"error"),grepl("Production wrapper executed",conditionMessage(guard)))
 set.seed(20261029)
 n <- 2002L
@@ -388,4 +391,24 @@ for(case in preparationReference$rows) {
   stopifnot(inherits(actual,"error")==is.null(case$expected))
   actual <- if(inherits(actual,"error"))list(error=TRUE)else list(indices=as.list(actual))
   compareIdentity(paste0("shrink_rows_",case$name),list(preparation=c(list(kind="Rows"),case)),actual)
+}
+
+# Model-frame expression evaluation is separate; matrix coding and products
+# must execute wholly in the same standalone kernel for these evaluated inputs.
+testSources <- file.path(dirname(normalizePath(script)),"..","r-pkg/rsdeseq2/tests/testthat")
+source(file.path(testSources,"helper-reference-values.R"))
+source(file.path(testSources,"helper-model-matrix.R"))
+matrixReference <- jsonlite::fromJSON(file.path(testSources,"data","model_matrix_r462.json"),simplifyVector=FALSE)
+for(case in matrixReference$cases) {
+  frame <- .model_reference_frame(case)
+  actual <- suppressWarnings(withoutRCalculations(rsdeseq2:::.rsdeseq2_model_matrix(~1,frame),projection=TRUE,zeros=TRUE,model=TRUE))
+  compareIdentity(paste0("model_matrix_",case$name),case,
+    list(names=as.list(colnames(actual)),assignments=as.list(attr(actual,"assign")),values=hexVector(as.vector(t(actual)))))
+}
+for(case in matrixReference$average_contrasts) {
+  positive<-as.integer(unlist(case$positive))+1L;negative<-as.integer(unlist(case$negative))+1L
+  actual<-tryCatch(withoutRCalculations(.Call("rsdeseq2_average_contrast",as.integer(case$coefficients),positive,negative,PACKAGE="rsdeseq2"),projection=TRUE,zeros=TRUE,model=TRUE),error=identity)
+  stopifnot(inherits(actual,"error")==is.null(case$expected))
+  actual<-if(inherits(actual,"error"))list(error=TRUE)else list(values=hexVector(actual))
+  compareIdentity(paste0("average_contrast_",case$name),list(preparation=c(list(kind="AverageContrast"),case)),actual)
 }

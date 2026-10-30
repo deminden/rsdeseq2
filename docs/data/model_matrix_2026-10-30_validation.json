@@ -1,0 +1,116 @@
+{
+  "source_package": {
+    "sha256": "54a704249e7bc24c725adf440a41f45eebee220f137e1e9f6e550df307503d40",
+    "files_verified": 284,
+    "changed_files": [],
+    "description_normalization": "Generated Packaged/NeedsCompilation fields and DCF whitespace only"
+  },
+  "crate_files_verified": 448,
+  "artifact_sha256": {
+    "evaluate_r_interface": "79f252434d7281188319d14befa8243d5631138962ff600d63d7522d9840878e",
+    "rsdeseq2-0.3.1.crate": "e7b2701bc539d5d009f958715a905b899453d46eb885e57aef59cdb4950d75f9",
+    "rsdeseq2": "3c8218d9e4a767239e1c72eee592430202b57c860db94e2d452358a8c94fb2f3"
+  },
+  "rust_tests_passed": 1063,
+  "baseline_commit": "6ace382",
+  "numerical_baseline_commit": "af6e9b8",
+  "implementation": "Shared formula matrix assembly, factor coding, polynomial QR and expanded list-contrast mean weights",
+  "backend_tests_passed": 1,
+  "python_distinct_support_tests_passed": 46,
+  "python_initial_unset_Rscript_skip_resolved_by_targeted_run": true,
+  "r_check_status": "OK",
+  "r_assertions_passed": 1933,
+  "r_failures": 0,
+  "r_warnings": 0,
+  "r_skipped": 0,
+  "standalone_wrapped_bit_equality_cases": 189,
+  "matrix_reference_cases": 48,
+  "average_reference_cases": 10,
+  "ordered_reference_profile": "R4.6.2 / OpenBLAS0.3.34 VORTEX",
+  "full_ordered_level_counts_bit_identical": 94,
+  "existing_reference_manifests_modified": false,
+  "optimization_round_counted": false,
+  "root_and_backend_msrv": "Rust1.97.1 checks passed",
+  "sanitizers": {
+    "status": "passed",
+    "c": "address,undefined",
+    "rust": "address",
+    "rust_stdlib_instrumented": false,
+    "r_interpreter_instrumented": false,
+    "preinstalled_r_dependencies_instrumented": false,
+    "leak_detection": false,
+    "asan_runtime": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/clang/23/lib/darwin/libclang_rt.asan_osx_dynamic.dylib",
+    "target": "aarch64-apple-darwin",
+    "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+    "rust_address_instrumentation_verified": true,
+    "asan_symbols_verified": true,
+    "ubsan_symbols_verified": true
+  },
+  "native_paired_measurement": {
+    "rsdeseq2_baseline": {
+      "cases": 11,
+      "elapsed_s": 35.56560454198916,
+      "max_rss_mib": 302.015625
+    },
+    "rsdeseq2": {
+      "cases": 11,
+      "elapsed_s": 36.01481441700889,
+      "max_rss_mib": 302.046875
+    },
+    "DESeq2": {
+      "cases": 11,
+      "elapsed_s": 188.94596129002457,
+      "max_rss_mib": 1764.5625
+    }
+  },
+  "r_paired_measurement": {
+    "baseline": {
+      "cases": 20,
+      "elapsed_s": 88.6091776270041,
+      "max_rss_mib": 1127.171875
+    },
+    "candidate": {
+      "cases": 20,
+      "elapsed_s": 88.01108162500896,
+      "max_rss_mib": 1126.640625
+    }
+  },
+  "r_complete_raw_payloads_byte_identical": 20,
+  "r_payload_comparison": "Default strict zero-tolerance; no metadata migration exception",
+  "gtex": {
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "checkpoint_exports_byte_identical": 22,
+    "minimum_target_reduction": 664,
+    "minimum_global_reduction": 597,
+    "checked_cli_identical_to_final": true
+  },
+  "reference_sha256": "564f9c290967e4eae8e492455d7177e3a717fd15a35cd5ade8328a7d8458a0a9",
+  "readme_modified": false,
+  "post_measurement_generator_reproduction": {
+    "default_reference_byte_identical": true,
+    "full_matrix_cases_bit_identical": 130,
+    "ordered_counts_bit_identical": 94,
+    "runtime_artifacts_unchanged": true,
+    "timing": "These generator-option and full-reproduction checks ran after both paired measurements completed"
+  },
+  "post_measurement_test_review": {
+    "targeted_tests_passed": 3,
+    "changes": "Removed dead approximate branch from strict matrix oracle checks and added invalid response-index/type assertions",
+    "production_code_changed": false,
+    "runtime_artifacts_byte_identical_to_measured": true,
+    "clippy_and_msrv_passed": true,
+    "generator_script_sha256": "29950ac86e02d72ce44e23647cd38dd42fc4d601d4256000b76b9c740d5ef37e"
+  },
+  "conformance_script_sha256": "e554212d046edc537b7652a51d7aac1100a4f9d70734b0927d9710ce17bea152",
+  "post_measurement_private_library_check": {
+    "formerly_failing_ordered_counts": [
+      53,
+      68,
+      85,
+      91
+    ],
+    "serialized_matrices_including_attributes_byte_identical": true,
+    "production_sources_unchanged": true
+  }
+}

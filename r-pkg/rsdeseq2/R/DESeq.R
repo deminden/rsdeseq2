@@ -95,7 +95,7 @@ DESeq <- function(object,
     }
     designOrigin <- .rsdeseq2_formula_origin(formula)
     modelFrame <- stats::model.frame(formula, data = colData)
-    design <- stats::model.matrix(formula, data = modelFrame)
+    design <- .rsdeseq2_model_matrix(formula, data = modelFrame)
     formulaOffsets <- stats::model.offset(modelFrame)
     prepared <- .rsdeseq2_prepare_normalization(
       object, .rsdeseq2_validate_counts(counts), sizeFactors, normalizationFactors,
@@ -112,7 +112,7 @@ DESeq <- function(object,
       if (!is.null(reducedOffsets) && !identical(as.numeric(reducedOffsets), as.numeric(formulaOffsets))) {
         stop("LRT full and reduced formulas must use the same normalization offsets", call. = FALSE)
       }
-      reduced <- stats::model.matrix(reduced, data = reducedFrame)
+      reduced <- .rsdeseq2_model_matrix(reduced, data = reducedFrame)
     }
   } else if (is.list(object) && !is.null(object$counts)) {
     counts <- object$counts

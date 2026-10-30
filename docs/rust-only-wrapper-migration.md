@@ -148,3 +148,15 @@ inputs. Formula/model-matrix, expanded-contrast and optional posterior/s-value
 arithmetic still need standalone paths. Initial native adjustment, C18's
 remaining replacement allocation and final combined speed/memory reconciliation
 are also still open; the measured individual memory increases remain recorded.
+
+The [formula matrix checkpoint](rust-only-model-matrix-2026-10-30.md) subsequently
+moves factor coding, interaction products, matrix assembly and expanded-list
+mean weights into shared Rust. Formula matrix construction now uses the same
+standalone `ModelMatrixPlan`, with 48 independent matrix references, ten contrast
+references, 189 direct identity cases and a checked source package passing 1,933
+assertions. All 94 supported ordered-level counts match original R output bits
+on the recorded reference environment. Existing GTEx exports and twenty complete
+R workflow payloads remain byte-identical. Numerical expression evaluation in
+`model.frame`, integration with the older standalone formula parser, frozen-local
+VST grids/function evaluation and optional posterior/s-value routes remain open.
+The native timing cost is retained for the combined audit; this is no 2% round.

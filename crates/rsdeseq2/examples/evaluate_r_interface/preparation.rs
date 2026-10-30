@@ -11,6 +11,11 @@ pub(super) struct Input {
 #[derive(Deserialize)]
 #[serde(tag = "kind")]
 enum Preparation {
+    AverageContrast {
+        coefficients: usize,
+        positive: Vec<usize>,
+        negative: Vec<usize>,
+    },
     Offset {
         genes: usize,
         samples: usize,
@@ -36,6 +41,18 @@ fn numbers(values: Vec<String>) -> Result<Vec<f64>, Box<dyn Error>> {
 pub(super) fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let result = (|| -> Result<Value, Box<dyn Error>> {
         match input.preparation {
+            Preparation::AverageContrast {
+                coefficients,
+                positive,
+                negative,
+            } => {
+                let values = rsdeseq2::contrasts::averaged_list_contrast(
+                    coefficients,
+                    &positive,
+                    &negative,
+                )?;
+                Ok(json!({"values":values.iter().map(|&v|super::bits(v)).collect::<Vec<_>>()}))
+            }
             Preparation::Offset {
                 genes,
                 samples,

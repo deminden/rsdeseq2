@@ -163,6 +163,11 @@ measurements/costs remain preserved, and the main README figures stay unchanged.
 
 ## Remaining work
 
+The subsequent [matrix checkpoint](rust-only-model-matrix-2026-10-30.md) moves
+matrix assembly and expanded list-contrast means into shared Rust. It preserves
+this checkpoint's measurements and unresolved memory costs; numerical formula
+expression evaluation and the other migrations below remain required.
+
 Formula/model-matrix and expanded-contrast arithmetic still execute in R and
 require standalone paths. Optional ashr/apeglm and posterior/s-value calculations,
 unused initial native row adjustment, enabled-but-no-refit replacement allocation
