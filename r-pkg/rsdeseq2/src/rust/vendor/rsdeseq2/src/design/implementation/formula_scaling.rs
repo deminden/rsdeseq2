@@ -118,46 +118,22 @@ fn formula_numeric_scale_term(
     let numeric_name = formula_variable_name(numeric_text.trim())?;
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;
-    if scale == FormulaScaleOption::Auto && covariate.values.len() < 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'scale({expression})' requires at least two samples"
-            ),
-        });
-    }
-    let mut sum = 0.0_f64;
-    for (idx, value) in covariate.values.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula transform 'scale({expression})' received non-finite value at sample {idx}"),
-            });
-        }
-        sum += value;
-        if !sum.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'scale({expression})' produced non-finite center"
-                ),
-            });
-        }
-    }
-    let center_value = match center {
-        FormulaScaleOption::Auto => sum / covariate.values.len() as f64,
-        FormulaScaleOption::Disabled => 0.0,
-        FormulaScaleOption::Explicit(value) => value,
+    let centers;
+    let divisors;
+    let center_policy = match center {
+        FormulaScaleOption::Auto => super::numeric_transform::ScalePolicy::Automatic,
+        FormulaScaleOption::Disabled => super::numeric_transform::ScalePolicy::Disabled,
+        FormulaScaleOption::Explicit(value) => { centers = [value]; super::numeric_transform::ScalePolicy::Supplied(&centers) },
     };
-    let divisor = match scale {
-        FormulaScaleOption::Auto => {
-            formula_scale_auto_divisor(expression, covariate.values, center_value)?
-        }
-        FormulaScaleOption::Disabled => 1.0,
-        FormulaScaleOption::Explicit(value) => value,
+    let scale_policy = match scale {
+        FormulaScaleOption::Auto => super::numeric_transform::ScalePolicy::Automatic,
+        FormulaScaleOption::Disabled => super::numeric_transform::ScalePolicy::Disabled,
+        FormulaScaleOption::Explicit(value) => { divisors = [value]; super::numeric_transform::ScalePolicy::Supplied(&divisors) },
     };
-    let values = covariate
-        .values
-        .iter()
-        .map(|value| (value - center_value) / divisor)
-        .collect::<Vec<_>>();
+    let matrix = crate::matrix::MatrixView::new(covariate.values.len(), 1, covariate.values, crate::matrix::MatrixOrder::ColumnMajor)?;
+    let values = super::numeric_transform::scale_covariates(matrix, center_policy, scale_policy)
+        .map_err(|error| DeseqError::InvalidOptions { reason: format!("formula transform 'scale({expression})': {error}") })?
+        .values.into_values();
     let label = match (center, scale) {
         (FormulaScaleOption::Auto, FormulaScaleOption::Auto) => "scale",
         (FormulaScaleOption::Disabled, FormulaScaleOption::Auto) => "scale_uncentered",
@@ -168,40 +144,6 @@ fn formula_numeric_scale_term(
         _ => "centered_scaled",
     };
     Ok((format!("{numeric_name}_{label}"), values))
-}
-
-fn formula_scale_auto_divisor(
-    expression: &str,
-    values: &[f64],
-    center: f64,
-) -> Result<f64, DeseqError> {
-    let mut sum_squares = 0.0_f64;
-    for value in values.iter().copied() {
-        let adjusted = value - center;
-        let square = adjusted * adjusted;
-        if !square.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'scale({expression})' produced non-finite scale"
-                ),
-            });
-        }
-        sum_squares += square;
-        if !sum_squares.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'scale({expression})' produced non-finite scale"
-                ),
-            });
-        }
-    }
-    let divisor = (sum_squares / (values.len() as f64 - 1.0)).sqrt();
-    if !divisor.is_finite() || divisor <= 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'scale({expression})' requires non-zero scale"),
-        });
-    }
-    Ok(divisor)
 }
 
 fn parse_formula_scale_option(
@@ -221,10 +163,10 @@ fn parse_formula_scale_option(
                         "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite number"
                     ),
                 })?;
-            if !parsed.is_finite() || (argument == "scale" && parsed <= 0.0) {
+            if !parsed.is_finite() || (argument == "scale" && parsed == 0.0) {
                 return Err(DeseqError::InvalidOptions {
                     reason: format!(
-                        "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite positive scale"
+                        "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite non-zero scale"
                     ),
                 });
             }

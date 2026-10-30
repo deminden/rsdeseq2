@@ -7,7 +7,6 @@ use crate::matrix::MatrixView;
 
 mod contrasts;
 mod polynomial;
-mod polynomial_reduction;
 use contrasts::CodingMatrix;
 
 fn invalid(reason: impl Into<String>) -> DeseqError {

@@ -280,7 +280,11 @@ fn formula_numeric_covariate_function_values(
     let numeric_name = covariate.name;
     let mut values = Vec::with_capacity(covariate.values.len());
     for (idx, value) in covariate.values.iter().copied().enumerate() {
-        let transformed = if let Some(base) = base {
+        let transformed = if transform.name == "as.integer" {
+            super::numeric_transform::integer_covariate(value).map_err(|error| DeseqError::InvalidOptions {
+                reason: format!("formula transform '{}({expression})' at sample {idx}: {error}", transform.label),
+            })?
+        } else if let Some(base) = base {
             value.log(base)
         } else {
             (transform.apply)(value)

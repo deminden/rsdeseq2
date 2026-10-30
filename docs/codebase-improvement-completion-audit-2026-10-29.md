@@ -167,3 +167,22 @@ falls 0.67%, and maximum RSS changes +0.03/−0.53 MiB for native/R. No optimiza
 round is counted. R expression evaluation and frozen-local VST numerical work
 are explicitly still required alongside optional posterior routes and the
 previously recorded allocation/performance follow-ups.
+
+The [native formula-transform foundation](native-formula-transforms-2026-10-30.md)
+adds standalone finite polynomial/recurrence, scaling and integer-coercion
+kernels and uses them in the native formula parser. Its 85 independent R cases
+preserve exact values/metadata and invalid-output decisions; 75 of these also
+exercise the supported native parser grammar. Integer fractions and range,
+large shifted covariates, negative divisors, disabled-centering overflow and
+signed-zero behavior receive explicit coverage. The full Rust suite passes
+1,065 tests, the checked R package remains at 1,933 assertions, 189 existing
+interface identity cases pass, and all 130 previous matrix cases and 22 GTEx
+exports retain exact outputs. Production R expression evaluation remains open;
+this foundation does not complete C19 or change the other audit dispositions.
+
+Its single paired pass measures native elapsed +0.27% and maximum RSS −2.19 MiB;
+the twenty-case R panel measures elapsed −1.05% and maximum RSS +0.84 MiB. All
+twenty complete R payloads remain byte-identical and below 2 GiB. Individual
+costs, including +8.27 MiB for the large two-group results case, remain recorded.
+No optimization round is counted, and the earlier memory/performance follow-up
+remains open.

@@ -160,3 +160,13 @@ R workflow payloads remain byte-identical. Numerical expression evaluation in
 `model.frame`, integration with the older standalone formula parser, frozen-local
 VST grids/function evaluation and optional posterior/s-value routes remain open.
 The native timing cost is retained for the combined audit; this is no 2% round.
+
+The [native formula-transform foundation](native-formula-transforms-2026-10-30.md)
+then corrects integer coercion and replaces uncentered polynomial construction
+with the shared polynomial QR operation. Standalone polynomial/recurrence and
+matrix-scaling APIs pass 85 independently frozen R cases, including exact
+metadata and invalid fitting-output decisions. Native formula parsing uses these
+kernels, while production R model-frame expression evaluation still needs to
+adopt the shared evaluator. The full previous 130-case matrix sweep and all
+22 native GTEx exports remain exact. This numerical foundation does not close
+the formula migration or the other remaining items above.
