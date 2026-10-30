@@ -95,7 +95,7 @@
   if (!inherits(formula, "formula")) {
     stop("DESeqDataSet design must be a formula", call. = FALSE)
   }
-  modelFrame <- stats::model.frame(formula, data = colData)
+  modelFrame <- .rsdeseq2_model_frame(formula, data = colData)
   design <- .rsdeseq2_model_matrix(formula, data = modelFrame)
   formulaOffsets <- stats::model.offset(modelFrame)
 
@@ -116,7 +116,7 @@
   if (!is.null(weights)) {
     weights <- .rsdeseq2_align_fit_observations(weights, counts, "weights")
   }
-  normalizationFrame <- stats::model.frame(methods::slot(object, "design"), data = colData)
+  normalizationFrame <- .rsdeseq2_model_frame(methods::slot(object, "design"), data = colData)
   prepared <- .rsdeseq2_prepare_normalization(
     object, counts, sizeFactors, normalizationFactors, stats::model.offset(normalizationFrame))
   sizeFactors <- prepared$sizeFactors

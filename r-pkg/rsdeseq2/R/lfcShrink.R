@@ -7,7 +7,7 @@
     stop("normal contrast shrinkage does not support formula interactions", call. = FALSE)
   }
   colData <- as.data.frame(SummarizedExperiment::colData(dds))
-  modelFrame <- stats::model.frame(formula, data = colData)
+  modelFrame <- .rsdeseq2_model_frame(formula, data = colData)
   factorNames <- names(modelFrame)[vapply(modelFrame, is.factor, logical(1))]
   if (!all(factorNames %in% names(colData))) {
     stop("normal contrast shrinkage currently requires factors used directly in the formula", call. = FALSE)

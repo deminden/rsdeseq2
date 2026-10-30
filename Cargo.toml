@@ -13,6 +13,8 @@ approx = "0.5.1"
 clap = { version = "4.6.7", features = ["derive"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 csv = "1.4.0"
+icu_collator = "2.4.0"
+icu_locale = "2.4.0"
 libm = "0.2.16"
 nalgebra = "0.35.0"
 rayon = "1.12.0"

@@ -60,6 +60,41 @@ pub fn scale_covariates(
             ));
         }
     }
+    let output = scale_expression(input, center, scale)?;
+    if output.center.iter().flatten().any(|v| !v.is_finite())
+        || output
+            .scale
+            .iter()
+            .flatten()
+            .any(|v| !v.is_finite() || *v == 0.0)
+    {
+        return Err(invalid(
+            "scaling produced a non-finite center or zero/non-finite divisor",
+        ));
+    }
+    if output.values.as_slice().iter().any(|v| !v.is_finite()) {
+        return Err(invalid("scaling produced non-finite model covariates"));
+    }
+    Ok(output)
+}
+
+// Expression evaluation may produce missing/non-finite intermediates that a
+// later built-in replaces. The finite fitting API above validates the final
+// result; both APIs use these same column reductions and element operations.
+pub(super) fn scale_expression(
+    input: MatrixView<'_, f64>,
+    center: ScalePolicy<'_>,
+    scale: ScalePolicy<'_>,
+) -> Result<ScaledCovariates, DeseqError> {
+    let rows = input.n_rows();
+    let columns = input.n_cols();
+    for policy in [center, scale] {
+        if let ScalePolicy::Supplied(values) = policy
+            && values.len() != columns
+        {
+            return Err(invalid("scale controls require one value per column"));
+        }
+    }
     let mut values = vec![0.0; rows * columns];
     let mut centers =
         (!matches!(center, ScalePolicy::Disabled)).then(|| Vec::with_capacity(columns));
@@ -70,7 +105,13 @@ pub fn scale_covariates(
         // correction pass. They are different operations, not frontend modes.
         let center_value = match center {
             ScalePolicy::Automatic => {
-                (0..rows).fold(0.0, |sum, row| sum + input.at(row, column)) / rows as f64
+                let present = (0..rows)
+                    .map(|row| *input.at(row, column))
+                    .filter(|v| !v.is_nan());
+                let (total, count) = present.fold((0.0, 0usize), |(sum, count), value| {
+                    (sum + value, count + 1)
+                });
+                total / count as f64
             }
             ScalePolicy::Disabled => 0.0,
             ScalePolicy::Supplied(v) => v[column],
@@ -84,22 +125,16 @@ pub fn scale_covariates(
         }
         let divisor = match scale {
             ScalePolicy::Automatic => {
-                let squares = (0..rows)
-                    .map(|r| {
-                        let x = values[r * columns + column];
-                        x * x
-                    })
-                    .sum::<f64>();
-                (squares / rows.saturating_sub(1).max(1) as f64).sqrt()
+                let present = (0..rows)
+                    .map(|r| values[r * columns + column])
+                    .filter(|v| !v.is_nan());
+                let (squares, count) =
+                    present.fold((0.0, 0usize), |(sum, count), x| (sum + x * x, count + 1));
+                (squares / count.saturating_sub(1).max(1) as f64).sqrt()
             }
             ScalePolicy::Disabled => 1.0,
             ScalePolicy::Supplied(v) => v[column],
         };
-        if !center_value.is_finite() || !divisor.is_finite() || divisor == 0.0 {
-            return Err(invalid(
-                "scaling produced a non-finite center or zero/non-finite divisor",
-            ));
-        }
         if !matches!(scale, ScalePolicy::Disabled) {
             for row in 0..rows {
                 values[row * columns + column] /= divisor;
@@ -111,9 +146,6 @@ pub fn scale_covariates(
         if let Some(v) = &mut divisors {
             v.push(divisor);
         }
-    }
-    if values.iter().any(|v| !v.is_finite()) {
-        return Err(invalid("scaling produced non-finite model covariates"));
     }
     Ok(ScaledCovariates {
         values: RowMajorMatrix::from_row_major(rows, columns, values)?,
@@ -137,7 +169,7 @@ pub fn integer_covariate(value: f64) -> Result<f64, DeseqError> {
 
 // Scalar mean used by polynomial construction. Binary64 reduction and the
 // correction/overflow fallback are explicit and shared across all frontends.
-fn scalar_mean(values: &[f64]) -> f64 {
+pub(super) fn scalar_mean(values: &[f64]) -> f64 {
     let n = values.len() as f64;
     let total = values.iter().fold(0.0, |sum, x| sum + x);
     let ordinary = total.is_finite();

@@ -1,7 +1,8 @@
 # Formula parsing/evaluation is still a separate migration item. This adapter
 # transports evaluated variables and term codes; all coding/products are Rust.
 .rsdeseq2_model_matrix <- function(formula, data) {
-  frame <- if (is.null(attr(data, "terms"))) stats::model.frame(formula, data) else data
+  .rsdeseq2_validate_formula_calls(formula)
+  frame <- if (is.null(attr(data, "terms"))) .rsdeseq2_model_frame(formula, data) else data
   terms <- attr(frame, "terms")
   codes <- attr(terms, "factors")
   if (!length(codes)) codes <- matrix(integer(), nrow=length(frame), ncol=0L)

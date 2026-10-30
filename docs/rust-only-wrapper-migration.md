@@ -78,6 +78,13 @@ between the two interfaces.
 The migration is **in progress**. Removing the experimental commits does not
 mean the older R calculations listed above have already been removed.
 
+The user's later formula decision disallows custom functions for now; it
+supersedes the earlier choice to translate their bodies. The
+[built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)
+adds an early custom/masked-call guard and independently checked standalone
+expression primitives. The production model-frame/offset port remains open;
+neither this guard nor the new evaluator closes C19.
+
 The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both
 interfaces share the numerical projection/zero/inference kernels, with 87 direct

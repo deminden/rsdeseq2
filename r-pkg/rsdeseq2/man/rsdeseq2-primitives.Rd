@@ -240,7 +240,9 @@ estimate and standard error.}
 \code{"nbinomR"}, or \code{"general"}.}
 \item{quiet}{Whether to suppress method messages.}
 \item{design, reduced}{Full and reduced numeric model matrices, or formulas for
-\code{DESeqDataSet} input.}
+\code{DESeqDataSet} input. Formula calls must use supported built-in transforms;
+custom functions, aliases and functions masking built-ins are currently
+unsupported. Precompute a numeric model matrix to use a custom transformation.}
 \item{...}{Additional options passed to the selected optional shrinkage
 package. Normal shrinkage rejects unsupported arguments.}
 }

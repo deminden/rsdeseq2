@@ -31,6 +31,8 @@ harness = false
 [dependencies]
 clap.workspace = true
 csv.workspace = true
+icu_collator.workspace = true
+icu_locale.workspace = true
 libm.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true

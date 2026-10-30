@@ -12,6 +12,8 @@ path = "src/lib.rs"
 [dependencies]
 clap = { version = "^4.6.7", features = ["derive"] }
 csv = { version = "^1.4.0" }
+icu_collator = { version = "^2.4.0" }
+icu_locale = { version = "^2.4.0" }
 libm = { version = "^0.2.16" }
 nalgebra = { version = "^0.35.0" }
 rayon = { version = "^1.12.0" }
