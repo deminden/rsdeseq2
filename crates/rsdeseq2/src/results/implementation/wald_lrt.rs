@@ -342,37 +342,11 @@ pub fn apply_cooks_cutoff(
     results: &mut DeseqResults,
     cutoff: Option<f64>,
 ) -> Result<(), DeseqError> {
-    let Some(cutoff) = cutoff else {
+    if cutoff.is_none() {
         return Ok(());
-    };
-    if !cutoff.is_finite() {
-        return Err(DeseqError::NonFiniteValue {
-            context: "Cook's cutoff".to_string(),
-            index: None,
-            value: cutoff,
-        });
     }
-
-    for (idx, row) in results.rows.iter_mut().enumerate() {
-        row.cooks_outlier = match row.max_cooks {
-            Some(value) => {
-                if !value.is_finite() {
-                    return Err(DeseqError::NonFiniteValue {
-                        context: "result maxCooks".to_string(),
-                        index: Some(idx),
-                        value,
-                    });
-                }
-                Some(value > cutoff)
-            }
-            None => None,
-        };
-        if row.cooks_outlier == Some(true) {
-            row.pvalue = None;
-        }
-    }
-    recompute_padj(results)?;
-    Ok(())
+    let policy = crate::results::CooksPolicy::new(cutoff, None)?;
+    apply_cooks_policy(results, policy)
 }
 
 /// Apply Cook's p-value filtering with DESeq2's two-group low-count heuristic.
@@ -389,47 +363,54 @@ pub fn apply_cooks_cutoff_with_low_count_heuristic(
     counts: &CountMatrix,
     cooks: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
-    let Some(cutoff) = cutoff else {
+    if cutoff.is_none() {
         return Ok(());
-    };
-    if !cutoff.is_finite() {
-        return Err(DeseqError::NonFiniteValue {
-            context: "Cook's cutoff".to_string(),
-            index: None,
-            value: cutoff,
-        });
     }
-    validate_cooks_heuristic_inputs(results, counts, cooks)?;
+    // Validate threshold before matrix context, as on the legacy path.
+    crate::results::CooksPolicy::new(cutoff, None)?;
+    let heuristic = crate::results::LowCountHeuristic::new(
+        crate::matrix::CountView::from(counts),
+        cooks.into(),
+    )?;
+    let policy = crate::results::CooksPolicy::new(cutoff, Some(heuristic))?;
+    apply_cooks_policy(results, policy)
+}
 
-    for (gene, row) in results.rows.iter_mut().enumerate() {
-        let is_outlier = match row.max_cooks {
-            Some(value) => {
-                if !value.is_finite() {
-                    return Err(DeseqError::NonFiniteValue {
-                        context: "result maxCooks".to_string(),
-                        index: Some(gene),
-                        value,
-                    });
-                }
-                Some(value > cutoff)
-            }
-            None => None,
-        };
-        row.cooks_outlier = match is_outlier {
-            Some(true) => {
-                let spare =
-                    low_count_outlier_heuristic_spares_row(counts.row(gene)?, cooks.row(gene)?);
-                if spare {
-                    Some(false)
-                } else {
-                    row.pvalue = None;
-                    Some(true)
-                }
-            }
-            other => other,
-        };
+fn apply_cooks_policy(
+    results: &mut DeseqResults,
+    policy: crate::results::CooksPolicy<'_>,
+) -> Result<(), DeseqError> {
+    update_cooks_policy_rows(results, policy, true)
+}
+
+pub(crate) fn mask_cooks_policy_rows(
+    results: &mut DeseqResults,
+    policy: crate::results::CooksPolicy<'_>,
+) -> Result<(), DeseqError> {
+    update_cooks_policy_rows(results, policy, false)
+}
+
+fn update_cooks_policy_rows(
+    results: &mut DeseqResults,
+    policy: crate::results::CooksPolicy<'_>,
+    adjust: bool,
+) -> Result<(), DeseqError> {
+    let mask = policy.evaluate(
+        results.rows.iter().map(|r| r.pvalue),
+        results.rows.iter().map(|r| r.max_cooks),
+    )?;
+    let adjusted = adjust.then(|| bh_adjust(&mask.pvalue));
+    for (index, ((row, pvalue), outlier)) in results
+        .rows
+        .iter_mut()
+        .zip(mask.pvalue)
+        .zip(mask.outlier)
+        .enumerate()
+    {
+        row.pvalue = pvalue;
+        row.cooks_outlier = outlier;
+        row.padj = adjusted.as_ref().and_then(|v| v[index]);
     }
-    recompute_padj(results)?;
     Ok(())
 }
 

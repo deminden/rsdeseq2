@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_cooks_cutoff_for_factor_level_metadata,
+        CountMatrix, apply_cooks_cutoff_for_factor_level_metadata,
         factor_level_contrast_is_single_two_level_condition, full_deviance_from_log_like,
-        CountMatrix,
     };
     use crate::contrasts::FactorLevelContrast;
+    use crate::design::DesignMatrix;
     use crate::errors::DeseqError;
     use crate::matrix::RowMajorMatrix;
     use crate::results::{DeseqResultRow, DeseqResults};
@@ -133,17 +133,41 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect::<Vec<_>>();
+        let design =
+            DesignMatrix::from_row_major(4, 2, vec![1., 0., 1., 0., 1., 1., 1., 1.], None).unwrap();
         let mut two_level_results = one_cooks_result();
         apply_cooks_cutoff_for_factor_level_metadata(
             &mut two_level_results,
             Some(5.0),
             &counts,
             &cooks,
+            &design,
             FactorLevelContrast::new("condition", "B", "A", &two_levels),
         )
         .unwrap();
         assert_eq!(two_level_results.rows[0].pvalue, Some(0.01));
         assert_eq!(two_level_results.rows[0].cooks_outlier, Some(false));
+        // Two labels alone do not establish a single-factor design. A third
+        // design column must disable the special low-count exception.
+        let additive = DesignMatrix::from_row_major(
+            4,
+            3,
+            vec![1., 0., 0., 1., 0., 1., 1., 1., 0., 1., 1., 1.],
+            None,
+        )
+        .unwrap();
+        let mut additive_results = one_cooks_result();
+        apply_cooks_cutoff_for_factor_level_metadata(
+            &mut additive_results,
+            Some(5.),
+            &counts,
+            &cooks,
+            &additive,
+            FactorLevelContrast::new("condition", "B", "A", &two_levels),
+        )
+        .unwrap();
+        assert_eq!(additive_results.rows[0].pvalue, None);
+        assert_eq!(additive_results.rows[0].cooks_outlier, Some(true));
 
         let extra_level = ["A", "A", "B", "C"]
             .into_iter()
@@ -155,6 +179,7 @@ mod tests {
             Some(5.0),
             &counts,
             &cooks,
+            &design,
             FactorLevelContrast::new("condition", "B", "A", &extra_level),
         )
         .unwrap();

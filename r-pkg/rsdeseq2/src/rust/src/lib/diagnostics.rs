@@ -1,4 +1,30 @@
-// Cook's filtering and stable diagnostic schema exports.
+// Borrowed Cook's filtering and stable diagnostic schema exports.
+fn finite_value(value: f64) -> Option<f64> {
+    value.is_finite().then_some(value)
+}
+
+unsafe fn borrowed_cooks_heuristic<'a>(
+    genes: usize,
+    samples: usize,
+    counts: *const f64,
+    cooks: *const f64,
+) -> Result<rsdeseq2::results::LowCountHeuristic<'a>, String> {
+    use rsdeseq2::matrix::{CountView, MatrixOrder, MatrixView};
+    let length = genes.checked_mul(samples).ok_or("Cook's shape overflow")?;
+    let matrix = |pointer, name| -> Result<_, String> {
+        MatrixView::new(
+            genes,
+            samples,
+            unsafe { input_slice(pointer, length, name)? },
+            MatrixOrder::ColumnMajor,
+        )
+        .map_err(|e| e.to_string())
+    };
+    let counts =
+        CountView::from_doubles(matrix(counts, "Cook's counts")?).map_err(|e| e.to_string())?;
+    rsdeseq2::results::LowCountHeuristic::new(counts, matrix(cooks, "Cook's distances")?)
+        .map_err(|e| e.to_string())
+}
 
 /// # Safety
 ///
@@ -22,43 +48,27 @@ pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
     run_backend(|| {
         let pvalues = unsafe { input_slice(pvalues, n_genes, "p-values")? };
         let max_cooks = unsafe { input_slice(max_cooks, n_genes, "maximum Cook's distances")? };
-        let mut results = DeseqResults {
-            rows: (0..n_genes)
-                .map(|gene| DeseqResultRow {
-                    gene: None,
-                    base_mean: 0.0,
-                    log2_fold_change: None,
-                    lfc_se: None,
-                    stat: None,
-                    pvalue: pvalues[gene].is_finite().then_some(pvalues[gene]),
-                    padj: None,
-                    dispersion: None,
-                    converged: None,
-                    max_cooks: max_cooks[gene].is_finite().then_some(max_cooks[gene]),
-                    cooks_outlier: None,
-                    filtered: None,
-                })
-                .collect(),
-            ..DeseqResults::default()
-        };
-        if use_low_count_heuristic != 0 {
-            let count_matrix = unsafe { counts_from_r(n_genes, n_samples, counts)? };
-            let cooks_matrix = unsafe { row_major_from_column_major(n_genes, n_samples, cooks)? };
-            apply_cooks_cutoff_with_low_count_heuristic(
-                &mut results,
-                Some(cutoff),
-                &count_matrix,
-                &cooks_matrix,
-            )
-            .map_err(|error| error.to_string())?;
-        } else {
-            apply_cooks_cutoff(&mut results, Some(cutoff)).map_err(|error| error.to_string())?;
+        if use_low_count_heuristic > 1 {
+            return Err("low-count flag must be zero or one".into());
         }
+        let heuristic = if use_low_count_heuristic == 1 {
+            Some(unsafe { borrowed_cooks_heuristic(n_genes, n_samples, counts, cooks)? })
+        } else {
+            None
+        };
+        let policy = rsdeseq2::results::CooksPolicy::new(Some(cutoff), heuristic)
+            .map_err(|e| e.to_string())?;
+        let mask = policy
+            .evaluate(
+                pvalues.iter().copied().map(finite_value),
+                max_cooks.iter().copied().map(finite_value),
+            )
+            .map_err(|e| e.to_string())?;
         let out_p = unsafe { output_slice(output_pvalues, n_genes, "masked p-values")? };
         let outlier = unsafe { output_slice(output_outlier, n_genes, "Cook's outlier flags")? };
-        for (gene, row) in results.rows.iter().enumerate() {
-            out_p[gene] = row.pvalue.unwrap_or(f64::NAN);
-            outlier[gene] = row.cooks_outlier.map_or(u8::MAX, u8::from);
+        for gene in 0..n_genes {
+            out_p[gene] = mask.pvalue[gene].unwrap_or(f64::NAN);
+            outlier[gene] = mask.outlier[gene].map_or(u8::MAX, u8::from);
         }
         Ok(())
     })

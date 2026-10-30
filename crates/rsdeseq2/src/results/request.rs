@@ -1,7 +1,7 @@
 //! Validated result policy, independent of fit execution and presentation.
 use super::{
-    DeseqResults, apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic,
-    resolve_cooks_cutoff,
+    CooksPolicy, DeseqResults, LowCountHeuristic, mask_cooks_policy_rows, resolve_cooks_cutoff,
+    two_level_design_matches,
 };
 use crate::contrasts::ResultsContrast;
 use crate::core::{CountMatrix, DeseqFit};
@@ -22,7 +22,7 @@ pub struct ResultRequest {
     wald: WaldTestOptions,
     cooks: CooksCutoff,
     filtering: IndependentFilteringOptions,
-    low_count_heuristic: bool,
+    low_count_heuristic: Option<bool>,
 }
 
 impl ResultRequest {
@@ -50,13 +50,14 @@ impl ResultRequest {
             wald,
             cooks,
             filtering,
-            low_count_heuristic: false,
+            low_count_heuristic: None,
         })
     }
 
-    /// Enable the two-group heuristic after the caller establishes its design context.
+    /// Override the two-group heuristic. By default, stored formula factors and
+    /// a matching two-column design establish eligibility automatically.
     pub fn low_count_heuristic(mut self, enabled: bool) -> Self {
-        self.low_count_heuristic = enabled;
+        self.low_count_heuristic = Some(enabled);
         self
     }
 }
@@ -107,16 +108,45 @@ impl DeseqFit {
                 reason: "Cook's filtering requires retained Cook's context".into(),
             });
         }
-        if request.low_count_heuristic && cutoff.is_some() {
+        let mut low_count = request.low_count_heuristic.unwrap_or(false);
+        if cutoff.is_some()
+            && request.low_count_heuristic.is_none()
+            && let Some(frame) = &self.model_frame
+        {
+            for factor in &frame.factors {
+                let levels = factor.levels.as_ref().map_or_else(
+                    || {
+                        factor
+                            .sample_levels
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                    },
+                    Vec::len,
+                );
+                if two_level_design_matches(design.matrix().into(), &factor.sample_levels, levels)?
+                {
+                    low_count = true;
+                    break;
+                }
+            }
+        }
+        let heuristic = if low_count && cutoff.is_some() {
             let cooks = self
                 .cooks
                 .as_ref()
                 .ok_or_else(|| DeseqError::InvalidOptions {
                     reason: "low-count filtering requires retained Cook's distances".into(),
                 })?;
-            apply_cooks_cutoff_with_low_count_heuristic(&mut results, cutoff, counts, cooks)?;
+            Some(LowCountHeuristic::new(
+                crate::matrix::CountView::from(counts),
+                cooks.into(),
+            )?)
         } else {
-            apply_cooks_cutoff(&mut results, cutoff)?;
+            None
+        };
+        if cutoff.is_some() {
+            mask_cooks_policy_rows(&mut results, CooksPolicy::new(cutoff, heuristic)?)?;
         }
         apply_independent_filtering(&mut results, &request.filtering)?;
         Ok(results)

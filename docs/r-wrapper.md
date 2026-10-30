@@ -26,6 +26,10 @@ inference borrows shared arrays in chunks of at most 64 requests (default 32);
 filtering and Cook's decisions remain separate for every request. Primitive
 Wald/LRT fits and supported list inputs are also accepted. See the
 [batch implementation and validation](rust-only-result-batches-2026-10-30.md).
+Fitted Cook's/refit presentation now uses the shared borrowed Rust row policy;
+R only marshals context and attaches output columns. The
+[Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md) records its independent
+checks, corrected native design eligibility, exact comparisons and measured costs.
 
 `nproc` controls a reusable local worker pool for fitting, replacement refits and
 transforms, including frozen rlog. The `strict`, `fast` and `diagnostic` mode

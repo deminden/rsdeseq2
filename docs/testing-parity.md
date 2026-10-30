@@ -264,3 +264,33 @@ rules now use the standalone Rust engine. Remaining R calculations are listed in
 the [migration inventory](rust-only-wrapper-migration.md); no reference or
 precision bound has been relaxed to close a gate. Earlier checkpoint numbers and
 measurements remain in their linked historical reports.
+
+## Shared Cook/refit checkpoint — 2026-10-30
+
+The [Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md) passes 1,049
+Rust tests, one backend test and 45 Python checks. The final R source package
+has Status OK, 1,510 assertions, no failures/warnings/skips and 262 source files
+matching the working tree. Direct standalone/wrapped comparisons cover 101
+bit-equality cases. C ASan/UBSan and Rust ASan pass malformed-buffer and valid
+shared/writable-storage controls. MSRV, formatting, Clippy, strict documentation,
+vendor checks and crate verification pass. Remote publication jobs remain pending.
+
+Independent row-policy checks cover the eligibility correction for additive or
+mismatched designs, automatic stored formula context, exact thresholds, last
+legacy ties, three-larger-count exceptions, missingness, replacement/refit behavior and
+validation before mutation. Runtime guards reject R outer products/intermediate
+BH in fitted presentation. All 22 GTEx exports remain byte-identical to
+`a7b256f`, with 121+9 unchanged precision gates; those runs disable Cook's, so
+the dedicated row-policy checks establish the corrected eligibility behavior.
+
+One native paired timing pass shows +2.08% elapsed time and no optimization round.
+All 18 paired R input/fit/output payloads are byte-identical. Targeted two-group
+ten-result time improves 14.84% and peak RSS falls 27 MiB, while the full R
+process sum changes +0.19%. Slower controls and remaining migration work are
+retained in the checkpoint and completion audit.
+
+A final installed-source audit also identifies remaining exact-tie and strict
+formula-origin differences from real DESeq2. These checks preserve the legacy
+wrapper tie rule for this migration; they do not establish full DESeq2 Cook's
+parity for those edges. The checkpoint and completion audit keep the required
+independent correction open.

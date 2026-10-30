@@ -35,7 +35,7 @@ if (workflow == "replacement") {
   batch <- factor(rep(1:4, 2)); sizeFactors <- NULL
 }
 cd <- data.frame(condition = condition, batch = batch, row.names = colnames(counts))
-formula <- if (workflow %in% c("rlog", "vst", "replacement")) ~ condition else ~ batch + condition
+formula <- if (workflow %in% c("rlog", "vst", "replacement", "two_group_results")) ~ condition else ~ batch + condition
 dds <- DESeq2::DESeqDataSetFromMatrix(counts, cd, formula)
 fitArgs <- list(object = dds, fitType = "mean", sizeFactors = sizeFactors, nproc = 1L,
                 minReplicatesForReplace = if (workflow == "replacement") 3L else if (workflow == "replacement_none") 7L else Inf)
@@ -44,19 +44,21 @@ fit <- timed("fit", do.call(rsdeseq2::DESeq, fitArgs))
 state <- S4Vectors::metadata(fit)$rsdeseq2RustFit
 if (workflow == "replacement") stopifnot(state$nRefit > 0L)
 if (workflow == "replacement_none") stopifnot(state$nRefit == 0L)
+multipleResults <- function() {
+  requests <- lapply(seq_len(10L), function(i) list(name = rsdeseq2::resultsNames(fit)[[1L + i %% ncol(state$beta)]]))
+  # Older packages can execute the same requests individually. This changes
+  # transport only; both sides retain their normal per-request result policies.
+  tables <- if ("resultsList" %in% getNamespaceExports("rsdeseq2")) {
+    rsdeseq2::resultsList(fit, requests)
+  } else lapply(requests, function(request) do.call(rsdeseq2::results, c(list(object = fit), request)))
+  lapply(tables, as.data.frame)
+}
 value <- switch(workflow,
   rlog = timed("rlog", {out <- rsdeseq2::rlog(fit, blind = FALSE, fitType = "mean", nproc = 1L); list(values = SummarizedExperiment::assay(out), metadata = S4Vectors::metadata(out))}),
   vst = timed("vst", {out <- rsdeseq2::varianceStabilizingTransformation(fit, blind = FALSE, fitType = "mean", nproc = 1L); SummarizedExperiment::assay(out)}),
   multi_results = timed("ten_results", lapply(seq_len(10L), function(i) as.data.frame(rsdeseq2::results(fit, name = rsdeseq2::resultsNames(fit)[[1L + i %% ncol(state$beta)]])))),
-  batch_results = timed("ten_results", {
-    requests <- lapply(seq_len(10L), function(i) list(name = rsdeseq2::resultsNames(fit)[[1L + i %% ncol(state$beta)]]))
-    # The baseline predates resultsList. Both branches ask for the same ten
-    # tables; this capability check changes transport, never numerical policy.
-    tables <- if ("resultsList" %in% getNamespaceExports("rsdeseq2")) {
-      rsdeseq2::resultsList(fit, requests)
-    } else lapply(requests, function(request) do.call(rsdeseq2::results, c(list(object = fit), request)))
-    lapply(tables, as.data.frame)
-  }),
+  batch_results = timed("ten_results", multipleResults()),
+  two_group_results = timed("ten_results", multipleResults()),
   shrink_normal = timed("shrink_normal", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "normal"))),
   shrink_ashr = timed("shrink_ashr", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "ashr"))),
   shrink_apeglm = timed("shrink_apeglm", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "apeglm"))),

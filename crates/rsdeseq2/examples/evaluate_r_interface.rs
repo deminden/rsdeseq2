@@ -1,6 +1,8 @@
 //! Standalone numerical conformance driver; it neither links nor launches R.
 #[path = "evaluate_r_interface/batch.rs"]
 mod batch;
+#[path = "evaluate_r_interface/cooks.rs"]
+mod cooks;
 use rsdeseq2::independent_filtering::{
     IndependentFilteringOptions, evaluate_independent_filtering,
 };
@@ -360,6 +362,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    CooksPolicy(cooks::Input),
     Batch(batch::BatchInput),
     Statistics(StatisticsInput),
     Filtering(FilteringInput),
@@ -372,6 +375,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::CooksPolicy(input) => cooks::evaluate(input)?,
         Input::Batch(input) => batch::evaluate(input)?,
         Input::Statistics(input) => statistics(input)?,
         Input::Filtering(input) => filtering(input)?,

@@ -1,14 +1,27 @@
 // Validate global LRT subspaces before any expensive fitting stage.
 fn validate_lrt_designs(full: &DesignMatrix, reduced: &DesignMatrix) -> Result<(), DeseqError> {
     if full.n_samples() != reduced.n_samples() {
-        return Err(invalid_dimensions("LRT reduced design samples", full.n_samples(), reduced.n_samples()));
+        return Err(invalid_dimensions(
+            "LRT reduced design samples",
+            full.n_samples(),
+            reduced.n_samples(),
+        ));
     }
     if full.n_coefficients() <= reduced.n_coefficients() {
-        return Err(invalid_dimensions("LRT full/reduced coefficients", reduced.n_coefficients()+1, full.n_coefficients()));
+        return Err(invalid_dimensions(
+            "LRT full/reduced coefficients",
+            reduced.n_coefficients() + 1,
+            full.n_coefficients(),
+        ));
     }
     full.validate_full_rank("LRT full")?;
     reduced.validate_full_rank("LRT reduced")?;
-    let columns = full.n_coefficients().checked_add(reduced.n_coefficients()).ok_or_else(|| DeseqError::InvalidOptions { reason: "LRT combined design dimensions overflow".into() })?;
+    let columns = full
+        .n_coefficients()
+        .checked_add(reduced.n_coefficients())
+        .ok_or_else(|| DeseqError::InvalidOptions {
+            reason: "LRT combined design dimensions overflow".into(),
+        })?;
     let mut values = Vec::new();
     for row in 0..full.n_samples() {
         values.extend_from_slice(full.matrix().row(row)?);
@@ -16,7 +29,9 @@ fn validate_lrt_designs(full: &DesignMatrix, reduced: &DesignMatrix) -> Result<(
     }
     let combined = DesignMatrix::from_row_major(full.n_samples(), columns, values, None)?;
     if combined.rank()? != full.n_coefficients() {
-        return Err(DeseqError::InvalidOptions { reason: "LRT reduced design must be nested in the full design column space".into() });
+        return Err(DeseqError::InvalidOptions {
+            reason: "LRT reduced design must be nested in the full design column space".into(),
+        });
     }
     Ok(())
 }
@@ -172,13 +187,14 @@ fn merge_replacement_refit_results(
         ));
     }
     if let Some(refit_results) = refit_results
-        && refit_results.rows.len() != original_results.rows.len() {
-            return Err(invalid_dimensions(
-                "replacement-refit refit result rows",
-                original_results.rows.len(),
-                refit_results.rows.len(),
-            ));
-        }
+        && refit_results.rows.len() != original_results.rows.len()
+    {
+        return Err(invalid_dimensions(
+            "replacement-refit refit result rows",
+            original_results.rows.len(),
+            refit_results.rows.len(),
+        ));
+    }
     if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
         return Err(invalid_dimensions(
             "replacement-refit baseMean rows",
@@ -350,15 +366,21 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
     }
 }
 
-
 fn apply_cooks_cutoff_for_factor_level_metadata(
     results: &mut DeseqResults,
     cutoff: Option<f64>,
     counts: &CountMatrix,
     cooks: &RowMajorMatrix<f64>,
+    design: &DesignMatrix,
     contrast: FactorLevelContrast<'_>,
 ) -> Result<(), DeseqError> {
-    if factor_level_contrast_is_single_two_level_condition(contrast) {
+    if factor_level_contrast_is_single_two_level_condition(contrast)
+        && crate::results::two_level_design_matches(
+            design.matrix().into(),
+            contrast.sample_levels,
+            2,
+        )?
+    {
         apply_cooks_cutoff_with_low_count_heuristic(results, cutoff, counts, cooks)
     } else {
         apply_cooks_cutoff(results, cutoff)
@@ -381,10 +403,12 @@ fn factor_level_contrast_is_single_two_level_condition(contrast: FactorLevelCont
 }
 
 fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
-    row.log2_fold_change = Some(0.0);
-    row.lfc_se = Some(0.0);
-    row.stat = Some(0.0);
-    row.pvalue = Some(1.0);
+    crate::results::ReplacementRows::set_zero_values(
+        &mut row.log2_fold_change,
+        &mut row.lfc_se,
+        &mut row.stat,
+        &mut row.pvalue,
+    );
     row.padj = None;
     row.dispersion = None;
     row.converged = None;
@@ -624,8 +648,6 @@ fn mask_wald_degrees_of_freedom_for_all_zero_rows(
     Ok(())
 }
 
-
-
 fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     let full_deviance = glm_fit
         .log_like
@@ -681,11 +703,25 @@ mod nested_design_tests {
 
     #[test]
     fn nested_subspaces_accept_reparameterized_and_rescaled_bases() {
-        let full = DesignMatrix::from_row_major(8, 3,
-            (0..8).flat_map(|i| [1.0, (i / 4) as f64, (i % 2) as f64]).collect(), None).unwrap();
+        let full = DesignMatrix::from_row_major(
+            8,
+            3,
+            (0..8)
+                .flat_map(|i| [1.0, (i / 4) as f64, (i % 2) as f64])
+                .collect(),
+            None,
+        )
+        .unwrap();
         for scale in [1e-12, 1.0, 1e12] {
-            let reduced = DesignMatrix::from_row_major(8, 2,
-                (0..8).flat_map(|i| [2.0*scale, (3.0 + (i / 4) as f64)*scale]).collect(), None).unwrap();
+            let reduced = DesignMatrix::from_row_major(
+                8,
+                2,
+                (0..8)
+                    .flat_map(|i| [2.0 * scale, (3.0 + (i / 4) as f64) * scale])
+                    .collect(),
+                None,
+            )
+            .unwrap();
             validate_lrt_designs(&full, &reduced).unwrap();
         }
     }

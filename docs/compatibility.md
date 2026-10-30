@@ -6,9 +6,14 @@ Current source changes and their gates are recorded in the
 options. `resultsList()` now uses the standalone borrowed inference engine for
 bounded batches, with independent per-request policies and the same output as
 individual calls. Filtering/BH, probabilities, contrast projection and
-contrast-zero rules are shared Rust implementations. Remaining Cook's/refit,
-offset/formula and posterior calculations still require migration; see the
+contrast-zero and Cook/refit row rules are shared Rust implementations. Native
+low-count eligibility requires a matching two-column design; stored requests
+infer it from formula factors unless explicitly overridden. Remaining shrinkage
+zero checks, offset/formula and posterior calculations still require migration; see the
 [Rust-only implementation contract](rust-only-wrapper-migration.md).
+The [Cook/refit audit](rust-only-cooks-policy-2026-10-30.md) additionally records
+remaining legacy tie and formula-origin differences from DESeq2; complete Cook's
+parity is not yet established for those edges.
 
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).

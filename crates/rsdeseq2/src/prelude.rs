@@ -147,10 +147,10 @@ pub use crate::options::{
     TestType,
 };
 pub use crate::results::{
-    DESEQ2_RESULT_CORE_COLUMNS, DeseqResultColumn, DeseqResultColumnMetadata,
-    DeseqResultColumnValues, DeseqResultRow, DeseqResults, DeseqResultsDataFrame,
-    DeseqResultsMetadata, DeseqResultsTableMetadata, DeseqResultsTableMetadataEntry,
-    ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
+    CooksMask, CooksPolicy, DESEQ2_RESULT_CORE_COLUMNS, DeseqResultColumn,
+    DeseqResultColumnMetadata, DeseqResultColumnValues, DeseqResultRow, DeseqResults,
+    DeseqResultsDataFrame, DeseqResultsMetadata, DeseqResultsTableMetadata,
+    DeseqResultsTableMetadataEntry, ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
     ExpandedAdditiveBetaPriorWaldReplacementResults, ExpandedAdditiveBetaPriorWaldResults,
     ExpandedAdditiveBetaPriorWaldResultsInput, ExpandedBetaPriorWaldNormalizedResultsInput,
     ExpandedBetaPriorWaldReplacementResults, ExpandedBetaPriorWaldResults,
@@ -159,9 +159,10 @@ pub use crate::results::{
     ExpandedFactorBetaPriorWaldResultsInput, ExpandedFormulaBetaPriorWaldNormalizedResultsInput,
     ExpandedFormulaBetaPriorWaldResultsInput,
     ExpandedFormulaModelFrameBetaPriorWaldNormalizedResultsInput,
-    ExpandedFormulaModelFrameBetaPriorWaldResultsInput, RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS,
-    ResultRequest, apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic,
-    build_lrt_contrast_results, build_lrt_results, build_wald_contrast_results,
+    ExpandedFormulaModelFrameBetaPriorWaldResultsInput, LowCountHeuristic,
+    RSDESEQ2_RESULT_DIAGNOSTIC_COLUMNS, ReplacementRows, ResultRequest, RowFlags,
+    apply_cooks_cutoff, apply_cooks_cutoff_with_low_count_heuristic, build_lrt_contrast_results,
+    build_lrt_results, build_wald_contrast_results,
     build_wald_contrast_results_from_expanded_beta_prior_fit,
     build_wald_contrast_results_from_expanded_model_fit, build_wald_results,
     build_wald_results_from_expanded_beta_prior_fit, build_wald_results_from_expanded_model_fit,
@@ -207,6 +208,7 @@ pub use crate::results::{
     fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights,
     fit_expanded_formula_model_frame_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement,
     recompute_padj, resolve_cooks_cutoff, rsdeseq2_result_diagnostic_column_names,
+    two_level_design_matches,
 };
 pub use crate::transform::{
     FastVstSubset, FastVstSubsetMetadata, RLOG_INTERCEPT_PRIOR_VARIANCE, RLOG_PRIOR_UPPER_QUANTILE,
@@ -226,4 +228,4 @@ pub use crate::transform::{
     vst_with_dispersion_trend_and_size_factors,
 };
 
-pub use crate::matrix::{MatrixOrder, MatrixView};
+pub use crate::matrix::{CountView, MatrixOrder, MatrixView};

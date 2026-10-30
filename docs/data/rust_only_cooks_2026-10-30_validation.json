@@ -1,0 +1,126 @@
+{
+  "baseline_commit": "a7b256f",
+  "implementation": "Borrowed shared Cook/refit row policy and matching-design eligibility; omit mask-stage adjustment",
+  "rust_tests_passed": 1049,
+  "rust_tests_failed": 0,
+  "rust_existing_opt_in_ignored": 1,
+  "backend_tests_passed": 1,
+  "python_support_tests_passed": 45,
+  "r_check_status": "OK",
+  "r_assertions_passed": 1510,
+  "r_failures": 0,
+  "r_warnings": 0,
+  "r_skipped": 0,
+  "standalone_wrapped_bit_equality_cases": 101,
+  "new_cook_policy_cases": 14,
+  "existing_reference_manifests_modified": false,
+  "optimization_round_counted": false,
+  "crate_package_verification": "passed",
+  "crate_sources_tests_examples_match_working_sources": true,
+  "source_package": {
+    "sha256": "ef76548e7db0f356e07330e33b8b43740a8ab75f991f5309ea0579d58c6fbbd0",
+    "files_verified": 262,
+    "changed_files": [],
+    "description_normalization": "Generated Packaged/NeedsCompilation fields and DCF whitespace only"
+  },
+  "artifact_sha256": {
+    "evaluate_r_interface": "23927eaf290205b215fe0080feb63512897d4cc72d042042058e64e5860a671f",
+    "rsdeseq2-0.3.1.crate": "e6cb3dda8fffc4c34e6c4543547f44bd3b8f079519f5b132e92381ddbc13d948",
+    "rsdeseq2": "18306b193820d8a66f67ddf4a2b2b3b3c23439de925ab9db9ba84ea28669d813"
+  },
+  "sanitizers": {
+    "status": "passed",
+    "c": "address,undefined",
+    "rust": "address",
+    "rust_stdlib_instrumented": false,
+    "r_interpreter_instrumented": false,
+    "preinstalled_r_dependencies_instrumented": false,
+    "leak_detection": false,
+    "asan_runtime": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/clang/23/lib/darwin/libclang_rt.asan_osx_dynamic.dylib",
+    "target": "aarch64-apple-darwin",
+    "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+    "rust_address_instrumentation_verified": true,
+    "asan_symbols_verified": true,
+    "ubsan_symbols_verified": true
+  },
+  "root_and_backend_msrv": "Rust1.97.1 checks passed",
+  "gtex": {
+    "per_contrast_gates_passed": 121,
+    "global_gates_passed": 9,
+    "checkpoint_exports_byte_identical": 22,
+    "minimum_target_reduction": 664,
+    "minimum_global_reduction": 597
+  },
+  "native_paired_measurement": {
+    "DESeq2": {
+      "cases": 11,
+      "elapsed": 189.87705462599115,
+      "max_rss_mib": 1877.0625
+    },
+    "rsdeseq2": {
+      "cases": 11,
+      "elapsed": 36.46149999900808,
+      "max_rss_mib": 302.046875
+    },
+    "rsdeseq2_baseline": {
+      "cases": 11,
+      "elapsed": 35.71944845598773,
+      "max_rss_mib": 302.03125
+    },
+    "native_elapsed_change_pct": 2.077444011865648,
+    "native_throughput_change_pct": -2.0351646066139373,
+    "speed_ratio_vs_deseq2": 5.207604037989569,
+    "identity_check_completed_before_first_measured_process": true,
+    "identity_check_end_unix": 1793326086.467307,
+    "first_measured_process_log_creation_unix": 1793326094.0906022
+  },
+  "native_measurement_accepted": true,
+  "measurements_status": "complete",
+  "corrected_behavior": [
+    "Native factor-level low-count exception now requires a matching two-column design",
+    "Stored ResultRequest infers matching formula eligibility by default, preserving explicit override"
+  ],
+  "remaining_scope": [
+    "Normal shrinkage global-zero detection",
+    "Remaining normalization offsets and formula calculations",
+    "Standalone ashr/apeglm and posterior calculations",
+    "Enabled-but-no-refit buffer allocation",
+    "Observed native timing cost and previous rlog cost; final combined performance reconciliation",
+    "Reuse invariant low-count flags within bounded R batches and omit unused initial native request adjustment",
+    "DESeq2 first-tie versus legacy last-tie Cook maxima; strict single-factor formula-origin eligibility"
+  ],
+  "r_workflow_paired_measurement": {
+    "paired_cases": 18,
+    "payloads_byte_identical": 18,
+    "repeats": 1,
+    "baseline_total_s": 78.66351562500495,
+    "candidate_total_s": 78.80941454297863,
+    "baseline_max_rss_mib": 1137.265625,
+    "candidate_max_rss_mib": 1122.296875,
+    "rss_budget_mib": 2048,
+    "previous_control_cases": 17,
+    "control_baseline_s": 73.50560320801014,
+    "control_candidate_s": 73.94228425098117,
+    "elapsed_change_pct": 0.18547215543887052,
+    "control_elapsed_change_pct": 0.5940785789285918
+  },
+  "r_workflow_precision_gate": "All 18 complete input/fitted/output RDS payloads byte-identical; zero-tolerance object comparisons also pass",
+  "performance_limitations": [
+    "Native elapsed +2.08%, dominated by condition_blocked 3.838\u21924.630s; all11 results retained, no optimization round",
+    "R18 process sum +0.19%, prior17 controls +0.59%; targeted two-group ten-result stage improves; LRT/ashr and individual-call controls show costs, all reported",
+    "Previous checkpoint rlog cost remains in its original report; current rlog control comparison is checkpoint-specific"
+  ],
+  "source_check_log": "results/codebase_improvements/rust-only-cooks-source-v2/check.log",
+  "native_boundary_evidence": "results/codebase_improvements/rust-only-cooks-sanitizers-v2/sanitizers.json",
+  "identity_check_log": "results/codebase_improvements/rust-only-cooks-identity-v4.log",
+  "deseq2_row_policy_source_audit": {
+    "runtime": "deseq2-r462-native",
+    "package": "DESeq2 1.52.0",
+    "function": "results",
+    "evidence": "results/codebase_improvements/rust-only-cooks-deseq2-tie-audit.log",
+    "findings": [
+      "which.max selects first tied maximum; current engine retains last tie",
+      "DESeq2 requires a single formula variable that is a two-level factor; current legacy wrapper uses matching partitions"
+    ]
+  }
+}

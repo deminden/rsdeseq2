@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
-| C19 | Borrowed standalone Rust request/view, filtering/BH, inference probabilities, contrast projection and contrast-zero rules | Shared contrast count selection and zero overrides now pass 85 cross-interface bit cases and full GTEx bounds; all 22 exports match `9f175f3`. The 1,169 scalar references remain unchanged. Cook's/refit policy, remaining offsets/formula calculations and shrinkage remain pending. See the [zero-rule checkpoint](rust-only-contrast-zero-2026-10-30.md). |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero and Cook/refit presentation | Shared Cook's masks and replacement-row values now pass 101 direct bit cases, a 1,510-assertion source check, instrumented boundary tests and unchanged GTEx exports. Native eligibility now requires a matching two-column design; stored requests infer matching formula context. See the [Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md). Exact Cook's tie/formula-origin parity, remaining shrinkage zero flags, offsets/formula and posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -108,3 +108,12 @@ RSS 302.328 MiB, 5.40× DESeq2 process-time ratio and no optimization round. All
 batch extraction is 1.71× faster; the existing 14 R controls sum to +2.58% time,
 mostly the largest rlog (+6.26%). Those observed costs remain in the final
 performance follow-up; the measurements were not repeated or relabeled.
+
+The subsequent [Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md)
+retains all prior records and adds one paired comparison against `a7b256f`.
+Native elapsed is +2.08%, with essentially flat RSS; the first blocked-condition
+pair accounts for the aggregate increase. No optimization round is counted.
+All 18 R workflow payloads are byte-identical and below 2 GiB; the targeted
+two-group ten-result stage improves 14.84% and peak RSS falls 27 MiB. The R
+process total changes +0.19%, with slower controls reported explicitly. The
+observed native timing cost and final combined performance audit remain open.
