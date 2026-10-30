@@ -43,7 +43,7 @@ nbinomLRTRust <- function(baseMean = NULL,
   if (is.null(baseMean) || is.null(beta) || is.null(lrtStat)) {
     stop("baseMean, beta, and lrtStat are required for primitive nbinomLRTRust", call. = FALSE)
   }
-  lrtFitRust(
+  fit <- lrtFitRust(
     baseMean = baseMean,
     beta = beta,
     betaCovariance = betaCovariance,
@@ -60,4 +60,7 @@ nbinomLRTRust <- function(baseMean = NULL,
     colData = colData,
     rowNames = rowNames
   )
+  orderedFactors <- .rsdeseq2_object_field(object, "orderedFactors")
+  if (!is.null(orderedFactors)) fit$orderedFactors <- .rsdeseq2_validate_results_names(orderedFactors)
+  fit
 }

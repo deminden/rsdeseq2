@@ -96,9 +96,14 @@ subsequently routes the compatibility parser's numeric transforms, coercions,
 offsets and matrix products through the shared evaluator and matrix plan.
 Fifty-four actual-parser/R-wrapper cases agree with original R after explicit
 column mapping; a previous-source control disagrees in thirteen cases. Remaining
-native factor/class semantics include ordered coding and rejection of relevel
-on ordered factors. Those corrections, warning/method parity and the VST/posterior
-and final authority/audit work remain required.
+native factor/class semantics at that checkpoint included ordered coding and
+rejection of relevel on ordered factors. The [0.4.0 preparation](release-0.4.0.md)
+corrects these through the shared factor/matrix engine, along with unused-level
+handling, higher-order contrast policy and product order. Its independent panel
+contains 51 matrix/frame cases and nine expanded-factor recoding cases. Expanded
+factor recoding for normal shrinkage also moves out of R. General warning/method
+semantics, frozen local VST reuse, optional posterior/s-value calculations,
+the redundant initial BH pass and final authority/performance audit remain open.
 
 The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both

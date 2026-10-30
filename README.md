@@ -11,7 +11,7 @@ workflows in Rust: normalization, dispersion estimation, negative-binomial
 Wald and likelihood-ratio tests, transformations, and result assembly. The
 Rust crate and CLI require neither R nor DESeq2 at runtime.
 
-DESeq2 is used only to generate saved validation references. `rsdeseq2` is not
+The Rust core uses DESeq2 only for validation references. `rsdeseq2` is not
 a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 
 ## Choose an Interface
@@ -21,6 +21,10 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | [CLI](docs/cli.md) | File-based normalization, Wald/LRT, VST, and rlog workflows | Explicit numeric TSV inputs; no R formula parser |
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
 | [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
+
+The R wrapper’s [Rust-only migration](docs/rust-only-wrapper-migration.md) is
+in progress. Supported formula calculations use the shared Rust core; frozen
+local VST reuse and optional ashr/apeglm posterior calculations still involve R.
 
 ## Install and Run
 
@@ -126,53 +130,54 @@ The public Rust API is pre-1.0 and can change between minor releases. See the
 
 ## Validation and Performance
 
-The current development checkout is compared with native R 4.6.2 / DESeq2
-1.52.0 on eleven GTEx v8 Kidney Cortex contrasts: biological comparisons and
-reproducible blocked/unblocked random splits. Every contrast uses all 56,200 genes.
+The 0.4.0 candidate is compared with native R 4.6.2 / DESeq2 1.52.0 on eleven
+GTEx v8 Kidney Cortex contrasts: biological comparisons and reproducible
+blocked/unblocked random splits. Every contrast uses all 56,200 genes.
 
 ### Precision
 
-These are maximum absolute differences from the matched DESeq2 results,
-including estimated dispersions. Group values are maxima across distinct
-contrasts; gene coverage and finite/NA patterns match throughout.
+Maximum absolute differences from matched DESeq2 results, including estimated
+dispersions. Group values are maxima across distinct contrasts; gene coverage
+and finite/NA patterns match throughout.
 
 | Contrast group | Contrasts | Max LFC error | Max SE error | Max p-value error | Max adjusted p-value error |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Original blocked | 1 | `7.84e-07` | `1.38e-06` | `3.73e-07` | `1.14e-06` |
-| Male vs female | 1 | `1.41e-09` | `1.35e-05` | `2.98e-05` | `7.31e-11` |
+| Male vs female | 1 | `1.41e-09` | `1.35e-05` | `2.98e-05` | `3.42e-11` |
 | Male age 4 vs 3 | 1 | `1.47e-07` | `2.34e-05` | `2.16e-05` | `8.25e-07` |
 | Blocked random splits | 5 | `7.15e-06` | `2.75e-05` | `3.74e-05` | `1.26e-05` |
-| Unblocked random splits | 3 | `5.28e-09` | `1.20e-05` | `1.72e-05` | `2.87e-05` |
+| Unblocked random splits | 3 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `2.87e-05` |
 
 ### Speed
 
 | Contrast group | Rust (s) | DESeq2 (s) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 3.82 | 20.24 | 5.30× |
-| Male vs female | 2.61 | 14.73 | 5.63× |
-| Male age 4 vs 3 | 2.25 | 13.77 | 6.11× |
-| Blocked random splits | 3.98 | 20.12 | 5.05× |
-| Unblocked random splits | 2.54 | 15.13 | 5.95× |
+| Original blocked | 3.92 | 20.53 | 5.23× |
+| Male vs female | 2.63 | 15.01 | 5.71× |
+| Male age 4 vs 3 | 2.29 | 14.19 | 6.20× |
+| Blocked random splits | 4.26 | 26.32 | 6.17× |
+| Unblocked random splits | 2.60 | 16.05 | 6.17× |
 
-One sequential process run per tool and contrast on Apple M5/macOS, with one
-fitting/BLAS thread. Multiple-contrast groups show medians across distinct
-contrasts. Timings include startup, loading, fitting and completed output.
-Summed time is **36.23 seconds for Rust versus 195.04 seconds for DESeq2**,
-a **5.38×** ratio for this workflow and machine.
+One process run per tool and contrast on Apple M5/macOS, with one fitting/BLAS
+thread. Multiple-contrast groups show medians across distinct contrasts. Timings
+include startup, loading, fitting and completed output. Summed time is
+**40.67 seconds for Rust versus 242.48 seconds for DESeq2**, an observed **5.96×** ratio.
+Background CPU activity affected this pass, so performance conclusions are
+provisional; it does not establish an isolated speed effect.
 
 ### Memory
 
 | Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 301.95 | 1763.56 | 5.84× |
-| Male vs female | 240.95 | 1690.38 | 7.02× |
-| Male age 4 vs 3 | 211.42 | 1600.14 | 7.57× |
-| Blocked random splits | 300.12 | 1757.20 | 5.85× |
-| Unblocked random splits | 240.94 | 1634.42 | 6.78× |
+| Original blocked | 301.95 | 1682.03 | 5.57× |
+| Male vs female | 242.91 | 1689.48 | 6.96× |
+| Male age 4 vs 3 | 211.38 | 1600.11 | 7.57× |
+| Blocked random splits | 301.98 | 1735.72 | 5.75× |
+| Unblocked random splits | 242.89 | 1640.25 | 6.75× |
 
 Peak whole-process RSS from the same runs; MiB = 2^20 bytes, including the R
-interpreter and libraries. Group values are medians across distinct contrasts.
-Rust peaks at **211–302 MiB**, using **82.8–86.8% less peak RSS than DESeq2**.
+interpreter and libraries. Groups show medians across distinct contrasts.
+Rust peaks at **211–308 MiB**, using **80.3–86.8% less peak RSS than DESeq2**.
 
 Per-contrast measurements, provenance, precision checks and reproducible scripts
 are in the [current comparison](docs/gtex-native-wald-benchmark.md).

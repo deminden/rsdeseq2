@@ -517,16 +517,19 @@ fn expanded_formula_design_supports_three_way_terms() {
             "condition_B_vs_A".to_string(),
             "batch_Y_vs_X".to_string(),
             "dose".to_string(),
-            "condition_B_vs_A:batch_Y_vs_X:dose".to_string(),
+            "conditionA:batchX:dose".to_string(),
+            "conditionA:batchY:dose".to_string(),
+            "conditionB:batchX:dose".to_string(),
+            "conditionB:batchY:dose".to_string(),
         ]
     );
     assert_eq!(
         direct.standard_design.matrix().as_slice(),
         &[
-            1.0, 0.0, 0.0, 0.0, 0.0, //
-            1.0, 0.0, 1.0, 1.0, 0.0, //
-            1.0, 1.0, 0.0, 2.0, 0.0, //
-            1.0, 1.0, 1.0, 3.0, 3.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 2.0, 0.0, 0.0, 2.0, 0.0, //
+            1.0, 1.0, 1.0, 3.0, 0.0, 0.0, 0.0, 3.0,
         ]
     );
     assert_eq!(
@@ -610,16 +613,19 @@ fn expanded_formula_design_supports_arbitrary_order_terms() {
             "batch_Y_vs_X".to_string(),
             "dose".to_string(),
             "time".to_string(),
-            "condition_B_vs_A:batch_Y_vs_X:dose:time".to_string(),
+            "conditionA:batchX:dose:time".to_string(),
+            "conditionA:batchY:dose:time".to_string(),
+            "conditionB:batchX:dose:time".to_string(),
+            "conditionB:batchY:dose:time".to_string(),
         ]
     );
     assert_eq!(
         direct.standard_design.matrix().as_slice(),
         &[
-            1.0, 0.0, 0.0, 0.0, 2.0, 0.0, //
-            1.0, 0.0, 1.0, 1.0, 3.0, 0.0, //
-            1.0, 1.0, 0.0, 2.0, 5.0, 0.0, //
-            1.0, 1.0, 1.0, 3.0, 7.0, 21.0,
+            1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, //
+            1.0, 0.0, 1.0, 1.0, 3.0, 0.0, 3.0, 0.0, 0.0, //
+            1.0, 1.0, 0.0, 2.0, 5.0, 0.0, 0.0, 10.0, 0.0, //
+            1.0, 1.0, 1.0, 3.0, 7.0, 0.0, 0.0, 0.0, 21.0,
         ]
     );
     assert_eq!(

@@ -2,6 +2,7 @@ fn expanded_formula_design_from_state<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    derived_factors: &[FormulaDerivedFactorCovariate],
 ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
     let used_factors = formula_used_factors(state, factors)?;
     let used_numeric_covariates = formula_used_numeric_covariates(state, numeric_covariates)?;
@@ -14,6 +15,18 @@ fn expanded_formula_design_from_state<'a>(
     )?;
     validate_formula_used_factor_specs(&used_factors, n_samples)?;
     validate_numeric_covariate_specs(&used_numeric_covariates, n_samples)?;
+    if derived_factors.iter().any(|factor| {
+        factor.primitive.has_class("ordered")
+            && used_factors.iter().any(|used| used.factor == factor.name)
+    }) {
+        return formula_ordered_design(
+            state,
+            &used_factors,
+            &used_numeric_covariates,
+            derived_factors,
+            n_samples,
+        );
+    }
 
     // Formula state is first normalized to the actually referenced variables;
     // coefficient names and matrix columns are then emitted in the same order
@@ -208,7 +221,21 @@ fn expanded_formula_design_from_state<'a>(
         coefficient_groups.push(vec![col]);
     }
 
-    Ok(ExpandedAdditiveFactorDesign {
+    Ok(formula_design_output(
+        state,
+        expanded_design,
+        standard_design,
+        coefficient_groups,
+    ))
+}
+
+fn formula_design_output(
+    state: &ExpandedFormulaDesignState<'_>,
+    expanded_design: DesignMatrix,
+    standard_design: DesignMatrix,
+    coefficient_groups: Vec<Vec<usize>>,
+) -> ExpandedAdditiveFactorDesign {
+    ExpandedAdditiveFactorDesign {
         expanded_design,
         standard_design,
         coefficient_groups,
@@ -246,7 +273,7 @@ fn expanded_formula_design_from_state<'a>(
             .iter()
             .map(formula_higher_order_interaction_name)
             .collect(),
-    })
+    }
 }
 
 fn formula_used_factors<'a>(
@@ -581,7 +608,12 @@ fn push_formula_higher_order_standard_names(
     standard_names: &mut Vec<String>,
     standard_expanded_names: &mut Vec<String>,
 ) -> Result<(), DeseqError> {
-    let treatment_filter = |factor: &str| formula_has_factor_main_effect(state, factor);
+    let variables = interaction
+        .variables
+        .iter()
+        .map(FormulaVariableRef::name)
+        .collect::<Vec<_>>();
+    let treatment_filter = |factor: &str| formula_factor_has_complement(state, factor, &variables);
     let standard =
         formula_higher_order_names(interaction, used_factors, factor_levels, &treatment_filter)?;
     let expanded_by_name = formula_higher_order_names_with_choice_filter(

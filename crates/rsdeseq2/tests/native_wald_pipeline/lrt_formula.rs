@@ -243,8 +243,16 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
     );
 
     let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
-    let ordered_contrast =
-        ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B");
+    let ordered_contrast = ResultsContrast::numeric(vec![0.0, 1.0]);
+    let invalid = builder
+        .fit_lrt_formula_with_results_contrast_request(
+            &counts,
+            ordered_formula,
+            reduced,
+            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+        )
+        .unwrap_err();
+    assert!(invalid.to_string().contains("ordered factor"));
     let (ordered_fit, mut ordered_results) = builder
         .fit_lrt_formula_with_results_contrast_request(
             &counts,
@@ -275,11 +283,11 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
     assert_eq!(ordered_object_results, ordered_results);
     assert_eq!(
         ordered_results.metadata.result_name.as_deref(),
-        Some("ordered.condition..levels...c..B....A..._A_vs_B")
+        Some("contrast")
     );
     assert_eq!(
         ordered_results.metadata.comparison.as_deref(),
-        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
+        Some("primitive numeric contrast")
     );
 
     let relabeled_formula = "~ factor(condition, levels=c('A','B'), labels=c('control','treated'))";
@@ -326,50 +334,17 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
         )
     );
 
-    let ordered_relabeled_formula =
-        "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))";
-    let ordered_relabeled_contrast = ResultsContrast::character(
-        "ordered.condition..levels...c..A....B....labels...c..control....treated...",
-        "treated",
-        "control",
-    );
-    let (ordered_relabeled_fit, mut ordered_relabeled_results) = builder
+    let error = builder
         .fit_lrt_formula_with_results_contrast_request(
             &counts,
-            ordered_relabeled_formula,
+            "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
             reduced,
-            &ordered_relabeled_contrast,
+            &ResultsContrast::character(
+                "ordered.condition..levels...c..A....B....labels...c..control....treated...",
+                "treated",
+                "control",
+            ),
         )
-        .unwrap();
-    ordered_relabeled_results.independent_filtering = None;
-    let ordered_relabeled_object_results = ordered_relabeled_fit
-        .results_contrast_request(&counts, &ordered_relabeled_contrast, counts.gene_names())
-        .unwrap();
-    let ordered_relabeled_replacement = builder
-        .fit_lrt_formula_with_results_contrast_request_with_cooks_replacement(
-            &counts,
-            ordered_relabeled_formula,
-            reduced,
-            &ordered_relabeled_contrast,
-            &CooksReplacementOptions::new(f64::MAX),
-        )
-        .unwrap();
-    assert_eq!(ordered_relabeled_replacement.refit_plan.n_refit, 0);
-    assert_eq!(
-        ordered_relabeled_replacement.results.rows,
-        ordered_relabeled_results.rows
-    );
-    assert_eq!(ordered_relabeled_object_results, ordered_relabeled_results);
-    assert_eq!(
-        ordered_relabeled_results.metadata.result_name.as_deref(),
-        Some(
-            "ordered.condition..levels...c..A....B....labels...c..control....treated..._treated_vs_control"
-        )
-    );
-    assert_eq!(
-        ordered_relabeled_results.metadata.comparison.as_deref(),
-        Some(
-            "factor-level contrast: ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\")) treated vs control"
-        )
-    );
+        .unwrap_err();
+    assert!(error.to_string().contains("ordered factor"));
 }

@@ -528,11 +528,20 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
     );
 
     let ordered_formula = "~ ordered(condition, levels=c('B','A'))";
-    let ordered_output = builder
+    let invalid = builder
         .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
             &counts,
             ordered_formula,
             &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &options,
+        )
+        .unwrap_err();
+    assert!(invalid.to_string().contains("ordered factor"));
+    let ordered_output = builder
+        .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
+            &counts,
+            ordered_formula,
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
             &options,
         )
         .unwrap();
@@ -541,14 +550,13 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
     };
 
     assert_eq!(ordered_output.refit_plan.n_refit, 0);
-    assert_eq!(ordered_output.results.rows, output.results.rows);
     assert_eq!(
         ordered_output.results.metadata.result_name.as_deref(),
-        Some("ordered.condition..levels...c..B....A..._A_vs_B")
+        Some("contrast")
     );
     assert_eq!(
         ordered_output.results.metadata.comparison.as_deref(),
-        Some("factor-level contrast: ordered(condition, levels = c(\"B\", \"A\")) A vs B")
+        Some("primitive numeric contrast")
     );
 
     let offset_values = builder.current_model_frame().unwrap().numeric_covariates[0]
@@ -615,7 +623,7 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
         .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
             &counts,
             ordered_formula,
-            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
             &options,
         )
         .unwrap();
@@ -623,7 +631,7 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
         .fit_formula_with_test_results_contrast_request_with_cooks_replacement(
             &counts,
             "~ ordered(condition, levels=c('B','A')) + offset(exposure)",
-            &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
+            &ResultsContrast::numeric(vec![0.0, 1.0]),
             &options,
         )
         .unwrap();

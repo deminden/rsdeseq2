@@ -147,16 +147,26 @@ benchmarking, but they are not a claim of full
   `as.ordered(condition)` for already-supplied factor metadata, simple
   `factor(condition, levels=c(...))` and
   `ordered(condition, levels=c(...))` level reordering with positional or named
-  `x`/`levels` arguments, conservative
+  `x`/`levels` arguments,
   `factor(condition, levels=c(...), labels=c(...))` and
   `ordered(condition, levels=c(...), labels=c(...))` relabeling with
-  positional or named `x`/`levels`/`labels` arguments, and
+  positional or named `x`/`levels`/`labels` arguments (also labels without
+  explicit levels, duplicate labels that merge levels, and scalar prefixes), and
   `droplevels(condition)` over already-supplied or simple formula-derived
   factor metadata. `as.factor(...)` and `as.ordered(...)` intentionally reject
   `levels`/`labels` arguments. Nested factor-valued transforms in the supported subset,
-  such as `factor(relevel(...))`, `ordered(relevel(...))`,
-  `relevel(ordered(...))`, and `droplevels(ordered(...))`, preserve
-  formula-local references after relabeling or dropped-level pruning. Quoted
+  such as `factor(relevel(...))`, `ordered(relevel(...))`, and
+  `droplevels(ordered(...))`, use the shared Rust factor operations.
+  `factor()`/`ordered()` conversions drop unused levels; `as.factor()` preserves
+  an existing factor's levels and ordered class. `droplevels()` resets the
+  reference to the first retained level. `relevel(ordered(...))` is rejected.
+  Ordered factors use polynomial contrasts, including `.L` and `.Q` columns;
+  select named polynomial coefficients or numeric contrasts. Treatment-style
+  factor-level selectors are rejected when formula metadata identifies an
+  ordered factor. Expanded native matrices retain these polynomial coordinates
+  and expand unordered factors to full indicators. This does not certify
+  DESeq2's unsupported source-ordered formula or failed expanded ordered-prior
+  routes. Quoted
   level and label strings in this supported subset can
   contain spaces, hyphens, parentheses, transform-like text, equals signs,
   escaped quotes, and escaped backslashes. Supported factor-valued transform

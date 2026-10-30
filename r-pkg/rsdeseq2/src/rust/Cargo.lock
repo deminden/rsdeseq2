@@ -673,7 +673,7 @@ checksum = "242a0ea0fc186cafd47b36676c3f6393a81683463174decd0163a9ceefa4d94b"
 
 [[package]]
 name = "rsdeseq2"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "clap",
  "csv",
@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "rsdeseq2-r"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "rsdeseq2",
 ]

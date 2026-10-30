@@ -1,0 +1,6 @@
+{
+  "observed_utc": "2026-10-30T17:56:27.614619+00:00",
+  "uptime_and_load": "17:56  up 1 day,  6:12, 1 user, load averages: 7.10 6.69 5.74",
+  "background_cpu_observation": "Virtualization virtual-machine process ~66% CPU, separate Rust process ~7% CPU; operating-system/app processes also active. No project builds or other fitting runs launched by this task overlap the measurements.",
+  "interpretation": "External load observed during blocked random splits; retain every observation and do not claim isolated speed effects or unchanged performance from this single pass. No unchanged-case retiming."
+}

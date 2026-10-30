@@ -138,10 +138,24 @@ fn formula_expanded_matrix_values(
         .into_iter()
         .zip(names)
         .enumerate()
-        .map(|(index, (pieces, name))| PlannedColumn {
-            name: name.clone(),
-            assignment: if pieces.is_empty() { 0 } else { index + 1 },
-            pieces,
+        .map(|(index, (mut pieces, name))| {
+            pieces.sort_by_key(|piece| {
+                let name = if piece.variable < factors.len() {
+                    factors[piece.variable].factor
+                } else {
+                    numeric[piece.variable - factors.len()].name
+                };
+                state
+                    .frame_order
+                    .iter()
+                    .position(|v| v == name)
+                    .unwrap_or(usize::MAX)
+            });
+            PlannedColumn {
+                name: name.clone(),
+                assignment: if pieces.is_empty() { 0 } else { index + 1 },
+                pieces,
+            }
         })
         .collect();
     Ok(ModelMatrixPlan::from_columns(samples, &variables, columns)?.values())

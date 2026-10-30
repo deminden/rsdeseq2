@@ -84,7 +84,7 @@ def main():
     parser.add_argument('--baseline-binary',type=Path,help='Optional previous Rust release for a direct release comparison')
     parser.add_argument('--baseline-label',default='previous release')
     parser.add_argument('--validated-results-root',type=Path,help='Frozen native results directory; require exact hashes for the current Rust binary')
-    parser.add_argument('--validated-output-hashes', type=Path, default=ROOT/'docs/data/release_0.3.1_gtex_output_sha256.tsv', help='Reviewed native output manifest with release_sha256 entries')
+    parser.add_argument('--validated-output-hashes', type=Path, default=ROOT/'docs/data/release_0.4.0_gtex_output_sha256.tsv', help='Reviewed native output manifest with release_sha256 entries')
     parser.add_argument('--exploration', action='store_true', help='Report-only measurements, never accepted optimization/release evidence')
     parser.add_argument('--reference-hashes', type=Path, default=ROOT/'docs/data/gtex_dispersion_reference_sha256.tsv')
     parser.add_argument('--repeats',type=int,default=1)

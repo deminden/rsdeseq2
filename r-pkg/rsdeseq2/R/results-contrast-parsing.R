@@ -118,6 +118,10 @@
     return(contrast)
   }
   factor <- contrast[[1L]]
+  ordered <- .rsdeseq2_resolve_named_metadata_field(factor, object$orderedFactors, "ordered factor")
+  if (!is.null(ordered)) {
+    stop(sprintf("factor-level contrast for ordered factor '%s' requires a named or numeric contrast on its polynomial columns", factor), call. = FALSE)
+  }
   fields <- names(object$factorLevels)
   if (is.null(fields) && !is.null(object$colData)) {
     fields <- colnames(object$colData) %||% names(object$colData)

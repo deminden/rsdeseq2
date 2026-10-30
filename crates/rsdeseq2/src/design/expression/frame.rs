@@ -213,3 +213,71 @@ pub fn offsets(
     }
     Ok(Some(result))
 }
+
+/// Prepare unordered factors for an expanded contrast matrix. The last row of
+/// each input is a frontend-added placeholder. Add the reserved reference level,
+/// recode through the shared factor operation and assign that row to reference.
+pub fn expanded_factors(
+    values: &[Value],
+    null_level: &str,
+    options: &EvaluationOptions,
+) -> Result<Vec<Value>, DeseqError> {
+    if null_level.is_empty() || null_level.contains('\0') {
+        return Err(invalid(
+            "expanded factor reference must be nonempty text without NUL",
+        ));
+    }
+    values
+        .iter()
+        .map(|value| {
+            validate_value(value, 0)?;
+            if !value.has_class("factor") || value.has_class("ordered") {
+                return Err(invalid(
+                    "expanded factor reference requires an unordered factor",
+                ));
+            }
+            if value.is_empty() || value.dimensions.is_some() {
+                return Err(invalid(
+                    "expanded factor requires a nonempty vector with a placeholder row",
+                ));
+            }
+            let mut levels = value
+                .attribute("levels")
+                .ok_or_else(|| invalid("factor levels missing"))?
+                .text()?;
+            if levels
+                .iter()
+                .any(|level| level.as_deref() == Some(null_level))
+            {
+                return Err(invalid(
+                    "a formula factor already uses the reserved expanded-model level",
+                ));
+            }
+            super::checked_elements(levels.len().checked_add(1))?;
+            levels.push(Some(null_level.into()));
+            let mut input = value.clone();
+            input.set_attribute("levels", Value::new(Data::Text(levels)));
+            let expression = Expression::Call {
+                function: "relevel".into(),
+                arguments: vec![
+                    Argument {
+                        name: Some("x".into()),
+                        expression: Expression::Literal(input),
+                    },
+                    Argument {
+                        name: Some("ref".into()),
+                        expression: Expression::Literal(Value::new(Data::Text(vec![Some(
+                            null_level.into(),
+                        )]))),
+                    },
+                ],
+            };
+            let mut result = super::evaluate(&expression, &[], options)?;
+            let Data::Number { values, .. } = &mut result.data else {
+                unreachable!("factor recoding returns integer codes");
+            };
+            *values.last_mut().expect("nonempty factor checked above") = 1.0;
+            Ok(result)
+        })
+        .collect()
+}

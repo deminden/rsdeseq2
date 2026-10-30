@@ -124,24 +124,6 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
         ]
     );
 
-    let nested_ordered_named = expanded_formula_design(
-        "~ relevel(x=as.ordered(condition), ref=\"C\")",
-        &factors,
-        &[],
-    )
-    .unwrap();
-    assert_eq!(
-        nested_ordered_named
-            .standard_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "relevel(as.ordered(condition), ref = \"C\")_A_vs_C".to_string(),
-            "relevel(as.ordered(condition), ref = \"C\")_B_vs_C".to_string(),
-        ]
-    );
-
     let nested_as_factor =
         expanded_formula_design("~ factor(relevel(condition, ref=\"B\"))", &factors, &[]).unwrap();
     assert_eq!(
@@ -153,20 +135,6 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
             "Intercept".to_string(),
             "factor(relevel(condition, ref = \"B\"))_A_vs_B".to_string(),
             "factor(relevel(condition, ref = \"B\"))_C_vs_B".to_string(),
-        ]
-    );
-
-    let nested_ordered_relevel =
-        expanded_formula_design("~ ordered(relevel(condition, ref=\"B\"))", &factors, &[]).unwrap();
-    assert_eq!(
-        nested_ordered_relevel
-            .standard_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(relevel(condition, ref = \"B\"))_A_vs_B".to_string(),
-            "ordered(relevel(condition, ref = \"B\"))_C_vs_B".to_string(),
         ]
     );
 
@@ -183,26 +151,6 @@ fn expanded_formula_design_supports_relevel_factor_transform() {
             "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
                 .to_string(),
             "relevel(factor(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_A_vs_B"
-                .to_string(),
-        ]
-    );
-
-    let nested_ordered_levels = expanded_formula_design(
-        "~ relevel(ordered(condition, levels=c('C','B','A')), ref='B')",
-        &factors,
-        &[],
-    )
-    .unwrap();
-    assert_eq!(
-        nested_ordered_levels
-            .standard_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "relevel(ordered(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_C_vs_B"
-                .to_string(),
-            "relevel(ordered(condition, levels = c(\"C\", \"B\", \"A\")), ref = \"B\")_A_vs_B"
                 .to_string(),
         ]
     );
@@ -352,28 +300,6 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
         ]
     );
 
-    let ordered =
-        expanded_formula_design("~ ordered(condition) + as.ordered(x=batch)", &factors, &[])
-            .unwrap();
-    assert_eq!(
-        ordered.standard_design.coefficient_names().unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition)_B_vs_A".to_string(),
-            "as.ordered(batch)_Y_vs_X".to_string(),
-        ]
-    );
-    assert_eq!(
-        ordered.expanded_design.coefficient_names().unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition)A".to_string(),
-            "ordered(condition)B".to_string(),
-            "as.ordered(batch)X".to_string(),
-            "as.ordered(batch)Y".to_string(),
-        ]
-    );
-
     let interaction =
         expanded_formula_design("~ factor(condition):as.factor(batch)", &factors, &[]).unwrap();
     assert_eq!(
@@ -467,65 +393,6 @@ fn expanded_formula_design_supports_factor_identity_transforms() {
     )
     .unwrap();
     assert_eq!(relabeled_positional, relabeled);
-
-    let ordered_reordered =
-        expanded_formula_design("~ ordered(condition, levels=c('B','A'))", &factors, &[]).unwrap();
-    assert_eq!(
-        ordered_reordered
-            .standard_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition, levels = c(\"B\", \"A\"))_A_vs_B".to_string(),
-        ]
-    );
-    assert_eq!(
-        ordered_reordered
-            .expanded_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition, levels = c(\"B\", \"A\"))B".to_string(),
-            "ordered(condition, levels = c(\"B\", \"A\"))A".to_string(),
-        ]
-    );
-
-    let ordered_relabeled = expanded_formula_design(
-        "~ ordered(condition, levels=c('A','B'), labels=c('control','treated'))",
-        &factors,
-        &[],
-    )
-    .unwrap();
-    assert_eq!(
-        ordered_relabeled
-            .standard_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))_treated_vs_control".to_string(),
-        ]
-    );
-    assert_eq!(
-        ordered_relabeled
-            .expanded_design
-            .coefficient_names()
-            .unwrap(),
-        &[
-            "Intercept".to_string(),
-            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))control".to_string(),
-            "ordered(condition, levels = c(\"A\", \"B\"), labels = c(\"control\", \"treated\"))treated".to_string(),
-        ]
-    );
-    let ordered_relabeled_named = expanded_formula_design(
-        "~ ordered(x=condition, labels=c('control','treated'), levels=c('A','B'))",
-        &factors,
-        &[],
-    )
-    .unwrap();
-    assert_eq!(ordered_relabeled_named, ordered_relabeled);
 
     let relabeled_non_syntactic = expanded_formula_design(
         "~ factor(condition, levels=c('A','B'), labels=c('control group','treated-group'))",
@@ -826,27 +693,6 @@ fn expanded_formula_design_supports_droplevels_factor_transform() {
         ]
     );
 
-    let dropped_ordered = expanded_formula_design_from_model_frame(
-        "~ droplevels(ordered(condition, levels=c('A','B','Z')))",
-        &model_frame,
-    )
-    .unwrap();
-    assert_eq!(
-        dropped_ordered.standard_design.coefficient_names().unwrap(),
-        &[
-            "Intercept".to_string(),
-            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))_B_vs_A".to_string(),
-        ]
-    );
-    assert_eq!(
-        dropped_ordered.expanded_design.coefficient_names().unwrap(),
-        &[
-            "Intercept".to_string(),
-            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))A".to_string(),
-            "droplevels(ordered(condition, levels = c(\"A\", \"B\", \"Z\")))B".to_string(),
-        ]
-    );
-
     let dropped_releveled = expanded_formula_design_from_model_frame(
         "~ droplevels(relevel(condition, ref='A'))",
         &model_frame,
@@ -901,7 +747,7 @@ fn expanded_formula_design_supports_droplevels_factor_transform() {
             .unwrap(),
         &[
             "Intercept".to_string(),
-            "droplevels(condition)_B_vs_A".to_string(),
+            "droplevels(condition)_A_vs_B".to_string(),
         ]
     );
 }

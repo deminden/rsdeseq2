@@ -82,6 +82,7 @@ pub fn expanded_formula_design_with_offsets<'a>(
     let mut state = ExpandedFormulaDesignState::default();
 
     let rhs = expand_parenthesized_formula_terms(&rhs)?;
+    state.frame_order = super::formula_origin::formula_variables(&format!("~{rhs}"))?;
     for (sign, raw_term) in split_formula_signed_terms(&rhs)? {
         let term = raw_term.trim();
         if term.is_empty() {
@@ -132,9 +133,20 @@ pub fn expanded_formula_design_with_offsets<'a>(
     }
 
     let model_frame = formula_model_frame_from_specs(&all_factors, &all_numeric_covariates);
-    let mut design =
-        expanded_formula_design_from_state(&state, &all_factors, &all_numeric_covariates)?;
-    let origin = DesignOrigin::formula(super::formula_origin::formula_variables(formula)?)?;
+    let mut design = expanded_formula_design_from_state(
+        &state,
+        &all_factors,
+        &all_numeric_covariates,
+        &derived_factor_covariates,
+    )?;
+    let origin = DesignOrigin::formula(super::formula_origin::formula_variables(formula)?)?
+        .with_ordered_factors(
+            derived_factor_covariates
+                .iter()
+                .filter(|f| f.primitive.has_class("ordered"))
+                .map(|f| f.name.clone())
+                .collect(),
+        );
     design.standard_design = design.standard_design.with_origin(origin.clone());
     design.expanded_design = design.expanded_design.with_origin(origin);
     Ok(ExpandedFormulaDesignWithOffsets {

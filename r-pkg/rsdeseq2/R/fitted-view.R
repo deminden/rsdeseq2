@@ -24,6 +24,9 @@
     fit$designOrigin <- currentOrigin
   } else if(!identical(.rsdeseq2_result_design_origin(fit),currentOrigin)) invalid("formula origin")
   frame <- .rsdeseq2_model_frame(methods::slot(object, "design"), data = cd)
+  orderedFactors <- names(frame)[vapply(frame, is.ordered, logical(1))]
+  if (!is.null(fit$orderedFactors) && !identical(fit$orderedFactors, orderedFactors)) invalid("ordered factor metadata")
+  if (length(orderedFactors)) fit$orderedFactors <- orderedFactors
   design <- .rsdeseq2_model_matrix(methods::slot(object, "design"), data = frame)
   if (!identical(dimnames(design), dimnames(fit$design)) || !equal(design, fit$design)) invalid("design")
   state <- S4Vectors::metadata(object)$rsdeseq2Normalization

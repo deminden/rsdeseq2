@@ -36,7 +36,7 @@ nbinomWaldTestRust <- function(baseMean = NULL,
   if (is.null(baseMean) || is.null(beta)) {
     stop("baseMean and beta are required for primitive nbinomWaldTestRust", call. = FALSE)
   }
-  waldFitRust(
+  fit <- waldFitRust(
     baseMean = baseMean,
     beta = beta,
     betaCovariance = betaCovariance,
@@ -50,4 +50,7 @@ nbinomWaldTestRust <- function(baseMean = NULL,
     colData = colData,
     rowNames = rowNames
   )
+  orderedFactors <- .rsdeseq2_object_field(object, "orderedFactors")
+  if (!is.null(orderedFactors)) fit$orderedFactors <- .rsdeseq2_validate_results_names(orderedFactors)
+  fit
 }

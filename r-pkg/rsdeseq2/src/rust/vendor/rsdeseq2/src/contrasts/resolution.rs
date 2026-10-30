@@ -98,6 +98,17 @@ fn resolve_factor_level_contrast(
     denominator: &str,
     reference: &Option<String>,
 ) -> Result<Vec<f64>, DeseqError> {
+    if design.origin().ordered_factors().iter().any(|name| {
+        crate::design::r_like_name_candidates(name)
+            .iter()
+            .any(|candidate| candidate == factor)
+    }) {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!(
+                "factor-level contrast for ordered factor '{factor}' requires a named or numeric contrast on its polynomial columns"
+            ),
+        });
+    }
     validate_factor_level_contrast(factor, numerator, denominator)?;
     let names = coefficient_names(design)?;
 

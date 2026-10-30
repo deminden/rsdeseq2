@@ -249,6 +249,8 @@ DESeq <- function(object,
     class = "rsdeseq2RustFit"
   )
   if (isDataSet) {
+    orderedFactors <- names(modelFrame)[vapply(modelFrame, is.ordered, logical(1))]
+    if (length(orderedFactors)) fit$orderedFactors <- orderedFactors
     rowMetadata <- S4Vectors::mcols(object)
     previousFit <- S4Vectors::metadata(object)$rsdeseq2RustFit
     if (!is.null(previousFit$resultsNames)) {

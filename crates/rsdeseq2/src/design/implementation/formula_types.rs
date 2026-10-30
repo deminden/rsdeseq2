@@ -1,6 +1,7 @@
 // Private state and derived-covariate types shared by the formula implementation.
 
 struct ExpandedFormulaDesignState<'a> {
+    frame_order: Vec<String>,
     has_intercept: bool,
     selected_factors: Vec<ExpandedFactorSpec<'a>>,
     selected_numeric_covariates: Vec<ExpandedNumericSpec<'a>>,
@@ -27,6 +28,7 @@ struct FormulaDerivedFactorCovariate {
     sample_levels: Vec<String>,
     reference: String,
     levels: Option<Vec<String>>,
+    primitive: super::expression::Value,
 }
 
 type FormulaDerivedNumericTerm = (String, Vec<f64>);
@@ -56,6 +58,7 @@ impl FormulaVariableRef<'_> {
 impl Default for ExpandedFormulaDesignState<'_> {
     fn default() -> Self {
         Self {
+            frame_order: Vec::new(),
             has_intercept: true,
             selected_factors: Vec::new(),
             selected_numeric_covariates: Vec::new(),
