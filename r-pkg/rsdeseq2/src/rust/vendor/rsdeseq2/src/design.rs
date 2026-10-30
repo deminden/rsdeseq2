@@ -3,6 +3,7 @@
 //! Public items are re-exported from a split private implementation so
 //! existing `rsdeseq2::design::*` paths remain source-compatible.
 
+pub mod expression;
 mod formula_origin;
 mod implementation;
 mod model_matrix;
