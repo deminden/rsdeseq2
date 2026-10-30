@@ -1,8 +1,9 @@
 //! Borrowed coefficient/covariance projection shared by every interface.
 use super::inference_primitives::wald_from_estimate_rows;
-use super::wald::{checked_product3_ordered_by_magnitude, checked_scaled_sum};
+use super::wald::checked_product3_ordered_by_magnitude;
 use super::{WaldContrastOutput, WaldTestOptions};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::math::sum::checked_scaled_sum;
 use crate::matrix::{MatrixOrder, MatrixView};
 
 /// Shape-checked per-gene covariance matrices with explicit tensor layout.

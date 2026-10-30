@@ -203,3 +203,6 @@ include!("lib/diagnostics.rs");
 
 #[path = "lib/contrast_inference.rs"]
 mod contrast_inference;
+
+#[path = "lib/contrast_zero.rs"]
+mod contrast_zero;

@@ -338,25 +338,11 @@ pub(super) fn apply_contrast_all_zero_to_wald_contrast(
     contrast_all_zero: &[bool],
     all_zero: &[bool],
 ) -> Result<(), DeseqError> {
-    let n_genes = contrast.log2_fold_change.len();
-    if contrast_all_zero.len() != n_genes {
-        return Err(invalid_dimensions(
-            "contrastAllZero rows",
-            n_genes,
-            contrast_all_zero.len(),
-        ));
-    }
-    if all_zero.len() != n_genes {
-        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
-    }
-    for gene in 0..n_genes {
-        if contrast_all_zero[gene] && !all_zero[gene] {
-            contrast.log2_fold_change[gene] = Some(0.0);
-            contrast.wald.stat[gene] = Some(0.0);
-            contrast.wald.pvalue[gene] = Some(1.0);
-        }
-    }
-    Ok(())
+    crate::contrasts::ContrastZeroPolicy::new(contrast_all_zero, all_zero)?.apply_wald(
+        &mut contrast.log2_fold_change,
+        &mut contrast.wald.stat,
+        &mut contrast.wald.pvalue,
+    )
 }
 
 pub(super) fn apply_contrast_all_zero_to_lrt_results(
@@ -364,21 +350,6 @@ pub(super) fn apply_contrast_all_zero_to_lrt_results(
     contrast_all_zero: &[bool],
     all_zero: &[bool],
 ) -> Result<(), DeseqError> {
-    let n_genes = results.rows.len();
-    if contrast_all_zero.len() != n_genes {
-        return Err(invalid_dimensions(
-            "contrastAllZero rows",
-            n_genes,
-            contrast_all_zero.len(),
-        ));
-    }
-    if all_zero.len() != n_genes {
-        return Err(invalid_dimensions("allZero rows", n_genes, all_zero.len()));
-    }
-    for gene in 0..n_genes {
-        if contrast_all_zero[gene] && !all_zero[gene] {
-            results.rows[gene].log2_fold_change = Some(0.0);
-        }
-    }
-    Ok(())
+    crate::contrasts::ContrastZeroPolicy::new(contrast_all_zero, all_zero)?
+        .apply_effects(results.rows.iter_mut().map(|row| &mut row.log2_fold_change))
 }

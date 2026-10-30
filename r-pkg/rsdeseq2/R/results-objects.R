@@ -384,13 +384,7 @@
     degreesOfFreedom = degreesOfFreedom,
     nGenes = nrow(object$beta)
   )
-  wald <- .rsdeseq2_wald_from_primitive_fit(object, numericContrast, waldOptions)
-  wald <- .rsdeseq2_apply_results_contrast_all_zero(
-    wald = wald,
-    fit = object,
-    numericContrast = numericContrast,
-    allZero = allZero
-  )
+  wald <- .rsdeseq2_wald_from_primitive_fit(object, numericContrast, waldOptions, allZero)
   out <- resultsTableRust(
     baseMean = object$baseMean,
     log2FoldChange = wald$log2FoldChange,
@@ -461,13 +455,7 @@
     allZero <- resolved$allZero
   }
 
-  lrt <- .rsdeseq2_lrt_from_primitive_fit(object, numericContrast)
-  lrt <- .rsdeseq2_apply_lrt_results_contrast_all_zero(
-    lrt = lrt,
-    fit = object,
-    numericContrast = numericContrast,
-    allZero = allZero
-  )
+  lrt <- .rsdeseq2_lrt_from_primitive_fit(object, numericContrast, allZero)
   out <- resultsTableRust(
     baseMean = object$baseMean,
     log2FoldChange = lrt$log2FoldChange,

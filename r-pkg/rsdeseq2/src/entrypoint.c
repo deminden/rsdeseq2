@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <limits.h>
 #include "validation.h"
+extern SEXP rsdeseq2_project_contrast_zero(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rsdeseq2_wald_contrast_zero(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_project_contrast(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_wald_contrast(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_wald_statistics(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -602,6 +604,8 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
 }
 
 static const R_CallMethodDef call_methods[] = {
+    {"rsdeseq2_project_contrast_zero", (DL_FUNC)&rsdeseq2_project_contrast_zero, 5},
+    {"rsdeseq2_wald_contrast_zero", (DL_FUNC)&rsdeseq2_wald_contrast_zero, 9},
     {"rsdeseq2_project_contrast", (DL_FUNC)&rsdeseq2_project_contrast, 4},
     {"rsdeseq2_wald_contrast", (DL_FUNC)&rsdeseq2_wald_contrast, 8},
     {"rsdeseq2_wald_statistics", (DL_FUNC)&rsdeseq2_wald_statistics, 6},

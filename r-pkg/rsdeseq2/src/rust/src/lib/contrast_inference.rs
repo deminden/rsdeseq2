@@ -1,4 +1,5 @@
 //! Synchronous borrowing of R's column-major inference arrays.
+use super::contrast_zero::{ContrastZero, apply_zero_context};
 use super::inference_statistics::borrowed_wald_options;
 use super::{input_slice, output_slice, run_backend};
 use rsdeseq2::glm::{CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates};
@@ -8,7 +9,9 @@ use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 /// C validates the complete G×P beta/optional SE and G×P×P covariance buffers,
 /// P contrast values, scalar options, scalar/G df and G-element outputs.
 /// Presence flags are explicit; NULL never selects statistical behavior.
-/// No pointer is retained. Input and output buffers must not overlap.
+/// An optional zero-context descriptor is validated in C, including every
+/// pointed-to count/design/string allocation. No pointer is retained.
+/// Input and output buffers must not overlap.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
     genes: usize,
@@ -30,6 +33,7 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
     lfc_se: *mut f64,
     stat: *mut f64,
     pvalue: *mut f64,
+    zero_context: *const ContrastZero,
 ) -> i32 {
     run_backend(|| {
         if has_se > 1 || has_covariance > 1 || use_wald > 1 {
@@ -70,7 +74,7 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
         };
         let estimates = InferenceEstimates::new(beta, se, covariance).map_err(|e| e.to_string())?;
         let contrast = unsafe { input_slice(contrast, coefficients, "contrast coefficients")? };
-        let (effect, se, inference) = if use_wald == 1 {
+        let (mut effect, se, mut inference) = if use_wald == 1 {
             let options =
                 unsafe { borrowed_wald_options(genes, threshold, alternative, use_t, df_len, df)? };
             let result = wald_test_contrast_from_estimates(&estimates, contrast, &options)
@@ -82,6 +86,16 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
                 .map_err(|e| e.to_string())?;
             (result.log2_fold_change, result.lfc_se, None)
         };
+        unsafe {
+            apply_zero_context(
+                zero_context,
+                genes,
+                coefficients,
+                contrast,
+                &mut effect,
+                inference.as_mut(),
+            )?;
+        }
         let output_effect = unsafe { output_slice(lfc, genes, "contrast effects")? };
         let output_se = unsafe { output_slice(lfc_se, genes, "contrast SEs")? };
         for gene in 0..genes {

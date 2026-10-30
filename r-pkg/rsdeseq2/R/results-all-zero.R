@@ -1,86 +1,24 @@
-# All-zero contrast handling and observed sample-level aliases.
+# Contrast-zero context contains identifiers and borrowed primitive inputs only.
+# Every count reduction, design score and result override runs in Rust.
 
-.rsdeseq2_apply_lrt_results_contrast_all_zero <- function(lrt,
-                                                          fit,
-                                                          numericContrast,
-                                                          allZero) {
-  flags <- .rsdeseq2_results_contrast_all_zero_flags(
-    fit = fit,
-    numericContrast = numericContrast,
-    allZero = allZero
-  )
-  if (is.null(flags)) {
-    return(lrt)
-  }
-  allZeroRows <- if (is.null(fit$counts)) rep(FALSE, length(flags)) else rowSums(fit$counts) == 0
-  zeroRows <- which(flags & !allZeroRows)
-  if (length(zeroRows) != 0L) {
-    lrt$log2FoldChange[zeroRows] <- 0
-  }
-  lrt
-}
-
-.rsdeseq2_apply_results_contrast_all_zero <- function(wald,
-                                                      fit,
-                                                      numericContrast,
-                                                      allZero) {
-  flags <- .rsdeseq2_results_contrast_all_zero_flags(
-    fit = fit,
-    numericContrast = numericContrast,
-    allZero = allZero
-  )
-  if (is.null(flags)) {
-    return(wald)
-  }
-  allZeroRows <- if (is.null(fit$counts)) rep(FALSE, length(flags)) else rowSums(fit$counts) == 0
-  zeroRows <- which(flags & !allZeroRows)
-  if (length(zeroRows) != 0L) {
-    wald$log2FoldChange[zeroRows] <- 0
-    wald$stat[zeroRows] <- 0
-    wald$pvalue[zeroRows] <- 1
-  }
-  wald
-}
-
-.rsdeseq2_results_contrast_all_zero_flags <- function(fit,
-                                                      numericContrast,
-                                                      allZero) {
-  if (is.null(fit$counts)) {
-    return(NULL)
-  }
-  if (is.null(allZero) || identical(allZero$type, "none")) {
+.rsdeseq2_contrast_zero_context <- function(fit, allZero) {
+  if (is.null(fit$counts) || is.null(allZero) || identical(allZero$type, "none")) {
     return(NULL)
   }
   if (identical(allZero$type, "character")) {
-    sampleLevels <- .rsdeseq2_character_contrast_sample_levels(fit, allZero)
-    numerator <- .rsdeseq2_resolve_sample_level_alias(
-      allZero$numerator,
-      sampleLevels,
-      "numerator"
-    )
-    denominator <- .rsdeseq2_resolve_sample_level_alias(
-      allZero$denominator,
-      sampleLevels,
-      "denominator"
-    )
+    levels <- .rsdeseq2_character_contrast_sample_levels(fit, allZero)
+    numerator <- .rsdeseq2_resolve_sample_level_alias(allZero$numerator, levels, "numerator")
+    denominator <- .rsdeseq2_resolve_sample_level_alias(allZero$denominator, levels, "denominator")
     if (identical(numerator, denominator)) {
       stop("character contrast all-zero handling requires distinct numerator and denominator levels", call. = FALSE)
     }
-    selected <- sampleLevels %in% c(numerator, denominator)
-    return(rowSums(fit$counts[, selected, drop = FALSE] == 0) == sum(selected))
+    return(list(rule = 2L, counts = fit$counts, sampleLevels = levels,
+      numerator = numerator, denominator = denominator))
   }
   if (!identical(allZero$type, "numeric")) {
     stop("unknown contrast all-zero rule", call. = FALSE)
   }
-  if (all(numericContrast >= 0) || all(numericContrast <= 0)) {
-    return(rep(FALSE, nrow(fit$counts)))
-  }
-  if (is.null(fit$modelMatrix)) {
-    stop("numeric contrast all-zero handling requires modelMatrix", call. = FALSE)
-  }
-  contrastBinary <- ifelse(numericContrast == 0, 0, 1)
-  selected <- as.numeric(fit$modelMatrix %*% contrastBinary) != 0
-  rowSums(fit$counts[, selected, drop = FALSE]) == 0
+  list(rule = 1L, counts = fit$counts, design = fit$modelMatrix)
 }
 
 .rsdeseq2_character_contrast_sample_levels <- function(fit, allZero) {

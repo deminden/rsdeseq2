@@ -1,3 +1,4 @@
+use crate::math::sum::checked_scaled_sum;
 use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
 use statrs::distribution::{Continuous, Normal};
 
@@ -207,30 +208,6 @@ pub fn wald_test_coefficient_with_options(
         .map(|gene| (beta[gene * p + coefficient], se[gene * p + coefficient]));
     let residual = fit.model_matrix.n_samples() as f64 - fit.model_matrix.n_coefficients() as f64;
     super::inference_primitives::wald_from_estimate_rows(rows, options, Some(residual))
-}
-
-pub(super) fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return None;
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let mut normalized_sum = 0.0;
-    for value in values.iter().copied() {
-        let term = value / scale;
-        let next = normalized_sum + term;
-        if !term.is_finite() || !next.is_finite() {
-            return None;
-        }
-        normalized_sum = next;
-    }
-    let sum = normalized_sum * scale;
-    sum.is_finite().then_some(sum)
 }
 
 /// Compute one Wald statistic and two-sided standard-Normal p-value.

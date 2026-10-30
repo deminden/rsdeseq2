@@ -1,10 +1,10 @@
 //! Common public imports for users of the `rsdeseq2` crate.
 
 pub use crate::contrasts::{
-    ContrastSpec, FactorLevelContrast, ResolvedResultsContrast, ResultsContrast,
-    ResultsContrastAllZero, contrast_all_zero_factor_levels, contrast_all_zero_numeric,
-    factor_level_contrast_from_model_frame, resolve_coefficient_index, resolve_contrast,
-    resolve_results_contrast,
+    ContrastCounts, ContrastSpec, ContrastZeroPolicy, FactorLevelContrast, ResolvedResultsContrast,
+    ResultsContrast, ResultsContrastAllZero, contrast_all_zero_factor_levels,
+    contrast_all_zero_numeric, factor_level_contrast_from_model_frame, resolve_coefficient_index,
+    resolve_contrast, resolve_results_contrast,
 };
 pub use crate::cooks::{
     CooksOutput, CooksRefitPlan, CooksReplacementMetadata, CooksReplacementMetadataEntry,

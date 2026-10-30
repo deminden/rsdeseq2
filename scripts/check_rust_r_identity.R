@@ -15,10 +15,11 @@ hex <- function(value) {
   paste(format(writeBin(as.double(value), raw(), size = 8, endian = "big")), collapse = "")
 }
 hexVector <- function(values) lapply(unname(values), hex)
-withoutRCalculations <- function(expression, projection = FALSE) {
+withoutRCalculations <- function(expression, projection = FALSE, zeros = FALSE) {
   # Fail at runtime if the production wrapper reintroduces statistical R calls.
   functions <- list(stats = c("p.adjust", "quantile", "lowess", "pnorm", "pt", "pchisq", "qf", "dnorm"), base = "mean")
   if (projection) functions$base <- c(functions$base, "%*%", "sqrt")
+  if (zeros) functions$base <- c(functions$base, "rowSums", "colSums", "sum")
   on.exit(for (package in names(functions)) for (name in functions[[package]])
     suppressMessages(untrace(name, where = asNamespace(package))), add = TRUE)
   for (package in names(functions)) for (name in functions[[package]])
@@ -206,4 +207,44 @@ for(name in names(projectionCases)) {
       rsdeseq2:::.rsdeseq2_wald_from_primitive_fit(fit,case$contrast,options), projection=TRUE)
     compareIdentity(paste0("projection_",name,"_",mode),input,lapply(actual,hexVector))
   }
+}
+
+# Zero rules are evaluated within the same Rust projection call. R only aligns
+# metadata. Include a globally zero gene with supplied finite estimates to
+# distinguish global exclusion from the contrast-specific override.
+zeroCounts <- matrix(c(0,0,0,0,5,6, 0,0,0,0,0,0, 0,1,0,0,5,6, 0,0,1,0,0,0),4,6,byrow=TRUE)
+zeroDesign <- diag(3)[c(1,1,2,2,3,3),]
+zeroCases <- list(
+  factor=list(rule="character",contrast=c(-1,1,0)),
+  factor_reference=list(rule="character",contrast=c(0,1,0),noDesign=TRUE),
+  numeric=list(rule="numeric",contrast=c(-1,1,0)),
+  fractional=list(rule="numeric",contrast=c(-2,.5,0)),
+  one_sided=list(rule="numeric",contrast=c(0,1,0),noDesign=TRUE),
+  cancelled_design=list(rule="numeric",contrast=c(-1,1,0),cancel=TRUE),
+  unicode=list(rule="character",contrast=c(-1,1,0),unicode=TRUE)
+)
+for(name in names(zeroCases)) for(mode in c("raw","normal","t")) {
+  case <- zeroCases[[name]]
+  design <- if(isTRUE(case$noDesign))NULL else zeroDesign
+  if(isTRUE(case$cancel)) design <- cbind(rep(-1,6),rep(1,6),rep(0,6))
+  levels <- if(isTRUE(case$unicode))rep(c("A β","B β","C β"),each=2)else rep(c("A","B","C"),each=2)
+  numerator <- levels[3]; denominator <- levels[1]
+  fit <- list(beta=projectionBeta,betaSE=projectionSE,betaCovariance=projectionCov,
+    counts=zeroCounts,modelMatrix=design,sampleLevels=levels)
+  allZero <- list(type=case$rule,numerator=numerator,denominator=denominator)
+  df <- if(mode=="t")c(NaN,NaN,2,100)else NULL
+  options <- list(lfcThreshold=.75,altHypothesis="greater",useT=mode=="t",degreesOfFreedom=df)
+  input <- list(operation="projection",genes=4L,coefficients=3L,
+    beta=strings(as.vector(t(projectionBeta))),se=strings(as.vector(t(projectionSE))),
+    covariance=strings(unlist(lapply(1:4,function(gene)as.vector(t(projectionCov[gene,,]))))),
+    contrast=strings(case$contrast),threshold=if(mode=="raw")NULL else ".75",alternative="greater",
+    df=if(is.null(df))NULL else strings(df),
+    zero=list(samples=6L,counts=as.list(as.integer(t(zeroCounts))),
+      design=if(is.null(design))NULL else strings(as.vector(t(design))),levels=as.list(levels),
+      numerator=numerator,denominator=denominator,rule=case$rule))
+  actual <- withoutRCalculations(if(mode=="raw")
+    rsdeseq2:::.rsdeseq2_lrt_from_primitive_fit(fit,case$contrast,allZero) else
+    rsdeseq2:::.rsdeseq2_wald_from_primitive_fit(fit,case$contrast,options,allZero),
+    projection=TRUE,zeros=TRUE)
+  compareIdentity(paste0("zero_",name,"_",mode),input,lapply(actual,hexVector))
 }
