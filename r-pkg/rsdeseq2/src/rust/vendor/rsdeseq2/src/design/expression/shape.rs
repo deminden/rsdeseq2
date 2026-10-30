@@ -16,6 +16,7 @@ impl Value {
         let mut v = self.clone();
         v.dimensions = None;
         v.dimnames = [None, None];
+        v.dimname_names = [None, None];
         v.names = self
             .names
             .as_ref()
@@ -61,12 +62,46 @@ impl Evaluator<'_> {
             }
             "c" => {
                 let values = args.iter().map(|(_, v)| v.flattened()).collect::<Vec<_>>();
-                if values.iter().any(|v| matches!(&v.data, Data::Text(_))) {
+                if values.iter().all(|v| matches!(v.data, Data::Null)) {
+                    return Ok(Value::new(Data::Null));
+                }
+                super::checked_elements(
+                    values
+                        .iter()
+                        .try_fold(0usize, |n, v| n.checked_add(v.len())),
+                )?;
+                let has_names = args
+                    .iter()
+                    .zip(&values)
+                    .any(|((name, _), v)| !v.is_empty() && (name.is_some() || v.names.is_some()));
+                let names = has_names.then(|| {
+                    args.iter()
+                        .zip(&values)
+                        .flat_map(|((name, _), v)| {
+                            let prefix = name.as_deref().filter(|s| !s.is_empty());
+                            (0..v.len()).map(move |i| {
+                                let inner = v
+                                    .names
+                                    .as_ref()
+                                    .map(|n| n[i].as_str())
+                                    .filter(|s| !s.is_empty());
+                                match (prefix, inner) {
+                                    (Some(p), Some(n)) => format!("{p}.{n}"),
+                                    (Some(p), None) if v.len() == 1 => p.into(),
+                                    (Some(p), None) => format!("{p}{}", i + 1),
+                                    (None, Some(n)) => n.into(),
+                                    _ => String::new(),
+                                }
+                            })
+                        })
+                        .collect()
+                });
+                let mut result = if values.iter().any(|v| matches!(&v.data, Data::Text(_))) {
                     let mut result = Vec::new();
                     for v in &values {
                         result.extend(self.characters(v)?.text()?)
                     }
-                    Ok(Value::new(Data::Text(result)))
+                    Value::new(Data::Text(result))
                 } else if values
                     .iter()
                     .all(|v| matches!(&v.data, Data::Logical(_) | Data::Null))
@@ -77,7 +112,7 @@ impl Evaluator<'_> {
                             out.extend(v)
                         }
                     }
-                    Ok(Value::new(Data::Logical(out)))
+                    Value::new(Data::Logical(out))
                 } else {
                     let integer = values.iter().all(|v| {
                         matches!(
@@ -91,11 +126,13 @@ impl Evaluator<'_> {
                             out.extend(v.numeric()?)
                         }
                     }
-                    Ok(Value::new(Data::Number {
+                    Value::new(Data::Number {
                         values: out,
                         integer,
-                    }))
-                }
+                    })
+                };
+                result.names = names;
+                Ok(result)
             }
             "length" => {
                 let a = arguments(args, &["x"])?;
@@ -107,6 +144,7 @@ impl Evaluator<'_> {
             "seq_len" => {
                 let a = arguments(args, &["length.out"])?;
                 let n = dimension(a[0].ok_or_else(|| invalid("seq_len requires a length"))?)?;
+                super::checked_elements(Some(n))?;
                 Ok(Value::new(Data::Number {
                     values: (1..=n).map(|i| i as f64).collect(),
                     integer: true,
@@ -116,12 +154,14 @@ impl Evaluator<'_> {
                 let a = arguments(args, &["x", "times", "length.out", "each"])?;
                 let input = a[0].ok_or_else(|| invalid("rep requires x"))?.flattened();
                 let each = a[3].map(dimension).transpose()?.unwrap_or(1);
+                super::checked_elements(input.len().checked_mul(each))?;
                 let mut indices = Vec::new();
                 for i in 0..input.len() {
                     indices.extend(std::iter::repeat_n(i, each))
                 }
                 if let Some(length) = a[2] {
                     let n = dimension(length)?;
+                    super::checked_elements(Some(n))?;
                     if indices.is_empty() && n > 0 {
                         return Err(invalid("rep cannot recycle empty values"));
                     }
@@ -132,6 +172,7 @@ impl Evaluator<'_> {
                         |v: f64| -> Result<usize, DeseqError> { dimension(&Value::scalar(v)) };
                     if times.len() == 1 {
                         let n = count(times[0])?;
+                        super::checked_elements(indices.len().checked_mul(n))?;
                         let original = indices.clone();
                         for _ in 1..n {
                             indices.extend_from_slice(&original)
@@ -140,14 +181,18 @@ impl Evaluator<'_> {
                             indices.clear()
                         }
                     } else if times.len() == indices.len() {
+                        let counts = times
+                            .into_iter()
+                            .map(count)
+                            .collect::<Result<Vec<_>, _>>()?;
+                        super::checked_elements(
+                            counts.iter().try_fold(0usize, |sum, n| sum.checked_add(*n)),
+                        )?;
                         indices = indices
                             .iter()
-                            .zip(times)
-                            .map(
-                                |(&i, n)| Ok(std::iter::repeat_n(i, count(n)?).collect::<Vec<_>>()),
-                            )
-                            .collect::<Result<Vec<_>, DeseqError>>()?
-                            .concat()
+                            .zip(counts)
+                            .flat_map(|(&i, n)| std::iter::repeat_n(i, n))
+                            .collect();
                     } else {
                         return Err(invalid("rep times must be scalar or one per value"));
                     }
@@ -177,6 +222,7 @@ impl Evaluator<'_> {
                 let size = rows
                     .checked_mul(cols)
                     .ok_or_else(|| invalid("formula matrix shape overflow"))?;
+                super::checked_elements(Some(size))?;
                 let byrow = a[3].map(|v| v.bool_scalar()).transpose()?.unwrap_or(false);
                 if input.is_empty() && size > 0 {
                     return Err(invalid("formula matrix requires values"));
@@ -206,7 +252,8 @@ impl Evaluator<'_> {
                                         .into_iter()
                                         .map(|x| x.unwrap_or_default())
                                         .collect(),
-                                )
+                                );
+                                out.dimname_names[i] = p.names.clone();
                             }
                         }
                     } else {
@@ -230,16 +277,13 @@ impl Evaluator<'_> {
                     .iter()
                     .map(|(_, (_, v))| v.dimensions.map_or(1, |d| d[1]))
                     .sum::<usize>();
-                let mut values = vec![
-                    0.0;
-                    rows.checked_mul(cols)
-                        .ok_or_else(|| invalid("cbind shape overflow"))?
-                ];
+                let mut values = vec![0.0; super::checked_elements(rows.checked_mul(cols))?];
                 let mut names = Vec::new();
                 let mut any_names = false;
                 let mut offset = 0;
                 let mut integer = true;
                 let mut row_names = None;
+                let mut row_name_names = None;
                 for (index, (name, v)) in include {
                     let width = v.dimensions.map_or(1, |d| d[1]);
                     let n = v.dimensions.map_or(v.len(), |d| d[0]);
@@ -248,6 +292,11 @@ impl Evaluator<'_> {
                             v.dimnames[0].clone()
                         } else {
                             v.names.clone()
+                        };
+                        row_name_names = if v.dimensions.is_some() {
+                            v.dimname_names[0].clone()
+                        } else {
+                            None
                         };
                     }
                     if n == 0 && rows > 0 {
@@ -285,6 +334,7 @@ impl Evaluator<'_> {
                 let mut out = Value::new(Data::Number { values, integer });
                 out.dimensions = Some([rows, cols]);
                 out.dimnames[0] = row_names;
+                out.dimname_names[0] = row_name_names;
                 if any_names {
                     out.dimnames[1] = Some(names)
                 }

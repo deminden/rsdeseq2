@@ -29,6 +29,7 @@ impl Evaluator<'_> {
         let mut unshaped = test.clone();
         unshaped.dimensions = None;
         unshaped.dimnames = [None, None];
+        unshaped.dimname_names = [None, None];
         unshaped.names = None;
         let logical = self.elementary("as.logical", &[(None, unshaped)])?;
         let Data::Logical(conditions) = logical.data else {

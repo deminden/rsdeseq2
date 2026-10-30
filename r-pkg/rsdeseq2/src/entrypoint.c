@@ -16,6 +16,10 @@ extern SEXP rsdeseq2_validate_counts(SEXP);
 extern SEXP rsdeseq2_normal_shrinkage_rows(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_offset_factors(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_model_matrix(SEXP,SEXP,SEXP,SEXP,SEXP);
+extern SEXP rsdeseq2_formula_request(SEXP);
+#ifdef RSDESEQ2_TEST_FORMULA_UNWIND
+extern SEXP rsdeseq2_test_formula_transport(SEXP);
+#endif
 extern SEXP rsdeseq2_average_contrast(SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_present_results(SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_contrast_batch(SEXP, SEXP, SEXP, SEXP);
@@ -622,6 +626,10 @@ static const R_CallMethodDef call_methods[] = {
 #endif
     {"rsdeseq2_average_contrast", (DL_FUNC)&rsdeseq2_average_contrast, 3},
     {"rsdeseq2_model_matrix", (DL_FUNC)&rsdeseq2_model_matrix, 5},
+    {"rsdeseq2_formula_request", (DL_FUNC)&rsdeseq2_formula_request, 1},
+#ifdef RSDESEQ2_TEST_FORMULA_UNWIND
+    {"rsdeseq2_test_formula_transport", (DL_FUNC)&rsdeseq2_test_formula_transport, 1},
+#endif
     {"rsdeseq2_validate_counts", (DL_FUNC)&rsdeseq2_validate_counts, 1},
     {"rsdeseq2_normal_shrinkage_rows", (DL_FUNC)&rsdeseq2_normal_shrinkage_rows, 4},
     {"rsdeseq2_offset_factors", (DL_FUNC)&rsdeseq2_offset_factors, 4},

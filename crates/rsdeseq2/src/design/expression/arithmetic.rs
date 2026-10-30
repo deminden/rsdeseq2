@@ -111,6 +111,25 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
     }
     let logical = matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=" | "&" | "|");
     let mut result = template.clone();
+    if a.len() == b.len() {
+        result.attributes = right.attributes.clone();
+        for (name, value) in &left.attributes {
+            result.set_attribute(name, value.clone());
+        }
+        result.names = left.names.clone().or_else(|| right.names.clone());
+        if left.dimensions.is_some() && right.dimensions.is_some() {
+            for i in 0..2 {
+                result.dimnames[i] = left.dimnames[i]
+                    .clone()
+                    .or_else(|| right.dimnames[i].clone());
+                result.dimname_names[i] = if left.dimnames[i].is_some() {
+                    left.dimname_names[i].clone()
+                } else {
+                    right.dimname_names[i].clone()
+                };
+            }
+        }
+    }
     if logical {
         let bools = (0..n)
             .map(|i| {
@@ -177,7 +196,11 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
                 if integer && (!v.is_finite() || v <= i32::MIN as f64 || v > i32::MAX as f64) {
                     super::NA_REAL
                 } else {
-                    v
+                    if integer {
+                        super::integer_storage(v)
+                    } else {
+                        v
+                    }
                 },
             );
         }
@@ -189,10 +212,14 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
             integer,
         };
     }
+    if result.dimensions.is_some() {
+        result.names = None;
+    }
     if n == 0 {
         result.dimensions = None;
         result.names = None;
         result.dimnames = [None, None];
+        result.dimname_names = [None, None];
     }
     Ok(result)
 }

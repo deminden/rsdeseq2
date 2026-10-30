@@ -3,6 +3,8 @@
 mod batch;
 #[path = "evaluate_r_interface/cooks.rs"]
 mod cooks;
+#[path = "evaluate_r_interface/formula.rs"]
+mod formula;
 #[path = "evaluate_r_interface/model_matrix.rs"]
 mod model_matrix;
 #[path = "evaluate_r_interface/preparation.rs"]
@@ -366,6 +368,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Formula(formula::Input),
     ModelMatrix(model_matrix::Case),
     Preparation(preparation::Input),
     CooksPolicy(cooks::Input),
@@ -381,6 +384,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Formula(input) => formula::panel(input),
         Input::ModelMatrix(input) => {
             model_matrix::evaluate(&input, rsdeseq2::matrix::MatrixOrder::RowMajor)
         }

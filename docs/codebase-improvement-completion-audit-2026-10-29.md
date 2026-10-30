@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Conditional R replacement output and borrowed native Cook's factors | The [conditional-storage checkpoint](conditional-replacement-storage-2026-10-30.md) completes the local gate: no R replacement matrix for disabled/no-refit paths, moved owned output under R unwind cleanup when needed, and no temporary factor-matrix expansion/clone. Wald/LRT all-zero-only updates retain their counts. Four injected real-fit error paths release owners and recover exactly; all twenty paired R payloads remain identical. Large no-refit RSS falls 1.016 MiB in the combined candidate. The initial R-only attempt's +4.203 MiB outcome is retained. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation, offset products and formula matrix assembly | The [matrix checkpoint](rust-only-model-matrix-2026-10-30.md) adds shared factor/interaction construction and expanded list-contrast means, with 189 direct identity cases and all 94 supported ordered-level counts matching original R bits. The [expression foundation](built-in-formula-expressions-2026-10-30.md) adds 129 independent primitive cases and rejects custom formula calls per the user's revised scope. Production model-frame/offset integration, initial row adjustment, frozen-local VST and optional posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation, offset products and formula matrix/frame calculations | The [formula-frame checkpoint](rust-only-formula-frames-2026-10-30.md) removes production R expression, frame/offset and character/logical factor calculations, with 188 direct expression identity cases plus the earlier 189 cases and strict live frames. The earlier matrix port retains all 94 supported ordered-level references. Legacy parser adoption, broader warning/method semantics, initial row adjustment, frozen-local VST and optional posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -200,3 +200,19 @@ first attempt's target RSS increase is retained; the combined target pair falls
 1.016 MiB with +0.35% elapsed. Native/R totals rise 0.30%/0.54%, all twenty R
 payloads are exact and below 2 GiB, and no optimization round is counted. C19,
 C21 authority and C23's final combined audit remain open.
+
+The [shared formula-frame checkpoint](rust-only-formula-frames-2026-10-30.md)
+subsequently removes production R expression evaluation, missing-row selection,
+categorical/response preparation and model-offset summation. One shared Rust
+engine serves the actual R bridge and standalone primitive interface. All 188
+expression cases (129 preserved plus 59 independent additions) agree exactly,
+and 189 earlier interface cases remain exact. The checked source passes 2,445 R
+assertions; root/backend suites pass 1,069/three tests. Four injected formula
+decode errors release owners and recover under the instrumented boundary tests.
+All 121+9 GTEx gates, 22 native exports and twenty complete R payloads remain
+unchanged. One paired native pass is essentially flat (elapsed −0.17%); R elapsed
+falls 2.13%, dominated by one slower baseline no-refit case, with the other
+nineteen cases +0.15%. Maximum native/R RSS is 302.359/1,127.781 MiB; individual
+costs and all timings remain recorded. No optimization round is counted.
+Legacy parser adoption, warning/method parity, VST/posteriors, initial adjustment
+and the final authority/combined audit remain open.

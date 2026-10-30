@@ -59,11 +59,3 @@
   }
   walk(formula)
 }
-
-# Transitional model-frame adapter: the expression engine port is tracked in
-# docs/rust-only-wrapper-migration.md. Validation is already shared by every R
-# formula entry, but numerical model.frame evaluation still needs replacement.
-.rsdeseq2_model_frame <- function(formula, data) {
-  .rsdeseq2_validate_formula_calls(formula)
-  stats::model.frame(formula, data=data)
-}

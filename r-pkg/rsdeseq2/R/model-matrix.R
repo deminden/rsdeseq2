@@ -1,5 +1,4 @@
-# Formula parsing/evaluation is still a separate migration item. This adapter
-# transports evaluated variables and term codes; all coding/products are Rust.
+# Formula values, factor coding and products share standalone Rust kernels.
 .rsdeseq2_model_matrix <- function(formula, data) {
   .rsdeseq2_validate_formula_calls(formula)
   frame <- if (is.null(attr(data, "terms"))) .rsdeseq2_model_frame(formula, data) else data
@@ -11,12 +10,10 @@
   defaults <- as.character(getOption("contrasts"))
   response <- attr(terms,"response")
   if (is.null(response)) response <- 0L
+  prepared <- .rsdeseq2_model_values(frame,response)
   variables <- lapply(seq_along(frame), function(i) {
-    value <- frame[[i]]
+    value <- prepared[[i]]
     name <- names(frame)[[i]]
-    if (is.character(value)) value <- factor(value)
-    if (i==response) value <- as.double(value)
-    if (is.logical(value)) value <- factor(value, levels=c(FALSE, TRUE))
     if (is.factor(value)) {
       coding <- attr(value, "contrasts")
       if (is.null(coding)) coding <- defaults[[1L + is.ordered(value)]]

@@ -97,7 +97,7 @@
   }
   modelFrame <- .rsdeseq2_model_frame(formula, data = colData)
   design <- .rsdeseq2_model_matrix(formula, data = modelFrame)
-  formulaOffsets <- stats::model.offset(modelFrame)
+  formulaOffsets <- .rsdeseq2_model_offsets(modelFrame)
 
   sizeFactors <- DESeq2::sizeFactors(object)
   normalizationFactors <- DESeq2::normalizationFactors(object)
@@ -118,7 +118,7 @@
   }
   normalizationFrame <- .rsdeseq2_model_frame(methods::slot(object, "design"), data = colData)
   prepared <- .rsdeseq2_prepare_normalization(
-    object, counts, sizeFactors, normalizationFactors, stats::model.offset(normalizationFrame))
+    object, counts, sizeFactors, normalizationFactors, .rsdeseq2_model_offsets(normalizationFrame))
   sizeFactors <- prepared$sizeFactors
   normalizationFactors <- prepared$normalizationFactors
   if (is.null(normalizationFactors) && !is.null(sizeFactors)) {
