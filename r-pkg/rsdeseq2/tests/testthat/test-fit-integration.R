@@ -133,99 +133,103 @@ testthat::test_that("Rust DESeq accepts a Bioconductor DESeqDataSet", {
 
 testthat::test_that("DESeqDataSet Cook's replacement refits match DESeq2", {
   testthat::skip_if_not_installed("DESeq2")
-  counts <- .rsdeseq2_test_counts()
-  counts[1L, 8L] <- 2000L
-  counts[2L, ] <- 0L
-  counts[2L, 8L] <- 1000L
-  col_data <- data.frame(
-    condition = factor(rep(c("A", "B"), each = 4L), levels = c("A", "B")),
-    row.names = colnames(counts)
-  )
-  dds <- DESeq2::DESeqDataSetFromMatrix(counts, col_data, ~ condition)
+  for (scenario in c("mixed", "all_zero_only")) {
+    counts <- .rsdeseq2_test_counts()
+    if (scenario == "mixed") counts[1L, 8L] <- 2000L
+    expectedRefit <- if(scenario=="mixed")2L else 1L
+    expectedRefitRows <- if(scenario=="mixed")rownames(counts)[1L] else character()
+    counts[2L, ] <- 0L
+    counts[2L, 8L] <- 1000L
+    col_data <- data.frame(
+      condition = factor(rep(c("A", "B"), each = 4L), levels = c("A", "B")),
+      row.names = colnames(counts)
+    )
+    dds <- DESeq2::DESeqDataSetFromMatrix(counts, col_data, ~ condition)
 
-  for (test in c("Wald", "LRT")) {
-    reference_args <- list(
-      object = dds,
-      fitType = "mean",
-      test = test,
-      minReplicatesForReplace = 3L,
-      quiet = TRUE
-    )
-    if (test == "LRT") reference_args$reduced <- ~ 1
-    reference <- do.call(DESeq2::DESeq, reference_args)
-    fitted <- DESeq(
-      dds,
-      fitType = "mean",
-      test = test,
-      reduced = if (test == "LRT") ~ 1 else NULL,
-      minReplicatesForReplace = 3L
-    )
-    fit_state <- S4Vectors::metadata(fitted)$rsdeseq2RustFit
-    reference_results <- DESeq2::results(reference, independentFiltering = FALSE)
-    fitted_results <- results(fitted, independentFiltering = FALSE)
+    for (test in c("Wald", "LRT")) {
+      reference_args <- list(
+        object = dds,
+        fitType = "mean",
+        test = test,
+        minReplicatesForReplace = 3L,
+        quiet = TRUE
+      )
+      if (test == "LRT") reference_args$reduced <- ~ 1
+      reference <- do.call(DESeq2::DESeq, reference_args)
+      fitted <- DESeq(
+        dds,
+        fitType = "mean",
+        test = test,
+        reduced = if (test == "LRT") ~ 1 else NULL,
+        minReplicatesForReplace = 3L
+      )
+      fit_state <- S4Vectors::metadata(fitted)$rsdeseq2RustFit
+      reference_results <- DESeq2::results(reference, independentFiltering = FALSE)
+      fitted_results <- results(fitted, independentFiltering = FALSE)
 
-    testthat::expect_equal(fit_state$nRefit, 2L)
-    testthat::expect_true(methods::is(fitted_results, "DESeqResults"))
-    testthat::expect_equal(S4Vectors::metadata(fitted_results)$resultName, "conditionB")
-    testthat::expect_equal(S4Vectors::metadata(fitted_results)$cooksReplacement$nRefit, 2L)
-    testthat::expect_equal(S4Vectors::mcols(fitted_results)$type, rep("results", ncol(fitted_results)))
-    testthat::expect_equal(S4Vectors::mcols(fitted_results)$description[[2L]], "log2 fold change (MLE): conditionB")
-    testthat::expect_equal(S4Vectors::mcols(fitted)$replace, S4Vectors::mcols(reference)$replace)
-    testthat::expect_equal(S4Vectors::mcols(fitted)$baseVar, S4Vectors::mcols(reference)$baseVar, tolerance = 1e-4)
-    testthat::expect_equal(S4Vectors::mcols(fitted)$allZero, S4Vectors::mcols(reference)$allZero)
-    testthat::expect_equal(
-      unname(SummarizedExperiment::colData(fitted)$replaceable),
-      unname(SummarizedExperiment::colData(reference)$replaceable)
-    )
-    testthat::expect_equal(
-      SummarizedExperiment::assay(fitted, "replaceCounts"),
-      SummarizedExperiment::assay(reference, "replaceCounts"),
-      tolerance = 0
-    )
-    testthat::expect_equal(
-      SummarizedExperiment::assay(fitted, "replaceCooks"),
-      SummarizedExperiment::assay(reference, "replaceCooks"),
-      tolerance = 1e-5
-    )
-    testthat::expect_equal(
-      SummarizedExperiment::assay(fitted, "counts"),
-      SummarizedExperiment::assay(dds, "counts")
-    )
-    testthat::expect_equal(fitted_results$baseMean, reference_results$baseMean, tolerance = 1e-10)
-    testthat::expect_equal(fitted_results$log2FoldChange, reference_results$log2FoldChange, tolerance = 1e-4)
-    testthat::expect_equal(fitted_results$lfcSE, reference_results$lfcSE, tolerance = 1e-4)
-    testthat::expect_equal(unname(fitted_results$stat), unname(reference_results$stat), tolerance = 2e-4)
-    testthat::expect_equal(unname(fitted_results$pvalue), unname(reference_results$pvalue), tolerance = 1e-4)
-    result_metadata <- attr(fitted_results, "metadata")
-    testthat::expect_true(result_metadata$cooksReplacement$enabled)
-    testthat::expect_equal(result_metadata$cooksReplacement$nRefit, 2L)
-    testthat::expect_equal(result_metadata$cooksReplacement$refitRows, rownames(counts)[1L])
-    testthat::expect_equal(result_metadata$cooksReplacement$newAllZeroRows, rownames(counts)[2L])
-    for (assayName in c("replaceCounts", "replaceCooks")) {
-      edited <- fitted
-      SummarizedExperiment::assay(edited, assayName)[1, 1] <-
-        SummarizedExperiment::assay(edited, assayName)[1, 1] + 1
-      testthat::expect_error(results(edited), paste(assayName, "changed"))
+      testthat::expect_equal(fit_state$nRefit, expectedRefit)
+      testthat::expect_true(methods::is(fitted_results, "DESeqResults"))
+      testthat::expect_equal(S4Vectors::metadata(fitted_results)$resultName, "conditionB")
+      testthat::expect_equal(S4Vectors::metadata(fitted_results)$cooksReplacement$nRefit, expectedRefit)
+      testthat::expect_equal(S4Vectors::mcols(fitted_results)$type, rep("results", ncol(fitted_results)))
+      testthat::expect_equal(S4Vectors::mcols(fitted_results)$description[[2L]], "log2 fold change (MLE): conditionB")
+      testthat::expect_equal(S4Vectors::mcols(fitted)$replace, S4Vectors::mcols(reference)$replace)
+      testthat::expect_equal(S4Vectors::mcols(fitted)$baseVar, S4Vectors::mcols(reference)$baseVar, tolerance = 1e-4)
+      testthat::expect_equal(S4Vectors::mcols(fitted)$allZero, S4Vectors::mcols(reference)$allZero)
+      testthat::expect_equal(
+        unname(SummarizedExperiment::colData(fitted)$replaceable),
+        unname(SummarizedExperiment::colData(reference)$replaceable)
+      )
+      testthat::expect_equal(
+        SummarizedExperiment::assay(fitted, "replaceCounts"),
+        SummarizedExperiment::assay(reference, "replaceCounts"),
+        tolerance = 0
+      )
+      testthat::expect_equal(
+        SummarizedExperiment::assay(fitted, "replaceCooks"),
+        SummarizedExperiment::assay(reference, "replaceCooks"),
+        tolerance = 1e-5
+      )
+      testthat::expect_equal(
+        SummarizedExperiment::assay(fitted, "counts"),
+        SummarizedExperiment::assay(dds, "counts")
+      )
+      testthat::expect_equal(fitted_results$baseMean, reference_results$baseMean, tolerance = 1e-10)
+      testthat::expect_equal(fitted_results$log2FoldChange, reference_results$log2FoldChange, tolerance = 1e-4)
+      testthat::expect_equal(fitted_results$lfcSE, reference_results$lfcSE, tolerance = 1e-4)
+      testthat::expect_equal(unname(fitted_results$stat), unname(reference_results$stat), tolerance = 2e-4)
+      testthat::expect_equal(unname(fitted_results$pvalue), unname(reference_results$pvalue), tolerance = 1e-4)
+      result_metadata <- attr(fitted_results, "metadata")
+      testthat::expect_true(result_metadata$cooksReplacement$enabled)
+      testthat::expect_equal(result_metadata$cooksReplacement$nRefit, expectedRefit)
+      testthat::expect_equal(result_metadata$cooksReplacement$refitRows, expectedRefitRows)
+      testthat::expect_equal(result_metadata$cooksReplacement$newAllZeroRows, rownames(counts)[2L])
+      for (assayName in c("replaceCounts", "replaceCooks")) {
+        edited <- fitted
+        SummarizedExperiment::assay(edited, assayName)[1, 1] <-
+          SummarizedExperiment::assay(edited, assayName)[1, 1] + 1
+        testthat::expect_error(results(edited), paste(assayName, "changed"))
+      }
+
     }
 
-  }
+    filtered_result <- results(fitted)
+    filtered_metadata <- S4Vectors::metadata(filtered_result)
+    testthat::expect_equal(filtered_metadata$alpha, 0.1)
+    testthat::expect_identical(
+      filtered_metadata$independentFiltering$enabled,
+      attr(filtered_result, "independentFiltering")$enabled
+    )
+    if (filtered_metadata$independentFiltering$enabled) {
+      testthat::expect_true(is.finite(filtered_metadata$filterThreshold))
+      testthat::expect_true(is.data.frame(filtered_metadata$filterNumRej))
+    }
 
-  filtered_result <- results(fitted)
-  filtered_metadata <- S4Vectors::metadata(filtered_result)
-  testthat::expect_equal(filtered_metadata$alpha, 0.1)
-  testthat::expect_identical(
-    filtered_metadata$independentFiltering$enabled,
-    attr(filtered_result, "independentFiltering")$enabled
-  )
-  if (filtered_metadata$independentFiltering$enabled) {
-    testthat::expect_true(is.finite(filtered_metadata$filterThreshold))
-    testthat::expect_true(is.data.frame(filtered_metadata$filterNumRej))
+    disabled <- DESeq(dds, fitType = "mean", minReplicatesForReplace = Inf)
+    testthat::expect_false("replaceCounts" %in% SummarizedExperiment::assayNames(disabled))
+    testthat::expect_false(attr(results(disabled), "metadata")$cooksReplacement$enabled)
+    testthat::expect_error(DESeq(dds, fitType = "mean", minReplicatesForReplace = 2L), "at least 3")
   }
-
-  disabled <- DESeq(dds, fitType = "mean", minReplicatesForReplace = Inf)
-  testthat::expect_false("replaceCounts" %in% SummarizedExperiment::assayNames(disabled))
-  testthat::expect_false(attr(results(disabled), "metadata")$cooksReplacement$enabled)
-  testthat::expect_error(DESeq(dds, fitType = "mean", minReplicatesForReplace = 2L), "at least 3")
 })
 
 testthat::test_that("DESeqDataSet fits attach fitted means, Cook's distances, and row metadata", {

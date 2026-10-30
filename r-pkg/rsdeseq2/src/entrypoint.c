@@ -7,6 +7,11 @@
 #include <stddef.h>
 #include <limits.h>
 #include "validation.h"
+#include "fit_abi.h"
+extern SEXP rsdeseq2_finish_replacement(Rsdeseq2ReplacementCounts **, size_t, size_t, SEXP);
+#ifdef RSDESEQ2_TEST_REPLACEMENT_UNWIND
+extern SEXP rsdeseq2_test_replacement_transport(SEXP);
+#endif
 extern SEXP rsdeseq2_validate_counts(SEXP);
 extern SEXP rsdeseq2_normal_shrinkage_rows(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_offset_factors(SEXP,SEXP,SEXP,SEXP);
@@ -27,7 +32,6 @@ extern SEXP rsdeseq2_independent_filtering(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern int rsdeseq2_r_estimate_size_factors(size_t, size_t, const double *, int, const double *, const size_t *, size_t, double *);
 extern int rsdeseq2_r_normalized_counts(size_t, size_t, const double *, const double *, const double *, double *);
 extern int rsdeseq2_r_base_metadata(size_t, size_t, const double *, const double *, const double *, const double *, double *, double *, uint8_t *);
-extern int rsdeseq2_r_fit(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, size_t, const double *, int, int, size_t, double, size_t, int, double *, double *, double *, double *, double *, double *, double *, uint8_t *, uint8_t *, uint8_t *, uint8_t *, size_t *, double *, double *, double *, double *, int *);
 extern int rsdeseq2_r_lfc_shrink_normal(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, const double *, const double *, const double *, size_t, ptrdiff_t, double, double *, double *, double *, double *, double *);
 extern int rsdeseq2_r_lfc_shrink_normal_contrast(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, size_t, const double *, const int32_t *, const int32_t *, const double *, const double *, const double *, const int32_t *, const double *, ptrdiff_t, ptrdiff_t, double, double *, double *, double *, double *, double *);
 extern int rsdeseq2_r_transform(size_t, size_t, const double *, const double *, const double *, const double *, size_t, const double *, int, int, uint8_t, size_t, size_t, const double *, double, int, const double *, const double *, const double *, double *, double *, double *, double *);
@@ -205,8 +209,8 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SEXP all_zero_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
     SEXP mu_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
     SEXP cooks_out = PROTECT(Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
-    SEXP replace_counts_out = PROTECT(Rf_asInteger(min_replicates_for_replace) == 0
-        ? R_NilValue : Rf_allocMatrix(REALSXP, (int)n_genes, (int)n_samples));
+    SEXP replacement_continuation = PROTECT(R_MakeUnwindCont());
+    Rsdeseq2ReplacementCounts *replacement_owner = NULL;
     SEXP replace_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
     SEXP replaceable_samples_out = PROTECT(Rf_allocVector(LGLSXP, n_samples));
     SEXP refit_rows_out = PROTECT(Rf_allocVector(LGLSXP, n_genes));
@@ -226,9 +230,11 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         Rf_asReal(cooks_replacement_cutoff),
         (size_t)Rf_asInteger(threads), Rf_asInteger(execution_mode), REAL(values),
         REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out),
-        replace_counts_out == R_NilValue ? NULL : REAL(replace_counts_out),
+        &replacement_owner,
         replace_values, replaceable_values, refit_rows_values, new_all_zero_values, &n_refit_value, REAL(size_factors_out),
         REAL(dispersions_out), REAL(disp_fit_out), REAL(base_var_out), LOGICAL(all_zero_out)));
+    SEXP replace_counts_out = PROTECT(rsdeseq2_finish_replacement(
+        &replacement_owner, n_genes, n_samples, replacement_continuation));
     INTEGER(n_refit_out)[0] = (int)n_refit_value;
     for (size_t gene = 0; gene < n_genes; ++gene) LOGICAL(replace_out)[gene] = replace_values[gene] == 2 ? NA_LOGICAL : (replace_values[gene] ? TRUE : FALSE);
     for (size_t sample = 0; sample < n_samples; ++sample) LOGICAL(replaceable_samples_out)[sample] = replaceable_values[sample] ? TRUE : FALSE;
@@ -335,7 +341,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SET_STRING_ELT(fit_names, 15, Rf_mkChar("refitRows"));
     SET_STRING_ELT(fit_names, 16, Rf_mkChar("newAllZeroRows"));
     Rf_setAttrib(fit, R_NamesSymbol, fit_names);
-    UNPROTECT(26);
+    UNPROTECT(27);
     return fit;
 }
 
@@ -611,6 +617,9 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
 }
 
 static const R_CallMethodDef call_methods[] = {
+#ifdef RSDESEQ2_TEST_REPLACEMENT_UNWIND
+    {"rsdeseq2_test_replacement_transport", (DL_FUNC)&rsdeseq2_test_replacement_transport, 1},
+#endif
     {"rsdeseq2_average_contrast", (DL_FUNC)&rsdeseq2_average_contrast, 3},
     {"rsdeseq2_model_matrix", (DL_FUNC)&rsdeseq2_model_matrix, 5},
     {"rsdeseq2_validate_counts", (DL_FUNC)&rsdeseq2_validate_counts, 1},

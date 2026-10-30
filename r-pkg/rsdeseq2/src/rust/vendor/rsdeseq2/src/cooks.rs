@@ -3,8 +3,8 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{
-    base_mean, base_variance, normalization_factors_from_size_factors,
-    normalized_counts_with_factors, validate_normalization_factors,
+    base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,
+    validate_size_factors,
 };
 
 const MIN_COOKS_DISPERSION: f64 = 0.04;
@@ -292,13 +292,12 @@ pub fn replace_outlier_counts(
     if counts.n_samples() <= model_matrix.n_coefficients() {
         return no_replacement_output(counts);
     }
-    let scale_factors = match normalization_factors {
+    match normalization_factors {
         Some(factors) => {
             validate_normalization_factors(counts, factors)?;
-            factors.clone()
         }
-        None => normalization_factors_from_size_factors(counts, size_factors)?,
-    };
+        None => validate_size_factors(size_factors, counts.n_samples())?,
+    }
     let replaceable_samples = match &options.which_samples {
         Some(samples) => samples.clone(),
         None => samples_for_cooks(model_matrix, options.min_replicates)?,
@@ -307,7 +306,10 @@ pub fn replace_outlier_counts(
     let mut candidate_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
     for gene in 0..counts.n_genes() {
         let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
-        let scale_row = scale_factors.row(gene)?;
+        let scale_row = match normalization_factors {
+            Some(factors) => factors.row(gene)?,
+            None => size_factors,
+        };
         for (sample, scale) in scale_row.iter().copied().enumerate() {
             let scaled_mean = checked_product2(
                 trim_mean,
@@ -388,15 +390,15 @@ pub fn prepare_cooks_replacement_refit(
         model_matrix,
         options,
     )?;
-    let scale_factors = match normalization_factors {
+    let replaced_normalized_counts = match normalization_factors {
         Some(factors) => {
             validate_normalization_factors(counts, factors)?;
-            factors.clone()
+            normalized_counts_with_factors(&replacement.replaced_counts, factors)?
         }
-        None => normalization_factors_from_size_factors(counts, size_factors)?,
+        None => {
+            crate::normalization::normalized_counts(&replacement.replaced_counts, size_factors)?
+        }
     };
-    let replaced_normalized_counts =
-        normalized_counts_with_factors(&replacement.replaced_counts, &scale_factors)?;
     let replaced_base_mean = base_mean(&replaced_normalized_counts)?;
     let replaced_base_var = base_variance(&replaced_normalized_counts)?;
     let replaced_all_zero = replacement.replaced_counts.all_zero_flags();
