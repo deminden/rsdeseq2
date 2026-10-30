@@ -229,7 +229,7 @@ impl Evaluator<'_> {
             values: codes,
             integer: true,
         });
-        result.names = input.names.clone();
+        result.names = input.flattened().names;
         result.set_attribute("levels", Value::new(Data::Text(output_levels)));
         result.set_attribute(
             "class",

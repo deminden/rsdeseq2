@@ -27,7 +27,7 @@
   design <- .rsdeseq2_model_matrix(methods::slot(object, "design"), data = frame)
   if (!identical(dimnames(design), dimnames(fit$design)) || !equal(design, fit$design)) invalid("design")
   state <- S4Vectors::metadata(object)$rsdeseq2Normalization
-  offsets <- stats::model.offset(frame)
+  offsets <- .rsdeseq2_model_offsets(frame)
   if (is.null(state) && !is.null(offsets)) invalid("offset provenance")
   if (!is.null(state) && !equal(offsets, state$offsets)) invalid("offsets")
   nf <- DESeq2::normalizationFactors(object)

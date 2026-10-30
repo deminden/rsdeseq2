@@ -80,7 +80,11 @@ impl Evaluator<'_> {
                 if name == "I" {
                     let mut classes = vec![Some("AsIs".into())];
                     if let Some(v) = x.attribute("class") {
-                        classes.extend(v.text()?)
+                        classes.extend(
+                            v.text()?
+                                .into_iter()
+                                .filter(|s| s.as_deref() != Some("AsIs")),
+                        )
                     }
                     x.set_attribute("class", Value::new(Data::Text(classes)))
                 }
@@ -92,7 +96,11 @@ impl Evaluator<'_> {
                 if args.len() != 2 {
                     return Err(invalid("binary formula operation requires two arguments"));
                 }
-                super::arithmetic::binary(name, &args[0].1, &args[1].1)
+                if matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=") {
+                    self.comparison(name, &args[0].1, &args[1].1)
+                } else {
+                    super::arithmetic::binary(name, &args[0].1, &args[1].1)
+                }
             }
             "scale" | "poly" => self.transform(name, args),
             "factor" | "ordered" | "as.factor" | "as.ordered" | "droplevels" | "relevel" => {
@@ -101,31 +109,7 @@ impl Evaluator<'_> {
             "c" | "list" | "cbind" | "matrix" | "rep" | "seq_len" | "length" => {
                 self.shape(name, args, expressions)
             }
-            "mean" | "sum" | "sd" => {
-                let a = arguments(args, &["x", "na.rm"])?;
-                let mut x = a[0]
-                    .ok_or_else(|| invalid("formula summary requires x"))?
-                    .numeric()?;
-                if a[1].map(|v| v.bool_scalar()).transpose()?.unwrap_or(false) {
-                    x.retain(|v| !v.is_nan())
-                }
-                let total = x.iter().fold(0.0, |s, v| s + v);
-                let value = match name {
-                    "sum" => total,
-                    "mean" => super::super::numeric_transform::scalar_mean(&x),
-                    _ => {
-                        if x.len() < 2 || x.iter().any(|v| v.is_nan()) {
-                            super::NA_REAL
-                        } else {
-                            let mean = super::super::numeric_transform::scalar_mean(&x);
-                            (x.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>()
-                                / (x.len() - 1) as f64)
-                                .sqrt()
-                        }
-                    }
-                };
-                Ok(Value::scalar(value))
-            }
+            "mean" | "sum" | "sd" => self.summary(name, args),
             _ => self.elementary(name, args),
         }
     }

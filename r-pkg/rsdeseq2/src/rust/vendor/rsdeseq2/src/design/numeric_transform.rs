@@ -8,6 +8,7 @@ use crate::matrix::{MatrixView, RowMajorMatrix};
 mod polynomial;
 pub(super) mod polynomial_qr;
 mod reduction;
+pub(super) use polynomial::polynomial_expression;
 pub use polynomial::{PolynomialBasis, PolynomialCoefficients, polynomial_basis};
 
 fn invalid(reason: impl Into<String>) -> DeseqError {

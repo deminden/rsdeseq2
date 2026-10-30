@@ -82,8 +82,14 @@ The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The
 [built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)
 adds an early custom/masked-call guard and independently checked standalone
-expression primitives. The production model-frame/offset port remains open;
-neither this guard nor the new evaluator closes C19.
+expression primitives. That checkpoint left the production model-frame/offset
+port open; the guard and evaluator alone did not close C19. The later
+[shared formula-frame checkpoint](rust-only-formula-frames-2026-10-30.md)
+connects production expression evaluation, row policy, categorical preparation
+and offset summation to the standalone engine. R retains symbolic metadata only
+on those paths. It adds 188 direct expression identity cases and strict live
+whole-frame checks. Legacy parser adoption, general warning/method semantics,
+VST/posterior ports and the other completion gates below remain open.
 
 The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both

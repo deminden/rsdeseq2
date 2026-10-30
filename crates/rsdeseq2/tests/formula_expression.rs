@@ -3,69 +3,19 @@ use rsdeseq2::design::expression::{
 };
 use serde_json::Value as Json;
 
-fn strings(v: &Json) -> Option<Vec<String>> {
-    v.as_array()
-        .map(|a| a.iter().map(|v| v.as_str().unwrap().into()).collect())
-}
-fn value(v: &Json) -> Value {
-    let list = v["values"].as_array();
-    let data = match v["type"].as_str().unwrap() {
-        "number" => Data::Number {
-            integer: v["integer"].as_bool().unwrap(),
-            values: list
-                .unwrap()
-                .iter()
-                .map(|v| f64::from_bits(u64::from_str_radix(v.as_str().unwrap(), 16).unwrap()))
-                .collect(),
-        },
-        "text" => Data::Text(
-            list.unwrap()
-                .iter()
-                .map(|v| v.as_str().map(str::to_owned))
-                .collect(),
-        ),
-        "logical" => Data::Logical(list.unwrap().iter().map(Json::as_bool).collect()),
-        "list" => Data::List(list.unwrap().iter().map(value).collect()),
-        "null" => Data::Null,
-        _ => panic!(),
-    };
-    let mut result = Value::new(data);
-    result.names = strings(&v["names"]);
-    result.dimnames = [strings(&v["dimnames"][0]), strings(&v["dimnames"][1])];
-    result.dimensions = v["dimensions"].as_array().map(|d| {
-        [
-            d[0].as_u64().unwrap() as usize,
-            d[1].as_u64().unwrap() as usize,
-        ]
-    });
-    if let Some(a) = v["attributes"].as_object() {
-        result.attributes = a.iter().map(|(n, v)| (n.clone(), value(v))).collect()
-    }
-    result
-}
-fn expression(v: &Json) -> Expression {
-    match v["type"].as_str().unwrap() {
-        "symbol" => Expression::Symbol(v["name"].as_str().unwrap().into()),
-        "literal" => Expression::Literal(value(&v["value"])),
-        "call" => Expression::Call {
-            function: v["function_name"].as_str().unwrap().into(),
-            arguments: v["arguments"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|a| Argument {
-                    name: a["name"].as_str().map(str::to_owned),
-                    expression: expression(&a["expression"]),
-                })
-                .collect(),
-        },
-        _ => panic!(),
-    }
-}
+#[allow(dead_code)]
+#[path = "../examples/evaluate_r_interface/formula.rs"]
+mod formula;
+use formula::{expression, value};
+
 fn equal_value(actual: &Value, expected: &Value, path: &str) {
     assert_eq!(actual.dimensions, expected.dimensions, "{path}: dimensions");
     assert_eq!(actual.names, expected.names, "{path}: names");
     assert_eq!(actual.dimnames, expected.dimnames, "{path}: dimnames");
+    assert_eq!(
+        actual.dimname_names, expected.dimname_names,
+        "{path}: label names"
+    );
     match (&actual.data, &expected.data) {
         (
             Data::Number {
@@ -114,8 +64,14 @@ fn equal_value(actual: &Value, expected: &Value, path: &str) {
 }
 #[test]
 fn built_in_expressions_match_independent_r_values_and_metadata() {
-    let reference: Json =
-        serde_json::from_str(include_str!("data/formula_expression_r462.json")).unwrap();
+    compare_reference(include_str!("data/formula_expression_r462.json"));
+}
+#[test]
+fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
+    compare_reference(include_str!("data/formula_expression_extended_r462.json"));
+}
+fn compare_reference(contents: &str) {
+    let reference: Json = serde_json::from_str(contents).unwrap();
     let variables = reference["variables"]
         .as_object()
         .unwrap()
@@ -148,6 +104,42 @@ fn built_in_expressions_match_independent_r_values_and_metadata() {
     assert!(
         failures.is_empty(),
         "independent expression failures: {failures:?}"
+    );
+}
+
+#[test]
+fn primitive_wire_preserves_reference_bits_and_rejects_truncation() {
+    use rsdeseq2::design::expression::wire;
+    let reference: Json =
+        serde_json::from_str(include_str!("data/formula_expression_r462.json")).unwrap();
+    for (name, input) in reference["variables"].as_object().unwrap() {
+        let original = value(input);
+        let bytes = wire::encode(&original).unwrap();
+        equal_value(&wire::decode(&bytes).unwrap(), &original, name);
+    }
+    let nested = value(&reference["variables"]["coefficients"]);
+    let bytes = wire::encode(&nested).unwrap();
+    for end in 0..bytes.len() {
+        assert!(
+            wire::decode(&bytes[..end]).is_err(),
+            "accepted truncation at {end}"
+        );
+    }
+    let mut trailing = bytes.clone();
+    trailing.push(0);
+    assert!(wire::decode(&trailing).is_err());
+    let mut oversized = bytes;
+    oversized[5..13].copy_from_slice(&u64::MAX.to_le_bytes());
+    assert!(wire::decode(&oversized).is_err());
+    let huge = call(
+        "seq_len",
+        vec![Expression::Literal(Value::scalar(i32::MAX as f64))],
+    );
+    assert!(
+        evaluate(&huge, &[], &EvaluationOptions::default())
+            .unwrap_err()
+            .to_string()
+            .contains("size limit")
     );
 }
 
@@ -240,6 +232,14 @@ fn rejects_custom_calls_even_in_unused_branches_and_validates_owned_inputs() {
             &options
         )
         .is_err()
+    );
+    let mut nested = Expression::Literal(Value::scalar(1.0));
+    for _ in 0..128 {
+        nested = call("(", vec![nested]);
+    }
+    assert_eq!(
+        evaluate(&nested, &[], &options).unwrap(),
+        Value::scalar(1.0)
     );
     let mut nested = Expression::Literal(Value::scalar(1.0));
     for _ in 0..130 {

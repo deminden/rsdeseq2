@@ -14,6 +14,8 @@ entrypoint.o: $(RUST_BACKEND) validation.h fit_abi.h
 replacement_counts.o: $(RUST_BACKEND) validation.h fit_abi.h
 row_preparation.o: $(RUST_BACKEND) validation.h
 model_matrix.o: $(RUST_BACKEND) validation.h
+formula_request.o: $(RUST_BACKEND) validation.h formula_transport.h
+formula_encode.o formula_decode.o: formula_transport.h
 contrast_batch.o: $(RUST_BACKEND) validation.h contrast_inference.h contrast_zero.h
 contrast_inference.o: $(RUST_BACKEND) validation.h contrast_inference.h contrast_zero.h
 contrast_zero.o: $(RUST_BACKEND) validation.h contrast_zero.h

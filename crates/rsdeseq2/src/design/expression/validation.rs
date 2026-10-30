@@ -47,8 +47,15 @@ pub(super) fn validate_expression(expression: &Expression, depth: usize) -> Resu
 // Public primitive inputs must be checked before any matrix indexing or factor
 // lookup. This also bounds recursive metadata independently of AST recursion.
 pub(super) fn validate_value(value: &Value, depth: usize) -> Result<(), DeseqError> {
-    if depth > 128 {
-        return Err(invalid("formula value nesting exceeds 128"));
+    validate_value_with_limit(value, depth, 128)
+}
+pub(super) fn validate_value_with_limit(
+    value: &Value,
+    depth: usize,
+    limit: usize,
+) -> Result<(), DeseqError> {
+    if depth > limit {
+        return Err(invalid(format!("formula value nesting exceeds {limit}")));
     }
     if let Some([rows, columns]) = value.dimensions {
         if rows.checked_mul(columns) != Some(value.len()) {
@@ -59,7 +66,23 @@ pub(super) fn validate_value(value: &Value, depth: usize) -> Result<(), DeseqErr
                 return Err(invalid("formula dimension names do not match dimensions"));
             }
         }
-    } else if value.dimnames.iter().any(Option::is_some) {
+        for i in 0..2 {
+            if let Some(names) = &value.dimname_names[i]
+                && value.dimnames[i]
+                    .as_ref()
+                    .is_none_or(|v| v.len() != names.len())
+            {
+                return Err(invalid(
+                    "formula label names require matching dimension labels",
+                ));
+            }
+        }
+    } else if value
+        .dimnames
+        .iter()
+        .chain(&value.dimname_names)
+        .any(Option::is_some)
+    {
         return Err(invalid("formula dimension names require dimensions"));
     }
     if value.names.as_ref().is_some_and(|n| n.len() != value.len()) {
@@ -83,11 +106,11 @@ pub(super) fn validate_value(value: &Value, depth: usize) -> Result<(), DeseqErr
         if name.is_empty() || value.attributes[..index].iter().any(|(n, _)| n == name) {
             return Err(invalid("formula attributes require unique nonempty names"));
         }
-        validate_value(attribute, depth + 1)?;
+        validate_value_with_limit(attribute, depth + 1, limit)?;
     }
     if let Data::List(values) = &value.data {
         for v in values {
-            validate_value(v, depth + 1)?;
+            validate_value_with_limit(v, depth + 1, limit)?;
         }
     }
     if value.has_class("factor") {

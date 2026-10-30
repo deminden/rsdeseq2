@@ -34,6 +34,24 @@ pub fn polynomial_basis(
             "polynomials require finite values and positive degree",
         ));
     }
+    let result = polynomial_expression(input, degree, raw, coefficients)?;
+    if result.values.as_slice().iter().any(|v| !v.is_finite()) {
+        return Err(invalid("polynomial transform produced non-finite values"));
+    }
+    Ok(result)
+}
+
+pub(in crate::design) fn polynomial_expression(
+    input: &[f64],
+    degree: usize,
+    raw: bool,
+    coefficients: Option<&PolynomialCoefficients>,
+) -> Result<PolynomialBasis, DeseqError> {
+    if degree == 0 || (!raw && coefficients.is_none() && input.iter().any(|v| !v.is_finite())) {
+        return Err(invalid(
+            "orthogonal polynomials require nonmissing finite input and positive degree",
+        ));
+    }
     let width = degree
         .checked_add(1)
         .ok_or_else(|| invalid("polynomial degree overflow"))?;
@@ -139,6 +157,13 @@ pub fn polynomial_basis(
 }
 
 fn power(x: f64, exponent: usize) -> f64 {
+    if x.is_nan() {
+        return if exponent == 0 {
+            1.0
+        } else {
+            x + exponent as f64
+        };
+    }
     if x == 0.0 && exponent != 0 {
         return 0.0;
     }
@@ -162,9 +187,6 @@ fn finish(
     values: Vec<f64>,
     coefficients: Option<PolynomialCoefficients>,
 ) -> Result<PolynomialBasis, DeseqError> {
-    if values.iter().any(|v| !v.is_finite()) {
-        return Err(invalid("polynomial transform produced non-finite values"));
-    }
     Ok(PolynomialBasis {
         values: RowMajorMatrix::from_row_major(rows, columns, values)?,
         coefficients,

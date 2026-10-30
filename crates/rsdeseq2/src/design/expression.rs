@@ -5,12 +5,17 @@ use icu_collator::{Collator, CollatorBorrowed};
 use icu_locale::Locale;
 
 mod arithmetic;
+mod comparisons;
 mod conditional;
 mod factors;
+pub mod frame;
 mod functions;
+mod polynomials;
 mod shape;
+mod summaries;
 mod transforms;
 mod validation;
+pub mod wire;
 use validation::{function_name, validate_expression, validate_value};
 
 /// Atomic/list storage. Numeric matrices use row-major order; missing logical
@@ -36,10 +41,13 @@ pub struct Value {
     pub data: Data,
     /// Optional matrix shape.
     pub dimensions: Option<[usize; 2]>,
-    /// Optional vector/list names.
+    /// Optional element/list names in storage order (row-major for matrices).
     pub names: Option<Vec<String>>,
     /// Optional row/column names.
     pub dimnames: [Option<Vec<String>>; 2],
+    /// Optional names attached to the row/column label vectors themselves.
+    /// Multivariate polynomial column labels use these grid-row identifiers.
+    pub dimname_names: [Option<Vec<String>>; 2],
     /// Class, factor levels, recurrence/scaling and other primitive metadata.
     pub attributes: Vec<(String, Value)>,
 }
@@ -56,12 +64,22 @@ impl Value {
         Self::numbers(vec![value])
     }
     /// Construct a value without metadata.
-    pub fn new(data: Data) -> Self {
+    pub fn new(mut data: Data) -> Self {
+        if let Data::Number {
+            values,
+            integer: true,
+        } = &mut data
+        {
+            for v in values {
+                *v = integer_storage(*v);
+            }
+        }
         Self {
             data,
             dimensions: None,
             names: None,
             dimnames: [None, None],
+            dimname_names: [None, None],
             attributes: Vec::new(),
         }
     }
@@ -125,7 +143,12 @@ impl Value {
     pub(super) fn has_class(&self, class: &str) -> bool {
         matches!(self.attribute("class").map(|v|&v.data),Some(Data::Text(v)) if v.iter().any(|s|s.as_deref()==Some(class)))
     }
-    pub(super) fn with_numbers(&self, values: Vec<f64>, integer: bool) -> Self {
+    pub(super) fn with_numbers(&self, mut values: Vec<f64>, integer: bool) -> Self {
+        if integer {
+            for v in &mut values {
+                *v = integer_storage(*v);
+            }
+        }
         let mut v = self.clone();
         v.data = Data::Number { values, integer };
         v
@@ -172,7 +195,25 @@ pub(super) fn invalid(reason: impl Into<String>) -> DeseqError {
         reason: reason.into(),
     }
 }
+// Prevent short symbolic requests (e.g. seq_len(INT_MAX)) from requesting
+// unbounded intermediate storage before the bounded transport can reject it.
+pub(super) fn checked_elements(count: Option<usize>) -> Result<usize, DeseqError> {
+    count
+        .filter(|n| *n <= wire::MAX_BYTES / std::mem::size_of::<f64>())
+        .ok_or_else(|| invalid("formula expression output exceeds size limit"))
+}
 pub(super) const NA_REAL: f64 = f64::from_bits(0x7ff0_0000_0000_07a2);
+// Integer storage has one missing sentinel and no signed zero. Canonicalize
+// its double carrier without changing any ordinary floating-point value.
+pub(super) fn integer_storage(value: f64) -> f64 {
+    if value.is_nan() {
+        NA_REAL
+    } else if value == 0.0 {
+        0.0
+    } else {
+        value
+    }
+}
 pub(super) fn is_na(value: f64) -> bool {
     value.is_nan() && value.to_bits() as u32 == 1954
 }
@@ -187,13 +228,24 @@ pub fn evaluate(
     variables: &[(String, Value)],
     options: &EvaluationOptions,
 ) -> Result<Value, DeseqError> {
+    evaluate_many(std::slice::from_ref(expression), variables, options).map(|mut v| v.remove(0))
+}
+
+/// Evaluate a bounded set with shared bindings and collation initialization.
+pub fn evaluate_many(
+    expressions: &[Expression],
+    variables: &[(String, Value)],
+    options: &EvaluationOptions,
+) -> Result<Vec<Value>, DeseqError> {
     for (index, (name, value)) in variables.iter().enumerate() {
         if name.is_empty() || variables[..index].iter().any(|(n, _)| n == name) {
             return Err(invalid("formula bindings require unique nonempty names"));
         }
         validate_value(value, 0)?;
     }
-    validate_expression(expression, 0)?;
+    for expression in expressions {
+        validate_expression(expression, 0)?;
+    }
     let collation = if matches!(options.collation.as_str(), "root" | "") {
         "und"
     } else {
@@ -217,7 +269,10 @@ pub fn evaluate(
         variables,
         collator,
     };
-    evaluator.expression(expression, 0)
+    expressions
+        .iter()
+        .map(|e| evaluator.expression(e, 0))
+        .collect()
 }
 impl Evaluator<'_> {
     fn expression(&mut self, expression: &Expression, depth: usize) -> Result<Value, DeseqError> {
