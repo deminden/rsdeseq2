@@ -24,7 +24,7 @@
     fit$designOrigin <- currentOrigin
   } else if(!identical(.rsdeseq2_result_design_origin(fit),currentOrigin)) invalid("formula origin")
   frame <- stats::model.frame(methods::slot(object, "design"), data = cd)
-  design <- stats::model.matrix(methods::slot(object, "design"), data = frame)
+  design <- .rsdeseq2_model_matrix(methods::slot(object, "design"), data = frame)
   if (!identical(dimnames(design), dimnames(fit$design)) || !equal(design, fit$design)) invalid("design")
   state <- S4Vectors::metadata(object)$rsdeseq2Normalization
   offsets <- stats::model.offset(frame)

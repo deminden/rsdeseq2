@@ -2,6 +2,7 @@
 
 mod aliases;
 mod all_zero;
+mod averages;
 mod counts_view;
 mod model_frame;
 mod resolution;
@@ -19,5 +20,6 @@ pub use resolution::{resolve_coefficient_index, resolve_contrast, resolve_result
 
 pub use all_zero::{contrast_all_zero_factor_levels, contrast_all_zero_numeric};
 
+pub use averages::averaged_list_contrast;
 pub use counts_view::ContrastCounts;
 pub use zero_policy::ContrastZeroPolicy;

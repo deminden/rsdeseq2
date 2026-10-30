@@ -96,7 +96,7 @@
     stop("DESeqDataSet design must be a formula", call. = FALSE)
   }
   modelFrame <- stats::model.frame(formula, data = colData)
-  design <- stats::model.matrix(formula, data = modelFrame)
+  design <- .rsdeseq2_model_matrix(formula, data = modelFrame)
   formulaOffsets <- stats::model.offset(modelFrame)
 
   sizeFactors <- DESeq2::sizeFactors(object)

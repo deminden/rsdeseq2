@@ -207,4 +207,5 @@ mod contrast_zero;
 #[path = "lib/result_policy.rs"]
 mod result_policy;
 
+mod model_matrix;
 mod row_preparation;

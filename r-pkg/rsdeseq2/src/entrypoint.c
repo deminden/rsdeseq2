@@ -10,6 +10,8 @@
 extern SEXP rsdeseq2_validate_counts(SEXP);
 extern SEXP rsdeseq2_normal_shrinkage_rows(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_offset_factors(SEXP,SEXP,SEXP,SEXP);
+extern SEXP rsdeseq2_model_matrix(SEXP,SEXP,SEXP,SEXP,SEXP);
+extern SEXP rsdeseq2_average_contrast(SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_present_results(SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_contrast_batch(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rsdeseq2_project_contrast_zero(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -609,6 +611,8 @@ SEXP rsdeseq2_apply_cooks_cutoff(SEXP pvalue,
 }
 
 static const R_CallMethodDef call_methods[] = {
+    {"rsdeseq2_average_contrast", (DL_FUNC)&rsdeseq2_average_contrast, 3},
+    {"rsdeseq2_model_matrix", (DL_FUNC)&rsdeseq2_model_matrix, 5},
     {"rsdeseq2_validate_counts", (DL_FUNC)&rsdeseq2_validate_counts, 1},
     {"rsdeseq2_normal_shrinkage_rows", (DL_FUNC)&rsdeseq2_normal_shrinkage_rows, 4},
     {"rsdeseq2_offset_factors", (DL_FUNC)&rsdeseq2_offset_factors, 4},

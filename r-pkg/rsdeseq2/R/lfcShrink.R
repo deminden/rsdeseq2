@@ -57,7 +57,7 @@
     value[nrow(value)] <- nullLevel
     expandedData[[name]] <- value
   }
-  expanded <- stats::model.matrix(formula, data = expandedData)
+  expanded <- .rsdeseq2_model_matrix(formula, data = expandedData)
   nullColumns <- grepl(nullLevel, colnames(expanded), fixed = TRUE)
   expanded <- expanded[-nrow(expanded), !nullColumns, drop = FALSE]
   colnames(expanded)[colnames(expanded) == "(Intercept)"] <- "Intercept"
@@ -109,7 +109,6 @@
     }
     contrastVector <- as.numeric(contrast)
   } else if (is.list(contrast)) {
-    contrastVector <- numeric(ncol(expanded))
     positive <- match(contrast[[1L]], colnames(expanded))
     negative <- match(contrast[[2L]], colnames(expanded))
     if (anyNA(positive) || anyNA(negative)) {
@@ -118,8 +117,8 @@
     if (length(intersect(positive, negative))) {
       stop("list contrast coefficients must not appear in both numerator and denominator", call. = FALSE)
     }
-    if (length(positive)) contrastVector[positive] <- 1 / length(positive)
-    if (length(negative)) contrastVector[negative] <- -1 / length(negative)
+    contrastVector <- .Call("rsdeseq2_average_contrast", as.integer(ncol(expanded)),
+      as.integer(positive), as.integer(negative), PACKAGE="rsdeseq2")
   } else {
     contrastVector <- numeric(ncol(expanded))
     selectedColumns <- expandedFactorColumns[[factorName]]

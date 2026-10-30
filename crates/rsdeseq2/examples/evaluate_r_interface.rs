@@ -3,6 +3,8 @@
 mod batch;
 #[path = "evaluate_r_interface/cooks.rs"]
 mod cooks;
+#[path = "evaluate_r_interface/model_matrix.rs"]
+mod model_matrix;
 #[path = "evaluate_r_interface/preparation.rs"]
 mod preparation;
 use rsdeseq2::independent_filtering::{
@@ -364,6 +366,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    ModelMatrix(model_matrix::Case),
     Preparation(preparation::Input),
     CooksPolicy(cooks::Input),
     Batch(batch::BatchInput),
@@ -378,6 +381,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::ModelMatrix(input) => {
+            model_matrix::evaluate(&input, rsdeseq2::matrix::MatrixOrder::RowMajor)
+        }
         Input::Preparation(input) => preparation::evaluate(input)?,
         Input::CooksPolicy(input) => cooks::evaluate(input)?,
         Input::Batch(input) => batch::evaluate(input)?,

@@ -5,7 +5,9 @@
 
 mod formula_origin;
 mod implementation;
+mod model_matrix;
 mod origin;
 
 pub use implementation::*;
+pub use model_matrix::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
 pub use origin::DesignOrigin;
