@@ -91,5 +91,11 @@ The [shared contrast checkpoint](rust-only-contrast-projection-2026-10-29.md)
 additionally moves effect/SE projection into borrowed standalone Rust views and
 removes redundant Wald evaluation from native LRT display queries. It passes
 64 direct bit-equality cases, a checked R source package and unchanged full GTEx
-exports relative to the shared-probability checkpoint. All-zero/Cook's row policy,
-bounded batches, offsets/formula arithmetic and shrinkage remain pending.
+exports relative to the shared-probability checkpoint.
+
+The [shared contrast-zero checkpoint](rust-only-contrast-zero-2026-10-30.md)
+additionally moves count selection, global-zero exclusion and Wald/LRT contrast
+zero overrides into Rust, with 85 direct bit-equality cases. Cook's/refit policy,
+bounded batches, remaining offsets/formula arithmetic and shrinkage still require
+completion. The prepared count view can be reused, but the batch bridge has not
+yet been restored.

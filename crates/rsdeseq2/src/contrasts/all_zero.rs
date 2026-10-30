@@ -1,9 +1,12 @@
 //! Contrast-specific all-zero rules and sample-level aliases.
 
+use super::counts_view::ContrastCounts;
 use super::resolution::{validate_factor_level_contrast, validate_numeric_contrast};
 use crate::core::CountMatrix;
 use crate::design::{DesignMatrix, r_like_name_candidates as candidate_names};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::math::sum::checked_scaled_sum;
+use crate::matrix::MatrixView;
 use std::collections::HashSet;
 
 /// Identify rows where every sample involved in a numeric contrast has zero counts.
@@ -19,82 +22,55 @@ pub fn contrast_all_zero_numeric(
     design: &DesignMatrix,
     contrast: &[f64],
 ) -> Result<Vec<bool>, DeseqError> {
-    if design.n_samples() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "contrastAllZero design samples",
-            counts.n_samples(),
-            design.n_samples(),
-        ));
+    match numeric_samples(counts.n_samples(), Some(design.matrix().into()), contrast)? {
+        Some(selected) => ContrastCounts::from(counts).selected_flags(&selected),
+        None => Ok(vec![false; counts.n_genes()]),
     }
-    let contrast = validate_numeric_contrast(contrast, design.n_coefficients())?;
-    if contrast.iter().all(|value| *value >= 0.0) || contrast.iter().all(|value| *value <= 0.0) {
-        return Ok(vec![false; counts.n_genes()]);
-    }
-
-    let contrast_binary = contrast
-        .iter()
-        .map(|value| if *value == 0.0 { 0.0 } else { 1.0 })
-        .collect::<Vec<_>>();
-    let mut selected_samples = Vec::with_capacity(design.n_samples());
-    for sample in 0..design.n_samples() {
-        let row = design.matrix().row(sample)?;
-        let mut terms = Vec::with_capacity(row.len());
-        for (design_value, contrast_value) in row.iter().zip(contrast_binary.iter()) {
-            let term = design_value * contrast_value;
-            if !term.is_finite() {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "contrastAllZero design score".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                });
-            }
-            terms.push(term);
-        }
-        let Some(score) = checked_scaled_sum(&terms) else {
-            return Err(DeseqError::NonFiniteValue {
-                context: "contrastAllZero design score".to_string(),
-                index: Some(sample),
-                value: f64::NAN,
-            });
-        };
-        selected_samples.push(score != 0.0);
-    }
-
-    let mut flags = Vec::with_capacity(counts.n_genes());
-    for gene in 0..counts.n_genes() {
-        let selected_sum = counts
-            .row(gene)?
-            .iter()
-            .zip(selected_samples.iter())
-            .filter_map(|(count, selected)| selected.then_some(*count as u64))
-            .sum::<u64>();
-        flags.push(selected_sum == 0);
-    }
-    Ok(flags)
 }
 
-fn checked_scaled_sum(values: &[f64]) -> Option<f64> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return None;
+pub(super) fn numeric_samples(
+    samples: usize,
+    design: Option<MatrixView<'_, f64>>,
+    contrast: &[f64],
+) -> Result<Option<Vec<bool>>, DeseqError> {
+    if let Some(design) = design {
+        if design.n_rows() != samples {
+            return Err(invalid_dimensions(
+                "contrastAllZero design samples",
+                samples,
+                design.n_rows(),
+            ));
         }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let mut normalized_sum = 0.0;
-    for value in values.iter().copied() {
-        let term = value / scale;
-        let next = normalized_sum + term;
-        if !term.is_finite() || !next.is_finite() {
-            return None;
+        if design.n_cols() != contrast.len() {
+            return Err(invalid_dimensions(
+                "contrastAllZero design coefficients",
+                design.n_cols(),
+                contrast.len(),
+            ));
         }
-        normalized_sum = next;
     }
-    let sum = normalized_sum * scale;
-    sum.is_finite().then_some(sum)
+    let contrast = validate_numeric_contrast(contrast, contrast.len())?;
+    if contrast.iter().all(|value| *value >= 0.0) || contrast.iter().all(|value| *value <= 0.0) {
+        return Ok(None);
+    }
+    let design = design.ok_or_else(|| DeseqError::InvalidOptions {
+        reason: "numeric contrast all-zero handling requires modelMatrix".into(),
+    })?;
+    let mut terms = Vec::with_capacity(contrast.len());
+    let mut selected = Vec::with_capacity(samples);
+    for sample in 0..samples {
+        terms.clear();
+        for (column, &weight) in contrast.iter().enumerate() {
+            terms.push(design.at(sample, column) * if weight == 0.0 { 0.0 } else { 1.0 });
+        }
+        let score = checked_scaled_sum(&terms).ok_or_else(|| DeseqError::NonFiniteValue {
+            context: "contrastAllZero design score".into(),
+            index: Some(sample),
+            value: f64::NAN,
+        })?;
+        selected.push(score != 0.0);
+    }
+    Ok(Some(selected))
 }
 
 /// Identify rows where both requested factor levels have zero counts.
@@ -110,11 +86,21 @@ pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
     numerator: &str,
     denominator: &str,
 ) -> Result<Vec<bool>, DeseqError> {
+    let selected = factor_level_samples(counts.n_samples(), sample_levels, numerator, denominator)?;
+    ContrastCounts::from(counts).selected_flags(&selected)
+}
+
+pub(super) fn factor_level_samples<S: AsRef<str>>(
+    samples: usize,
+    sample_levels: &[S],
+    numerator: &str,
+    denominator: &str,
+) -> Result<Vec<bool>, DeseqError> {
     validate_factor_level_contrast("factor", numerator, denominator)?;
-    if sample_levels.len() != counts.n_samples() {
+    if sample_levels.len() != samples {
         return Err(invalid_dimensions(
             "contrastAllZero sample levels",
-            counts.n_samples(),
+            samples,
             sample_levels.len(),
         ));
     }
@@ -150,23 +136,7 @@ pub fn contrast_all_zero_factor_levels<S: AsRef<str>>(
             ),
         });
     }
-    let selected_count = selected_samples
-        .iter()
-        .filter(|selected| **selected)
-        .count();
-
-    let mut flags = Vec::with_capacity(counts.n_genes());
-    for gene in 0..counts.n_genes() {
-        let zero_count = counts
-            .row(gene)?
-            .iter()
-            .zip(selected_samples.iter())
-            .filter(|(_, selected)| **selected)
-            .filter(|(count, _)| **count == 0)
-            .count();
-        flags.push(zero_count == selected_count);
-    }
-    Ok(flags)
+    Ok(selected_samples)
 }
 
 fn unique_sample_levels<S: AsRef<str>>(sample_levels: &[S]) -> Vec<&str> {

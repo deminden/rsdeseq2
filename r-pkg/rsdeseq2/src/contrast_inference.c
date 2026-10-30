@@ -30,8 +30,11 @@ static void validate_estimates(SEXP beta, SEXP se, SEXP covariance, SEXP contras
 }
 
 static SEXP contrast_inference(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
-                              int wald, double threshold, int alternative, int use_t, SEXP df) {
+                              int wald, double threshold, int alternative, int use_t, SEXP df, SEXP context) {
     R_xlen_t genes = matrix_rows(beta);
+    Rsdeseq2ContrastZero zero = {0};
+    if (context != R_NilValue)
+        rsdeseq2_validate_contrast_zero(context, genes, matrix_cols(beta), &zero);
     SEXP lfc = PROTECT(Rf_allocVector(REALSXP, genes));
     SEXP lfc_se = PROTECT(Rf_allocVector(REALSXP, genes));
     SEXP stat = PROTECT(wald ? Rf_allocVector(REALSXP, genes) : R_NilValue);
@@ -41,7 +44,8 @@ static SEXP contrast_inference(SEXP beta, SEXP se, SEXP covariance, SEXP contras
         covariance != R_NilValue, covariance == R_NilValue ? NULL : REAL(covariance),
         REAL(contrast), (uint8_t)wald, threshold, alternative, (uint8_t)use_t,
         df == R_NilValue ? 0 : (size_t)XLENGTH(df), df == R_NilValue ? NULL : REAL(df),
-        NA_REAL, REAL(lfc), REAL(lfc_se), wald ? REAL(stat) : NULL, wald ? REAL(pvalue) : NULL);
+        NA_REAL, REAL(lfc), REAL(lfc_se), wald ? REAL(stat) : NULL, wald ? REAL(pvalue) : NULL,
+        context == R_NilValue ? NULL : &zero);
     if (status) Rf_error("rsdeseq2 Rust backend: %s", rsdeseq2_r_last_error());
     const char *wald_names[] = {"log2FoldChange", "lfcSE", "stat", "pvalue", ""};
     const char *projection_names[] = {"log2FoldChange", "lfcSE", ""};
@@ -52,13 +56,17 @@ static SEXP contrast_inference(SEXP beta, SEXP se, SEXP covariance, SEXP contras
     return output;
 }
 
-SEXP rsdeseq2_project_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast) {
+SEXP rsdeseq2_project_contrast_zero(SEXP beta, SEXP se, SEXP covariance, SEXP contrast, SEXP context) {
     validate_estimates(beta, se, covariance, contrast);
-    return contrast_inference(beta, se, covariance, contrast, 0, 0, 0, 0, R_NilValue);
+    return contrast_inference(beta, se, covariance, contrast, 0, 0, 0, 0, R_NilValue, context);
 }
 
-SEXP rsdeseq2_wald_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
-                          SEXP threshold, SEXP alternative, SEXP use_t, SEXP df) {
+SEXP rsdeseq2_project_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast) {
+    return rsdeseq2_project_contrast_zero(beta, se, covariance, contrast, R_NilValue);
+}
+
+SEXP rsdeseq2_wald_contrast_zero(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
+                          SEXP threshold, SEXP alternative, SEXP use_t, SEXP df, SEXP context) {
     validate_estimates(beta, se, covariance, contrast);
     validate_real_scalar(threshold, "lfcThreshold");
     int alt = validate_integer_scalar(alternative, 0, 5, "alternative");
@@ -70,5 +78,10 @@ SEXP rsdeseq2_wald_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
         checked_product(XLENGTH(df), 1);
     } else if (df != R_NilValue) Rf_error("degrees of freedom require useT=TRUE");
     return contrast_inference(beta, se, covariance, contrast, 1,
-        Rf_asReal(threshold), alt, LOGICAL(use_t)[0], df);
+        Rf_asReal(threshold), alt, LOGICAL(use_t)[0], df, context);
+}
+
+SEXP rsdeseq2_wald_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
+                          SEXP threshold, SEXP alternative, SEXP use_t, SEXP df) {
+    return rsdeseq2_wald_contrast_zero(beta, se, covariance, contrast, threshold, alternative, use_t, df, R_NilValue);
 }

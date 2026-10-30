@@ -1,15 +1,16 @@
 # All numerical inference and projection runs in the standalone Rust engine.
 
-.rsdeseq2_wald_from_primitive_fit <- function(fit, numericContrast, options) {
-  .Call("rsdeseq2_wald_contrast", fit$beta, fit$betaSE, fit$betaCovariance,
+.rsdeseq2_wald_from_primitive_fit <- function(fit, numericContrast, options, allZero = NULL) {
+  .Call("rsdeseq2_wald_contrast_zero", fit$beta, fit$betaSE, fit$betaCovariance,
     as.numeric(numericContrast), options$lfcThreshold,
     .rsdeseq2_wald_alternative_code(options$altHypothesis),
-    options$useT, options$degreesOfFreedom, PACKAGE = "rsdeseq2")
+    options$useT, options$degreesOfFreedom,
+    .rsdeseq2_contrast_zero_context(fit, allZero), PACKAGE = "rsdeseq2")
 }
 
-.rsdeseq2_lrt_from_primitive_fit <- function(fit, numericContrast) {
-  .Call("rsdeseq2_project_contrast", fit$beta, fit$betaSE, fit$betaCovariance,
-    as.numeric(numericContrast), PACKAGE = "rsdeseq2")
+.rsdeseq2_lrt_from_primitive_fit <- function(fit, numericContrast, allZero = NULL) {
+  .Call("rsdeseq2_project_contrast_zero", fit$beta, fit$betaSE, fit$betaCovariance,
+    as.numeric(numericContrast), .rsdeseq2_contrast_zero_context(fit, allZero), PACKAGE = "rsdeseq2")
 }
 
 .rsdeseq2_wald_alternative_code <- function(alternative) {

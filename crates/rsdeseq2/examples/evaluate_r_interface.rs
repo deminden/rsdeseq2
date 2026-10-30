@@ -120,6 +120,63 @@ fn normalization(input: NormalizationInput) -> Result<serde_json::Value, Box<dyn
 }
 
 #[derive(Deserialize)]
+struct ZeroInput {
+    samples: usize,
+    counts: Vec<u32>,
+    design: Option<Vec<String>>,
+    levels: Option<Vec<String>>,
+    numerator: Option<String>,
+    denominator: Option<String>,
+    rule: String,
+}
+impl ZeroInput {
+    fn apply(
+        self,
+        genes: usize,
+        coefficients: usize,
+        contrast: &[f64],
+        effect: &mut [Option<f64>],
+        inference: Option<&mut rsdeseq2::glm::WaldOutput>,
+    ) -> Result<(), Box<dyn Error>> {
+        use rsdeseq2::prelude::{
+            ContrastCounts, ContrastZeroPolicy, CountMatrix, MatrixOrder, MatrixView,
+        };
+        let counts = CountMatrix::from_row_major_u32(genes, self.samples, self.counts)?;
+        let counts = ContrastCounts::from(&counts);
+        let design = self
+            .design
+            .map(|v| {
+                v.into_iter()
+                    .map(|v| v.parse::<f64>())
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?;
+        let flags = match self.rule.as_str() {
+            "numeric" => counts.numeric_flags(
+                design
+                    .as_deref()
+                    .map(|d| MatrixView::new(self.samples, coefficients, d, MatrixOrder::RowMajor))
+                    .transpose()?,
+                contrast,
+            )?,
+            "character" => counts.factor_flags(
+                self.levels.as_deref().ok_or("missing sample levels")?,
+                self.numerator.as_deref().ok_or("missing numerator")?,
+                self.denominator.as_deref().ok_or("missing denominator")?,
+            )?,
+            _ => return Err("unknown zero rule".into()),
+        };
+        let policy = ContrastZeroPolicy::new(&flags, counts.all_zero())?;
+        if let Some(inference) = inference {
+            policy.apply_wald(effect, &mut inference.stat, &mut inference.pvalue)?;
+        } else {
+            policy.apply_effects(effect.iter_mut())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 enum StatisticsInput {
     Wald {
@@ -139,6 +196,7 @@ enum StatisticsInput {
         threshold: Option<String>,
         alternative: Option<String>,
         df: Option<Vec<String>>,
+        zero: Option<Box<ZeroInput>>,
     },
     Lrt {
         statistics: Vec<String>,
@@ -200,6 +258,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
             threshold,
             alternative,
             df,
+            zero,
         } => {
             use rsdeseq2::glm::{
                 CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
@@ -249,7 +308,17 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
                     Some(df) => WaldTestOptions::t_per_gene_degrees_of_freedom(df),
                 }
                 .with_lfc_threshold(threshold.parse()?, alternative);
-                let output = wald_test_contrast_from_estimates(&estimates, &contrast, &options)?;
+                let mut output =
+                    wald_test_contrast_from_estimates(&estimates, &contrast, &options)?;
+                if let Some(zero) = zero {
+                    (*zero).apply(
+                        genes,
+                        coefficients,
+                        &contrast,
+                        &mut output.log2_fold_change,
+                        Some(&mut output.wald),
+                    )?;
+                }
                 Ok(
                     json!({"log2FoldChange":output.log2_fold_change.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
                     "lfcSE":output.lfc_se.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
@@ -257,7 +326,16 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
                     "pvalue":output.wald.pvalue.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>() }),
                 )
             } else {
-                let output = estimates.project_contrast(&contrast)?;
+                let mut output = estimates.project_contrast(&contrast)?;
+                if let Some(zero) = zero {
+                    (*zero).apply(
+                        genes,
+                        coefficients,
+                        &contrast,
+                        &mut output.log2_fold_change,
+                        None,
+                    )?;
+                }
                 Ok(
                     json!({"log2FoldChange":output.log2_fold_change.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>(),
                     "lfcSE":output.lfc_se.into_iter().map(|v|v.map(bits)).collect::<Vec<_>>() }),
