@@ -2,13 +2,7 @@
 use super::all_zero::{factor_level_samples, numeric_samples};
 use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::matrix::{MatrixOrder, MatrixView};
-
-#[derive(Clone, Copy, Debug)]
-enum Storage<'a> {
-    Unsigned(MatrixView<'a, u32>),
-    Double(MatrixView<'a, f64>),
-}
+use crate::matrix::{CountView, MatrixOrder, MatrixView};
 
 /// Validated borrowed counts with one cached global-zero flag per gene.
 ///
@@ -16,7 +10,7 @@ enum Storage<'a> {
 /// once; the same view can evaluate multiple numeric or factor contrasts.
 #[derive(Debug)]
 pub struct ContrastCounts<'a> {
-    storage: Storage<'a>,
+    counts: CountView<'a>,
     all_zero: Vec<bool>,
 }
 
@@ -32,7 +26,7 @@ impl<'a> ContrastCounts<'a> {
             all_zero[gene] &= *value == 0;
         }
         Self {
-            storage: Storage::Unsigned(values),
+            counts: CountView::from_unsigned(values),
             all_zero,
         }
     }
@@ -41,28 +35,14 @@ impl<'a> ContrastCounts<'a> {
     /// Validate the complete buffer and cache global-zero rows in one pass.
     pub fn from_doubles(values: MatrixView<'a, f64>) -> Result<Self, DeseqError> {
         let mut all_zero = vec![true; values.n_rows()];
-        for (index, &value) in values.as_slice().iter().enumerate() {
-            if !value.is_finite()
-                || value < 0.0
-                || value.fract() != 0.0
-                || value > f64::from(u32::MAX)
-            {
-                return Err(DeseqError::InvalidCounts {
-                    reason: format!(
-                        "contrast count at storage index {index} is not a valid u32 count"
-                    ),
-                });
-            }
+        let counts = CountView::from_doubles_with(values, |index, count| {
             let gene = match values.order() {
                 MatrixOrder::RowMajor => index / values.n_cols(),
                 MatrixOrder::ColumnMajor => index % values.n_rows(),
             };
-            all_zero[gene] &= value == 0.0;
-        }
-        Ok(Self {
-            storage: Storage::Double(values),
-            all_zero,
-        })
+            all_zero[gene] &= count == 0;
+        })?;
+        Ok(Self { counts, all_zero })
     }
 
     /// Gene count.
@@ -72,10 +52,7 @@ impl<'a> ContrastCounts<'a> {
 
     /// Sample count.
     pub fn n_samples(&self) -> usize {
-        match self.storage {
-            Storage::Unsigned(v) => v.n_cols(),
-            Storage::Double(v) => v.n_cols(),
-        }
+        self.counts.n_samples()
     }
 
     /// Cached flags for genes with zero counts in every sample.
@@ -119,13 +96,10 @@ impl<'a> ContrastCounts<'a> {
         }
         Ok((0..self.n_genes())
             .map(|gene| {
-                selected.iter().enumerate().all(|(sample, &selected)| {
-                    !selected
-                        || match self.storage {
-                            Storage::Unsigned(values) => *values.at(gene, sample) == 0,
-                            Storage::Double(values) => *values.at(gene, sample) == 0.0,
-                        }
-                })
+                selected
+                    .iter()
+                    .enumerate()
+                    .all(|(sample, &selected)| !selected || self.counts.at(gene, sample) == 0)
             })
             .collect())
     }

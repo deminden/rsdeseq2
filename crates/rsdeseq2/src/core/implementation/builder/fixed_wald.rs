@@ -278,6 +278,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 counts,
                 original_cooks,
+                design,
                 factor_contrast,
             )?;
         } else {
@@ -366,6 +367,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 counts,
                 original_cooks,
+                design,
                 factor_contrast,
             )?;
         } else {
@@ -610,6 +612,7 @@ impl DeseqBuilder {
             cooks_cutoff,
             counts,
             &wald_output.cooks.cooks,
+            design,
             contrast,
         )?;
         apply_independent_filtering(
@@ -713,6 +716,7 @@ impl DeseqBuilder {
             cooks_cutoff,
             counts,
             original_cooks,
+            design,
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;

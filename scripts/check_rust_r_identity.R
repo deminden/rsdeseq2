@@ -289,3 +289,42 @@ publicInput$requests <- lapply(publicRequests,function(r)list(contrast=strings(r
 publicActual <- withoutRCalculations(resultsList(publicFit,publicRequests,batchSize=32L),projection=TRUE,zeros=TRUE)
 compareIdentity("public_batch_65",publicInput,list(results=lapply(publicActual,function(r)
   lapply(as.list(r[c("lfcSE","log2FoldChange","pvalue","stat")]),hexVector))))
+
+# Borrowed Cook/refit row policy: compare mask-only and fitted presentation with
+# row-major unsigned standalone inputs and column-major double wrapper inputs.
+cpCounts <- matrix(c(1,5,6,7,0, 1,5,6,0,0, 1,9,5,6,7, 1,5,6,7,0, 9,5,6,7,0, 1,2,3,4,5),6,5,byrow=TRUE)
+cpCooks <- matrix(c(10,.1,.2,.3,.4,10,.1,.2,.3,.4,10,10,.2,.3,.4,
+  NaN,NaN,NaN,NaN,NaN,5,.1,.2,.3,.4,10,.1,.2,.3,.4),6,5,byrow=TRUE)
+cpP <- c(.01,.02,NA_real_,.04,.05,.06);cpMax <- c(10,10,10,10,5,NA_real_)
+cpDesign <- cbind(1,c(0,0,1,1,1))
+cpTable <- data.frame(log2FoldChange=as.double(1:6),lfcSE=rep(.5,6),stat=as.double(2*(1:6)),pvalue=cpP,cooksOutlier=rep(FALSE,6))
+cpBase <- list(test="Wald",schemaVersion=1L,results=list(maxCooks=cpMax),counts=cpCounts,cooks=cpCooks,design=cpDesign,
+  refitRows=c(FALSE,TRUE,FALSE,FALSE,FALSE,FALSE),newAllZeroRows=c(FALSE,FALSE,FALSE,TRUE,FALSE,FALSE))
+cpInput <- function(fit,cutoff,mode,low_count=NULL) list(cooks_policy=list(mode=mode,samples=5L,
+  pvalue=lapply(cpP,function(v)if(is.na(v))NULL else sprintf("%.17g",v)),maximum=lapply(cpMax,function(v)if(is.na(v))NULL else sprintf("%.17g",v)),
+  effect=strings(cpTable$log2FoldChange),se=strings(cpTable$lfcSE),stat=strings(cpTable$stat),cutoff=if(is.null(cutoff))NULL else sprintf("%.17g",cutoff),
+  counts=as.list(as.integer(t(cpCounts))),cooks=strings(as.vector(t(cpCooks))),
+  design=strings(as.vector(t(fit$design))),coefficients=ncol(fit$design),
+  factors=unname(lapply(Filter(is.factor,fit$colData),function(x)list(codes=as.list(replace(as.integer(x),is.na(x),-2147483648)),levels=nlevels(x)))),
+  low_count=low_count,refitted=as.list(fit$refitRows),new_zero=as.list(fit$newAllZeroRows)))
+cpGroups <- factor(c("A","A","B","B","B"))
+for(low_count in c(FALSE,TRUE)) for(cutoff in c(0,5,10)) {
+  fit <- cpBase;fit$refitRows[] <- FALSE;fit$newAllZeroRows[] <- FALSE
+  fit$colData <- data.frame(group=cpGroups)
+  actual <- withoutRCalculations(applyCooksCutoffRust(cpP,cpMax,cutoff,cpCounts,cpCooks,low_count))
+  compareIdentity(paste0("cooks_mask_",low_count,"_",cutoff),cpInput(fit,cutoff,"mask",low_count),
+    list(pvalue=hexVector(actual$pvalue),cooksOutlier=as.list(actual$cooksOutlier)))
+}
+cpVariants <- list(matching=list(design=cpDesign,colData=data.frame(group=cpGroups)),
+  releveled=list(design=cpDesign,colData=data.frame(group=relevel(cpGroups,"B"))),
+  mismatched=list(design=cpDesign,colData=data.frame(group=factor(c("A","B","A","B","B")))),
+  additive=list(design=cbind(cpDesign,c(0,1,0,1,0)),colData=data.frame(group=cpGroups)),
+  missing=list(design=cpDesign,colData=data.frame(group=factor(c("A",NA,"B","B","B")))),
+  third_level=list(design=cpDesign,colData=data.frame(group=factor(c("A","A","B","B","C")))))
+for(name in names(cpVariants)) for(enabled in if(name %in% c("matching","additive"))c(FALSE,TRUE)else TRUE) {
+  fit <- modifyList(cpBase,cpVariants[[name]]); cutoff <- if(enabled)5 else FALSE
+  actual <- withoutRCalculations(rsdeseq2:::.rsdeseq2_fit_cooks_policy(cpTable,fit,cutoff),projection=TRUE,zeros=TRUE)
+  actual <- c(lapply(as.list(actual[c("log2FoldChange","lfcSE","stat","pvalue")]),hexVector),
+    list(cooksOutlier=lapply(actual$cooksOutlier,function(v)if(is.na(v))NULL else v)))
+  compareIdentity(paste0("cooks_present_",name,"_",enabled),cpInput(fit,if(enabled)5 else NULL,"present"),actual)
+}

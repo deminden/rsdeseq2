@@ -82,8 +82,8 @@ The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restor
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both
 interfaces share the numerical projection/zero/inference kernels, with 87 direct
 bit-equality cases, including 65-request batches. Dataset validation and primitive
-extraction happen once per public batch call. Remaining Cook's/refit, offset,
-formula and posterior arithmetic above are still required.
+extraction happen once per public batch call. Remaining offset, formula and posterior arithmetic above is still required;
+the subsequent row-policy checkpoint below removes Cook/refit calculations.
 
 The [first standalone primitive checkpoint](rust-only-primitives-2026-10-29.md)
 completes shared filtering/BH and fixes supplied geometric-mean transport, with
@@ -106,3 +106,13 @@ zero overrides into Rust, with 85 direct bit-equality cases. Cook's/refit policy
 bounded batches, remaining offsets/formula arithmetic and shrinkage were still
 pending at that checkpoint. The later batch checkpoint above restores the bridge;
 the other remaining migrations stay open.
+
+The [shared Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md) moves
+masking, replacement-zero presentation, refit suppression and two-group partition
+checks into borrowed standalone Rust. It removes placeholder result construction,
+matrix copies and intermediate BH passes from the query bridge. It adds matching
+design eligibility to native metadata helpers and automatic formula-context
+selection to stored requests, with 101 direct bit-equality cases, 1,510 R
+assertions and unchanged full GTEx exports. Normal shrinkage's global-zero check,
+remaining offsets/formula arithmetic, optional posterior routes and final
+performance reconciliation remain open.

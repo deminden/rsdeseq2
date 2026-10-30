@@ -226,37 +226,18 @@ results <- function(object,
   } else if (identical(fit$test, "LRT") && is.null(fit$schemaVersion)) {
     stop("This saved LRT fit lacks verified raw statistics; refit before selecting results", call. = FALSE)
   }
-  zero <- which(fit$newAllZeroRows %||% logical())
-  if (length(zero)) {
-    out$log2FoldChange[zero] <- 0
-    out$lfcSE[zero] <- 0
-    out$stat[zero] <- 0
-    out$pvalue[zero] <- 1
-  }
-  if (identical(cutoff, TRUE)) {
-    cutoff <- .rsdeseq2_default_cooks_cutoff(fit$design)
-  }
-  if (is.null(cutoff) || identical(cutoff, FALSE)) {
-    if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- rep(NA, nrow(out))
-    return(out)
-  }
-  maxCooks <- fit$results$maxCooks
-  if (is.null(maxCooks)) stop("The fit lacks Cook's context; refit", call. = FALSE)
-  # Successfully refitted rows must not be masked using the original outlier.
-  if (!is.null(fit$refitRows)) maxCooks[which(fit$refitRows)] <- 0
-  if (length(zero)) maxCooks[zero] <- 0
-  lowCount <- FALSE
-  if (ncol(fit$design) == 2L && !is.null(fit$colData)) {
-    groups <- fit$design[, 2L]
-    lowCount <- any(vapply(fit$colData, function(x) {
-      is.factor(x) && nlevels(x) == 2L &&
-        identical(outer(unname(as.character(x)), unname(as.character(x)), "=="), outer(unname(groups), unname(groups), "=="))
-    }, logical(1)))
-  }
-  masked <- applyCooksCutoffRust(out$pvalue, maxCooks, cutoff,
-                                counts = fit$counts, cooks = fit$cooks,
-                                lowCountHeuristic = lowCount)
-  out$pvalue <- masked$pvalue
-  if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- masked$cooksOutlier
+  if (identical(cutoff, TRUE)) cutoff <- .rsdeseq2_default_cooks_cutoff(fit$design)
+  active <- !is.null(cutoff) && !identical(cutoff, FALSE)
+  factors <- if (!active || is.null(fit$colData)) list() else lapply(Filter(is.factor, fit$colData),
+    function(x) list(codes = as.integer(x), levels = nlevels(x)))
+  context <- list(refitRows = fit$refitRows, newAllZeroRows = fit$newAllZeroRows,
+    maxCooks = if (active) fit$results$maxCooks else NULL,
+    counts = if (active) fit$counts else NULL, cooks = if (active) fit$cooks else NULL,
+    design = if (active) fit$design else NULL, factors = factors)
+  presented <- .Call("rsdeseq2_present_results",
+    as.list(out[c("log2FoldChange", "lfcSE", "stat", "pvalue")]), context,
+    if (active) cutoff else NULL, PACKAGE = "rsdeseq2")
+  for (name in c("log2FoldChange", "lfcSE", "stat", "pvalue")) out[[name]] <- presented[[name]]
+  if ("cooksOutlier" %in% names(out)) out$cooksOutlier <- presented$cooksOutlier
   out
 }

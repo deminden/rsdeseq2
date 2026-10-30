@@ -204,6 +204,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 input.counts,
                 &cooks.cooks,
+                input.design,
                 contrast,
             )?;
         } else {
@@ -379,6 +380,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 input.counts,
                 &cooks.cooks,
+                input.full_design,
                 contrast,
             )?;
         } else {

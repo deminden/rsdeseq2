@@ -125,6 +125,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 counts,
                 original_cooks,
+                full_design,
                 contrast,
             )?;
         } else {
@@ -296,6 +297,7 @@ impl DeseqBuilder {
                 cooks_cutoff,
                 counts,
                 original_cooks,
+                full_design,
                 factor_contrast,
             )?;
         } else {
@@ -677,6 +679,7 @@ impl DeseqBuilder {
             cooks_cutoff,
             counts,
             &lrt_output.cooks.cooks,
+            full_design,
             contrast,
         )?;
         apply_independent_filtering(&mut lrt_output.results, &self.independent_filtering_options)?;
@@ -791,6 +794,7 @@ impl DeseqBuilder {
             cooks_cutoff,
             counts,
             original_cooks,
+            full_design,
             contrast,
         )?;
         apply_independent_filtering(&mut results, &self.independent_filtering_options)?;

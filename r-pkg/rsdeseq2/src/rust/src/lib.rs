@@ -5,10 +5,9 @@ use std::ptr;
 
 use rsdeseq2::prelude::{
     BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
-    BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DeseqResultRow,
-    DeseqResults, DesignMatrix, ExecutionMode, FitType, ParametricDispersionTrend, RowMajorMatrix,
-    SizeFactorMethod, TestType, WaldAlternative, WaldTestOptions, apply_cooks_cutoff,
-    apply_cooks_cutoff_with_low_count_heuristic, base_mean, base_mean_with_weights, base_variance,
+    BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DesignMatrix,
+    ExecutionMode, FitType, ParametricDispersionTrend, RowMajorMatrix, SizeFactorMethod, TestType,
+    WaldAlternative, WaldTestOptions, base_mean, base_mean_with_weights, base_variance,
     base_variance_with_weights, estimate_beta_prior_variance, estimate_size_factors_with_options,
     fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
     fit_glms_with_estimated_beta_prior_variance,
@@ -206,3 +205,6 @@ mod contrast_inference;
 
 #[path = "lib/contrast_zero.rs"]
 mod contrast_zero;
+
+#[path = "lib/result_policy.rs"]
+mod result_policy;
