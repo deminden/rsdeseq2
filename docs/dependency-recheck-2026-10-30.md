@@ -55,3 +55,20 @@ inactive dependency update does not introduce a new timing claim or optimization
 round. The comparison environment remains `deseq2-r462-native`; its independently
 pinned R reference packages are unchanged. The broader Rust-only migration and
 final combined performance/memory audit remain open.
+
+## Follow-up confirmation
+
+The registry was checked again at **2026-10-30 09:45:13 UTC**, against
+`8fec875`. All **119 registry names / 123 root registry entries** retain the
+same latest stable versions recorded in the inventory above. All 15 direct
+dependencies remain latest stable, including rcompat-locfit 0.2.0 and
+rcompat-lbfgsb 0.3.0 in both lockfiles. No resolved release is yanked, and every
+registry checksum in both lockfiles matches the published release. The seven
+upstream-constrained families are unchanged. No dependency or numerical source
+change was necessary.
+
+The locked full Rust suite passes **1,063 tests**, with one existing opt-in test
+ignored. The locked R backend test and read-only vendor consistency check also
+pass. This confirmation does not rerun timings or change the independently
+pinned R comparison environment. The validation record includes the follow-up
+timestamp, direct versions, unchanged lockfile hashes and check results.
