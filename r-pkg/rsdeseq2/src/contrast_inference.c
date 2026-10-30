@@ -9,7 +9,7 @@
 
 extern const char *rsdeseq2_r_last_error(void);
 
-static void validate_estimates(SEXP beta, SEXP se, SEXP covariance, SEXP contrast) {
+void rsdeseq2_validate_inference_matrices(SEXP beta, SEXP se, SEXP covariance) {
     validate_matrix(beta, "beta");
     R_xlen_t genes = matrix_rows(beta), coefficients = matrix_cols(beta);
     if (se != R_NilValue) {
@@ -26,39 +26,68 @@ static void validate_estimates(SEXP beta, SEXP se, SEXP covariance, SEXP contras
         validate_vector(covariance, REALSXP,
             checked_product(genes, checked_product(coefficients, coefficients)), "beta covariance");
     }
-    validate_vector(contrast, REALSXP, coefficients, "contrast");
+}
+
+void rsdeseq2_validate_wald_transport(SEXP threshold, SEXP alternative, SEXP use_t, SEXP df,
+                                     R_xlen_t genes, Rsdeseq2ContrastRequest *request) {
+    validate_real_scalar(threshold, "lfcThreshold");
+    request->alternative = validate_integer_scalar(alternative, 0, 5, "alternative");
+    validate_boolean(use_t, "useT");
+    request->use_t = (uint8_t)LOGICAL(use_t)[0];
+    request->use_wald = 1;
+    request->threshold = Rf_asReal(threshold);
+    if (request->use_t) {
+        validate_vector(df, REALSXP, XLENGTH(df), "degrees of freedom");
+        if (XLENGTH(df) != 1 && XLENGTH(df) != genes)
+            Rf_error("degrees of freedom must be scalar or one per gene");
+        checked_product(XLENGTH(df), 1);
+        request->df_len = (size_t)XLENGTH(df);
+        request->df = REAL(df);
+    } else if (df != R_NilValue) Rf_error("degrees of freedom require useT=TRUE");
+}
+
+SEXP rsdeseq2_allocate_contrast_output(R_xlen_t genes, Rsdeseq2ContrastRequest *request) {
+    const char *wald_names[] = {"log2FoldChange", "lfcSE", "stat", "pvalue", ""};
+    const char *projection_names[] = {"log2FoldChange", "lfcSE", ""};
+    SEXP result = PROTECT(Rf_mkNamed(VECSXP, request->use_wald ? wald_names : projection_names));
+    for (int column = 0; column < (request->use_wald ? 4 : 2); ++column) {
+        SEXP values = PROTECT(Rf_allocVector(REALSXP, genes));
+        SET_VECTOR_ELT(result, column, values);
+        switch (column) {
+            case 0: request->lfc = REAL(values); break;
+            case 1: request->lfc_se = REAL(values); break;
+            case 2: request->stat = REAL(values); break;
+            case 3: request->pvalue = REAL(values); break;
+        }
+        UNPROTECT(1);
+    }
+    UNPROTECT(1);
+    return result;
 }
 
 static SEXP contrast_inference(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
-                              int wald, double threshold, int alternative, int use_t, SEXP df, SEXP context) {
-    R_xlen_t genes = matrix_rows(beta);
+                              Rsdeseq2ContrastRequest *request, SEXP context) {
+    rsdeseq2_validate_inference_matrices(beta, se, covariance);
+    R_xlen_t genes = matrix_rows(beta), coefficients = matrix_cols(beta);
+    validate_vector(contrast, REALSXP, coefficients, "contrast");
+    request->contrast = REAL(contrast);
     Rsdeseq2ContrastZero zero = {0};
-    if (context != R_NilValue)
-        rsdeseq2_validate_contrast_zero(context, genes, matrix_cols(beta), &zero);
-    SEXP lfc = PROTECT(Rf_allocVector(REALSXP, genes));
-    SEXP lfc_se = PROTECT(Rf_allocVector(REALSXP, genes));
-    SEXP stat = PROTECT(wald ? Rf_allocVector(REALSXP, genes) : R_NilValue);
-    SEXP pvalue = PROTECT(wald ? Rf_allocVector(REALSXP, genes) : R_NilValue);
-    int status = rsdeseq2_r_contrast_inference((size_t)genes, (size_t)matrix_cols(beta), REAL(beta),
-        se != R_NilValue, se == R_NilValue ? NULL : REAL(se),
-        covariance != R_NilValue, covariance == R_NilValue ? NULL : REAL(covariance),
-        REAL(contrast), (uint8_t)wald, threshold, alternative, (uint8_t)use_t,
-        df == R_NilValue ? 0 : (size_t)XLENGTH(df), df == R_NilValue ? NULL : REAL(df),
-        NA_REAL, REAL(lfc), REAL(lfc_se), wald ? REAL(stat) : NULL, wald ? REAL(pvalue) : NULL,
-        context == R_NilValue ? NULL : &zero);
+    if (context != R_NilValue) {
+        rsdeseq2_validate_contrast_zero(context, genes, coefficients, &zero);
+        request->zero = &zero;
+    }
+    SEXP result = PROTECT(rsdeseq2_allocate_contrast_output(genes, request));
+    int status = rsdeseq2_r_contrast_batch((size_t)genes, (size_t)coefficients, REAL(beta),
+        se != R_NilValue, se == R_NilValue ? NULL : REAL(se), covariance != R_NilValue,
+        covariance == R_NilValue ? NULL : REAL(covariance), 1, request, NA_REAL);
     if (status) Rf_error("rsdeseq2 Rust backend: %s", rsdeseq2_r_last_error());
-    const char *wald_names[] = {"log2FoldChange", "lfcSE", "stat", "pvalue", ""};
-    const char *projection_names[] = {"log2FoldChange", "lfcSE", ""};
-    SEXP output = PROTECT(Rf_mkNamed(VECSXP, wald ? wald_names : projection_names));
-    SET_VECTOR_ELT(output, 0, lfc); SET_VECTOR_ELT(output, 1, lfc_se);
-    if (wald) { SET_VECTOR_ELT(output, 2, stat); SET_VECTOR_ELT(output, 3, pvalue); }
-    UNPROTECT(5);
-    return output;
+    UNPROTECT(1);
+    return result;
 }
 
 SEXP rsdeseq2_project_contrast_zero(SEXP beta, SEXP se, SEXP covariance, SEXP contrast, SEXP context) {
-    validate_estimates(beta, se, covariance, contrast);
-    return contrast_inference(beta, se, covariance, contrast, 0, 0, 0, 0, R_NilValue, context);
+    Rsdeseq2ContrastRequest request = {0};
+    return contrast_inference(beta, se, covariance, contrast, &request, context);
 }
 
 SEXP rsdeseq2_project_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast) {
@@ -67,18 +96,10 @@ SEXP rsdeseq2_project_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contras
 
 SEXP rsdeseq2_wald_contrast_zero(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,
                           SEXP threshold, SEXP alternative, SEXP use_t, SEXP df, SEXP context) {
-    validate_estimates(beta, se, covariance, contrast);
-    validate_real_scalar(threshold, "lfcThreshold");
-    int alt = validate_integer_scalar(alternative, 0, 5, "alternative");
-    validate_boolean(use_t, "useT");
-    if (LOGICAL(use_t)[0]) {
-        validate_vector(df, REALSXP, XLENGTH(df), "degrees of freedom");
-        if (XLENGTH(df) != 1 && XLENGTH(df) != matrix_rows(beta))
-            Rf_error("degrees of freedom must be scalar or one per gene");
-        checked_product(XLENGTH(df), 1);
-    } else if (df != R_NilValue) Rf_error("degrees of freedom require useT=TRUE");
-    return contrast_inference(beta, se, covariance, contrast, 1,
-        Rf_asReal(threshold), alt, LOGICAL(use_t)[0], df, context);
+    rsdeseq2_validate_inference_matrices(beta, se, covariance);
+    Rsdeseq2ContrastRequest request = {0};
+    rsdeseq2_validate_wald_transport(threshold, alternative, use_t, df, matrix_rows(beta), &request);
+    return contrast_inference(beta, se, covariance, contrast, &request, context);
 }
 
 SEXP rsdeseq2_wald_contrast(SEXP beta, SEXP se, SEXP covariance, SEXP contrast,

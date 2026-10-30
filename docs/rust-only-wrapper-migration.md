@@ -78,6 +78,13 @@ between the two interfaces.
 The migration is **in progress**. Removing the experimental commits does not
 mean the older R calculations listed above have already been removed.
 
+The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
+`resultsList()` using `PreparedContrastView` and bounded native chunks. Both
+interfaces share the numerical projection/zero/inference kernels, with 87 direct
+bit-equality cases, including 65-request batches. Dataset validation and primitive
+extraction happen once per public batch call. Remaining Cook's/refit, offset,
+formula and posterior arithmetic above are still required.
+
 The [first standalone primitive checkpoint](rust-only-primitives-2026-10-29.md)
 completes shared filtering/BH and fixes supplied geometric-mean transport, with
 20 direct bit-equality cases. The remaining stages above are still required.
@@ -96,6 +103,6 @@ exports relative to the shared-probability checkpoint.
 The [shared contrast-zero checkpoint](rust-only-contrast-zero-2026-10-30.md)
 additionally moves count selection, global-zero exclusion and Wald/LRT contrast
 zero overrides into Rust, with 85 direct bit-equality cases. Cook's/refit policy,
-bounded batches, remaining offsets/formula arithmetic and shrinkage still require
-completion. The prepared count view can be reused, but the batch bridge has not
-yet been restored.
+bounded batches, remaining offsets/formula arithmetic and shrinkage were still
+pending at that checkpoint. The later batch checkpoint above restores the bridge;
+the other remaining migrations stay open.

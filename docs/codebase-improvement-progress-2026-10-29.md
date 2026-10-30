@@ -152,3 +152,10 @@ return identical results. R-specific probability/arithmetic backends are outside
 that contract. Previously saved measurements and source archives remain historical
 evidence of their recorded checkpoints, not validation of the replacement path.
 C23 final documentation and artifact checks remain pending.
+
+That paragraph describes the removed experimental checkpoint. The subsequent
+[standalone batch replacement](rust-only-result-batches-2026-10-30.md) restores
+`resultsList()` on borrowed Rust primitives with bounded native chunks, shared
+single/batch adapters and direct bit-equality evidence. The remaining statistical
+migration is still tracked in the completion audit; historical measurements in
+this report have not been relabeled as replacement-engine results.

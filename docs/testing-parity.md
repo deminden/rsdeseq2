@@ -239,23 +239,28 @@ It includes the executable hash, test results, full-reference gates and paired
 speed/memory measurements. The executable is byte-identical to the baseline;
 no numerical runtime code or R wrapper functions changed.
 
-## Improvement checkpoint — 2026-10-29
+## Standalone batch checkpoint — 2026-10-30
 
-Native R 4.6.2 source-package validation passes 1,368 assertions with zero
-failures, warnings or skips and Status OK. The Rust workspace passes 1,027 tests
-with one opt-in full-GTEx case; that case also passes when run explicitly in the
-release profile. Python integrity tests pass 44 cases. MSRV, core/backend Clippy,
-read-only vendor checks and workflow lint pass locally. Remote target jobs remain
-required for publication and have not been executed by this local work.
+The [batch checkpoint](rust-only-result-batches-2026-10-30.md) supersedes the
+removed R-backed implementation's acceptance claims. Native R 4.6.2 validates
+1,488 assertions with no failures, warnings or skips and source-package Status
+OK. Rust passes 1,045 tests, with the existing opt-in full-GTEx case excluded
+from the ordinary run; the separate eleven-contrast gate passes. Backend/Python
+support suites pass one/45 tests. MSRV, root/backend Clippy/formatting, strict
+documentation, crate verification and read-only vendor checks pass locally.
+Remote platform jobs remain required for publication.
 
-All 22 GTEx result/diagnostic exports remain byte-identical to the reviewed native
-baseline; 121 per-contrast and nine global precision gates pass. The independent
-Pasilla Wald/LRT panel passes unchanged absolute bounds and exact native export
-identity. R query tests reuse fitted fixtures to cover per-request alpha, t df,
-thresholds, replacement/new-zero rows, saved fits and subset shrinkage. They compare
-bulk and individual tables at zero tolerance and independently check DESeq2.
+All 22 GTEx result/diagnostic exports remain byte-identical to `b0855d0`; 121
+per-contrast and nine global precision gates pass. Direct standalone/wrapped
+comparisons now cover 87 bit-equality cases, including mixed primitive batches
+and 65-request public batches. R tests compare complete single/batch tables with
+`identical()` and verify validation reuse, subset/edit handling, per-request
+alpha/df/thresholds, Cook's masking, Wald/LRT, replacement and legacy states.
+C ASan/UBSan and Rust ASan pass the malformed-call child and numerical controls;
+instrumentation exclusions are recorded in the checkpoint.
 
-The [execution report](codebase-improvement-progress-2026-10-29.md) links measured
-memory/query changes. R BH/filtering remains on its validated implementation
-because the current Rust arithmetic order fails an exact-output probe; this is a
-retained gate, not a widened tolerance or a changed reference.
+BH/filtering, inference probabilities, contrast projection and contrast-zero
+rules now use the standalone Rust engine. Remaining R calculations are listed in
+the [migration inventory](rust-only-wrapper-migration.md); no reference or
+precision bound has been relaxed to close a gate. Earlier checkpoint numbers and
+measurements remain in their linked historical reports.

@@ -70,3 +70,8 @@
   .Call("rsdeseq2_default_cooks_cutoff", as.integer(nrow(design)),
     as.integer(ncol(design)), PACKAGE = "rsdeseq2")
 }
+
+.rsdeseq2_evaluate_result_batch <- function(object,requests) {
+  .Call("rsdeseq2_contrast_batch",object$beta,object$betaSE,object$betaCovariance,
+    requests,PACKAGE="rsdeseq2")
+}

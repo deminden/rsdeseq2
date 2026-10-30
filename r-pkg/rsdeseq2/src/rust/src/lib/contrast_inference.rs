@@ -1,19 +1,34 @@
-//! Synchronous borrowing of R's column-major inference arrays.
-use super::contrast_zero::{ContrastZero, apply_zero_context};
+//! Bounded synchronous inference; both single and batch calls use this path.
+use super::contrast_zero::{ContrastZero, decode_zero, prepare_zero_inputs};
 use super::inference_statistics::borrowed_wald_options;
 use super::{input_slice, output_slice, run_backend};
-use rsdeseq2::glm::{CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates};
+use rsdeseq2::glm::{CovarianceView, InferenceEstimates, PreparedContrastView};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 
+/// Matches contrast_inference.h. C validates every pointed-to buffer.
+#[repr(C)]
+pub(super) struct ContrastRequest {
+    contrast: *const f64,
+    threshold: f64,
+    alternative: i32,
+    use_wald: u8,
+    use_t: u8,
+    df_len: usize,
+    df: *const f64,
+    zero: *const ContrastZero,
+    lfc: *mut f64,
+    lfc_se: *mut f64,
+    stat: *mut f64,
+    pvalue: *mut f64,
+}
+
 /// # Safety
-/// C validates the complete G×P beta/optional SE and G×P×P covariance buffers,
-/// P contrast values, scalar options, scalar/G df and G-element outputs.
-/// Presence flags are explicit; NULL never selects statistical behavior.
-/// An optional zero-context descriptor is validated in C, including every
-/// pointed-to count/design/string allocation. No pointer is retained.
-/// Input and output buffers must not overlap.
+/// C validates G×P beta/optional SE, G×P×P covariance, 1..=64 request
+/// descriptors, each P-element contrast, scalar/G df, all zero contexts and
+/// distinct caller-owned G-element output arrays. No pointer is retained or
+/// R API called. Outputs must not alias inputs or one another.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
+pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
     genes: usize,
     coefficients: usize,
     beta: *const f64,
@@ -21,23 +36,13 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
     se: *const f64,
     has_covariance: u8,
     covariance: *const f64,
-    contrast: *const f64,
-    use_wald: u8,
-    threshold: f64,
-    alternative: i32,
-    use_t: u8,
-    df_len: usize,
-    df: *const f64,
+    count: usize,
+    requests: *const ContrastRequest,
     missing: f64,
-    lfc: *mut f64,
-    lfc_se: *mut f64,
-    stat: *mut f64,
-    pvalue: *mut f64,
-    zero_context: *const ContrastZero,
 ) -> i32 {
     run_backend(|| {
-        if has_se > 1 || has_covariance > 1 || use_wald > 1 {
-            return Err("contrast presence flags must be zero or one".into());
+        if has_se > 1 || has_covariance > 1 || !(1..=64).contains(&count) {
+            return Err("invalid contrast batch flags or request count".into());
         }
         let length = genes
             .checked_mul(coefficients)
@@ -60,12 +65,16 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
             let length = genes
                 .checked_mul(width)
                 .ok_or("covariance shape overflow")?;
-            let values = unsafe { input_slice(covariance, length, "contrast covariance")? };
             Some(
                 CovarianceView::new(
                     coefficients,
-                    MatrixView::new(genes, width, values, MatrixOrder::ColumnMajor)
-                        .map_err(|e| e.to_string())?,
+                    MatrixView::new(
+                        genes,
+                        width,
+                        unsafe { input_slice(covariance, length, "contrast covariance")? },
+                        MatrixOrder::ColumnMajor,
+                    )
+                    .map_err(|e| e.to_string())?,
                 )
                 .map_err(|e| e.to_string())?,
             )
@@ -73,42 +82,55 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_inference(
             None
         };
         let estimates = InferenceEstimates::new(beta, se, covariance).map_err(|e| e.to_string())?;
-        let contrast = unsafe { input_slice(contrast, coefficients, "contrast coefficients")? };
-        let (mut effect, se, mut inference) = if use_wald == 1 {
-            let options =
-                unsafe { borrowed_wald_options(genes, threshold, alternative, use_t, df_len, df)? };
-            let result = wald_test_contrast_from_estimates(&estimates, contrast, &options)
-                .map_err(|e| e.to_string())?;
-            (result.log2_fold_change, result.lfc_se, Some(result.wald))
-        } else {
-            let result = estimates
-                .project_contrast(contrast)
-                .map_err(|e| e.to_string())?;
-            (result.log2_fold_change, result.lfc_se, None)
-        };
-        unsafe {
-            apply_zero_context(
-                zero_context,
-                genes,
-                coefficients,
-                contrast,
-                &mut effect,
-                inference.as_mut(),
-            )?;
-        }
-        let output_effect = unsafe { output_slice(lfc, genes, "contrast effects")? };
-        let output_se = unsafe { output_slice(lfc_se, genes, "contrast SEs")? };
-        for gene in 0..genes {
-            output_effect[gene] = effect[gene].unwrap_or(missing);
-            output_se[gene] = se[gene].unwrap_or(missing);
-        }
-        if let Some(result) = inference {
-            let output_stat = unsafe { output_slice(stat, genes, "contrast statistics")? };
-            let output_pvalue = unsafe { output_slice(pvalue, genes, "contrast p-values")? };
-            for gene in 0..genes {
-                output_stat[gene] = result.stat[gene].unwrap_or(missing);
-                output_pvalue[gene] = result.pvalue[gene].unwrap_or(missing);
-            }
+        let requests = unsafe { input_slice(requests, count, "contrast requests")? };
+        let (counts, design) =
+            unsafe { prepare_zero_inputs(requests.iter().map(|r| r.zero), genes, coefficients)? };
+        let view =
+            PreparedContrastView::new(estimates, counts, design).map_err(|e| e.to_string())?;
+        for (index, request) in requests.iter().enumerate() {
+            let evaluate = || -> Result<(), String> {
+                if request.use_wald > 1 {
+                    return Err("Wald mode must be zero or one".into());
+                }
+                let options = if request.use_wald == 1 {
+                    Some(unsafe {
+                        borrowed_wald_options(
+                            genes,
+                            request.threshold,
+                            request.alternative,
+                            request.use_t,
+                            request.df_len,
+                            request.df,
+                        )?
+                    })
+                } else {
+                    None
+                };
+                let contrast = unsafe {
+                    input_slice(request.contrast, coefficients, "contrast coefficients")?
+                };
+                let zero = unsafe { decode_zero(request.zero)? };
+                let result = view
+                    .evaluate(contrast, options.as_ref(), zero.rule())
+                    .map_err(|e| e.to_string())?;
+                let effect = unsafe { output_slice(request.lfc, genes, "contrast effects")? };
+                let se = unsafe { output_slice(request.lfc_se, genes, "contrast SEs")? };
+                for gene in 0..genes {
+                    effect[gene] = result.projection.log2_fold_change[gene].unwrap_or(missing);
+                    se[gene] = result.projection.lfc_se[gene].unwrap_or(missing);
+                }
+                if let Some(wald) = result.wald {
+                    let stat = unsafe { output_slice(request.stat, genes, "contrast statistics")? };
+                    let pvalue =
+                        unsafe { output_slice(request.pvalue, genes, "contrast p-values")? };
+                    for gene in 0..genes {
+                        stat[gene] = wald.stat[gene].unwrap_or(missing);
+                        pvalue[gene] = wald.pvalue[gene].unwrap_or(missing);
+                    }
+                }
+                Ok(())
+            };
+            evaluate().map_err(|e| format!("contrast request {}: {e}", index + 1))?;
         }
         Ok(())
     })

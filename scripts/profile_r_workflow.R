@@ -48,8 +48,25 @@ value <- switch(workflow,
   rlog = timed("rlog", {out <- rsdeseq2::rlog(fit, blind = FALSE, fitType = "mean", nproc = 1L); list(values = SummarizedExperiment::assay(out), metadata = S4Vectors::metadata(out))}),
   vst = timed("vst", {out <- rsdeseq2::varianceStabilizingTransformation(fit, blind = FALSE, fitType = "mean", nproc = 1L); SummarizedExperiment::assay(out)}),
   multi_results = timed("ten_results", lapply(seq_len(10L), function(i) as.data.frame(rsdeseq2::results(fit, name = rsdeseq2::resultsNames(fit)[[1L + i %% ncol(state$beta)]])))),
+  batch_results = timed("ten_results", {
+    requests <- lapply(seq_len(10L), function(i) list(name = rsdeseq2::resultsNames(fit)[[1L + i %% ncol(state$beta)]]))
+    # The baseline predates resultsList. Both branches ask for the same ten
+    # tables; this capability check changes transport, never numerical policy.
+    tables <- if ("resultsList" %in% getNamespaceExports("rsdeseq2")) {
+      rsdeseq2::resultsList(fit, requests)
+    } else lapply(requests, function(request) do.call(rsdeseq2::results, c(list(object = fit), request)))
+    lapply(tables, as.data.frame)
+  }),
   shrink_normal = timed("shrink_normal", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "normal"))),
   shrink_ashr = timed("shrink_ashr", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "ashr"))),
   shrink_apeglm = timed("shrink_apeglm", as.data.frame(rsdeseq2::lfcShrink(fit, coef = tail(rsdeseq2::resultsNames(fit), 1L), type = "apeglm"))),
   timed("results", as.data.frame(rsdeseq2::results(fit))))
 saveRDS(list(counts = counts, fitted = state, output = value), args[[5L]], compress = FALSE)
+if (workflow == "replacement_none") {
+  # Untimed retained-storage evidence; keep these observations out of the
+  # precision payload and separate from the stage elapsed-time columns.
+  storage <- data.frame(field = c("counts", "replaceCounts", "replaceCooks"),
+    retained_bytes = vapply(c("counts", "replaceCounts", "replaceCooks"),
+      function(field) as.numeric(object.size(state[[field]])), numeric(1)))
+  write.table(storage, paste0(args[[5L]], ".storage.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+}

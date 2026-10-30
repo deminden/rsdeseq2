@@ -41,9 +41,9 @@ That metadata error is corrected without changing the measurements.
 | C15 | Ownership moves | Existing exact comparisons and measured evidence retained. |
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
-| C18 | Disabled replacement buffer omitted | Enabled-but-no-refit storage remains. Need assess a representative larger case before closing the conditional handle decision. |
+| C18 | Disabled replacement buffer omitted | Enabled-but-no-refit allocation remains. The batch checkpoint measures 56,200 × 16 at 940.734 MiB with no retained replacement arrays; its avoidable temporary R buffer payload is 6.860 MiB. No native handle is added and no omitted-allocation claim is made for that path. |
 | C19 | Borrowed standalone Rust request/view, filtering/BH, inference probabilities, contrast projection and contrast-zero rules | Shared contrast count selection and zero overrides now pass 85 cross-interface bit cases and full GTEx bounds; all 22 exports match `9f175f3`. The 1,169 scalar references remain unchanged. Cook's/refit policy, remaining offsets/formula calculations and shrinkage remain pending. See the [zero-rule checkpoint](rust-only-contrast-zero-2026-10-30.md). |
-| C20 | Standalone-engine batch bridge pending | The experimental resultsList implementation was removed with its R-backed commit. Restore it on the standalone engine with primitive borrowing and bounded batches. |
+| C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
 | C23 | Checkpoint-bound docs and source artifacts | Historical artifacts preserved. A final tested source package and documentation reconciliation are required after outstanding implementation. |
@@ -100,3 +100,11 @@ the existing relative policy, while R's default QR calls them deficient. At
 are distinct from the independent `1e-12`-scaled covariate case, which is full
 rank in both reference policies. Structural rank does not promise an adequately
 conditioned or numerically estimable model.
+
+The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) also
+records one accepted paired eleven-contrast pass: native elapsed +0.36%, maximum
+RSS 302.328 MiB, 5.40× DESeq2 process-time ratio and no optimization round. All
+17 paired R workflow payloads are byte-identical and below 2 GiB. Ten-result
+batch extraction is 1.71× faster; the existing 14 R controls sum to +2.58% time,
+mostly the largest rlog (+6.26%). Those observed costs remain in the final
+performance follow-up; the measurements were not repeated or relabeled.

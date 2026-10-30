@@ -2,6 +2,7 @@
 
 pub mod beta;
 mod contrast_projection;
+mod contrast_view;
 pub mod dispersion_fit;
 pub mod fallback;
 pub(crate) mod inference;
@@ -37,6 +38,7 @@ pub use beta::{
 pub use contrast_projection::{
     ContrastProjection, CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
 };
+pub use contrast_view::{ContrastInference, ContrastZeroRule, PreparedContrastView};
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{OptimFallbackRows, optim_fallback_rows};
 pub use inference_primitives::wald_test_from_estimates;

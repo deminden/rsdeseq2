@@ -1,5 +1,6 @@
 #ifndef RSDESEQ2_VALIDATION_H
 #define RSDESEQ2_VALIDATION_H
+#include <string.h>
 
 /* Validate allocated R storage before constructing any native slice. */
 static R_xlen_t checked_product(R_xlen_t a, R_xlen_t b) {
@@ -57,5 +58,21 @@ static void validate_real_scalar(SEXP x, const char *name) {
 static void validate_boolean(SEXP x, const char *name) {
     if (TYPEOF(x) != LGLSXP || XLENGTH(x) != 1 || LOGICAL(x)[0] == NA_LOGICAL)
         Rf_error("%s must be TRUE or FALSE", name);
+}
+/* Metadata lookup only; no numerical processing. */
+static SEXP named_list_field(SEXP x, const char *name, const char *context) {
+    SEXP names = Rf_getAttrib(x, R_NamesSymbol);
+    if (TYPEOF(x) != VECSXP || TYPEOF(names) != STRSXP || XLENGTH(names) != XLENGTH(x))
+        Rf_error("%s must be a named list", context);
+    SEXP value = R_NilValue;
+    int found = 0;
+    for (R_xlen_t i = 0; i < XLENGTH(x); ++i) {
+        if (STRING_ELT(names, i) == NA_STRING) Rf_error("%s names cannot be missing", context);
+        if (!strcmp(CHAR(STRING_ELT(names, i)), name)) {
+            if (found) Rf_error("duplicate %s field: %s", context, name);
+            value = VECTOR_ELT(x, i); found = 1;
+        }
+    }
+    return value;
 }
 #endif

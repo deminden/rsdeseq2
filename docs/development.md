@@ -168,3 +168,12 @@ include the restored reference/test-tool library in `R_LIBS_USER`. The source
 installer's `--check-installed --library PATH` checks that path in addition to
 normal R libraries. Main README figures compare with DESeq2; previous-Rust deltas
 and per-stage figures belong in the detailed reports.
+
+Use `PreparedContrastView` when evaluating several primitive contrasts. It
+borrows coefficient/SE/covariance matrices and prepares count-zero context once;
+consume each owned result before the next request when bounded scratch matters.
+The R single and batch calls share this kernel and C request descriptor. No R
+callback or numerical backend is permitted. See the
+[batch checkpoint](rust-only-result-batches-2026-10-30.md) for validation and
+paired measurements, and the [completion audit](codebase-improvement-completion-audit-2026-10-29.md)
+for remaining work.
