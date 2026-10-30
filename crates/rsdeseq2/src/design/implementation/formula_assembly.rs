@@ -84,67 +84,14 @@ fn expanded_formula_design_from_state<'a>(
     }
     validate_unique_coefficient_names(&expanded_names, "expanded formula design")?;
 
-    let mut expanded_values = Vec::with_capacity(n_samples * expanded_names.len());
-    for sample in 0..n_samples {
-        if state.has_intercept {
-            expanded_values.push(1.0);
-        }
-        for factor in &state.selected_factors {
-            let levels = formula_factor_levels(factor.factor, &used_factors, &factor_levels)?;
-            let sample_level = factor.sample_levels[sample].as_str();
-            for level in levels {
-                expanded_values.push((sample_level == level) as u8 as f64);
-            }
-        }
-        for covariate in &state.selected_numeric_covariates {
-            expanded_values.push(covariate.values[sample]);
-        }
-        for interaction in &state.factor_interactions {
-            let left = formula_factor_spec(interaction.left_factor, &used_factors)?;
-            let right = formula_factor_spec(interaction.right_factor, &used_factors)?;
-            let left_levels =
-                formula_factor_levels(interaction.left_factor, &used_factors, &factor_levels)?;
-            let right_levels =
-                formula_factor_levels(interaction.right_factor, &used_factors, &factor_levels)?;
-            let left_sample_level = left.sample_levels[sample].as_str();
-            let right_sample_level = right.sample_levels[sample].as_str();
-            for left_level in left_levels {
-                for right_level in right_levels {
-                    expanded_values.push(
-                        (left_sample_level == left_level && right_sample_level == right_level) as u8
-                            as f64,
-                    );
-                }
-            }
-        }
-        for interaction in &state.factor_numeric_interactions {
-            let factor = formula_factor_spec(interaction.factor, &used_factors)?;
-            let numeric = formula_numeric_spec(interaction.numeric, &used_numeric_covariates)?;
-            let levels = formula_factor_levels(interaction.factor, &used_factors, &factor_levels)?;
-            let sample_level = factor.sample_levels[sample].as_str();
-            let numeric_value = numeric.values[sample];
-            for level in levels {
-                expanded_values.push(((sample_level == level) as u8 as f64) * numeric_value);
-            }
-        }
-        for interaction in &state.numeric_interactions {
-            expanded_values.push(
-                formula_numeric_spec(interaction.left_numeric, &used_numeric_covariates)?.values
-                    [sample]
-                    * formula_numeric_spec(interaction.right_numeric, &used_numeric_covariates)?
-                        .values[sample],
-            );
-        }
-        for interaction in &state.higher_order_interactions {
-            expanded_values.extend(formula_higher_order_expanded_values(
-                interaction,
-                &used_factors,
-                &used_numeric_covariates,
-                &factor_levels,
-                sample,
-            )?);
-        }
-    }
+    let expanded_values = formula_expanded_matrix_values(
+        state,
+        &used_factors,
+        &used_numeric_covariates,
+        &factor_levels,
+        &expanded_names,
+        n_samples,
+    )?;
     let expanded_design = DesignMatrix::from_row_major(
         n_samples,
         expanded_names.len(),
@@ -624,39 +571,6 @@ fn formula_higher_order_expanded_names(
     factor_levels: &[Vec<String>],
 ) -> Result<Vec<String>, DeseqError> {
     formula_higher_order_names(interaction, used_factors, factor_levels, &|_| false)
-}
-
-fn formula_higher_order_expanded_values(
-    interaction: &FormulaHigherOrderInteractionSpec<'_>,
-    used_factors: &[ExpandedFactorSpec<'_>],
-    used_numeric_covariates: &[ExpandedNumericSpec<'_>],
-    factor_levels: &[Vec<String>],
-    sample: usize,
-) -> Result<Vec<f64>, DeseqError> {
-    let mut values = Vec::new();
-    let level_grid = formula_higher_order_level_grid(interaction, used_factors, factor_levels)?;
-    for levels in level_grid {
-        let mut value = 1.0;
-        for (variable, level) in interaction.variables.iter().zip(levels) {
-            match variable {
-                FormulaVariableRef::Factor(factor) => {
-                    let factor = formula_factor_spec(factor, used_factors)?;
-                    let sample_level = factor.sample_levels[sample].as_str();
-                    let Some(level) = level else {
-                        return Err(DeseqError::InvalidOptions {
-                            reason: "formula factor interaction level is missing".to_string(),
-                        });
-                    };
-                    value *= (sample_level == level) as u8 as f64;
-                }
-                FormulaVariableRef::Numeric(numeric) => {
-                    value *= formula_numeric_spec(numeric, used_numeric_covariates)?.values[sample];
-                }
-            }
-        }
-        values.push(value);
-    }
-    Ok(values)
 }
 
 fn push_formula_higher_order_standard_names(

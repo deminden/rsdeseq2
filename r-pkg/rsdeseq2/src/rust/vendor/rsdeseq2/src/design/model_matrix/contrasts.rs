@@ -4,10 +4,35 @@ use crate::errors::DeseqError;
 pub(super) struct CodingMatrix {
     pub names: Vec<String>,
     pub values: Vec<f64>,
+    treatment_base: Option<usize>,
 }
 impl CodingMatrix {
     pub fn new(levels: &[String], coding: FactorCoding<'_>) -> Result<Self, DeseqError> {
         let n = levels.len();
+        // Treatment columns are indicators, including in expanded native plans.
+        // Retaining n*(n-1) zeros/ones would add quadratic storage to a parser
+        // migration that only needs level lookup and shared product evaluation.
+        if let FactorCoding::Treatment { base } = coding {
+            if base >= n {
+                return Err(invalid(
+                    "factor treatment base is outside its declared levels",
+                ));
+            }
+            let names = levels
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != base)
+                .map(|(_, name)| name.clone())
+                .collect::<Vec<_>>();
+            if names.iter().any(|name| name.contains('\0')) {
+                return Err(invalid("factor contrast names/values are invalid"));
+            }
+            return Ok(Self {
+                names,
+                values: Vec::new(),
+                treatment_base: Some(base),
+            });
+        }
         let width = match coding {
             FactorCoding::Matrix { values, .. } => values.n_cols(),
             _ => n - 1,
@@ -19,25 +44,7 @@ impl CodingMatrix {
                 .ok_or_else(|| invalid("factor coding shape overflow"))?
         ];
         match coding {
-            FactorCoding::Treatment { base } => {
-                if base >= n {
-                    return Err(invalid(
-                        "factor treatment base is outside its declared levels",
-                    ));
-                }
-                names = levels
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| *i != base)
-                    .map(|(_, v)| v.clone())
-                    .collect();
-                for level in 0..n {
-                    if level != base {
-                        let column = if level < base { level } else { level - 1 };
-                        values[level * width + column] = 1.0;
-                    }
-                }
-            }
+            FactorCoding::Treatment { .. } => unreachable!("treatment indicators returned above"),
             FactorCoding::Sum => {
                 for column in 0..width {
                     values[column * width + column] = 1.0;
@@ -95,6 +102,18 @@ impl CodingMatrix {
         if names.iter().any(|s| s.contains('\0')) || values.iter().any(|v| !v.is_finite()) {
             return Err(invalid("factor contrast names/values are invalid"));
         }
-        Ok(Self { names, values })
+        Ok(Self {
+            names,
+            values,
+            treatment_base: None,
+        })
+    }
+    pub fn value(&self, level: usize, column: usize) -> f64 {
+        if let Some(base) = self.treatment_base {
+            let selected = if column < base { column } else { column + 1 };
+            (level == selected) as u8 as f64
+        } else {
+            self.values[level * self.names.len() + column]
+        }
     }
 }

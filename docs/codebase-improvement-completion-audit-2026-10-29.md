@@ -42,7 +42,7 @@ That metadata error is corrected without changing the measurements.
 | C16 | Bounded ordered row batches | Existing exact comparisons and measured evidence retained. |
 | C17 | Internal covariance retention requirements | Existing exact comparisons and measured transform memory reduction retained. |
 | C18 | Conditional R replacement output and borrowed native Cook's factors | The [conditional-storage checkpoint](conditional-replacement-storage-2026-10-30.md) completes the local gate: no R replacement matrix for disabled/no-refit paths, moved owned output under R unwind cleanup when needed, and no temporary factor-matrix expansion/clone. Wald/LRT all-zero-only updates retain their counts. Four injected real-fit error paths release owners and recover exactly; all twenty paired R payloads remain identical. Large no-refit RSS falls 1.016 MiB in the combined candidate. The initial R-only attempt's +4.203 MiB outcome is retained. |
-| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation, offset products and formula matrix/frame calculations | The [formula-frame checkpoint](rust-only-formula-frames-2026-10-30.md) removes production R expression, frame/offset and character/logical factor calculations, with 188 direct expression identity cases plus the earlier 189 cases and strict live frames. The earlier matrix port retains all 94 supported ordered-level references. Legacy parser adoption, broader warning/method semantics, initial row adjustment, frozen-local VST and optional posterior calculations remain open. |
+| C19 | Borrowed standalone Rust inference, filtering/BH, contrast-zero, Cook/refit, count/shrinkage-row preparation, offset products and formula matrix/frame calculations | The [formula-frame checkpoint](rust-only-formula-frames-2026-10-30.md) removes production R expression, frame/offset and character/logical factor calculations. The [native-parser consolidation](native-parser-shared-evaluation-2026-10-30.md) shares numeric transforms, offsets and matrix products and corrects thirteen independent cases. The previous 189 primitive and 188 expression cases remain exact; the earlier matrix port retains all 94 supported ordered-level references. Native factor/class corrections, warning/method parity, initial adjustment, frozen-local VST and optional posterior calculations remain open. |
 | C20 | Standalone-engine bounded result batches | `resultsList` validates a dataset/extracts primitives once, borrows shared matrices and evaluates chunks of at most 64 requests through `PreparedContrastView`. Single calls use the same kernel/adapters. Exact per-request policies, 87 direct bit cases, source package and instrumentation pass; see the [batch checkpoint](rust-only-result-batches-2026-10-30.md). C19's remaining presentation migration still applies. |
 | C21 | Private execution and fitted-result modules, public forwarding APIs | Implemented portions retained; authoritative shared result path awaits C19/C20 completion. |
 | C22 | Preflight, staging, hash-verified completion record | Existing collision/failure/numerical tests retained. |
@@ -216,3 +216,19 @@ nineteen cases +0.15%. Maximum native/R RSS is 302.359/1,127.781 MiB; individual
 costs and all timings remain recorded. No optimization round is counted.
 Legacy parser adoption, warning/method parity, VST/posteriors, initial adjustment
 and the final authority/combined audit remain open.
+
+The [native-parser consolidation](native-parser-shared-evaluation-2026-10-30.md)
+then routes numeric transforms, coercions, offset addition and matrix products
+through the shared engine. Fifty-four actual-parser/R-wrapper cases match
+original R after explicit column mapping. A previous-source control disagrees
+in thirteen cases (44 matrix and 31 offset entries); those differences are
+corrected without changing existing references. Treatment indicators avoid
+quadratic contrast storage. The checked source passes 2,445 R assertions; the
+root/backend suites pass 1,071/three tests, and fresh sanitizer controls pass.
+The prior 189+188 direct cases, all 121+9 GTEx gates, 22 exports and twenty
+complete paired R payloads remain exact. Native/R elapsed changes −1.34%/−0.38%,
+with essentially flat maxima of 302.063/1,127.594 MiB; individual slower/more
+memory-intensive cases remain recorded. No optimization round is counted.
+Native factor/class semantics, warning/method parity, VST/posteriors, initial
+adjustment, authoritative result routing and final combined/platform gates
+remain open.

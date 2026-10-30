@@ -7,6 +7,8 @@ mod cooks;
 mod formula;
 #[path = "evaluate_r_interface/model_matrix.rs"]
 mod model_matrix;
+#[path = "evaluate_r_interface/native_formula.rs"]
+mod native_formula;
 #[path = "evaluate_r_interface/preparation.rs"]
 mod preparation;
 use rsdeseq2::independent_filtering::{
@@ -368,6 +370,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    NativeFormula(native_formula::Input),
     Formula(formula::Input),
     ModelMatrix(model_matrix::Case),
     Preparation(preparation::Input),
@@ -384,6 +387,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::NativeFormula(input) => native_formula::evaluate(&input),
         Input::Formula(input) => formula::panel(input),
         Input::ModelMatrix(input) => {
             model_matrix::evaluate(&input, rsdeseq2::matrix::MatrixOrder::RowMajor)

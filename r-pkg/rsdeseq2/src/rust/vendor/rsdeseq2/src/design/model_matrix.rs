@@ -73,6 +73,19 @@ struct Piece {
     full: bool,
 }
 
+/// An explicit column layout supplied by a native term parser. It uses the
+/// same variable preparation and product evaluation as the R-style term plan.
+pub(crate) struct PlannedColumn {
+    pub name: String,
+    pub assignment: usize,
+    pub pieces: Vec<ColumnPiece>,
+}
+pub(crate) struct ColumnPiece {
+    pub variable: usize,
+    pub column: usize,
+    pub full: bool,
+}
+
 /// Validated model-matrix schema. Terms contain one code per variable: zero
 /// omits it, one uses contrasts, and two uses full factor indicators. Within an
 /// interaction the first variable's columns vary fastest, as in R model.matrix.
@@ -86,6 +99,54 @@ pub struct ModelMatrixPlan<'a> {
     response_dropped: bool,
 }
 impl<'a> ModelMatrixPlan<'a> {
+    pub(crate) fn from_columns(
+        samples: usize,
+        variables: &[ModelMatrixVariable<'a>],
+        columns: Vec<PlannedColumn>,
+    ) -> Result<Self, DeseqError> {
+        let mut plan = Self::new(samples, variables, &[], false)?;
+        samples
+            .checked_mul(columns.len())
+            .ok_or_else(|| invalid("model matrix shape overflow"))?;
+        for column in columns {
+            if column.name.contains('\0') {
+                return Err(invalid("model matrix column names must contain no NUL"));
+            }
+            let pieces = column
+                .pieces
+                .into_iter()
+                .map(|piece| {
+                    let variable = plan.variables.get(piece.variable).ok_or_else(|| {
+                        invalid("model matrix piece variable is outside the plan")
+                    })?;
+                    let width = match &variable.data {
+                        VariableData::Numeric(matrix) => matrix.n_cols(),
+                        VariableData::Factor {
+                            levels, contrasted, ..
+                        } => {
+                            if piece.full {
+                                levels.len()
+                            } else {
+                                contrasted.names.len()
+                            }
+                        }
+                    };
+                    if piece.column >= width {
+                        return Err(invalid("model matrix piece column is outside its variable"));
+                    }
+                    Ok(Piece {
+                        variable: piece.variable,
+                        column: piece.column,
+                        full: piece.full,
+                    })
+                })
+                .collect::<Result<Vec<_>, DeseqError>>()?;
+            plan.assignments.push(column.assignment);
+            plan.columns.push(pieces);
+            plan.names.push(column.name);
+        }
+        Ok(plan)
+    }
     /// Prepare a matrix without copying numeric input matrices. An absent
     /// intercept promotes the first participating factor to full indicators.
     /// Terms may be empty, yielding an intercept-only or zero-column matrix.
@@ -320,7 +381,7 @@ impl<'a> ModelMatrixPlan<'a> {
                             if piece.full {
                                 (level == piece.column) as u8 as f64
                             } else {
-                                contrasted.values[level * contrasted.names.len() + piece.column]
+                                contrasted.value(level, piece.column)
                             }
                         }
                     };
@@ -347,4 +408,67 @@ fn numeric_suffixes(columns: usize, names: Option<&[String]>) -> Result<Vec<Stri
             .map(<[String]>::to_vec)
             .unwrap_or_else(|| (1..=columns).map(|n| n.to_string()).collect())
     })
+}
+
+#[cfg(test)]
+mod explicit_columns_tests {
+    use super::*;
+    use crate::matrix::MatrixOrder;
+
+    #[test]
+    fn explicit_column_pieces_are_validated_before_materialization() {
+        let values = [1.0, -0.0];
+        let variable = ModelMatrixVariable::Numeric {
+            name: "x",
+            values: MatrixView::new(2, 1, &values, MatrixOrder::RowMajor).unwrap(),
+            names: None,
+        };
+        for (name, variable_index, column) in [("x", 1, 0), ("x", 0, 1), ("x\0", 0, 0)] {
+            assert!(
+                ModelMatrixPlan::from_columns(
+                    2,
+                    &[variable],
+                    vec![PlannedColumn {
+                        name: name.into(),
+                        assignment: 1,
+                        pieces: vec![ColumnPiece {
+                            variable: variable_index,
+                            column,
+                            full: false
+                        }],
+                    }]
+                )
+                .is_err()
+            );
+        }
+        let result = ModelMatrixPlan::from_columns(
+            2,
+            &[variable],
+            vec![
+                PlannedColumn {
+                    name: "intercept".into(),
+                    assignment: 0,
+                    pieces: vec![],
+                },
+                PlannedColumn {
+                    name: "x".into(),
+                    assignment: 1,
+                    pieces: vec![ColumnPiece {
+                        variable: 0,
+                        column: 0,
+                        full: false,
+                    }],
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            result
+                .values()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>(),
+            [1.0f64, 1.0, 1.0, -0.0].map(f64::to_bits)
+        );
+    }
 }

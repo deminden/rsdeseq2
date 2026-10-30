@@ -83,64 +83,52 @@ fn formula_transform_close_index(after_open: &str) -> Result<usize, DeseqError> 
 struct FormulaNumericTransform {
     name: &'static str,
     label: &'static str,
-    apply: fn(f64) -> f64,
 }
 
 const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 11] = [
     FormulaNumericTransform {
         name: "poly",
         label: "poly",
-        apply: std::convert::identity,
     },
     FormulaNumericTransform {
         name: "scale",
         label: "scale",
-        apply: std::convert::identity,
     },
     FormulaNumericTransform {
         name: "log10",
         label: "log10",
-        apply: f64::log10,
     },
     FormulaNumericTransform {
         name: "log1p",
         label: "log1p",
-        apply: f64::ln_1p,
     },
     FormulaNumericTransform {
         name: "log2",
         label: "log2",
-        apply: f64::log2,
     },
     FormulaNumericTransform {
         name: "sqrt",
         label: "sqrt",
-        apply: f64::sqrt,
     },
     FormulaNumericTransform {
         name: "as.numeric",
         label: "as.numeric",
-        apply: std::convert::identity,
     },
     FormulaNumericTransform {
         name: "as.double",
         label: "as.double",
-        apply: std::convert::identity,
     },
     FormulaNumericTransform {
         name: "as.integer",
         label: "as.integer",
-        apply: std::convert::identity,
     },
     FormulaNumericTransform {
         name: "log",
         label: "log",
-        apply: f64::ln,
     },
     FormulaNumericTransform {
         name: "I",
         label: "I",
-        apply: std::convert::identity,
     },
 ];
 
@@ -262,8 +250,12 @@ fn formula_numeric_function_term(
     let (numeric_text, base) = formula_numeric_function_arguments(transform, expression)?;
     let numeric_name = formula_variable_name(numeric_text.trim())?;
     if matches!(transform.label, "as.numeric" | "as.double" | "as.integer") {
-        if let Some(covariate) = maybe_formula_numeric_covariate(Some(numeric_name), numeric_covariates)? {
-            return formula_numeric_covariate_function_values(transform, expression, covariate, base);
+        if let Some(covariate) =
+            maybe_formula_numeric_covariate(Some(numeric_name), numeric_covariates)?
+        {
+            return formula_numeric_covariate_function_values(
+                transform, expression, covariate, base,
+            );
         }
         return formula_factor_numeric_coercion_term(transform, expression, numeric_name, factors);
     }
@@ -278,27 +270,15 @@ fn formula_numeric_covariate_function_values(
     base: Option<f64>,
 ) -> Result<(String, Vec<f64>), DeseqError> {
     let numeric_name = covariate.name;
-    let mut values = Vec::with_capacity(covariate.values.len());
-    for (idx, value) in covariate.values.iter().copied().enumerate() {
-        let transformed = if transform.name == "as.integer" {
-            super::numeric_transform::integer_covariate(value).map_err(|error| DeseqError::InvalidOptions {
-                reason: format!("formula transform '{}({expression})' at sample {idx}: {error}", transform.label),
-            })?
-        } else if let Some(base) = base {
-            value.log(base)
-        } else {
-            (transform.apply)(value)
-        };
-        if !transformed.is_finite() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform '{}({expression})' produced non-finite value at sample {idx}",
-                    transform.label
-                ),
-            });
-        }
-        values.push(transformed);
+    let mut arguments = vec![(Some("x"), formula_numeric_value(covariate.values))];
+    if let Some(base) = base {
+        arguments.push((Some("base"), super::expression::Value::scalar(base)));
     }
+    let values = formula_call_values(
+        transform.name,
+        arguments,
+        &format!("{}({expression})", transform.label),
+    )?;
     let name = if let Some(base) = base {
         format!("{numeric_name}_log_base_{}", formula_numeric_label(base))
     } else {
@@ -315,23 +295,36 @@ fn formula_factor_numeric_coercion_term(
 ) -> Result<(String, Vec<f64>), DeseqError> {
     let factor = find_formula_factor(factor_name, factors)?;
     let levels = formula_factor_code_levels(factor);
-    let values = factor
-        .sample_levels
-        .iter()
-        .enumerate()
-        .map(|(sample, level)| {
-            levels
-                .iter()
-                .position(|candidate| candidate == level)
-                .map(|idx| idx as f64 + 1.0)
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform '{}({expression})' has sample level '{}' outside factor levels at sample {sample}",
-                        transform.label, level
-                    ),
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    use super::expression::{Argument, Data, Expression, Value};
+    let text = |v: &[String]| {
+        Expression::Literal(Value::new(Data::Text(
+            v.iter().cloned().map(Some).collect(),
+        )))
+    };
+    let input = Expression::Call {
+        function: "factor".into(),
+        arguments: vec![
+            Argument {
+                name: Some("x".into()),
+                expression: text(factor.sample_levels),
+            },
+            Argument {
+                name: Some("levels".into()),
+                expression: text(&levels),
+            },
+        ],
+    };
+    let expression_ast = Expression::Call {
+        function: transform.name.into(),
+        arguments: vec![Argument {
+            name: None,
+            expression: input,
+        }],
+    };
+    let values = formula_expression_values(
+        &expression_ast,
+        &format!("{}({expression})", transform.label),
+    )?;
     Ok((format!("{}_{}", factor.factor, transform.label), values))
 }
 
@@ -423,12 +416,18 @@ fn formula_numeric_function_arguments(
 
 fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
-    let parsed = value.parse::<f64>().map_err(|_| DeseqError::InvalidOptions {
-        reason: format!("formula transform 'log({expression})' base must be finite and positive"),
-    })?;
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| DeseqError::InvalidOptions {
+            reason: format!(
+                "formula transform 'log({expression})' base must be finite and positive"
+            ),
+        })?;
     if !parsed.is_finite() || parsed <= 0.0 || parsed == 1.0 {
         return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'log({expression})' base must be finite and positive"),
+            reason: format!(
+                "formula transform 'log({expression})' base must be finite and positive"
+            ),
         });
     }
     Ok(parsed)
@@ -451,7 +450,9 @@ fn find_formula_numeric_covariate<'a>(
         [] => {}
         _ => {
             return Err(DeseqError::InvalidOptions {
-                reason: format!("formula numeric covariate '{numeric_name}' appears more than once"),
+                reason: format!(
+                    "formula numeric covariate '{numeric_name}' appears more than once"
+                ),
             });
         }
     }

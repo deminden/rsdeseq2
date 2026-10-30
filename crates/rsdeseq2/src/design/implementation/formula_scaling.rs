@@ -29,12 +29,7 @@ fn formula_numeric_scale_term(
             continue;
         }
         if let Some(value) = normalized.strip_prefix("scale=") {
-            reject_duplicate_formula_transform_argument(
-                scale_seen,
-                "scale",
-                "scale",
-                expression,
-            )?;
+            reject_duplicate_formula_transform_argument(scale_seen, "scale", "scale", expression)?;
             scale_seen = true;
             scale = parse_formula_scale_option(value, "scale", expression)?;
             continue;
@@ -64,10 +59,7 @@ fn formula_numeric_scale_term(
                 }
                 "scale" => {
                     reject_duplicate_formula_transform_argument(
-                        scale_seen,
-                        "scale",
-                        "scale",
-                        expression,
+                        scale_seen, "scale", "scale", expression,
                     )?;
                     scale_seen = true;
                     scale = parse_formula_scale_option(value, "scale", expression)?;
@@ -118,22 +110,24 @@ fn formula_numeric_scale_term(
     let numeric_name = formula_variable_name(numeric_text.trim())?;
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;
-    let centers;
-    let divisors;
-    let center_policy = match center {
-        FormulaScaleOption::Auto => super::numeric_transform::ScalePolicy::Automatic,
-        FormulaScaleOption::Disabled => super::numeric_transform::ScalePolicy::Disabled,
-        FormulaScaleOption::Explicit(value) => { centers = [value]; super::numeric_transform::ScalePolicy::Supplied(&centers) },
+    let option_value = |option| match option {
+        FormulaScaleOption::Auto => {
+            super::expression::Value::new(super::expression::Data::Logical(vec![Some(true)]))
+        }
+        FormulaScaleOption::Disabled => {
+            super::expression::Value::new(super::expression::Data::Logical(vec![Some(false)]))
+        }
+        FormulaScaleOption::Explicit(value) => super::expression::Value::scalar(value),
     };
-    let scale_policy = match scale {
-        FormulaScaleOption::Auto => super::numeric_transform::ScalePolicy::Automatic,
-        FormulaScaleOption::Disabled => super::numeric_transform::ScalePolicy::Disabled,
-        FormulaScaleOption::Explicit(value) => { divisors = [value]; super::numeric_transform::ScalePolicy::Supplied(&divisors) },
-    };
-    let matrix = crate::matrix::MatrixView::new(covariate.values.len(), 1, covariate.values, crate::matrix::MatrixOrder::ColumnMajor)?;
-    let values = super::numeric_transform::scale_covariates(matrix, center_policy, scale_policy)
-        .map_err(|error| DeseqError::InvalidOptions { reason: format!("formula transform 'scale({expression})': {error}") })?
-        .values.into_values();
+    let values = formula_call_values(
+        "scale",
+        vec![
+            (Some("x"), formula_numeric_value(covariate.values)),
+            (Some("center"), option_value(center)),
+            (Some("scale"), option_value(scale)),
+        ],
+        &format!("scale({expression})"),
+    )?;
     let label = match (center, scale) {
         (FormulaScaleOption::Auto, FormulaScaleOption::Auto) => "scale",
         (FormulaScaleOption::Disabled, FormulaScaleOption::Auto) => "scale_uncentered",
