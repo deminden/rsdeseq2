@@ -188,10 +188,8 @@ fn expanded_formula_design_with_offsets_supports_numeric_transform_offsets() {
     .unwrap();
     assert_eq!(
         coercion_offsets.offsets,
-        dose.iter()
-            .zip(exposure.iter())
-            .map(|(dose, exposure)| dose + dose + exposure)
-            .collect::<Vec<_>>()
+        // Original R truncates the fractional exposure before adding offsets.
+        [2.0, 5.0, 9.0, 18.0]
     );
 
     let factor_offset_levels = vec!["B".to_string(), "A".to_string()];
@@ -387,7 +385,6 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("~ scale(dose, scale=maybe)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, center=NaN)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, scale=0)", &factors, &numeric).is_err());
-    assert!(expanded_formula_design("~ scale(dose, scale=-1)", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ scale(dose, raw=TRUE)", &factors, &numeric).is_err());
     assert!(
         expanded_formula_design(

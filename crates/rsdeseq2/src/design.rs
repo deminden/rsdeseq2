@@ -6,6 +6,7 @@
 mod formula_origin;
 mod implementation;
 mod model_matrix;
+pub mod numeric_transform;
 mod origin;
 
 pub use implementation::*;
