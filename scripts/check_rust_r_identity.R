@@ -248,3 +248,44 @@ for(name in names(zeroCases)) for(mode in c("raw","normal","t")) {
     projection=TRUE,zeros=TRUE)
   compareIdentity(paste0("zero_",name,"_",mode),input,lapply(actual,hexVector))
 }
+
+# Cross-interface prepared batches, including mixed raw/Normal/t requests and
+# both layouts. A 65-request public call additionally crosses a native chunk.
+batchRequests <- lapply(seq_len(65L),function(i) {
+  mode <- (i-1L) %% 3L
+  list(contrast=c(-1,1,0)*if(i %% 2L)1 else -2,
+    threshold=if(mode==0L)NULL else .75,alternative="greater",
+    df=if(mode==2L)c(.5,10,NaN,100)else NULL,
+    zero=c("character","numeric","none")[[mode+1L]],numerator="B",denominator="A")
+})
+batchInput <- list(genes=4L,coefficients=3L,beta=strings(as.vector(t(projectionBeta))),
+  se=strings(as.vector(t(projectionSE))),
+  covariance=strings(unlist(lapply(1:4,function(g)as.vector(t(projectionCov[g,,]))))),
+  samples=6L,counts=as.list(as.integer(t(zeroCounts))),design=strings(as.vector(t(zeroDesign))),
+  levels=as.list(rep(c("A","B","C"),each=2)),
+  requests=lapply(batchRequests,function(r) {
+    r$contrast <- strings(r$contrast);r["threshold"] <- list(if(is.null(r$threshold))NULL else sprintf("%.17g",r$threshold))
+    r["df"] <- list(if(is.null(r$df))NULL else strings(r$df));r
+  }))
+transport <- lapply(batchRequests,function(r)list(contrast=r$contrast,
+  wald=if(is.null(r$threshold))NULL else list(threshold=r$threshold,alternative=4L,useT=!is.null(r$df),df=r$df),
+  zero=if(r$zero=="none")NULL else if(r$zero=="numeric")list(rule=1L,counts=zeroCounts,design=zeroDesign)else
+    list(rule=2L,counts=zeroCounts,sampleLevels=rep(c("A","B","C"),each=2),numerator="B",denominator="A")))
+actual <- withoutRCalculations(c(
+  .Call("rsdeseq2_contrast_batch",projectionBeta,projectionSE,projectionCov,transport[1:64],PACKAGE="rsdeseq2"),
+  .Call("rsdeseq2_contrast_batch",projectionBeta,projectionSE,projectionCov,transport[65],PACKAGE="rsdeseq2")),projection=TRUE,zeros=TRUE)
+compareIdentity("prepared_batch_65",batchInput,list(results=lapply(actual,function(r)lapply(r[sort(names(r))],hexVector))))
+
+publicFit <- waldFitRust(rep(20,4),projectionBeta,betaSE=projectionSE,betaCovariance=projectionCov,
+  counts=zeroCounts,modelMatrix=zeroDesign,sampleLevels=rep(c("A","B","C"),each=2),
+  resultsNames=c("Intercept","condition_B_vs_A","condition_C_vs_A"))
+publicRequests <- lapply(seq_len(65L),function(i)list(contrast=c(-1,1,0)*if(i%%2L)1 else -2,
+  lfcThreshold=.75,altHypothesis="greater",independentFiltering=FALSE,
+  useT=i%%3L==0L,degreesOfFreedom=if(i%%3L==0L)c(.5,10,NaN,100)else NULL))
+publicInput <- batchInput
+publicInput$requests <- lapply(publicRequests,function(r)list(contrast=strings(r$contrast),threshold=".75",
+  alternative="greater",df=if(r$useT)strings(r$degreesOfFreedom)else NULL,
+  zero="numeric",numerator="B",denominator="A"))
+publicActual <- withoutRCalculations(resultsList(publicFit,publicRequests,batchSize=32L),projection=TRUE,zeros=TRUE)
+compareIdentity("public_batch_65",publicInput,list(results=lapply(publicActual,function(r)
+  lapply(as.list(r[c("lfcSE","log2FoldChange","pvalue","stat")]),hexVector))))

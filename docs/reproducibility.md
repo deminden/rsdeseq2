@@ -301,3 +301,9 @@ unchanged when checking a candidate; see the [memory report](memory-improvements
 The [Rust-only wrapper migration](rust-only-wrapper-migration.md) records the
 replacement contract and its required direct cross-interface equality checks.
 The previous R-backed request implementation and its acceptance claims were withdrawn.
+The replacement [bounded result-batch checkpoint](rust-only-result-batches-2026-10-30.md)
+uses the standalone engine, preserves those historical artifacts, and records
+its own source package, executable hashes, exact comparisons and paired
+measurements. `scripts/check_rust_r_identity.R` compares IEEE-754 output bits
+against the Rust-only `evaluate_r_interface` example, including 65-request
+batches across the native chunk boundary.

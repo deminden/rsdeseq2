@@ -335,145 +335,21 @@
   NA_character_
 }
 
-.rsdeseq2_results_primitive_wald_fit <- function(object,
-                                                 contrast,
-                                                 name,
-                                                 listValues,
-                                                 reference,
-                                                 lfcThreshold,
-                                                 altHypothesis,
-                                                 useT,
-                                                 degreesOfFreedom,
-                                                 alpha,
-                                                 independentFiltering) {
-  resultsNames <- object$resultsNames
-  reference <- reference %||% .rsdeseq2_reference_for_character_contrast(object, contrast)
-  contrast <- .rsdeseq2_canonicalize_character_contrast(object, contrast)
-  reference <- .rsdeseq2_canonicalize_character_contrast_reference(object, contrast, reference)
-  if (is.null(contrast)) {
-    if (is.null(name)) {
-      if (length(resultsNames) < 2L) {
-        stop("default results require at least two result names", call. = FALSE)
-      }
-      name <- resultsNames[[length(resultsNames)]]
-    }
-    coefficient <- .rsdeseq2_resolve_results_name_index(name, resultsNames)
-    numericContrast <- numeric(length(resultsNames))
-    numericContrast[[coefficient]] <- 1
-    names(numericContrast) <- resultsNames
-    resultName <- resultsNames[[coefficient]]
-    comparison <- sprintf("coefficient %s", resultName)
-    allZero <- list(type = "none")
-  } else {
-    resolved <- resolveResultsContrastRust(
-      contrast = contrast,
-      resultsNames = resultsNames,
-      listValues = listValues,
-      reference = reference
-    )
-    numericContrast <- resolved$numeric
-    resultName <- resolved$resultName
-    comparison <- resolved$comparison
-    allZero <- resolved$allZero
-  }
-
-  waldOptions <- .rsdeseq2_validate_wald_result_options(
-    lfcThreshold = lfcThreshold,
-    altHypothesis = altHypothesis,
-    useT = useT,
-    degreesOfFreedom = degreesOfFreedom,
-    nGenes = nrow(object$beta)
-  )
-  wald <- .rsdeseq2_wald_from_primitive_fit(object, numericContrast, waldOptions, allZero)
-  out <- resultsTableRust(
-    baseMean = object$baseMean,
-    log2FoldChange = wald$log2FoldChange,
-    lfcSE = wald$lfcSE,
-    stat = wald$stat,
-    pvalue = wald$pvalue,
-    contrast = numericContrast,
-    rowNames = object$rowNames
-  )
-  attr(out, "resultName") <- resultName
-  attr(out, "comparison") <- comparison
-  attr(out, "contrastAllZero") <- allZero$type
-  attr(out, "lfcThreshold") <- waldOptions$lfcThreshold
-  attr(out, "altHypothesis") <- waldOptions$altHypothesis
-  if (!is.null(waldOptions$degreesOfFreedom)) {
-    attr(out, "degreesOfFreedom") <- waldOptions$degreesOfFreedom
-  }
-  applyIndependentFilteringRust(
-    out,
-    alpha = alpha,
-    enabled = independentFiltering
-  )
+.rsdeseq2_results_primitive_wald_fit <- function(object, contrast, name, listValues, reference,
+    lfcThreshold, altHypothesis, useT, degreesOfFreedom, alpha, independentFiltering) {
+  prepared <- .rsdeseq2_prepare_result_request(object, list(contrast=contrast,name=name,
+    listValues=listValues,reference=reference,lfcThreshold=lfcThreshold,altHypothesis=altHypothesis,
+    useT=useT,degreesOfFreedom=degreesOfFreedom,alpha=alpha,independentFiltering=independentFiltering), FALSE)
+  raw <- .rsdeseq2_wald_from_primitive_fit(object,prepared$selector$numeric,
+    prepared$wald,prepared$selector$allZero)
+  .rsdeseq2_format_primitive_result(object,prepared,raw)
 }
 
-.rsdeseq2_results_primitive_lrt_fit <- function(object,
-                                                contrast,
-                                                name,
-                                                listValues,
-                                                reference,
-                                                lfcThreshold,
-                                                altHypothesis,
-                                                useT,
-                                                degreesOfFreedom,
-                                                alpha,
-                                                independentFiltering) {
-  if (!is.numeric(lfcThreshold) || length(lfcThreshold) != 1L || !is.finite(lfcThreshold) || lfcThreshold != 0 ||
-    !identical(altHypothesis, "greaterAbs") || isTRUE(useT) || !is.null(degreesOfFreedom)) {
-    stop("lfcThreshold, altHypothesis, useT, and degreesOfFreedom are only supported for Wald results", call. = FALSE)
-  }
-  resultsNames <- object$resultsNames
-  reference <- reference %||% .rsdeseq2_reference_for_character_contrast(object, contrast)
-  contrast <- .rsdeseq2_canonicalize_character_contrast(object, contrast)
-  reference <- .rsdeseq2_canonicalize_character_contrast_reference(object, contrast, reference)
-  if (is.null(contrast)) {
-    if (is.null(name)) {
-      if (length(resultsNames) < 2L) {
-        stop("default results require at least two result names", call. = FALSE)
-      }
-      name <- resultsNames[[length(resultsNames)]]
-    }
-    coefficient <- .rsdeseq2_resolve_results_name_index(name, resultsNames)
-    numericContrast <- numeric(length(resultsNames))
-    numericContrast[[coefficient]] <- 1
-    names(numericContrast) <- resultsNames
-    resultName <- resultsNames[[coefficient]]
-    comparison <- sprintf("coefficient %s; LRT full vs reduced", resultName)
-    allZero <- list(type = "none")
-  } else {
-    resolved <- resolveResultsContrastRust(
-      contrast = contrast,
-      resultsNames = resultsNames,
-      listValues = listValues,
-      reference = reference
-    )
-    numericContrast <- resolved$numeric
-    resultName <- resolved$resultName
-    comparison <- sprintf("%s; LRT full vs reduced", resolved$comparison)
-    allZero <- resolved$allZero
-  }
-
-  lrt <- .rsdeseq2_lrt_from_primitive_fit(object, numericContrast, allZero)
-  out <- resultsTableRust(
-    baseMean = object$baseMean,
-    log2FoldChange = lrt$log2FoldChange,
-    lfcSE = lrt$lfcSE,
-    stat = object$lrtStat,
-    pvalue = object$lrtPvalue,
-    contrast = numericContrast,
-    rowNames = object$rowNames
-  )
-  attr(out, "resultName") <- resultName
-  attr(out, "comparison") <- comparison
-  attr(out, "contrastAllZero") <- allZero$type
-  if (!is.null(object$lrtDf)) {
-    attr(out, "lrtDf") <- object$lrtDf
-  }
-  applyIndependentFilteringRust(
-    out,
-    alpha = alpha,
-    enabled = independentFiltering
-  )
+.rsdeseq2_results_primitive_lrt_fit <- function(object, contrast, name, listValues, reference,
+    lfcThreshold, altHypothesis, useT, degreesOfFreedom, alpha, independentFiltering) {
+  prepared <- .rsdeseq2_prepare_result_request(object, list(contrast=contrast,name=name,
+    listValues=listValues,reference=reference,lfcThreshold=lfcThreshold,altHypothesis=altHypothesis,
+    useT=useT,degreesOfFreedom=degreesOfFreedom,alpha=alpha,independentFiltering=independentFiltering), TRUE)
+  raw <- .rsdeseq2_lrt_from_primitive_fit(object,prepared$selector$numeric,prepared$selector$allZero)
+  .rsdeseq2_format_primitive_result(object,prepared,raw)
 }

@@ -9,20 +9,7 @@
 #include "contrast_zero.h"
 
 static SEXP context_field(SEXP context, const char *name) {
-    SEXP names = Rf_getAttrib(context, R_NamesSymbol);
-    if (TYPEOF(context) != VECSXP || TYPEOF(names) != STRSXP || XLENGTH(names) != XLENGTH(context))
-        Rf_error("contrast zero context must be a named list");
-    SEXP value = R_NilValue;
-    int found = 0;
-    for (R_xlen_t i = 0; i < XLENGTH(context); ++i) {
-        if (STRING_ELT(names, i) == NA_STRING) Rf_error("contrast zero context names cannot be missing");
-        if (!strcmp(CHAR(STRING_ELT(names, i)), name)) {
-            if (found) Rf_error("duplicate contrast zero context field: %s", name);
-            value = VECTOR_ELT(context, i);
-            found = 1;
-        }
-    }
-    return value;
+    return named_list_field(context, name, "contrast zero context");
 }
 
 static const char *level_string(SEXP values, R_xlen_t index, const char *name) {

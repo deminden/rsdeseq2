@@ -48,77 +48,19 @@ results <- function(object,
     ))
   }
   if (inherits(object, "rsdeseq2RustFit")) {
-    if (is.null(contrast) && is.null(name) &&
-        identical(as.numeric(lfcThreshold), 0) && identical(altHypothesis, "greaterAbs") &&
-        !isTRUE(useT) && is.null(degreesOfFreedom)) {
-      out <- applyIndependentFilteringRust(
-        .rsdeseq2_fit_cooks_policy(object$results, object, cooksCutoff, cached = TRUE),
-        alpha = alpha,
-        enabled = independentFiltering
-      )
-      if (!isTRUE(independentFiltering)) out$filtered <- NULL
-      if (identical(object$test, "Wald")) {
-        resultName <- utils::tail(object$resultsNames, 1L)
-        comparison <- sprintf("coefficient %s", resultName)
-      } else {
-        resultName <- utils::tail(object$resultsNames, 1L)
-        comparison <- sprintf("coefficient %s; LRT full vs reduced", resultName)
-      }
-      metadata <- list(
-        resultName = resultName,
-        comparison = comparison,
-        test = object$test,
-        contrastAllZero = "none",
-        lfcThreshold = 0,
-        altHypothesis = "greaterAbs",
-        contrast = NULL,
-        alpha = alpha,
-        lrtDf = object$lrtDf,
-        independentFiltering = attr(out, "independentFiltering"),
-        cooksReplacement = .rsdeseq2_cooks_replacement_metadata(object)
-      )
-      return(.rsdeseq2_finalize_result_metadata(out, metadata, object))
+    args <- list(contrast=contrast,name=name,listValues=listValues,reference=reference,
+      lfcThreshold=lfcThreshold,altHypothesis=altHypothesis,useT=useT,degreesOfFreedom=degreesOfFreedom,
+      alpha=alpha,independentFiltering=independentFiltering,cooksCutoff=cooksCutoff)
+    if(.rsdeseq2_cached_result_request(args)) {
+      return(.rsdeseq2_finish_fitted_result(object,args,object$results,cached=TRUE))
     }
-    primitive <- if (identical(object$test, "LRT")) {
-      nbinomLRTRust(object = object)
-    } else {
-      nbinomWaldTestRust(object = object)
-    }
-    out <- results(
-      object = primitive,
-      contrast = contrast,
-      name = name,
-      listValues = listValues,
-      reference = reference,
-      lfcThreshold = lfcThreshold,
-      altHypothesis = altHypothesis,
-      useT = useT,
-      degreesOfFreedom = degreesOfFreedom,
-      alpha = alpha,
-      independentFiltering = FALSE,
-      cooksCutoff = FALSE
-    )
-    out <- .rsdeseq2_fit_cooks_policy(out, object, cooksCutoff)
-    out <- applyIndependentFilteringRust(out, alpha = alpha, enabled = independentFiltering)
-    metadata <- attr(out, "metadata")
-    if (is.null(metadata)) {
-      metadata <- list(
-        resultName = attr(out, "resultName"),
-        comparison = attr(out, "comparison"),
-        test = object$test,
-        contrastAllZero = attr(out, "contrastAllZero"),
-        contrast = attr(out, "contrast"),
-        lfcThreshold = attr(out, "lfcThreshold"),
-        altHypothesis = attr(out, "altHypothesis"),
-        degreesOfFreedom = attr(out, "degreesOfFreedom"),
-        lrtDf = attr(out, "lrtDf"),
-        alpha = alpha,
-        independentFiltering = attr(out, "independentFiltering")
-      )
-    }
-    metadata$independentFiltering <- attr(out, "independentFiltering")
-    metadata$cooksReplacement <- .rsdeseq2_cooks_replacement_metadata(object)
-    return(.rsdeseq2_finalize_result_metadata(out, metadata, object))
+    lrt <- identical(object$test,"LRT")
+    primitive <- if(lrt)nbinomLRTRust(object=object) else nbinomWaldTestRust(object=object)
+    prepared <- .rsdeseq2_prepare_result_request(primitive,args,lrt)
+    raw <- if(lrt) .rsdeseq2_lrt_from_primitive_fit(primitive,prepared$selector$numeric,prepared$selector$allZero) else
+      .rsdeseq2_wald_from_primitive_fit(primitive,prepared$selector$numeric,prepared$wald,prepared$selector$allZero)
+    out <- .rsdeseq2_format_primitive_result(primitive,prepared,raw,adjust=FALSE)
+    return(.rsdeseq2_finish_fitted_result(object,args,out))
   }
   if (inherits(object, "rsdeseq2PrimitiveWaldFit")) {
     return(.rsdeseq2_results_primitive_wald_fit(

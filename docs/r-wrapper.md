@@ -9,6 +9,24 @@ gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
 are composed from retained base normalization once; repeated fitting reuses that
 provenance. Older offset fits without it may require the original input.
 
+`resultsList()` evaluates several requests after one fitted-dataset validation:
+
+```r
+tables <- rsdeseq2::resultsList(dds, list(
+  forward = list(contrast = c("condition", "B", "A")),
+  reverse = list(contrast = c("condition", "A", "B"), alpha = 0.05),
+  unmasked = list(name = tail(rsdeseq2::resultsNames(dds), 1L), cooksCutoff = FALSE)
+), batchSize = 32L)
+```
+
+Each entry accepts `results()` arguments and overrides common arguments passed
+in `...`, including an explicit `NULL`. Names and order are preserved, and each
+table has the same values, classes and metadata as its individual call. Native
+inference borrows shared arrays in chunks of at most 64 requests (default 32);
+filtering and Cook's decisions remain separate for every request. Primitive
+Wald/LRT fits and supported list inputs are also accepted. See the
+[batch implementation and validation](rust-only-result-batches-2026-10-30.md).
+
 `nproc` controls a reusable local worker pool for fitting, replacement refits and
 transforms, including frozen rlog. The `strict`, `fast` and `diagnostic` mode
 names currently share the strict numerical algorithm; they do not select
