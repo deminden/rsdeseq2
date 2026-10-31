@@ -1,0 +1,10 @@
+{
+  "observed_utc": "2026-10-31T14:25:10.840840+00:00",
+  "uptime": "14:25  up 2 days,  2:40, 1 user, load averages: 6.61 10.98 7.50",
+  "observation": "At the first timed contrast, Spotlight metadata indexing processes collectively used over 40% CPU; the candidate took 7.59 s. No builds or independent fitting tasks from this work were running. Preserve the entire pass without reruns.",
+  "later_observation": {
+    "observed_utc": "2026-10-31T14:33:47.769323+00:00",
+    "uptime": "14:33  up 2 days,  2:49, 1 user, load averages: 33.19 15.43 9.80",
+    "observation": "A separate virtual-machine process used about 170% CPU and separate Rust compiler processes were active; load average reached 32.51. The blocked fourth-split baseline took 21.10 s versus 7.69 s for candidate. No builds/fits from this task overlap measurement. Performance cannot be certified from this pass."
+  }
+}

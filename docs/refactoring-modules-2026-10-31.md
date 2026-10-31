@@ -46,3 +46,24 @@ build-normalized DESCRIPTION. The tested native CLI has SHA-256
 `ce1194830a7eb4f1055beeda4053a12335b33f78de3a07c2dc0e0d3aca2a8e18`.
 Earlier sanitizer checks apply to their recorded pre-refactor artifacts; no fresh
 sanitizer run is claimed for this source-only rearrangement.
+
+## Performance status
+
+The paired native timing run was stopped after extreme external contention made
+its result unsuitable for checking unchanged speed. Nine of eleven contrasts
+completed, with 28 timed processes retained; the R workflow timing panel did
+not start. The observed machine load reached 60 or more, with a separate
+virtual machine and Rust compilers consuming CPU. In the fourth blocked split,
+the previous binary took 21.10 s and the candidate 7.69 s; in the fifth, those
+figures were 10.25 s and 26.05 s. These are not evidence of an isolated speed
+change. No unchanged case was retimed and no optimization round is claimed.
+**Speed and memory parity remain unverified by this measurement.**
+
+Evidence is retained in the [validation record](data/refactor_modules_2026-10-31_validation.json),
+[GTEx precision gates](data/refactor_modules_2026-10-31_gtex_precision.tsv),
+[global gates](data/refactor_modules_2026-10-31_gtex_global_precision.tsv),
+[22 export identities](data/refactor_modules_2026-10-31_native_output_identity.tsv),
+[partial timings](data/refactor_modules_2026-10-31_partial_native_timings.tsv),
+[background observation](data/refactor_modules_2026-10-31_background_observation.json)
+and [interruption record](data/refactor_modules_2026-10-31_interruption.json).
+The [previously prepared 0.4.0 bundle](release-0.4.0.md) predates this refactor.
