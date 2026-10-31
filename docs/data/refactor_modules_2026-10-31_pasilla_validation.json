@@ -16,11 +16,11 @@
   },
   "binaries": {
     "baseline": {
-      "path": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/release-0.4.0-candidate-v1/rsdeseq2",
+      "path": "results/codebase_improvements/release-0.4.0-candidate-v1/rsdeseq2",
       "sha256": "c41f9357e61ef612ec53bc6f45ae930f05e4782afb30d4710e3b2f2294376dfa"
     },
     "candidate": {
-      "path": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/refactor-2026-10-31-candidate/rsdeseq2",
+      "path": "results/codebase_improvements/refactor-2026-10-31-candidate/rsdeseq2",
       "sha256": "ce1194830a7eb4f1055beeda4053a12335b33f78de3a07c2dc0e0d3aca2a8e18"
     }
   },

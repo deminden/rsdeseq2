@@ -42,7 +42,9 @@ are compared after their explicit validated column mapping.
 
 The crate archive includes 499 verified source, test and example files; the R
 source archive contains 333 verified source members, excluding its
-build-normalized DESCRIPTION. The tested native CLI has SHA-256
+build-normalized DESCRIPTION. These artifacts were checked at `413b524`; a
+subsequent cleanup removed trailing blank lines from four R source files and
+normalized machine-specific paths in the published evidence. The tested native CLI has SHA-256
 `ce1194830a7eb4f1055beeda4053a12335b33f78de3a07c2dc0e0d3aca2a8e18`.
 Earlier sanitizer checks apply to their recorded pre-refactor artifacts; no fresh
 sanitizer run is claimed for this source-only rearrangement.

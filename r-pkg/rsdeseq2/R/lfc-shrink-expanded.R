@@ -134,4 +134,3 @@
     standardInterceptIndex = match("Intercept", standardNames)
   )
 }
-
