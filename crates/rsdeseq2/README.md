@@ -14,7 +14,8 @@ It is not a drop-in replacement for the complete Bioconductor API.
 
 ## Install
 
-Add the library to a Rust project:
+Add the published library to a Rust project. The published version may differ
+from the 0.4.0 candidate measured below:
 
 ```bash
 cargo add rsdeseq2

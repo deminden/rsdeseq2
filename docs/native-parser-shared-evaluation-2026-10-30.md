@@ -1,5 +1,9 @@
 # Native formula parsing uses the shared numerical engine
 
+This is a historical checkpoint. Its factor/class limitations were subsequently
+addressed in the [0.4.0 candidate](release-0.4.0.md); the statements below
+describe the earlier parser and its measurements.
+
 The native string-formula parser now translates its numeric transforms and
 matrix columns into the same Rust operations used by the primitive interface
 and R wrapper. The parser retains its existing grammar, aliases, coefficient

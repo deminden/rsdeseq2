@@ -1,5 +1,9 @@
 # Implementation Plan
 
+This document records the original implementation checklist. For the current
+status and remaining work, see the [completion audit](codebase-improvement-completion-audit-2026-10-29.md)
+and [Rust-only wrapper migration](rust-only-wrapper-migration.md).
+
 This plan keeps `rsdeseq2` close to DESeq2 while preserving a clean Rust
 implementation. An optional ignored DESeq2 source checkout may be placed at
 `external/DESeq2` for inspection; no DESeq2 source is vendored or translated
@@ -305,8 +309,9 @@ line by line.
   levels when needed.
 - [x] Nested factor-valued formula transforms for the supported primitive
   subset, including `factor(relevel(...))`, `ordered(relevel(...))`,
-  `relevel(ordered(...))`, and `droplevels(ordered(...))`, preserving
-  formula-local references after relabeling or dropped-level pruning.
+  and `droplevels(ordered(...))`. `relevel(ordered(...))` is rejected, matching
+  R's ordered-factor behavior; dropped levels reset the reference as documented
+  in the [compatibility matrix](compatibility.md).
 - [x] Primitive `offset(numeric)` and single-vector supported transform offset
   formula extraction, such as `offset(log2(numeric))` and
   `offset(I(numeric + other_numeric))`, into per-sample log-offset vectors

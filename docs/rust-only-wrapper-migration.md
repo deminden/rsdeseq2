@@ -104,6 +104,9 @@ contains 51 matrix/frame cases and nine expanded-factor recoding cases. Expanded
 factor recoding for normal shrinkage also moves out of R. General warning/method
 semantics, frozen local VST reuse, optional posterior/s-value calculations,
 the redundant initial BH pass and final authority/performance audit remain open.
+The [frozen-local VST audit](frozen-local-vst-audit-2026-10-31.md) identifies
+the saved locfit representation and custom-closure cases that the next port
+must address.
 
 The [standalone batch checkpoint](rust-only-result-batches-2026-10-30.md) restores
 `resultsList()` using `PreparedContrastView` and bounded native chunks. Both
