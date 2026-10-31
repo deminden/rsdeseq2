@@ -1,0 +1,48 @@
+# Module refactoring — 2026-10-31
+
+This change reorganizes the candidate after `9d4482d`. It does not complete the
+[Rust-only wrapper migration](rust-only-wrapper-migration.md) or constitute a
+new published release.
+
+## Changes
+
+- VST fast-subset preparation and local integration/FMM spline calculations
+  have separate private modules, with their existing public exports retained.
+- Lowess calculation is separated from independent-filter selection. Cook's
+  replacement/refit planning and robust trimmed variance are private modules.
+- The CLI's Wald and LRT branches are separate handlers under the existing
+  staging/publish transaction.
+- R's normal, ashr and apeglm shrinkage handlers and expanded-design preparation
+  are separate source files; their function bodies are byte-identical to the
+  previous combined file.
+- The large IRLS and contrast integration-test files are organized by behavior.
+  All 46 IRLS and 51 contrast test functions remain present.
+
+The moved VST, lowess and Cook's kernel source matches the prior source apart
+from module visibility and formatting; arithmetic expressions and their order are
+unchanged. Public Rust paths and R exports are retained. The R package vendors
+exactly the same reorganized core source.
+
+## Numerical and package checks
+
+The full Rust suite passes 1,072 tests, the backend passes three, and the
+checked R source package passes 2,615 assertions with no failures, warnings or
+skips. Root and backend all-target Clippy checks with warnings denied, Rust
+1.97.1 checks, vendor integrity and the Python suite (46 tests, one platform
+skip) pass. The two reorganized integration suites retain and pass all 97 test
+functions.
+
+All 121 per-contrast and nine global frozen GTEx precision gates pass; all 22
+result/diagnostic exports are byte-identical to the preceding 0.4.0 candidate.
+The independent Pasilla Wald/LRT comparison passes its bounds and all eight
+result, diagnostic, coefficient and SE exports are exact. Direct standalone/R
+checks pass 189 primitive, 188 expression, 54 native-formula, 51 factor-frame
+and nine expanded-factor cases. Formula APIs with different public label order
+are compared after their explicit validated column mapping.
+
+The crate archive includes 499 verified source, test and example files; the R
+source archive contains 333 verified source members, excluding its
+build-normalized DESCRIPTION. The tested native CLI has SHA-256
+`ce1194830a7eb4f1055beeda4053a12335b33f78de3a07c2dc0e0d3aca2a8e18`.
+Earlier sanitizer checks apply to their recorded pre-refactor artifacts; no fresh
+sanitizer run is claimed for this source-only rearrangement.

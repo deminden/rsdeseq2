@@ -9,6 +9,8 @@ include!("implementation/paths.rs");
 
 // Top-level CLI dispatch and command execution.
 include!("implementation/run.rs");
+mod run_lrt;
+mod run_wald;
 
 // CLI result adapters and beta-prior analysis builders.
 include!("implementation/analysis.rs");
