@@ -28,7 +28,8 @@ local VST reuse and optional ashr/apeglm posterior calculations still involve R.
 
 ## Install and Run
 
-Install the released CLI from crates.io:
+Install the published CLI from crates.io. This installs the published version,
+which may differ from the 0.4.0 candidate described below:
 
 ```bash
 cargo install rsdeseq2 --locked
@@ -120,7 +121,7 @@ estimateSizeFactorsRust(counts, native = TRUE)
 | Ratio and `poscounts` normalization | Supported | Includes supplied geometric means, control genes, normalized counts, base metadata, and normalization-factor offsets |
 | Wald and LRT result workflows | Supported for documented paths | Supplied-dispersion GLMs and implemented native-dispersion branches; coefficient, list, and numeric contrasts; Normal and t tails |
 | Diagnostics and result assembly | Supported for documented paths | Cook's diagnostics and replacement/refitting, independent filtering, adjusted p-values, and result metadata |
-| Transformations and priors | Supported for documented paths | Mean, parametric, and local VST; rlog; normal, `ashr`, and `apeglm` shrinkage; selected formula/model-frame workflows. Formula interactions and some transformed-factor contrast forms are unsupported |
+| Transformations and priors | Supported for documented paths | Mean, parametric, and local VST; rlog; normal, `ashr`, and `apeglm` shrinkage; selected formula/model-frame workflows. Normal shrinkage with formula interactions and some transformed-factor contrast forms are unsupported |
 | R package | Partial | Matrix, list, and limited `DESeqDataSet` Wald/LRT fits with fitted assays, row/result metadata, and eligible Cook's replacement/refits; dataset transforms return Bioconductor transform objects and selected `lfcShrink` methods return `DESeqResults`. Additional Bioconductor semantics remain unsupported |
 | Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, plotting, arbitrary R expressions, or complete object-mutation and metadata semantics |
 

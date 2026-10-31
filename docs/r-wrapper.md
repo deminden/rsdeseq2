@@ -1,7 +1,9 @@
 # R Backend
 
-Unreleased correctness changes are recorded in the
-[implementation progress report](codebase-improvement-progress-2026-10-29.md).
+The [0.4.0 candidate report](release-0.4.0.md) records the current validation and
+remaining Rust-only migration work. The earlier
+[implementation progress report](codebase-improvement-progress-2026-10-29.md)
+describes its historical checkpoint.
 Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
 (disabled), or a non-negative finite cutoff, and rejects unused arguments.
 Dataset result/shrinkage access validates retained fit inputs and maps unique
@@ -44,8 +46,10 @@ repository root with `scripts/sync_r_vendor.sh` before making a source release.
 `DESeq()` and `fitRust()` run dispersion estimation, GLM fitting, Wald tests,
 and likelihood-ratio tests in Rust. They accept a count matrix plus an explicit
 numeric design matrix, a list containing `counts` and `design`, or a
-Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. Formula
-designs are expanded with R's `model.matrix()` and passed to Rust. The fit
+Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. R parses
+formula metadata; supported expressions, model frames, offsets and matrix
+values are evaluated by the shared Rust core. Custom formula functions are
+rejected before execution. The fit
 retains coefficient estimates and covariance, so `results()` supports named
 coefficients and DESeq2-style contrasts as well as the default result table.
 Matrix and list inputs return an `rsdeseq2RustFit` list. A `DESeqDataSet` input
@@ -72,8 +76,8 @@ DESeq2 fitting and result option. Use `rsdeseq2::results()` and
 replacement method for `DESeq2::results()`.
 
 For dataset transformations, `vst()`, `varianceStabilizingTransformation()`,
-and `rlog()` return Bioconductor `DESeqTransform` objects and run the trend,
-VST, or rlog computations in Rust. They support blind and design-aware
+and `rlog()` return Bioconductor `DESeqTransform` objects. Their main trend,
+VST and rlog computations run in Rust. They support blind and design-aware
 dispersion fitting, normalization factors, observation weights, and formula
 offsets. Fast `vst()` selects its subset by ordinary normalized-count means,
 including for weighted datasets, and errors when fewer than `nsub` genes
@@ -81,16 +85,17 @@ qualify. Rlog can also reuse supplied frozen intercepts and a shared sample
 prior variance. Full-data VST reuses existing frozen parametric/mean
 dispersion-function parameters in Rust. For a frozen local trend, R evaluates
 the existing function on DESeq2's 999-point grid and Rust integrates the
-sampled curve. Design-aware rlog reuses an existing `dispFit` column when
+sampled curve. The [frozen-local audit](frozen-local-vst-audit-2026-10-31.md)
+explains the remaining R calculations and closure limitations. Design-aware rlog reuses an existing `dispFit` column when
 `blind=FALSE`. Broader local-VST and fast-subset edge cases remain open.
 
 `lfcShrink()` currently accepts a dataset fitted by `rsdeseq2::DESeq()` and
 either a coefficient name/index or an expanded-design factor-level, numeric, or
 list contrast. Coefficient lookup accepts exact names and unambiguous
 DESeq2-cleaned aliases, including for transformed-factor formulas. The
-`type="normal"` contrast route builds the DESeq2-style
-expanded model in R, then estimates priors, refits, and tests the posterior
-contrast in Rust. Numeric contrasts require a supplied result table; list
+`type="normal"` contrast route prepares expanded-design metadata in R and uses
+Rust for factor recoding, matrix values, prior estimation, refitting and the
+posterior contrast. Numeric contrasts require a supplied result table; list
 contrasts average selected coefficients and need supplied results when their
 names are absent from the unshrunk design. Optional `type="ashr"` shrinkage
 uses the ashr package for posterior means/SDs and s-values. Optional
@@ -98,6 +103,8 @@ uses the ashr package for posterior means/SDs and s-values. Optional
 posterior SDs and s-values, but not contrasts. Formula interactions are
 rejected for normal shrinkage. Factor-level contrast syntax for transformed
 factors remains unsupported when DESeq2 cannot resolve its coefficient names.
+Ordered factors use polynomial coefficients; choose a named coefficient or a
+numeric contrast instead of a treatment-style factor-level contrast.
 
 The package also exposes primitive matrix helpers:
 
@@ -133,8 +140,8 @@ where `maxCooks > cooksCutoff`, recomputes BH-adjusted p-values, and can apply
 the DESeq2 two-group low-count Cook's heuristic when the caller supplies raw
 `counts`, per-sample `cooks`, and has already established the one-factor
 two-level formula condition. It does not inspect DESeqDataSet objects or infer
-formula semantics. The masking and low-count heuristic step use the registered
-`.Call` bridge; R assembles the output table and computes BH-adjusted p-values.
+formula semantics. Masking, the low-count heuristic and BH adjustment use the
+Rust backend; R assembles the output table.
 When p-values carry gene names, named
 `maxCooks`, count rows, and Cook's rows are aligned to that order before
 masking; named Cook's columns are aligned to named count columns before the
@@ -279,10 +286,9 @@ also consume list-like primitive or fitted-object
 LRT fields directly and internally package them through `nbinomLRTRust()`.
 
 `applyIndependentFilteringRust()` applies baseMean-driven filtered BH
-adjustment to a primitive result data frame. It uses the same default theta-grid
-shape as the Rust core, candidate cutoffs from R type-7 quantiles, BH adjustment
-after filtering, and `stats::lowess(..., f = 1/5)` metadata for threshold
-selection. The returned data frame gets a `filtered` column and an
+adjustment to a primitive result data frame. The Rust core computes the default
+theta grid, R-compatible type-7 quantiles, BH adjustments and lowess fit used
+for threshold selection. The returned data frame gets a `filtered` column and an
 `independentFiltering` attribute with theta, rejection counts, selected
 threshold, lowess fit, and alpha. This helper does not inspect DESeqDataSet
 objects.
