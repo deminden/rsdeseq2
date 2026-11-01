@@ -33,7 +33,22 @@ impl Evaluator<'_> {
                     value.data,
                     Data::Number { integer: true, .. } | Data::Logical(_) | Data::Null
                 );
-                for v in value.flattened().numeric()? {
+                let input = value.flattened().numeric()?;
+                #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+                let input = if input
+                    .iter()
+                    .filter(|value| !remove || !value.is_nan())
+                    .all(|value| value.is_finite())
+                {
+                    // R rounds each argument's extended reduction before the
+                    // binary64 accumulation across variadic arguments.
+                    vec![crate::design::numeric_transform::column_sum(
+                        input.into_iter().filter(|value| !remove || !value.is_nan()),
+                    )]
+                } else {
+                    input
+                };
+                for v in input {
                     if !remove || !v.is_nan() {
                         missing |= is_na(v);
                         if !total.is_nan() {
