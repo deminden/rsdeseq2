@@ -1,5 +1,12 @@
 # rsdeseq2 0.4.0
 
+* Match Linux original-R extended reductions, polynomial BLAS rounding and
+  per-argument sum precision in Rust. Independently regenerate six exact Linux
+  formula reference panels under a fixed Haswell reference kernel.
+* Preserve quantification precision and paired workflow payloads. Reference and
+  compatibility R CI, full GTEx replay and all five release targets pass.
+* Retain the visible R CMD check warning for Rust runtime termination symbols.
+
 * Share formula arithmetic, model-frame preparation, offsets and model-matrix
   calculations between the standalone Rust core and the R interface. Reject
   custom formula functions before execution; supported built-ins use Rust.

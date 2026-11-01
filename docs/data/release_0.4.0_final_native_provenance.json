@@ -1,0 +1,22 @@
+{
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.9.6",
+  "rust_threads": 1,
+  "blas_threads": 1,
+  "repeats": 1,
+  "binary_sha256": "ea197ba12ba7c1ae2391408f60fd1215fe8d3ab5754db9cd4a18743d9dbbea72",
+  "rscript": "Rscript (deseq2-r462-native)",
+  "baseline_binary_sha256": "226642cab9ecaaed0bef2f920189a7f7b2c48966983467440adb2e6e7c940b3c",
+  "baseline_label": "85faa3c before extended-precision fixes",
+  "tool_order": "alternates by contrast/repetition; rotates all three tools when a baseline is supplied",
+  "timing_scope": "process startup, input parsing, full native Wald fit and result TSV output",
+  "diagnostic_validation_scope": "separate untimed native fits; exact result and diagnostic hashes required",
+  "memory_metric": "per-process maximum resident set size, normalized to MiB (2^20 bytes)",
+  "memory_scope": "entire fitting process, including interpreter/libraries, input data and native allocations",
+  "time_command": [
+    "/usr/bin/time",
+    "-l"
+  ],
+  "cpu_model": "Apple M5"
+}
