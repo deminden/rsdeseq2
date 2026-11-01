@@ -1,0 +1,75 @@
+name: Linux candidate diagnostics
+on:
+  push:
+    branches: [codex/linux-diagnostics-7770534]
+permissions:
+  contents: read
+jobs:
+  rust-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "7770534650cbb45146697fa719b433137221e002"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run all Rust tests even after failures
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --workspace --no-fail-fast 2>&1 | tee linux-rust-diagnostics.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-rust-diagnostics
+          path: linux-rust-diagnostics.log
+          if-no-files-found: ignore
+  r-reference:
+    runs-on: ubuntu-latest
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.r-library-reference
+      MAKEFLAGS: -j2
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "7770534650cbb45146697fa719b433137221e002"
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.2'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran
+      - run: mkdir -p "$R_LIBS_USER"
+      - uses: actions/cache@v4
+        id: reference-cache
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
+      - name: Restore verified reference environment
+        run: python scripts/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
+      - run: R CMD build r-pkg/rsdeseq2
+      - name: Check package
+        id: package-check
+        continue-on-error: true
+        run: R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
+      - name: Print complete failure diagnostics
+        if: always()
+        shell: bash
+        run: |
+          if [ -f rsdeseq2.Rcheck/tests/testthat.Rout.fail ]; then cat rsdeseq2.Rcheck/tests/testthat.Rout.fail; fi
+          if [ -f rsdeseq2.Rcheck/00check.log ]; then cat rsdeseq2.Rcheck/00check.log; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-r-reference-diagnostics
+          path: |
+            rsdeseq2.Rcheck/tests/testthat.Rout*
+            rsdeseq2.Rcheck/00check.log
+          if-no-files-found: ignore
+      - name: Report package-check failure
+        if: steps.package-check.outcome == 'failure'
+        run: exit 1
