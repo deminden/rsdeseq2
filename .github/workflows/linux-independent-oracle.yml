@@ -38,6 +38,9 @@ jobs:
           mkdir -p independent-oracle
           Rscript --vanilla scripts/generate_formula_expression_reference.R independent-oracle/formula.json
           Rscript --vanilla scripts/generate_model_matrix_reference.R independent-oracle/model.json
+          Rscript --vanilla scripts/generate_extended_formula_reference.R independent-oracle/extended.json
+          Rscript --vanilla scripts/generate_numeric_transform_reference.R independent-oracle/numeric.json
+          Rscript --vanilla scripts/generate_native_formula_reference.R independent-oracle/native.json
           Rscript --vanilla -e 'writeLines(capture.output(sessionInfo()), "independent-oracle/session.txt")'
       - uses: actions/upload-artifact@v4
         with:
