@@ -23,7 +23,11 @@ pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
         (left_even + right_even) + (left_odd + right_odd)
     };
     for index in blocks * 32..x.len() {
-        sum = x[index].mul_add(y[index], sum);
+        sum = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            sum + x[index] * y[index]
+        } else {
+            x[index].mul_add(y[index], sum)
+        };
     }
     sum
 }
@@ -50,4 +54,15 @@ fn norm_binary64(x: &[f64]) -> f64 {
         }
     }
     scale * squares.sqrt()
+}
+
+pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
+    let vector_end = x.len() / 16 * 16;
+    for (i, (v, &x)) in y.iter_mut().zip(x).enumerate() {
+        *v = if cfg!(all(target_os = "linux", target_arch = "x86_64")) && i >= vector_end {
+            *v + weight * x
+        } else {
+            weight.mul_add(x, *v)
+        };
+    }
 }
