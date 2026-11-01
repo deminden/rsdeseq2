@@ -70,6 +70,91 @@ fn built_in_expressions_match_independent_r_values_and_metadata() {
 fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
     compare_reference(include_str!("data/formula_expression_extended_r462.json"));
 }
+
+#[test]
+fn sum_preserves_r_missing_precedence_across_nan_orders() {
+    let na = f64::from_bits(0x7ff0_0000_0000_07a2);
+    let linux_x86 = cfg!(all(target_os = "linux", target_arch = "x86_64"));
+    let generated_nan = if linux_x86 {
+        0xfff8_0000_0000_0000
+    } else {
+        f64::NAN.to_bits()
+    };
+    let options = EvaluationOptions::default();
+    for (values, expected) in [
+        (vec![na, f64::NAN], 0x7ff8_0000_0000_07a2),
+        (
+            vec![f64::NAN, na],
+            if linux_x86 {
+                f64::NAN.to_bits()
+            } else {
+                0x7ff8_0000_0000_07a2
+            },
+        ),
+        (
+            vec![f64::INFINITY, f64::NEG_INFINITY, na],
+            if linux_x86 {
+                generated_nan
+            } else {
+                0x7ff8_0000_0000_07a2
+            },
+        ),
+    ] {
+        let input = Expression::Literal(Value::numbers(values));
+        let result = evaluate(&call("sum", vec![input]), &[], &options).unwrap();
+        let Data::Number { values, .. } = result.data else {
+            panic!("sum must return a number");
+        };
+        assert_eq!(values[0].to_bits(), expected);
+    }
+    let input = Expression::Literal(Value::numbers(vec![f64::INFINITY, f64::NEG_INFINITY]));
+    let result = evaluate(&call("sum", vec![input]), &[], &options).unwrap();
+    let Data::Number { values, .. } = result.data else {
+        panic!("sum must return a number");
+    };
+    assert_eq!(values[0].to_bits(), generated_nan);
+    let payload = f64::from_bits(0x7ff8_0000_0000_1234);
+    for (input, expected) in [
+        (vec![payload, f64::NAN], payload.to_bits()),
+        (vec![f64::NAN, payload], f64::NAN.to_bits()),
+        (
+            vec![f64::INFINITY, f64::NEG_INFINITY, payload],
+            generated_nan,
+        ),
+    ] {
+        let input = Expression::Literal(Value::numbers(input));
+        let result = evaluate(&call("sum", vec![input]), &[], &options).unwrap();
+        let Data::Number { values, .. } = result.data else {
+            panic!("sum must return a number");
+        };
+        assert_eq!(values[0].to_bits(), expected);
+    }
+}
+
+#[test]
+fn mean_preserves_r_missing_and_nan_order() {
+    let na = f64::from_bits(0x7ff0_0000_0000_07a2);
+    let options = EvaluationOptions::default();
+    let linux_x86 = cfg!(all(target_os = "linux", target_arch = "x86_64"));
+    for (values, expected) in [
+        (vec![na, f64::NAN], 0x7ff8_0000_0000_07a2),
+        (
+            vec![f64::NAN, na],
+            if linux_x86 {
+                0x7ff8_0000_0000_07a2
+            } else {
+                f64::NAN.to_bits()
+            },
+        ),
+    ] {
+        let input = Expression::Literal(Value::numbers(values));
+        let result = evaluate(&call("mean", vec![input]), &[], &options).unwrap();
+        let Data::Number { values, .. } = result.data else {
+            panic!("mean must return a number");
+        };
+        assert_eq!(values[0].to_bits(), expected);
+    }
+}
 fn compare_reference(contents: &str) {
     let reference: Json = serde_json::from_str(contents).unwrap();
     let variables = reference["variables"]
