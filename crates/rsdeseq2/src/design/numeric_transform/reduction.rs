@@ -6,9 +6,14 @@
 //! BLAS the calling frontend happens to load. Rust and R use the same schedule.
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    if std::arch::is_x86_feature_detected!("avx512f") {
-        return dot_skylake(x, y);
+    {
+        dot_skylake(x, y)
     }
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    dot_binary64(x, y)
+}
+#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
     let block_width = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         16
     } else {
@@ -41,7 +46,7 @@ pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
 pub(super) fn norm(x: &[f64]) -> f64 {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
-        return super::extended::norm(x);
+        super::extended::norm(x)
     }
     #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
     norm_binary64(x)

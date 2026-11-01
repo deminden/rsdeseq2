@@ -194,7 +194,7 @@ pub fn integer_covariate(value: f64) -> Result<f64, DeseqError> {
 pub(super) fn scalar_mean(values: &[f64]) -> f64 {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
-        return extended::mean(values);
+        extended::mean(values)
     }
     #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
     scalar_mean_binary64(values)
