@@ -15,6 +15,23 @@ jobs:
         run: |
           set -o pipefail
           cargo test --locked --workspace --no-fail-fast 2>&1 | tee oracle-comparison.log
+      - name: Quantify model matrix differences
+        if: always()
+        shell: bash
+        run: |
+          cargo build --locked -p rsdeseq2 --example evaluate_r_interface
+          python3 - <<'PYCODE'
+          import json,subprocess,struct,math,tempfile
+          r=json.load(open('crates/rsdeseq2/tests/data/model_matrix_r462.json'))
+          for case in r['cases']:
+              if case['name'].startswith('ordered_') or case['name']=='orthogonal_poly':
+                  with tempfile.NamedTemporaryFile(mode='w',suffix='.json') as f:
+                      json.dump(case,f); f.flush()
+                      out=json.loads(subprocess.check_output(['target/debug/examples/evaluate_r_interface',f.name],text=True))
+                  decode=lambda s:struct.unpack('>d',bytes.fromhex(s))[0]
+                  pairs=list(zip(map(decode,out['values']),map(decode,case['expected'])))
+                  print(case['name'], 'max_abs=',max(abs(a-b) for a,b in pairs), 'unequal=',sum(a!=b for a,b in pairs),'/',len(pairs))
+          PYCODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
