@@ -307,3 +307,9 @@ its own source package, executable hashes, exact comparisons and paired
 measurements. `scripts/check_rust_r_identity.R` compares IEEE-754 output bits
 against the Rust-only `evaluate_r_interface` example, including 65-request
 batches across the native chunk boundary.
+
+## Linux formula references
+
+The Linux x86_64 formula panels retain exact independent R bits under a fixed
+reference BLAS kernel. See [Linux numerical parity](linux_numerical_parity.md)
+for the environment, generator command, and extended-precision reductions.
