@@ -8,7 +8,7 @@ the AVX512 requirement of the earlier Cooperlake diagnostic kernel.
 The existing macOS references remain unchanged. All comparisons retain exact
 floating-point bits, attributes, input order, and rejection decisions.
 
-Linux R accumulates means, column sums, and BLAS vector norms using x87 extended
+Linux R accumulates means, finite per-argument sums, column sums, and BLAS vector norms using x87 extended
 precision. The Rust core implements those reductions directly, retaining the
 extended result until R's corresponding conversion to binary64. Polynomial QR
 uses the reference kernel's reduction order and fused operations. The scalar

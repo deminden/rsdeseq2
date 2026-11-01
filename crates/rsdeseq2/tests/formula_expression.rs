@@ -340,3 +340,20 @@ fn rejects_custom_calls_even_in_unused_branches_and_validates_owned_inputs() {
             .contains("nesting exceeds 128")
     );
 }
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn sum_cancellation_retains_r_argument_rounding_boundaries() {
+    let options = EvaluationOptions::default();
+    // Original R rsum accumulates one vector in LDOUBLE, then do_summary
+    // combines the individually rounded arguments in binary64.
+    let vector = Expression::Literal(Value::numbers(vec![1e16, 1.0, -1e16]));
+    let single = evaluate(&call("sum", vec![vector]), &[], &options).unwrap();
+    assert_eq!(single, Value::scalar(1.0));
+    let arguments = [1e16, 1.0, -1e16]
+        .into_iter()
+        .map(|x| Expression::Literal(Value::scalar(x)))
+        .collect();
+    let separate = evaluate(&call("sum", arguments), &[], &options).unwrap();
+    assert_eq!(separate, Value::scalar(0.0));
+}
