@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent model.matrix references; never loads rsdeseq2.
-stopifnot(getRversion()=="4.6.2",packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args <- commandArgs(TRUE)
 allLevels <- "--all-levels" %in% args
 args <- args[args!="--all-levels"]
@@ -77,6 +77,6 @@ averages<-lapply(names(averageSpecs),function(name){x<-averageSpecs[[name]];sele
  if(valid){if(length(x$p))value[x$p+1L]<-1/length(x$p);if(length(x$n))value[x$n+1L]<- -1/length(x$n)}
  list(name=name,coefficients=7L,positive=as.list(x$p),negative=as.list(x$n),expected=if(valid)hexes(value)else NULL)
 })
-ref<-list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),
+ref<-list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),
  purpose="Independent stats::model.matrix assembly and expanded list-contrast means; expression evaluation tested separately"),cases=cases,average_contrasts=averages)
 for(path in paths){dir.create(dirname(path),recursive=TRUE,showWarnings=FALSE);jsonlite::write_json(ref,path,pretty=TRUE,auto_unbox=TRUE,null="null",digits=NA);cat("Wrote",path,"\n")}

@@ -1,5 +1,5 @@
 test_that("shared model-matrix assembly preserves independently frozen values and order", {
-  r<-jsonlite::fromJSON(test_path("data","model_matrix_r462.json"),simplifyVector=FALSE)
+  r<-jsonlite::fromJSON(.formula_reference_path(test_path("data"),"model_matrix_r462.json"),simplifyVector=FALSE)
   expect_length(r$cases,48L)
   for(case in r$cases) {
     input<-.model_reference_input(case)

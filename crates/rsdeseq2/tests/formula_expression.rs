@@ -1,3 +1,6 @@
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 use rsdeseq2::design::expression::{
     Argument, Data, EvaluationOptions, Expression, Value, evaluate,
 };
@@ -64,11 +67,11 @@ fn equal_value(actual: &Value, expected: &Value, path: &str) {
 }
 #[test]
 fn built_in_expressions_match_independent_r_values_and_metadata() {
-    compare_reference(include_str!("data/formula_expression_r462.json"));
+    compare_reference(formula_reference!("formula_expression_r462"));
 }
 #[test]
 fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
-    compare_reference(include_str!("data/formula_expression_extended_r462.json"));
+    compare_reference(formula_reference!("formula_expression_extended_r462"));
 }
 
 #[test]
@@ -196,7 +199,7 @@ fn compare_reference(contents: &str) {
 fn primitive_wire_preserves_reference_bits_and_rejects_truncation() {
     use rsdeseq2::design::expression::wire;
     let reference: Json =
-        serde_json::from_str(include_str!("data/formula_expression_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("formula_expression_r462")).unwrap();
     for (name, input) in reference["variables"].as_object().unwrap() {
         let original = value(input);
         let bytes = wire::encode(&original).unwrap();

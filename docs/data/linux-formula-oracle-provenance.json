@@ -1,0 +1,17 @@
+{
+  "R": "4.6.2",
+  "platform": "x86_64-pc-linux-gnu",
+  "OpenBLAS": "0.3.26",
+  "kernel": "Cooperlake",
+  "threads": 1,
+  "locale": "C.UTF-8",
+  "generator_run": "https://github.com/deminden/rsdeseq2/actions/runs/41309807388",
+  "source": "Original base/stats R; rsdeseq2 was never loaded; only the unused DESeq2 version guard was omitted in diagnostic copies.",
+  "files": {
+    "crates/rsdeseq2/tests/data/native_formula_r462_linux_x86_64.json": "ef2653976790dc71c28b3302bded7e45ccbb746980dae4701077d81fbdc0e438",
+    "crates/rsdeseq2/tests/data/numeric_transform_r462_linux_x86_64.json": "4cfccfdccbb758ea02b69ab75b198d2841259c27fd61f23232cd0575ec39f135",
+    "crates/rsdeseq2/tests/data/formula_expression_r462_linux_x86_64.json": "616da9cc867b0f7e6859e3af49853c5269394078e2dfc4a2801a3a43c05035f5",
+    "crates/rsdeseq2/tests/data/model_matrix_r462_linux_x86_64.json": "a49fa93dd06797a3be26ff92bed9bfb65382a2aa9a58fd1be7de2b00ae1f2b1f",
+    "crates/rsdeseq2/tests/data/formula_expression_extended_r462_linux_x86_64.json": "437439b913a95680524bbc87779c43cac824dbedfc05fc23820fd12443097f8b"
+  }
+}

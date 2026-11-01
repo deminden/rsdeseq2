@@ -1,3 +1,6 @@
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 #[path = "../examples/evaluate_r_interface/factor_expansion.rs"]
 mod factor_expansion;
 #[allow(dead_code)]
@@ -9,7 +12,7 @@ mod input;
 #[test]
 fn actual_native_formula_parser_matches_independent_r_matrix_and_offset_bits() {
     let reference: serde_json::Value =
-        serde_json::from_str(include_str!("data/native_formula_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("native_formula_r462")).unwrap();
     let input: input::Input = serde_json::from_value(reference.clone()).unwrap();
     let actual = input::evaluate(&input);
     let cases = reference["native_formula_cases"].as_array().unwrap();

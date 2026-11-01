@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent finite-fitting matrices/offsets from original R, never rsdeseq2.
-stopifnot(getRversion()=="4.6.2", packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args <- commandArgs(TRUE)
 script <- sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root <- normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
@@ -66,6 +66,6 @@ record("invalid_log","~log(x)")
 record("invalid_offset","~x+offset(log(x))")
 record("many_treatment","~many",c("Intercept",paste0("many_",levels(d$many)[-1L],"_vs_L001")))
 record("many_middle_reference","~relevel(many,ref='L064')",c("Intercept",paste0('relevel(many, ref = "L064")_',setdiff(levels(d$many),"L064"),"_vs_L064")))
-output <- list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),policy="Finite fitting covariates/offsets; original R matrix columns reordered only by explicit names; no fitting/rank threshold changed"),numeric=numeric,factors=factors,native_formula_cases=cases)
+output <- list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),policy="Finite fitting covariates/offsets; original R matrix columns reordered only by explicit names; no fitting/rank threshold changed"),numeric=numeric,factors=factors,native_formula_cases=cases)
 for(path in paths)jsonlite::write_json(output,path,auto_unbox=TRUE,null="null",pretty=TRUE,digits=NA)
 cat(length(cases),"independent native formula cases generated\n")
