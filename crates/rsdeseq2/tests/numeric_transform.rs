@@ -1,3 +1,6 @@
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 use rsdeseq2::design::numeric_transform::{
     PolynomialCoefficients, ScalePolicy, integer_covariate, polynomial_basis, scale_covariates,
 };
@@ -121,7 +124,7 @@ fn check_formula(case: &Case, input: &[f64]) {
 #[test]
 fn formula_transforms_match_independent_r_bits_and_invalid_output_decisions() {
     let reference: Reference =
-        serde_json::from_str(include_str!("data/numeric_transform_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("numeric_transform_r462")).unwrap();
     for case in reference.cases {
         let input = floats(&case.input);
         check_formula(&case, &input);

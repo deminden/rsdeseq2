@@ -2,7 +2,7 @@
 //!
 //! This is separate from fitting rank checks: changing the order/number of
 //! applied reflections changes the basis even when its span is unchanged.
-use super::super::numeric_transform::polynomial_qr;
+use super::super::numeric_transform::{column_sum, polynomial_qr};
 pub(super) fn contrasts(n: usize) -> Vec<f64> {
     let center = (n as f64 + 1.0) / 2.0;
     let columns = (0..n)
@@ -23,7 +23,7 @@ pub(super) fn contrasts(n: usize) -> Vec<f64> {
     let (columns, _) = polynomial_qr::basis(columns);
     let mut output = vec![0.0; n * (n - 1)];
     for column in 1..n {
-        let length = columns[column].iter().map(|v| v * v).sum::<f64>().sqrt();
+        let length = column_sum(columns[column].iter().map(|v| v * v)).sqrt();
         for row in 0..n {
             output[row * (n - 1) + column - 1] = columns[column][row] / length;
         }

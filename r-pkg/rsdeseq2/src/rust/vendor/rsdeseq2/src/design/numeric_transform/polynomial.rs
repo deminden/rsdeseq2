@@ -1,4 +1,4 @@
-use super::{invalid, polynomial_qr, scalar_mean};
+use super::{column_sum, invalid, polynomial_qr, scalar_mean};
 use crate::{errors::DeseqError, matrix::RowMajorMatrix};
 
 /// Recurrence metadata for evaluating the same polynomial basis on new values.
@@ -126,17 +126,11 @@ pub(in crate::design) fn polynomial_expression(
     }
     let norms = columns
         .iter()
-        .map(|c| c.iter().map(|x| x * x).sum::<f64>())
+        .map(|c| column_sum(c.iter().map(|x| x * x)))
         .collect::<Vec<_>>();
     let alpha = (0..degree)
         .map(|c| {
-            centered
-                .iter()
-                .zip(&columns[c])
-                .map(|(x, z)| x * (z * z))
-                .sum::<f64>()
-                / norms[c]
-                + mean
+            column_sum(centered.iter().zip(&columns[c]).map(|(x, z)| x * (z * z))) / norms[c] + mean
         })
         .collect();
     let mut norm2 = Vec::with_capacity(width + 1);

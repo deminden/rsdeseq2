@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent formula-transform references; never loads rsdeseq2.
-stopifnot(getRversion()=="4.6.2", packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args <- commandArgs(TRUE)
 script <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value=TRUE)[[1L]])
 root <- normalizePath(file.path(dirname(gsub("~+~", " ", script, fixed=TRUE)), ".."))
@@ -72,7 +72,7 @@ for(x in c(-3.9,-1.1,-.9,-0,0,.9,1.1,3.9,-2147483647.9,2147483647.9,-2147483648,
 scaling("scale_negative_divisor",c(-3,-.5,1,2,4,8),TRUE,-2)
 scaling("scale_negative_zeros_center_only",c(-0,-0),TRUE,FALSE)
 scaling("scale_negative_zeros_supplied",c(-0,-0),FALSE,-2)
-reference <- list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),
+reference <- list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),
   purpose="Independent finite formula covariates, polynomial QR/recurrence, scaling and integer coercion; invalid fitting outputs reject"),cases=cases)
 for(path in paths) {
   dir.create(dirname(path),recursive=TRUE,showWarnings=FALSE)

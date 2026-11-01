@@ -1,6 +1,6 @@
 test_that("formula transport retains every frozen independent primitive value", {
   for(file in c("formula_expression_r462.json","formula_expression_extended_r462.json")) {
-  reference <- jsonlite::fromJSON(test_path("data",file),simplifyVector=FALSE)
+  reference <- jsonlite::fromJSON(.formula_reference_path(test_path("data"),file),simplifyVector=FALSE)
   variables <- lapply(reference$variables,.formula_decode)
   expect_length(reference$cases,if(file=="formula_expression_r462.json")129L else 59L)
   for(case in reference$cases) {

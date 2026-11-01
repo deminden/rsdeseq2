@@ -23,6 +23,8 @@ jobs:
       R_LIBS_USER: ${{ github.workspace }}/.r-library-${{ matrix.lane }}
       MAKEFLAGS: -j2
       OPENBLAS_NUM_THREADS: '1'
+      OPENBLAS_CORETYPE: Cooperlake
+      LC_ALL: C.UTF-8
       OMP_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +55,9 @@ jobs:
         run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("testthat", "ashr", "BiocManager")); BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)'
       - name: Record environment
         run: Rscript -e 'print(sessionInfo())' > R-reference-session.txt
+      - name: Independently regenerate Linux formula references
+        if: matrix.lane == 'reference'
+        run: python scripts/check_linux_formula_references.py --output-dir regenerated-formula-references
       - name: Build package
         run: R CMD build r-pkg/rsdeseq2
       - name: Package check

@@ -5,6 +5,7 @@ if(length(args)!=3L)stop("usage: STANDALONE_DRIVER R_LIBRARY FRESH_OUTPUT_DIR")
 driver<-normalizePath(args[[1L]]);library(rsdeseq2,lib.loc=normalizePath(args[[2L]]))
 script<-sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root<-normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
+source(file.path(root,"r-pkg/rsdeseq2/tests/testthat/helper-reference-values.R"))
 source(file.path(root,"r-pkg/rsdeseq2/tests/testthat/helper-formula.R"))
 out<-args[[3L]]
 if(dir.exists(out))stop("Use a fresh identity output directory")
@@ -17,7 +18,7 @@ canonical<-function(x){
 total<-0L
 for(file in c("formula_expression_r462.json","formula_expression_extended_r462.json")) {
  panelOut<-file.path(out,sub(".json$","",file));dir.create(panelOut)
-reference<-jsonlite::fromJSON(file.path(root,"crates/rsdeseq2/tests/data",file),simplifyVector=FALSE)
+reference<-jsonlite::fromJSON(.formula_reference_path(file.path(root,"crates/rsdeseq2/tests/data"),file),simplifyVector=FALSE)
 input<-list(formula_cases=reference$cases,variables=reference$variables,collation=reference$metadata$collation)
 path<-file.path(panelOut,"input.json");jsonlite::write_json(input,path,auto_unbox=TRUE,null="null",digits=NA)
 output<-system2(driver,shQuote(normalizePath(path)),stdout=TRUE,stderr=TRUE)

@@ -398,7 +398,7 @@ for(case in preparationReference$rows) {
 testSources <- file.path(dirname(normalizePath(script)),"..","r-pkg/rsdeseq2/tests/testthat")
 source(file.path(testSources,"helper-reference-values.R"))
 source(file.path(testSources,"helper-model-matrix.R"))
-matrixReference <- jsonlite::fromJSON(file.path(testSources,"data","model_matrix_r462.json"),simplifyVector=FALSE)
+matrixReference <- jsonlite::fromJSON(.formula_reference_path(file.path(testSources,"data"),"model_matrix_r462.json"),simplifyVector=FALSE)
 for(case in matrixReference$cases) {
   frame <- .model_reference_frame(case)
   actual <- suppressWarnings(withoutRCalculations(rsdeseq2:::.rsdeseq2_model_matrix(~1,frame),projection=TRUE,zeros=TRUE,model=TRUE))
