@@ -1,0 +1,6365 @@
+{
+  "metadata": {
+    "R": "4.6.2",
+    "DESeq2": "not-installed-not-used",
+    "collation": "root"
+  },
+  "variables": {
+    "x": {
+      "type": "number",
+      "integer": false,
+      "values": [
+        "c000000000000000",
+        "bff0000000000000",
+        "8000000000000000",
+        "0000000000000000",
+        "3fd0000000000000",
+        "3fe0000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "4014000000000000",
+        "401c000000000000",
+        "4022000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    },
+    "y": {
+      "type": "number",
+      "integer": false,
+      "values": [
+        "3fd0000000000000",
+        "3fe0000000000000",
+        "3fe8000000000000",
+        "3ff0000000000000",
+        "3ff4000000000000",
+        "3ff8000000000000",
+        "3ffc000000000000",
+        "4000000000000000",
+        "4002000000000000",
+        "4004000000000000",
+        "4006000000000000",
+        "4008000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    },
+    "xi": {
+      "type": "number",
+      "integer": true,
+      "values": [
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "4010000000000000",
+        "4014000000000000",
+        "4018000000000000",
+        "401c000000000000",
+        "4020000000000000",
+        "4022000000000000",
+        "4024000000000000",
+        "4026000000000000",
+        "4028000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    },
+    "z": {
+      "type": "number",
+      "integer": false,
+      "values": [
+        "c000000000000000",
+        "bff0000000000000",
+        "7ff00000000007a2",
+        "0000000000000000",
+        "7ff8000000000000",
+        "3fe0000000000000",
+        "7ff0000000000000",
+        "4000000000000000",
+        "fff0000000000000",
+        "4014000000000000",
+        "401c000000000000",
+        "4022000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    },
+    "g": {
+      "type": "number",
+      "integer": true,
+      "values": [
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": {
+        "class": {
+          "type": "text",
+          "integer": false,
+          "values": [
+            "factor"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        },
+        "levels": {
+          "type": "text",
+          "integer": false,
+          "values": [
+            "C",
+            "B",
+            "A"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        }
+      }
+    },
+    "orderedg": {
+      "type": "number",
+      "integer": true,
+      "values": [
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "3ff0000000000000",
+        "4000000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": {
+        "class": {
+          "type": "text",
+          "integer": false,
+          "values": [
+            "ordered",
+            "factor"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        },
+        "levels": {
+          "type": "text",
+          "integer": false,
+          "values": [
+            "C",
+            "B",
+            "A"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        }
+      }
+    },
+    "ch": {
+      "type": "text",
+      "integer": false,
+      "values": [
+        "A",
+        "a",
+        "ä",
+        "b",
+        "x",
+        "X",
+        "a-b",
+        "a_b",
+        "2",
+        "10",
+        null,
+        "é"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    },
+    "M": {
+      "type": "number",
+      "integer": false,
+      "values": [
+        "c000000000000000",
+        "3fd0000000000000",
+        "bff0000000000000",
+        "3fe0000000000000",
+        "8000000000000000",
+        "3fe8000000000000",
+        "0000000000000000",
+        "3ff0000000000000",
+        "3fd0000000000000",
+        "3ff4000000000000",
+        "3fe0000000000000",
+        "3ff8000000000000",
+        "3ff0000000000000",
+        "3ffc000000000000",
+        "4000000000000000",
+        "4000000000000000",
+        "4008000000000000",
+        "4002000000000000",
+        "4014000000000000",
+        "4004000000000000",
+        "401c000000000000",
+        "4006000000000000",
+        "4022000000000000",
+        "4008000000000000"
+      ],
+      "dimensions": [
+        12,
+        2
+      ],
+      "names": null,
+      "dimnames": [
+        [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7",
+          "s8",
+          "s9",
+          "s10",
+          "s11",
+          "s12"
+        ],
+        [
+          "x",
+          "y"
+        ]
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": {}
+    },
+    "NM": {
+      "type": "number",
+      "integer": true,
+      "values": [
+        "3ff0000000000000",
+        "4008000000000000",
+        "4014000000000000",
+        "4000000000000000",
+        "4010000000000000",
+        "4018000000000000"
+      ],
+      "dimensions": [
+        2,
+        3
+      ],
+      "names": [
+        "a",
+        "c",
+        "e",
+        "b",
+        "d",
+        "f"
+      ],
+      "dimnames": [],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": {}
+    },
+    "coefficients": {
+      "type": "list",
+      "integer": false,
+      "values": [
+        {
+          "type": "number",
+          "integer": false,
+          "values": [
+            "4000800000000000",
+            "4013cea2936396fd"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        },
+        {
+          "type": "number",
+          "integer": false,
+          "values": [
+            "3ff0000000000000",
+            "4028000000000000",
+            "405ed10000000001",
+            "40914529e241023a"
+          ],
+          "dimensions": null,
+          "names": null,
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": []
+        }
+      ],
+      "dimensions": null,
+      "names": [
+        "alpha",
+        "norm2"
+      ],
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": {}
+    },
+    "multiCoefficients": {
+      "type": "list",
+      "integer": false,
+      "values": [
+        {
+          "type": "list",
+          "integer": false,
+          "values": [
+            {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "4000800000000000",
+                "4013cea2936396fd"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "dimname_names": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3ff0000000000000",
+                "4028000000000000",
+                "405ed10000000001",
+                "40914529e241023a"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "dimname_names": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          ],
+          "dimensions": null,
+          "names": [
+            "alpha",
+            "norm2"
+          ],
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": {}
+        },
+        {
+          "type": "list",
+          "integer": false,
+          "values": [
+            {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3ffa000000000000",
+                "3ff9ffffffffffff"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "dimname_names": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3ff0000000000000",
+                "4028000000000000",
+                "4021e00000000002",
+                "4014daaaaaaaaaad"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "dimname_names": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          ],
+          "dimensions": null,
+          "names": [
+            "alpha",
+            "norm2"
+          ],
+          "dimnames": [
+            null,
+            null
+          ],
+          "dimname_names": [
+            null,
+            null
+          ],
+          "attributes": {}
+        }
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    }
+  },
+  "cases": [
+    {
+      "name": "sum_integer",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "xi"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "4053800000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_logical",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": ">",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "xi"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "4010000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "4020000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_empty",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": []
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "0000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_null",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "null",
+                "integer": false,
+                "values": null,
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "0000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_empty_double",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "as.numeric",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "null",
+                      "integer": false,
+                      "values": null,
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "0000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_variadic",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "y"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4046200000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_named",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": "first",
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "second",
+            "expression": {
+              "type": "symbol",
+              "name": "y"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4046200000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_missing",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff80000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_clean",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          },
+          {
+            "name": "na.rm",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "fff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_overflow",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "41dfffffffc00000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "3ff0000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "41e0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_integer",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "xi"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "401a000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_trim",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3fc999999999999a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff7800000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_trim_positional",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3fc999999999999a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff7800000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_median",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3fe0000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3fe8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_large_trim",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3ff0000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3fe8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_trim_missing",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "x"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3fb999999999999a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_trim_clean",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "x"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3fb999999999999a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "na.rm",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ffc666666666666"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_named_flag",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "na.rm",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4000800000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "integer_center",
+      "expression": {
+        "type": "call",
+        "function_name": "I",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "-",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "xi"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "call",
+                    "function_name": "sum",
+                    "arguments": [
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "symbol",
+                          "name": "xi"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "c053400000000000",
+          "c053000000000000",
+          "c052c00000000000",
+          "c052800000000000",
+          "c052400000000000",
+          "c052000000000000",
+          "c051c00000000000",
+          "c051800000000000",
+          "c051400000000000",
+          "c051000000000000",
+          "c050c00000000000",
+          "c050800000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "AsIs"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "character_equal",
+      "expression": {
+        "type": "call",
+        "function_name": "==",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "ch"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          null,
+          false
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "character_less",
+      "expression": {
+        "type": "call",
+        "function_name": "<",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "ch"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "b"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          null,
+          false
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mixed_character",
+      "expression": {
+        "type": "call",
+        "function_name": "==",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "xi"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "2"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "factor_equal",
+      "expression": {
+        "type": "call",
+        "function_name": "==",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "g"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "A"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "factor_not_equal",
+      "expression": {
+        "type": "call",
+        "function_name": "!=",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "g"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "C"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "factor_compare",
+      "expression": {
+        "type": "call",
+        "function_name": "==",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "g"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "factor",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "g"
+                  }
+                },
+                {
+                  "name": "levels",
+                  "expression": {
+                    "type": "call",
+                    "function_name": "c",
+                    "arguments": [
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "text",
+                            "integer": false,
+                            "values": [
+                              "A"
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      },
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "text",
+                            "integer": false,
+                            "values": [
+                              "B"
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      },
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "text",
+                            "integer": false,
+                            "values": [
+                              "C"
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "ordered_less",
+      "expression": {
+        "type": "call",
+        "function_name": "<",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "orderedg"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "text",
+                "integer": false,
+                "values": [
+                  "A"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "conditional_factor",
+      "expression": {
+        "type": "call",
+        "function_name": "ifelse",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "==",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "g"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "text",
+                      "integer": false,
+                      "values": [
+                        "A"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "y"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "3fe0000000000000",
+          "3fe8000000000000",
+          "0000000000000000",
+          "3ff4000000000000",
+          "3ff8000000000000",
+          "3ff0000000000000",
+          "4000000000000000",
+          "4002000000000000",
+          "4014000000000000",
+          "4006000000000000",
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "raw_missing",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "raw",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "4010000000000000",
+          "bff0000000000000",
+          "3ff0000000000000",
+          "7ff80000000007a2",
+          "7ff80000000007a2",
+          "0000000000000000",
+          "0000000000000000",
+          "7ff8000000000000",
+          "7ff8000000000000",
+          "3fe0000000000000",
+          "3fd0000000000000",
+          "7ff0000000000000",
+          "7ff0000000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "fff0000000000000",
+          "7ff0000000000000",
+          "4014000000000000",
+          "4039000000000000",
+          "401c000000000000",
+          "4048800000000000",
+          "4022000000000000",
+          "4054400000000000"
+        ],
+        "dimensions": [
+          12,
+          2
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1",
+            "2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": true,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "raw_repair",
+      "expression": {
+        "type": "call",
+        "function_name": "ifelse",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "is.na",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "call",
+                    "function_name": "poly",
+                    "arguments": [
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "symbol",
+                          "name": "z"
+                        }
+                      },
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "number",
+                            "integer": false,
+                            "values": [
+                              "4000000000000000"
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      },
+                      {
+                        "name": "raw",
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "logical",
+                            "integer": false,
+                            "values": [
+                              true
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "0000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "poly",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "z"
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "4000000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": "raw",
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "logical",
+                      "integer": false,
+                      "values": [
+                        true
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "4010000000000000",
+          "bff0000000000000",
+          "3ff0000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3fe0000000000000",
+          "3fd0000000000000",
+          "7ff0000000000000",
+          "7ff0000000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "fff0000000000000",
+          "7ff0000000000000",
+          "4014000000000000",
+          "4039000000000000",
+          "401c000000000000",
+          "4048800000000000",
+          "4022000000000000",
+          "4054400000000000"
+        ],
+        "dimensions": [
+          12,
+          2
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1",
+            "2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {}
+      }
+    },
+    {
+      "name": "recurrence_missing",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "coefs",
+            "expression": {
+              "type": "symbol",
+              "name": "coefficients"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17945",
+          "3fe14bcd1e03b7f9",
+          "bfd1a7571ec9b9f1",
+          "3fcea0deb9a3424e",
+          "7ff80000000007a2",
+          "7ff80000000007a2",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec004",
+          "7ff8000000000000",
+          "7ff8000000000000",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "7ff0000000000000",
+          "7ff0000000000000",
+          "bf770ecfd49efd50",
+          "bfd36b518245d1da",
+          "fff0000000000000",
+          "7ff0000000000000",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fdc76488a7440af",
+          "bf739a49683f36ce",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852"
+        ],
+        "dimensions": [
+          12,
+          2
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1",
+            "2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "coefs": {
+            "type": "list",
+            "integer": false,
+            "values": [
+              {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000800000000000",
+                  "4013cea2936396fd"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              },
+              {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3ff0000000000000",
+                  "4028000000000000",
+                  "405ed10000000001",
+                  "40914529e241023a"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            ],
+            "dimensions": null,
+            "names": [
+              "alpha",
+              "norm2"
+            ],
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": {}
+          },
+          "degree": {
+            "type": "number",
+            "integer": true,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_matrix",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17947",
+          "3fe14bcd1e03b7fe",
+          "bfdd6f8b439f2a7c",
+          "3fc58aa342f4bc4e",
+          "3fe00ef9edbef708",
+          "bfd1a7571ec9b9f3",
+          "3fcea0deb9a3424e",
+          "bfd81571f1823a08",
+          "3fba92ac08d6890c",
+          "3fcd328098fe1e36",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec0fb",
+          "bfd2bb589f654994",
+          "3fabd69bd87f3a3a",
+          "3f82afae766531ee",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec080",
+          "bfcac27e9a90b241",
+          "3fa3e26f517f72bb",
+          "bfc3daa95dcb8530",
+          "bfc4e56c58b01590",
+          "bfaaf3ea4c4a572c",
+          "bfc00e4bf656d15b",
+          "3f94f8184ca253c2",
+          "bfd0ef361b4bb55e",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "bfa568654873c1d2",
+          "3f781a395b0716b9",
+          "bfd47026d17eaebf",
+          "bfb87fbcd1e8ed25",
+          "bfc7620d04a9ff81",
+          "3fa568654873c1ca",
+          "bf7063c09a0f0f6e",
+          "bfd47026d17eaebf",
+          "bf770ecfd49efd5b",
+          "bfd36b518245d1db",
+          "3fc00e4bf656d159",
+          "bf47236a42e815d6",
+          "bfd0ef361b4bb55c",
+          "3fb59de2d7550d79",
+          "bfd74bfc8d1fa50b",
+          "3fcac27e9a90b240",
+          "3f9213ab04455105",
+          "bfc3daa95dcb852e",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fd2bb589f654994",
+          "3fb3d3025ffd82ae",
+          "3f82afae76653234",
+          "3fdc76488a7440af",
+          "bf739a49683f3691",
+          "3fd81571f1823a06",
+          "3fc56bc95ff0dc2d",
+          "3fcd328098fe1e3a",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852",
+          "3fdd6f8b439f2a7b",
+          "3fd264a6f82f7d54",
+          "3fe00ef9edbef705"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "coefs": {
+            "type": "list",
+            "integer": false,
+            "values": [
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "4000800000000000",
+                      "4013cea2936396fd"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "405ed10000000001",
+                      "40914529e241023a"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              },
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ffa000000000000",
+                      "3ff9ffffffffffff"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "4021e00000000002",
+                      "4014daaaaaaaaaad"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              }
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_matrix_positional",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17947",
+          "3fe14bcd1e03b7fe",
+          "bfdd6f8b439f2a7c",
+          "3fc58aa342f4bc4e",
+          "3fe00ef9edbef708",
+          "bfd1a7571ec9b9f3",
+          "3fcea0deb9a3424e",
+          "bfd81571f1823a08",
+          "3fba92ac08d6890c",
+          "3fcd328098fe1e36",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec0fb",
+          "bfd2bb589f654994",
+          "3fabd69bd87f3a3a",
+          "3f82afae766531ee",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec080",
+          "bfcac27e9a90b241",
+          "3fa3e26f517f72bb",
+          "bfc3daa95dcb8530",
+          "bfc4e56c58b01590",
+          "bfaaf3ea4c4a572c",
+          "bfc00e4bf656d15b",
+          "3f94f8184ca253c2",
+          "bfd0ef361b4bb55e",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "bfa568654873c1d2",
+          "3f781a395b0716b9",
+          "bfd47026d17eaebf",
+          "bfb87fbcd1e8ed25",
+          "bfc7620d04a9ff81",
+          "3fa568654873c1ca",
+          "bf7063c09a0f0f6e",
+          "bfd47026d17eaebf",
+          "bf770ecfd49efd5b",
+          "bfd36b518245d1db",
+          "3fc00e4bf656d159",
+          "bf47236a42e815d6",
+          "bfd0ef361b4bb55c",
+          "3fb59de2d7550d79",
+          "bfd74bfc8d1fa50b",
+          "3fcac27e9a90b240",
+          "3f9213ab04455105",
+          "bfc3daa95dcb852e",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fd2bb589f654994",
+          "3fb3d3025ffd82ae",
+          "3f82afae76653234",
+          "3fdc76488a7440af",
+          "bf739a49683f3691",
+          "3fd81571f1823a06",
+          "3fc56bc95ff0dc2d",
+          "3fcd328098fe1e3a",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852",
+          "3fdd6f8b439f2a7b",
+          "3fd264a6f82f7d54",
+          "3fe00ef9edbef705"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "coefs": {
+            "type": "list",
+            "integer": false,
+            "values": [
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "4000800000000000",
+                      "4013cea2936396fd"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "405ed10000000001",
+                      "40914529e241023a"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              },
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ffa000000000000",
+                      "3ff9ffffffffffff"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "4021e00000000002",
+                      "4014daaaaaaaaaad"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              }
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_dots",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "y"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17947",
+          "3fe14bcd1e03b7fe",
+          "bfdd6f8b439f2a7c",
+          "3fc58aa342f4bc4e",
+          "3fe00ef9edbef708",
+          "bfd1a7571ec9b9f3",
+          "3fcea0deb9a3424e",
+          "bfd81571f1823a08",
+          "3fba92ac08d6890c",
+          "3fcd328098fe1e36",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec0fb",
+          "bfd2bb589f654994",
+          "3fabd69bd87f3a3a",
+          "3f82afae766531ee",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec080",
+          "bfcac27e9a90b241",
+          "3fa3e26f517f72bb",
+          "bfc3daa95dcb8530",
+          "bfc4e56c58b01590",
+          "bfaaf3ea4c4a572c",
+          "bfc00e4bf656d15b",
+          "3f94f8184ca253c2",
+          "bfd0ef361b4bb55e",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "bfa568654873c1d2",
+          "3f781a395b0716b9",
+          "bfd47026d17eaebf",
+          "bfb87fbcd1e8ed25",
+          "bfc7620d04a9ff81",
+          "3fa568654873c1ca",
+          "bf7063c09a0f0f6e",
+          "bfd47026d17eaebf",
+          "bf770ecfd49efd5b",
+          "bfd36b518245d1db",
+          "3fc00e4bf656d159",
+          "bf47236a42e815d6",
+          "bfd0ef361b4bb55c",
+          "3fb59de2d7550d79",
+          "bfd74bfc8d1fa50b",
+          "3fcac27e9a90b240",
+          "3f9213ab04455105",
+          "bfc3daa95dcb852e",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fd2bb589f654994",
+          "3fb3d3025ffd82ae",
+          "3f82afae76653234",
+          "3fdc76488a7440af",
+          "bf739a49683f3691",
+          "3fd81571f1823a06",
+          "3fc56bc95ff0dc2d",
+          "3fcd328098fe1e3a",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852",
+          "3fdd6f8b439f2a7b",
+          "3fd264a6f82f7d54",
+          "3fe00ef9edbef705"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "coefs": {
+            "type": "list",
+            "integer": false,
+            "values": [
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "4000800000000000",
+                      "4013cea2936396fd"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "405ed10000000001",
+                      "40914529e241023a"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              },
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ffa000000000000",
+                      "3ff9ffffffffffff"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "4021e00000000002",
+                      "4014daaaaaaaaaad"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              }
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_matrix_raw",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "raw",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "4010000000000000",
+          "3fd0000000000000",
+          "bfe0000000000000",
+          "3fb0000000000000",
+          "bff0000000000000",
+          "3ff0000000000000",
+          "3fe0000000000000",
+          "bfe0000000000000",
+          "3fd0000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3fe8000000000000",
+          "0000000000000000",
+          "3fe2000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3ff0000000000000",
+          "0000000000000000",
+          "3ff0000000000000",
+          "3fd0000000000000",
+          "3fb0000000000000",
+          "3ff4000000000000",
+          "3fd4000000000000",
+          "3ff9000000000000",
+          "3fe0000000000000",
+          "3fd0000000000000",
+          "3ff8000000000000",
+          "3fe8000000000000",
+          "4002000000000000",
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3ffc000000000000",
+          "3ffc000000000000",
+          "4008800000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "4010000000000000",
+          "4008000000000000",
+          "4022000000000000",
+          "4002000000000000",
+          "401b000000000000",
+          "4014400000000000",
+          "4014000000000000",
+          "4039000000000000",
+          "4004000000000000",
+          "4029000000000000",
+          "4019000000000000",
+          "401c000000000000",
+          "4048800000000000",
+          "4006000000000000",
+          "4033400000000000",
+          "401e400000000000",
+          "4022000000000000",
+          "4054400000000000",
+          "4008000000000000",
+          "403b000000000000",
+          "4022000000000000"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_dots_raw",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "y"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4008000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "raw",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "4010000000000000",
+          "c020000000000000",
+          "3fd0000000000000",
+          "bfe0000000000000",
+          "3ff0000000000000",
+          "3fb0000000000000",
+          "bfc0000000000000",
+          "3f90000000000000",
+          "bff0000000000000",
+          "3ff0000000000000",
+          "bff0000000000000",
+          "3fe0000000000000",
+          "bfe0000000000000",
+          "3fe0000000000000",
+          "3fd0000000000000",
+          "bfd0000000000000",
+          "3fc0000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3fe8000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3fe2000000000000",
+          "0000000000000000",
+          "3fdb000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3ff0000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3ff0000000000000",
+          "0000000000000000",
+          "3ff0000000000000",
+          "3fd0000000000000",
+          "3fb0000000000000",
+          "3f90000000000000",
+          "3ff4000000000000",
+          "3fd4000000000000",
+          "3fb4000000000000",
+          "3ff9000000000000",
+          "3fd9000000000000",
+          "3fff400000000000",
+          "3fe0000000000000",
+          "3fd0000000000000",
+          "3fc0000000000000",
+          "3ff8000000000000",
+          "3fe8000000000000",
+          "3fd8000000000000",
+          "4002000000000000",
+          "3ff2000000000000",
+          "400b000000000000",
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3ffc000000000000",
+          "3ffc000000000000",
+          "3ffc000000000000",
+          "4008800000000000",
+          "4008800000000000",
+          "4015700000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "4020000000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "4020000000000000",
+          "4010000000000000",
+          "4020000000000000",
+          "4020000000000000",
+          "4008000000000000",
+          "4022000000000000",
+          "403b000000000000",
+          "4002000000000000",
+          "401b000000000000",
+          "4034400000000000",
+          "4014400000000000",
+          "402e600000000000",
+          "4026c80000000000",
+          "4014000000000000",
+          "4039000000000000",
+          "405f400000000000",
+          "4004000000000000",
+          "4029000000000000",
+          "404f400000000000",
+          "4019000000000000",
+          "403f400000000000",
+          "402f400000000000",
+          "401c000000000000",
+          "4048800000000000",
+          "4075700000000000",
+          "4006000000000000",
+          "4033400000000000",
+          "4060d80000000000",
+          "401e400000000000",
+          "404a780000000000",
+          "4034cc0000000000",
+          "4022000000000000",
+          "4054400000000000",
+          "4086c80000000000",
+          "4008000000000000",
+          "403b000000000000",
+          "406e600000000000",
+          "4022000000000000",
+          "4054400000000000",
+          "403b000000000000"
+        ],
+        "dimensions": [
+          12,
+          9
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "3.0",
+            "0.1",
+            "1.1",
+            "2.1",
+            "0.2",
+            "1.2",
+            "0.3"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "9",
+            "10",
+            "13"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "4008000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4008000000000000",
+              "4000000000000000",
+              "4008000000000000",
+              "4008000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_matrix_simple",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "simple",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "logical",
+                "integer": false,
+                "values": [
+                  true
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17947",
+          "3fe14bcd1e03b7fe",
+          "bfdd6f8b439f2a7c",
+          "3fc58aa342f4bc4e",
+          "3fe00ef9edbef708",
+          "bfd1a7571ec9b9f3",
+          "3fcea0deb9a3424e",
+          "bfd81571f1823a08",
+          "3fba92ac08d6890c",
+          "3fcd328098fe1e36",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec0fb",
+          "bfd2bb589f654994",
+          "3fabd69bd87f3a3a",
+          "3f82afae766531ee",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec080",
+          "bfcac27e9a90b241",
+          "3fa3e26f517f72bb",
+          "bfc3daa95dcb8530",
+          "bfc4e56c58b01590",
+          "bfaaf3ea4c4a572c",
+          "bfc00e4bf656d15b",
+          "3f94f8184ca253c2",
+          "bfd0ef361b4bb55e",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "bfa568654873c1d2",
+          "3f781a395b0716b9",
+          "bfd47026d17eaebf",
+          "bfb87fbcd1e8ed25",
+          "bfc7620d04a9ff81",
+          "3fa568654873c1ca",
+          "bf7063c09a0f0f6e",
+          "bfd47026d17eaebf",
+          "bf770ecfd49efd5b",
+          "bfd36b518245d1db",
+          "3fc00e4bf656d159",
+          "bf47236a42e815d6",
+          "bfd0ef361b4bb55c",
+          "3fb59de2d7550d79",
+          "bfd74bfc8d1fa50b",
+          "3fcac27e9a90b240",
+          "3f9213ab04455105",
+          "bfc3daa95dcb852e",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fd2bb589f654994",
+          "3fb3d3025ffd82ae",
+          "3f82afae76653234",
+          "3fdc76488a7440af",
+          "bf739a49683f3691",
+          "3fd81571f1823a06",
+          "3fc56bc95ff0dc2d",
+          "3fcd328098fe1e3a",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852",
+          "3fdd6f8b439f2a7b",
+          "3fd264a6f82f7d54",
+          "3fe00ef9edbef705"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "poly",
+              "matrix"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "coefs": {
+            "type": "list",
+            "integer": false,
+            "values": [
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "4000800000000000",
+                      "4013cea2936396fd"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "405ed10000000001",
+                      "40914529e241023a"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              },
+              {
+                "type": "list",
+                "integer": false,
+                "values": [
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ffa000000000000",
+                      "3ff9ffffffffffff"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  },
+                  {
+                    "type": "number",
+                    "integer": false,
+                    "values": [
+                      "3ff0000000000000",
+                      "4028000000000000",
+                      "4021e00000000002",
+                      "4014daaaaaaaaaad"
+                    ],
+                    "dimensions": null,
+                    "names": null,
+                    "dimnames": [
+                      null,
+                      null
+                    ],
+                    "dimname_names": [
+                      null,
+                      null
+                    ],
+                    "attributes": []
+                  }
+                ],
+                "dimensions": null,
+                "names": [
+                  "alpha",
+                  "norm2"
+                ],
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": {}
+              }
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "degree": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000",
+              "4000000000000000",
+              "3ff0000000000000",
+              "4000000000000000",
+              "4000000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "polynomial_recurrence",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": "coefs",
+            "expression": {
+              "type": "symbol",
+              "name": "multiCoefficients"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfd76b0b13f17945",
+          "3fe14bcd1e03b7f9",
+          "bfdd6f8b439f2a79",
+          "3fc58aa342f4bc4a",
+          "3fe00ef9edbef703",
+          "bfd1a7571ec9b9f1",
+          "3fcea0deb9a3424e",
+          "bfd81571f1823a06",
+          "3fba92ac08d68907",
+          "3fcd328098fe1e2f",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec004",
+          "bfd2bb589f654993",
+          "3fabd69bd87f3a38",
+          "3f82afae7665318c",
+          "bfc7c7465343f53a",
+          "bf5d1b8d4d2ec004",
+          "bfcac27e9a90b240",
+          "3fa3e26f517f72bb",
+          "bfc3daa95dcb8536",
+          "bfc4e56c58b01590",
+          "bfaaf3ea4c4a5730",
+          "bfc00e4bf656d15a",
+          "3f94f8184ca253c1",
+          "bfd0ef361b4bb561",
+          "bfc203925e1c35e6",
+          "bfb9891419cfdc74",
+          "bfa568654873c1cd",
+          "3f781a395b0716b4",
+          "bfd47026d17eaec3",
+          "bfb87fbcd1e8ed25",
+          "bfc7620d04a9ff80",
+          "3fa568654873c1cd",
+          "bf7063c09a0f0f70",
+          "bfd47026d17eaec3",
+          "bf770ecfd49efd50",
+          "bfd36b518245d1da",
+          "3fc00e4bf656d15a",
+          "bf47236a42e815cc",
+          "bfd0ef361b4bb55f",
+          "3fb59de2d7550d7b",
+          "bfd74bfc8d1fa50d",
+          "3fcac27e9a90b240",
+          "3f9213ab04455107",
+          "bfc3daa95dcb8533",
+          "3fd0eee0a024c207",
+          "bfd38072c38e4ec1",
+          "3fd2bb589f654993",
+          "3fb3d3025ffd82ad",
+          "3f82afae766531fc",
+          "3fdc76488a7440af",
+          "bf739a49683f36ce",
+          "3fd81571f1823a06",
+          "3fc56bc95ff0dc2d",
+          "3fcd328098fe1e36",
+          "3fe3fed83a61dfab",
+          "3fe1251026542852",
+          "3fdd6f8b439f2a79",
+          "3fd264a6f82f7d53",
+          "3fe00ef9edbef705"
+        ],
+        "dimensions": [
+          12,
+          5
+        ],
+        "names": null,
+        "dimnames": [
+          null,
+          [
+            "1.0",
+            "2.0",
+            "0.1",
+            "1.1",
+            "0.2"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          [
+            "2",
+            "3",
+            "4",
+            "5",
+            "7"
+          ]
+        ],
+        "attributes": {}
+      }
+    },
+    {
+      "name": "scale_named",
+      "expression": {
+        "type": "call",
+        "function_name": "scale",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": "first",
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "3ff0000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": "second",
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "4000000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": "third",
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "4010000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfebee9056fb9c39",
+          "bfcbee9056fb9c3c",
+          "3ff1751a365d41a3"
+        ],
+        "dimensions": [
+          3,
+          1
+        ],
+        "names": null,
+        "dimnames": [
+          [
+            "first",
+            "second",
+            "third"
+          ],
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "scaled:center": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "4002aaaaaaaaaaab"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "scaled:scale": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff870be4c1c28b2"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "scale_nested",
+      "expression": {
+        "type": "call",
+        "function_name": "scale",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "scale",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "x"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bff36ad3c8ed9e6d",
+          "bfed467a62234d61",
+          "bfe3b74d326b5de9",
+          "bfe3b74d326b5de9",
+          "bfe15381e67d620b",
+          "bfdddf6d351ecc59",
+          "bfd450400566dce0",
+          "bf931e5a5f6fdeee",
+          "3fd1ec74b978e102",
+          "3fec1494bc2c4f72",
+          "3ff799778dce1732",
+          "400094525ec30355"
+        ],
+        "dimensions": [
+          12,
+          1
+        ],
+        "names": null,
+        "dimnames": [],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "scaled:center": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "bc66000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "scaled:scale": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff0000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "scale_asis",
+      "expression": {
+        "type": "call",
+        "function_name": "scale",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "I",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "M"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bff36ad3c8ed9e6d",
+          "bff868249c525fce",
+          "bfed467a62234d61",
+          "bff3f81df44365a9",
+          "bfe3b74d326b5de9",
+          "bfef102e9868d707",
+          "bfe3b74d326b5de9",
+          "bfe63021484ae2bc",
+          "bfe15381e67d620b",
+          "bfdaa027f059dce1",
+          "bfdddf6d351ecc59",
+          "bfc1c01aa03be896",
+          "bfd450400566dce0",
+          "3fc1c01aa03be896",
+          "bf931e5a5f6fdef1",
+          "3fdaa027f059dce1",
+          "3fd1ec74b978e102",
+          "3fe63021484ae2bc",
+          "3fec1494bc2c4f72",
+          "3fef102e9868d707",
+          "3ff799778dce1732",
+          "3ff3f81df44365a9",
+          "400094525ec30355",
+          "3ff868249c525fce"
+        ],
+        "dimensions": [
+          12,
+          2
+        ],
+        "names": null,
+        "dimnames": [
+          [
+            "s1",
+            "s2",
+            "s3",
+            "s4",
+            "s5",
+            "s6",
+            "s7",
+            "s8",
+            "s9",
+            "s10",
+            "s11",
+            "s12"
+          ],
+          [
+            "x",
+            "y"
+          ]
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "AsIs"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "scaled:center": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "4000800000000000",
+              "3ffa000000000000"
+            ],
+            "dimensions": null,
+            "names": [
+              "x",
+              "y"
+            ],
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": {}
+          },
+          "scaled:scale": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "400ac7be7f9790f7",
+              "3fecd82b446159f3"
+            ],
+            "dimensions": null,
+            "names": [
+              "x",
+              "y"
+            ],
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "sum_nan_na",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff8000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sum_na_nan",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff8000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff80000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_nan_na",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff8000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": false,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff80000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "sd_nonfinite",
+      "expression": {
+        "type": "call",
+        "function_name": "sd",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "missing_condition",
+      "expression": {
+        "type": "call",
+        "function_name": "ifelse",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "is.na",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "z"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "0000000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "z"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "bff0000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "0000000000000000",
+          "3fe0000000000000",
+          "7ff0000000000000",
+          "4000000000000000",
+          "fff0000000000000",
+          "4014000000000000",
+          "401c000000000000",
+          "4022000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "invalid_degree",
+      "expression": {
+        "type": "call",
+        "function_name": "poly",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "M"
+            }
+          },
+          {
+            "name": "degree",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "4034000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "invalid_sum",
+      "expression": {
+        "type": "call",
+        "function_name": "sum",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "ch"
+            }
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "invalid_trim",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          },
+          {
+            "name": "trim",
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "7ff00000000007a2"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "nested_asis",
+      "expression": {
+        "type": "call",
+        "function_name": "I",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "I",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "symbol",
+                    "name": "x"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000",
+          "bff0000000000000",
+          "8000000000000000",
+          "0000000000000000",
+          "3fd0000000000000",
+          "3fe0000000000000",
+          "3ff0000000000000",
+          "4000000000000000",
+          "4008000000000000",
+          "4014000000000000",
+          "401c000000000000",
+          "4022000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "class": {
+            "type": "text",
+            "integer": false,
+            "values": [
+              "AsIs"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "named_matrix",
+      "expression": {
+        "type": "symbol",
+        "name": "NM"
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "3ff0000000000000",
+          "4008000000000000",
+          "4014000000000000",
+          "4000000000000000",
+          "4010000000000000",
+          "4018000000000000"
+        ],
+        "dimensions": [
+          2,
+          3
+        ],
+        "names": [
+          "a",
+          "c",
+          "e",
+          "b",
+          "d",
+          "f"
+        ],
+        "dimnames": [],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {}
+      }
+    },
+    {
+      "name": "named_matrix_concat",
+      "expression": {
+        "type": "call",
+        "function_name": "c",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "NM"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "3ff0000000000000",
+          "4000000000000000",
+          "4008000000000000",
+          "4010000000000000",
+          "4014000000000000",
+          "4018000000000000"
+        ],
+        "dimensions": null,
+        "names": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f"
+        ],
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {}
+      }
+    },
+    {
+      "name": "named_matrix_scale",
+      "expression": {
+        "type": "call",
+        "function_name": "scale",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "NM"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "bfe6a09e667f3bcc",
+          "bfe6a09e667f3bcc",
+          "bfe6a09e667f3bcc",
+          "3fe6a09e667f3bcc",
+          "3fe6a09e667f3bcc",
+          "3fe6a09e667f3bcc"
+        ],
+        "dimensions": [
+          2,
+          3
+        ],
+        "names": null,
+        "dimnames": [],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {
+          "scaled:center": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3ff8000000000000",
+              "400c000000000000",
+              "4016000000000000"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          },
+          "scaled:scale": {
+            "type": "number",
+            "integer": false,
+            "values": [
+              "3fe6a09e667f3bcd",
+              "3fe6a09e667f3bcd",
+              "3fe6a09e667f3bcd"
+            ],
+            "dimensions": null,
+            "names": null,
+            "dimnames": [
+              null,
+              null
+            ],
+            "dimname_names": [
+              null,
+              null
+            ],
+            "attributes": []
+          }
+        }
+      }
+    },
+    {
+      "name": "named_matrix_add",
+      "expression": {
+        "type": "call",
+        "function_name": "+",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "NM"
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "number",
+                "integer": false,
+                "values": [
+                  "3ff0000000000000"
+                ],
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4000000000000000",
+          "4010000000000000",
+          "4018000000000000",
+          "4008000000000000",
+          "4014000000000000",
+          "401c000000000000"
+        ],
+        "dimensions": [
+          2,
+          3
+        ],
+        "names": null,
+        "dimnames": [],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": {}
+      }
+    },
+    {
+      "name": "integer_neg_missing",
+      "expression": {
+        "type": "call",
+        "function_name": "-",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "0000000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "3ff0000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "0000000000000000",
+          "bff0000000000000",
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "integer_zero_product",
+      "expression": {
+        "type": "call",
+        "function_name": "*",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "0000000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "3ff0000000000000"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                },
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "literal",
+                    "value": {
+                      "type": "number",
+                      "integer": true,
+                      "values": [
+                        "7ff00000000007a2"
+                      ],
+                      "dimensions": null,
+                      "names": null,
+                      "dimnames": [
+                        null,
+                        null
+                      ],
+                      "dimname_names": [
+                        null,
+                        null
+                      ],
+                      "attributes": []
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "(",
+              "arguments": [
+                {
+                  "name": null,
+                  "expression": {
+                    "type": "call",
+                    "function_name": "-",
+                    "arguments": [
+                      {
+                        "name": null,
+                        "expression": {
+                          "type": "literal",
+                          "value": {
+                            "type": "number",
+                            "integer": true,
+                            "values": [
+                              "3ff0000000000000"
+                            ],
+                            "dimensions": null,
+                            "names": null,
+                            "dimnames": [
+                              null,
+                              null
+                            ],
+                            "dimname_names": [
+                              null,
+                              null
+                            ],
+                            "attributes": []
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": true,
+        "values": [
+          "0000000000000000",
+          "bff0000000000000",
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_null",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "null",
+                "integer": false,
+                "values": null,
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_text",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "ch"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "concatenate_null",
+      "expression": {
+        "type": "call",
+        "function_name": "c",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "literal",
+              "value": {
+                "type": "null",
+                "integer": false,
+                "values": null,
+                "dimensions": null,
+                "names": null,
+                "dimnames": [
+                  null,
+                  null
+                ],
+                "dimname_names": [
+                  null,
+                  null
+                ],
+                "attributes": []
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "null",
+        "integer": false,
+        "values": null,
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "mean_concatenate_null",
+      "expression": {
+        "type": "call",
+        "function_name": "mean",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "call",
+              "function_name": "c",
+              "arguments": []
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    }
+  ]
+}

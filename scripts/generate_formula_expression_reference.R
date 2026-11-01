@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent built-in expression values and metadata; never loads rsdeseq2.
-stopifnot(getRversion()=="4.6.2",packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args<-commandArgs(TRUE)
 script<-sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root<-normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
@@ -88,5 +88,5 @@ cases<-lapply(names(specs),function(name) {
   result<-tryCatch(withCallingHandlers(eval(expr,vars,enclos=asNamespace("stats")),warning=function(w)invokeRestart("muffleWarning")),error=identity)
   list(name=name,expression=expression(expr),expected=if(inherits(result,"error"))NULL else tryCatch(value(result),error=function(e)stop(name,": ",typeof(result),": ",conditionMessage(e))))
 })
-reference<-list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),ICU=unname(extSoftVersion()["ICU"]),collation=icuGetCollate("actual")),variables=lapply(vars,value),cases=cases)
+reference<-list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),ICU=unname(extSoftVersion()["ICU"]),collation=icuGetCollate("actual")),variables=lapply(vars,value),cases=cases)
 for(path in paths){dir.create(dirname(path),recursive=TRUE,showWarnings=FALSE);jsonlite::write_json(reference,path,pretty=TRUE,auto_unbox=TRUE,null="null",digits=NA);cat("Wrote",length(cases),"cases to",path,"\n")}

@@ -1,4 +1,7 @@
-//! Frozen independent R matrices, including attributes/order and signed zeros.
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
+// Frozen independent R matrices, including attributes/order and signed zeros.
 #[path = "../examples/evaluate_r_interface/model_matrix.rs"]
 mod input;
 use rsdeseq2::design::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
@@ -7,7 +10,7 @@ use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 #[test]
 fn formula_term_assembly_matches_independent_r_in_both_storage_orders() {
     let r: serde_json::Value =
-        serde_json::from_str(include_str!("data/model_matrix_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("model_matrix_r462")).unwrap();
     let cases = r["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 48);
     for value in cases {
@@ -106,7 +109,7 @@ fn expanded_list_contrasts_match_independent_r_group_means_and_rejections() {
         expected: Option<Vec<String>>,
     }
     let reference: serde_json::Value =
-        serde_json::from_str(include_str!("data/model_matrix_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("model_matrix_r462")).unwrap();
     let cases = reference["average_contrasts"].as_array().unwrap();
     assert_eq!(cases.len(), 10);
     for case in cases {

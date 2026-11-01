@@ -7,23 +7,18 @@
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
-        dot_skylake(x, y)
+        dot_reference_haswell(x, y)
     }
     #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
     dot_binary64(x, y)
 }
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
-    let block_width = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        16
-    } else {
-        32
-    };
-    let blocks = x.len() / block_width;
+    let blocks = x.len() / 32;
     let mut lanes = [0.0; 16];
     for block in 0..blocks {
-        let start = block * block_width;
-        for half in (0..block_width).step_by(16) {
+        let start = block * 32;
+        for half in [0, 16] {
             for lane in 0..16 {
                 lanes[lane] = x[start + half + lane].mul_add(y[start + half + lane], lanes[lane]);
             }
@@ -38,7 +33,7 @@ fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
         let right_odd = (lanes[9] + lanes[11]) + (lanes[13] + lanes[15]);
         (left_even + right_even) + (left_odd + right_odd)
     };
-    for index in blocks * block_width..x.len() {
+    for index in blocks * 32..x.len() {
         sum = x[index].mul_add(y[index], sum);
     }
     sum
@@ -69,33 +64,35 @@ fn norm_binary64(x: &[f64]) -> f64 {
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn dot_skylake(x: &[f64], y: &[f64]) -> f64 {
-    let mut wide = [0.0; 32];
-    let n32 = x.len() / 32 * 32;
-    for start in (0..n32).step_by(32) {
-        for i in 0..32 {
-            wide[i] = x[start + i].mul_add(y[start + i], wide[i]);
-        }
-    }
+fn dot_reference_haswell(x: &[f64], y: &[f64]) -> f64 {
     let mut lanes = [0.0; 16];
-    for block in 0..4 {
-        for i in 0..4 {
-            lanes[block * 4 + i] = wide[block * 8 + i] + wide[block * 8 + i + 4];
-        }
-    }
-    let n16 = x.len() / 16 * 16;
-    for start in (n32..n16).step_by(16) {
+    let end = x.len() / 16 * 16;
+    for start in (0..end).step_by(16) {
         for i in 0..16 {
             lanes[i] = x[start + i].mul_add(y[start + i], lanes[i]);
         }
     }
-    let mut reduced = [0.0; 4];
-    for i in 0..4 {
-        reduced[i] = ((lanes[i] + lanes[i + 4]) + lanes[i + 8]) + lanes[i + 12];
+    let mut pair = [0.0; 8];
+    for group in 0..4 {
+        for i in 0..2 {
+            pair[group * 2 + i] = lanes[group * 4 + i] + lanes[group * 4 + i + 2];
+        }
     }
-    let mut total = (reduced[0] + reduced[2]) + (reduced[1] + reduced[3]);
-    for i in n16..x.len() {
-        total = x[i].mul_add(y[i], total);
+    let even = (pair[0] + pair[2]) + (pair[4] + pair[6]);
+    let odd = (pair[1] + pair[3]) + (pair[5] + pair[7]);
+    let mut total = even + odd;
+    for i in end..x.len() {
+        total += x[i] * y[i];
     }
     total
+}
+pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
+    let end = x.len() / 16 * 16;
+    for (i, (v, &x)) in y.iter_mut().zip(x).enumerate() {
+        *v = if cfg!(all(target_os = "linux", target_arch = "x86_64")) && i >= end {
+            *v + weight * x
+        } else {
+            weight.mul_add(x, *v)
+        };
+    }
 }
