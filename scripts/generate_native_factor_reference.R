@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent original-R matrices, metadata and expanded-column maps.
-stopifnot(getRversion()=="4.6.2",packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args <- commandArgs(TRUE)
 script <- sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root <- normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
@@ -109,6 +109,6 @@ expansions <- lapply(names(inputs),function(name) {
   input<-inputs[[name]];if(length(input))input<-input[c(seq_along(input),length(input))]
   list(name=name,input=.formula_descriptor(input),null_level="_null_level_",expected=expected)
 })
-output<-list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),expanded_policy="Original model.matrix with identity contrasts for unordered factors; ordered polynomial coordinates retained; not DESeq2 expanded ordered-formula betaPrior"),numeric=numeric,factors=factors,native_formula_cases=cases,factor_expansions=expansions)
+output<-list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),expanded_policy="Original model.matrix with identity contrasts for unordered factors; ordered polynomial coordinates retained; not DESeq2 expanded ordered-formula betaPrior"),numeric=numeric,factors=factors,native_formula_cases=cases,factor_expansions=expansions)
 for(path in paths)jsonlite::write_json(output,path,auto_unbox=TRUE,null="null",pretty=TRUE,digits=NA)
 cat(length(cases),"independent native factor cases generated\n")

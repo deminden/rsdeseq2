@@ -13,6 +13,7 @@ PANELS = {
     'model_matrix': 'model_matrix_r462',
     'native_formula': 'native_formula_r462',
     'numeric_transform': 'numeric_transform_r462',
+    'native_factor': 'native_factor_r462',
 }
 
 
@@ -22,7 +23,7 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=False)
-    env = dict(os.environ, LC_ALL='C.UTF-8', OPENBLAS_CORETYPE='Cooperlake', OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1')
+    env = dict(os.environ, LC_ALL='C.UTF-8', OPENBLAS_CORETYPE='Haswell', OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1')
     for generator, stem in PANELS.items():
         output = args.output_dir / (stem + '.json')
         subprocess.run([args.rscript, '--vanilla', str(ROOT / 'scripts' / ('generate_' + generator + '_reference.R')), str(output.resolve())], env=env, check=True)

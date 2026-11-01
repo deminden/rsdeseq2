@@ -1,3 +1,6 @@
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 #[path = "../examples/evaluate_r_interface/factor_expansion.rs"]
 mod factor_expansion;
 #[allow(dead_code)]
@@ -9,7 +12,7 @@ mod input;
 #[test]
 fn factor_classes_and_matrix_column_maps_match_original_r() {
     let reference: serde_json::Value =
-        serde_json::from_str(include_str!("data/native_factor_r462.json")).unwrap();
+        serde_json::from_str(formula_reference!("native_factor_r462")).unwrap();
     let input: input::Input = serde_json::from_value(reference.clone()).unwrap();
     let actual = input::evaluate(&input);
     let cases = reference["native_formula_cases"].as_array().unwrap();

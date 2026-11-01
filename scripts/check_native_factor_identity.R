@@ -6,6 +6,7 @@ driver <- normalizePath(args[[1L]])
 library(rsdeseq2,lib.loc=normalizePath(args[[2L]]))
 script <- sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root <- normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
+source(file.path(root,"r-pkg/rsdeseq2/tests/testthat/helper-reference-values.R"))
 source(file.path(root,"r-pkg/rsdeseq2/tests/testthat/helper-formula.R"))
 canonical <- function(value) {
   if(!is.list(value))return(value)
@@ -15,7 +16,7 @@ canonical <- function(value) {
 out <- args[[3L]]
 if(dir.exists(out))stop("Use a fresh identity output directory")
 dir.create(out,recursive=TRUE)
-reference <- jsonlite::fromJSON(file.path(root,"crates/rsdeseq2/tests/data/native_factor_r462.json"),simplifyVector=FALSE)
+reference <- jsonlite::fromJSON(.formula_reference_path(file.path(root,"crates/rsdeseq2/tests/data"),"native_factor_r462.json"),simplifyVector=FALSE)
 path <- file.path(out,"input.json")
 jsonlite::write_json(reference,path,auto_unbox=TRUE,null="null",digits=NA)
 output <- system2(driver,shQuote(normalizePath(path)),stdout=TRUE,stderr=TRUE)
