@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid};
+use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid, is_na};
 use crate::{design::numeric_transform::scalar_mean, errors::DeseqError};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -20,7 +20,8 @@ impl Evaluator<'_> {
                 .transpose()?
                 .unwrap_or(false);
             let mut integer = true;
-            let mut total = 0.0;
+            let mut total = 0.0_f64;
+            let mut missing = false;
             for (arg, value) in args {
                 if arg.as_deref() == Some("na.rm") {
                     continue;
@@ -34,12 +35,35 @@ impl Evaluator<'_> {
                 );
                 for v in value.flattened().numeric()? {
                     if !remove || !v.is_nan() {
-                        total += v;
+                        missing |= is_na(v);
+                        if !total.is_nan() {
+                            if v.is_nan() {
+                                // Preserve the first NaN's payload and quiet it,
+                                // as R does, independently of CPU operand order.
+                                total = f64::from_bits(v.to_bits() | (1 << 51));
+                            } else {
+                                total += v;
+                                if total.is_nan() {
+                                    // R's accumulator yields a negative NaN
+                                    // for Inf + -Inf on x86 Linux.
+                                    total =
+                                        if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+                                            f64::from_bits(0xfff8_0000_0000_0000)
+                                        } else {
+                                            f64::NAN
+                                        };
+                                }
+                            }
+                        }
                     }
                 }
             }
             if integer && total.is_nan() {
                 total = NA_REAL;
+            } else if missing && !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+                // Apple's R gives NA precedence over an earlier NaN. On x86
+                // Linux, R preserves the accumulator's first NaN instead.
+                total = f64::from_bits(0x7ff8_0000_0000_07a2);
             } else if total <= i32::MIN as f64 || total > i32::MAX as f64 {
                 integer = false;
             }
