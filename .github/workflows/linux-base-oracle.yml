@@ -1,0 +1,44 @@
+name: Linux base R oracle
+on:
+  push:
+    branches: [codex/linux-base-oracle-7770534]
+permissions:
+  contents: read
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '7770534650cbb45146697fa719b433137221e002'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.2'
+      - name: Install JSON writer
+        run: Rscript -e 'install.packages("jsonlite", repos="https://cloud.r-project.org")'
+      - name: Generate original R statistics without loading DESeq2
+        shell: bash
+        run: |
+          mkdir -p independent-oracle
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import re
+          names=['formula_expression','extended_formula','model_matrix','numeric_transform','native_formula']
+          for name in names:
+              p=Path('scripts/generate_'+name+'_reference.R')
+              s=p.read_text()
+              s=re.sub(r'^stopifnot\(getRversion\(\).*$', 'stopifnot(getRversion()=="4.6.2")',s,flags=re.M)
+              s=re.sub(r'as.character\(packageVersion\("DESeq2"\)\)', '"not-installed-not-used"', s)
+              q=Path('scripts/debug_'+name+'_reference.R');q.write_text(s)
+          PYCODE
+          for name in formula_expression extended_formula model_matrix numeric_transform native_formula; do
+            Rscript --vanilla scripts/debug_${name}_reference.R independent-oracle/${name}.json
+          done
+          Rscript --vanilla -e 'writeLines(capture.output(sessionInfo()), "independent-oracle/session.txt")'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-base-oracle
+          path: independent-oracle/
