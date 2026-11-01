@@ -220,7 +220,7 @@ fn scalar_mean_binary64(values: &[f64]) -> f64 {
     mean
 }
 
-fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
+pub(super) fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
         extended::sum(values).value()

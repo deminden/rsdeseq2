@@ -1,6 +1,6 @@
 //! Centered polynomial QR with relative-norm column deferral.
 //! This operation does not change the rank policy used by model fitting.
-use super::reduction::{axpy, dot, norm};
+use super::reduction::{dot, norm};
 
 // Caller supplies a finite, nonempty column-major problem with width <= rows.
 pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, usize) {
@@ -40,15 +40,15 @@ pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, us
             let weight = -inner / columns[step][step];
             if weight != 0.0 {
                 let (previous, remaining) = columns.split_at_mut(other);
-                axpy(weight, &previous[step][step..], &mut remaining[0][step..]);
+                for (value, &reflector) in
+                    remaining[0][step..].iter_mut().zip(&previous[step][step..])
+                {
+                    *value = weight.mul_add(reflector, *value);
+                }
             }
             if tails[other] != 0.0 {
                 let fraction = columns[other][step].abs() / tails[other];
-                let remaining = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                    (1.0 - fraction * fraction).max(0.0)
-                } else {
-                    (-fraction).mul_add(fraction, 1.0).max(0.0)
-                };
+                let remaining = (-fraction).mul_add(fraction, 1.0).max(0.0);
                 tails[other] = if remaining >= 1e-6 {
                     tails[other] * remaining.sqrt()
                 } else {
@@ -73,7 +73,9 @@ pub(in crate::design) fn basis(mut columns: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, us
             let inner = dot(&columns[step][step..], &q[step..]);
             let weight = -inner / reflectors[step];
             if weight != 0.0 {
-                axpy(weight, &columns[step][step..], &mut q[step..]);
+                for r in step..n {
+                    q[r] = weight.mul_add(columns[step][r], q[r]);
+                }
             }
             columns[step][step] = diagonal;
         }

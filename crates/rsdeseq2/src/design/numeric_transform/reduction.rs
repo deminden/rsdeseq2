@@ -3,11 +3,16 @@
 //! These operations specify rounding rather than delegating it to whichever
 //! BLAS the calling frontend happens to load. Rust and R use the same schedule.
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
-    let blocks = x.len() / 32;
+    let block_width = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        16
+    } else {
+        32
+    };
+    let blocks = x.len() / block_width;
     let mut lanes = [0.0; 16];
     for block in 0..blocks {
-        let start = block * 32;
-        for half in [0, 16] {
+        let start = block * block_width;
+        for half in (0..block_width).step_by(16) {
             for lane in 0..16 {
                 lanes[lane] = x[start + half + lane].mul_add(y[start + half + lane], lanes[lane]);
             }
@@ -22,12 +27,8 @@ pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
         let right_odd = (lanes[9] + lanes[11]) + (lanes[13] + lanes[15]);
         (left_even + right_even) + (left_odd + right_odd)
     };
-    for index in blocks * 32..x.len() {
-        sum = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            sum + x[index] * y[index]
-        } else {
-            x[index].mul_add(y[index], sum)
-        };
+    for index in blocks * block_width..x.len() {
+        sum = x[index].mul_add(y[index], sum);
     }
     sum
 }
@@ -54,15 +55,4 @@ fn norm_binary64(x: &[f64]) -> f64 {
         }
     }
     scale * squares.sqrt()
-}
-
-pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
-    let vector_end = x.len() / 16 * 16;
-    for (i, (v, &x)) in y.iter_mut().zip(x).enumerate() {
-        *v = if cfg!(all(target_os = "linux", target_arch = "x86_64")) && i >= vector_end {
-            *v + weight * x
-        } else {
-            weight.mul_add(x, *v)
-        };
-    }
 }
