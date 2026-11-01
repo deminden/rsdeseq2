@@ -1,0 +1,18 @@
+name: Linux missing values check
+on:
+  push:
+    branches: [codex/linux-missing-check-7770534]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify standalone Rust and vendored R use identical source
+        run: scripts/sync_r_vendor.sh --check
+      - name: Check R missing-value and NaN semantics
+        run: |
+          cargo test --locked -p rsdeseq2 --test formula_expression sum_preserves_r_missing_precedence_across_nan_orders
+          cargo test --locked -p rsdeseq2 --test formula_expression mean_preserves_r_missing_and_nan_order
