@@ -23,18 +23,19 @@ versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
 
-## Version 0.4.0 preparation
+## Version 0.4.0
 
-The [0.4.0 candidate report](release-0.4.0.md) gathers the validated changes since
+The [0.4.0 release report](release-0.4.0.md) gathers the validated changes since
 0.3.1. The minor version reflects formula-coding, input-validation and fitted-state
 corrections. It includes independent original-R references, direct standalone/R
 identity checks, current GTEx precision/speed/RSS evidence and a checked source
 package. All package and lockfile versions agree at 0.4.0.
 
 The Rust-only wrapper migration remains in progress. Frozen local VST and optional
-ashr/apeglm calculations still involve R; this candidate does not claim otherwise.
-Local checks prepare the release; the coordinated five-target publication workflow
-must still pass before publication. No tag or upload is created by local preparation.
+ashr/apeglm calculations still involve R; this release does not claim otherwise.
+The coordinated workflow validates each release tag before publishing the checked
+source packages and five target archives. The release report records the final
+paired measurements and the visible compiled-code warning.
 
 The [earlier development report](codebase-improvement-progress-2026-10-29.md)
 and [refactor checkpoint](refactoring-followup-2026-10-29.md) retain their original

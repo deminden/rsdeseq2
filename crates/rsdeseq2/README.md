@@ -14,17 +14,16 @@ It is not a drop-in replacement for the complete Bioconductor API.
 
 ## Install
 
-Add the published library to a Rust project. The published version may differ
-from the 0.4.0 candidate measured below:
+Add version 0.4.0 to a Rust project:
 
 ```bash
-cargo add rsdeseq2
+cargo add rsdeseq2@0.4.0
 ```
 
 Install the CLI:
 
 ```bash
-cargo install rsdeseq2 --locked
+cargo install rsdeseq2 --version 0.4.0 --locked
 ```
 
 ## Supported Scope
@@ -47,12 +46,11 @@ Detailed status lives in
 
 ## Validation and Performance
 
-The 0.4.0 candidate takes 40.67 seconds versus DESeq2's 242.48 seconds across
-eleven GTEx contrasts: an observed 5.96× summed process-time ratio. Rust peak
-RSS is 211–308 MiB, 80.3–86.8% below the matched DESeq2 process.
+Version 0.4.0 takes 36.27 seconds versus DESeq2's 189.25 seconds across
+eleven GTEx contrasts: an observed 5.22× summed process-time ratio. Rust peak
+RSS is 213–302 MiB, 82.8–86.7% below the matched DESeq2 process.
 Comparisons use native R 4.6.2 / DESeq2 1.52.0 on Apple M5, with one fitting/BLAS
-worker. Background CPU activity affected this single pass; performance
-conclusions are provisional.
+worker. These are single-pass observations with no discarded outliers.
 
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex, including biological comparisons and reproducible blocked/unblocked
