@@ -51,3 +51,26 @@ class RReferenceLock(unittest.TestCase):
     def test_cran_archive_fallback_preserves_source_identity(self):
         row = dict(package='ashr', version='2.2-63', url='https://cran.r-project.org/src/contrib/ashr_2.2-63.tar.gz')
         self.assertEqual(reference.source_urls(row)[-1], 'https://cran.r-project.org/src/contrib/Archive/ashr/ashr_2.2-63.tar.gz')
+
+    def test_mirror_fallback_still_requires_the_locked_archive_hash(self):
+        expected = b'locked package source'
+        row = dict(package='pkgbuild', version='1.4.8',
+                   url='https://cran.r-project.org/src/contrib/pkgbuild_1.4.8.tar.gz',
+                   sha256=reference.hashlib.sha256(expected).hexdigest())
+        for payload in [expected, b'changed package source']:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp:
+                destination = Path(temp)/'source.tar.gz'
+                def download(command, **kwargs):
+                    if command[-1] == row['url']:
+                        raise reference.subprocess.CalledProcessError(22, command)
+                    Path(command[command.index('--output')+1]).write_bytes(payload)
+                with mock.patch.object(reference.subprocess, 'run', side_effect=download) as run:
+                    if payload == expected:
+                        reference.download_source(row, destination)
+                        self.assertEqual(destination.read_bytes(), expected)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'hash differs'):
+                            reference.download_source(row, destination)
+                        self.assertFalse(destination.exists())
+                self.assertEqual(run.call_count, 2)
+                self.assertIn('cloud.r-project.org', run.call_args.args[0][-1])
