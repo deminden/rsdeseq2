@@ -9,6 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.2'
+      - name: Verify expected values directly with Linux R
+        run: |
+          Rscript --vanilla -e 'h <- function(x) paste(format(writeBin(x, raw(), size=8, endian="big")), collapse=""); nan <- readBin(as.raw(c(0x7f,0xf8,0,0,0,0,0x12,0x34)), "double", n=1, size=8, endian="big"); stopifnot(h(sum(c(NA_real_, NaN))) == "7ff80000000007a2", h(sum(c(NaN, NA_real_))) == "7ff8000000000000", h(sum(c(Inf, -Inf, NA_real_))) == "fff8000000000000", h(sum(c(nan, NaN))) == "7ff8000000001234", h(mean(c(NaN, NA_real_))) == "7ff80000000007a2", h(mean(c(NA_real_, NaN))) == "7ff80000000007a2")'
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify standalone Rust and vendored R use identical source
         run: scripts/sync_r_vendor.sh --check
