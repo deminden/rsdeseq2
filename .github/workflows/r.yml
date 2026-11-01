@@ -23,7 +23,7 @@ jobs:
       R_LIBS_USER: ${{ github.workspace }}/.r-library-${{ matrix.lane }}
       MAKEFLAGS: -j2
       OPENBLAS_NUM_THREADS: '1'
-      OPENBLAS_CORETYPE: Cooperlake
+      OPENBLAS_CORETYPE: Haswell
       LC_ALL: C.UTF-8
       OMP_NUM_THREADS: '1'
     steps:
@@ -43,13 +43,19 @@ jobs:
       - name: Cache exact reference packages
         id: reference-cache
         if: matrix.lane == 'reference'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.R_LIBS_USER }}
           key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
       - name: Restore verified numerical reference environment
         if: matrix.lane == 'reference'
         run: python scripts/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
+      - name: Cache verified reference dependencies
+        if: matrix.lane == 'reference' && steps.reference-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
       - name: Install current compatibility dependencies
         if: matrix.lane == 'current'
         run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("testthat", "ashr", "BiocManager")); BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)'

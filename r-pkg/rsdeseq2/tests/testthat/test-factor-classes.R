@@ -1,5 +1,5 @@
 test_that("factor matrices and frames match independent original R references", {
-  reference <- jsonlite::fromJSON(test_path("data","native_factor_r462.json"),simplifyVector=FALSE)
+  reference <- jsonlite::fromJSON(.formula_reference_path(test_path("data"),"native_factor_r462.json"),simplifyVector=FALSE)
   decode <- function(hex)readBin(as.raw(strtoi(substring(hex,seq(1,15,2),seq(2,16,2)),16L)),"double",1L,size=8,endian="big")
   d <- as.data.frame(stats::setNames(lapply(reference$numeric,function(v)vapply(v$values,decode,0.0)),vapply(reference$numeric,`[[`,"","name")))
   for(v in reference$factors)d[[v$name]] <- factor(unlist(v$sample_levels),levels=unlist(v$levels))
