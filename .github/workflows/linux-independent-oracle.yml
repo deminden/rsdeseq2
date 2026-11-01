@@ -1,0 +1,45 @@
+name: Linux independent R references
+on:
+  push:
+    branches: [codex/linux-oracle-7770534]
+permissions:
+  contents: read
+jobs:
+  r-reference:
+    runs-on: ubuntu-latest
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.r-library-reference
+      MAKEFLAGS: -j2
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "7770534650cbb45146697fa719b433137221e002"
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.2'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran
+      - run: mkdir -p "$R_LIBS_USER"
+      - uses: actions/cache@v4
+        id: reference-cache
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
+      - name: Restore verified reference environment
+        run: python scripts/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
+      - name: Generate references directly with Linux R
+        run: |
+          mkdir -p independent-oracle
+          Rscript --vanilla scripts/generate_formula_expression_reference.R independent-oracle/formula.json
+          Rscript --vanilla scripts/generate_model_matrix_reference.R independent-oracle/model.json
+          Rscript --vanilla -e 'writeLines(capture.output(sessionInfo()), "independent-oracle/session.txt")'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-independent-oracle
+          path: independent-oracle/
