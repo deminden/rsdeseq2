@@ -94,7 +94,7 @@ jobs:
           package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
           mkdir -p "dist/${package_dir}"
           cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${package_dir}/"
-          cp README.md LICENSE "dist/${package_dir}/"
+          cp README.md LICENSE THIRD_PARTY_NOTICES.md "dist/${package_dir}/"
 
       - name: Package tarball
         if: matrix.archive_ext == 'tar.gz'
