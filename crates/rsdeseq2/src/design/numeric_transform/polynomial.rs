@@ -161,7 +161,7 @@ fn power(x: f64, exponent: usize) -> f64 {
     if x == 0.0 && exponent != 0 {
         return 0.0;
     }
-    if (-11.0..=11.0).contains(&x) {
+    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) && (-11.0..=11.0).contains(&x) {
         match exponent {
             3 => return x * x * x,
             4 => return x * x * x * x,

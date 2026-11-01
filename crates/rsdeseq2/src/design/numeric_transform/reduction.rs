@@ -1,8 +1,14 @@
+// Arithmetic schedules adapted from OpenBLAS 0.3.26.
+// See OPENBLAS-LICENSE in this directory for its BSD license.
 //! Explicit, portable reduction order for the small polynomial QR problem.
 //!
 //! These operations specify rounding rather than delegating it to whichever
 //! BLAS the calling frontend happens to load. Rust and R use the same schedule.
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    if std::arch::is_x86_feature_detected!("avx512f") {
+        return dot_skylake(x, y);
+    }
     let block_width = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         16
     } else {
@@ -55,4 +61,36 @@ fn norm_binary64(x: &[f64]) -> f64 {
         }
     }
     scale * squares.sqrt()
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn dot_skylake(x: &[f64], y: &[f64]) -> f64 {
+    let mut wide = [0.0; 32];
+    let n32 = x.len() / 32 * 32;
+    for start in (0..n32).step_by(32) {
+        for i in 0..32 {
+            wide[i] = x[start + i].mul_add(y[start + i], wide[i]);
+        }
+    }
+    let mut lanes = [0.0; 16];
+    for block in 0..4 {
+        for i in 0..4 {
+            lanes[block * 4 + i] = wide[block * 8 + i] + wide[block * 8 + i + 4];
+        }
+    }
+    let n16 = x.len() / 16 * 16;
+    for start in (n32..n16).step_by(16) {
+        for i in 0..16 {
+            lanes[i] = x[start + i].mul_add(y[start + i], lanes[i]);
+        }
+    }
+    let mut reduced = [0.0; 4];
+    for i in 0..4 {
+        reduced[i] = ((lanes[i] + lanes[i + 4]) + lanes[i + 8]) + lanes[i + 12];
+    }
+    let mut total = (reduced[0] + reduced[2]) + (reduced[1] + reduced[3]);
+    for i in n16..x.len() {
+        total = x[i].mul_add(y[i], total);
+    }
+    total
 }

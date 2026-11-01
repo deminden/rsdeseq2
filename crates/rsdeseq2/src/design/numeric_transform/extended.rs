@@ -1,3 +1,5 @@
+// Arithmetic schedules adapted from OpenBLAS 0.3.26.
+// See OPENBLAS-LICENSE in this directory for its BSD license.
 //! Linux x86 R uses the x87 extended accumulator for scalar reductions.
 //! Keep that arithmetic in the Rust core, including the final rounding to f64.
 use std::arch::asm;
