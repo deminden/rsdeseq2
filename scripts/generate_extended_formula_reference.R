@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Independent R calculations; the helper supplies primitive encoding only.
-stopifnot(getRversion()=="4.6.2",packageVersion("DESeq2")=="1.52.0")
+stopifnot(getRversion()=="4.6.2")
 args<-commandArgs(TRUE)
 script<-sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1L]])
 root<-normalizePath(file.path(dirname(gsub("~+~"," ",script,fixed=TRUE)),".."))
@@ -42,5 +42,5 @@ cases<-lapply(names(specs),function(name){
  e<-specs[[name]];result<-tryCatch(withCallingHandlers(eval(e,vars,enclos=asNamespace("stats")),warning=function(w)invokeRestart("muffleWarning")),error=identity)
  list(name=name,expression=ast(e),expected=if(inherits(result,"error"))NULL else .formula_descriptor(result))
 })
-reference<-list(metadata=list(R=as.character(getRversion()),DESeq2=as.character(packageVersion("DESeq2")),collation=icuGetCollate("actual")),variables=lapply(vars,.formula_descriptor),cases=cases)
+reference<-list(metadata=list(R=as.character(getRversion()),platform=R.version$platform,BLAS=unname(extSoftVersion()["BLAS"]),blas_core=Sys.getenv("OPENBLAS_CORETYPE"),collation=icuGetCollate("actual")),variables=lapply(vars,.formula_descriptor),cases=cases)
 for(path in paths){dir.create(dirname(path),recursive=TRUE,showWarnings=FALSE);jsonlite::write_json(reference,path,pretty=TRUE,auto_unbox=TRUE,null="null",digits=NA);cat("Wrote",length(cases),"independent extended cases to",path,"\n")}

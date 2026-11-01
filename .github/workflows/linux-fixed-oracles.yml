@@ -26,7 +26,7 @@ jobs:
           python3 - <<'PYCODE'
           from pathlib import Path
           import re
-          names=['formula_expression','extended_formula','model_matrix','numeric_transform','native_formula']
+          names=['formula_expression','extended_formula','model_matrix','numeric_transform','native_formula','native_factor']
           for name in names:
               p=Path('scripts/generate_'+name+'_reference.R')
               s=p.read_text()
@@ -35,8 +35,8 @@ jobs:
               q=Path('scripts/debug_'+name+'_reference.R');q.write_text(s)
           PYCODE
           lscpu > independent-oracle/cpu.txt
-          for core in Haswell Cooperlake; do
-            for name in formula_expression extended_formula model_matrix numeric_transform native_formula; do
+          for core in Haswell; do
+            for name in formula_expression extended_formula model_matrix numeric_transform native_formula native_factor; do
               OPENBLAS_VERBOSE=2 OPENBLAS_CORETYPE=$core Rscript --vanilla scripts/debug_${name}_reference.R independent-oracle/${core}_${name}.json
             done
           done

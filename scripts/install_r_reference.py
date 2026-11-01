@@ -52,6 +52,10 @@ def require_source_hash(path, expected):
 def source_urls(row):
     urls = [row['url']]
     if urlparse(row['url']).netloc == 'cran.r-project.org':
+        urls.extend([
+            f'https://cloud.r-project.org/src/contrib/{row["package"]}_{row["version"]}.tar.gz',
+            f'https://cloud.r-project.org/src/contrib/Archive/{row["package"]}/{row["package"]}_{row["version"]}.tar.gz',
+        ])
         archive = f'https://cran.r-project.org/src/contrib/Archive/{row["package"]}/{row["package"]}_{row["version"]}.tar.gz'
         if archive not in urls:
             urls.append(archive)
