@@ -28,6 +28,15 @@ pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
     sum
 }
 pub(super) fn norm(x: &[f64]) -> f64 {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        return super::extended::norm(x);
+    }
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    norm_binary64(x)
+}
+#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+fn norm_binary64(x: &[f64]) -> f64 {
     let mut scale = 0.0;
     let mut squares = 1.0;
     for value in x.iter().map(|v| v.abs()).filter(|&v| v != 0.0) {
