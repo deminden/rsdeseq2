@@ -1,0 +1,47 @@
+name: Release candidate platform checks
+on:
+  push:
+    branches: [codex/release-check-d64d2f2]
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "d64d2f26fbd7df07ed769688b896ed4953233079"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Verify exact source revision
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "d64d2f26fbd7df07ed769688b896ed4953233079"
+      - name: Build release binary
+        run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
+      - name: Run release-profile platform tests
+        run: >-
+          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }}
+          --test model_validity --test wald_reference --test lrt_reference
+          --test dispersion_reference --test gtex_real_wald_parity
+          --test thread_invariance --test cli
+      - name: Check platform missing-value semantics
+        shell: bash
+        run: |
+          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }} --test formula_expression sum_preserves_r_missing_precedence_across_nan_orders
+          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }} --test formula_expression mean_preserves_r_missing_and_nan_order
+          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }} --test formula_expression sum_cancellation_retains_r_argument_rounding_boundaries
