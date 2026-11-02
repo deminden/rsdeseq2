@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   deployments: write
+  actions: read
 
 concurrency:
   group: release-${{ github.ref }}
