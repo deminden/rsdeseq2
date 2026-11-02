@@ -2,12 +2,23 @@ name: Release binaries
 
 on:
   workflow_call:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag whose checked assets need publication
+        required: true
+        type: string
+      source_run_id:
+        description: Original Release run with successful validation and five binary builds
+        required: true
+        type: string
 
 permissions:
   contents: write
+  actions: read
 
 env:
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 concurrency:
   group: release-binaries-${{ github.ref }}
@@ -15,6 +26,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch'
     name: Build ${{ matrix.asset_suffix }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -135,24 +147,102 @@ jobs:
   release:
     name: Upload GitHub release assets
     needs: build
+    if: ${{ always() && (needs.build.result == 'success' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     steps:
+      # Checkout cleans the workspace, so it must precede every artifact download.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Verify source and original successful checks
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, subprocess, urllib.request
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          run_id = os.environ.get('SOURCE_RUN_ID')
+          if run_id:
+              if not run_id.isdecimal():
+                  raise SystemExit('Source run ID must be numeric')
+              base = 'https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/'
+              def api(path):
+                  request = urllib.request.Request(base + path, headers={
+                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                      'Accept': 'application/vnd.github+json', 'User-Agent': 'rsdeseq2-release'})
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      return json.load(response)
+              run = api('actions/runs/' + run_id)
+              if (run['head_sha'] != commit or run['head_branch'] != os.environ['RELEASE_TAG']
+                      or run['event'] != 'push' or run['status'] != 'completed'
+                      or run['path'] != '.github/workflows/release.yml'):
+                  raise SystemExit('Source run must be the completed original tagged Release workflow')
+              jobs = api('actions/runs/' + run_id + '/jobs?per_page=100')
+              if jobs['total_count'] > len(jobs['jobs']):
+                  raise SystemExit('Source run job list is incomplete')
+              required = {
+                  'validate / rust / rust', 'validate / msrv',
+                  'validate / r / r (reference, 4.6.2)', 'validate / r / r (current, release)',
+                  'validate / parity / full-gtex-replay', 'validate / artifacts',
+                  *('binaries / Build ' + target for target in (
+                      'linux-x86_64', 'linux-aarch64', 'macos-x86_64', 'macos-aarch64', 'windows-x86_64'))}
+              passed = {job['name'] for job in jobs['jobs'] if job['conclusion'] == 'success'}
+              if required - passed:
+                  raise SystemExit('Original validation or binary checks did not all pass: ' + str(sorted(required - passed)))
+              for job in jobs['jobs']:
+                  if (job['conclusion'] not in ('success', 'skipped')
+                          and job['name'] != 'binaries / Upload GitHub release assets'):
+                      raise SystemExit('Original run has another unsuccessful job: ' + job['name'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('commit=' + commit + '\n')
+          PYCODE
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: rsdeseq2-${{ env.RELEASE_TAG }}-*
           merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id || github.run_id }}
 
-      - uses: actions/checkout@v4
       - name: Download checked source artifacts
         uses: actions/download-artifact@v4
         with:
-          name: validated-source-${{ github.sha }}
+          name: validated-source-${{ steps.source.outputs.commit }}
           path: validated
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id || github.run_id }}
       - name: Verify checked source artifacts
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
-          python3 scripts/release_artifact_manifest.py verify validated
+          env GITHUB_SHA="$SOURCE_COMMIT" GITHUB_REF_NAME="$RELEASE_TAG" \
+            python3 scripts/release_artifact_manifest.py verify validated
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+          records = list(Path('dist').glob('*.build.json'))
+          targets = {'x86_64-unknown-linux-gnu', 'aarch64-unknown-linux-gnu',
+                     'x86_64-apple-darwin', 'aarch64-apple-darwin', 'x86_64-pc-windows-msvc'}
+          if len(records) != 5:
+              raise SystemExit('Exactly five tested binary records are required')
+          actual_targets = set()
+          for path in records:
+              data = json.loads(path.read_text())
+              archive = path.with_name(path.name.removesuffix('.build.json') +
+                          ('.zip' if data['target'].endswith('msvc') else '.tar.gz'))
+              if (data['source_commit'] != os.environ['SOURCE_COMMIT']
+                      or data['profile'] != 'release'
+                      or data['validation_sha256'] != sha(Path('validated/validation.json'))
+                      or data['archive_sha256'] != sha(archive)):
+                  raise SystemExit('Binary provenance differs: ' + path.name)
+              actual_targets.add(data['target'])
+          if actual_targets != targets:
+              raise SystemExit('Binary target set is incomplete')
+          PYCODE
           cp validated/* dist/
 
       - name: Generate checksums

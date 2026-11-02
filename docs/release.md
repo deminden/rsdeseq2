@@ -283,3 +283,11 @@ source/hash identities. Only then may crate publication and the five target
 binary jobs proceed; each target runs release-profile numerical/CLI checks.
 Publishing verifies the checked artifact manifest and tag/version agreement;
 repackaging must reproduce the checked crate bytes. See the validation gate above.
+
+If the final GitHub asset upload fails after source validation and all five
+binary builds pass, run **Release binaries** manually from the default branch.
+Supply the existing `release_tag` and the original coordinated Release workflow's
+`source_run_id`. Recovery requires successful original checks, verifies the tag
+and artifact hashes, and uploads those existing checked archives. It does not
+rebuild binaries, republish the crate, or move the tag. Checkout must precede
+artifact downloads because checkout cleans the workspace.
