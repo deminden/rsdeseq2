@@ -4,7 +4,8 @@ Current local development adds [bounded posterior components and all six
 normal-likelihood mixture grids](shrinkage-component-development.md), plus
 small-argument expression corrections. The local default ashr route and restricted
 likelihood expressions now use Rust. The local default [apeglm workflow](native-apeglm-development.md)
-also uses Rust; advanced optional methods and
+also uses Rust. The later [general-regression checkpoint](native-regression-development.md)
+adds translated custom likelihoods, general fitting and `nbinomR`; advanced optional methods and
 final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

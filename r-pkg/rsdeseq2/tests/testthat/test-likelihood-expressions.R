@@ -68,3 +68,44 @@ testthat::test_that("canonical likelihood descriptors retain parameter captures 
   normal$etruncFUN <- function(a, b) stop("must not execute")
   testthat::expect_error(translate(normal), "unsupported")
 })
+
+testthat::test_that("regression likelihood syntax supports vector densities without widening formulas", {
+  translate <- rsdeseq2:::.rsdeseq2_apeglm_likelihood
+  sigma <- .7
+  parsed <- translate(function(y,x,beta,param,offset)
+    stats::dnorm(y, mean=as.numeric(x %*% beta)+offset, sd=sigma, log=TRUE))
+  testthat::expect_identical(parsed$type, "restricted")
+  testthat::expect_identical(parsed$model$arguments, c("y","x","beta","param","offset"))
+  testthat::expect_identical(parsed$model$constants, list(sigma=sigma))
+  testthat::expect_error(rsdeseq2:::.rsdeseq2_validate_formula_calls(~stats::dnorm(x)), "unsupported")
+  testthat::expect_error(rsdeseq2:::.rsdeseq2_validate_formula_calls(~x %*% y), "unsupported")
+  if (requireNamespace("apeglm", quietly=TRUE)) {
+    testthat::expect_identical(translate(apeglm::logLikNB), list(type="negative_binomial"))
+    # Identical multi-statement text outside the original namespace is still
+    # a custom function and must satisfy the single-expression restriction.
+    fake <- apeglm::logLikNB
+    environment(fake) <- baseenv()
+    testthat::expect_error(translate(fake), "one expression")
+  }
+})
+
+testthat::test_that("regression imports reject callbacks, masked densities and executable captures", {
+  translate <- rsdeseq2:::.rsdeseq2_apeglm_likelihood
+  touched <- FALSE
+  danger <- function(...) {touched <<- TRUE; stop("must not execute")}
+  testthat::expect_error(translate(function(y,x,beta,param,offset)
+    ifelse(TRUE, stats::dnorm(y, log=TRUE), danger(y))), "unsupported")
+  env <- new.env(parent=baseenv())
+  env$dnorm <- danger
+  fun <- function(y,x,beta,param,offset)dnorm(y, log=TRUE)
+  environment(fun) <- env
+  testthat::expect_error(translate(fun), "custom or unsupported")
+  fun <- function(y,x,beta,param,offset)stats::dnorm(y, sd=sigma, log=TRUE)
+  environment(fun) <- env
+  makeActiveBinding("sigma", function() {touched <<- TRUE; .7}, env)
+  testthat::expect_error(translate(fun), "active")
+  rm("sigma", envir=env)
+  delayedAssign("sigma", {touched <<- TRUE; .7}, assign.env=env)
+  testthat::expect_error(translate(fun), "delayed")
+  testthat::expect_false(touched)
+})

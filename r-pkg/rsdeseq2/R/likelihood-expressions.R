@@ -1,5 +1,5 @@
 # Translate syntax and captured scalar primitives. Never call the R functions.
-.rsdeseq2_restricted_likelihood_function <- function(fun, arity, label) {
+.rsdeseq2_restricted_likelihood_function <- function(fun, arity, label, regression = FALSE) {
   if (!is.function(fun) || is.primitive(fun) || length(formals(fun)) != arity ||
       "..." %in% names(formals(fun))) {
     stop(sprintf("%s requires %s scalar arguments", label, arity), call. = FALSE)
@@ -16,13 +16,15 @@
   allowed <- c("(", "I", "+", "-", "*", "/", "^", "%%", "%/%", "!", "&", "|",
     "<", "<=", ">", ">=", "==", "!=", "log", "log2", "log10", "log1p", "exp",
     "expm1", "sqrt", "abs", "sign", "floor", "ceiling", "trunc", "ifelse", "pmin", "pmax")
+  extra <- if (regression) c("%*%", "lgamma", "as.numeric", "as.double", "dnorm", "dnbinom", "dbinom", "dt") else character()
+  allowed <- c(allowed, extra)
   inspect <- function(x, depth = 0L) {
     if (depth > 128L) stop(sprintf("%s nesting exceeds 128", label), call. = FALSE)
     if (!is.call(x)) return(invisible(NULL))
     head <- x[[1L]]
     name <- if (is.symbol(head)) as.character(head) else if (
       is.call(head) && length(head) == 3L && identical(head[[1L]], as.name("::")) &&
-      identical(head[[2L]], as.name("base")) && is.symbol(head[[3L]])) {
+      as.character(head[[2L]]) %in% (if (regression) c("base", "stats") else "base") && is.symbol(head[[3L]])) {
       as.character(head[[3L]])
     } else "computed call"
     if (!name %in% allowed) stop(sprintf("unsupported %s call '%s'", label, name), call. = FALSE)
@@ -32,7 +34,7 @@
   inspect(expression)
   env <- environment(fun)
   formula <- structure(call("~", expression), class = "formula", .Environment = env)
-  .rsdeseq2_validate_formula_calls(formula)
+  .rsdeseq2_validate_formula_calls(formula, extra_calls = extra)
   arguments <- names(formals(fun))
   captured <- setdiff(all.vars(expression), arguments)
   constants <- stats::setNames(lapply(captured, function(name) {

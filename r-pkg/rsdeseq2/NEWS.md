@@ -7,6 +7,10 @@
 * Retain original apeglm iteration/stopping behavior with a standalone
   MIT-licensed LBFGSpp algorithm adaptation. Ship its attribution with Rust source
   and installed R packages; the read-only vendor gate checks notice integrity.
+* Add shared Rust general apeglm and analytic `nbinomR` fitting, with BFGS and
+  bounded L-BFGS-B. Translate restricted five-argument likelihood expressions,
+  matrix products and supported density calls without invoking R callbacks.
+  Custom formula functions remain unsupported.
 
 * Import standard saved DESeq2 local-dispersion coefficients without refitting.
   Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.

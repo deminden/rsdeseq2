@@ -22,7 +22,7 @@ fn invalid(reason: &str) -> DeseqError {
         reason: format!("restricted likelihood expression: {reason}"),
     }
 }
-fn scalar(value: &Value) -> Result<f64, DeseqError> {
+pub(super) fn scalar(value: &Value) -> Result<f64, DeseqError> {
     if value.dimensions.is_some() || !value.attributes.is_empty() {
         return Err(invalid("only unclassed scalar values are supported"));
     }
@@ -39,7 +39,7 @@ fn scalar(value: &Value) -> Result<f64, DeseqError> {
         _ => Err(invalid("only numeric and logical values are supported")),
     }
 }
-fn validate(
+pub(super) fn validate(
     expression: &Expression,
     bindings: &[&str],
     depth: usize,

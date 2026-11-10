@@ -6,6 +6,9 @@ separately in [ashr development](shrinkage-component-development.md) and
 original-package numerical references with direct native/R-free output-bit
 comparisons and blocked R statistical calls. Advanced optional methods and the
 final combined suite/performance/memory/artifact gates remain open.
+The later [general-regression checkpoint](native-regression-development.md)
+covers translated likelihoods and analytic `nbinomR`, with independent
+high-precision density checks where original R loses tail precision.
 
 ## Accepted benchmark runs
 

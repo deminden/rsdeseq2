@@ -188,6 +188,16 @@ pub fn fit_negative_binomial_posterior(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
+    fit_batch(input, options, None)
+}
+pub(super) fn fit_batch(
+    input: NegativeBinomialPosteriorInput<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+    regression: Option<(
+        Option<MatrixView<'_, f64>>,
+        &super::regression::RegressionPosteriorOptions,
+    )>,
+) -> Result<NegativeBinomialPosterior, DeseqError> {
     let g = input.counts.n_rows();
     let n = input.counts.n_cols();
     let p = input.design.n_cols();
@@ -201,7 +211,7 @@ pub fn fit_negative_binomial_posterior(
             .counts
             .as_slice()
             .iter()
-            .any(|v| !v.is_finite() || *v < 0.0)
+            .any(|v| !v.is_finite() || (regression.is_none() && *v < 0.0))
     {
         return Err(invalid(
             "counts must be finite nonnegative numbers and design must be finite",
@@ -293,7 +303,14 @@ pub fn fit_negative_binomial_posterior(
         let counts = (0..n)
             .map(|i| *input.counts.at(gene, i))
             .collect::<Vec<_>>();
-        if counts.iter().all(|&v| v == 0.0) {
+        let nb_r = regression.is_some_and(|(_, o)| {
+            o.method == super::regression::RegressionMethod::NegativeBinomialR
+        });
+        let skip_zero = regression.is_none()
+            || regression.is_some_and(|(_, o)| {
+                o.method == super::regression::RegressionMethod::NegativeBinomialR && o.log_link
+            });
+        if skip_zero && counts.iter().all(|&v| v == 0.0) {
             diagnostics.push(PosteriorMapDiagnostic {
                 convergence: None,
                 function_evaluations: 0,
@@ -328,8 +345,49 @@ pub fn fit_negative_binomial_posterior(
         let initial = (0..p)
             .map(|j| if j % 2 == 0 { 0.1 } else { -0.1 })
             .collect::<Vec<_>>();
-        let mut result = optimize(&row, initial.clone())?;
-        let disagreement = if options.check_opposite_start {
+        let general = regression
+            .filter(|(_, o)| o.method == super::regression::RegressionMethod::General)
+            .map(|(parameters, config)| super::regression::GeneralRow {
+                y: &row.counts,
+                design: input.design,
+                parameters: parameters.map(|m| (0..m.n_cols()).map(|j| *m.at(gene, j)).collect()),
+                weights: &row.weights,
+                offsets: &row.offsets,
+                prior: &prior,
+                options: config,
+                error: std::cell::RefCell::new(None),
+            });
+        let mut result = if let Some(general) = &general {
+            general.optimize(
+                (0..p)
+                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+                    .collect(),
+            )?
+        } else {
+            if nb_r {
+                let (_, config) = regression.unwrap();
+                let mut start = (0..p)
+                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+                    .collect::<Vec<_>>();
+                if config.log_link {
+                    let baseline = (0..n)
+                        .filter(|&i| {
+                            (0..p).filter(|&j| *input.design.at(i, j) == 0.0).count() == p - 1
+                        })
+                        .collect::<Vec<_>>();
+                    let mean = if baseline.is_empty() {
+                        row.counts.iter().sum::<f64>() / n as f64
+                    } else {
+                        baseline.iter().map(|&i| row.counts[i]).sum::<f64>() / baseline.len() as f64
+                    };
+                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln() };
+                }
+                super::regression::optimize_nb_r(&row, config, start)?
+            } else {
+                optimize(&row, initial.clone())?
+            }
+        };
+        let disagreement = if regression.is_none() && options.check_opposite_start {
             let second = optimize(&row, initial.into_iter().map(|v| -v).collect())?;
             result
                 .par
@@ -339,7 +397,7 @@ pub fn fit_negative_binomial_posterior(
         } else {
             false
         };
-        if !options.map_only && (result.convergence != 0 || disagreement) {
+        if regression.is_none() && !options.map_only && (result.convergence != 0 || disagreement) {
             result = refine(&row, result.par)?;
         }
         for (j, &value) in result.par.iter().enumerate() {
@@ -347,7 +405,21 @@ pub fn fit_negative_binomial_posterior(
         }
         let mut laplace_valid = false;
         if let Some(sd) = &mut sd {
-            let h = row.hessian(&result.par, options.hessian_step);
+            let h = if let Some(general) = &general {
+                general.hessian(&result.par, options.hessian_step)
+            } else {
+                row.hessian(&result.par, options.hessian_step)
+            };
+            if let Some(e) = general.as_ref().and_then(|g| g.take_error()) {
+                return Err(e);
+            }
+            if regression.is_some()
+                && (!h.iter().all(|v| v.is_finite()) || h.clone().try_inverse().is_none())
+            {
+                return Err(invalid(
+                    "general posterior Hessian is singular or nonfinite",
+                ));
+            }
             if h.iter().all(|v| v.is_finite())
                 && let Some(covariance) = h.try_inverse()
                 && covariance

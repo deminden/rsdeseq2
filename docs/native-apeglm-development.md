@@ -9,10 +9,12 @@ statistical routine is called. The default method no longer requires the apeglm
 package at runtime; original apeglm remains the independent comparison engine.
 
 The full [Rust-only migration](rust-only-wrapper-migration.md) remains open.
-Current native public methods are `nbinomCR` and MAP-only `nbinomC`.
-General/restricted custom likelihoods, `nbinomR`, random-start methods,
+Current native public methods are `general`, `nbinomR`, `nbinomCR` and MAP-only
+`nbinomC`. General fitting accepts restricted custom likelihood expressions,
+central/noncentral Student-t priors and Gaussian nuisance priors. The general
+and `nbinomR` routes support BFGS and bounded L-BFGS-B. Random-start methods,
 beta-binomial methods, grid intervals, parameter uncertainty, contrasts and
-alternate optimizer policies still require implementation. Unfinished methods
+other optimizer policies still require implementation. Unfinished methods
 fail explicitly, with no R calculation fallback. This checkpoint is not a new
 release, and GitHub publication remains unauthorized.
 
@@ -76,6 +78,16 @@ The [machine-readable local report](data/native-apeglm-local.json) binds the exa
 measured errors. Full suites, sanitizer/platform checks, combined speed/memory
 acceptance, final documentation reconciliation and source-bundle rebuilding
 remain deferred until the remaining methods are implemented.
+
+## General and restricted likelihood checkpoint
+
+The subsequent [general-likelihood checkpoint](native-regression-development.md)
+adds standalone general regression and analytic `nbinomR` fitting. It records
+21 original posterior profiles, 20 density-expression panels, 35 import-policy
+assertions and complete native/R-free batch comparisons. Public general,
+`nbinomR` and translated custom-likelihood checks pass on 1,200 genes with R
+statistical routines blocked. Default-method regression checks retain the
+thirteen independent profiles, normalization-factor profile and public workflow.
 
 ## Reproduction
 

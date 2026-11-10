@@ -98,6 +98,7 @@
     list(
       Y = counts,
       x = design,
+      log.lik = if (identical(apeMethod, "general")) list(type = "negative_binomial") else NULL,
       param = as.numeric(dispersions),
       coef = coefficient,
       mle = if (apeAdapt) list(estimates = res$log2FoldChange, standard_errors = res$lfcSE, scale = "log2") else NULL,
@@ -108,9 +109,11 @@
     ),
     dots
   )
-  # NB methods do not use log.lik. No R closure enters the numerical transport.
-  # General restricted-expression support is a separate native adapter.
-  apeArguments$log.lik <- NULL
+  nativeMethod <- match.arg(apeArguments$method, c("general", "nbinomR", "nbinomCR", "nbinomC", "nbinomC*", "betabinR", "betabinCR", "betabinC", "betabinC*"))
+  if (identical(nativeMethod, "general")) {
+    if (is.function(apeArguments$log.lik)) apeArguments$log.lik <- .rsdeseq2_apeglm_likelihood(apeArguments$log.lik)
+    if (is.null(apeArguments$log.lik)) stop("general apeglm requires a likelihood function", call. = FALSE)
+  } else apeArguments$log.lik <- NULL
   apeFit <- .rsdeseq2_formula_request(list(operation = "apeglm_shrinkage", arguments = apeArguments))
   if (length(apeFit$posterior_mode) != nrow(counts)) {
     stop("apeglm returned a coefficient matrix with an incompatible row count", call. = FALSE)

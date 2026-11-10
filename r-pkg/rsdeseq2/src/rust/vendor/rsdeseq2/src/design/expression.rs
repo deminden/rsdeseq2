@@ -314,7 +314,7 @@ impl Evaluator<'_> {
     }
 }
 
-pub(super) fn arguments<'a, T>(
+pub(crate) fn arguments<'a, T>(
     args: &'a [(Option<String>, T)],
     formals: &[&str],
 ) -> Result<Vec<Option<&'a T>>, DeseqError> {

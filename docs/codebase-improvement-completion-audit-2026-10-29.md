@@ -8,6 +8,11 @@ below retains its recorded source scope; C19/C21/C23 are not closed by these
 default-method checkpoints. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
+The later [general-regression checkpoint](native-regression-development.md)
+adds general and `nbinomR` apeglm methods plus restricted custom likelihoods,
+with native/R-free output identity and independent original-package posterior
+checks. Other advanced methods and the final gates remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).
