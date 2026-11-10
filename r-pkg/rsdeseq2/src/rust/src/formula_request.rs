@@ -133,6 +133,7 @@ fn dispatch(request: &Value) -> Result<Value, String> {
         "frozen_local_grid" => frozen_local::evaluate(request),
         "posterior_normal_mixture" => posterior::normal_mixture(request),
         "posterior_svalues" => posterior::ordered_svalues(request),
+        "posterior_fit_mixture" => posterior::fit_mixture(request),
         "evaluate" | "frame_evaluate" => {
             let expressions = list(get(request, "expressions")?)?
                 .iter()

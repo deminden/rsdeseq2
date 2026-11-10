@@ -20,3 +20,17 @@ testthat::test_that('posterior bridge preserves point masses and validates compl
   for (rate in list(-.1,1.1,Inf))
     testthat::expect_error(.rsdeseq2_formula_request(list(operation='posterior_svalues',rates=rate)))
 })
+
+testthat::test_that('native mixture fitting retains weighted prior modes and diagnostics', {
+  request<-list(operation='posterior_fit_mixture',observations=2L,components=2L,
+    log_likelihoods=c(0,-Inf,-Inf,0),observation_weights=c(3,1),dirichlet=c(2,2),initial_weights=NULL,
+    options=list(max_iterations=1000L,gradient_tolerance=1e-8,em_iterations=20L,active_iterations=100L,zero_threshold=1e-8,likelihood_offset=0))
+  fit<-.rsdeseq2_formula_request(request)
+  testthat::expect_true(fit$converged)
+  testthat::expect_equal(fit$weights,c(2/3,1/3),tolerance=1e-12)
+  testthat::expect_equal(fit$penalized_log_likelihood,4*log(2/3)+2*log(1/3),tolerance=1e-12)
+  testthat::expect_lte(fit$dual_residual,1e-8)
+  for(change in list(list(observation_weights=1),list(dirichlet=c(0,1)),list(components=3L),
+      list(options=list(likelihood_offset=-1)),list(options=list(active_iterations=0L))))
+    testthat::expect_error(.rsdeseq2_formula_request(utils::modifyList(request,change,keep.null=TRUE)))
+})

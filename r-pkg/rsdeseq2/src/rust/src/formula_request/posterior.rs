@@ -1,12 +1,76 @@
 //! Primitive transport for standalone posterior kernels; no R callbacks.
-use super::{Data, Value, get, named};
-use rsdeseq2::shrinkage::{NormalMixture, svalues};
+use super::{Data, Value, get, integer, named};
+use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+use rsdeseq2::shrinkage::{MixtureFitOptions, NormalMixture, fit_mixture_proportions, svalues};
 
 fn numbers(value: &Value) -> Result<&[f64], String> {
     match &value.data {
         Data::Number { values, .. } => Ok(values),
         _ => Err("posterior request requires numeric vectors".into()),
     }
+}
+fn scalar(value: &Value) -> Result<f64, String> {
+    match numbers(value)? {
+        [value] => Ok(*value),
+        _ => Err("posterior control requires one numeric value".into()),
+    }
+}
+
+pub(super) fn fit_mixture(request: &Value) -> Result<Value, String> {
+    let controls = get(request, "options")?;
+    let options = MixtureFitOptions {
+        max_iterations: integer(get(controls, "max_iterations")?)?,
+        gradient_tolerance: scalar(get(controls, "gradient_tolerance")?)?,
+        em_iterations: integer(get(controls, "em_iterations")?)?,
+        active_iterations: integer(get(controls, "active_iterations")?)?,
+        zero_threshold: scalar(get(controls, "zero_threshold")?)?,
+        likelihood_offset: scalar(get(controls, "likelihood_offset")?)?,
+    };
+    let initial = get(request, "initial_weights")?;
+    let initial = if matches!(initial.data, Data::Null) {
+        None
+    } else {
+        Some(numbers(initial)?)
+    };
+    let observations = integer(get(request, "observations")?)?;
+    let components = integer(get(request, "components")?)?;
+    let likelihoods = MatrixView::new(
+        observations,
+        components,
+        numbers(get(request, "log_likelihoods")?)?,
+        MatrixOrder::RowMajor,
+    )
+    .map_err(|e| e.to_string())?;
+    let fit = fit_mixture_proportions(
+        likelihoods,
+        Some(numbers(get(request, "observation_weights")?)?),
+        numbers(get(request, "dirichlet")?)?,
+        initial,
+        options,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(named(
+        &[
+            "weights",
+            "log_likelihood",
+            "penalized_log_likelihood",
+            "dual_residual",
+            "optimizer_weight_sum",
+            "function_evaluations",
+            "converged",
+            "message",
+        ],
+        vec![
+            Value::numbers(fit.weights),
+            Value::numbers(vec![fit.log_likelihood]),
+            Value::numbers(vec![fit.penalized_log_likelihood]),
+            Value::numbers(vec![fit.dual_residual]),
+            Value::numbers(vec![fit.optimizer_weight_sum]),
+            Value::numbers(vec![fit.function_evaluations as f64]),
+            Value::new(Data::Logical(vec![Some(fit.converged)])),
+            Value::new(Data::Text(vec![Some(fit.message)])),
+        ],
+    ))
 }
 
 pub(super) fn normal_mixture(request: &Value) -> Result<Value, String> {

@@ -48,6 +48,13 @@ with R math blocked. Public optional shrinkage routes remain unchanged; prior
 fitting, alternate families/likelihoods and the full options/missingness/warning
 contract are still open. No unchanged workflow is retimed for unused primitives.
 
+The later [mixture prior fitter](mixture-prior-fitting-2026-11-10.md) supplies
+standalone EM/SQP weight fitting, including observation weights and a Dirichlet
+penalty. Eight original ashr profiles cover 1,920 observations and complete-fit
+bridge/R-free output bits agree. The public optional shrinkage methods still
+require their grid/component/likelihood/control and missingness/warning adapters;
+this foundation does not close C19/C21/C23 or add a performance claim.
+
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
 apeglm 1.34.0 and ashr 2.2-63. Historical benchmark results retain their original
 checkpoint and executable identity. The measured M4 executable is SHA-256

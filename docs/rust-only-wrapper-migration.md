@@ -100,6 +100,14 @@ R math blocked. This foundation does not switch public optional methods or
 close their prior-fitting, alternate-family, option/missingness and warning
 contracts. The inventory in that report preserves their broader migration scope.
 
+The [mixture-weight checkpoint](mixture-prior-fitting-2026-11-10.md) adds a native
+EM/SQP fitter over supplied component log likelihoods. Eight independent original
+ashr profiles cover 1,920 observations, and complete fits agree bit for bit across
+the bridge and R-free process with identical binary inputs. The likelihood offset
+and fitting procedure correct a rejected optimizer trial without changing bounds.
+Full prior/grid/likelihood/control and missingness/warning adapters still precede
+production adoption; the public optional methods and completion gates remain open.
+
 The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The
 [built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)
