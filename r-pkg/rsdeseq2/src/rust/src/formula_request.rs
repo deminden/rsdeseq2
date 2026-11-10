@@ -4,6 +4,7 @@ use rsdeseq2::design::expression::{
     self, Argument, Data, EvaluationOptions, Expression, Value, frame, wire,
 };
 use std::ptr;
+mod frozen_local;
 pub struct FormulaOutput {
     bytes: Vec<u8>,
 }
@@ -128,6 +129,7 @@ fn frame_output(result: frame::Frame) -> Value {
 fn dispatch(request: &Value) -> Result<Value, String> {
     let operation = text(get(request, "operation")?)?;
     match operation {
+        "frozen_local_grid" => frozen_local::evaluate(request),
         "evaluate" | "frame_evaluate" => {
             let expressions = list(get(request, "expressions")?)?
                 .iter()

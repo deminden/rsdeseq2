@@ -97,7 +97,7 @@ jobs:
           cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }}
           --test model_validity --test wald_reference --test lrt_reference
           --test dispersion_reference --test gtex_real_wald_parity
-          --test thread_invariance --test cli
+          --test thread_invariance --test cli --test frozen_local_vst
 
       - name: Stage files
         shell: bash

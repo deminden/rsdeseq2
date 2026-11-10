@@ -4,7 +4,12 @@ use crate::errors::DeseqError;
 use crate::matrix::RowMajorMatrix;
 
 // Fast-VST row selection and aligned subsets.
+mod frozen;
 mod subset;
+pub use frozen::{
+    FrozenLocalDispersion, SavedLocalDispersionFit, frozen_local_vst_grid_from_counts,
+    vst_frozen_local,
+};
 pub use subset::{
     FastVstSubset, FastVstSubsetMetadata, fast_vst_eligible_count, fast_vst_subset,
     fast_vst_subset_indices, fast_vst_subset_matrix_rows, fast_vst_subset_normalized_counts,

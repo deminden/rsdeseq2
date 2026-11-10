@@ -7,6 +7,7 @@ use icu_locale::Locale;
 mod arithmetic;
 mod comparisons;
 mod conditional;
+mod extrema;
 mod factors;
 pub mod frame;
 mod functions;

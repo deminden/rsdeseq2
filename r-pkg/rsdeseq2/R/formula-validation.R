@@ -8,7 +8,7 @@
     "is.nan", "is.finite", "is.infinite", "c", "list", "cbind", "matrix", "rep",
     "seq_len", "length", "scale", "poly", "factor", "ordered", "as.factor",
     "as.ordered", "droplevels", "relevel", "mean", "sum", "sd", "ifelse",
-    "~", ":", "%in%")
+    "~", ":", "%in%", "pmax", "pmin")
   env <- environment(formula)
   if (is.null(env)) env <- baseenv()
   trusted <- list(baseenv(), asNamespace("base"), asNamespace("stats"))

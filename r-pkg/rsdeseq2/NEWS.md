@@ -1,3 +1,12 @@
+# Development after 0.4.0
+
+* Import standard saved DESeq2 local-dispersion coefficients without refitting.
+  Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.
+* Translate restricted custom dispersion expressions into Rust. Reject custom
+  calls, active bindings and delayed expressions before execution.
+* Borrow count/normalization matrices when preparing the 999-point frozen grid,
+  avoiding a full normalized matrix transfer through the primitive transport.
+
 # rsdeseq2 0.4.0
 
 * Match Linux original-R extended reductions, polynomial BLAS rounding and

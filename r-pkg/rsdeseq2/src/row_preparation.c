@@ -7,7 +7,16 @@ extern const char *rsdeseq2_r_last_error(void);
 extern int rsdeseq2_r_validate_counts(size_t,size_t,const double *);
 extern int rsdeseq2_r_normal_shrinkage_rows(size_t,size_t,const double *,const double *,const double *,const int32_t *,int32_t *,size_t *);
 extern int rsdeseq2_r_offset_factors(size_t,size_t,const double *,const double *,const double *,double *);
+extern int rsdeseq2_r_frozen_local_grid(size_t,size_t,const double *,const double *,const double *,double *);
 static void checked(int status) {if(status)Rf_error("rsdeseq2 Rust backend: %s",rsdeseq2_r_last_error());}
+SEXP rsdeseq2_frozen_local_grid(SEXP counts,SEXP sf,SEXP nf) {
+    validate_matrix(counts,"counts");
+    validate_normalization(counts,sf,nf,R_NilValue);
+    SEXP grid=PROTECT(Rf_allocVector(REALSXP,999));
+    checked(rsdeseq2_r_frozen_local_grid((size_t)matrix_rows(counts),(size_t)matrix_cols(counts),REAL(counts),
+        sf==R_NilValue?NULL:REAL(sf),nf==R_NilValue?NULL:REAL(nf),REAL(grid)));
+    UNPROTECT(1);return grid;
+}
 SEXP rsdeseq2_validate_counts(SEXP counts) {
     validate_matrix(counts,"counts");
     checked(rsdeseq2_r_validate_counts((size_t)matrix_rows(counts),(size_t)matrix_cols(counts),REAL(counts)));
