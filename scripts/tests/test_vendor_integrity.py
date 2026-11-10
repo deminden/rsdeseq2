@@ -10,6 +10,20 @@ import sync_r_vendor as vendor
 
 
 class VendorIntegrity(unittest.TestCase):
+    def test_installed_notices_are_complete_and_read_only_check_rejects_drift(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source, destination = Path(temp)/'NOTICE', Path(temp)/'COPYRIGHTS'
+            source.write_text('Required third-party notice\n')
+            for content in (None, 'incomplete notice\n'):
+                if content is not None: destination.write_text(content)
+                before = destination.read_bytes() if destination.exists() else None
+                with self.assertRaisesRegex(ValueError, 'third-party notices differ'):
+                    vendor.sync_notice(source, destination, check=True)
+                self.assertEqual(before, destination.read_bytes() if destination.exists() else None)
+            vendor.sync_notice(source, destination)
+            vendor.sync_notice(source, destination, check=True)
+            self.assertEqual(source.read_bytes(), destination.read_bytes())
+
     def test_check_rejects_missing_extra_and_changed_sources_without_writing(self):
         for mutation in ('missing', 'extra', 'changed'):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:

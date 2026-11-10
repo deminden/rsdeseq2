@@ -1,0 +1,139 @@
+{
+  "artifacts": {
+    "results/native-apeglm/local-library/rsdeseq2/libs/rsdeseq2.so": "1e754bf52edec7d6fb05dab45c0d9276bb29ad27184e2ff5a86ae3e2d2c7c656",
+    "results/native-apeglm/workflow-complete/public-input.json": "320def94f48f6e767e32a6a3a1b1098afd3a161bebef97674161b0338af6b524",
+    "results/native-apeglm/workflow/paired_fits.rds": "991679fd2f0ed9b84219f9717aba25aa2da6c593097dbf4e66128e3656ac32f9",
+    "target/release/examples/evaluate_r_interface": "7226baea0a85dec02ea8e96aa49e568e8daff9e0beadd706995526beadcfa355"
+  },
+  "files": {
+    "README.md": "e1ea427346a997aae082d1133a83c9a00d7b985bc401b0bdee8d3b596de8b827",
+    "THIRD_PARTY_NOTICES.md": "a686bccec64c71716db5189c019bdfb84a524c38b19b20d1cf0d3f56cdc18347",
+    "crates/rsdeseq2/examples/evaluate_r_interface.rs": "5deae2b3b50987a79c3437dca220868f996ca4d373dbd46c6d09a2d8fc2f5f8b",
+    "crates/rsdeseq2/examples/evaluate_r_interface/heavy_tail.rs": "dfa22c6f2560b91ba8ab37da8d4c3e514c212404ce3ff5e5c83c82e71dbb4d30",
+    "crates/rsdeseq2/src/shrinkage.rs": "01cd13c9de974278af896cad913301f571c7655d23c7e3298a5156d449aa9a44",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail.rs": "472454ea98b75ac4ff55f5d06aa8f6acf0807e5f3bfc547d91df11971bf8f674",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/LBFGSPP-LICENSE": "dc476432003637cc15966d2f5cc69ac62c1425e5ec0d6e6f56433436b8fad85b",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "16303ed3ee7638935a82769182b9e54ea828ddabda73f2d8af58f1ebb7187793",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/negative_binomial.rs": "979c879d84c0a211f49d5245f15ce7811037402b6876b91ffea8bf84634f7fa8",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/prior.rs": "d16cd5d8849141a842919e95fff6f017241427479d3e529cfba02964863e2b40",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/unbounded_lbfgs.rs": "6a46b3d852ad72bfdd21d58e8f3dbc1ebf51d071e1b7c6f72f1bd3df0aa49009",
+    "crates/rsdeseq2/src/shrinkage/location_batch.rs": "8387b852c14778a189a686a3549badde326eb120cec8feb1ea0efe91e4f14179",
+    "crates/rsdeseq2/tests/data/cauchy_posterior_r462.json": "948baf09a7238758c10d187799627f7ba5baa8ce42a252c7a4e5c01efdba4982",
+    "crates/rsdeseq2/tests/heavy_tail.rs": "1292560d1db3d833750178764bdcb581e7db64b4137b10d6eedaf693801503d0",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "906164ae23630b9f479f2bf6ea888f01c56a1905917290b970b75bf84161afd0",
+    "docs/compatibility.md": "8de067952a3af1307afe3e18aab16bef5121d999da67d77b54f06d4c27f3df65",
+    "docs/native-apeglm-development.md": "a065af635eee3fb7b85f965ddefe53441219adc13d50348877d95d530dd0d1e1",
+    "docs/r-wrapper.md": "44fc56ed8ec96e31c4dfc6977e05ba12ad918d2fcd3af91fc54fb387f3333ec1",
+    "docs/rust-only-wrapper-migration.md": "2737feb00e74c951939ba362b95104a7897a2a9ddbe70c3a2618aa65ad68f9d4",
+    "docs/shrinkage-component-development.md": "a82ddae039c6b5df34cb2e724ac891efb32ff5644668c8abc6f22895bfce906e",
+    "docs/testing-parity.md": "1a52326f68bf12385d32e83563dbedad93eb07b259011b4e54a84b3817654251",
+    "r-pkg/rsdeseq2/NEWS.md": "03cfa645f5e01c6ad94bfebd0b23195f616c4b93feb0d1adee159df56f1cab0d",
+    "r-pkg/rsdeseq2/R/lfc-shrink-apeglm.R": "dd1047309cee6aeb929e783edad10bf47ae64af0497344277a8eb8eec5679fa0",
+    "r-pkg/rsdeseq2/README.md": "8ac8bcadea476d86dd20f363918e717b328b201f9cf7b565d581b30335a163a3",
+    "r-pkg/rsdeseq2/inst/COPYRIGHTS": "a686bccec64c71716db5189c019bdfb84a524c38b19b20d1cf0d3f56cdc18347",
+    "r-pkg/rsdeseq2/man/rsdeseq2-primitives.Rd": "6e0c19b8311c8d430ff96c866d6cb2e683ca6b488c370ce3ce9a9b62c2b6d266",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request.rs": "afa01dd32e49207daa3f034fcaa190da2407f16835312dd657cb32e691d4b0ac",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/apeglm.rs": "b9a729d58e381bc69017dd1b6acd4a2ca8f82e948c88706767f9fd301a6830fb",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/ashr.rs": "02a2812750060cec1a0d5c69eb12d6258e88171df1ab74d62a2c57b91ba5f329",
+    "scripts/check_native_apeglm_workflow.R": "661018b83afe3e4b9a438ca0825a9b3e88ce4a938fede921b4da22b82f10cec7",
+    "scripts/generate_cauchy_posterior_reference.R": "3cdb2d3baad850b034141971b0079b327b05dd31a75296e87db78397ac642ec4",
+    "scripts/sync_r_vendor.py": "ff14cbfeeeec800914347be67bd2429e99da5134c47e0d5375e1f9fe91e6b826",
+    "scripts/tests/test_vendor_integrity.py": "87ac86766cf52cc98552b5417dd6a6afd39f179c56944304a9647f2edddc6fa3"
+  },
+  "focused_validation": {
+    "Python_vendor_integrity_tests": 3,
+    "Rust_tests": 3,
+    "core_and_backend_clippy_all_targets": "passed",
+    "direct_interface_and_public_workflow": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 14,
+      "existing_bounds_unchanged": true,
+      "genes": 1200,
+      "normalization_factor_errors": {
+        "mode": 1.3663e-14,
+        "sd": 8.6739e-13,
+        "svalue": 6.7751e-14,
+        "threshold_svalue": 1.6875e-14
+      },
+      "public_errors": [
+        {
+          "mode": 1.7164e-13,
+          "profile": "default",
+          "sd": 5.3516e-13,
+          "svalue": null
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "sign",
+          "sd": 5.3516e-13,
+          "svalue": 1.8527e-15
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "threshold",
+          "sd": 5.3516e-13,
+          "svalue": 2.609e-15
+        }
+      ],
+      "public_normalization_log2_bits_identical": true
+    },
+    "direct_interface_fields": [
+      "selected coefficient mode/SD",
+      "sign and FSOS s-values",
+      "adapted prior scale/variance",
+      "nuisance indices",
+      "convergence status"
+    ],
+    "existing_bounds_or_oracles_relaxed": false,
+    "full_suites_performance_memory_sanitizers_and_release_bundle": "deferred until remaining methods are combined",
+    "invalid_boundary_cases": "nonfinite/negative/overflowing counts, invalid dispersions, nonrepresentable prior scales; all-zero rows retain NA and absent convergence",
+    "original_posterior_profiles": 13,
+    "original_prior_profiles": 6,
+    "posterior_observations": 145,
+    "previous_12_new_fixture_profiles_unchanged_when_adding_sensitive_row": true,
+    "read_only_vendor_and_notice_gate": "passed",
+    "source_warnings_in_frozen_profiles": []
+  },
+  "full_plan_complete": false,
+  "licensing": {
+    "GPL_apeglm_source_bundled": false,
+    "R_installed_notice": "r-pkg/rsdeseq2/inst/COPYRIGHTS",
+    "R_notice_equals_root": true,
+    "Rust_source_notice": "crates/rsdeseq2/src/shrinkage/heavy_tail/LBFGSPP-LICENSE"
+  },
+  "numerical_build_source_manifest": {
+    "all_current_files_match": true,
+    "files": 573,
+    "path": "results/native-apeglm/build-source-final.json",
+    "sha256": "8fb30d2f3ba15a38feeba0dcb5f2fbd0ffaafb30a7bac048318b74de76289995"
+  },
+  "parent_commit": "97c247aecb0295a9ef0669987a0e372c8541e802",
+  "performance_claim": "none; no counted 2% optimization round; default absent weights and sample offsets avoid full repeated matrices",
+  "publication_authorized": false,
+  "reference_environment": {
+    "DESeq2": "1.52.0",
+    "R": "4.6.2",
+    "RcppNumerical": "0.7.0",
+    "apeglm": "1.34.0",
+    "apeglm_upstream_git": "685e82d2c5cdf91d3f0d04a4b96e4d4d61524b87"
+  },
+  "rejected_trial": {
+    "bound": 0.01,
+    "method": "general L-BFGS-B optimized beyond the reference stopping policy",
+    "native_line_search_failures": 13,
+    "public_log2_MAP_error": 0.010455605,
+    "rejected_oracle_bounds_changed": false,
+    "resolution": "MIT-licensed unbounded LBFGSpp algorithm adaptation, matching the source normalization +10 and 1e-8 gradient/function stopping rules; fallback refinement reuses rcompat-lbfgsb",
+    "source_SD_error": 0.0009256931
+  },
+  "remaining": [
+    "advanced ashr families, optimizers, estimated modes, controls and output/warning contracts",
+    "apeglm general and restricted custom likelihoods, nbinomR, beta-binomial and random-start methods",
+    "grid intervals, parameter uncertainty, contrast and alternate optimizer policies",
+    "C21 authority audit and C23 full combined precision/speed/memory/sanitizer/platform/source-bundle checks"
+  ],
+  "scope": "Local unreleased default negative-binomial apeglm and MAP-only adoption; advanced method surface and full plan remain unfinished"
+}

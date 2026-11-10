@@ -23,8 +23,8 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
 
 The R wrapper’s [Rust-only migration](docs/rust-only-wrapper-migration.md) is
-in progress. Supported formula calculations and the local default ashr workflow
-use the shared Rust core. Advanced ashr options and apeglm migration remain open;
+in progress. Supported formula calculations and local default ashr/apeglm workflows
+use the shared Rust core. Advanced shrinkage options remain open;
 released 0.4.0 optional shrinkage still involves R.
 
 ## Install and Run

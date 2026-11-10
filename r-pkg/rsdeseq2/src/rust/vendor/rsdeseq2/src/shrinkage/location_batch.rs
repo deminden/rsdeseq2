@@ -1,5 +1,5 @@
 //! Complete location-scale shrinkage preparation and summaries in Rust.
-//! Public R adoption still requires the remaining method/options parity gates.
+//! The default public adapter uses this engine; advanced option gates remain.
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{
     LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions, MixtureGrid,

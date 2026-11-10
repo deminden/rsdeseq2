@@ -8,7 +8,7 @@
   if (!inherits(dds, "DESeqDataSet")) {
     stop("object must be a DESeqDataSet", call. = FALSE)
   }
-  for (package in c("SummarizedExperiment", "S4Vectors", "DESeq2", "apeglm")) {
+  for (package in c("SummarizedExperiment", "S4Vectors", "DESeq2")) {
     if (!requireNamespace(package, quietly = TRUE)) {
       stop(sprintf("type='apeglm' requires package '%s'", package), call. = FALSE)
     }
@@ -81,51 +81,46 @@
     if (length(sizeFactors) != ncol(counts) || any(!is.finite(sizeFactors)) || any(sizeFactors <= 0)) {
       stop("the stored Rust fit has no compatible size factors", call. = FALSE)
     }
-    offset <- matrix(rep(log(sizeFactors), each = nrow(counts)), nrow = nrow(counts))
+    offset <- list(size_factors = sizeFactors)
   } else {
     normalizationFactors <- fit$normalizationFactors
     if (!all(dim(normalizationFactors) == dim(counts)) ||
         any(!is.finite(normalizationFactors)) || any(normalizationFactors <= 0)) {
       stop("the stored Rust fit has no compatible normalization factors", call. = FALSE)
     }
-    offset <- log(normalizationFactors)
+    offset <- list(factors = normalizationFactors)
   }
   weights <- fit$weights
-  if (is.null(weights)) {
-    weights <- matrix(1, nrow = nrow(counts), ncol = ncol(counts))
-  } else if (!all(dim(weights) == dim(counts)) || any(!is.finite(weights)) || any(weights <= 0)) {
+  if (!is.null(weights) && (!all(dim(weights) == dim(counts)) || any(!is.finite(weights)) || any(weights <= 0))) {
     stop("the stored Rust fit has no compatible observation weights", call. = FALSE)
   }
   apeArguments <- utils::modifyList(
     list(
       Y = counts,
       x = design,
-      log.lik = if (identical(apeMethod, "general")) apeglm::logLikNB else NULL,
       param = as.numeric(dispersions),
       coef = coefficient,
-      mle = if (apeAdapt) log(2) * cbind(res$log2FoldChange, res$lfcSE) else NULL,
-      threshold = if (lfcThreshold > 0) log(2) * lfcThreshold else NULL,
+      mle = if (apeAdapt) list(estimates = res$log2FoldChange, standard_errors = res$lfcSE, scale = "log2") else NULL,
+      threshold = if (lfcThreshold > 0) list(value = lfcThreshold, scale = "log2") else NULL,
       weights = weights,
       offset = offset,
       method = apeMethod
     ),
     dots
   )
-  apeFit <- do.call(apeglm::apeglm, apeArguments)
-  if (nrow(apeFit$map) != nrow(counts)) {
+  # NB methods do not use log.lik. No R closure enters the numerical transport.
+  # General restricted-expression support is a separate native adapter.
+  apeArguments$log.lik <- NULL
+  apeFit <- .rsdeseq2_formula_request(list(operation = "apeglm_shrinkage", arguments = apeArguments))
+  if (length(apeFit$posterior_mode) != nrow(counts)) {
     stop("apeglm returned a coefficient matrix with an incompatible row count", call. = FALSE)
   }
-  if (!quiet && !is.null(apeFit$diag) && "conv" %in% colnames(apeFit$diag) &&
-      any(apeFit$diag[, "conv"][!is.na(apeFit$diag[, "conv"])] != 0)) {
+  if (!quiet && any(apeFit$convergence[!is.na(apeFit$convergence)] != 0)) {
     message("some rows did not converge in finding the MAP")
   }
-  res$log2FoldChange <- log2(exp(1)) * apeFit$map[, coefficient]
+  res$log2FoldChange <- apeFit$posterior_mode
   names(res$log2FoldChange) <- rownames(res)
-  res$lfcSE <- if (is.null(apeFit$sd)) {
-    rep(NA_real_, nrow(res))
-  } else {
-    log2(exp(1)) * apeFit$sd[, coefficient]
-  }
+  res$lfcSE <- apeFit$posterior_sd
   names(res$lfcSE) <- rownames(res)
   returnSvalue <- isTRUE(svalue) || lfcThreshold > 0
   resultColumns <- if (returnSvalue) {
@@ -137,9 +132,10 @@
   res <- res[, resultColumns, drop = FALSE]
   if (returnSvalue) {
     res$svalue <- if (lfcThreshold > 0) {
-      as.numeric(apeglm::svalue(apeFit$thresh))
+      if (is.null(apeFit$threshold_svalue)) stop("thresholded apeglm output requires a non-NULL threshold", call. = FALSE)
+      apeFit$threshold_svalue
     } else {
-      as.numeric(apeFit$svalue)
+      apeFit$svalue
     }
     names(res$svalue) <- rownames(res)
   }
@@ -166,9 +162,10 @@
     resultData,
     priorInfo = list(
       type = "apeglm",
-      package = "apeglm",
-      version = as.character(utils::packageVersion("apeglm")),
-      prior.control = apeFit$prior.control
+      package = "rsdeseq2",
+      version = as.character(utils::packageVersion("rsdeseq2")),
+      engine = "Rust",
+      prior.control = apeFit$prior_control
     )
   )
 }

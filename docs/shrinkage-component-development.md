@@ -5,7 +5,7 @@ uniform and truncated-normal mixtures and preparation of all six mixture-grid
 families. R transports the same inputs to the same core. The local public
 `lfcShrink(type="ashr")` route now uses the native engine for its default SQP
 workflow, fixed/supplied priors and restricted likelihood expressions. Advanced
-ashr options and the apeglm route remain unfinished; this is not a release-ready
+ashr options and advanced [apeglm methods](native-apeglm-development.md) remain unfinished; this is not a release-ready
 replacement of the full optional-method interface.
 
 Following the user's latest instruction, further development and commits stay
@@ -212,7 +212,7 @@ presentation may still order labels and count storage sizes internally.
 
 Still open: other built-in likelihood families, non-SQP optimizers, estimated
 modes, remaining controls/output subsets, the full warning/integration-failure
-matrix, standalone apeglm, and the combined authority/performance/memory/artifact
+matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.
 Full suites and release checks remain deferred until this work is combined.
 Accepted checkpoint `153154a` and the published 0.4.0 release remain intact.

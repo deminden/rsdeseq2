@@ -8,8 +8,9 @@ bounded batches, with independent per-request policies and the same output as
 individual calls. Filtering/BH, probabilities, contrast projection and
 contrast-zero and Cook/refit row rules are shared Rust implementations. Native
 low-count eligibility requires a matching two-column design; stored requests
-infer it from formula factors unless explicitly overridden. Remaining shrinkage
-zero checks, offset/formula and posterior calculations still require migration; see the
+infer it from formula factors unless explicitly overridden. Local default ashr
+and negative-binomial apeglm workflows now share the native numerical engine.
+Advanced shrinkage method coverage and the final combined audit remain open; see the
 [Rust-only implementation contract](rust-only-wrapper-migration.md).
 The [Cook/refit audit](rust-only-cooks-policy-2026-10-30.md) additionally records
 remaining legacy tie and formula-origin differences from DESeq2; complete Cook's
