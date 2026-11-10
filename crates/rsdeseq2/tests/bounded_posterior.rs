@@ -7,6 +7,7 @@ struct References {
 #[derive(Deserialize)]
 struct Case {
     name: String,
+    df: Option<String>,
     weights: Vec<String>,
     means: Option<Vec<String>>,
     sds: Option<Vec<String>>,
@@ -35,24 +36,22 @@ fn number(v: &str) -> f64 {
 fn numbers(v: &[String]) -> Vec<f64> {
     v.iter().map(|v| number(v)).collect()
 }
-fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str) {
-    if b.is_nan() {
-        assert!(a.is_nan(), "{context}");
+fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: &mut Vec<String>) {
+    if (b.is_nan() && a.is_nan()) || a == b {
         return;
     }
-    if a == b {
+    if a.is_finite() && b.is_finite() && (a - b).abs() <= absolute + relative * b.abs() {
         return;
     }
-    assert!(
-        a.is_finite() && b.is_finite() && (a - b).abs() <= absolute + relative * b.abs(),
-        "{context}: {a:.17e} != {b:.17e}"
-    );
+    failures.push(format!("{context}: {a:.17e} != {b:.17e}"));
 }
 #[test]
 fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
+    let mut failures = vec![];
     for fixture in [
         include_str!("data/uniform_posterior_r462.json"),
         include_str!("data/truncated_posterior_r462.json"),
+        include_str!("data/student_uniform_posterior_r462.json"),
     ] {
         let r: References = serde_json::from_str(fixture).unwrap();
         for c in r.cases {
@@ -68,10 +67,13 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     .unwrap(),
                 )
             } else {
-                FixedMixture::Uniform(
+                let mut p =
                     UniformMixture::new(numbers(&c.weights), numbers(&c.lower), numbers(&c.upper))
-                        .unwrap(),
-                )
+                        .unwrap();
+                if let Some(df) = &c.df {
+                    p = p.with_student_t(number(df)).unwrap();
+                }
+                FixedMixture::Uniform(p)
             };
             let thresholds = numbers(&c.thresholds);
             let posteriors = prior
@@ -93,6 +95,7 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                         1e-8,
                         1e-12,
                         &format!("{context} likelihood{j}"),
+                        &mut failures,
                     );
                 }
                 let p = &posteriors[i];
@@ -102,6 +105,7 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     2e-6,
                     0.,
                     &format!("{context} mean"),
+                    &mut failures,
                 );
                 close(
                     p.standard_deviation(),
@@ -109,6 +113,7 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     2e-6,
                     0.,
                     &format!("{context} SD"),
+                    &mut failures,
                 );
                 for (j, &a) in p.weights().iter().enumerate() {
                     close(
@@ -117,6 +122,7 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                         2e-8,
                         0.,
                         &format!("{context} weight{j}"),
+                        &mut failures,
                     );
                 }
                 for (j, &threshold) in thresholds.iter().enumerate() {
@@ -126,11 +132,23 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                         2e-8,
                         0.,
                         &format!("{context} cdf({threshold})"),
+                        &mut failures,
                     );
                 }
             }
         }
     }
+    assert!(
+        failures.is_empty(),
+        "{} parity mismatches:\n{}",
+        failures.len(),
+        failures
+            .iter()
+            .take(30)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
 
 #[test]
@@ -147,6 +165,14 @@ fn uniform_point_masses_boundaries_and_invalid_inputs_remain_explicit() {
         (vec![1.], vec![-1e308], vec![1e308]),
     ] {
         assert!(UniformMixture::new(w, a, b).is_err());
+    }
+    for df in [f64::NAN, 0.0, -1.0, f64::NEG_INFINITY] {
+        assert!(
+            UniformMixture::new(vec![1.0], vec![-1.0], vec![1.0])
+                .unwrap()
+                .with_student_t(df)
+                .is_err()
+        );
     }
     let prior = UniformMixture::new(vec![2.], vec![1.25], vec![1.25]).unwrap();
     for (x, s) in [

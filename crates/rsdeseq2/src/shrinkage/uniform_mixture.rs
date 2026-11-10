@@ -1,6 +1,6 @@
-use super::truncated_standard::{log_phi, truncated_mean, truncated_second};
+use super::LocationLikelihood;
 use crate::math::elementary::language_exp;
-use crate::{DeseqError, errors::invalid_dimensions, math::normal_log_cdf};
+use crate::{DeseqError, errors::invalid_dimensions};
 
 /// Fixed finite uniform-mixture prior, including zero-width point masses.
 ///
@@ -9,10 +9,11 @@ use crate::{DeseqError, errors::invalid_dimensions, math::normal_log_cdf};
 #[derive(Clone, Debug)]
 pub struct UniformMixture {
     log_weights: Vec<f64>,
+    likelihood: LocationLikelihood,
     lower: Vec<f64>,
     upper: Vec<f64>,
 }
-/// A uniform-mixture prior conditioned on one finite normal observation.
+/// A uniform-mixture prior conditioned on one finite location-scale observation.
 #[derive(Clone, Debug)]
 pub struct UniformMixturePosterior {
     weights: Vec<f64>,
@@ -20,6 +21,7 @@ pub struct UniformMixturePosterior {
     upper: Vec<f64>,
     estimate: f64,
     standard_error: f64,
+    likelihood: LocationLikelihood,
     mean: f64,
     standard_deviation: f64,
 }
@@ -66,10 +68,25 @@ impl UniformMixture {
             ));
         }
         Ok(Self {
+            likelihood: LocationLikelihood::Normal,
             log_weights: weights.into_iter().map(f64::ln).collect(),
             lower,
             upper,
         })
+    }
+    /// Select a Student-t observation likelihood. Infinite degrees of freedom
+    /// retains the normal likelihood; finite values must be strictly positive.
+    /// Low-df moment undefinedness follows the original component evaluator.
+    pub fn with_student_t(self, degrees_of_freedom: f64) -> Result<Self, DeseqError> {
+        self.with_likelihood(LocationLikelihood::StudentT(degrees_of_freedom))
+    }
+    /// Select a validated standalone location-scale likelihood.
+    pub fn with_likelihood(mut self, likelihood: LocationLikelihood) -> Result<Self, DeseqError> {
+        self.likelihood = likelihood.validated()?;
+        Ok(self)
+    }
+    fn log_cdf(&self, q: f64) -> f64 {
+        self.likelihood.log_cdf(q)
     }
     /// Component log convolution densities in prior input order.
     pub fn log_likelihoods(
@@ -84,10 +101,12 @@ impl UniformMixture {
             .zip(&self.upper)
             .map(|(&a, &b)| {
                 if a == b {
-                    return log_phi((estimate - a) / standard_error) - standard_error.ln();
+                    let q = (estimate - a) / standard_error;
+                    let density = self.likelihood.log_density(q);
+                    return density - standard_error.ln();
                 }
-                let left = normal_log_cdf((estimate - a) / standard_error);
-                let right = normal_log_cdf((estimate - b) / standard_error);
+                let left = self.log_cdf((estimate - a) / standard_error);
+                let right = self.log_cdf((estimate - b) / standard_error);
                 // Preserve the established orientation and ordinary subtraction semantics.
                 left + (1.0 - language_exp(right - left)).ln() - (b - a).ln()
             })
@@ -114,6 +133,7 @@ impl UniformMixture {
                 upper: self.upper.clone(),
                 estimate,
                 standard_error,
+                likelihood: self.likelihood.clone(),
                 mean: f64::NAN,
                 standard_deviation: f64::NAN,
             });
@@ -128,20 +148,31 @@ impl UniformMixture {
         let mut mean = 0.0;
         let mut second = 0.0;
         for ((&a, &b), &weight) in self.lower.iter().zip(&self.upper).zip(&weights) {
-            let (component_mean, component_second) = if a == b {
-                (a, a * a)
-            } else {
-                let alpha = (a - estimate) / standard_error;
-                let beta = (b - estimate) / standard_error;
-                let m = truncated_mean(alpha, beta);
-                let m2 = truncated_second(alpha, beta);
-                (
-                    estimate + standard_error * m,
-                    estimate * estimate
-                        + 2.0 * estimate * standard_error * m
-                        + standard_error * standard_error * m2,
-                )
-            };
+            let (component_mean, component_second) =
+                if a == b && !matches!(self.likelihood, LocationLikelihood::Restricted(_)) {
+                    (a, a * a)
+                } else {
+                    let alpha = (a - estimate) / standard_error;
+                    let beta = (b - estimate) / standard_error;
+                    let m = self.likelihood.moment(alpha, beta, 1);
+                    let m2 = self.likelihood.moment(alpha, beta, 2);
+                    (
+                        if matches!(self.likelihood, LocationLikelihood::Normal) {
+                            estimate + standard_error * m
+                        } else {
+                            estimate
+                                - standard_error
+                                    * self.likelihood.moment(
+                                        (estimate - b) / standard_error,
+                                        (estimate - a) / standard_error,
+                                        1,
+                                    )
+                        },
+                        estimate * estimate
+                            + 2.0 * estimate * standard_error * m
+                            + standard_error * standard_error * m2,
+                    )
+                };
             mean += weight * component_mean;
             second += weight * component_second;
         }
@@ -151,6 +182,7 @@ impl UniformMixture {
             upper: self.upper.clone(),
             estimate,
             standard_error,
+            likelihood: self.likelihood.clone(),
             mean,
             standard_deviation: {
                 let second = if second < 0.0 { 0.0 } else { second };
@@ -161,6 +193,9 @@ impl UniformMixture {
     }
 }
 impl UniformMixturePosterior {
+    fn log_cdf(&self, q: f64) -> f64 {
+        self.likelihood.log_cdf(q)
+    }
     /// Normalized posterior component probabilities in prior order.
     pub fn weights(&self) -> &[f64] {
         &self.weights
@@ -188,9 +223,9 @@ impl UniformMixturePosterior {
                 } else if threshold >= b {
                     1.0
                 } else {
-                    let left = normal_log_cdf((self.estimate - a) / self.standard_error);
-                    let middle = normal_log_cdf((self.estimate - threshold) / self.standard_error);
-                    let right = normal_log_cdf((self.estimate - b) / self.standard_error);
+                    let left = self.log_cdf((self.estimate - a) / self.standard_error);
+                    let middle = self.log_cdf((self.estimate - threshold) / self.standard_error);
+                    let right = self.log_cdf((self.estimate - b) / self.standard_error);
                     let value =
                         (language_exp(middle - left) - 1.0) / (language_exp(right - left) - 1.0);
                     if value.is_nan() {

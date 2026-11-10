@@ -127,3 +127,54 @@ bounded-family fixtures (the fourth argument selects the reference),
 Pass the same standalone executable, candidate library and a fresh output
 directory. The public methods still require additional implementation and the
 final combined checks described in the [migration plan](rust-only-wrapper-migration.md).
+
+
+## Subsequent batch implementation in progress
+
+Further **local work in progress** adds a complete location-scale batch engine:
+normal/Student-t likelihood selection, default native weight fitting, supplied
+and fixed priors, pruning, alpha scaling, excluded-row prior summaries, raw
+unpruned CDF requests, sign/discovery probabilities and ordered s/q-values.
+Twenty independently generated original-package batches cover automatic and
+supplied grids, all six normal-likelihood families, observation weights,
+missing/zero/infinite SEs, unnormalized priors and actual upstream rejection.
+Their numerical values, NA/NaN distinctions, warnings and acceptance decisions
+pass the focused Rust table. This is separate from production adoption.
+
+The user also approved restricted custom likelihood expressions translated into
+Rust. The implementation imports one-expression function syntax and scalar
+numeric/logical captures without executing R functions, active bindings or
+promises. Arithmetic, comparisons, elementary math, `ifelse`, `pmin` and `pmax`
+use the existing standalone expression evaluator. First moments without an
+explicit expression use native adaptive Gauss integration; absent second moments
+retain missing SDs, matching the original helper. Captured objects and array
+constants are rejected before their methods can run.
+
+Three original custom likelihood batches (logistic, shifted logistic and Laplace)
+pass the same numerical and missing-kind checks. The Laplace panel also retains
+all 65 original NaN-intermediate warnings. Native warning detection uses vector
+expression semantics and a cached summary-operation graph; it preserves those
+diagnostics without repeating the underlying statistical calculations. These
+panels do not certify every custom expression, integration failure or advanced
+optional-method contract.
+
+A subtle original missing-row rule is retained: assigning a K-component prior
+into M selected rows recycles its weights column by column. Normal conditional
+means/SDs undergo the same permutation; uniform CDFs retain their interval order.
+A non-coprime M/K panel checks repetition as well as permutation. Summary fallback
+and raw CDF missingness are intentionally separate operations.
+
+The broader Student-t component panel remains **failing in five moment cells**:
+three far-tail df=10 SDs and the narrow df=100 zero-estimate mean/SD. Its 630 rows
+otherwise meet the fixed likelihood, weight, CDF and moment checks. The remaining
+errors concern beta/gamma rounding amplified by the original truncated-moment
+subtractions. No oracle or precision bound has been relaxed. Accepted checkpoint
+`153154a` remains available; subsequent batch/Student-t work is unreleased WIP.
+
+Current focused checks: the 23 complete original-package batch cases pass;
+the bounded component test reports exactly the five failures above; root and
+backend Clippy pass; the R importer passes 16 focused assertions without a new
+native rebuild. The new actual bridge/R-free batch checker is implemented but
+awaits the combined native package build. Full suites, paired timing/memory,
+release checks and source-bundle rebuilding remain deferred. Public ashr/apeglm
+routes still contain R calculations and must not be described as fully migrated.

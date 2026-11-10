@@ -1,18 +1,18 @@
 # Inspect language and stored primitives only. A dispersion closure, active
 # binding or delayed expression is never executed to discover its values.
-.rsdeseq2_frozen_binding <- function(name, env) {
+.rsdeseq2_frozen_binding <- function(name, env, context = "frozen dispersion") {
   while (!identical(env, emptyenv())) {
     if (exists(name, envir = env, inherits = FALSE)) {
-      if (bindingIsActive(name, env)) stop("active frozen dispersion bindings are unsupported", call. = FALSE)
+      if (bindingIsActive(name, env)) stop(sprintf("active %s bindings are unsupported", context), call. = FALSE)
       value <- do.call(base::substitute, list(as.name(name), env))
       if (is.call(value) || is.symbol(value)) {
-        stop("frozen dispersion constants must be stored primitive values in a local environment; delayed expressions are unsupported", call. = FALSE)
+        stop(sprintf("%s constants must be stored primitive values in a local environment; delayed expressions are unsupported", context), call. = FALSE)
       }
       return(value)
     }
     env <- parent.env(env)
   }
-  stop(sprintf("unknown frozen dispersion binding '%s'", name), call. = FALSE)
+  stop(sprintf("unknown %s binding '%s'", context, name), call. = FALSE)
 }
 
 .rsdeseq2_saved_local_calls <- function(env) {
@@ -74,7 +74,7 @@
   names <- setdiff(all.vars(expression), argument)
   constants <- stats::setNames(lapply(names, function(name) {
     value <- .rsdeseq2_frozen_binding(name, env)
-    if (!(is.numeric(value) || is.logical(value)) || is.object(value)) {
+    if (is.object(value) || !typeof(value) %in% c("integer", "double", "logical")) {
       stop("frozen dispersion constants must be primitive numeric or logical values", call. = FALSE)
     }
     value

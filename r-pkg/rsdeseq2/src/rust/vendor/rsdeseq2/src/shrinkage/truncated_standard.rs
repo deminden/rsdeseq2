@@ -59,3 +59,25 @@ pub(super) fn truncated_second(mut a: f64, mut b: f64) -> f64 {
     }
     moment
 }
+
+pub(super) fn scaled_mean(a: f64, b: f64, mean: f64, sd: f64) -> f64 {
+    if sd == 0.0 {
+        mean.clamp(a, b)
+    } else {
+        mean + sd * truncated_mean((a - mean) / sd, (b - mean) / sd)
+    }
+}
+pub(super) fn scaled_sd(a: f64, b: f64, mean: f64, sd: f64) -> f64 {
+    let alpha = (a - mean) / sd;
+    let beta = (b - mean) / sd;
+    let m = truncated_mean(alpha, beta);
+    let mut v = truncated_second(alpha, beta) - m * m;
+    let nearest = alpha.abs().min(beta.abs());
+    if nearest.is_finite() && nearest > 30.0 {
+        v = (1.0 / (nearest * nearest)).min((beta - alpha).powi(2) / 12.0);
+    }
+    if v.is_nan() {
+        v = 0.0;
+    }
+    (sd * sd * v).sqrt()
+}

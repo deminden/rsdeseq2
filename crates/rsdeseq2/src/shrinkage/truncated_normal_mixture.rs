@@ -1,5 +1,5 @@
 //! Finite truncated-normal mixtures for the optional shrinkage migration.
-use super::truncated_standard::{log_phi, truncated_mean, truncated_second};
+use super::truncated_standard::{log_phi, scaled_mean, scaled_sd};
 use crate::probability::normal_upper_tail;
 use crate::{DeseqError, errors::invalid_dimensions, math::elementary::language_exp};
 
@@ -37,28 +37,6 @@ fn invalid(reason: &str) -> DeseqError {
 fn cdf(q: f64) -> f64 {
     normal_upper_tail(-q)
 }
-fn clipped_mean(a: f64, b: f64, mean: f64, sd: f64) -> f64 {
-    if sd == 0.0 {
-        mean.clamp(a, b)
-    } else {
-        mean + sd * truncated_mean((a - mean) / sd, (b - mean) / sd)
-    }
-}
-fn variance(a: f64, b: f64, mean: f64, sd: f64) -> f64 {
-    let alpha = (a - mean) / sd;
-    let beta = (b - mean) / sd;
-    let m = truncated_mean(alpha, beta);
-    let mut v = truncated_second(alpha, beta) - m * m;
-    let nearest = alpha.abs().min(beta.abs());
-    if nearest.is_finite() && nearest > 30.0 {
-        v = (1.0 / (nearest * nearest)).min((beta - alpha).powi(2) / 12.0);
-    }
-    if v.is_nan() {
-        v = 0.0;
-    }
-    sd * sd * v
-}
-
 impl TruncatedNormalMixture {
     /// Validate nonnegative weights/SDs and ordered, possibly infinite bounds.
     /// Zero weights retain their component positions; weights need not sum to one.
@@ -192,7 +170,7 @@ impl TruncatedNormalMixture {
             .collect()
     }
 
-    fn posterior_at(
+    pub(super) fn posterior_at(
         &self,
         estimate: f64,
         standard_error: f64,
@@ -237,10 +215,9 @@ impl TruncatedNormalMixture {
             let prior_fraction = 1.0 / ((sd * sd) / v + 1.0);
             let location = prior_fraction * prior_mean + (1.0 - prior_fraction) * estimate;
             let scale = (1.0 / (1.0 / (sd * sd) + 1.0 / v)).sqrt();
-            let component_mean = clipped_mean(a, b, location, scale);
+            let component_mean = scaled_mean(a, b, location, scale);
             let bounds = (component * observations + row) % self.sds.len();
-            let component_sd =
-                variance(self.lower[bounds], self.upper[bounds], location, scale).sqrt();
+            let component_sd = scaled_sd(self.lower[bounds], self.upper[bounds], location, scale);
             mean += w * component_mean;
             second += w * (component_sd * component_sd + component_mean * component_mean);
             let fraction = 1.0 / (v / (sd * sd) + 1.0);

@@ -1,0 +1,59 @@
+{
+  "accepted_parent": "153154ab16b0329309da348f542d5420a4e1d957",
+  "files": {
+    "crates/rsdeseq2/src/shrinkage/adaptive_grid.rs": "be70e4832c1b120b8e0ee827733871622b5e10429541d48728ea8e16075d0ba6",
+    "crates/rsdeseq2/src/shrinkage/component_summary.rs": "1759158b9c1da9a3fc126ca8374bc849649d5ae2f8334b493babfeeb45d47d96",
+    "crates/rsdeseq2/src/shrinkage/expression_likelihood.rs": "f32d77a20f8db3745c399ad8e5a6ce222e52add85d60dbde5d92cee74080d3de",
+    "crates/rsdeseq2/src/shrinkage/expression_quadrature.rs": "7cf91b81e33b959dc81f1fde7f72154475ab3f98e016aa7fe53db3613dcecec5",
+    "crates/rsdeseq2/src/shrinkage/fixed_mixture.rs": "ce2f8bbbc5423784c547e4e6a6c207b9bdb573a86fa6e183395a8e048bf6af3b",
+    "crates/rsdeseq2/src/shrinkage/likelihood.rs": "dc7d295ec1ea85b16497a588d198f046fadc853c6b146564f5059b79346013b7",
+    "crates/rsdeseq2/src/shrinkage/likelihood_diagnostics.rs": "1fda86a7afeef00f9e4fc1ed2f86ac4c1e06796d695e401b8d2fc64220103097",
+    "crates/rsdeseq2/src/shrinkage/location_batch.rs": "f1663d6836e2e03e01c035bd1a5156eed3cc0bacb3176ba0b8ebc43b25b9b7db",
+    "crates/rsdeseq2/src/shrinkage/location_missing.rs": "e9ee10a15c8521bf74165d3a42b5df4651c86fb329062f63b99de7f72771b340",
+    "crates/rsdeseq2/src/shrinkage/mixture_fit.rs": "ab41734750ca8f27a3cbb9a870250d2de9e191bf3f1bf313c24cb518893ce67e",
+    "crates/rsdeseq2/src/shrinkage/normal_mixture.rs": "77ddb7a5b324361d6ce565195e6789d6c9de54c56f234c648bb9faddb2d399b5",
+    "crates/rsdeseq2/src/shrinkage/student_t.rs": "047bb301ce43d04b6aeb11428cb8340c0744b883f99878753ba0eb7a9a977b9e",
+    "crates/rsdeseq2/src/shrinkage/svalue.rs": "df2d91675c2410ef1be2b995fbdcfd5c964642d8bbab7bf40876c9cd5cde606d",
+    "crates/rsdeseq2/src/shrinkage/truncated_normal_mixture.rs": "52a741b5b7cc032bc0029f226aeb0316019d827d34d00d01590bcf4f57b793c3",
+    "crates/rsdeseq2/src/shrinkage/truncated_standard.rs": "aff34dff3df2e0d4ec676d1b73344c835a4eec5926810135544518ffe52ee51c",
+    "crates/rsdeseq2/src/shrinkage/uniform_mixture.rs": "787f828b7c26b327c87174160c1d03be26e8ec36342d0b4f325e56584be9236c",
+    "crates/rsdeseq2/tests/data/custom_likelihood_r462.json": "fe2a17400933fb2a161dcd188458f00a43847b30b198637c75c6be7e0197bc13",
+    "crates/rsdeseq2/tests/data/location_shrinkage_r462.json": "c1fa968798a3a8040573253ec6c92dd4f72c722581de11c4a42b5acd5bfa7da1",
+    "crates/rsdeseq2/tests/data/student_uniform_posterior_r462.json": "84788df89aacf73d9b2a97f89ecf60f3f856b40c1f5f9d4ea9fb7405f86d7b81",
+    "r-pkg/rsdeseq2/R/likelihood-expressions.R": "314f26bd6b650e7968cb2e8e030b0954fcfd79dcac9df623200e2f45cc059c63",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/location_shrinkage.rs": "d3e3456c70111126bb0d1f7ecf8f5beca15c253da14d5a6e23308247e2446f2f"
+  },
+  "focused_validation": {
+    "R_importer_assertions": 16,
+    "R_importer_scope": "pkgload compile=FALSE; syntax import only",
+    "actual_new_bridge_bit_conformance": "implemented, not run; waits for combined rebuild",
+    "backend_clippy_all_targets": "passed",
+    "core_clippy_all_targets": "passed",
+    "custom_original_batches": 3,
+    "full_suites_and_performance": "deferred",
+    "location_batch_test": "passed",
+    "location_original_batches": 20,
+    "vendor_integrity": "passed"
+  },
+  "full_plan_complete": false,
+  "known_failing_gate": {
+    "Student_t_observations": 630,
+    "bounds_or_oracles_relaxed": false,
+    "cases": [
+      "symmetric_df10 row0 x-15 se0.1 SD",
+      "halfuniform_df10 row0 x-15 se0.1 SD",
+      "shifted_df10 row0 x-15 se0.1 SD",
+      "narrow_df100 row11 x0 se4 mean",
+      "narrow_df100 row11 x0 se4 SD"
+    ],
+    "mismatched_cells": 5,
+    "test": "bounded_posterior"
+  },
+  "new_batch_bounds": {
+    "NA_vs_NaN_distinct": true,
+    "summary_cdf_loglik_absolute": 2e-06,
+    "warnings_and_acceptance_exact": true
+  },
+  "publication_authorized": false,
+  "scope": "Unreleased local WIP; public optional methods not yet migrated"
+}
