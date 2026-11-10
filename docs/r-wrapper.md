@@ -117,14 +117,29 @@ DESeq2-cleaned aliases, including for transformed-factor formulas. The
 Rust for factor recoding, matrix values, prior estimation, refitting and the
 posterior contrast. Numeric contrasts require a supplied result table; list
 contrasts average selected coefficients and need supplied results when their
-names are absent from the unshrunk design. Optional `type="ashr"` shrinkage
-uses the ashr package for posterior means/SDs and s-values. Optional
+names are absent from the unshrunk design. The local development
+`type="ashr"` route uses shared Rust fitting, posterior means/SDs and s-values,
+including restricted custom likelihood expressions. Advanced optimizer,
+estimated-mode and output-subset options remain unfinished and fail explicitly;
+see the [development scope](shrinkage-component-development.md). Released 0.4.0
+uses the original ashr package. Optional
 `type="apeglm"` shrinkage handles named/indexed Wald coefficients, including
 posterior SDs and s-values, but not contrasts. Formula interactions are
 rejected for normal shrinkage. Factor-level contrast syntax for transformed
 factors remains unsupported when DESeq2 cannot resolve its coefficient names.
 Ordered factors use polynomial coefficients; choose a named coefficient or a
 numeric contrast instead of a treatment-style factor-level contrast.
+
+In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
+and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
+`etruncFUN(a, b)` and `e2truncFUN(a, b)`. Each function must contain one supported
+expression: arithmetic, comparisons, elementary math, `ifelse`, `pmin` or `pmax`.
+Captured constants must be stored primitive numeric/logical scalars. The wrapper
+imports syntax and values; it never invokes these functions. Without an explicit
+first moment Rust integrates the density; without a second moment posterior SDs
+remain missing, as in the original helper. Arbitrary calls, reductions, arrays,
+active bindings and unevaluated promises are rejected. This likelihood-expression
+support is separate from formulas, which still reject custom functions.
 
 The package also exposes primitive matrix helpers:
 

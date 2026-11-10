@@ -2,7 +2,8 @@
 
 Current local development adds [bounded posterior components and all six
 normal-likelihood mixture grids](shrinkage-component-development.md), plus
-small-argument expression corrections. Public optional shrinkage adoption and
+small-argument expression corrections. The local default ashr route and restricted
+likelihood expressions now use Rust; advanced ashr options, standalone apeglm and
 final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
@@ -60,9 +61,10 @@ artifacts and do not certify a replacement implementation.
    preparation.
 5. **Shrinkage and transforms.** Audit all scale conversion, posterior summaries,
    s-values, prior fitting and threshold processing. Normal shrinkage already
-   has a Rust implementation. Existing optional ashr/apeglm routes still call R
-   packages: they require standalone implementations with independent posterior
-   and tail checks, rather than simply moving their R calls into a native shim.
+   has a Rust implementation. The local default ashr route now shares native
+   prior fitting and summaries; advanced options still need implementation.
+   The apeglm route still calls R and requires a standalone implementation with
+   independent posterior and tail checks.
    Keep existing functionality until the replacement passes its gates.
 6. **Reconcile performance, memory and artifacts.** Repeat the appropriate
    paired workflow/holdout checks only after substantive candidate changes.

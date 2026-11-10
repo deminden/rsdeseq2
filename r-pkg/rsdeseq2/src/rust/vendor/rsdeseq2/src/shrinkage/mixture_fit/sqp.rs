@@ -77,7 +77,7 @@ impl Problem {
                 ));
             }
             evaluations += 1;
-            let residual = (-gradient.iter().copied().fold(f64::INFINITY, f64::min)).max(0.0);
+            let residual = dual_residual(&gradient, &weights, options);
             if residual <= options.gradient_tolerance {
                 return Ok((
                     weights,
@@ -130,7 +130,7 @@ impl Problem {
             }
         }
         let gradient = self.objective_gradient(&weights).1;
-        let residual = (-gradient.iter().copied().fold(f64::INFINITY, f64::min)).max(0.0);
+        let residual = dual_residual(&gradient, &weights, options);
         evaluations += 1;
         Ok((
             weights,
@@ -140,6 +140,16 @@ impl Problem {
             "SQP iteration limit reached".into(),
         ))
     }
+}
+
+fn dual_residual(gradient: &[f64], weights: &[f64], options: MixtureFitOptions) -> f64 {
+    (-gradient
+        .iter()
+        .zip(weights)
+        .filter(|(_, w)| !options.positive_coordinate_convergence || **w > options.zero_threshold)
+        .map(|(g, _)| *g)
+        .fold(f64::INFINITY, f64::min))
+    .max(0.0)
 }
 
 // Active-set nonnegative quadratic minimization. Each free subproblem solves

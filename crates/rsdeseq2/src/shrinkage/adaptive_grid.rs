@@ -26,6 +26,12 @@ pub enum MixturePriorPenalty {
     NullBiased(f64),
     Parameters(Vec<f64>),
 }
+/// Original ashr method shorthand, distinct from individual grid controls.
+#[derive(Clone, Copy, Debug)]
+pub enum AdaptiveMethod {
+    Fdr,
+    Shrink,
+}
 /// Preparation controls. Observation-scale transformations belong to the caller.
 #[derive(Clone, Debug)]
 pub struct MixtureGridOptions {
@@ -311,6 +317,39 @@ pub fn prepare_mixture_grid(
     Ok(grid)
 }
 impl MixtureGrid {
+    /// Validate a supplied component grid with the requested prior penalty.
+    /// Supplied mixtures use their first component as the null component.
+    pub fn from_supplied(
+        components: MixtureComponents,
+        weights: Vec<f64>,
+        penalty: &MixturePriorPenalty,
+    ) -> Result<Self, DeseqError> {
+        let mut dirichlet = vec![1.0; weights.len()];
+        match penalty {
+            MixturePriorPenalty::Uniform => {}
+            MixturePriorPenalty::NullBiased(w) => {
+                if let Some(first) = dirichlet.first_mut() {
+                    *first = *w;
+                }
+            }
+            MixturePriorPenalty::Parameters(p) => dirichlet = p.clone(),
+        }
+        if dirichlet.len() != weights.len() || dirichlet.iter().any(|v| !v.is_finite() || *v < 1.0)
+        {
+            return Err(invalid(
+                "convex fitting requires matching finite Dirichlet parameters >=1",
+            ));
+        }
+        let grid = Self {
+            components,
+            initial_weights: weights,
+            dirichlet,
+            warnings: vec![],
+        };
+        grid.prior(&grid.initial_weights)?;
+        Ok(grid)
+    }
+
     /// Construct the same component prior with explicitly supplied weights.
     pub fn prior(&self, weights: &[f64]) -> Result<FixedMixture, DeseqError> {
         Ok(match &self.components {
@@ -384,5 +423,30 @@ impl std::str::FromStr for MixtureFamily {
             "halfnormal" => Ok(Self::HalfNormal),
             _ => Err(invalid("unknown normal-likelihood component family")),
         }
+    }
+}
+
+impl MixtureGridOptions {
+    /// Apply method defaults while preserving explicit-argument conflicts.
+    pub fn with_ashr_method(
+        mut self,
+        method: Option<AdaptiveMethod>,
+        point_mass: Option<bool>,
+        penalty: Option<MixturePriorPenalty>,
+        nullweight: f64,
+    ) -> Result<Self, DeseqError> {
+        if method.is_some() && (point_mass.is_some() || penalty.is_some()) {
+            return Err(invalid(
+                "specify either method or pointmass/prior, not both",
+            ));
+        }
+        if matches!(method, Some(AdaptiveMethod::Shrink)) {
+            self.point_mass = false;
+            self.penalty = MixturePriorPenalty::Uniform;
+        } else {
+            self.point_mass = point_mass.unwrap_or(true);
+            self.penalty = penalty.unwrap_or(MixturePriorPenalty::NullBiased(nullweight));
+        }
+        Ok(self)
     }
 }

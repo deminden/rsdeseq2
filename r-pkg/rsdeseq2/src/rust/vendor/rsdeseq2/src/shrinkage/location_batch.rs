@@ -2,8 +2,8 @@
 //! Public R adoption still requires the remaining method/options parity gates.
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{
-    FixedMixture, LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions,
-    MixtureGrid, MixtureGridOptions, UniformMixture, prepare_mixture_grid,
+    LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions, MixtureGrid,
+    MixtureGridOptions, prepare_mixture_grid,
 };
 use crate::DeseqError;
 
@@ -34,6 +34,8 @@ impl Default for LocationShrinkageOptions {
             observation_weights: None,
             fit_options: MixtureFitOptions {
                 likelihood_offset: 1e-6,
+                active_iterations: 20,
+                positive_coordinate_convergence: true,
                 ..Default::default()
             },
             thresholds: vec![],
@@ -65,31 +67,7 @@ fn invalid(reason: &str) -> DeseqError {
         reason: format!("location shrinkage: {reason}"),
     }
 }
-fn prior(
-    grid: &MixtureGrid,
-    weights: &[f64],
-    likelihood: &LocationLikelihood,
-) -> Result<FixedMixture, DeseqError> {
-    match likelihood {
-        LocationLikelihood::Normal => grid.prior(weights),
-        LocationLikelihood::StudentT(df) if *df == f64::INFINITY => grid.prior(weights),
-        LocationLikelihood::Restricted(f)
-            if f.name() == "normal"
-                && !matches!(grid.components, MixtureComponents::Uniform { .. }) =>
-        {
-            grid.prior(weights)
-        }
-        _ => match &grid.components {
-            MixtureComponents::Uniform { lower, upper } => Ok(FixedMixture::Uniform(
-                UniformMixture::new(weights.to_vec(), lower.clone(), upper.clone())?
-                    .with_likelihood(likelihood.clone())?,
-            )),
-            _ => Err(invalid(
-                "normal/truncated-normal mixtures require a normal observation likelihood",
-            )),
-        },
-    }
-}
+
 fn zero_clip(value: f64) -> f64 {
     if value < 0.0 { 0.0 } else { value }
 }
@@ -199,7 +177,7 @@ pub fn shrink_location_batch(
         ));
     }
     let mut warnings = grid.warnings.clone();
-    let initial_prior = prior(&grid, &grid.initial_weights, &options.likelihood)?;
+    let initial_prior = grid.prior_with_likelihood(&grid.initial_weights, &options.likelihood)?;
     if let LocationLikelihood::Restricted(f) = &options.likelihood {
         warnings.extend(super::likelihood_diagnostics::likelihood(
             f,
@@ -254,7 +232,7 @@ pub fn shrink_location_batch(
         .as_ref()
         .map(|f| f.weights.clone())
         .unwrap_or_else(|| grid.initial_weights.clone());
-    let raw_prior = prior(&grid, &fitted_weights, &options.likelihood)?;
+    let raw_prior = grid.prior_with_likelihood(&fitted_weights, &options.likelihood)?;
     if let MixtureComponents::TruncatedNormal { lower, upper, .. } = &grid.components
         && options.thresholds.iter().any(|&cutoff| {
             !lower
@@ -287,7 +265,7 @@ pub fn shrink_location_batch(
         dirichlet: vec![1.0; keep.len()],
         warnings: vec![],
     };
-    let summary_prior = prior(&summary_grid, &weights, &options.likelihood)?;
+    let summary_prior = summary_grid.prior_with_likelihood(&weights, &options.likelihood)?;
     let (prior_mean, prior_sd, zero) = summary_grid.components.moments(&weights);
     let prior_negative = summary_grid.components.prior_cdf(&weights, 0.0)?;
     let prior_zero: f64 = weights
@@ -327,8 +305,7 @@ pub fn shrink_location_batch(
                     .sum(),
             );
             negative[i] = zero_clip(posterior.cdf(0.0) - lfdr[i]);
-            let raw = raw_prior.posterior_at(x[i], se[i], i, n)?;
-            cdfs.extend(options.thresholds.iter().map(|&c| raw.cdf(c)));
+            cdfs.extend(raw_prior.cdf_values_at(x[i], se[i], &options.thresholds, i, n)?);
             let ll = raw_prior.log_likelihoods(x[i], se[i])?;
             log_likelihood += log_marginal(&ll, &fitted_weights)
                 - options.alpha

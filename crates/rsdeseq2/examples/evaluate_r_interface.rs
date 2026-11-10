@@ -1,4 +1,6 @@
 //! Standalone numerical conformance driver; it neither links nor launches R.
+#[path = "evaluate_r_interface/adaptive.rs"]
+mod adaptive;
 #[path = "evaluate_r_interface/batch.rs"]
 mod batch;
 #[path = "evaluate_r_interface/cooks.rs"]
@@ -402,6 +404,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Adaptive(adaptive::Input),
     Uniform(uniform::Input),
     MixtureGrid(mixture_grid::Input),
     LocationShrinkage(location_shrinkage::Input),
@@ -426,6 +429,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Adaptive(input) => adaptive::evaluate(input)?,
         Input::Uniform(input) => uniform::evaluate(input)?,
         Input::MixtureGrid(input) => mixture_grid::evaluate(input)?,
         Input::LocationShrinkage(input) => location_shrinkage::evaluate(input)?,

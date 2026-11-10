@@ -18,6 +18,7 @@ extern SEXP rsdeseq2_offset_factors(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_frozen_local_grid(SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_model_matrix(SEXP,SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_formula_request(SEXP);
+extern SEXP rsdeseq2_stored_binding(SEXP, SEXP, SEXP);
 #ifdef RSDESEQ2_TEST_FORMULA_UNWIND
 extern SEXP rsdeseq2_test_formula_transport(SEXP);
 #endif
@@ -628,6 +629,7 @@ static const R_CallMethodDef call_methods[] = {
     {"rsdeseq2_average_contrast", (DL_FUNC)&rsdeseq2_average_contrast, 3},
     {"rsdeseq2_model_matrix", (DL_FUNC)&rsdeseq2_model_matrix, 5},
     {"rsdeseq2_formula_request", (DL_FUNC)&rsdeseq2_formula_request, 1},
+    {"rsdeseq2_stored_binding", (DL_FUNC)&rsdeseq2_stored_binding, 3},
 #ifdef RSDESEQ2_TEST_FORMULA_UNWIND
     {"rsdeseq2_test_formula_transport", (DL_FUNC)&rsdeseq2_test_formula_transport, 1},
 #endif

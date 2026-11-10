@@ -112,13 +112,11 @@ impl UniformMixture {
             })
             .collect())
     }
-    /// Condition on a finite estimate and positive finite standard error.
-    /// Undefined endpoint differences propagate to NaN posterior summaries.
-    pub fn posterior(
+    fn posterior_weights(
         &self,
         estimate: f64,
         standard_error: f64,
-    ) -> Result<UniformMixturePosterior, DeseqError> {
+    ) -> Result<Vec<f64>, DeseqError> {
         let likelihoods = self.log_likelihoods(estimate, standard_error)?;
         let mut weights = likelihoods
             .iter()
@@ -127,8 +125,46 @@ impl UniformMixture {
             .collect::<Vec<_>>();
         let maximum = weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if weights.iter().any(|v| v.is_nan()) || !maximum.is_finite() {
+            return Ok(vec![f64::NAN; weights.len()]);
+        }
+        for w in &mut weights {
+            *w = language_exp(*w - maximum);
+        }
+        let total: f64 = weights.iter().sum();
+        for w in &mut weights {
+            *w /= total;
+        }
+        Ok(weights)
+    }
+    /// Evaluate CDF cutoffs without evaluating unused moment expressions.
+    pub fn cdf_values(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        thresholds: &[f64],
+    ) -> Result<Vec<f64>, DeseqError> {
+        let weights = self.posterior_weights(estimate, standard_error)?;
+        let view = CdfView {
+            lower: &self.lower,
+            upper: &self.upper,
+            weights: &weights,
+            estimate,
+            standard_error,
+            likelihood: &self.likelihood,
+        };
+        Ok(thresholds.iter().map(|&c| view.cdf(c)).collect())
+    }
+    /// Condition on a finite estimate and positive finite standard error.
+    /// Undefined endpoint differences propagate to NaN posterior summaries.
+    pub fn posterior(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+    ) -> Result<UniformMixturePosterior, DeseqError> {
+        let weights = self.posterior_weights(estimate, standard_error)?;
+        if weights.iter().any(|v| v.is_nan()) {
             return Ok(UniformMixturePosterior {
-                weights: vec![f64::NAN; weights.len()],
+                weights,
                 lower: self.lower.clone(),
                 upper: self.upper.clone(),
                 estimate,
@@ -137,13 +173,6 @@ impl UniformMixture {
                 mean: f64::NAN,
                 standard_deviation: f64::NAN,
             });
-        }
-        for weight in &mut weights {
-            *weight = language_exp(*weight - maximum);
-        }
-        let total = weights.iter().sum::<f64>();
-        for weight in &mut weights {
-            *weight /= total;
         }
         let mut mean = 0.0;
         let mut second = 0.0;
@@ -193,9 +222,6 @@ impl UniformMixture {
     }
 }
 impl UniformMixturePosterior {
-    fn log_cdf(&self, q: f64) -> f64 {
-        self.likelihood.log_cdf(q)
-    }
     /// Normalized posterior component probabilities in prior order.
     pub fn weights(&self) -> &[f64] {
         &self.weights
@@ -210,13 +236,37 @@ impl UniformMixturePosterior {
     }
     /// Right-continuous posterior CDF, including point-mass boundaries.
     pub fn cdf(&self, threshold: f64) -> f64 {
+        CdfView {
+            lower: &self.lower,
+            upper: &self.upper,
+            weights: &self.weights,
+            estimate: self.estimate,
+            standard_error: self.standard_error,
+            likelihood: &self.likelihood,
+        }
+        .cdf(threshold)
+    }
+}
+struct CdfView<'a> {
+    lower: &'a [f64],
+    upper: &'a [f64],
+    weights: &'a [f64],
+    estimate: f64,
+    standard_error: f64,
+    likelihood: &'a LocationLikelihood,
+}
+impl CdfView<'_> {
+    fn log_cdf(&self, x: f64) -> f64 {
+        self.likelihood.log_cdf(x)
+    }
+    pub fn cdf(&self, threshold: f64) -> f64 {
         if threshold.is_nan() || self.weights.iter().any(|v| v.is_nan()) {
             return f64::NAN;
         }
         self.lower
             .iter()
-            .zip(&self.upper)
-            .zip(&self.weights)
+            .zip(self.upper)
+            .zip(self.weights)
             .map(|((&a, &b), &w)| {
                 let probability = if threshold < a {
                     0.0

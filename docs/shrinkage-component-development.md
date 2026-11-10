@@ -2,10 +2,11 @@
 
 This unreleased work extends the standalone Rust engine with normal-likelihood
 uniform and truncated-normal mixtures and preparation of all six mixture-grid
-families. R transports the same inputs to the same core. Public `lfcShrink`
-ashr/apeglm routes have **not** switched to these primitives; their remaining
-likelihood, option, missingness, warning and posterior contracts still need
-implementation before the Rust-only migration is complete.
+families. R transports the same inputs to the same core. The local public
+`lfcShrink(type="ashr")` route now uses the native engine for its default SQP
+workflow, fixed/supplied priors and restricted likelihood expressions. Advanced
+ashr options and the apeglm route remain unfinished; this is not a release-ready
+replacement of the full optional-method interface.
 
 Following the user's latest instruction, further development and commits stay
 local. No new GitHub publication or release is authorized. Focused checks cover
@@ -139,7 +140,8 @@ Twenty independently generated original-package batches cover automatic and
 supplied grids, all six normal-likelihood families, observation weights,
 missing/zero/infinite SEs, unnormalized priors and actual upstream rejection.
 Their numerical values, NA/NaN distinctions, warnings and acceptance decisions
-pass the focused Rust table. This is separate from production adoption.
+pass the focused Rust table. The subsequent public-adapter checks below cover
+adoption of the default workflow, separately from the component table.
 
 The user also approved restricted custom likelihood expressions translated into
 Rust. The implementation imports one-expression function syntax and scalar
@@ -164,17 +166,70 @@ means/SDs undergo the same permutation; uniform CDFs retain their interval order
 A non-coprime M/K panel checks repetition as well as permutation. Summary fallback
 and raw CDF missingness are intentionally separate operations.
 
-The broader Student-t component panel remains **failing in five moment cells**:
-three far-tail df=10 SDs and the narrow df=100 zero-estimate mean/SD. Its 630 rows
-otherwise meet the fixed likelihood, weight, CDF and moment checks. The remaining
-errors concern beta/gamma rounding amplified by the original truncated-moment
-subtractions. No oracle or precision bound has been relaxed. Accepted checkpoint
-`153154a` remains available; subsequent batch/Student-t work is unreleased WIP.
+## Current local adapter checkpoint
 
-Current focused checks: the 23 complete original-package batch cases pass;
-the bounded component test reports exactly the five failures above; root and
-backend Clippy pass; the R importer passes 16 focused assertions without a new
-native rebuild. The new actual bridge/R-free batch checker is implemented but
-awaits the combined native package build. Full suites, paired timing/memory,
-release checks and source-bundle rebuilding remain deferred. Public ashr/apeglm
-routes still contain R calculations and must not be described as fully migrated.
+The five Student-t moment failures are repaired. A standalone positive-Gamma
+implementation uses Fullerton's public-domain SLATEC table; beta probability
+evaluation retains representable complements near one and uses stable recurrences
+and a compensated series for the affected shapes. Ordinary moment normalization
+and log-tail normalization retain separate arithmetic schedules. All 1,476
+bounded component rows (650 uniform, 196 truncated normal, 630 Student-t) now pass
+the original bounds and unchanged oracles.
+
+A new diagnostic panel exposed a limit of using R itself as a 16-ULP probability
+oracle: some original tiny-tail beta probabilities differ from independent
+90-digit truth by up to 274 ULP. The added leaf tests therefore check Gamma/beta
+normalization against the original values, source CDF parity at `1e-13` relative,
+and mathematical CDF accuracy at 16 ULP against an independent rational-beta and
+integrated-binomial-series calculation. This changes no existing component or
+public-method gate. The original diagnostic values remain in the repository.
+
+The public ashr adapter passes the default, sign-s-value and positive-threshold
+workflow on the existing 1,200-gene paired fixture. Maximum mean/SD differences
+from original DESeq2 are below `5e-14`; the existing `1e-3` posterior and `0.02`
+s-value bounds are unchanged. A rejected first adapter trial differed by
+`0.02194` in mean because the general fitter checked all-coordinate KKT
+convergence. Original mixSQP checks only positive coordinates. The compatibility
+batch now explicitly selects that rule and the original default active-set
+iteration limit; the general fitter retains its stronger convergence policy.
+An independent 1,200-observation oracle and an analytical boundary example
+protect both choices.
+
+Threshold queries use the original result MLEs/SEs, a normal likelihood and
+alpha zero, even when fitting inputs, alpha or likelihood are overridden. Ten
+independent query panels cover that policy, recycling, missingness and
+unnormalized priors. CDF-only requests avoid evaluating unused moment expressions.
+The R importer reads already forced scalar captures through a read-only R 4.6
+binding inspection entrypoint; active or unforced delayed bindings never run.
+Older R retains the conservative literal/stored-value importer.
+
+Actual freshly built bridge/R-free outputs match every bit for all 23 complete
+location/custom batches, ten query batches and 630 Student-t component rows,
+with R calculations blocked at the numerical boundary. The public workflow also
+blocks R statistical calls, including original ashr fitting/CDF helpers, and
+checks restricted logistic and canonical Student-t likelihoods. R object
+presentation may still order labels and count storage sizes internally.
+
+Still open: other built-in likelihood families, non-SQP optimizers, estimated
+modes, remaining controls/output subsets, the full warning/integration-failure
+matrix, standalone apeglm, and the combined authority/performance/memory/artifact
+audit. Unsupported development options fail explicitly without an R fallback.
+Full suites and release checks remain deferred until this work is combined.
+Accepted checkpoint `153154a` and the published 0.4.0 release remain intact.
+
+Reproduce the new focused checks after a local build/install:
+
+```sh
+cargo test -p rsdeseq2 --test bounded_posterior --test location_shrinkage \
+  --test adaptive_result --test mixture_fit --test source_convergence
+Rscript scripts/check_location_shrinkage_identity.R "$DRIVER" "$R_LIBRARY" "$FRESH_LOCATION_OUT"
+Rscript scripts/check_adaptive_result_identity.R "$DRIVER" "$R_LIBRARY" "$FRESH_QUERY_OUT"
+Rscript scripts/check_native_ashr_workflow.R "$R_LIBRARY" "$FRESH_WORKFLOW_OUT"
+```
+
+The `generate_adaptive_result_reference.R` generator uses only original ashr.
+`generate_mixture_convergence_reference.R` reads immutable input bits and invokes
+original ashr; its input may be the committed convergence fixture itself, with
+a fresh output path. `generate_student_component_leaves.R` and
+`generate_beta_mathematical_reference.py` reproduce the two independent leaf
+panels. Candidate numerical outputs never enter those oracle calculations.

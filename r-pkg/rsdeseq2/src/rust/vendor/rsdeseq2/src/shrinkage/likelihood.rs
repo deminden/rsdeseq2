@@ -51,3 +51,36 @@ impl LocationLikelihood {
         }
     }
 }
+
+impl super::MixtureGrid {
+    /// Construct a fixed prior under the requested observation likelihood.
+    pub fn prior_with_likelihood(
+        &self,
+        weights: &[f64],
+        likelihood: &LocationLikelihood,
+    ) -> Result<super::FixedMixture, DeseqError> {
+        match likelihood {
+            LocationLikelihood::Normal => self.prior(weights),
+            LocationLikelihood::StudentT(df) if *df == f64::INFINITY => self.prior(weights),
+            LocationLikelihood::Restricted(f)
+                if f.name() == "normal"
+                    && !matches!(self.components, super::MixtureComponents::Uniform { .. }) =>
+            {
+                self.prior(weights)
+            }
+            _ => match &self.components {
+                super::MixtureComponents::Uniform { lower, upper } => {
+                    Ok(super::FixedMixture::Uniform(
+                        super::UniformMixture::new(weights.to_vec(), lower.clone(), upper.clone())?
+                            .with_likelihood(likelihood.clone())?,
+                    ))
+                }
+                _ => Err(DeseqError::InvalidOptions {
+                    reason:
+                        "normal/truncated-normal mixtures require a normal observation likelihood"
+                            .into(),
+                }),
+            },
+        }
+    }
+}

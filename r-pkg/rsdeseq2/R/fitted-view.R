@@ -75,7 +75,9 @@
   for (name in matrices) if (!is.null(fit[[name]])) fit[[name]] <- fit[[name]][rows, , drop = FALSE]
   fit$betaCovariance <- fit$betaCovariance[rows, , , drop = FALSE]
   fit$results <- fit$results[rows, , drop = FALSE]
-  fit$nRefit <- sum(fit$refitRows | fit$newAllZeroRows, na.rm = TRUE)
+  fit$nRefit <- .rsdeseq2_formula_request(list(operation = "evaluate", collation = "C",
+    expressions = list(.rsdeseq2_formula_ast(quote(sum(refitRows | newAllZeroRows, na.rm = TRUE)))),
+    variables = list(refitRows = fit$refitRows, newAllZeroRows = fit$newAllZeroRows)))[[1L]]
   fit$colData <- cd
   fit
 }
