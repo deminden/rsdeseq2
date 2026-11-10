@@ -72,6 +72,7 @@ fn built_in_expressions_match_independent_r_values_and_metadata() {
 #[test]
 fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
     compare_reference(formula_reference!("formula_expression_extended_r462"));
+    compare_reference(include_str!("data/formula_elementary_boundaries_r462.json"));
 }
 
 #[test]

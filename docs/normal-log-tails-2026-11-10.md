@@ -1,5 +1,10 @@
 # Standalone normal log tails
 
+This report records checkpoint `3083bb1`. The subsequent local
+[component development](shrinkage-component-development.md) replaces its
+continued fraction with a rational log-tail evaluation for endpoint subtraction;
+the historical measurements and artifact identities below retain their scope.
+
 The posterior migration now has standalone normal log-CDF and log-upper-tail
 primitives in `rsdeseq2::math`. They support likelihood calculations for the
 remaining uniform/truncated-normal components when ordinary probabilities

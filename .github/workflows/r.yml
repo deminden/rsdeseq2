@@ -64,6 +64,16 @@ jobs:
       - name: Independently regenerate Linux formula references
         if: matrix.lane == 'reference'
         run: python scripts/check_linux_formula_references.py --output-dir regenerated-formula-references
+      - name: Independently record uniform posterior references
+        if: matrix.lane == 'reference'
+        run: Rscript --vanilla scripts/generate_uniform_posterior_reference.R uniform-posterior-reference.json
+      - name: Save independent posterior reference
+        if: matrix.lane == 'reference'
+        uses: actions/upload-artifact@v4
+        with:
+          name: uniform-reference-${{ github.sha }}
+          path: uniform-posterior-reference.json
+          if-no-files-found: error
       - name: Build package
         run: R CMD build r-pkg/rsdeseq2
       - name: Package check
@@ -79,6 +89,10 @@ jobs:
           Rscript --vanilla scripts/check_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-posterior
           Rscript --vanilla scripts/check_mixture_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-prior-fitting
           Rscript --vanilla scripts/check_normal_log_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-log-tails
+          Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform
+          if [ "${{ matrix.lane }}" = reference ]; then
+            Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform-live uniform-posterior-reference.json
+          fi
       - name: Save checked source package
         if: matrix.lane == 'reference'
         uses: actions/upload-artifact@v4

@@ -65,6 +65,38 @@ impl NormalMixture {
         })
     }
 
+    /// Component normal convolution log densities in prior input order.
+    pub fn log_likelihoods(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+    ) -> Result<Vec<f64>, DeseqError> {
+        let variance = standard_error * standard_error;
+        if !estimate.is_finite()
+            || !standard_error.is_finite()
+            || standard_error <= 0.0
+            || !variance.is_finite()
+            || variance == 0.0
+        {
+            return Err(invalid(
+                "estimate and positive standard error/variance must be finite",
+            ));
+        }
+        self.means
+            .iter()
+            .zip(&self.variances)
+            .map(|(&mean, &prior_variance)| {
+                let marginal_variance = variance + prior_variance;
+                if !marginal_variance.is_finite() {
+                    return Err(invalid("marginal variance overflow"));
+                }
+                let sd = marginal_variance.sqrt();
+                let z = (estimate - mean) / sd;
+                Ok(-0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln() - sd.ln())
+            })
+            .collect()
+    }
+
     /// Condition on an estimate with a strictly positive finite standard error.
     ///
     /// Likelihood weights are normalized in log space to retain far-tail

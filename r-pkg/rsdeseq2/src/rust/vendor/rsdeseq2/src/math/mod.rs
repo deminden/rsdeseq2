@@ -1,6 +1,7 @@
 //! Small numerical helpers used by the core algorithms.
 
 pub mod distributions;
+pub(crate) mod elementary;
 pub mod median;
 pub mod normal;
 pub mod optim;

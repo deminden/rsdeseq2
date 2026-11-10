@@ -135,6 +135,8 @@ fn dispatch(request: &Value) -> Result<Value, String> {
         "posterior_svalues" => posterior::ordered_svalues(request),
         "posterior_fit_mixture" => posterior::fit_mixture(request),
         "normal_log_probabilities" => posterior::normal_log(request),
+        "mixture_grid" => posterior::mixture_grid(request),
+        "posterior_uniform_mixture" | "posterior_truncated_normal_mixture" => posterior::uniform_mixture(request),
         "evaluate" | "frame_evaluate" => {
             let expressions = list(get(request, "expressions")?)?
                 .iter()
