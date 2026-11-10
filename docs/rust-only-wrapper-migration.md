@@ -85,9 +85,12 @@ user's request, restricted custom dispersion expressions also translate into
 the same standalone engine; their closures and delayed/active bindings are not
 executed. See the [source audit follow-up](frozen-local-vst-audit-2026-10-31.md)
 and [wrapper scope](r-wrapper.md). This development work leaves the published
-0.4.0 source and binaries intact. Optional posterior/s-value calculations,
-general warning/method semantics, initial result adjustment and the final
-authority/performance reconciliation remain open.
+0.4.0 source and binaries intact. The subsequent
+[builder adjustment checkpoint](deferred-result-adjustment-2026-11-10.md) removes
+discarded initial constructor BH work at private stages that apply final row
+policy; public adjusted constructor and convenience-query contracts remain
+unchanged. Optional posterior/s-value calculations, general warning/method
+semantics and the final authority/performance reconciliation remain open.
 
 The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The

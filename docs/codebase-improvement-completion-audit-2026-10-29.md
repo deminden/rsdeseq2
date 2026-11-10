@@ -32,8 +32,13 @@ now imports saved locfit predictions and translates restricted custom
 dispersion expressions into shared Rust. Independent references retain the
 existing VST bound; direct complete-output checks agree bit for bit with R
 calculations blocked. The historical checkpoint table below retains its
-original scope. Optional posterior/s-value calculations, general method/warning
-semantics, initial result adjustment and final combined authority/performance
+original scope. The subsequent [builder adjustment checkpoint](deferred-result-adjustment-2026-11-10.md)
+defers discarded initial BH calculations only at private stages that finalize
+row policy, preserving adjusted public constructor/query contracts. Full GTEx
+and held-out exports and all twenty paired R payloads remain exact. A combined
+native pass measures 1.116% higher throughput, below the 2% counting threshold;
+R workflow memory stays below 2 GiB. Optional posterior/s-value calculations,
+general method/warning semantics and final combined authority/performance
 evidence remain required before C19/C21/C23 can close.
 
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
