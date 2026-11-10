@@ -1,0 +1,103 @@
+{
+  "artifacts": {
+    "checked_r_library_sha256": "3b0354add840541efc4aa57801de124e00b45be9f9bd8eab42f4a518838cf2dd",
+    "checked_r_source_sha256": "6eda35b6119f2ce024bb37687eb66654ab2bb7cc8077963bd6680936b0caa47e",
+    "current_cli_sha256": "99ce8eac7a1b2b5269a11ba7485c1e538bc18ce398cccce0ecd669d9c97c0584",
+    "standalone_driver_sha256": "b8020eb96797869375280cbf2dea0c84357ed17847e0a0aa8099560a64bba98d"
+  },
+  "base_commit": "bb7331f41e50a0ce9b09544dab25bec1c5d35002",
+  "checks": {
+    "backend_passed": 3,
+    "clippy_both_graphs": "passed",
+    "direct_frozen_complete_bit_cases": 8,
+    "gtex_global_gates": 9,
+    "gtex_per_contrast_gates": 121,
+    "legacy_expression_bit_cases": 188,
+    "msrv_both_graphs": "1.97.1 passed",
+    "native_factor_matrix_and_expanded_cases": 60,
+    "native_formula_bit_cases": 54,
+    "python_platform_skips": 1,
+    "python_tests": 47,
+    "r_check": "OK",
+    "r_passed": 2634,
+    "rust_passed": 1077,
+    "sanitizer_checkpoint": {
+      "c": "address,undefined",
+      "dependencies_instrumented": false,
+      "formula_unwind_error_cases": 4,
+      "leak_detection": false,
+      "r_interpreter_instrumented": false,
+      "replacement_unwind_error_cases": 4,
+      "rust": "address",
+      "rust_stdlib_instrumented": false,
+      "status": "passed"
+    },
+    "unchanged_native_exports": 22,
+    "vendor": "passed"
+  },
+  "numerical_source_tree_sha256": "c286c70af2943f3b6ea4108be494875cc70c0290d6f7b36d8346c55dcd26c20e",
+  "optimization_rounds_counted": 0,
+  "performance_reconciliation_complete": false,
+  "reference": {
+    "DESeq2": "1.52.0",
+    "R": "4.6.2",
+    "fixture_sha256": "67f9b8f614255a9cc0284a50bef3ab7235806cea93ae60709ada4a5b87edf277",
+    "locfit": "1.5.9.12"
+  },
+  "remaining": [
+    "initial redundant native BH pass",
+    "optional ashr/apeglm posterior engines and s-values",
+    "general warning/method semantics",
+    "final result authority and combined performance/artifact audit"
+  ],
+  "scope": "Unreleased frozen local VST migration after 0.4.0",
+  "timing": {
+    "discarded_cases": 0,
+    "native_initial_matrix_transport": {
+      "baseline_peak_rss_mib": 302.140625,
+      "baseline_s": 36.0261368350001,
+      "binary_sha256": "a3375b59fbe77105c5e872977bb4049b890299661cc0808209a4b80ac270e6b1",
+      "candidate_peak_rss_mib": 301.96875,
+      "candidate_s": 37.13206612500007,
+      "elapsed_change_percent": 3.069797061686441
+    },
+    "one_pair_per_candidate": true,
+    "ordinary_r20_initial_matrix_transport": {
+      "baseline": {
+        "peak_rss_mib": 1130.828125,
+        "process_s": 86.956746625
+      },
+      "candidate": {
+        "peak_rss_mib": 1150.109375,
+        "process_s": 86.47491508599995
+      }
+    },
+    "target_borrowed_grid": {
+      "genes": 56200,
+      "library_sha256": {
+        "baseline": "12785fff1c864dad589941526d31a7b01c5a8cc2235316851a75cea3aeb5c128",
+        "candidate": "e2db83c5b220cd8e3ae9cb5eba5cd19a2ea9a9a1e95e4d466cd168b89415f5dd"
+      },
+      "max_rss_mib": 2048,
+      "repeats": 1,
+      "samples": 16,
+      "script_sha256": "b1f056dddf35a727a7c05d610a0b97ce2be356fd563076d8e73a910c660078d5",
+      "status": "complete",
+      "threads": 1
+    },
+    "target_initial": {
+      "genes": 56200,
+      "library_sha256": {
+        "baseline": "12785fff1c864dad589941526d31a7b01c5a8cc2235316851a75cea3aeb5c128",
+        "candidate": "c834adc8cf270a74e1eac7340856e8f14907ee8d91766fd0d13ccd9119f23d37"
+      },
+      "max_rss_mib": 2048,
+      "repeats": 1,
+      "samples": 16,
+      "script_sha256": "b1f056dddf35a727a7c05d610a0b97ce2be356fd563076d8e73a910c660078d5",
+      "status": "complete",
+      "threads": 1
+    },
+    "unchanged_case_retiming": false
+  }
+}

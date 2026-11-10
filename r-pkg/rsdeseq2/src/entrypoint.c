@@ -15,6 +15,7 @@ extern SEXP rsdeseq2_test_replacement_transport(SEXP);
 extern SEXP rsdeseq2_validate_counts(SEXP);
 extern SEXP rsdeseq2_normal_shrinkage_rows(SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_offset_factors(SEXP,SEXP,SEXP,SEXP);
+extern SEXP rsdeseq2_frozen_local_grid(SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_model_matrix(SEXP,SEXP,SEXP,SEXP,SEXP);
 extern SEXP rsdeseq2_formula_request(SEXP);
 #ifdef RSDESEQ2_TEST_FORMULA_UNWIND
@@ -633,6 +634,7 @@ static const R_CallMethodDef call_methods[] = {
     {"rsdeseq2_validate_counts", (DL_FUNC)&rsdeseq2_validate_counts, 1},
     {"rsdeseq2_normal_shrinkage_rows", (DL_FUNC)&rsdeseq2_normal_shrinkage_rows, 4},
     {"rsdeseq2_offset_factors", (DL_FUNC)&rsdeseq2_offset_factors, 4},
+    {"rsdeseq2_frozen_local_grid", (DL_FUNC)&rsdeseq2_frozen_local_grid, 3},
     {"rsdeseq2_present_results", (DL_FUNC)&rsdeseq2_present_results, 3},
     {"rsdeseq2_contrast_batch", (DL_FUNC)&rsdeseq2_contrast_batch, 4},
     {"rsdeseq2_project_contrast_zero", (DL_FUNC)&rsdeseq2_project_contrast_zero, 5},

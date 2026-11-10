@@ -1,0 +1,9 @@
+profile	normalization	tool	process_s	transform_s	peak_rss_mib
+saved	size	baseline	2.273237709	0.11	731.0
+saved	size	candidate	2.2851306660000006	0.0989999999999998	717.421875
+saved	matrix	candidate	2.4174817079999995	0.249	768.125
+saved	matrix	baseline	2.421210083	0.246	768.140625
+expression	size	baseline	2.259696917000001	0.101	730.640625
+expression	size	candidate	2.258443250000001	0.0989999999999998	723.9375
+expression	matrix	candidate	2.4132599589999995	0.248	764.921875
+expression	matrix	baseline	2.406228833	0.246	771.609375

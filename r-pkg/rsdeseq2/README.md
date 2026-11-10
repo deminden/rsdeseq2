@@ -75,8 +75,8 @@ interactions are rejected for normal shrinkage. Cleaned coefficient aliases
 work for transformed-factor formulas; factor-level contrast syntax remains
 unsupported when DESeq2 cannot resolve its coefficient names.
 
-Frozen local VST reuse and optional `ashr`/`apeglm` posterior calculations still
-involve R. The Rust-only wrapper migration is unfinished; see the
+Optional `ashr`/`apeglm` posterior calculations still involve R. The Rust-only
+wrapper migration is unfinished; see the
 [migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use
 polynomial coordinates; select their named coefficients or supply numeric
 contrasts rather than treatment-style factor-level contrasts.

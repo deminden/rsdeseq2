@@ -34,7 +34,7 @@
   frozenTrendSource <- "estimated"
   frozenDispersionFunction <- NULL
   frozenDispFit <- NULL
-  frozenLocalFunction <- NULL
+  frozenLocalModel <- NULL
   frozenLocalCurve <- NULL
   if (identical(transformType, "vstFull") && !blind) {
     candidate <- DESeq2::dispersionFunction(object)
@@ -59,7 +59,7 @@
       }
     } else if (identical(candidateType, "local")) {
       frozenTrendType <- 1L
-      frozenLocalFunction <- candidate
+      frozenLocalModel <- .rsdeseq2_frozen_local_model(candidate)
       frozenDispersionFunction <- candidateType
       frozenTrendSource <- "frozen_dispersion_function"
       fitType <- candidateType
@@ -134,25 +134,12 @@
   } else if (!is.null(normalizationFactors)) {
     sizeFactors <- NULL
   }
-  if (!is.null(frozenLocalFunction)) {
+  if (!is.null(frozenLocalModel)) {
     if (is.null(normalizationFactors) && is.null(sizeFactors)) {
       sizeFactors <- estimateSizeFactorsRust(counts, native = TRUE)
     }
-    normalizedForTrend <- if (is.null(normalizationFactors)) {
-      sweep(counts, 2L, sizeFactors, "/")
-    } else {
-      counts / normalizationFactors
-    }
-    maxNormalizedCount <- max(normalizedForTrend)
-    frozenGrid <- sinh(seq(
-      asinh(0), asinh(maxNormalizedCount), length.out = 1000L
-    ))[-1L]
-    frozenDispersions <- as.numeric(frozenLocalFunction(frozenGrid))
-    if (length(frozenDispersions) != length(frozenGrid) ||
-        any(!is.finite(frozenDispersions)) || any(frozenDispersions <= 0)) {
-      stop("frozen local dispersionFunction must return finite positive values on the VST grid", call. = FALSE)
-    }
-    frozenLocalCurve <- c(frozenGrid, frozenDispersions)
+    frozenLocalCurve <- .rsdeseq2_frozen_local_curve(
+      frozenLocalModel, counts, sizeFactors, normalizationFactors)
   }
   if (!is.matrix(design) || nrow(design) != ncol(counts) || !is.numeric(design)) {
     stop("transformation design must have one numeric row per sample", call. = FALSE)

@@ -83,10 +83,30 @@ offsets. Fast `vst()` selects its subset by ordinary normalized-count means,
 including for weighted datasets, and errors when fewer than `nsub` genes
 qualify. Rlog can also reuse supplied frozen intercepts and a shared sample
 prior variance. Full-data VST reuses existing frozen parametric/mean
-dispersion-function parameters in Rust. For a frozen local trend, R evaluates
-the existing function on DESeq2's 999-point grid and Rust integrates the
-sampled curve. The [frozen-local audit](frozen-local-vst-audit-2026-10-31.md)
-explains the remaining R calculations and closure limitations. Design-aware rlog reuses an existing `dispFit` column when
+dispersion-function parameters in Rust. The development tree after 0.4.0 also
+imports saved one-dimensional DESeq2 locfit coefficients without refitting;
+Rust constructs the 999-point grid, predicts dispersions and computes the VST.
+Restricted custom dispersion expressions are translated into the shared Rust
+expression engine. They must have one mean argument and one expression, using
+supported built-ins and primitive constants captured in a local environment.
+For example:
+
+```r
+trend <- local({
+  asymptote <- 0.15
+  function(mu) asymptote + 0.3 / sqrt(base::pmax(mu, 1e-8))
+})
+attr(trend, "fitType") <- "local"
+```
+
+Use qualified built-ins when packages mask them. Custom calls, multiple
+statements, active bindings, delayed calculations and unresolved global
+constants are rejected before execution. Saved locfit imports currently require
+the standard one-dimensional quadratic Gaussian DESeq2 profile. The
+[frozen-local audit and follow-up](frozen-local-vst-audit-2026-10-31.md) describe
+the independent references and direct interface checks. These development
+changes do not alter the published 0.4.0 artifacts.
+Design-aware rlog reuses an existing `dispFit` column when
 `blind=FALSE`. Broader local-VST and fast-subset edge cases remain open.
 
 `lfcShrink()` currently accepts a dataset fitted by `rsdeseq2::DESeq()` and

@@ -62,6 +62,8 @@ pub(super) fn supported(name: &str) -> bool {
             | "sum"
             | "sd"
             | "ifelse"
+            | "pmax"
+            | "pmin"
     )
 }
 impl Evaluator<'_> {
@@ -110,6 +112,7 @@ impl Evaluator<'_> {
                 self.shape(name, args, expressions)
             }
             "mean" | "sum" | "sd" => self.summary(name, args),
+            "pmax" | "pmin" => super::extrema::parallel(name, args),
             _ => self.elementary(name, args),
         }
     }

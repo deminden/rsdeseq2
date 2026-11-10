@@ -14,6 +14,28 @@ replayed. Older R statistical calculations are still present and must be
 migrated. Earlier sanitizer/workflow artifacts below certify their recorded
 historical source, rather than the not-yet-built replacement engine.
 
+## Subsequent release and migration status
+
+The [0.4.0 release](https://github.com/deminden/rsdeseq2/releases/tag/v0.4.0)
+is published at `9324f33`. Its tagged Rust, both R lanes, full parity, MSRV,
+checked-source and five target binary checks passed. The original run's final
+upload failed because checkout removed downloaded files; `bb7331f` fixes the
+ordering and adds guarded recovery. The
+[successful recovery](https://github.com/deminden/rsdeseq2/actions/runs/41367071439)
+publishes the original checked artifacts without moving the tag. All fifteen
+assets, binary/source identities and the crates.io checksum were independently
+verified. This closes the platform/publication gate for that released source;
+it does not complete the unfinished migration described below.
+
+The development [frozen-local VST follow-up](frozen-local-vst-audit-2026-10-31.md)
+now imports saved locfit predictions and translates restricted custom
+dispersion expressions into shared Rust. Independent references retain the
+existing VST bound; direct complete-output checks agree bit for bit with R
+calculations blocked. The historical checkpoint table below retains its
+original scope. Optional posterior/s-value calculations, general method/warning
+semantics, initial result adjustment and final combined authority/performance
+evidence remain required before C19/C21/C23 can close.
+
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
 apeglm 1.34.0 and ashr 2.2-63. Historical benchmark results retain their original
 checkpoint and executable identity. The measured M4 executable is SHA-256

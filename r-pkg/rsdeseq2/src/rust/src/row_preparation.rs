@@ -20,6 +20,37 @@ unsafe fn counts<'a>(
     .map_err(|e| e.to_string())
 }
 /// # Safety
+/// Counts and optional factors reference G×N doubles, optional size factors N
+/// doubles and output 999 distinct writable doubles. All borrows are synchronous.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rsdeseq2_r_frozen_local_grid(
+    genes: usize,
+    samples: usize,
+    values: *const f64,
+    sf: *const f64,
+    nf: *const f64,
+    output: *mut f64,
+) -> i32 {
+    run_backend(|| {
+        let counts = CountView::from_doubles(unsafe { counts(genes, samples, values)? })
+            .map_err(|e| e.to_string())?;
+        let sf = if sf.is_null() {
+            None
+        } else {
+            Some(unsafe { input_slice(sf, samples, "size factors")? })
+        };
+        let nf = if nf.is_null() {
+            None
+        } else {
+            Some(unsafe { self::counts(genes, samples, nf)? })
+        };
+        let grid = rsdeseq2::transform::frozen_local_vst_grid_from_counts(counts, sf, nf)
+            .map_err(|e| e.to_string())?;
+        unsafe { output_slice(output, 999, "frozen local grid")? }.copy_from_slice(&grid);
+        Ok(())
+    })
+}
+/// # Safety
 /// The input references G×N readable doubles; C validates complete matrix storage.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_validate_counts(

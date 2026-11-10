@@ -78,6 +78,17 @@ between the two interfaces.
 The migration is **in progress**. Removing the experimental commits does not
 mean the older R calculations listed above have already been removed.
 
+After the 0.4.0 release, the frozen-local VST port imports original saved locfit
+knots, residual coefficients and the global polynomial without refitting. Grid
+construction, interpolation/extrapolation and integration run in Rust. At the
+user's request, restricted custom dispersion expressions also translate into
+the same standalone engine; their closures and delayed/active bindings are not
+executed. See the [source audit follow-up](frozen-local-vst-audit-2026-10-31.md)
+and [wrapper scope](r-wrapper.md). This development work leaves the published
+0.4.0 source and binaries intact. Optional posterior/s-value calculations,
+general warning/method semantics, initial result adjustment and the final
+authority/performance reconciliation remain open.
+
 The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The
 [built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)
