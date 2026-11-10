@@ -108,6 +108,13 @@ and fitting procedure correct a rejected optimizer trial without changing bounds
 Full prior/grid/likelihood/control and missingness/warning adapters still precede
 production adoption; the public optional methods and completion gates remain open.
 
+The [normal log-tail checkpoint](normal-log-tails-2026-11-10.md) then supplies
+underflow-resistant log-CDF/log-upper-tail primitives for the remaining posterior
+components. All 666 original-R arguments meet the fixed ULP gate, and actual
+bridge/R-free outputs match every bit. It leaves existing Wald calculations and
+public shrinkage routes unchanged; the remaining component and method adapters
+are still required.
+
 The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The
 [built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)

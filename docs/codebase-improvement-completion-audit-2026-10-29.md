@@ -55,6 +55,12 @@ bridge/R-free output bits agree. The public optional shrinkage methods still
 require their grid/component/likelihood/control and missingness/warning adapters;
 this foundation does not close C19/C21/C23 or add a performance claim.
 
+The [normal log-tail support](normal-log-tails-2026-11-10.md) adds direct log
+probabilities for the remaining posterior components, with 666 original-R
+references and bit-identical native/wrapped output. Existing Wald/public
+shrinkage paths and parity bounds remain unchanged. Component/method adoption
+and the final audit gates are still open.
+
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
 apeglm 1.34.0 and ashr 2.2-63. Historical benchmark results retain their original
 checkpoint and executable identity. The measured M4 executable is SHA-256
