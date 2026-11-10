@@ -15,6 +15,8 @@ mod mixture_fit;
 mod model_matrix;
 #[path = "evaluate_r_interface/native_formula.rs"]
 mod native_formula;
+#[path = "evaluate_r_interface/normal_log.rs"]
+mod normal_log;
 #[path = "evaluate_r_interface/posterior.rs"]
 mod posterior;
 #[path = "evaluate_r_interface/preparation.rs"]
@@ -37,6 +39,20 @@ struct FilteringInput {
 
 fn bits(value: f64) -> String {
     format!("{:016x}", value.to_bits())
+}
+
+fn parse_numeric_input(value: &str) -> Result<f64, Box<dyn Error>> {
+    Ok(if let Some(bits) = value.strip_prefix("bits:") {
+        f64::from_bits(u64::from_str_radix(bits, 16)?)
+    } else if matches!(value, "NA" | "NaN") {
+        f64::NAN
+    } else {
+        value.parse()?
+    })
+}
+
+fn parse_numeric_inputs(values: &[String]) -> Result<Vec<f64>, Box<dyn Error>> {
+    values.iter().map(|v| parse_numeric_input(v)).collect()
 }
 
 fn filtering(input: FilteringInput) -> Result<serde_json::Value, Box<dyn Error>> {
@@ -378,6 +394,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    NormalLog(normal_log::Input),
     MixtureFit(mixture_fit::Input),
     Posterior(posterior::Input),
     FrozenLocal(frozen_local::Input),
@@ -398,6 +415,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::NormalLog(input) => normal_log::evaluate(input)?,
         Input::MixtureFit(input) => mixture_fit::evaluate(input)?,
         Input::Posterior(input) => posterior::evaluate(input)?,
         Input::FrozenLocal(input) => frozen_local::evaluate(input)?,

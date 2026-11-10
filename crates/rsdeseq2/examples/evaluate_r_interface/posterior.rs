@@ -23,15 +23,7 @@ struct SvalueCase {
     name: String,
     rates: Vec<String>,
 }
-fn numbers(values: &[String]) -> Result<Vec<f64>, Box<dyn Error>> {
-    values
-        .iter()
-        .map(|v| match v.as_str() {
-            "NA" | "NaN" => Ok(f64::NAN),
-            _ => Ok(v.parse()?),
-        })
-        .collect()
-}
+use super::parse_numeric_inputs as numbers;
 pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let mut cases = vec![];
     for case in input.posterior_cases {

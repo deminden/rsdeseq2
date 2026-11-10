@@ -34,3 +34,17 @@ testthat::test_that('native mixture fitting retains weighted prior modes and dia
       list(options=list(likelihood_offset=-1)),list(options=list(active_iterations=0L))))
     testthat::expect_error(.rsdeseq2_formula_request(utils::modifyList(request,change,keep.null=TRUE)))
 })
+
+testthat::test_that('log normal tails retain underflowed probabilities through the native bridge', {
+  x<-c(-Inf,-40,-8,0,8,40,Inf,NaN)
+  actual<-.rsdeseq2_formula_request(list(operation='normal_log_probabilities',arguments=x))
+  expected<-list(log_cdf=stats::pnorm(x,log.p=TRUE),log_upper=stats::pnorm(x,lower.tail=FALSE,log.p=TRUE))
+  for(name in names(expected)){
+    a<-actual[[name]];b<-expected[[name]];finite<-is.finite(b)
+    testthat::expect_identical(is.na(a),is.na(b))
+    testthat::expect_equal(a[!finite],b[!finite])
+    testthat::expect_true(all(abs(a[finite]-b[finite])<=16*.Machine$double.eps*pmax(abs(b[finite]),1e-300)))
+  }
+  testthat::expect_true(is.finite(actual$log_cdf[[2L]]))
+  testthat::expect_error(.rsdeseq2_formula_request(list(operation='normal_log_probabilities',arguments='invalid')))
+})

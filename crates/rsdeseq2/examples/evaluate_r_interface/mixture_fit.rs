@@ -29,16 +29,7 @@ struct Controls {
     zero_threshold: String,
     likelihood_offset: String,
 }
-fn number(v: &str) -> Result<f64, Box<dyn Error>> {
-    Ok(if let Some(bits) = v.strip_prefix("bits:") {
-        f64::from_bits(u64::from_str_radix(bits, 16)?)
-    } else {
-        v.parse()?
-    })
-}
-fn numbers(v: &[String]) -> Result<Vec<f64>, Box<dyn Error>> {
-    v.iter().map(|v| number(v)).collect()
-}
+use super::{parse_numeric_input as number, parse_numeric_inputs as numbers};
 pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let mut cases = vec![];
     for c in input.mixture_fit_cases {

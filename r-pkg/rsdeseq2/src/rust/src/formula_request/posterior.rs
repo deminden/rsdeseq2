@@ -1,5 +1,6 @@
 //! Primitive transport for standalone posterior kernels; no R callbacks.
 use super::{Data, Value, get, integer, named};
+use rsdeseq2::math::{normal_log_cdf, normal_log_upper_tail};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 use rsdeseq2::shrinkage::{MixtureFitOptions, NormalMixture, fit_mixture_proportions, svalues};
 
@@ -14,6 +15,22 @@ fn scalar(value: &Value) -> Result<f64, String> {
         [value] => Ok(*value),
         _ => Err("posterior control requires one numeric value".into()),
     }
+}
+
+pub(super) fn normal_log(request: &Value) -> Result<Value, String> {
+    let arguments = numbers(get(request, "arguments")?)?;
+    Ok(named(
+        &["log_cdf", "log_upper"],
+        vec![
+            Value::numbers(arguments.iter().map(|v| normal_log_cdf(*v)).collect()),
+            Value::numbers(
+                arguments
+                    .iter()
+                    .map(|v| normal_log_upper_tail(*v))
+                    .collect(),
+            ),
+        ],
+    ))
 }
 
 pub(super) fn fit_mixture(request: &Value) -> Result<Value, String> {

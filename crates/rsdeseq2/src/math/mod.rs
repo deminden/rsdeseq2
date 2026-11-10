@@ -2,6 +2,7 @@
 
 pub mod distributions;
 pub mod median;
+pub mod normal;
 pub mod optim;
 pub mod qr;
 pub mod special;
@@ -13,4 +14,5 @@ pub use distributions::{
     negative_binomial_log_pmf, negative_binomial_negative_twice_log_likelihood,
 };
 pub use median::{median, median_finite};
+pub use normal::{normal_log_cdf, normal_log_upper_tail};
 pub use special::trigamma;
