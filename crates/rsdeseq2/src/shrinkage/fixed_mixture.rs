@@ -69,6 +69,20 @@ impl FixedMixture {
             self.posterior(estimate, standard_error)
         }
     }
+    pub(super) fn cdf_values_at(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        thresholds: &[f64],
+        row: usize,
+        observations: usize,
+    ) -> Result<Vec<f64>, DeseqError> {
+        if let Self::Uniform(p) = self {
+            return p.cdf_values(estimate, standard_error, thresholds);
+        }
+        let p = self.posterior_at(estimate, standard_error, row, observations)?;
+        Ok(thresholds.iter().map(|&c| p.cdf(c)).collect())
+    }
     /// Condition a complete observation vector, retaining any family-specific
     /// batch-shape semantics required by the established numerical contract.
     pub fn posteriors(

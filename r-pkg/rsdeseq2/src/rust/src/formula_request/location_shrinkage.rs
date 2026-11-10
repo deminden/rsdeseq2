@@ -24,21 +24,14 @@ fn optional(value: &Value) -> Result<Option<Vec<f64>>, String> {
 fn characters(values: Vec<String>) -> Value {
     Value::new(Data::Text(values.into_iter().map(Some).collect()))
 }
-fn supplied(value: &Value, penalty: &MixturePriorPenalty) -> Result<Option<MixtureGrid>, String> {
+pub(super) fn supplied(
+    value: &Value,
+    penalty: &MixturePriorPenalty,
+) -> Result<Option<MixtureGrid>, String> {
     if matches!(value.data, Data::Null) {
         return Ok(None);
     }
     let weights = numbers(get(value, "weights")?)?.to_vec();
-    let mut dirichlet = vec![1.0; weights.len()];
-    match penalty {
-        MixturePriorPenalty::Uniform => {}
-        MixturePriorPenalty::NullBiased(w) => {
-            if let Some(first) = dirichlet.first_mut() {
-                *first = *w;
-            }
-        }
-        MixturePriorPenalty::Parameters(p) => dirichlet = p.clone(),
-    }
     let values = |name| numbers(get(value, name)?).map(<[f64]>::to_vec);
     let components = match text(get(value, "component_class")?)? {
         "normalmix" => MixtureComponents::Normal {
@@ -57,14 +50,11 @@ fn supplied(value: &Value, penalty: &MixturePriorPenalty) -> Result<Option<Mixtu
         },
         _ => return Err("unknown supplied-prior class".into()),
     };
-    Ok(Some(MixtureGrid {
-        components,
-        initial_weights: weights,
-        dirichlet,
-        warnings: vec![],
-    }))
+    MixtureGrid::from_supplied(components, weights, penalty)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
-fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
+pub(super) fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
     let (class, means, sds, lower, upper) = match components {
         MixtureComponents::Normal { means, sds } => {
             ("normalmix", Some(means), Some(sds), None, None)
@@ -248,7 +238,7 @@ fn restricted_function(value: &Value) -> Result<rsdeseq2::shrinkage::RestrictedF
     )
     .map_err(|e| e.to_string())
 }
-fn restricted_likelihood(
+pub(super) fn restricted_likelihood(
     value: &Value,
 ) -> Result<rsdeseq2::shrinkage::RestrictedLikelihood, String> {
     let optional = |name| {

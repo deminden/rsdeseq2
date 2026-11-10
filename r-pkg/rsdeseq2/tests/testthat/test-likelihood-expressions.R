@@ -41,3 +41,30 @@ testthat::test_that("custom likelihood import rejects executable bindings and un
   testthat::expect_error(inspect(masked), "custom or unsupported")
   testthat::expect_false(touched)
 })
+testthat::test_that("already forced closure parameters are read without repeating their expressions", {
+  testthat::skip_if(getRversion() < "4.6.0")
+  state <- new.env(parent = emptyenv())
+  state$touched <- FALSE
+  make_function <- function(constant) {
+    force(constant)
+    function(x) x + constant
+  }
+  fun <- make_function({ state$touched <- TRUE; .25 })
+  testthat::expect_true(state$touched)
+  state$touched <- FALSE
+  parsed <- rsdeseq2:::.rsdeseq2_restricted_likelihood_function(fun, 1L, "custom likelihood")
+  testthat::expect_identical(parsed$constants, list(constant = .25))
+  testthat::expect_false(state$touched)
+  testthat::expect_error(.Call("rsdeseq2_stored_binding", NA_character_, environment(fun), "test", PACKAGE="rsdeseq2"), "requires")
+})
+
+testthat::test_that("canonical likelihood descriptors retain parameter captures and reject masked bodies", {
+  testthat::skip_if_not_installed("ashr")
+  translate <- rsdeseq2:::.rsdeseq2_native_ash_likelihood
+  testthat::expect_identical(translate(ashr::lik_normal()), list(type = "normal"))
+  testthat::skip_if(getRversion() < "4.6.0")
+  testthat::expect_identical(translate(ashr::lik_t(5)), list(type = "t", df = 5))
+  normal <- ashr::lik_normal()
+  normal$etruncFUN <- function(a, b) stop("must not execute")
+  testthat::expect_error(translate(normal), "unsupported")
+})

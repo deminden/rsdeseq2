@@ -153,6 +153,32 @@ fn categorical_weighted_dirichlet_and_prior_only_modes_have_known_solutions() {
     assert!(fit.converged);
     assert!((fit.weights[0] - 0.25).abs() < 1e-7);
     assert_eq!(fit.log_likelihood, 0.);
+    // A zero initial weight cannot revive through EM. The general fitter must
+    // check its dual residual; source compatibility deliberately checks only
+    // positive coordinates and therefore retains the initial active support.
+    let logs = [0.0, 2.0_f64.ln()];
+    for source_rule in [false, true] {
+        let fit = fit_mixture_proportions(
+            MatrixView::new(1, 2, &logs, MatrixOrder::RowMajor).unwrap(),
+            None,
+            &[1., 1.],
+            Some(&[1., 0.]),
+            MixtureFitOptions {
+                positive_coordinate_convergence: source_rule,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(fit.converged);
+        assert_eq!(
+            fit.weights,
+            if source_rule {
+                vec![1., 0.]
+            } else {
+                vec![0., 1.]
+            }
+        );
+    }
 }
 #[test]
 fn invalid_mixture_problems_fail_and_iteration_limits_remain_visible() {

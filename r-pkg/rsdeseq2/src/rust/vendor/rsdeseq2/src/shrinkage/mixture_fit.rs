@@ -14,6 +14,9 @@ pub struct MixtureFitOptions {
     /// pseudo-observations. Zero fits the unregularized likelihood; ashr's
     /// mixSQP adapter uses 1e-6 by default.
     pub likelihood_offset: f64,
+    /// Original mixSQP checks dual residuals only on positive coordinates.
+    /// Keep false for the general convex fitter's stronger full KKT check.
+    pub positive_coordinate_convergence: bool,
 }
 impl Default for MixtureFitOptions {
     fn default() -> Self {
@@ -24,6 +27,7 @@ impl Default for MixtureFitOptions {
             active_iterations: 100,
             zero_threshold: 1e-8,
             likelihood_offset: 0.0,
+            positive_coordinate_convergence: false,
         }
     }
 }

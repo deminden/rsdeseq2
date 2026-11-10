@@ -118,6 +118,7 @@ pub(super) fn fit_mixture(request: &Value) -> Result<Value, String> {
         active_iterations: integer(get(controls, "active_iterations")?)?,
         zero_threshold: scalar(get(controls, "zero_threshold")?)?,
         likelihood_offset: scalar(get(controls, "likelihood_offset")?)?,
+        positive_coordinate_convergence: false,
     };
     let initial = get(request, "initial_weights")?;
     let initial = if matches!(initial.data, Data::Null) {

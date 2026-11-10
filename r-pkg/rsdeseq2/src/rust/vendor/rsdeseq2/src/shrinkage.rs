@@ -2,14 +2,18 @@
 //!
 //! These kernels do not yet replace the public R shrinkage methods.
 mod adaptive_grid;
+mod adaptive_result;
+mod beta_normalization;
 mod component_summary;
 mod expression_likelihood;
 mod expression_quadrature;
 mod fixed_mixture;
+mod gamma_normalization;
 mod likelihood;
 mod likelihood_diagnostics;
 mod location_batch;
 mod location_missing;
+mod location_query;
 mod mixture_fit;
 mod normal_mixture;
 mod student_t;
@@ -29,8 +33,8 @@ pub use truncated_normal_mixture::{TruncatedNormalMixture, TruncatedNormalMixtur
 pub use fixed_mixture::{FixedMixture, FixedMixturePosterior};
 
 pub use adaptive_grid::{
-    MixtureComponents, MixtureFamily, MixtureGrid, MixtureGridOptions, MixturePriorPenalty,
-    prepare_mixture_grid,
+    AdaptiveMethod, MixtureComponents, MixtureFamily, MixtureGrid, MixtureGridOptions,
+    MixturePriorPenalty, prepare_mixture_grid,
 };
 
 pub use location_batch::{LocationShrinkage, LocationShrinkageOptions, shrink_location_batch};
@@ -38,3 +42,7 @@ pub use location_batch::{LocationShrinkage, LocationShrinkageOptions, shrink_loc
 pub use expression_likelihood::{RestrictedFunction, RestrictedLikelihood};
 
 pub use likelihood::LocationLikelihood;
+
+pub use location_query::{LocationCdfOptions, location_cdf_batch, threshold_svalues};
+
+pub use adaptive_result::{AdaptiveShrinkageQuery, AdaptiveShrinkageResult, adaptive_shrinkage};

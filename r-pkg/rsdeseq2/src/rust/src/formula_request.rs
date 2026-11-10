@@ -4,6 +4,7 @@ use rsdeseq2::design::expression::{
     self, Argument, Data, EvaluationOptions, Expression, Value, frame, wire,
 };
 use std::ptr;
+mod ashr;
 mod frozen_local;
 mod location_shrinkage;
 mod posterior;
@@ -136,6 +137,7 @@ fn dispatch(request: &Value) -> Result<Value, String> {
         "posterior_svalues" => posterior::ordered_svalues(request),
         "posterior_fit_mixture" => posterior::fit_mixture(request),
         "normal_log_probabilities" => posterior::normal_log(request),
+        "ashr_shrinkage" => ashr::evaluate(request),
         "shrink_location_batch" => location_shrinkage::evaluate(request),
         "mixture_grid" => posterior::mixture_grid(request),
         "posterior_uniform_mixture" | "posterior_truncated_normal_mixture" => {

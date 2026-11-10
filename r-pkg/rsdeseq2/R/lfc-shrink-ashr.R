@@ -8,9 +8,6 @@
       !requireNamespace("DESeq2", quietly = TRUE)) {
     stop("SummarizedExperiment, S4Vectors, and DESeq2 are required for DESeqDataSet shrinkage", call. = FALSE)
   }
-  if (!requireNamespace("ashr", quietly = TRUE)) {
-    stop("type='ashr' requires installing the optional package 'ashr'", call. = FALSE)
-  }
   fit <- .rsdeseq2_fitted_view(dds)
   if (is.null(fit) || !inherits(fit, "rsdeseq2RustFit")) {
     stop("DESeqDataSet must be fitted with rsdeseq2::DESeq() before calling lfcShrink()", call. = FALSE)
@@ -94,23 +91,12 @@
     ),
     dots
   )
-  ashFit <- do.call(ashr::ash, ashArguments)
+  ashFit <- .rsdeseq2_native_ash(ashArguments, betaHat, seBetaHat, lfcThreshold, svalue)
   res$log2FoldChange <- ashFit$result$PosteriorMean
   res$lfcSE <- ashFit$result$PosteriorSD
   independentFilteringInfo <- attr(res, "independentFiltering")
   if (lfcThreshold > 0) {
-    cdfPositive <- ashr::cdf_post(
-      ashFit$fitted_g, lfcThreshold,
-      ashr::set_data(betaHat, seBetaHat)
-    )
-    cdfNegative <- ashr::cdf_post(
-      ashFit$fitted_g, -lfcThreshold,
-      ashr::set_data(betaHat, seBetaHat)
-    )
-    lfsr <- ifelse(res$log2FoldChange > 0, cdfPositive, 1 - cdfNegative)
-    sortedLfsr <- sort(lfsr, na.last = TRUE)
-    res$svalue <- cumsum(sortedLfsr) / seq_along(sortedLfsr)
-    res$svalue <- res$svalue[rank(lfsr, ties.method = "first", na.last = TRUE)]
+    res$svalue <- ashFit$result$svalue
   } else if (svalue) {
     res$svalue <- ashFit$result$svalue
     res <- res[, c("baseMean", "log2FoldChange", "lfcSE", "svalue"), drop = FALSE]
@@ -150,8 +136,9 @@
     resultData,
     priorInfo = list(
       type = "ashr",
-      package = "ashr",
-      version = as.character(utils::packageVersion("ashr")),
+      package = "rsdeseq2",
+      version = as.character(utils::packageVersion("rsdeseq2")),
+      engine = "Rust",
       fitted_g = ashFit$fitted_g
     )
   )

@@ -6,6 +6,9 @@
       if (bindingIsActive(name, env)) stop(sprintf("active %s bindings are unsupported", context), call. = FALSE)
       value <- do.call(base::substitute, list(as.name(name), env))
       if (is.call(value) || is.symbol(value)) {
+        if (getRversion() >= "4.6.0") {
+          return(.Call("rsdeseq2_stored_binding", name, env, context, PACKAGE = "rsdeseq2"))
+        }
         stop(sprintf("%s constants must be stored primitive values in a local environment; delayed expressions are unsupported", context), call. = FALSE)
       }
       return(value)

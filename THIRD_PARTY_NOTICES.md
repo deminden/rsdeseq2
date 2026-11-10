@@ -69,3 +69,10 @@ Norm schedule (OpenBLAS nrm2.S):
 /* interpreted as representing official policies, either expressed   */
 /* or implied, of The University of Texas at Austin.                 */
 /*********************************************************************/
+
+
+The positive Gamma normalization used by posterior components uses Fullerton's
+public-domain SLATEC/FNLIB Chebyshev table and Gamma recurrence, implemented in
+Rust. See [DGAMMA](https://netlib.org/slatec/fnlib/dgamma.f) and section 4 of the
+[SLATEC guide](https://netlib.org/slatec/guide), which states the library's public-domain
+status. No R runtime or R mathematical-library source is bundled for this code.
