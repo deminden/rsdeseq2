@@ -24,9 +24,10 @@ fn optional(value: &Value) -> Result<Option<Vec<f64>>, String> {
 fn characters(values: Vec<String>) -> Value {
     Value::new(Data::Text(values.into_iter().map(Some).collect()))
 }
-pub(super) fn supplied(
+pub(super) fn supplied_with_policy(
     value: &Value,
     penalty: &MixturePriorPenalty,
+    variational: bool,
 ) -> Result<Option<MixtureGrid>, String> {
     if matches!(value.data, Data::Null) {
         return Ok(None);
@@ -50,9 +51,13 @@ pub(super) fn supplied(
         },
         _ => return Err("unknown supplied-prior class".into()),
     };
-    MixtureGrid::from_supplied(components, weights, penalty)
-        .map(Some)
-        .map_err(|e| e.to_string())
+    (if variational {
+        MixtureGrid::from_supplied_variational(components, weights, penalty)
+    } else {
+        MixtureGrid::from_supplied(components, weights, penalty)
+    })
+    .map(Some)
+    .map_err(|e| e.to_string())
 }
 pub(super) fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
     let (class, means, sds, lower, upper) = match components {
@@ -164,8 +169,21 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if range.len() != 2 {
         return Err("location range requires two bounds".into());
     }
+    let optimizer = super::ashr::field(request, "optimizer")
+        .filter(|v| !matches!(v.data, Data::Null))
+        .map(|v| super::ashr_optimizer::policy(text(v)?, super::ashr::field(request, "control")))
+        .transpose()?
+        .unwrap_or_default();
     let nullweight = get(request, "nullweight")?;
-    let penalty = if matches!(nullweight.data, Data::Null) {
+    let penalty = if let Some(p) =
+        super::ashr::field(request, "penalty").filter(|v| !matches!(v.data, Data::Null))
+    {
+        if matches!(p.data, Data::Text(_)) && text(p)? == "unit" {
+            MixturePriorPenalty::Unit
+        } else {
+            MixturePriorPenalty::Parameters(numbers(p)?.to_vec())
+        }
+    } else if matches!(nullweight.data, Data::Null) {
         MixturePriorPenalty::Uniform
     } else {
         MixturePriorPenalty::NullBiased(scalar(nullweight)?)
@@ -181,9 +199,19 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             mode: scalar(get(request, "mode")?)?,
             range: (range[0], range[1]),
             penalty: penalty.clone(),
+            concentrated_initialization: !optimizer.is_sqp(),
+            variational_prior: optimizer.is_variational(),
             ..Default::default()
         },
-        supplied_grid: supplied(get(request, "supplied_prior")?, &penalty)?,
+        supplied_grid: supplied_with_policy(
+            get(request, "supplied_prior")?,
+            &penalty,
+            optimizer.is_variational(),
+        )?,
+        fit_options: rsdeseq2::shrinkage::MixtureFitOptions {
+            optimizer,
+            ..LocationShrinkageOptions::default().fit_options
+        },
         fixed_prior: flag(get(request, "fixed_prior")?)?,
         likelihood: if request
             .names
@@ -204,7 +232,6 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         prune_threshold: scalar(get(request, "prune_threshold")?)?,
         observation_weights: optional(get(request, "observation_weights")?)?,
         thresholds: numbers(get(request, "thresholds")?)?.to_vec(),
-        ..Default::default()
     };
     shrink_location_batch(
         numbers(get(request, "estimates")?)?,

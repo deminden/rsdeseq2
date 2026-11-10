@@ -108,3 +108,7 @@ engine exposes interval/contrast matrices; `lfcShrink()` keeps its selected-
 coefficient result-table shape. See the
 [posterior analysis scope](../../docs/native-posterior-analysis-development.md)
 for controls, validation and documented original-package grid corrections.
+
+Native ashr development also supports `mixEM`, `w_mixEM`, `mixVBEM` and
+`cxxMixSquarem`, with K=1 acceleration controls and variational unit/fractional
+priors. See [optimizer validation and scope](../../docs/native-ashr-optimizer-development.md).

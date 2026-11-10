@@ -21,8 +21,8 @@ struct Prior {
     upper: Option<Vec<String>>,
 }
 #[derive(Deserialize)]
-struct Case {
-    name: String,
+pub struct Case {
+    pub name: String,
     estimates: Vec<String>,
     standard_errors: Vec<String>,
     thresholds: Vec<String>,
@@ -39,6 +39,10 @@ struct Case {
     supplied_prior: Option<Prior>,
     df: Option<String>,
     custom_likelihood: Option<Value>,
+    optimizer: Option<String>,
+    #[serde(default)]
+    control: Value,
+    penalty: Option<Value>,
 }
 fn array(values: Vec<f64>) -> Value {
     json!(values.into_iter().map(bits).collect::<Vec<_>>())
@@ -66,28 +70,37 @@ fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
     };
     json!({"component_class":[class],"weights":array(weights),"means":means.map(array),"sds":sds.map(array),"lower":lower.map(array),"upper":upper.map(array)})
 }
-fn encode(r: LocationShrinkage) -> Value {
+pub fn encode(r: LocationShrinkage) -> Value {
     let fit=r.fit.map(|f|json!({"weights":array(f.weights),"log_likelihood":array(vec![f.log_likelihood]),"penalized_log_likelihood":array(vec![f.penalized_log_likelihood]),"dual_residual":array(vec![f.dual_residual]),"optimizer_weight_sum":array(vec![f.optimizer_weight_sum]),"function_evaluations":array(vec![f.function_evaluations as f64]),"converged":[f.converged],"message":[f.message]}));
     json!({"fitted_prior":mixture(r.fitted_grid.components,r.fitted_weights),"fit":fit,"posterior_mean":array(r.posterior_mean),"posterior_sd":array(r.posterior_sd),"negative_probability":array(r.negative_probability),"positive_probability":array(r.positive_probability),"local_false_discovery_rate":array(r.local_false_discovery_rate),"local_false_sign_rate":array(r.local_false_sign_rate),"svalues":array(r.svalues),"qvalues":array(r.qvalues),"cdf":array(r.cdf),"log_likelihood":array(vec![r.log_likelihood]),"warnings":r.warnings})
 }
-fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
+pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
     if c.range.len() != 2 {
         return Err("location range requires two bounds".into());
     }
-    let penalty = c
-        .nullweight
+    let optimizer = c
+        .optimizer
         .as_ref()
-        .map(|s| number(s).map(MixturePriorPenalty::NullBiased))
+        .map(|m| super::em_fit::policy(m, &c.control))
         .transpose()?
-        .unwrap_or(MixturePriorPenalty::Uniform);
+        .unwrap_or_default();
+    let penalty = if let Some(p) = &c.penalty {
+        if p == "unit" {
+            MixturePriorPenalty::Unit
+        } else {
+            MixturePriorPenalty::Parameters(numbers(&serde_json::from_value::<Vec<String>>(
+                p.clone(),
+            )?)?)
+        }
+    } else {
+        c.nullweight
+            .as_ref()
+            .map(|s| number(s).map(MixturePriorPenalty::NullBiased))
+            .transpose()?
+            .unwrap_or(MixturePriorPenalty::Uniform)
+    };
     let supplied_grid = if let Some(p) = &c.supplied_prior {
         let weights = numbers(&p.weights)?;
-        let mut dirichlet = vec![1.0; weights.len()];
-        if let Some(w) = &c.nullweight
-            && let Some(first) = dirichlet.first_mut()
-        {
-            *first = number(w)?;
-        }
         let required = |v: &Option<Vec<String>>| {
             v.as_ref()
                 .ok_or_else(|| -> Box<dyn Error> {
@@ -112,11 +125,10 @@ fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
             },
             _ => return Err("unknown supplied-prior class".into()),
         };
-        Some(MixtureGrid {
-            components,
-            initial_weights: weights,
-            dirichlet,
-            warnings: vec![],
+        Some(if optimizer.is_variational() {
+            MixtureGrid::from_supplied_variational(components, weights, &penalty)?
+        } else {
+            MixtureGrid::from_supplied(components, weights, &penalty)?
         })
     } else {
         None
@@ -129,9 +141,15 @@ fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
             mode: number(&c.mode)?,
             range: (number(&c.range[0])?, number(&c.range[1])?),
             penalty,
+            concentrated_initialization: !optimizer.is_sqp(),
+            variational_prior: optimizer.is_variational(),
             ..Default::default()
         },
         supplied_grid,
+        fit_options: rsdeseq2::shrinkage::MixtureFitOptions {
+            optimizer,
+            ..LocationShrinkageOptions::default().fit_options
+        },
         fixed_prior: c.fixed_prior,
         likelihood: if let Some(value) = &c.custom_likelihood {
             LocationLikelihood::Restricted(std::sync::Arc::new(super::likelihood::restricted(
@@ -151,7 +169,6 @@ fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
             .map(|v| numbers(v))
             .transpose()?,
         thresholds: numbers(&c.thresholds)?,
-        ..Default::default()
     };
     Ok(shrink_location_batch(
         &numbers(&c.estimates)?,

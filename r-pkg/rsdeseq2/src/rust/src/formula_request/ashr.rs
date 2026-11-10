@@ -1,5 +1,5 @@
 //! Source-method argument translation. All statistical operations stay in core.
-use super::location_shrinkage::{mixture, restricted_likelihood, supplied};
+use super::location_shrinkage::{mixture, restricted_likelihood, supplied_with_policy};
 use super::posterior::{numbers, scalar};
 use super::{Data, Value, fields, get, named, text};
 use rsdeseq2::shrinkage::{
@@ -160,11 +160,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "w_mixEM",
         ],
     )?;
-    if optmethod != "mixSQP" {
-        return Err(format!(
-            "native ashr optimizer '{optmethod}' is not implemented yet"
-        ));
-    }
+    let optimizer = super::ashr_optimizer::policy(&optmethod, field(args, "control"))?;
     let method = if field(args, "method").is_some() {
         Some(
             if choice(field(args, "method"), &["fdr", "shrink"])? == "shrink" {
@@ -183,6 +179,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             _ => match choice(Some(v), &["nullbiased", "uniform", "unit"])?.as_str() {
                 "nullbiased" => MixturePriorPenalty::NullBiased(nullweight),
                 "uniform" => MixturePriorPenalty::Uniform,
+                _ if optimizer.is_variational() => MixturePriorPenalty::Unit,
                 _ => return Err("unit prior requires a variational optimizer".into()),
             },
         })
@@ -209,6 +206,8 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             grid_multiplier: number(args, "gridmult", std::f64::consts::SQRT_2)?,
             mode: number(args, "mode", 0.0)?,
             range: (lower, upper),
+            concentrated_initialization: !optimizer.is_sqp(),
+            variational_prior: optimizer.is_variational(),
             ..Default::default()
         }
         .with_ashr_method(method, point_mass, penalty, nullweight)
@@ -220,7 +219,8 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         ..Default::default()
     };
     if let Some(g) = field(args, "g") {
-        options.supplied_grid = supplied(g, &options.grid.penalty)?;
+        options.supplied_grid =
+            supplied_with_policy(g, &options.grid.penalty, optimizer.is_variational())?;
     }
     let df = optional_numbers(field(args, "df"))?;
     let df = match df.as_deref() {
@@ -259,7 +259,10 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             df.map(LocationLikelihood::StudentT)
                 .unwrap_or(LocationLikelihood::Normal)
         };
-    controls(field(args, "control"), &mut options)?;
+    options.fit_options.optimizer = optimizer;
+    if optimizer.is_sqp() {
+        controls(field(args, "control"), &mut options)?;
+    }
     let output = number(args, "outputlevel", 2.0)?;
     if output < 2.0 || output.is_nan() || output == 4.0 || output == 5.0 {
         return Err("native ashr outputlevel subset is not implemented yet".into());

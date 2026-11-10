@@ -1,5 +1,6 @@
 //! Standalone probability primitives shared by inference and row policy.
 
+mod digamma;
 mod f_quantile;
 mod gamma;
 mod normal;
@@ -7,6 +8,7 @@ mod normal_log;
 pub(crate) mod quadrature;
 mod student_t;
 
+pub(crate) use digamma::digamma_positive;
 pub(crate) use f_quantile::f_99_quantile;
 pub(crate) use gamma::large_shape_chi_square_tail;
 pub(crate) use gamma::{log_half_gamma_ratio_correction, log1pmx, stirling_correction};

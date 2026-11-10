@@ -23,6 +23,8 @@ pub enum MixtureFamily {
 #[derive(Clone, Debug)]
 pub enum MixturePriorPenalty {
     Uniform,
+    /// Dirichlet 1/K parameters for variational inference.
+    Unit,
     NullBiased(f64),
     Parameters(Vec<f64>),
 }
@@ -42,6 +44,9 @@ pub struct MixtureGridOptions {
     pub mode: f64,
     pub range: (f64, f64),
     pub penalty: MixturePriorPenalty,
+    /// Source EM initialization, before asymmetric component expansion.
+    pub concentrated_initialization: bool,
+    pub variational_prior: bool,
 }
 impl Default for MixtureGridOptions {
     fn default() -> Self {
@@ -53,6 +58,8 @@ impl Default for MixtureGridOptions {
             mode: 0.0,
             range: (f64::NEG_INFINITY, f64::INFINITY),
             penalty: MixturePriorPenalty::Uniform,
+            concentrated_initialization: false,
+            variational_prior: false,
         }
     }
 }
@@ -161,8 +168,25 @@ pub fn prepare_mixture_grid(
         .unwrap()
         .0;
     let mut weights = vec![1.0; scales.len()];
+    if options.concentrated_initialization {
+        let k = scales.len();
+        let n = estimates.len();
+        if k < n {
+            weights.fill(1.0 / n as f64);
+            weights[null] = (n - k + 1) as f64 / n as f64;
+        } else {
+            weights.fill(1.0 / k as f64);
+        }
+        let sum = weights.iter().sum::<f64>();
+        for w in &mut weights {
+            *w /= sum;
+        }
+    }
     let mut dirichlet = match &options.penalty {
         MixturePriorPenalty::Uniform => vec![1.0; scales.len()],
+        MixturePriorPenalty::Unit if options.variational_prior => {
+            vec![1.0 / scales.len() as f64; scales.len()]
+        }
         MixturePriorPenalty::NullBiased(weight) => {
             let mut p = vec![1.0; scales.len()];
             p[null] = *weight;
@@ -171,7 +195,10 @@ pub fn prepare_mixture_grid(
         MixturePriorPenalty::Parameters(values) if values.len() == scales.len() => values.clone(),
         _ => return Err(invalid("penalty length must match the initial scale grid")),
     };
-    if dirichlet.iter().any(|v| !v.is_finite() || *v < 1.0) {
+    if dirichlet
+        .iter()
+        .any(|v| !v.is_finite() || *v <= 0.0 || (!options.variational_prior && *v < 1.0))
+    {
         return Err(invalid(
             "convex fitting requires finite Dirichlet parameters >= 1",
         ));
@@ -324,9 +351,28 @@ impl MixtureGrid {
         weights: Vec<f64>,
         penalty: &MixturePriorPenalty,
     ) -> Result<Self, DeseqError> {
+        Self::from_supplied_with_policy(components, weights, penalty, false)
+    }
+    pub fn from_supplied_variational(
+        components: MixtureComponents,
+        weights: Vec<f64>,
+        penalty: &MixturePriorPenalty,
+    ) -> Result<Self, DeseqError> {
+        Self::from_supplied_with_policy(components, weights, penalty, true)
+    }
+    fn from_supplied_with_policy(
+        components: MixtureComponents,
+        weights: Vec<f64>,
+        penalty: &MixturePriorPenalty,
+        variational: bool,
+    ) -> Result<Self, DeseqError> {
         let mut dirichlet = vec![1.0; weights.len()];
         match penalty {
             MixturePriorPenalty::Uniform => {}
+            MixturePriorPenalty::Unit if variational => dirichlet.fill(1.0 / weights.len() as f64),
+            MixturePriorPenalty::Unit => {
+                return Err(invalid("unit prior requires variational fitting"));
+            }
             MixturePriorPenalty::NullBiased(w) => {
                 if let Some(first) = dirichlet.first_mut() {
                     *first = *w;
@@ -334,7 +380,10 @@ impl MixtureGrid {
             }
             MixturePriorPenalty::Parameters(p) => dirichlet = p.clone(),
         }
-        if dirichlet.len() != weights.len() || dirichlet.iter().any(|v| !v.is_finite() || *v < 1.0)
+        if dirichlet.len() != weights.len()
+            || dirichlet
+                .iter()
+                .any(|v| !v.is_finite() || *v <= 0.0 || (!variational && *v < 1.0))
         {
             return Err(invalid(
                 "convex fitting requires matching finite Dirichlet parameters >=1",

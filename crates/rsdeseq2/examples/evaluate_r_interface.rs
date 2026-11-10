@@ -5,6 +5,8 @@ mod adaptive;
 mod batch;
 #[path = "evaluate_r_interface/cooks.rs"]
 mod cooks;
+#[path = "evaluate_r_interface/em_fit.rs"]
+mod em_fit;
 #[path = "evaluate_r_interface/factor_expansion.rs"]
 mod factor_expansion;
 #[path = "evaluate_r_interface/formula.rs"]
@@ -419,6 +421,7 @@ enum Input {
     LocationShrinkage(location_shrinkage::Input),
     NormalLog(normal_log::Input),
     MixtureFit(mixture_fit::Input),
+    EmFit(em_fit::Input),
     Posterior(posterior::Input),
     FrozenLocal(frozen_local::Input),
     NativeFormula(native_formula::Input),
@@ -447,6 +450,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Input::LocationShrinkage(input) => location_shrinkage::evaluate(input)?,
         Input::NormalLog(input) => normal_log::evaluate(input)?,
         Input::MixtureFit(input) => mixture_fit::evaluate(input)?,
+        Input::EmFit(input) => em_fit::evaluate(input)?,
         Input::Posterior(input) => posterior::evaluate(input)?,
         Input::FrozenLocal(input) => frozen_local::evaluate(input)?,
         Input::NativeFormula(input) => native_formula::evaluate(&input),

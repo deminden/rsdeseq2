@@ -210,7 +210,13 @@ blocks R statistical calls, including original ashr fitting/CDF helpers, and
 checks restricted logistic and canonical Student-t likelihoods. R object
 presentation may still order labels and count storage sizes internally.
 
-Still open: other built-in likelihood families, non-SQP optimizers, estimated
+The later [native optimizer checkpoint](native-ashr-optimizer-development.md)
+adds ordinary/weighted/variational/compiled-style EM, their K=1 controls and
+positive variational priors. Default SQP and the accepted numerical gates remain
+unchanged.
+
+Still open: other built-in likelihood families, interior-point/higher-order
+optimizers, estimated
 modes, remaining controls/output subsets, the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.

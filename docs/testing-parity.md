@@ -317,3 +317,9 @@ adds forty original-apeglm profiles and sixteen fixed-mode grid queries. Native
 and wrapped full analysis outputs agree exactly with R statistical calculations
 blocked. Original mesh interval allowances and three deliberate source-bug
 corrections are documented separately from unchanged MAP/SD/sign precision gates.
+
+The local [ashr optimizer checkpoint](native-ashr-optimizer-development.md) adds
+96 complete batches and 97 captured primitive problems, with exact native/wrapped
+output, original iteration/convergence checks, unchanged numerical bounds and
+independent categorical/Dirichlet solutions. Original compiled convergence and
+diagnostic bugs retain their unmodified observations beside explicit corrections.

@@ -17,6 +17,7 @@ pub struct MixtureFitOptions {
     /// Original mixSQP checks dual residuals only on positive coordinates.
     /// Keep false for the general convex fitter's stronger full KKT check.
     pub positive_coordinate_convergence: bool,
+    pub optimizer: MixtureOptimizer,
 }
 impl Default for MixtureFitOptions {
     fn default() -> Self {
@@ -28,6 +29,7 @@ impl Default for MixtureFitOptions {
             zero_threshold: 1e-8,
             likelihood_offset: 0.0,
             positive_coordinate_convergence: false,
+            optimizer: MixtureOptimizer::SequentialQuadratic,
         }
     }
 }
@@ -44,6 +46,9 @@ pub struct MixtureFit {
     pub optimizer_weight_sum: f64,
     pub function_evaluations: usize,
     pub message: String,
+    pub iterations: Option<usize>,
+    pub posterior_concentrations: Option<Vec<f64>>,
+    pub optimizer_objective: Option<f64>,
 }
 
 fn invalid(reason: impl Into<String>) -> DeseqError {
@@ -61,7 +66,29 @@ struct Problem {
     components: usize,
     offset: f64,
 }
+mod em;
 mod sqp;
+mod squarem;
+pub use squarem::SquaremOptions;
+
+/// Distinct native weight-fitting policies; the existing SQP path is the default.
+#[derive(Clone, Copy, Debug, Default)]
+pub enum MixtureOptimizer {
+    #[default]
+    SequentialQuadratic,
+    Em(SquaremOptions),
+    WeightedEm(SquaremOptions),
+    VariationalEm(SquaremOptions),
+    CxxEm(SquaremOptions),
+}
+impl MixtureOptimizer {
+    pub fn is_variational(self) -> bool {
+        matches!(self, Self::VariationalEm(_))
+    }
+    pub fn is_sqp(self) -> bool {
+        matches!(self, Self::SequentialQuadratic)
+    }
+}
 
 impl Problem {
     fn objective_gradient(&self, weights: &[f64]) -> (f64, Vec<f64>) {
@@ -112,7 +139,9 @@ impl Problem {
     }
 }
 
-/// Fit nonnegative mixture weights with a Dirichlet penalty (parameters >= 1).
+/// Fit mixture weights with a Dirichlet prior, using convex SQP by default.
+/// Convex methods require parameters >= 1; variational EM accepts positive
+/// parameters and returns their fitted posterior concentrations separately.
 ///
 /// Each matrix row is one observation and each column one component. Log
 /// likelihoods may be finite or negative infinity; positive-weight observations
@@ -125,6 +154,15 @@ pub fn fit_mixture_proportions(
     initial_weights: Option<&[f64]>,
     options: MixtureFitOptions,
 ) -> Result<MixtureFit, DeseqError> {
+    if !options.optimizer.is_sqp() {
+        return em::fit(
+            log_likelihoods,
+            observation_weights,
+            dirichlet,
+            initial_weights,
+            options.optimizer,
+        );
+    }
     let n = log_likelihoods.n_rows();
     let k = log_likelihoods.n_cols();
     if k == 0 {
@@ -271,5 +309,8 @@ pub fn fit_mixture_proportions(
         optimizer_weight_sum: total,
         function_evaluations: evaluations,
         message,
+        iterations: None,
+        posterior_concentrations: None,
+        optimizer_objective: None,
     })
 }
