@@ -41,6 +41,13 @@ R workflow memory stays below 2 GiB. Optional posterior/s-value calculations,
 general method/warning semantics and final combined authority/performance
 evidence remain required before C19/C21/C23 can close.
 
+The subsequent [posterior foundation](posterior-primitives-2026-11-10.md) supplies
+fixed normal-mixture summaries/tails and ordered s-values with 520 independent
+observations and eight sign-rate panels. Native bridge/R-free output bits agree
+with R math blocked. Public optional shrinkage routes remain unchanged; prior
+fitting, alternate families/likelihoods and the full options/missingness/warning
+contract are still open. No unchanged workflow is retimed for unused primitives.
+
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0,
 apeglm 1.34.0 and ashr 2.2-63. Historical benchmark results retain their original
 checkpoint and executable identity. The measured M4 executable is SHA-256

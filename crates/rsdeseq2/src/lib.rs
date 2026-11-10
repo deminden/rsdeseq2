@@ -34,6 +34,7 @@ pub mod options;
 pub mod prelude;
 mod probability;
 pub mod results;
+pub mod shrinkage;
 pub mod transform;
 
 pub use crate::errors::DeseqError;

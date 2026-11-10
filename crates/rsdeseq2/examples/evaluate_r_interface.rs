@@ -13,6 +13,8 @@ mod frozen_local;
 mod model_matrix;
 #[path = "evaluate_r_interface/native_formula.rs"]
 mod native_formula;
+#[path = "evaluate_r_interface/posterior.rs"]
+mod posterior;
 #[path = "evaluate_r_interface/preparation.rs"]
 mod preparation;
 use rsdeseq2::independent_filtering::{
@@ -374,6 +376,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Posterior(posterior::Input),
     FrozenLocal(frozen_local::Input),
     NativeFormula(native_formula::Input),
     Formula(formula::Input),
@@ -392,6 +395,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Posterior(input) => posterior::evaluate(input)?,
         Input::FrozenLocal(input) => frozen_local::evaluate(input)?,
         Input::NativeFormula(input) => native_formula::evaluate(&input),
         Input::Formula(input) => formula::panel(input),
