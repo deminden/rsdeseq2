@@ -31,7 +31,7 @@ pub struct Matrix {
     pub values: Vec<String>,
 }
 impl Matrix {
-    fn view<'a>(&self, values: &'a [f64]) -> Result<MatrixView<'a, f64>, DeseqError> {
+    pub fn view<'a>(&self, values: &'a [f64]) -> Result<MatrixView<'a, f64>, DeseqError> {
         MatrixView::new(self.rows, self.columns, values, MatrixOrder::ColumnMajor)
     }
 }

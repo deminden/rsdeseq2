@@ -123,7 +123,7 @@ including restricted custom likelihood expressions. Advanced optimizer,
 estimated-mode and output-subset options remain unfinished and fail explicitly;
 see the [development scope](shrinkage-component-development.md). Released 0.4.0
 uses the original ashr package. Local `type="apeglm"` default negative-binomial
-and MAP-only workflows now use Rust; its remaining optional methods are listed
+and MAP-only workflows, general likelihoods and `nbinomR` now use Rust; its remaining optional methods are listed
 in the [native development scope](native-apeglm-development.md). It handles named/indexed Wald coefficients, including
 posterior SDs and s-values, but not contrasts. Formula interactions are
 rejected for normal shrinkage. Factor-level contrast syntax for transformed
@@ -141,6 +141,16 @@ first moment Rust integrates the density; without a second moment posterior SDs
 remain missing, as in the original helper. Arbitrary calls, reductions, arrays,
 active bindings and unevaluated promises are rejected. This likelihood-expression
 support is separate from formulas, which still reject custom functions.
+
+General apeglm fitting accepts `log.lik=function(y,x,beta,param,offset)` through
+`lfcShrink(..., type="apeglm", apeMethod="general", log.lik=...)`. Functions
+must contain one supported expression. Alongside the elementary subset above,
+this route supports `%*%`, `as.numeric`, `as.double`, `lgamma`, `dnorm`,
+`dnbinom`, `dbinom` and `dt`. Density calls may be qualified with `stats::`.
+Captured constants remain stored primitive scalars; observation, design,
+coefficient, parameter and offset vectors come from the native request. The
+canonical original `apeglm::logLikNB` is recognized without execution. BFGS and
+L-BFGS-B run in Rust. See [validation and remaining scope](native-regression-development.md).
 
 The package also exposes primitive matrix helpers:
 

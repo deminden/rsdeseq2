@@ -1,6 +1,6 @@
 # Inspect language objects only. Never execute a formula to decide whether it is
 # supported; even a nested or masked function must fail before model evaluation.
-.rsdeseq2_validate_formula_calls <- function(formula) {
+.rsdeseq2_validate_formula_calls <- function(formula, extra_calls = character()) {
   builtins <- c("(", "I", "offset", "+", "-", "*", "/", "^", "%%", "%/%",
     "!", "&", "|", "<", "<=", ">", ">=", "==", "!=", "log", "log2", "log10",
     "log1p", "exp", "expm1", "sqrt", "abs", "sign", "floor", "ceiling", "trunc",
@@ -9,6 +9,7 @@
     "seq_len", "length", "scale", "poly", "factor", "ordered", "as.factor",
     "as.ordered", "droplevels", "relevel", "mean", "sum", "sd", "ifelse",
     "~", ":", "%in%", "pmax", "pmin")
+  builtins <- c(builtins, extra_calls)
   env <- environment(formula)
   if (is.null(env)) env <- baseenv()
   trusted <- list(baseenv(), asNamespace("base"), asNamespace("stats"))

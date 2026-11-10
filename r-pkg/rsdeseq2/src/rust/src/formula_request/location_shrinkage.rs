@@ -216,6 +216,16 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
 }
 
 fn restricted_function(value: &Value) -> Result<rsdeseq2::shrinkage::RestrictedFunction, String> {
+    let (arguments, expression, constants) = function_parts(value)?;
+    rsdeseq2::shrinkage::RestrictedFunction::new(arguments, expression, constants)
+        .map_err(|e| e.to_string())
+}
+type FunctionParts = (
+    Vec<String>,
+    rsdeseq2::design::expression::Expression,
+    Vec<(String, Value)>,
+);
+pub(super) fn function_parts(value: &Value) -> Result<FunctionParts, String> {
     let arguments = match &get(value, "arguments")?.data {
         Data::Text(v) => v
             .iter()
@@ -231,12 +241,11 @@ fn restricted_function(value: &Value) -> Result<rsdeseq2::shrinkage::RestrictedF
         let (names, values) = super::fields(constants)?;
         names.iter().cloned().zip(values.iter().cloned()).collect()
     };
-    rsdeseq2::shrinkage::RestrictedFunction::new(
+    Ok((
         arguments,
         super::ast(get(value, "expression")?, 0)?,
         constants,
-    )
-    .map_err(|e| e.to_string())
+    ))
 }
 pub(super) fn restricted_likelihood(
     value: &Value,

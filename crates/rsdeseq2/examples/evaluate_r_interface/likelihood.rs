@@ -2,7 +2,12 @@
 use rsdeseq2::shrinkage::{RestrictedFunction, RestrictedLikelihood};
 use serde_json::Value;
 use std::error::Error;
-fn function(value: &Value) -> Result<RestrictedFunction, Box<dyn Error>> {
+pub type FunctionParts = (
+    Vec<String>,
+    rsdeseq2::design::expression::Expression,
+    Vec<(String, rsdeseq2::design::expression::Value)>,
+);
+pub fn parts(value: &Value) -> Result<FunctionParts, Box<dyn Error>> {
     let arguments = value["arguments"]
         .as_array()
         .ok_or("likelihood argument names must be an array")?
@@ -21,11 +26,15 @@ fn function(value: &Value) -> Result<RestrictedFunction, Box<dyn Error>> {
                 .collect()
         })
         .unwrap_or_default();
-    Ok(RestrictedFunction::new(
+    Ok((
         arguments,
         super::formula::expression(&value["expression"]),
         constants,
-    )?)
+    ))
+}
+fn function(value: &Value) -> Result<RestrictedFunction, Box<dyn Error>> {
+    let (arguments, expression, constants) = parts(value)?;
+    Ok(RestrictedFunction::new(arguments, expression, constants)?)
 }
 pub fn restricted(value: &Value) -> Result<RestrictedLikelihood, Box<dyn Error>> {
     let optional = |name| {

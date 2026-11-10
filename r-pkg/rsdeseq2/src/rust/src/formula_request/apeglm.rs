@@ -6,7 +6,9 @@ use rsdeseq2::{
     matrix::{MatrixOrder, MatrixView},
     shrinkage::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosteriorInput,
-        NegativeBinomialPosteriorOptions, PosteriorOffsets, fit_negative_binomial_posterior,
+        NegativeBinomialPosteriorOptions, PosteriorOffsets, RegressionLikelihood, RegressionMethod,
+        RegressionOptimizer, RegressionPosteriorInput, RegressionPosteriorOptions,
+        RestrictedRegressionLikelihood, fit_negative_binomial_posterior, fit_regression_posterior,
     },
 };
 fn matrix(v: &Value) -> Result<MatrixView<'_, f64>, String> {
@@ -88,7 +90,10 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "betabinC*",
         ],
     )?;
-    if !matches!(method.as_str(), "nbinomCR" | "nbinomC") {
+    if !matches!(
+        method.as_str(),
+        "general" | "nbinomR" | "nbinomCR" | "nbinomC"
+    ) {
         return Err(format!(
             "native apeglm method '{method}' is not implemented yet"
         ));
@@ -100,12 +105,13 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     {
         return Err("native apeglm grid intervals are not implemented yet".into());
     }
-    if present(field(args, "optim.method")).is_some_and(|v| text(v).ok() != Some("BFGS"))
-        || field(args, "log.link")
-            .map(flag)
-            .transpose()?
-            .is_some_and(|v| !v)
-    {
+    let general = matches!(method.as_str(), "general" | "nbinomR");
+    let optimizer = choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?;
+    let log_link = field(args, "log.link")
+        .map(flag)
+        .transpose()?
+        .unwrap_or(true);
+    if !general && (optimizer != "BFGS" || !log_link) {
         return Err(
             "native apeglm alternate optimizers/log-link policy are not implemented yet".into(),
         );
@@ -121,16 +127,19 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     let target = present(field(args, "coef"))
         .map(|v| coefficient(v, p))
         .transpose()?;
-    if target == Some(0) {
+    if method != "general" && target == Some(0) {
         return Err("nbinom apeglm requires a coefficient after the intercept".into());
     }
     let mut prior = CauchyCoefficientPrior::default();
     let supplied_prior = present(field(args, "prior.control"));
+    let mut prior_df = 1.0;
+    let mut prior_ncp = 0.0;
+    let mut nuisance_mean = 0.0;
     if let Some(pc) = supplied_prior {
-        if scalar(get(pc, "prior.mean")?)? != 0.0
-            || scalar(get(pc, "prior.df")?)? != 1.0
-            || scalar(get(pc, "prior.no.shrink.mean")?)? != 0.0
-        {
+        prior_ncp = scalar(get(pc, "prior.mean")?)?;
+        prior_df = scalar(get(pc, "prior.df")?)?;
+        nuisance_mean = scalar(get(pc, "prior.no.shrink.mean")?)?;
+        if method != "general" && (prior_ncp != 0.0 || prior_df != 1.0 || nuisance_mean != 0.0) {
             return Err("nbinom apeglm requires zero-centered Cauchy priors".into());
         }
         prior.nuisance = indices(get(pc, "no.shrink")?, p)?;
@@ -201,29 +210,103 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             }
         })
         .transpose()?;
-    let result = fit_negative_binomial_posterior(
-        NegativeBinomialPosteriorInput {
-            counts,
-            design,
-            dispersions: numbers(get(args, "param")?)?,
-            offsets,
-            weights,
-            mle,
-        },
-        &NegativeBinomialPosteriorOptions {
-            prior,
-            coefficient: target,
-            threshold,
-            flip_sign: field(args, "flip.sign")
-                .map(flag)
-                .transpose()?
-                .unwrap_or(true),
-            multiplier: number(args, "multiplier", 1.0)?,
-            map_only: method == "nbinomC",
-            check_opposite_start: method == "nbinomCR",
-            ..Default::default()
-        },
-    )
+    let posterior = NegativeBinomialPosteriorOptions {
+        prior,
+        coefficient: target,
+        threshold,
+        flip_sign: field(args, "flip.sign")
+            .map(flag)
+            .transpose()?
+            .unwrap_or(true),
+        multiplier: number(args, "multiplier", 1.0)?,
+        map_only: method == "nbinomC",
+        check_opposite_start: method == "nbinomCR",
+        ..Default::default()
+    };
+    let result = if general {
+        let parameter = get(args, "param")?;
+        let parameters = if parameter.dimensions.is_some() {
+            matrix(parameter)?
+        } else {
+            MatrixView::new(
+                counts.n_rows(),
+                1,
+                numbers(parameter)?,
+                MatrixOrder::RowMajor,
+            )
+            .map_err(|e| e.to_string())?
+        };
+        let likelihood = if method == "nbinomR" {
+            RegressionLikelihood::NegativeBinomial
+        } else {
+            let model = get(args, "log.lik")?;
+            match text(get(model, "type")?)? {
+                "negative_binomial" => RegressionLikelihood::NegativeBinomial,
+                "restricted" => {
+                    let (a, e, c) =
+                        super::location_shrinkage::function_parts(get(model, "model")?)?;
+                    RegressionLikelihood::Restricted(std::sync::Arc::new(
+                        RestrictedRegressionLikelihood::new(a, e, c).map_err(|e| e.to_string())?,
+                    ))
+                }
+                _ => return Err("unsupported general likelihood descriptor".into()),
+            }
+        };
+        let bounds = if optimizer == "L-BFGS-B" {
+            if let Some(v) = present(field(args, "bounds")) {
+                let v = numbers(v)?;
+                if v.len() != 2 {
+                    return Err("bounds requires two values".into());
+                }
+                (v[0], v[1])
+            } else {
+                (f64::NEG_INFINITY, f64::INFINITY)
+            }
+        } else {
+            (f64::NEG_INFINITY, f64::INFINITY)
+        };
+        fit_regression_posterior(
+            RegressionPosteriorInput {
+                observations: counts,
+                design,
+                parameters: Some(parameters),
+                offsets,
+                weights,
+                mle,
+            },
+            &RegressionPosteriorOptions {
+                posterior,
+                likelihood,
+                prior_df,
+                prior_noncentrality: prior_ncp,
+                nuisance_mean,
+                optimizer: if optimizer == "BFGS" {
+                    RegressionOptimizer::Bfgs
+                } else {
+                    RegressionOptimizer::Lbfgsb
+                },
+                method: if method == "nbinomR" {
+                    RegressionMethod::NegativeBinomialR
+                } else {
+                    RegressionMethod::General
+                },
+                log_link,
+                bounds,
+            },
+        )
+    } else {
+        fit_negative_binomial_posterior(
+            NegativeBinomialPosteriorInput {
+                counts,
+                design,
+                dispersions: numbers(get(args, "param")?)?,
+                offsets,
+                weights,
+                mle,
+            },
+            &posterior,
+        )
+    }
     .map_err(|e| e.to_string())?;
     let target = target.ok_or("wrapper apeglm request requires a coefficient")?;
     let summary = result

@@ -48,9 +48,15 @@ pub use likelihood::LocationLikelihood;
 pub use location_query::{LocationCdfOptions, location_cdf_batch, threshold_svalues};
 
 pub use adaptive_result::{AdaptiveShrinkageQuery, AdaptiveShrinkageResult, adaptive_shrinkage};
+pub use heavy_tail::RegressionMethod;
+pub use heavy_tail::RestrictedRegressionLikelihood;
 pub use heavy_tail::{CauchyCoefficientPrior, estimate_cauchy_prior_variance};
 pub use heavy_tail::{
     CoefficientMle, CoefficientScale, NegativeBinomialPosterior, NegativeBinomialPosteriorInput,
     NegativeBinomialPosteriorOptions, PosteriorMapDiagnostic, fit_negative_binomial_posterior,
 };
 pub use heavy_tail::{PosteriorCoefficientSummary, PosteriorOffsets};
+pub use heavy_tail::{
+    RegressionLikelihood, RegressionOptimizer, RegressionPosteriorInput,
+    RegressionPosteriorOptions, fit_regression_posterior,
+};
