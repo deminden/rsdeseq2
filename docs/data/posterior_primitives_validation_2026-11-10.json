@@ -21,6 +21,39 @@
     "backend_passed": 3,
     "bridge_standalone_all_output_bits_equal": true,
     "clippy_both_graphs": "passed",
+    "github_ci": {
+      "R": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "r (reference, 4.6.2)",
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "r (current, release)",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "bb65d56cdec32203f4be3efef9f5f705e941fa9d",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42812090021"
+      },
+      "Rust": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "rust",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "bb65d56cdec32203f4be3efef9f5f705e941fa9d",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42812089848"
+      }
+    },
     "independent_normal_observations": 520,
     "independent_svalue_panels": 8,
     "lower_and_upper_tails": true,
@@ -56,5 +89,6 @@
     "production wrapper adoption without statistical R callbacks",
     "general method/warning semantics and final authority/performance/artifact reconciliation"
   ],
-  "scope": "Unreleased fixed normal-mixture posterior and ordered s-value primitives; public shrinkage routes unchanged"
+  "scope": "Unreleased fixed normal-mixture posterior and ordered s-value primitives; public shrinkage routes unchanged",
+  "source_implementation_commit": "bb65d56cdec32203f4be3efef9f5f705e941fa9d"
 }

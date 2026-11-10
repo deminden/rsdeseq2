@@ -9,6 +9,8 @@ mod factor_expansion;
 mod formula;
 #[path = "evaluate_r_interface/frozen_local.rs"]
 mod frozen_local;
+#[path = "evaluate_r_interface/mixture_fit.rs"]
+mod mixture_fit;
 #[path = "evaluate_r_interface/model_matrix.rs"]
 mod model_matrix;
 #[path = "evaluate_r_interface/native_formula.rs"]
@@ -376,6 +378,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    MixtureFit(mixture_fit::Input),
     Posterior(posterior::Input),
     FrozenLocal(frozen_local::Input),
     NativeFormula(native_formula::Input),
@@ -395,6 +398,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::MixtureFit(input) => mixture_fit::evaluate(input)?,
         Input::Posterior(input) => posterior::evaluate(input)?,
         Input::FrozenLocal(input) => frozen_local::evaluate(input)?,
         Input::NativeFormula(input) => native_formula::evaluate(&input),

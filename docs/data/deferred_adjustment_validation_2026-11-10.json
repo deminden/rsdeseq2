@@ -13,6 +13,34 @@
     "clippy_both_graphs": "passed",
     "complete_r_payloads_exact": 20,
     "direct_frozen_complete_bit_cases": 8,
+    "github_ci": {
+      "R": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "r (reference, 4.6.2)"
+          },
+          {
+            "conclusion": "success",
+            "name": "r (current, release)"
+          }
+        ],
+        "source_commit": "927fce15a2d5bb1dd5ca1989bd544451414b22ef",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42810277629"
+      },
+      "Rust": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "rust"
+          }
+        ],
+        "source_commit": "927fce15a2d5bb1dd5ca1989bd544451414b22ef",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42810277610"
+      }
+    },
     "gtex_global_gates": 9,
     "gtex_per_contrast_gates": 121,
     "legacy_expression_bit_cases": 188,
@@ -44,6 +72,7 @@
     "final result authority and combined performance/artifact audit"
   ],
   "scope": "Unreleased frozen-local VST plus deferred initial builder adjustment after 0.4.0",
+  "source_implementation_commit": "927fce15a2d5bb1dd5ca1989bd544451414b22ef",
   "timing": {
     "cpu": "Apple M5",
     "discarded_cases": 0,

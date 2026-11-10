@@ -1,0 +1,142 @@
+{
+  "artifacts": {
+    "checked_r_library_sha256": "916bd3bceb319d65954aaeb695c01c30d7ec838d3e8d8374c7817b7c960ea137",
+    "checked_r_source_sha256": "02dda07d40a1b99a852c4eaa8f397132f7720548b41c7881699efc474d2fcea7",
+    "standalone_driver_sha256": "95e20a2fb1ce6c35dc7e87121af9ab7ac18feb4649ad19fc4a45877a538810ad"
+  },
+  "base_commit": "bb65d56cdec32203f4be3efef9f5f705e941fa9d",
+  "bounds": {
+    "existing_public_method_bounds_changed": false,
+    "posterior_mean_and_sd_max_absolute": 2e-06,
+    "trial_bounds_or_oracles_loosened": false,
+    "weighted_log_likelihood_absolute": 1e-05
+  },
+  "checks": {
+    "analytic_weighted_dirichlet_and_prior_only_modes": true,
+    "backend_passed": 3,
+    "both_matrix_layouts_identical": true,
+    "clippy_both_graphs": "passed",
+    "complete_prior_fit_bit_cases": 8,
+    "iteration_limit_preserved": true,
+    "msrv_both_graphs": "1.97.1 passed",
+    "previous_frozen_vst_bit_cases": 8,
+    "previous_posterior_observations": 520,
+    "previous_svalue_panels": 8,
+    "python_platform_skips": 1,
+    "python_tests": 47,
+    "r_check": "OK",
+    "r_math_calls_blocked_during_bridge": true,
+    "r_passed": 2659,
+    "rust_passed": 1083,
+    "source_files_matched": 328,
+    "vendor": "passed"
+  },
+  "numerical_source_tree_sha256": "0e898241b6f699cd2bc21c729a72f4ddf7eefd702baad9e696e81cecf98bc531",
+  "observed_metrics": [
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 3,
+      "message": "SQP dual convergence reached",
+      "name": "null",
+      "posterior_mean_max_abs": 0.0,
+      "posterior_sd_max_abs": 0.0,
+      "weighted_log_likelihood_abs": 0.0
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 7,
+      "message": "SQP dual convergence reached",
+      "name": "mixed",
+      "posterior_mean_max_abs": 1.11e-15,
+      "posterior_sd_max_abs": 1.188e-14,
+      "weighted_log_likelihood_abs": 0.0
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 5,
+      "message": "SQP dual convergence reached",
+      "name": "weighted",
+      "posterior_mean_max_abs": 2.887e-15,
+      "posterior_sd_max_abs": 3.55e-14,
+      "weighted_log_likelihood_abs": 0.0
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 5,
+      "message": "SQP dual convergence reached",
+      "name": "nullbiased",
+      "posterior_mean_max_abs": 2.665e-15,
+      "posterior_sd_max_abs": 5.92e-14,
+      "weighted_log_likelihood_abs": 1.705e-13
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 5,
+      "message": "SQP dual convergence reached",
+      "name": "shifted",
+      "posterior_mean_max_abs": 1.11e-14,
+      "posterior_sd_max_abs": 7.994e-15,
+      "weighted_log_likelihood_abs": 4.547e-13
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 7,
+      "message": "SQP dual convergence reached",
+      "name": "duplicate",
+      "posterior_mean_max_abs": 2.012e-15,
+      "posterior_sd_max_abs": 9.479e-14,
+      "weighted_log_likelihood_abs": 0.0
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 7,
+      "message": "SQP dual convergence reached",
+      "name": "near_collinear",
+      "posterior_mean_max_abs": 3.15e-15,
+      "posterior_sd_max_abs": 4.741e-14,
+      "weighted_log_likelihood_abs": 5.684e-14
+    },
+    {
+      "dual_residual": 0.0,
+      "function_evaluations": 7,
+      "message": "SQP dual convergence reached",
+      "name": "active_duplicate",
+      "posterior_mean_max_abs": 2.193e-15,
+      "posterior_sd_max_abs": 4.732e-14,
+      "weighted_log_likelihood_abs": 1.137e-13
+    }
+  ],
+  "performance": {
+    "new_speed_or_memory_claim": false,
+    "optimization_rounds_counted": 0,
+    "public_fit_or_shrinkage_route_changed": false,
+    "unchanged_case_retiming": false
+  },
+  "reference": {
+    "R": "4.6.2",
+    "ashr": "2.2.63",
+    "fixture_sha256": "5801ad731c162a9a9d9d6af85f305bafbbee8508b16c5df7ba2713e9991f1dcf",
+    "generator_sha256": "bb655ae53e8718bbfa9580a21e9649df47c3d3c09309865c2c52949d7a03b717",
+    "observations": 1920,
+    "optimizer": "original mixSQP default controls",
+    "prior_profiles": 8,
+    "regeneration_byte_identical": true
+  },
+  "remaining": [
+    "complete ashr prior/component/likelihood/options/missingness/warning adapter, including low-rank/control semantics",
+    "apeglm engine and public options",
+    "production adoption without statistical R callbacks",
+    "general method/warning and final authority/performance/artifact reconciliation"
+  ],
+  "scope": "Unreleased standalone convex mixture-weight fitting foundation; public lfcShrink routes unchanged",
+  "trial": {
+    "accepted_algorithm": "EM warmup and nonnegative SQP with explicit offset",
+    "decimal_input_mismatches_found": 1901,
+    "identity_input_transport": "actual input f64 bits; no decimal reparsing",
+    "initial_lbfgsb_largest_checked_posterior_mean_difference": 5.354463640916407e-06,
+    "initial_trial_accepted": false,
+    "likelihood_offset_for_original_ashr_panel": 1e-06,
+    "standalone_unregularized_default_offset": 0.0,
+    "with_likelihood_offset_lbfgsb_refined_posterior_mean_difference": 2.1652561068563614e-06
+  }
+}
