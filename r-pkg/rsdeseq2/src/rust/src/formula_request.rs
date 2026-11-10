@@ -5,6 +5,7 @@ use rsdeseq2::design::expression::{
 };
 use std::ptr;
 mod frozen_local;
+mod posterior;
 pub struct FormulaOutput {
     bytes: Vec<u8>,
 }
@@ -130,6 +131,8 @@ fn dispatch(request: &Value) -> Result<Value, String> {
     let operation = text(get(request, "operation")?)?;
     match operation {
         "frozen_local_grid" => frozen_local::evaluate(request),
+        "posterior_normal_mixture" => posterior::normal_mixture(request),
+        "posterior_svalues" => posterior::ordered_svalues(request),
         "evaluate" | "frame_evaluate" => {
             let expressions = list(get(request, "expressions")?)?
                 .iter()

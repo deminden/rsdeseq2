@@ -1,0 +1,60 @@
+{
+  "artifacts": {
+    "checked_r_library_sha256": "20956caa0d2a1ce9d855a7cdbce1d5292740970453f16b8d8270abe880d6c162",
+    "checked_r_source_sha256": "e98970b14250336786c998b08abe5d106163824d167e228dd18ac372aecf353b",
+    "standalone_driver_sha256": "1ab5bf8bd80a32a578b954f7e705ac26b37eb7b602d87296799413359fb8fadc"
+  },
+  "base_commit": "927fce15a2d5bb1dd5ca1989bd544451414b22ef",
+  "bounds": {
+    "component_weights_and_both_tails_absolute_plus_relative": [
+      1e-300,
+      2e-11
+    ],
+    "existing_public_method_bounds_changed": false,
+    "posterior_moments_absolute_plus_relative": [
+      2e-12,
+      2e-12
+    ],
+    "svalues_absolute": 2e-15
+  },
+  "checks": {
+    "backend_passed": 3,
+    "bridge_standalone_all_output_bits_equal": true,
+    "clippy_both_graphs": "passed",
+    "independent_normal_observations": 520,
+    "independent_svalue_panels": 8,
+    "lower_and_upper_tails": true,
+    "msrv_both_graphs": "1.97.1 passed",
+    "python_platform_skips": 1,
+    "python_tests": 47,
+    "r_check": "OK",
+    "r_math_calls_blocked_during_bridge": true,
+    "r_passed": 2650,
+    "rust_passed": 1080,
+    "source_files_matched": 326,
+    "thresholds_per_observation": 10,
+    "vendor": "passed"
+  },
+  "numerical_source_tree_sha256": "01cfaf38a170d6a20e8bcfa6ef1c1c0a932cc93973be54e404c5ef5c0aa2e327",
+  "performance": {
+    "new_speed_or_memory_claim": false,
+    "optimization_rounds_counted": 0,
+    "public_fit_or_shrinkage_route_changed": false,
+    "unchanged_case_retiming": false
+  },
+  "reference": {
+    "R": "4.6.2",
+    "apeglm": "1.34.0",
+    "ashr": "2.2.63",
+    "fixture_sha256": "3da10b6167848b4400deb97f23e12810f2210ef3e33e8f663b893a24371794e0",
+    "generator_sha256": "c7fd7b04bd0e269696bcc76620575440460213f7c5f4ff00b819f87c5577e513",
+    "regeneration_byte_identical": true
+  },
+  "remaining": [
+    "ashr prior fitting, alternate mixture/likelihoods and full option/missingness/warning semantics",
+    "apeglm adaptation, optimization, posterior integration, scales and public option matrix",
+    "production wrapper adoption without statistical R callbacks",
+    "general method/warning semantics and final authority/performance/artifact reconciliation"
+  ],
+  "scope": "Unreleased fixed normal-mixture posterior and ordered s-value primitives; public shrinkage routes unchanged"
+}

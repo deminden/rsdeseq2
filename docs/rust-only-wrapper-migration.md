@@ -92,6 +92,14 @@ policy; public adjusted constructor and convenience-query contracts remain
 unchanged. Optional posterior/s-value calculations, general warning/method
 semantics and the final authority/performance reconciliation remain open.
 
+The [posterior foundation](posterior-primitives-2026-11-10.md) adds fixed
+normal-mixture moments, component probabilities, both tails and ordered s-values
+to the standalone engine. Original-package references cover 520 observations
+and eight s-value panels; actual bridge and R-free outputs match every bit with
+R math blocked. This foundation does not switch public optional methods or
+close their prior-fitting, alternate-family, option/missingness and warning
+contracts. The inventory in that report preserves their broader migration scope.
+
 The user's later formula decision disallows custom functions for now; it
 supersedes the earlier choice to translate their bodies. The
 [built-in expression checkpoint](built-in-formula-expressions-2026-10-30.md)
