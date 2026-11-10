@@ -11,6 +11,8 @@ mod factor_expansion;
 mod formula;
 #[path = "evaluate_r_interface/frozen_local.rs"]
 mod frozen_local;
+#[path = "evaluate_r_interface/heavy_tail.rs"]
+mod heavy_tail;
 #[path = "evaluate_r_interface/likelihood.rs"]
 mod likelihood;
 #[path = "evaluate_r_interface/location_shrinkage.rs"]
@@ -404,6 +406,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    HeavyTail(heavy_tail::Input),
     Adaptive(adaptive::Input),
     Uniform(uniform::Input),
     MixtureGrid(mixture_grid::Input),
@@ -429,6 +432,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::HeavyTail(input) => heavy_tail::evaluate(input)?,
         Input::Adaptive(input) => adaptive::evaluate(input)?,
         Input::Uniform(input) => uniform::evaluate(input)?,
         Input::MixtureGrid(input) => mixture_grid::evaluate(input)?,

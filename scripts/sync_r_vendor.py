@@ -63,6 +63,16 @@ def check_tree(expected, actual):
         raise ValueError('R vendor differs; run scripts/sync_r_vendor.sh:\n'+'\n'.join(changed))
 
 
+def sync_notice(source, destination, check=False):
+    """Ship the same notices with the installed R binary; check is read-only."""
+    wanted = source.read_bytes()
+    if check:
+        if not destination.is_file() or destination.read_bytes() != wanted:
+            raise ValueError('R third-party notices differ; run scripts/sync_r_vendor.sh')
+    else:
+        destination.write_bytes(wanted)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='read-only source, manifest and version check')
@@ -86,7 +96,6 @@ def main():
             'release. Do not edit this copy directly.\n')
         if args.check:
             check_tree(expected, VENDOR)
-            print('R vendor, manifest and package versions match.')
         else:
             shutil.copytree(expected/'src', VENDOR/'src', dirs_exist_ok=True)
             # Remove stale source paths as well as copying new ones.
@@ -96,6 +105,9 @@ def main():
             for name in ('Cargo.toml', 'README.md'):
                 shutil.copyfile(expected/name, VENDOR/name)
             print(f'Synchronized Rust core into {VENDOR}')
+        sync_notice(ROOT/'THIRD_PARTY_NOTICES.md', ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
+        if args.check:
+            print('R vendor, notices, manifest and package versions match.')
 
 
 if __name__ == '__main__':

@@ -1,9 +1,11 @@
 # Completion audit against C01–C23
 
-Current local development adds [bounded posterior components and all six
-normal-likelihood mixture grids](shrinkage-component-development.md), plus
-small-argument expression corrections. Public optional shrinkage adoption and
-final combined checks remain open. Further development/commits stay local until
+Current local development routes the default [ashr workflow](shrinkage-component-development.md)
+and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
+standalone Rust engine. Advanced shrinkage families/methods/options, the remaining
+authority audit and final combined checks remain open. The historical ledger
+below retains its recorded source scope; C19/C21/C23 are not closed by these
+default-method checkpoints. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The original [review](codebase-review-2026-10-22.md) and

@@ -3,7 +3,8 @@
 Current local development adds [bounded posterior components and all six
 normal-likelihood mixture grids](shrinkage-component-development.md), plus
 small-argument expression corrections. The local default ashr route and restricted
-likelihood expressions now use Rust; advanced ashr options, standalone apeglm and
+likelihood expressions now use Rust. The local default [apeglm workflow](native-apeglm-development.md)
+also uses Rust; advanced optional methods and
 final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
@@ -63,8 +64,9 @@ artifacts and do not certify a replacement implementation.
    s-values, prior fitting and threshold processing. Normal shrinkage already
    has a Rust implementation. The local default ashr route now shares native
    prior fitting and summaries; advanced options still need implementation.
-   The apeglm route still calls R and requires a standalone implementation with
-   independent posterior and tail checks.
+   The default negative-binomial apeglm route now has a standalone implementation
+   with independent posterior/tail and direct interface checks. Its general,
+   random-start, beta-binomial and grid methods remain unfinished.
    Keep existing functionality until the replacement passes its gates.
 6. **Reconcile performance, memory and artifacts.** Repeat the appropriate
    paired workflow/holdout checks only after substantive candidate changes.

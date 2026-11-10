@@ -122,8 +122,9 @@ names are absent from the unshrunk design. The local development
 including restricted custom likelihood expressions. Advanced optimizer,
 estimated-mode and output-subset options remain unfinished and fail explicitly;
 see the [development scope](shrinkage-component-development.md). Released 0.4.0
-uses the original ashr package. Optional
-`type="apeglm"` shrinkage handles named/indexed Wald coefficients, including
+uses the original ashr package. Local `type="apeglm"` default negative-binomial
+and MAP-only workflows now use Rust; its remaining optional methods are listed
+in the [native development scope](native-apeglm-development.md). It handles named/indexed Wald coefficients, including
 posterior SDs and s-values, but not contrasts. Formula interactions are
 rejected for normal shrinkage. Factor-level contrast syntax for transformed
 factors remains unsupported when DESeq2 cannot resolve its coefficient names.

@@ -1,5 +1,12 @@
 # Numerical tests and parity checks
 
+Local default ashr and negative-binomial apeglm migration checks are recorded
+separately in [ashr development](shrinkage-component-development.md) and
+[apeglm development](native-apeglm-development.md). They combine independent
+original-package numerical references with direct native/R-free output-bit
+comparisons and blocked R statistical calls. Advanced optional methods and the
+final combined suite/performance/memory/artifact gates remain open.
+
 ## Accepted benchmark runs
 
 `benchmark_gtex_native_wald.py` defaults to one sequential pass. An accepted run

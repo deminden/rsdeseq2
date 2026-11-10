@@ -297,7 +297,11 @@ contrast route uses a Rust expanded-model refit and returns a DESeqResults
 object with prior information. Optional \code{ashr} shrinkage returns
 posterior means/standard deviations and s-values. Optional \code{apeglm}
 shrinkage supports named/indexed Wald coefficients and returns posterior
-standard deviations and s-values. Formula interactions and transformed-factor
+standard deviations and s-values. In local development, default optional
+shrinkage workflows run in the shared Rust engine. Native apeglm currently
+supports \code{nbinomCR} and MAP-only \code{nbinomC}; advanced optional methods
+remain under development and return explicit unsupported-feature errors.
+Formula interactions and transformed-factor
 normal contrasts are not implemented.
 }
 \value{

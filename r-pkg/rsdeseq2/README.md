@@ -67,16 +67,16 @@ a dataset fitted with `rsdeseq2::DESeq()`; the contrast route uses the Rust
 expanded-model refit. Numeric contrasts require a supplied result table; list
 contrasts average selected expanded coefficients and need supplied results
 when their names are absent from the unshrunk design. The returned
-`DESeqResults` records the estimated beta-prior variances. With optional
-package `ashr` installed, `type="ashr"` returns posterior means/SDs and
-s-values. With optional package `apeglm` installed, `type="apeglm"` supports
+`DESeqResults` records the estimated beta-prior variances. Local development
+`type="ashr"` returns native posterior means/SDs and s-values, while
+`type="apeglm"` uses native negative-binomial fitting for
 named/indexed coefficients and returns posterior SDs and s-values. Formula
 interactions are rejected for normal shrinkage. Cleaned coefficient aliases
 work for transformed-factor formulas; factor-level contrast syntax remains
 unsupported when DESeq2 cannot resolve its coefficient names.
 
-Optional `ashr`/`apeglm` posterior calculations still involve R. The Rust-only
-wrapper migration is unfinished; see the
+The default optional shrinkage workflows run in Rust. Advanced method options
+remain unfinished and fail explicitly; see the
 [migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use
 polynomial coordinates; select their named coefficients or supply numeric
 contrasts rather than treatment-style factor-level contrasts.

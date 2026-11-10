@@ -1,5 +1,13 @@
 # Development after 0.4.0
 
+* Run default ashr and negative-binomial apeglm shrinkage in shared Rust,
+  including prior adaptation, posterior summaries, scale conversion and s-values.
+  Restricted ashr likelihood expressions are imported without R execution.
+  Advanced optional methods remain under development and fail explicitly.
+* Retain original apeglm iteration/stopping behavior with a standalone
+  MIT-licensed LBFGSpp algorithm adaptation. Ship its attribution with Rust source
+  and installed R packages; the read-only vendor gate checks notice integrity.
+
 * Import standard saved DESeq2 local-dispersion coefficients without refitting.
   Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.
 * Translate restricted custom dispersion expressions into Rust. Reject custom

@@ -1,6 +1,7 @@
 //! Standalone posterior primitives for the ongoing shrinkage-engine migration.
 //!
-//! These kernels do not yet replace the public R shrinkage methods.
+//! Default R shrinkage routes share these implementations. Advanced optional
+//! methods remain under development; see the documented migration scope.
 mod adaptive_grid;
 mod adaptive_result;
 mod beta_normalization;
@@ -9,6 +10,7 @@ mod expression_likelihood;
 mod expression_quadrature;
 mod fixed_mixture;
 mod gamma_normalization;
+mod heavy_tail;
 mod likelihood;
 mod likelihood_diagnostics;
 mod location_batch;
@@ -46,3 +48,9 @@ pub use likelihood::LocationLikelihood;
 pub use location_query::{LocationCdfOptions, location_cdf_batch, threshold_svalues};
 
 pub use adaptive_result::{AdaptiveShrinkageQuery, AdaptiveShrinkageResult, adaptive_shrinkage};
+pub use heavy_tail::{CauchyCoefficientPrior, estimate_cauchy_prior_variance};
+pub use heavy_tail::{
+    CoefficientMle, CoefficientScale, NegativeBinomialPosterior, NegativeBinomialPosteriorInput,
+    NegativeBinomialPosteriorOptions, PosteriorMapDiagnostic, fit_negative_binomial_posterior,
+};
+pub use heavy_tail::{PosteriorCoefficientSummary, PosteriorOffsets};

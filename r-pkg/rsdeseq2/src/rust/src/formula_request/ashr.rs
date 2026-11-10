@@ -6,7 +6,7 @@ use rsdeseq2::shrinkage::{
     AdaptiveMethod, AdaptiveShrinkageQuery, LocationLikelihood, LocationShrinkageOptions,
     MixtureGridOptions, MixturePriorPenalty, adaptive_shrinkage,
 };
-fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
+pub(super) fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
     let Data::List(values) = &v.data else {
         return None;
     };
@@ -16,10 +16,10 @@ fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
         .position(|n| n == name)
         .and_then(|i| values.get(i))
 }
-fn number(v: &Value, name: &str, default: f64) -> Result<f64, String> {
+pub(super) fn number(v: &Value, name: &str, default: f64) -> Result<f64, String> {
     field(v, name).map(scalar).unwrap_or(Ok(default))
 }
-fn flag(v: &Value) -> Result<bool, String> {
+pub(super) fn flag(v: &Value) -> Result<bool, String> {
     match &v.data {
         Data::Logical(v) => match v.as_slice() {
             [Some(v)] => Ok(*v),
@@ -39,7 +39,7 @@ fn optional_numbers(v: Option<&Value>) -> Result<Option<Vec<f64>>, String> {
         Some(v) => numbers(v).map(|v| Some(v.to_vec())),
     }
 }
-fn choice(v: Option<&Value>, choices: &[&str]) -> Result<String, String> {
+pub(super) fn choice(v: Option<&Value>, choices: &[&str]) -> Result<String, String> {
     let Some(v) = v else {
         return Ok(choices[0].into());
     };

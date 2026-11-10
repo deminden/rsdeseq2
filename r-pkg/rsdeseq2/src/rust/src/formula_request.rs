@@ -5,6 +5,7 @@ use rsdeseq2::design::expression::{
 };
 use std::ptr;
 mod ashr;
+mod apeglm;
 mod frozen_local;
 mod location_shrinkage;
 mod posterior;
@@ -138,6 +139,7 @@ fn dispatch(request: &Value) -> Result<Value, String> {
         "posterior_fit_mixture" => posterior::fit_mixture(request),
         "normal_log_probabilities" => posterior::normal_log(request),
         "ashr_shrinkage" => ashr::evaluate(request),
+        "apeglm_shrinkage" => apeglm::evaluate(request),
         "shrink_location_batch" => location_shrinkage::evaluate(request),
         "mixture_grid" => posterior::mixture_grid(request),
         "posterior_uniform_mixture" | "posterior_truncated_normal_mixture" => {
