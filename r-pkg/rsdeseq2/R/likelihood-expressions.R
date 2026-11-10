@@ -16,7 +16,7 @@
   allowed <- c("(", "I", "+", "-", "*", "/", "^", "%%", "%/%", "!", "&", "|",
     "<", "<=", ">", ">=", "==", "!=", "log", "log2", "log10", "log1p", "exp",
     "expm1", "sqrt", "abs", "sign", "floor", "ceiling", "trunc", "ifelse", "pmin", "pmax")
-  extra <- if (regression) c("%*%", "lgamma", "as.numeric", "as.double", "dnorm", "dnbinom", "dbinom", "dt") else character()
+  extra <- if (regression) c("[", "%*%", "lgamma", "as.numeric", "as.double", "dnorm", "dnbinom", "dbinom", "dt") else character()
   allowed <- c(allowed, extra)
   inspect <- function(x, depth = 0L) {
     if (depth > 128L) stop(sprintf("%s nesting exceeds 128", label), call. = FALSE)

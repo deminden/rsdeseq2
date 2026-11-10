@@ -1,8 +1,10 @@
 //! Standalone heavy-tailed negative-binomial posterior fitting.
+mod analysis;
 mod beta_binomial;
 mod bfgs;
 mod density;
 mod fit;
+mod grid;
 mod negative_binomial;
 mod prior;
 mod random;
@@ -26,3 +28,8 @@ pub use random::{PosteriorRng, PosteriorUniformKind};
 
 pub use fit::fit_negative_binomial_posterior_with_rng;
 pub use regression::fit_regression_posterior_with_rng;
+
+pub use analysis::{
+    PosteriorAnalysis, PosteriorAnalysisOptions, PosteriorGridDiagnostic, PosteriorIntervalKind,
+    PosteriorIntervalOptions,
+};

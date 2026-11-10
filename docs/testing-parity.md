@@ -311,3 +311,9 @@ formula-origin differences from real DESeq2. These checks preserve the legacy
 wrapper tie rule for this migration; they do not establish full DESeq2 Cook's
 parity for those edges. The checkpoint and completion audit keep the required
 independent correction open.
+
+The local [posterior analysis checkpoint](native-posterior-analysis-development.md)
+adds forty original-apeglm profiles and sixteen fixed-mode grid queries. Native
+and wrapped full analysis outputs agree exactly with R statistical calculations
+blocked. Original mesh interval allowances and three deliberate source-bug
+corrections are documented separately from unchanged MAP/SD/sign precision gates.

@@ -18,7 +18,7 @@ fn special(function: &str) -> Option<&str> {
         .map_or((None, function), |(a, b)| (Some(a), b));
     let source = match name {
         "dnorm" | "dnbinom" | "dbinom" | "dt" => "stats",
-        "%*%" | "lgamma" | "as.numeric" | "as.double" => "base",
+        "[" | "%*%" | "lgamma" | "as.numeric" | "as.double" => "base",
         _ => return None,
     };
     (owner.is_none() || owner == Some(source)).then_some(name)
@@ -48,7 +48,7 @@ fn validate_node(
     } = e
     {
         if let Some(name) = special(function) {
-            if name == "%*%" {
+            if matches!(name, "%*%" | "[") {
                 if arguments.len() != 2 || arguments.iter().any(|a| a.name.is_some()) {
                     return Err(invalid("matrix product requires two positional operands"));
                 }
@@ -104,6 +104,51 @@ fn numeric(v: &Value) -> Result<Vec<f64>, DeseqError> {
         Data::Null => Ok(vec![]),
         _ => Err(invalid("numeric likelihood values are required")),
     }
+}
+/// One-dimensional primitive numeric indexing. Matrices are read in R's
+/// column order. No classes, dispatch, names or callbacks enter this evaluator.
+fn subset(input: &Value, index: &Value) -> Result<Value, DeseqError> {
+    if !matches!(index.data, Data::Number { .. }) {
+        return Err(invalid("restricted likelihood indices must be numeric"));
+    }
+    let indices = numeric(index)?;
+    if indices
+        .iter()
+        .any(|v| !v.is_finite() || v.fract() != 0.0 || v.abs() > usize::MAX as f64)
+    {
+        return Err(invalid(
+            "restricted likelihood indices must be finite integers",
+        ));
+    }
+    let values = numeric(input)?;
+    let at = |i: usize| {
+        if i >= values.len() {
+            return super::super::location_missing::NA;
+        }
+        match input.dimensions {
+            Some([r, c]) => values[(i % r) * c + i / r],
+            None => values[i],
+        }
+    };
+    let negative = indices.iter().any(|v| *v < 0.0);
+    if negative && indices.iter().any(|v| *v > 0.0) {
+        return Err(invalid(
+            "cannot mix positive and negative likelihood indices",
+        ));
+    }
+    let out = if negative {
+        (0..values.len())
+            .filter(|i| !indices.iter().any(|v| -*v == (*i + 1) as f64))
+            .map(at)
+            .collect()
+    } else {
+        indices
+            .iter()
+            .filter(|v| **v > 0.0)
+            .map(|v| at(*v as usize - 1))
+            .collect()
+    };
+    Ok(Value::numbers(out))
 }
 fn product(a: &Value, b: &Value) -> Result<Value, DeseqError> {
     let av = numeric(a)?;
@@ -298,6 +343,7 @@ impl RestrictedRegressionLikelihood {
                 };
                 match special(function) {
                     Some("%*%") => product(&args[0].1, &args[1].1),
+                    Some("[") => subset(&args[0].1, &args[1].1),
                     Some("lgamma") => {
                         let b = expression::arguments(&args, &["x"])?;
                         let input = b[0].ok_or_else(|| invalid("lgamma requires x"))?;

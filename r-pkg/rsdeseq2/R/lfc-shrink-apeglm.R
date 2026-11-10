@@ -110,9 +110,11 @@
     dots
   )
   nativeMethod <- match.arg(apeArguments$method, c("general", "nbinomR", "nbinomCR", "nbinomC", "nbinomC*", "betabinR", "betabinCR", "betabinC", "betabinC*"))
-  if (identical(nativeMethod, "general")) {
+  gridInterval <- !is.null(apeArguments$interval.type) &&
+    !identical(match.arg(apeArguments$interval.type, c("laplace", "HPD", "credible")), "laplace")
+  if (identical(nativeMethod, "general") || gridInterval) {
     if (is.function(apeArguments$log.lik)) apeArguments$log.lik <- .rsdeseq2_apeglm_likelihood(apeArguments$log.lik)
-    if (is.null(apeArguments$log.lik)) stop("general apeglm requires a likelihood function", call. = FALSE)
+    if (identical(nativeMethod, "general") && is.null(apeArguments$log.lik)) stop("general apeglm requires a likelihood function", call. = FALSE)
   } else apeArguments$log.lik <- NULL
   randomStart <- grepl("*", nativeMethod, fixed = TRUE)
   randomState <- if (randomStart) .rsdeseq2_posterior_rng_state() else NULL

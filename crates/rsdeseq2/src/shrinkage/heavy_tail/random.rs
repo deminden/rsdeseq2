@@ -2,8 +2,8 @@
 //! R seed scrambling/state layout and two-uniform normal construction are
 //! interoperability data. No R/GPL generator implementation is copied or linked.
 use super::prior::invalid;
-use crate::{DeseqError, probability::normal_upper_tail};
-use statrs::distribution::{ContinuousCDF, Normal};
+use crate::{DeseqError, probability::normal_upper_quantile};
+
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
@@ -221,17 +221,7 @@ impl PosteriorRng {
             return f64::INFINITY;
         }
         let tail = p.min(1.0 - p);
-        let mut q = -Normal::standard().inverse_cdf(tail);
-        // Refine against the existing compensated standalone normal tail.
-        // This avoids adopting GPL qnorm code or adding another math backend.
-        for _ in 0..2 {
-            let density = 0.3989422804014327 * (-0.5 * q * q).exp();
-            let correction = (normal_upper_tail(q) - tail) / density;
-            if !correction.is_finite() {
-                break;
-            }
-            q += correction;
-        }
+        let q = normal_upper_quantile(tail);
         (if p < 0.5 { -q } else { q }) * 0.5
     }
     pub fn start_vector(&mut self, coefficients: usize) -> Vec<f64> {

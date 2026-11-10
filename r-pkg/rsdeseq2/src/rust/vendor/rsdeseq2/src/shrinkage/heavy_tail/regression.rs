@@ -245,23 +245,41 @@ impl GeneralRow<'_> {
         self.error.borrow_mut().take()
     }
     fn value_checked(&self, beta: &[f64]) -> Result<f64, DeseqError> {
+        self.value_at_checked(beta, self.parameters.as_deref())
+    }
+    pub(super) fn value_at_checked(
+        &self,
+        beta: &[f64],
+        parameters: Option<&[f64]>,
+    ) -> Result<f64, DeseqError> {
         let ll = match &self.options.likelihood {
-            RegressionLikelihood::Restricted(f) => f.evaluate(
-                self.y,
-                self.design,
-                beta,
-                self.parameters.as_deref(),
-                self.offsets,
-            )?,
+            RegressionLikelihood::Restricted(f) => {
+                f.evaluate(self.y, self.design, beta, parameters, self.offsets)?
+            }
             RegressionLikelihood::BetaBinomial => {
-                return Err(invalid(
-                    "beta-binomial likelihood must use analytic regression rows",
-                ));
+                let parameters =
+                    parameters.ok_or_else(|| invalid("missing beta-binomial parameters"))?;
+                if parameters.len() != self.y.len() + 1 {
+                    return Err(invalid("invalid beta-binomial parameter shape"));
+                }
+                self.y
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &y)| {
+                        let eta = beta
+                            .iter()
+                            .enumerate()
+                            .map(|(j, b)| self.design.at(i, j) * b)
+                            .sum::<f64>();
+                        let a = parameters[0] / (1.0 + (-eta).exp());
+                        let b = parameters[0] - a;
+                        super::beta_binomial::log_rising(a, y)
+                            + super::beta_binomial::log_rising(b, parameters[i + 1] - y)
+                    })
+                    .collect()
             }
             RegressionLikelihood::NegativeBinomial => {
-                let dispersion = self
-                    .parameters
-                    .as_ref()
+                let dispersion = parameters
                     .and_then(|v| v.first())
                     .copied()
                     .ok_or_else(|| invalid("missing dispersion"))?;

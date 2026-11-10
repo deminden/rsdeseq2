@@ -6,6 +6,7 @@ use rsdeseq2::design::expression::{
 use std::ptr;
 mod ashr;
 mod apeglm;
+mod apeglm_analysis;
 mod frozen_local;
 mod location_shrinkage;
 mod posterior;

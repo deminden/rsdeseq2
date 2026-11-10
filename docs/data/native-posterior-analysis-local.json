@@ -1,0 +1,213 @@
+{
+  "artifacts": {
+    "results/native-posterior-analysis/accepted-replay.json": "4e7b2430d37c9cf4e43e3353ea73d84e581218c1015aba3470a9ce0c9cff0e2a",
+    "results/native-posterior-analysis/analysis-final-source.log": "c29dafe385b476a4b83f14846355ff62f91fdb8d9441cbbc3b3672765d85b033",
+    "results/native-posterior-analysis/backend-clippy-final-source.log": "c9d19b5a125ca4491591e5bd37abdd90b543abf37466e86c6580267b15a6cabd",
+    "results/native-posterior-analysis/build-source-final.json": "cbe06af69cd664a0b9f07117546bec0f28d5176e376ce3547f2eba508e207e68",
+    "results/native-posterior-analysis/clippy-final-source.log": "febd901c9e2282ed6a58f5aa6c608eedb7c455e5a4b169704d4e9c8cf272d16a",
+    "results/native-posterior-analysis/default-regression/validation.json": "347cc224ddd8977dd30238ad3abdb8fafcb3953bbcfc92d76921cb3f1bcb3464",
+    "results/native-posterior-analysis/evaluate-r-interface-final": "71870aaab06eed6f7dce85da64ff7fc17c73f36ee1f7257c6b53fafd3a9fe0d8",
+    "results/native-posterior-analysis/final-focused-tests.log": "0bd101376894248253555a1fc21679425cdd26d45a42d03b3c80843f328116ca",
+    "results/native-posterior-analysis/grid-test-final.log": "01eb5009d30ba0b90376299ab220268258156b57279d118ccd3743f0767a5c33",
+    "results/native-posterior-analysis/local-library-final/rsdeseq2/libs/rsdeseq2.so": "219bc80aa55c0e498b8bc5608485fa0306f7cc38e44b78dd28599c052d9758c4",
+    "results/native-posterior-analysis/probe.R": "01f710c879fc5b04e2609d6538d9f2b262c8cd08f34b17d043a0c7c465db2f2e",
+    "results/native-posterior-analysis/probe.log": "ef7c02fe7057792981bced77433103b76426ae6fe3bc75e5149291f69f9e46f9",
+    "results/native-posterior-analysis/r-import-tests-final.log": "4cd7acab19fe7ed44c1be0cd760c1462bde0e3b0c7a813b05ec541127af7e587",
+    "results/native-posterior-analysis/rng-replay.json": "deae4af25b4373c73937256d928581bf537a246bf7d96e591b8f526fee390656",
+    "results/native-posterior-analysis/workflow-final/input.json": "e650ab407feab33d6ca167137a1c1f95a60ccf803fec36696dfe4fef6d38991a",
+    "results/native-posterior-analysis/workflow-final/standalone.json": "604dd7abdaa79d3efdbf3094c5402997af5b7d0fa0d82f0808c74498ff7920f1",
+    "results/native-posterior-analysis/workflow-final/validation.json": "f7681bf82c5a5d9ae30244fb168b2ba92fd217878c0211c27601a26a40eccc17",
+    "results/native-posterior-analysis/workflow-final/wrapped.json": "3a9a6b0e48310a23f7053bcc8f19d88344fbca2aad9e065c0d64b61145a68238"
+  },
+  "files": {
+    "crates/rsdeseq2/examples/evaluate_r_interface/heavy_tail.rs": "5e46eb57d10c48217ac31ed94c8a512d79eb1b18db088debfb135a9513769168",
+    "crates/rsdeseq2/examples/evaluate_r_interface/regression.rs": "72d06151f8eeb3d89a9a422323b7dd56f5cd5c3eb3038b4d2618fd1b2f5ba4c0",
+    "crates/rsdeseq2/src/matrix.rs": "576f5ae909a0d8d36a0a0edc5cc1dd7a988f60fd0b21c7e65e136c6f034d48bc",
+    "crates/rsdeseq2/src/probability/mod.rs": "b70e6a0dd1b1c21743614ada0b937685c74d3b7454c2b0373fb2e94c0b9d2fa5",
+    "crates/rsdeseq2/src/probability/normal.rs": "3d9a1f9b5f6c762f21f80fde6031f211ddf2f872e985739ef77585bc54cf8393",
+    "crates/rsdeseq2/src/shrinkage.rs": "4b0f8519b9515514ac6ef221ddeabb2f8c32139821969c36ef8753f1d11c8f4f",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail.rs": "8f11a475dacf06b39b89a6fc8dcf7093af95eb25931a7488f06483e2678dd096",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/analysis.rs": "3d5b8779cf46db1e158bb65f9cda1fb7c4cf213ef17ec5a666c62b6df5e8e17d",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/beta_binomial.rs": "1eb8730315a9a20612f7cb90f02db321008e8eb1ad5b03bed0ef7fc7c5aa425e",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "87bc2e3403581fed4c25e779dd40e6e4bf12c63299a80028a7922da90d8a2674",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/grid.rs": "91caec63d9fc76dd1527378741517f5b86c3aa1afe62a327dda8c7de21cc8985",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/random.rs": "a75cb9c97d2f1baaa2b59f687378f7bbe19da0e13e01b0417364cd3ce3c75def",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "44fce81194ca88d16b48f176ba7ec645eb4def5eac2feca09e6dc17432f0d3e7",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/regression_expression.rs": "7dd95f86a785bef92ee0f729813ceedead8281fe4c72154235a9b8659a564e7c",
+    "crates/rsdeseq2/tests/common/posterior.rs": "af10323e75bbd96771cbae6af3deff21bda5d17ad1074cbdf0e0657147193cbd",
+    "crates/rsdeseq2/tests/data/posterior_analysis_r462.json": "6831b2f7ec629775c2af72a76749785c5152c468b76cddd26dd16f0fe9f66b7b",
+    "crates/rsdeseq2/tests/posterior_analysis.rs": "44b35c667ef3865c155ba02d9680ee1553ed39b603e171146121d8b876303fe6",
+    "crates/rsdeseq2/tests/regression_posterior.rs": "98746a44a16334b594e60282858940e6854231c9bb6c0b9ff30265e700621a13",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "fdf4da6faa90ad30bf23cb18eeb6ae6468cff82b3dae752a7f60a96441509304",
+    "docs/native-apeglm-development.md": "627389fb70fc5510cba660e74d0629984b84ba180c2ef506906e457a2d9b8eae",
+    "docs/native-posterior-analysis-development.md": "e282bf86c4c1fc0e3226e7bb57097864a20a725feab3b7070f6a3fbc808cffcd",
+    "docs/native-random-start-development.md": "c54c88c5e20f33431b11008d75e1bdd3471fa5812c82a76c5b257506188cc7ca",
+    "docs/r-wrapper.md": "4e1220fc8f7119b7e3318dea81a63cf1adcf47c11310d19e78f95a644a805f50",
+    "docs/rust-only-wrapper-migration.md": "6b8e27fd58d03012b92f9ce6c93ec7df98d653d351b646cdf4e07317ad3d6d35",
+    "docs/testing-parity.md": "84a284a3ab7cc3b8e0f6ebaaabc9ad6ec8f6bccbcbbb6d54aaa878388a354278",
+    "r-pkg/rsdeseq2/NEWS.md": "b89507e42fd8fcda80338c40b2db5b27985409d6dbe2823c0907606ac9cab22f",
+    "r-pkg/rsdeseq2/R/lfc-shrink-apeglm.R": "5b94c521fca1e69a3e0be699620a120f55f419a8eacf41390a4473813c63a2e4",
+    "r-pkg/rsdeseq2/R/likelihood-expressions.R": "9c4136475e453a0d73ce8f6f5fa5e61d89a3da59a2faf2ddac70113ee58810a3",
+    "r-pkg/rsdeseq2/README.md": "059529f859586c0cb1762a7fcb93fa7f269052e33bc40b1490c337608773c69b",
+    "r-pkg/rsdeseq2/man/rsdeseq2-primitives.Rd": "3401b144233145b9f402d20a80fc552be7f445d45c59d7338cf4792517e7ceb5",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request.rs": "0ae3893dd79183a9aa5441660934dd628b4592d4ca230aa2a6214ea66f77cf2b",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/apeglm.rs": "e89a5c2f4b869d7aa219719131400b2af6f65a3ef28c2aeddfede3375a4a14ca",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/apeglm_analysis.rs": "54f84d44e983863fe371a4862be2143b4c05107311ae839c6c89e56c4b91a92a",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/matrix.rs": "576f5ae909a0d8d36a0a0edc5cc1dd7a988f60fd0b21c7e65e136c6f034d48bc",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/probability/mod.rs": "b70e6a0dd1b1c21743614ada0b937685c74d3b7454c2b0373fb2e94c0b9d2fa5",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/probability/normal.rs": "3d9a1f9b5f6c762f21f80fde6031f211ddf2f872e985739ef77585bc54cf8393",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage.rs": "4b0f8519b9515514ac6ef221ddeabb2f8c32139821969c36ef8753f1d11c8f4f",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail.rs": "8f11a475dacf06b39b89a6fc8dcf7093af95eb25931a7488f06483e2678dd096",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/analysis.rs": "3d5b8779cf46db1e158bb65f9cda1fb7c4cf213ef17ec5a666c62b6df5e8e17d",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/beta_binomial.rs": "1eb8730315a9a20612f7cb90f02db321008e8eb1ad5b03bed0ef7fc7c5aa425e",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "87bc2e3403581fed4c25e779dd40e6e4bf12c63299a80028a7922da90d8a2674",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/grid.rs": "91caec63d9fc76dd1527378741517f5b86c3aa1afe62a327dda8c7de21cc8985",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/random.rs": "a75cb9c97d2f1baaa2b59f687378f7bbe19da0e13e01b0417364cd3ce3c75def",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "44fce81194ca88d16b48f176ba7ec645eb4def5eac2feca09e6dc17432f0d3e7",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/regression_expression.rs": "7dd95f86a785bef92ee0f729813ceedead8281fe4c72154235a9b8659a564e7c",
+    "r-pkg/rsdeseq2/tests/testthat/test-likelihood-expressions.R": "417012df9455c0569ec13846795c17074263d8e87d10fc40fd44ada4a522f095",
+    "scripts/check_native_posterior_analysis.R": "a956b03d78a86996c622c6a561c1b86c1dba5680f127957d94a71781567def84",
+    "scripts/check_native_regression_workflow.R": "09083f8bdecb7f66764b057a27c3086f3460358a634ca2e9ec4ae06f92a48a39",
+    "scripts/generate_posterior_analysis_reference.R": "2ab3e9993cb373659f60af89ec769a600fc0885e54bb2145fbd173363875aa60",
+    "scripts/native_posterior_check_helpers.R": "83051dd24acd4f6e8a741dd84a74bae63da911d716b9c1e2003f1554cb5e5b37"
+  },
+  "focused_validation": {
+    "R_import_assertions": 40,
+    "Rust_fixed_grid_tests": 1,
+    "Rust_integration_tests": 14,
+    "analysis": {
+      "R_calculations_blocked": true,
+      "complete_native_standalone_batches": 40,
+      "existing_posterior_bounds_unchanged": true,
+      "fixed_grid_leaves": 16,
+      "original_reference_profiles": 40,
+      "public_errors": [
+        {
+          "mode": 2.3093e-14,
+          "profile": "HPD",
+          "sd": 2.0794e-13,
+          "svalue": 3.5735e-16
+        },
+        {
+          "mode": 2.3093e-14,
+          "profile": "credible",
+          "sd": 2.0794e-13,
+          "svalue": 3.5735e-16
+        },
+        {
+          "mode": 2.3093e-14,
+          "profile": "uncertain",
+          "sd": 2.0794e-13,
+          "svalue": 0
+        },
+        {
+          "mode": 2.3093e-14,
+          "profile": "custom_grid",
+          "sd": 2.0794e-13,
+          "svalue": 4.4756e-16
+        }
+      ]
+    },
+    "backend_all_targets_clippy": "passed",
+    "core_focused_clippy": "passed",
+    "default_regression": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 14,
+      "existing_bounds_unchanged": true,
+      "genes": 1200,
+      "normalization_factor_errors": {
+        "mode": 1.3663e-14,
+        "sd": 8.6739e-13,
+        "svalue": 6.7751e-14,
+        "threshold_svalue": 1.6875e-14
+      },
+      "public_errors": [
+        {
+          "mode": 1.7164e-13,
+          "profile": "default",
+          "sd": 5.3516e-13,
+          "svalue": null
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "sign",
+          "sd": 5.3516e-13,
+          "svalue": 1.8527e-15
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "threshold",
+          "sd": 5.3516e-13,
+          "svalue": 2.609e-15
+        }
+      ],
+      "public_normalization_log2_bits_identical": true
+    },
+    "immutable_e27_replays": [
+      {
+        "input": "results/native-random-start/workflow-final/input.json",
+        "name": "random-posterior",
+        "outputs_identical": true,
+        "sha256": "25e18b55f8d2db0f0df638bb89ae78d13298928fe2f93b54c501b16825a793ab"
+      },
+      {
+        "input": "results/native-random-start/default-regression/input.json",
+        "name": "default-posterior",
+        "outputs_identical": true,
+        "sha256": "10aa2627c0367031490bed7982221d35b0c890d82a6ad45a247f38f5d20268da"
+      },
+      {
+        "input": "results/native-regression/workflow-final/input.json",
+        "name": "general-posterior",
+        "outputs_identical": true,
+        "sha256": "81dcd4cc25412f93ba728d7a37f38010c510bd21dda78df6990b99d2dae9191d"
+      },
+      {
+        "input": "results/native-betabinomial/workflow-final/input.json",
+        "name": "beta-binomial-posterior",
+        "outputs_identical": true,
+        "sha256": "5ed0bbf9eeaea4fd508a15586860c5299a6357991b63370dacdc048ccf21f049"
+      },
+      {
+        "name": "random-generators",
+        "outputs_identical": true,
+        "profiles": 30,
+        "sha256": "deae4af25b4373c73937256d928581bf537a246bf7d96e591b8f526fee390656"
+      }
+    ],
+    "original_R": "4.6.2",
+    "original_apeglm": "1.34.0",
+    "vendor_integrity": "passed"
+  },
+  "numerical_gates": {
+    "accepted_oracles_unchanged": [
+      "crates/rsdeseq2/tests/data/regression_posterior_r462.json",
+      "crates/rsdeseq2/tests/data/cauchy_posterior_r462.json",
+      "crates/rsdeseq2/tests/data/beta_binomial_posterior_r462.json",
+      "crates/rsdeseq2/tests/data/posterior_rng_r462.json",
+      "crates/rsdeseq2/tests/data/random_start_posterior_r462.json"
+    ],
+    "existing_MAP_SD_sign_bounds": "unchanged",
+    "new_fixed_grid_probability_tail_absolute": 2e-10,
+    "new_mesh_interval_bound": "one grid cell plus existing MAP/SD allowance; Laplace uses existing MAP/SD allowance"
+  },
+  "original_source_corrections": [
+    "grid threshold field mismatch raises replacement-length error",
+    "empty nuisance product for one coefficient",
+    "zero R index drops lower endpoint and recycles upper; independent R tail root finder retained"
+  ],
+  "performance_claim": "none; unchanged quantification paths are not retimed; zero counted optimization rounds",
+  "publication_authorized": false,
+  "remaining": [
+    "advanced ashr methods/options",
+    "other optimizer/RNG policies",
+    "complete warning/authority audit",
+    "final combined precision/speed/memory/sanitizer/platform/source-bundle gates"
+  ],
+  "scope": "Local shared posterior intervals, full-covariance contrasts, scalar parameter uncertainty and restricted grid likelihoods",
+  "source_identity": "runtime source file hashes; working tree implementation built and tested locally",
+  "source_parent": "e27a10adf447c36142755c4b7ea151a2c80126d3"
+}

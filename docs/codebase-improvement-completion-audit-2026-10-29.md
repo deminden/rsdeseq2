@@ -23,6 +23,13 @@ portable native RNG state and both MAP-only random-start methods. Direct/wrapped
 posterior, state and error-lifecycle evidence is recorded separately; legacy RNG
 modes, advanced options and the final combined gates remain unfinished.
 
+The subsequent [posterior analysis checkpoint](native-posterior-analysis-development.md)
+adds shared Laplace/grid intervals, scalar parameter uncertainty, covariance-based
+posterior contrasts and grid likelihood overrides. Forty actual native/wrapped
+batches agree exactly; original-package comparisons and three explicit source
+edge corrections are recorded. Advanced ashr options, warning/method authority
+and the final combined C19/C21/C23 gates remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

@@ -100,6 +100,10 @@ impl<T> RowMajorMatrix<T> {
         &self.values
     }
 
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.values
+    }
+
     /// Consume the matrix and return row-major values.
     pub fn into_values(self) -> Vec<T> {
         self.values
