@@ -9,6 +9,10 @@ final combined suite/performance/memory/artifact gates remain open.
 The later [general-regression checkpoint](native-regression-development.md)
 covers translated likelihoods and analytic `nbinomR`, with independent
 high-precision density checks where original R loses tail precision.
+The [beta-binomial checkpoint](native-beta-binomial-development.md) adds three
+logit methods, saturated-row optimizer checks and explicit native warning
+comparisons. Source warning counts and failure-reason wording can differ near
+floating-point plateaus; these differences remain visible in the report.
 
 ## Accepted benchmark runs
 

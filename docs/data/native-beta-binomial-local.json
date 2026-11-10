@@ -1,0 +1,233 @@
+{
+  "artifacts": {
+    "results/native-betabinomial/bfgs-source-trace.json": "f19e3647f64b98d7816f339b211ae35edcfa50baed0d447133b0922b2e8dc6b2",
+    "results/native-betabinomial/default-regression/validation.json": "347cc224ddd8977dd30238ad3abdb8fafcb3953bbcfc92d76921cb3f1bcb3464",
+    "results/native-betabinomial/evaluate-r-interface": "78fda37d26dbebb4d0b40a1697a84f1bad70d6db58874fd0f3c2d23a559e41a9",
+    "results/native-betabinomial/general-regression/validation.json": "1919d9bef9de183f412d3b48ada95bb786bc44678d7cb292af6d1acde8596ffe",
+    "results/native-betabinomial/local-library/rsdeseq2/libs/rsdeseq2.so": "645ebd76fbd3da9801a463f5e0e3839a208b2d435e1e44f1455319afeaf5ad6c",
+    "results/native-betabinomial/workflow-final/input.json": "2e141e8df201696eecd6828a675efc5625d894d2d65a03b56b0d7aa1ffdd73ab",
+    "results/native-betabinomial/workflow-final/standalone.json": "d443439ad56b60cf53264dc1bb5d7372ecf8a7f08c1a50220e36c41c8150dd19",
+    "results/native-betabinomial/workflow-final/validation.json": "667ffa53a25efc2b4ad30edad52a3409f1f0042669fd2248f6fb536b48f4ea7c",
+    "results/native-betabinomial/workflow-final/wrapped.json": "bc140e7775f75c5689f054205814f582cb32ad57b9f489369abf07100b8aa34f"
+  },
+  "bfgs_corrections": [
+    "periodic inverse-metric reset after more than twice the coefficient count in accepted gradient updates",
+    "fresh-metric relative-objective convergence probe retains previous score",
+    "100-gradient budget includes the initial gradient"
+  ],
+  "files": {
+    "crates/rsdeseq2/examples/evaluate_r_interface/heavy_tail.rs": "ae3cf9dc5f6d8b661d84bad464be68fcf11df5305f8b7076fbb9004ae366d2af",
+    "crates/rsdeseq2/examples/evaluate_r_interface/regression.rs": "1482bbea9111b844c95f712070769a5c0cfe23121021901ef7eaff507fce2f09",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail.rs": "0e07257a91b61b94f853aaac8d76b6c710d6dc4e0109e19b2c6964aea279ece8",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/beta_binomial.rs": "527abf2962ac4a1f2d72268b0e7affa21b61194a58f82f3550d3e6dca9fabc95",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/bfgs.rs": "04029fb47bea37dce93698795decc27f0be4204913dd8c5e8da08ca91baeb4c6",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "c10d7623bfee1209e54f4625cf3ab1acf8c4c4cb741c1e38c680071569e7020e",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "7a5258842a7954fbc8139f639dadbedc648c351cc9a83a3cb85b9ad14de4617c",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/unbounded_lbfgs.rs": "98d44c1d3bb5078639393aecf8c3b2cf73dc1ee38751fae0e545bef21e307d4f",
+    "crates/rsdeseq2/tests/data/beta_binomial_posterior_r462.json": "84cb1b457c7a2963a322111d2f962640e188284c28b77dcd78b0f2fc0fea6bdd",
+    "crates/rsdeseq2/tests/regression_posterior.rs": "e7b5ea5ac68bac34b453caf014e3db4cadc9df37fb5089a97f9fed0f42629658",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "d6094c3759ae0fa5642ba86c8734880ad8667cdcd4b7e682700c9f6c68c49066",
+    "docs/native-apeglm-development.md": "5ab445a6d190c24a800b03357ca567fdc2e97e0fec555ebcbd81a8ca011f6a4d",
+    "docs/native-beta-binomial-development.md": "be258f4b6933a7c8da5ced0abcb458de74444e0ad61ed453216d67305728ee6a",
+    "docs/native-regression-development.md": "32530896559760dbd7aa96d45229c86bb1b2a4192bee0197e88795584b1e8611",
+    "docs/r-wrapper.md": "87cdfb4e37ef2db9866df2306729f13f8a94251033337299abf019626cce0d9e",
+    "docs/rust-only-wrapper-migration.md": "5833cf9de87a64a514049a13f9da517551a719c23bcc2982af2da618b7b4bf43",
+    "docs/testing-parity.md": "e7eb80a42db17f25205ad1366c5b8301139785dc55636461d4d8da4e31bb9b92",
+    "r-pkg/rsdeseq2/NEWS.md": "390820355b013746c710b35687ad5e56d9bb0356688c2654166bae499445339e",
+    "r-pkg/rsdeseq2/R/lfc-shrink-apeglm.R": "ca0a98745f559aa6caaa60cd726eeb130ef7b71da382a933c2bb402037c72cbb",
+    "r-pkg/rsdeseq2/README.md": "f6fc321c934d8b4dcc288770127c3744a559b646b74f2a4c1586530f3452bfbd",
+    "r-pkg/rsdeseq2/man/rsdeseq2-primitives.Rd": "67fb39ddef953ed8357aa25ecd6c195b72c62d9d8221335da01a71d4628794c7",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/apeglm.rs": "7d8ebfef2b22d30b761387a6a88eb95143c81dd1ab76e397046f8bff9d173038",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail.rs": "0e07257a91b61b94f853aaac8d76b6c710d6dc4e0109e19b2c6964aea279ece8",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/beta_binomial.rs": "527abf2962ac4a1f2d72268b0e7affa21b61194a58f82f3550d3e6dca9fabc95",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/bfgs.rs": "04029fb47bea37dce93698795decc27f0be4204913dd8c5e8da08ca91baeb4c6",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "c10d7623bfee1209e54f4625cf3ab1acf8c4c4cb741c1e38c680071569e7020e",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "7a5258842a7954fbc8139f639dadbedc648c351cc9a83a3cb85b9ad14de4617c",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/unbounded_lbfgs.rs": "98d44c1d3bb5078639393aecf8c3b2cf73dc1ee38751fae0e545bef21e307d4f",
+    "scripts/check_native_regression_workflow.R": "d9cefa4f05d6151fb1bad971d9e46e90522719c4d2c554bc30f24ea84ad5b28e",
+    "scripts/generate_beta_binomial_posterior_reference.R": "c528596113ee9455e56af5b8fa47e981a65b5d7e41354dcf27ba6fcb4c8e2c7b"
+  },
+  "focused_validation": {
+    "Rust_tests": 8,
+    "analytic_gate": {
+      "absolute": 1e-09,
+      "relative": 1e-12
+    },
+    "analytic_likelihood_gradient_profiles": 9,
+    "backend_all_target_clippy": "passed",
+    "beta_binomial_posterior_rows": 156,
+    "beta_binomial_public_and_interface": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 39,
+      "existing_bounds_unchanged": true,
+      "genes": 256,
+      "original_public_warning_counts": {
+        "betabinC": 19,
+        "betabinCR": 19,
+        "betabinR": 0
+      },
+      "public_errors": [
+        {
+          "mode": 4.7431866232947e-07,
+          "profile": "betabinR",
+          "sd": 1.46754514318559e-07,
+          "threshold_svalue": 4.24045947661211e-09
+        },
+        {
+          "mode": 6.62614489214952e-07,
+          "profile": "betabinCR",
+          "sd": 5.82103264479272e-08,
+          "threshold_svalue": 6.36149237454031e-09
+        },
+        {
+          "mode": 1.27757855511446e-06,
+          "profile": "betabinC",
+          "sd": 0,
+          "threshold_svalue": 0
+        }
+      ],
+      "public_warning_counts": {
+        "betabinC": 21,
+        "betabinCR": 21,
+        "betabinR": 0
+      },
+      "warning_events_identical": 39,
+      "warning_messages_identical": 37
+    },
+    "complete_native_standalone_fields": [
+      "selected mode/SD",
+      "sign/FSOS s-values",
+      "adapted prior scale/variance",
+      "nuisance indices",
+      "convergence",
+      "native warning strings"
+    ],
+    "core_focused_clippy": "passed",
+    "default_negative_binomial_regression": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 14,
+      "existing_bounds_unchanged": true,
+      "genes": 1200,
+      "normalization_factor_errors": {
+        "mode": 1.3663e-14,
+        "sd": 8.6739e-13,
+        "svalue": 6.7751e-14,
+        "threshold_svalue": 1.6875e-14
+      },
+      "public_errors": [
+        {
+          "mode": 1.7164e-13,
+          "profile": "default",
+          "sd": 5.3516e-13,
+          "svalue": null
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "sign",
+          "sd": 5.3516e-13,
+          "svalue": 1.8527e-15
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "threshold",
+          "sd": 5.3516e-13,
+          "svalue": 2.609e-15
+        }
+      ],
+      "public_normalization_log2_bits_identical": true
+    },
+    "existing_bounds_or_frozen_oracles_relaxed": false,
+    "full_suites_sanitizers_performance_memory_platform_bundle": "deferred until remaining implementation is combined",
+    "general_and_nbinomR_regression": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 21,
+      "existing_bounds_unchanged": true,
+      "genes": 1200,
+      "public_errors": [
+        {
+          "mode": 2.15953197502117e-06,
+          "profile": "general",
+          "sd": 3.54175705707949e-08,
+          "threshold_svalue": 1.62736213393799e-10
+        },
+        {
+          "mode": 3.81749094335859e-07,
+          "profile": "nbinomR",
+          "sd": 9.75571288197585e-08,
+          "threshold_svalue": 1.5622710347607e-09
+        },
+        {
+          "mode": 2.15953197502117e-06,
+          "profile": "custom",
+          "sd": 3.54175705707949e-08,
+          "threshold_svalue": 1.62736213393799e-10
+        }
+      ],
+      "public_warning_counts": {
+        "custom": 0,
+        "general": 0,
+        "nbinomR": 0
+      },
+      "warning_events_identical": 19,
+      "warning_messages_identical": 19
+    },
+    "invalid_domain_checks": [
+      "zero/negative/nonfinite concentration",
+      "successes above trials",
+      "parameter column count"
+    ],
+    "posterior_profiles": 39,
+    "vendor_and_notice_integrity": "passed"
+  },
+  "full_plan_complete": false,
+  "licensing": "Independent beta-binomial gamma/psi equations and BFGS; existing MIT-licensed LBFGSpp adaptation and notices retained; no GPL implementation copied",
+  "numerical_build_source_manifest": {
+    "all_current_files_match": true,
+    "files": 576,
+    "path": "results/native-betabinomial/build-source-final.json",
+    "sha256": "e0b8abf40a87e6a8382566c5cc128394b86fb655dabd33f3a8417017b896ce5f"
+  },
+  "parent_commit": "5d18f84008da378e01d0c2016c7515afcfdff0c1",
+  "performance_claim": "none; unchanged CLI quantification not retimed; no counted 2% optimization round",
+  "publication_authorized": false,
+  "reference_environment": {
+    "R": "4.6.2",
+    "apeglm": "1.34.0",
+    "input_encoding": "f64_bits"
+  },
+  "rejected_trials": {
+    "accepted": "all 39 BB profiles, previous general/NB profiles and public checks pass unchanged bounds",
+    "immediate_relative_stop": "56 mismatches; rejected",
+    "initial_full_inverse_BFGS": "60 posterior mismatches in 39 BB profiles",
+    "periodic_reset_and_fresh_probe_without_budget_correction": "one remaining MAP mismatch of 0.1144; rejected"
+  },
+  "remaining": [
+    "random-start C* methods and native RNG/state handling",
+    "grid intervals, parameter uncertainty, contrasts and other optimizer policies",
+    "advanced ashr methods/options",
+    "C21 authority and warning-policy reconciliation",
+    "C23 combined precision/speed/memory/sanitizer/platform/source-bundle checks"
+  ],
+  "scope": "Local shared beta-binomial logit posterior methods and common BFGS policy corrections",
+  "warning_contract": {
+    "different_wording_profiles": [
+      "all_gaussian_betabinCR",
+      "all_gaussian_betabinC"
+    ],
+    "native_and_wrapped_identical": true,
+    "original_complete_wording_identical_profiles": 37,
+    "original_event_categories_identical_profiles": 39,
+    "policy": "Expose actual native solver diagnostics; do not synthesize original warning counts. Complete warning-policy reconciliation remains in authority audit.",
+    "public_fast_methods_native_line_search_warnings": 21,
+    "public_fast_methods_original_line_search_warnings": 19
+  }
+}

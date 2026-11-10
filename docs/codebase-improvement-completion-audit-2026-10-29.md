@@ -13,6 +13,11 @@ adds general and `nbinomR` apeglm methods plus restricted custom likelihoods,
 with native/R-free output identity and independent original-package posterior
 checks. Other advanced methods and the final gates remain open.
 
+The [beta-binomial checkpoint](native-beta-binomial-development.md) adds the
+three specialized logit methods, corrects shared BFGS stopping policies and
+transports native optimizer warnings. Its original-R warning differences are
+recorded explicitly; advanced options and combined completion checks remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

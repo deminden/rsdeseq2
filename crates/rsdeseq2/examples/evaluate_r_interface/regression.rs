@@ -131,13 +131,20 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             threshold: Some(number(&c.threshold)?),
             ..Default::default()
         },
-        likelihood: match &c.likelihood {
-            None => RegressionLikelihood::NegativeBinomial,
-            Some(v) => RegressionLikelihood::Restricted(Arc::new(likelihood(v)?)),
+        likelihood: if c.method.starts_with("betabin") {
+            RegressionLikelihood::BetaBinomial
+        } else {
+            match &c.likelihood {
+                None => RegressionLikelihood::NegativeBinomial,
+                Some(v) => RegressionLikelihood::Restricted(Arc::new(likelihood(v)?)),
+            }
         },
         method: match c.method.as_str() {
             "general" => RegressionMethod::General,
             "nbinomR" => RegressionMethod::NegativeBinomialR,
+            "betabinR" => RegressionMethod::BetaBinomialR,
+            "betabinCR" => RegressionMethod::BetaBinomialCR,
+            "betabinC" => RegressionMethod::BetaBinomialC,
             _ => return Err("invalid fixture method".into()),
         },
         optimizer: match c.optimizer.as_str() {

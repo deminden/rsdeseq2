@@ -73,6 +73,12 @@ The default apeglm regression check still passes the thirteen frozen profiles,
 a normalization-factor profile and the public default/sign/threshold workflow.
 No quantification timing or memory claim is added for unchanged fitting paths.
 
+The subsequent [beta-binomial checkpoint](native-beta-binomial-development.md)
+adds the specialized logit family and corrects the common BFGS stopping policy.
+All original general-regression references remain frozen and pass; the updated
+1,200-gene general/`nbinomR` errors are recorded in that checkpoint. The original
+report above retains its own source scope.
+
 ## Reproduction and remaining scope
 
 ```sh
@@ -88,7 +94,7 @@ not a runtime dependency. It imports no candidate implementation. Fresh output
 paths preserve earlier evidence. The checker reuses the accepted Rust count fit
 and fits only the newly changed posterior methods against independent references.
 
-Random-start and beta-binomial methods, grid intervals, parameter uncertainty,
+Random-start methods, grid intervals, parameter uncertainty,
 contrasts, other optimizer policies, and the complete warning/control surface
 remain unfinished. Advanced ashr work, C21's authority audit and C23's final
 combined precision/speed/memory/sanitizer/platform/source-bundle checks also

@@ -10,10 +10,11 @@ package at runtime; original apeglm remains the independent comparison engine.
 
 The full [Rust-only migration](rust-only-wrapper-migration.md) remains open.
 Current native public methods are `general`, `nbinomR`, `nbinomCR` and MAP-only
-`nbinomC`. General fitting accepts restricted custom likelihood expressions,
+`nbinomC`, plus beta-binomial `betabinR`, `betabinCR` and MAP-only `betabinC`.
+General fitting accepts restricted custom likelihood expressions,
 central/noncentral Student-t priors and Gaussian nuisance priors. The general
 and `nbinomR` routes support BFGS and bounded L-BFGS-B. Random-start methods,
-beta-binomial methods, grid intervals, parameter uncertainty, contrasts and
+grid intervals, parameter uncertainty, contrasts and
 other optimizer policies still require implementation. Unfinished methods
 fail explicitly, with no R calculation fallback. This checkpoint is not a new
 release, and GitHub publication remains unauthorized.
@@ -88,6 +89,12 @@ assertions and complete native/R-free batch comparisons. Public general,
 `nbinomR` and translated custom-likelihood checks pass on 1,200 genes with R
 statistical routines blocked. Default-method regression checks retain the
 thirteen independent profiles, normalization-factor profile and public workflow.
+
+The later [beta-binomial checkpoint](native-beta-binomial-development.md) adds
+the logit family, three specialized methods and native optimizer warnings.
+Its saturated profiles correct BFGS metric resets, convergence probes and the
+accepted-gradient iteration budget, improving the existing general/`nbinomR`
+comparison without changing the default negative-binomial prefit settings.
 
 ## Reproduction
 

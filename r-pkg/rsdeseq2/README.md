@@ -76,7 +76,8 @@ work for transformed-factor formulas; factor-level contrast syntax remains
 unsupported when DESeq2 cannot resolve its coefficient names.
 
 The default optional shrinkage workflows, general apeglm likelihoods and
-`nbinomR` run in Rust. General likelihood functions are translated from
+`nbinomR` and beta-binomial `betabinR`/`betabinCR`/`betabinC` run in Rust.
+General likelihood functions are translated from
 restricted expressions without R execution. Advanced method options
 remain unfinished and fail explicitly; see the
 [migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use

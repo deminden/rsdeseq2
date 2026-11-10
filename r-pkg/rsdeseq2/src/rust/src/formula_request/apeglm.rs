@@ -92,7 +92,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     )?;
     if !matches!(
         method.as_str(),
-        "general" | "nbinomR" | "nbinomCR" | "nbinomC"
+        "general" | "nbinomR" | "nbinomCR" | "nbinomC" | "betabinR" | "betabinCR" | "betabinC"
     ) {
         return Err(format!(
             "native apeglm method '{method}' is not implemented yet"
@@ -105,7 +105,10 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     {
         return Err("native apeglm grid intervals are not implemented yet".into());
     }
-    let general = matches!(method.as_str(), "general" | "nbinomR");
+    let general = matches!(
+        method.as_str(),
+        "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC"
+    );
     let optimizer = choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?;
     let log_link = field(args, "log.link")
         .map(flag)
@@ -127,7 +130,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     let target = present(field(args, "coef"))
         .map(|v| coefficient(v, p))
         .transpose()?;
-    if method != "general" && target == Some(0) {
+    if method.starts_with("nbinom") && target == Some(0) {
         return Err("nbinom apeglm requires a coefficient after the intercept".into());
     }
     let mut prior = CauchyCoefficientPrior::default();
@@ -219,7 +222,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             .transpose()?
             .unwrap_or(true),
         multiplier: number(args, "multiplier", 1.0)?,
-        map_only: method == "nbinomC",
+        map_only: matches!(method.as_str(), "nbinomC" | "betabinC"),
         check_opposite_start: method == "nbinomCR",
         ..Default::default()
     };
@@ -236,7 +239,9 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             )
             .map_err(|e| e.to_string())?
         };
-        let likelihood = if method == "nbinomR" {
+        let likelihood = if method.starts_with("betabin") {
+            RegressionLikelihood::BetaBinomial
+        } else if method == "nbinomR" {
             RegressionLikelihood::NegativeBinomial
         } else {
             let model = get(args, "log.lik")?;
@@ -285,10 +290,12 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
                 } else {
                     RegressionOptimizer::Lbfgsb
                 },
-                method: if method == "nbinomR" {
-                    RegressionMethod::NegativeBinomialR
-                } else {
-                    RegressionMethod::General
+                method: match method.as_str() {
+                    "nbinomR" => RegressionMethod::NegativeBinomialR,
+                    "betabinR" => RegressionMethod::BetaBinomialR,
+                    "betabinCR" => RegressionMethod::BetaBinomialCR,
+                    "betabinC" => RegressionMethod::BetaBinomialC,
+                    _ => RegressionMethod::General,
                 },
                 log_link,
                 bounds,
@@ -371,6 +378,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "threshold_svalue",
             "prior_control",
             "convergence",
+            "warnings",
         ],
         vec![
             Value::numbers(summary.mode),
@@ -379,6 +387,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             optional(summary.threshold_svalues),
             pc,
             optional(Some(convergence)),
+            Value::new(Data::Text(result.warnings.into_iter().map(Some).collect())),
         ],
     ))
 }
