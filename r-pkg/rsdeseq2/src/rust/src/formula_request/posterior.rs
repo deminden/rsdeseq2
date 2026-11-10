@@ -2,6 +2,7 @@
 use super::{Data, Value, get, integer, named};
 use rsdeseq2::math::{normal_log_cdf, normal_log_upper_tail};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+use rsdeseq2::shrinkage::{FixedMixture, UniformMixture, TruncatedNormalMixture};
 use rsdeseq2::shrinkage::{MixtureFitOptions, NormalMixture, fit_mixture_proportions, svalues};
 
 fn numbers(value: &Value) -> Result<&[f64], String> {
@@ -10,6 +11,58 @@ fn numbers(value: &Value) -> Result<&[f64], String> {
         _ => Err("posterior request requires numeric vectors".into()),
     }
 }
+pub(super) fn uniform_mixture(request: &Value) -> Result<Value, String> {
+    let weights = numbers(get(request, "weights")?)?.to_vec();
+    let lower = numbers(get(request, "lower")?)?.to_vec();
+    let upper = numbers(get(request, "upper")?)?.to_vec();
+    let truncated = matches!(&get(request, "operation")?.data, Data::Text(v) if v.first().and_then(|v| v.as_deref()) == Some("posterior_truncated_normal_mixture"));
+    let prior = if truncated {
+        FixedMixture::TruncatedNormal(TruncatedNormalMixture::new(weights,
+            numbers(get(request, "means")?)?.to_vec(), numbers(get(request, "sds")?)?.to_vec(), lower, upper).map_err(|e| e.to_string())?)
+    } else {
+        FixedMixture::Uniform(UniformMixture::new(weights, lower, upper).map_err(|e| e.to_string())?)
+    };
+    let estimates = numbers(get(request, "estimates")?)?;
+    let errors = numbers(get(request, "standard_errors")?)?;
+    if estimates.len() != errors.len() {
+        return Err("posterior estimates and standard errors must have matching lengths".into());
+    }
+    let thresholds = numbers(get(request, "thresholds")?)?;
+    let mut likelihoods = vec![];
+    let mut means = vec![];
+    let mut sds = vec![];
+    let mut weights = vec![];
+    let mut cdf = vec![];
+    let posteriors = prior.posteriors(estimates, errors).map_err(|e| e.to_string())?;
+    for ((&estimate, &se), p) in estimates.iter().zip(errors).zip(posteriors) {
+        likelihoods.extend(
+            prior
+                .log_likelihoods(estimate, se)
+                .map_err(|e| e.to_string())?,
+        );
+        means.push(p.mean());
+        sds.push(p.standard_deviation());
+        weights.extend_from_slice(p.weights());
+        cdf.extend(thresholds.iter().map(|c| p.cdf(*c)));
+    }
+    Ok(named(
+        &[
+            "log_likelihoods",
+            "posterior_mean",
+            "posterior_sd",
+            "posterior_weights",
+            "cdf",
+        ],
+        vec![
+            Value::numbers(likelihoods),
+            Value::numbers(means),
+            Value::numbers(sds),
+            Value::numbers(weights),
+            Value::numbers(cdf),
+        ],
+    ))
+}
+
 fn scalar(value: &Value) -> Result<f64, String> {
     match numbers(value)? {
         [value] => Ok(*value),
@@ -151,4 +204,34 @@ pub(super) fn ordered_svalues(request: &Value) -> Result<Value, String> {
             .map(|v| v.unwrap_or(f64::from_bits(0x7ff0_0000_0000_07a2)))
             .collect(),
     ))
+}
+
+
+pub(super) fn mixture_grid(request: &Value) -> Result<Value, String> {
+    use rsdeseq2::shrinkage::{MixtureComponents, MixtureGridOptions, MixturePriorPenalty, prepare_mixture_grid};
+    let point_mass = match &get(request, "point_mass")?.data {
+        Data::Logical(v) if v.as_slice()==[Some(true)] => true,
+        Data::Logical(v) if v.as_slice()==[Some(false)] => false,
+        _ => return Err("grid point_mass requires one nonmissing logical".into()),
+    };
+    let range=numbers(get(request, "range")?)?;
+    if range.len()!=2 {return Err("grid range requires two bounds".into());}
+    let scales=get(request,"scales")?;
+    let nullweight=get(request,"nullweight")?;
+    let options=MixtureGridOptions {
+        family:super::text(get(request,"family")?)?.parse().map_err(|e:rsdeseq2::DeseqError|e.to_string())?,
+        scales:if matches!(scales.data,Data::Null) {None}else{Some(numbers(scales)?.to_vec())},
+        point_mass,mode:scalar(get(request,"mode")?)?,range:(range[0],range[1]),
+        penalty:if matches!(nullweight.data,Data::Null) {MixturePriorPenalty::Uniform}else{MixturePriorPenalty::NullBiased(scalar(nullweight)?)},
+        ..Default::default()
+    };
+    let g=prepare_mixture_grid(numbers(get(request,"estimates")?)?,numbers(get(request,"standard_errors")?)?,&options).map_err(|e|e.to_string())?;
+    let (class,means,sds,lower,upper)=match g.components {
+        MixtureComponents::Normal{means,sds}=>("normalmix",Some(means),Some(sds),None,None),
+        MixtureComponents::Uniform{lower,upper}=>("unimix",None,None,Some(lower),Some(upper)),
+        MixtureComponents::TruncatedNormal{means,sds,lower,upper}=>("tnormalmix",Some(means),Some(sds),Some(lower),Some(upper)),
+    };
+    let value=|v:Option<Vec<f64>>|v.map(Value::numbers).unwrap_or_else(||Value::new(Data::Null));
+    Ok(named(&["component_class","initial_weights","dirichlet","means","sds","lower","upper","warnings"],
+        vec![Value::new(Data::Text(vec![Some(class.into())])),Value::numbers(g.initial_weights),Value::numbers(g.dirichlet),value(means),value(sds),value(lower),value(upper),Value::new(Data::Text(g.warnings.into_iter().map(Some).collect()))]))
 }

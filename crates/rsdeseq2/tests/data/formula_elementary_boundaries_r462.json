@@ -1,0 +1,223 @@
+{
+  "metadata": {
+    "R": "4.6.2",
+    "platform": "aarch64-apple-darwin27.2.0",
+    "collation": "root"
+  },
+  "variables": {
+    "x": {
+      "type": "number",
+      "integer": false,
+      "values": [
+        "8000000000000000",
+        "0000000000000000",
+        "bcc0000000000000",
+        "bcb8000000000000",
+        "bcb0000000000000",
+        "bca0000000000000",
+        "3ca0000000000000",
+        "3cb0000000000000",
+        "3cb8000000000000",
+        "3cc0000000000000",
+        "be60000000000000",
+        "be50000000000002",
+        "be50000000000000",
+        "be4ffffffffffffe",
+        "be40000000000000",
+        "3e40000000000000",
+        "3e4ffffffffffffe",
+        "3e50000000000000",
+        "3e50000000000002",
+        "3e60000000000000",
+        "b970000000000000",
+        "3970000000000000",
+        "8010000000000000",
+        "0010000000000000"
+      ],
+      "dimensions": null,
+      "names": null,
+      "dimnames": [
+        null,
+        null
+      ],
+      "dimname_names": [
+        null,
+        null
+      ],
+      "attributes": []
+    }
+  },
+  "cases": [
+    {
+      "name": "exp_boundaries",
+      "expression": {
+        "type": "call",
+        "function_name": "exp",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3feffffffffffffc",
+          "3feffffffffffffd",
+          "3feffffffffffffe",
+          "3fefffffffffffff",
+          "3ff0000000000000",
+          "3ff0000000000001",
+          "3ff0000000000002",
+          "3ff0000000000002",
+          "3feffffff0000004",
+          "3feffffff8000001",
+          "3feffffff8000000",
+          "3feffffff8000000",
+          "3feffffffc000000",
+          "3ff0000002000000",
+          "3ff0000004000000",
+          "3ff0000004000000",
+          "3ff0000004000001",
+          "3ff0000008000002",
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3ff0000000000000",
+          "3ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "log1p_boundaries",
+      "expression": {
+        "type": "call",
+        "function_name": "log1p",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "0000000000000000",
+          "0000000000000000",
+          "bcc0000000000001",
+          "bcb8000000000001",
+          "bcb0000000000000",
+          "bca0000000000000",
+          "3ca0000000000000",
+          "3cb0000000000000",
+          "3cb7ffffffffffff",
+          "3cbffffffffffffe",
+          "be60000004000001",
+          "be50000002000002",
+          "be50000002000000",
+          "be50000001ffffff",
+          "be40000001000000",
+          "3e3ffffffe000000",
+          "3e4ffffffbffffff",
+          "3e4ffffffc000001",
+          "3e4ffffffc000005",
+          "3e5ffffff8000003",
+          "b970000000000000",
+          "3970000000000000",
+          "8010000000000000",
+          "0010000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    },
+    {
+      "name": "expm1_boundaries",
+      "expression": {
+        "type": "call",
+        "function_name": "expm1",
+        "arguments": [
+          {
+            "name": null,
+            "expression": {
+              "type": "symbol",
+              "name": "x"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "0000000000000000",
+          "0000000000000000",
+          "bcbffffffffffffe",
+          "bcb7ffffffffffff",
+          "bcb0000000000000",
+          "bca0000000000000",
+          "3ca0000000000000",
+          "3cb0000000000000",
+          "3cb8000000000001",
+          "3cc0000000000001",
+          "be5ffffff8000001",
+          "be4ffffffc000004",
+          "be4ffffffc000000",
+          "be4ffffffbfffffe",
+          "be3ffffffe000000",
+          "3e40000001000000",
+          "3e50000001ffffff",
+          "3e50000002000000",
+          "3e50000002000002",
+          "3e60000004000001",
+          "b970000000000000",
+          "3970000000000000",
+          "8010000000000000",
+          "0010000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      }
+    }
+  ]
+}

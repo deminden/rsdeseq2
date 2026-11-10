@@ -1,5 +1,11 @@
 # One numerical engine for Rust and R
 
+Current local development adds [bounded posterior components and all six
+normal-likelihood mixture grids](shrinkage-component-development.md), plus
+small-argument expression corrections. Public optional shrinkage adoption and
+final combined checks remain open. Further development/commits stay local until
+the user explicitly authorizes GitHub publication.
+
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R
 numerical leaves: R is an interface, and the standalone Rust engine must return
 identical results to the R-wrapped engine. Production R statistical calculations

@@ -11,6 +11,8 @@ mod formula;
 mod frozen_local;
 #[path = "evaluate_r_interface/mixture_fit.rs"]
 mod mixture_fit;
+#[path = "evaluate_r_interface/mixture_grid.rs"]
+mod mixture_grid;
 #[path = "evaluate_r_interface/model_matrix.rs"]
 mod model_matrix;
 #[path = "evaluate_r_interface/native_formula.rs"]
@@ -21,6 +23,8 @@ mod normal_log;
 mod posterior;
 #[path = "evaluate_r_interface/preparation.rs"]
 mod preparation;
+#[path = "evaluate_r_interface/uniform.rs"]
+mod uniform;
 use rsdeseq2::independent_filtering::{
     IndependentFilteringOptions, evaluate_independent_filtering,
 };
@@ -394,6 +398,8 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Uniform(uniform::Input),
+    MixtureGrid(mixture_grid::Input),
     NormalLog(normal_log::Input),
     MixtureFit(mixture_fit::Input),
     Posterior(posterior::Input),
@@ -415,6 +421,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Uniform(input) => uniform::evaluate(input)?,
+        Input::MixtureGrid(input) => mixture_grid::evaluate(input)?,
         Input::NormalLog(input) => normal_log::evaluate(input)?,
         Input::MixtureFit(input) => mixture_fit::evaluate(input)?,
         Input::Posterior(input) => posterior::evaluate(input)?,

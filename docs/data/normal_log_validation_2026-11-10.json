@@ -22,6 +22,39 @@
   "checks": {
     "backend_passed": 3,
     "clippy_both_graphs": "passed",
+    "github_ci": {
+      "R": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "r (reference, 4.6.2)",
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "r (current, release)",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "3083bb16c165f6b1fe7f4e211b866658ff193931",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42818661179"
+      },
+      "Rust": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "rust",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "3083bb16c165f6b1fe7f4e211b866658ff193931",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42818661215"
+      }
+    },
     "msrv_both_graphs": "1.97.1 passed",
     "normal_log_arguments_all_output_bits_equal": 666,
     "previous_posterior_observations": 520,
@@ -57,5 +90,6 @@
     "apeglm engine and public options",
     "general method/warning and final authority/performance/artifact reconciliation"
   ],
-  "scope": "Unreleased standalone log-normal tail support for posterior component migration; existing Wald path unchanged"
+  "scope": "Unreleased standalone log-normal tail support for posterior component migration; existing Wald path unchanged",
+  "source_implementation_commit": "3083bb16c165f6b1fe7f4e211b866658ff193931"
 }

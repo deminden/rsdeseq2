@@ -48,3 +48,20 @@ testthat::test_that('log normal tails retain underflowed probabilities through t
   testthat::expect_true(is.finite(actual$log_cdf[[2L]]))
   testthat::expect_error(.rsdeseq2_formula_request(list(operation='normal_log_probabilities',arguments='invalid')))
 })
+
+testthat::test_that('uniform posterior transport preserves numerical boundaries and missing rows', {
+  request<-list(operation='posterior_uniform_mixture',weights=1,lower=-10,upper=10,
+    estimates=c(0,1),standard_errors=c(.5,.7),thresholds=c(-Inf,0,Inf))
+  result<-.rsdeseq2_formula_request(request)
+  testthat::expect_equal(result$posterior_mean,c(0,1),tolerance=2e-12)
+  testthat::expect_equal(result$posterior_sd,c(.5,.7),tolerance=2e-12)
+  testthat::expect_equal(result$cdf[c(2,5)],stats::pnorm(0,c(0,1),c(.5,.7)),tolerance=2e-12)
+  testthat::expect_equal(result$log_likelihoods,rep(-log(20),2),tolerance=2e-12)
+  missing<-utils::modifyList(request,list(lower=-1,upper=1,estimates=40,standard_errors=.01))
+  missing<-.rsdeseq2_formula_request(missing)
+  testthat::expect_true(all(is.nan(missing$posterior_mean)))
+  testthat::expect_true(all(is.nan(missing$posterior_sd)))
+  testthat::expect_true(all(is.nan(missing$cdf)))
+  for(change in list(list(lower=11),list(weights=0),list(standard_errors=c(.5,-.7)),list(estimates=0)))
+    testthat::expect_error(.rsdeseq2_formula_request(utils::modifyList(request,change)))
+})

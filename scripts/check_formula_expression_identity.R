@@ -16,7 +16,7 @@ canonical<-function(x){
  lapply(x,canonical)
 }
 total<-0L
-for(file in c("formula_expression_r462.json","formula_expression_extended_r462.json")) {
+for(file in c("formula_expression_r462.json","formula_expression_extended_r462.json","formula_elementary_boundaries_r462.json")) {
  panelOut<-file.path(out,sub(".json$","",file));dir.create(panelOut)
 reference<-jsonlite::fromJSON(.formula_reference_path(file.path(root,"crates/rsdeseq2/tests/data"),file),simplifyVector=FALSE)
 input<-list(formula_cases=reference$cases,variables=reference$variables,collation=reference$metadata$collation)

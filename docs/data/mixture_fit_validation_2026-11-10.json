@@ -17,6 +17,39 @@
     "both_matrix_layouts_identical": true,
     "clippy_both_graphs": "passed",
     "complete_prior_fit_bit_cases": 8,
+    "github_ci": {
+      "R": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "r (current, release)",
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "r (reference, 4.6.2)",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "3e03b805bb6bc1e8ae08d199f33a922f8f9d54ea",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42816949849"
+      },
+      "Rust": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "rust",
+            "status": "completed"
+          }
+        ],
+        "source_commit": "3e03b805bb6bc1e8ae08d199f33a922f8f9d54ea",
+        "status": "completed",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42816949687"
+      }
+    },
     "iteration_limit_preserved": true,
     "msrv_both_graphs": "1.97.1 passed",
     "previous_frozen_vst_bit_cases": 8,
@@ -129,6 +162,7 @@
     "general method/warning and final authority/performance/artifact reconciliation"
   ],
   "scope": "Unreleased standalone convex mixture-weight fitting foundation; public lfcShrink routes unchanged",
+  "source_implementation_commit": "3e03b805bb6bc1e8ae08d199f33a922f8f9d54ea",
   "trial": {
     "accepted_algorithm": "EM warmup and nonnegative SQP with explicit offset",
     "decimal_input_mismatches_found": 1901,

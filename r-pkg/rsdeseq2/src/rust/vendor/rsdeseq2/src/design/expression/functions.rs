@@ -256,21 +256,9 @@ impl Evaluator<'_> {
                 }
                 "log2" => v.log2(),
                 "log10" => v.log10(),
-                "log1p" => {
-                    if v == 0.0 {
-                        0.0
-                    } else {
-                        v.ln_1p()
-                    }
-                }
-                "exp" => {
-                    if v.abs() <= f64::EPSILON.sqrt() {
-                        1.0 + v
-                    } else {
-                        v.exp()
-                    }
-                }
-                "expm1" => v.exp_m1(),
+                "log1p" => crate::math::elementary::language_log1p(v),
+                "exp" => crate::math::elementary::language_exp(v),
+                "expm1" => crate::math::elementary::language_expm1(v),
                 "sqrt" => v.sqrt(),
                 "abs" => v.abs(),
                 "sign" => {

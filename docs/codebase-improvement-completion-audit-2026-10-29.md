@@ -1,5 +1,11 @@
 # Completion audit against C01–C23
 
+Current local development adds [bounded posterior components and all six
+normal-likelihood mixture grids](shrinkage-component-development.md), plus
+small-argument expression corrections. Public optional shrinkage adoption and
+final combined checks remain open. Further development/commits stay local until
+the user explicitly authorizes GitHub publication.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).
