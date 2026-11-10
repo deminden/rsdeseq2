@@ -7,8 +7,9 @@ likelihood expressions now use Rust. The local default [apeglm workflow](native-
 also uses Rust. The later [general-regression checkpoint](native-regression-development.md)
 adds translated custom likelihoods, general fitting and `nbinomR`. The later
 [beta-binomial checkpoint](native-beta-binomial-development.md) adds the
-specialized logit methods; advanced optional methods and
-final combined checks remain open. Further development/commits stay local until
+specialized logit methods. The [random-start checkpoint](native-random-start-development.md)
+adds portable native state for both MAP-only random-start methods. Advanced
+options and final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R
@@ -68,8 +69,10 @@ artifacts and do not certify a replacement implementation.
    has a Rust implementation. The local default ashr route now shares native
    prior fitting and summaries; advanced options still need implementation.
    The default negative-binomial apeglm route now has a standalone implementation
-   with independent posterior/tail and direct interface checks. Its general,
-   random-start, beta-binomial and grid methods remain unfinished.
+   with independent posterior/tail and direct interface checks. General,
+   beta-binomial and portable random-start methods now use the same engine.
+   Grid intervals, parameter uncertainty, contrasts, other optimizer/RNG modes
+   and complete warning/authority reconciliation remain unfinished.
    Keep existing functionality until the replacement passes its gates.
 6. **Reconcile performance, memory and artifacts.** Repeat the appropriate
    paired workflow/holdout checks only after substantive candidate changes.

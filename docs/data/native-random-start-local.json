@@ -1,0 +1,214 @@
+{
+  "artifacts": {
+    "results/native-random-start/default-regression/standalone-final-driver.json": "10aa2627c0367031490bed7982221d35b0c890d82a6ad45a247f38f5d20268da",
+    "results/native-random-start/default-regression/validation.json": "347cc224ddd8977dd30238ad3abdb8fafcb3953bbcfc92d76921cb3f1bcb3464",
+    "results/native-random-start/evaluate-r-interface": "a3dfced9bae41f16f78c81d35fa953d554bdb273db16b21899d70497e4b0da3e",
+    "results/native-random-start/local-library/rsdeseq2/libs/rsdeseq2.so": "8336a78d544320c471f8d87aa6ccee04382f47038906070d1b8f013fc6242cf3",
+    "results/native-random-start/rng-standalone-final.json": "deae4af25b4373c73937256d928581bf537a246bf7d96e591b8f526fee390656",
+    "results/native-random-start/workflow-final/input.json": "cec705acee1f2e315ef7e2ad58ae2278f6b20b22380a8f2c28d401f890116129",
+    "results/native-random-start/workflow-final/standalone-final-driver.json": "25e18b55f8d2db0f0df638bb89ae78d13298928fe2f93b54c501b16825a793ab",
+    "results/native-random-start/workflow-final/validation.json": "e5bb932e75819d519bcce1249d96c7f7cb86147a08e1ce3414ec8c5a7bfad737",
+    "results/native-random-start/workflow-final/wrapped.json": "ddeaa31deb07b1511759459e490e8ac04928d8e999cedc0a18328da9ecc93b06"
+  },
+  "files": {
+    "crates/rsdeseq2/examples/evaluate_r_interface.rs": "461b0c0df71b04a2673753eb15cc9736fa2f1b4aab84200a145dc1bb83e56b19",
+    "crates/rsdeseq2/examples/evaluate_r_interface/heavy_tail.rs": "a7100c8524218fe669e413b7ce8e30d0d579eb994a9ba9abb9d565bd2b5034f1",
+    "crates/rsdeseq2/examples/evaluate_r_interface/random.rs": "98f69895774b0a0631753a080a568a523894a180c874d80440b8c98cde6198bd",
+    "crates/rsdeseq2/examples/evaluate_r_interface/regression.rs": "dfc8081097c6aeec398702db183442171589df4dfafcab1a1c03653b94bfe967",
+    "crates/rsdeseq2/src/shrinkage.rs": "9690e535cb7e18740a9a08cc767b8cecc8872a751e29f344bfd55230b1aa55d8",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail.rs": "e8e4ffd11f926015aa0b9c49301efe790d3eed01862598d8f391f67a20857ae2",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "ba6622a109fd5b3455f4e7c534976feeb984b71fa66948e12746552a96311205",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/random.rs": "ab79fb5af68709744a95dc4aebcd3d1e2d4f1eaf237d4dba1953f46d5b389634",
+    "crates/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "e23cb652fd3224485fdea01521b5b9868846e12de43829be1418fcd0a04ef5e8",
+    "crates/rsdeseq2/tests/data/posterior_rng_r462.json": "3c9d4d9c6c6910aec0f909bca8af9d5d43e4b221c4d78d52621d42fe91875955",
+    "crates/rsdeseq2/tests/data/random_start_posterior_r462.json": "09a7beed6100973aab06858b6193b3eb788da3fdd117de0986137edf22d8ff7c",
+    "crates/rsdeseq2/tests/heavy_tail.rs": "d3abd9644d9daf784e70251f8b1fef3a79152549b54695be9ee3fbaa42af3711",
+    "crates/rsdeseq2/tests/posterior_rng.rs": "9ceb3d02d5885c5e1ab3348320c5a40083671ebd2173af50e2838dd23deff697",
+    "crates/rsdeseq2/tests/regression_posterior.rs": "6931e664a89dec5e22d5e75be54a61a5ba5cbc3c90ea6ad0a5557f4c401a6f26",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "230cf1b1ec31589077f46771f21955265b41f3353c98660830e93446ff377ecf",
+    "docs/native-apeglm-development.md": "927a0a94186c27e9f3eeabbe2c18b46ce5fdd0d51a1ac5b85e8b4ff8ba213edd",
+    "docs/native-beta-binomial-development.md": "71f541ed1cec5bfc672a04e44c7727aa42918e27236989ba966dfca7c4581c53",
+    "docs/native-random-start-development.md": "9c91594f871ed72938dd77d895886c07f821ef17fdc42a3f8fecd45c48a7ed0d",
+    "docs/native-regression-development.md": "10240c9f65bdf22092506268b5c23eb5a8732bb0c62f3203cad49d27dc307739",
+    "docs/r-wrapper.md": "e52eeccc794eb904992b77f4b0810e8582c976d4c7567e0d5793992b701c6370",
+    "docs/rust-only-wrapper-migration.md": "eb7b50a17c7c90a15480ed70844d1cbcadd515cfc939d4120fff0f749636315b",
+    "docs/testing-parity.md": "809bf6a85f9df2843b8e7e92903be58e92e615943562a98437d67b6ff586b66c",
+    "r-pkg/rsdeseq2/NEWS.md": "01006cac648b11e28ec238f5c1ca23687dca057b6777030a38d396e768276752",
+    "r-pkg/rsdeseq2/R/lfc-shrink-apeglm.R": "e15516491eaa8e030cc510ef760c2e717f4a8f1d76786db8296e6e9de98ba3fb",
+    "r-pkg/rsdeseq2/R/posterior-rng.R": "32d4cf88e4c3b304219076a2bc75b05c6428defe669d9a263a49e6d3f7a5a1bb",
+    "r-pkg/rsdeseq2/README.md": "38e0468e08f7df815216a5789c7cc515d5d16be48a83dc0333a573389076d4fc",
+    "r-pkg/rsdeseq2/man/rsdeseq2-primitives.Rd": "3b504e91f1cf0e02bb1683031ae8ee5b93d7719fd7fbf829af6384681593b142",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request.rs": "05ae2e5535aadb70ec83fb6751c27bdac02e3215f144abdfd491751769585b3c",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/apeglm.rs": "b8d5499a53819b53d6da19cdd790cf06bb320c84eca32de594d5c67a1c5d197a",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/posterior_rng.rs": "d92d388db1e884d518b241f62edff4193326357de5a50e954005b02c2040cfcf",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage.rs": "9690e535cb7e18740a9a08cc767b8cecc8872a751e29f344bfd55230b1aa55d8",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail.rs": "e8e4ffd11f926015aa0b9c49301efe790d3eed01862598d8f391f67a20857ae2",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/fit.rs": "ba6622a109fd5b3455f4e7c534976feeb984b71fa66948e12746552a96311205",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/random.rs": "ab79fb5af68709744a95dc4aebcd3d1e2d4f1eaf237d4dba1953f46d5b389634",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/heavy_tail/regression.rs": "e23cb652fd3224485fdea01521b5b9868846e12de43829be1418fcd0a04ef5e8",
+    "r-pkg/rsdeseq2/tests/testthat/test-posterior-rng.R": "c645dbbdf1e534aac8a1f28f557364c433c544edfe0eb5fdd512a68c62d48090",
+    "scripts/check_native_regression_workflow.R": "88d3ed55fb574f778db9166f6b227130661f3f5c456348523dcbfd427788c133",
+    "scripts/generate_posterior_rng_reference.R": "7c0f46d4803d6a20ebcb48146fdd971da70af008138c6fde48f9bd1872ceef01",
+    "scripts/generate_random_start_posterior_reference.R": "7453ccc7cf3e6b06e7fa9ce6235efbef8cbb9fe5421a1a7a40d9dfc8b3ab2fce"
+  },
+  "focused_validation": {
+    "R_import_assertions": 11,
+    "Rust_tests": 11,
+    "backend_all_targets_clippy": "passed",
+    "beta_binomial_profiles": 79,
+    "core_focused_clippy": "passed",
+    "default_method_regression": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 14,
+      "existing_bounds_unchanged": true,
+      "genes": 1200,
+      "normalization_factor_errors": {
+        "mode": 1.3663e-14,
+        "sd": 8.6739e-13,
+        "svalue": 6.7751e-14,
+        "threshold_svalue": 1.6875e-14
+      },
+      "public_errors": [
+        {
+          "mode": 1.7164e-13,
+          "profile": "default",
+          "sd": 5.3516e-13,
+          "svalue": null
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "sign",
+          "sd": 5.3516e-13,
+          "svalue": 1.8527e-15
+        },
+        {
+          "mode": 1.7164e-13,
+          "profile": "threshold",
+          "sd": 5.3516e-13,
+          "svalue": 2.609e-15
+        }
+      ],
+      "public_normalization_log2_bits_identical": true
+    },
+    "existing_bounds_or_oracles_relaxed": false,
+    "final_driver_replayed_complete_recorded_payloads_exactly": true,
+    "full_suites_sanitizers_performance_memory_platform_bundle": "deferred until remaining implementation is combined",
+    "negative_binomial_profiles": 85,
+    "posterior_rows": 1270,
+    "posterior_workflow": {
+      "DESeq2": "1.52.0",
+      "R": "4.6.2",
+      "R_calculations_blocked": true,
+      "apeglm": "1.34.0",
+      "complete_native_standalone_batches": 164,
+      "existing_bounds_unchanged": true,
+      "genes": 256,
+      "original_public_warning_counts": {
+        "L'Ecuyer-CMRG_betabinC*": 15,
+        "L'Ecuyer-CMRG_nbinomC*": 0,
+        "Mersenne-Twister_betabinC*": 14,
+        "Mersenne-Twister_nbinomC*": 0
+      },
+      "public_errors": [
+        {
+          "mode": 1.77635683940025e-14,
+          "profile": "Mersenne-Twister_nbinomC*",
+          "sd": 0,
+          "threshold_svalue": 0
+        },
+        {
+          "mode": 4.13983458846801e-07,
+          "profile": "Mersenne-Twister_betabinC*",
+          "sd": 0,
+          "threshold_svalue": 0
+        },
+        {
+          "mode": 1.53210777398272e-14,
+          "profile": "L'Ecuyer-CMRG_nbinomC*",
+          "sd": 0,
+          "threshold_svalue": 0
+        },
+        {
+          "mode": 1.57969826232798e-06,
+          "profile": "L'Ecuyer-CMRG_betabinC*",
+          "sd": 0,
+          "threshold_svalue": 0
+        }
+      ],
+      "public_random_states_identical": true,
+      "public_warning_counts": {
+        "L'Ecuyer-CMRG_betabinC*": 14,
+        "L'Ecuyer-CMRG_nbinomC*": 0,
+        "Mersenne-Twister_betabinC*": 12,
+        "Mersenne-Twister_nbinomC*": 0
+      },
+      "rng_error_checks": {
+        "R_random_calls_blocked": true,
+        "late_error_retains_consumed_state": true,
+        "unseeded_request_initializes_in_Rust": true,
+        "unsupported_state_rejects_without_changes": true
+      },
+      "warning_events_identical": 159,
+      "warning_messages_identical": 159
+    },
+    "previous_162_profiles_unchanged_when_appending_integer_NA_cases": true,
+    "previous_28_numeric_state_profiles_unchanged_when_adding_CMRG_seed_boundaries": true,
+    "vendor_and_notice_integrity": "passed"
+  },
+  "full_plan_complete": false,
+  "licensing": "Independent published MT/CMRG equations, existing MIT statrs quantile/shared normal tail; no GPL implementation or new dependency added",
+  "numerical_build_source_manifest": {
+    "all_current_files_match": true,
+    "files": 580,
+    "path": "results/native-random-start/build-source-final.json",
+    "sha256": "c6bc90152865fac7daf63112862d982f364067a5d0a930a3431a7e55d08cb2d8"
+  },
+  "parent_commit": "f1bf2abe41c208295dc115c51f662c0b6bf6d0b9",
+  "performance_claim": "none; unchanged quantification not retimed; no counted 2% round",
+  "publication_authorized": false,
+  "reference_environment": {
+    "R": "4.6.2",
+    "apeglm": "1.34.0"
+  },
+  "remaining": [
+    "grid intervals, parameter uncertainty, contrasts and other optimizer/RNG modes",
+    "advanced ashr methods/options",
+    "C21 authority and full warning-policy reconciliation",
+    "C23 combined precision/speed/memory/sanitizer/platform/source-bundle checks"
+  ],
+  "rng_precision": {
+    "generator_profiles": 30,
+    "native_and_wrapped_draw_and_state_bits_identical": true,
+    "normal_values": 1920,
+    "observed_max_normal_ULP": 4,
+    "original_normal_gate_ULP": 16,
+    "uniform_values": 1920,
+    "uniforms_and_all_recorded_states_exact": true
+  },
+  "scope": "Local MAP-only random-start NB/beta-binomial shrinkage with shared portable native RNG state",
+  "state_contract": [
+    "one p-coordinate vector per batch, including wholly zero NB batches",
+    "integer-NA state word bits preserved",
+    "late fitting error retains consumed state",
+    "early invalid input/state consumes no draws",
+    "unseeded state initialized entirely in Rust",
+    "active/delayed/nonprimitive/unwritable bindings reject without execution"
+  ],
+  "supported_states": [
+    "MT19937/Inversion",
+    "Lecuyer-CMRG/Inversion",
+    "Rounding/Rejection sampling headers retained",
+    "parallel-stream states imported"
+  ],
+  "warning_differences": [
+    "Mersenne-Twister_1_small_theta_betabinC",
+    "L'Ecuyer-CMRG_42_large_theta_betabinC",
+    "L'Ecuyer-CMRG_42_all_gaussian_betabinC",
+    "L'Ecuyer-CMRG_781_intercept_betabinC",
+    "L'Ecuyer-CMRG_781_all_gaussian_betabinC"
+  ],
+  "warning_policy": "Actual native diagnostics retained; all native/wrapped warning strings match. Original plateau warning counts differ in the recorded cases and remain part of authority audit."
+}

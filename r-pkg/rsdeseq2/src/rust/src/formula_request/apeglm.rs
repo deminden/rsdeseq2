@@ -8,7 +8,9 @@ use rsdeseq2::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosteriorInput,
         NegativeBinomialPosteriorOptions, PosteriorOffsets, RegressionLikelihood, RegressionMethod,
         RegressionOptimizer, RegressionPosteriorInput, RegressionPosteriorOptions,
-        RestrictedRegressionLikelihood, fit_negative_binomial_posterior, fit_regression_posterior,
+        RestrictedRegressionLikelihood, fit_negative_binomial_posterior,
+        fit_negative_binomial_posterior_with_rng, fit_regression_posterior,
+        fit_regression_posterior_with_rng,
     },
 };
 fn matrix(v: &Value) -> Result<MatrixView<'_, f64>, String> {
@@ -90,14 +92,6 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "betabinC*",
         ],
     )?;
-    if !matches!(
-        method.as_str(),
-        "general" | "nbinomR" | "nbinomCR" | "nbinomC" | "betabinR" | "betabinCR" | "betabinC"
-    ) {
-        return Err(format!(
-            "native apeglm method '{method}' is not implemented yet"
-        ));
-    }
     if choice(
         field(args, "interval.type"),
         &["laplace", "HPD", "credible"],
@@ -107,7 +101,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     }
     let general = matches!(
         method.as_str(),
-        "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC"
+        "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC" | "betabinC*"
     );
     let optimizer = choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?;
     let log_link = field(args, "log.link")
@@ -222,9 +216,17 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             .transpose()?
             .unwrap_or(true),
         multiplier: number(args, "multiplier", 1.0)?,
-        map_only: matches!(method.as_str(), "nbinomC" | "betabinC"),
+        map_only: matches!(
+            method.as_str(),
+            "nbinomC" | "betabinC" | "nbinomC*" | "betabinC*"
+        ),
         check_opposite_start: method == "nbinomCR",
         ..Default::default()
+    };
+    let mut rng = if method.ends_with('*') {
+        Some(super::posterior_rng::restore(field(request, "rng_state"))?)
+    } else {
+        None
     };
     let result = if general {
         let parameter = get(args, "param")?;
@@ -270,51 +272,72 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         } else {
             (f64::NEG_INFINITY, f64::INFINITY)
         };
-        fit_regression_posterior(
-            RegressionPosteriorInput {
-                observations: counts,
-                design,
-                parameters: Some(parameters),
-                offsets,
-                weights,
-                mle,
+        let input = RegressionPosteriorInput {
+            observations: counts,
+            design,
+            parameters: Some(parameters),
+            offsets,
+            weights,
+            mle,
+        };
+        let options = RegressionPosteriorOptions {
+            posterior,
+            likelihood,
+            prior_df,
+            prior_noncentrality: prior_ncp,
+            nuisance_mean,
+            optimizer: if optimizer == "BFGS" {
+                RegressionOptimizer::Bfgs
+            } else {
+                RegressionOptimizer::Lbfgsb
             },
-            &RegressionPosteriorOptions {
-                posterior,
-                likelihood,
-                prior_df,
-                prior_noncentrality: prior_ncp,
-                nuisance_mean,
-                optimizer: if optimizer == "BFGS" {
-                    RegressionOptimizer::Bfgs
-                } else {
-                    RegressionOptimizer::Lbfgsb
-                },
-                method: match method.as_str() {
-                    "nbinomR" => RegressionMethod::NegativeBinomialR,
-                    "betabinR" => RegressionMethod::BetaBinomialR,
-                    "betabinCR" => RegressionMethod::BetaBinomialCR,
-                    "betabinC" => RegressionMethod::BetaBinomialC,
-                    _ => RegressionMethod::General,
-                },
-                log_link,
-                bounds,
+            method: match method.as_str() {
+                "nbinomR" => RegressionMethod::NegativeBinomialR,
+                "betabinR" => RegressionMethod::BetaBinomialR,
+                "betabinCR" => RegressionMethod::BetaBinomialCR,
+                "betabinC" => RegressionMethod::BetaBinomialC,
+                "betabinC*" => RegressionMethod::BetaBinomialCStar,
+                _ => RegressionMethod::General,
             },
-        )
+            log_link,
+            bounds,
+        };
+        if let Some(rng) = rng.as_mut() {
+            fit_regression_posterior_with_rng(input, &options, rng)
+        } else {
+            fit_regression_posterior(input, &options)
+        }
     } else {
-        fit_negative_binomial_posterior(
-            NegativeBinomialPosteriorInput {
-                counts,
-                design,
-                dispersions: numbers(get(args, "param")?)?,
-                offsets,
-                weights,
-                mle,
-            },
-            &posterior,
-        )
-    }
-    .map_err(|e| e.to_string())?;
+        let input = NegativeBinomialPosteriorInput {
+            counts,
+            design,
+            dispersions: numbers(get(args, "param")?)?,
+            offsets,
+            weights,
+            mle,
+        };
+        if let Some(rng) = rng.as_mut() {
+            fit_negative_binomial_posterior_with_rng(input, &posterior, rng)
+        } else {
+            fit_negative_binomial_posterior(input, &posterior)
+        }
+    };
+    let result = match result {
+        Ok(result) => result,
+        Err(error) => {
+            if let Some(rng) = rng.as_ref() {
+                let state = rng.has_drawn().then(|| rng.r_seed());
+                return Ok(named(
+                    &["error", "random_state"],
+                    vec![
+                        Value::new(Data::Text(vec![Some(error.to_string())])),
+                        super::posterior_rng::encode(state.as_deref()),
+                    ],
+                ));
+            }
+            return Err(error.to_string());
+        }
+    };
     let target = target.ok_or("wrapper apeglm request requires a coefficient")?;
     let summary = result
         .coefficient_summary(target, CoefficientScale::Log2)
@@ -379,6 +402,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "prior_control",
             "convergence",
             "warnings",
+            "random_state",
         ],
         vec![
             Value::numbers(summary.mode),
@@ -388,6 +412,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             pc,
             optional(Some(convergence)),
             Value::new(Data::Text(result.warnings.into_iter().map(Some).collect())),
+            super::posterior_rng::encode(result.random_state.as_deref()),
         ],
     ))
 }

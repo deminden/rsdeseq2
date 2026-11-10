@@ -94,7 +94,8 @@ not a runtime dependency. It imports no candidate implementation. Fresh output
 paths preserve earlier evidence. The checker reuses the accepted Rust count fit
 and fits only the newly changed posterior methods against independent references.
 
-Random-start methods, grid intervals, parameter uncertainty,
+The later [random-start checkpoint](native-random-start-development.md) adds the
+two MAP-only random-start methods using portable native RNG state. Grid intervals, parameter uncertainty,
 contrasts, other optimizer policies, and the complete warning/control surface
 remain unfinished. Advanced ashr work, C21's authority audit and C23's final
 combined precision/speed/memory/sanitizer/platform/source-bundle checks also

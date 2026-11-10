@@ -6,9 +6,11 @@ use rsdeseq2::{
     matrix::{MatrixOrder, MatrixView},
     shrinkage::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosterior,
-        NegativeBinomialPosteriorOptions, PosteriorOffsets, RegressionLikelihood, RegressionMethod,
-        RegressionOptimizer, RegressionPosteriorInput, RegressionPosteriorOptions,
-        RestrictedRegressionLikelihood, fit_regression_posterior,
+        NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions, PosteriorOffsets,
+        PosteriorRng, RegressionLikelihood, RegressionMethod, RegressionOptimizer,
+        RegressionPosteriorInput, RegressionPosteriorOptions, RestrictedRegressionLikelihood,
+        fit_negative_binomial_posterior_with_rng, fit_regression_posterior,
+        fit_regression_posterior_with_rng,
     },
 };
 use serde::Deserialize;
@@ -42,6 +44,8 @@ pub struct Case {
     pub log_link: bool,
     pub threshold: String,
     pub likelihood: Option<Value>,
+    pub rng_state: Option<Vec<String>>,
+    pub flip_sign: Option<bool>,
 }
 #[derive(Deserialize)]
 pub struct Leaf {
@@ -129,6 +133,7 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             },
             coefficient: Some(c.coefficient),
             threshold: Some(number(&c.threshold)?),
+            flip_sign: c.flip_sign.unwrap_or(true),
             ..Default::default()
         },
         likelihood: if c.method.starts_with("betabin") {
@@ -140,11 +145,12 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             }
         },
         method: match c.method.as_str() {
-            "general" => RegressionMethod::General,
+            "general" | "nbinomC*" => RegressionMethod::General,
             "nbinomR" => RegressionMethod::NegativeBinomialR,
             "betabinR" => RegressionMethod::BetaBinomialR,
             "betabinCR" => RegressionMethod::BetaBinomialCR,
             "betabinC" => RegressionMethod::BetaBinomialC,
+            "betabinC*" => RegressionMethod::BetaBinomialCStar,
             _ => return Err("invalid fixture method".into()),
         },
         optimizer: match c.optimizer.as_str() {
@@ -158,7 +164,36 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
         log_link: c.log_link,
         bounds: (number(&c.bounds[0])?, number(&c.bounds[1])?),
     };
-    Ok(fit_regression_posterior(input, &options)?)
+    if c.method == "nbinomC*" {
+        let parameter = input.parameters.ok_or("missing NB dispersions")?;
+        if parameter.n_cols() != 1 {
+            return Err("NB dispersions require one column".into());
+        }
+        let dispersions = (0..parameter.n_rows())
+            .map(|i| parameter.get(i, 0).copied())
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut rng = PosteriorRng::from_r_seed(&super::random::state(
+            c.rng_state.as_deref().ok_or("missing random state")?,
+        )?)?;
+        return Ok(fit_negative_binomial_posterior_with_rng(
+            NegativeBinomialPosteriorInput {
+                counts: input.observations,
+                design: input.design,
+                dispersions: &dispersions,
+                offsets: input.offsets,
+                weights: input.weights,
+                mle: input.mle,
+            },
+            &options.posterior,
+            &mut rng,
+        )?);
+    }
+    Ok(if let Some(state) = &c.rng_state {
+        let mut rng = PosteriorRng::from_r_seed(&super::random::state(state)?)?;
+        fit_regression_posterior_with_rng(input, &options, &mut rng)?
+    } else {
+        fit_regression_posterior(input, &options)?
+    })
 }
 pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let cases = input

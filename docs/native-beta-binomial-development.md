@@ -94,7 +94,9 @@ The generator loads only original apeglm. Fresh output paths protect earlier
 evidence. The shared checker reuses saved original posterior comparisons and
 accepted count fits when supplied, avoiding repeated unchanged fitting.
 
-Random-start methods, grid intervals, parameter uncertainty, contrasts and other
+The later [random-start checkpoint](native-random-start-development.md) adds
+`betabinC*` and `nbinomC*` with portable native RNG state. Grid intervals,
+parameter uncertainty, contrasts and other
 optimizer policies remain unfinished, alongside advanced ashr methods/options,
 the final authority audit and combined precision/speed/memory/sanitizer/platform/
 source-bundle gates. No unchanged quantification timing or RSS is remeasured for

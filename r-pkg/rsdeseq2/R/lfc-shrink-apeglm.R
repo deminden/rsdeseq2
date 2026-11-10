@@ -114,7 +114,12 @@
     if (is.function(apeArguments$log.lik)) apeArguments$log.lik <- .rsdeseq2_apeglm_likelihood(apeArguments$log.lik)
     if (is.null(apeArguments$log.lik)) stop("general apeglm requires a likelihood function", call. = FALSE)
   } else apeArguments$log.lik <- NULL
-  apeFit <- .rsdeseq2_formula_request(list(operation = "apeglm_shrinkage", arguments = apeArguments))
+  randomStart <- grepl("*", nativeMethod, fixed = TRUE)
+  randomState <- if (randomStart) .rsdeseq2_posterior_rng_state() else NULL
+  apeFit <- .rsdeseq2_formula_request(list(operation = "apeglm_shrinkage", arguments = apeArguments,
+    rng_state = randomState))
+  if (!is.null(apeFit$random_state)) assign(".Random.seed", apeFit$random_state, envir = .GlobalEnv)
+  if (!is.null(apeFit$error)) stop(apeFit$error, call. = FALSE)
   for (message in apeFit$warnings) warning(message, call. = FALSE)
   if (length(apeFit$posterior_mode) != nrow(counts)) {
     stop("apeglm returned a coefficient matrix with an incompatible row count", call. = FALSE)

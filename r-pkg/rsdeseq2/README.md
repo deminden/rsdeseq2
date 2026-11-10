@@ -75,10 +75,11 @@ interactions are rejected for normal shrinkage. Cleaned coefficient aliases
 work for transformed-factor formulas; factor-level contrast syntax remains
 unsupported when DESeq2 cannot resolve its coefficient names.
 
-The default optional shrinkage workflows, general apeglm likelihoods and
+The default optional shrinkage workflows, general apeglm likelihoods,
 `nbinomR` and beta-binomial `betabinR`/`betabinCR`/`betabinC` run in Rust.
 General likelihood functions are translated from
-restricted expressions without R execution. Advanced method options
+restricted expressions without R execution. MAP-only `nbinomC*` and `betabinC*`
+use native random starts with portable R state import/export. Advanced method options
 remain unfinished and fail explicitly; see the
 [migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use
 polynomial coordinates; select their named coefficients or supply numeric

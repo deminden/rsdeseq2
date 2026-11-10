@@ -9,6 +9,7 @@ mod apeglm;
 mod frozen_local;
 mod location_shrinkage;
 mod posterior;
+mod posterior_rng;
 pub struct FormulaOutput {
     bytes: Vec<u8>,
 }

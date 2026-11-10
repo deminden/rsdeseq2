@@ -31,6 +31,8 @@ mod normal_log;
 mod posterior;
 #[path = "evaluate_r_interface/preparation.rs"]
 mod preparation;
+#[path = "evaluate_r_interface/random.rs"]
+mod random;
 #[path = "evaluate_r_interface/regression.rs"]
 mod regression;
 #[path = "evaluate_r_interface/uniform.rs"]
@@ -408,6 +410,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    Random(random::Input),
     Regression(regression::Input),
     HeavyTail(heavy_tail::Input),
     Adaptive(adaptive::Input),
@@ -435,6 +438,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::Random(input) => random::evaluate(input)?,
         Input::Regression(input) => regression::evaluate(input)?,
         Input::HeavyTail(input) => heavy_tail::evaluate(input)?,
         Input::Adaptive(input) => adaptive::evaluate(input)?,
