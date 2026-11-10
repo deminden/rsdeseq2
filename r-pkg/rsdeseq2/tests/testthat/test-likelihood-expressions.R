@@ -109,3 +109,18 @@ testthat::test_that("regression imports reject callbacks, masked densities and e
   testthat::expect_error(translate(fun), "delayed")
   testthat::expect_false(touched)
 })
+
+testthat::test_that("regression-only numeric subscripts import syntax without executing dispatch", {
+  parsed <- rsdeseq2:::.rsdeseq2_apeglm_likelihood(function(y,x,beta,param,offset)
+    lgamma(y + param[1]) - lgamma(param[-1]))
+  testthat::expect_identical(parsed$type, "restricted")
+  testthat::expect_length(parsed$model$constants, 0L)
+  testthat::expect_error(rsdeseq2:::.rsdeseq2_validate_formula_calls(~x[1]), "unsupported")
+  touched <- FALSE
+  env <- new.env(parent=baseenv())
+  env$`[` <- function(...) { touched <<- TRUE; stop("must not execute") }
+  fun <- function(y,x,beta,param,offset)param[1]
+  environment(fun) <- env
+  testthat::expect_error(rsdeseq2:::.rsdeseq2_apeglm_likelihood(fun), "custom or unsupported")
+  testthat::expect_false(touched)
+})

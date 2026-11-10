@@ -71,8 +71,10 @@ artifacts and do not certify a replacement implementation.
    The default negative-binomial apeglm route now has a standalone implementation
    with independent posterior/tail and direct interface checks. General,
    beta-binomial and portable random-start methods now use the same engine.
-   Grid intervals, parameter uncertainty, contrasts, other optimizer/RNG modes
-   and complete warning/authority reconciliation remain unfinished.
+   [Optional posterior analysis](native-posterior-analysis-development.md) now
+   shares grid/Laplace intervals, scalar parameter uncertainty and covariance-based
+   posterior contrasts. Other optimizer/RNG modes and complete warning/authority
+   reconciliation remain unfinished.
    Keep existing functionality until the replacement passes its gates.
 6. **Reconcile performance, memory and artifacts.** Repeat the appropriate
    paired workflow/holdout checks only after substantive candidate changes.

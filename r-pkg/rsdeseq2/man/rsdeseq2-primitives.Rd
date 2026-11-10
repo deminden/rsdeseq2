@@ -310,6 +310,11 @@ and ignore supplied offsets after checking their shape.
 General likelihood functions are translated from restricted
 five-argument expressions, with matrix products and supported density calls;
 the wrapper never executes these functions. BFGS and L-BFGS-B run in Rust.
+Optional Laplace/grid intervals, scalar parameter uncertainty and covariance-based
+posterior contrasts also run in Rust. Grid sign summaries affect returned s-values;
+extra interval/contrast matrices are available through the primitive engine,
+not added as coefficient result-table columns. Restricted regression expressions
+support primitive numeric one-dimensional subscripts.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.
 Formula interactions and transformed-factor

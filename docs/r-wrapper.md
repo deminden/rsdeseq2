@@ -146,12 +146,23 @@ support is separate from formulas, which still reject custom functions.
 General apeglm fitting accepts `log.lik=function(y,x,beta,param,offset)` through
 `lfcShrink(..., type="apeglm", apeMethod="general", log.lik=...)`. Functions
 must contain one supported expression. Alongside the elementary subset above,
-this route supports `%*%`, `as.numeric`, `as.double`, `lgamma`, `dnorm`,
+this route supports primitive numeric one-dimensional indexing, `%*%`,
+`as.numeric`, `as.double`, `lgamma`, `dnorm`,
 `dnbinom`, `dbinom` and `dt`. Density calls may be qualified with `stats::`.
 Captured constants remain stored primitive scalars; observation, design,
 coefficient, parameter and offset vectors come from the native request. The
 canonical original `apeglm::logLikNB` is recognized without execution. BFGS and
 L-BFGS-B run in Rust. See [validation and remaining scope](native-regression-development.md).
+
+Optional `interval.type="HPD"` or `"credible"` uses native grid sign summaries;
+`interval.level`, `ngrid`, `nsd`, `ngrid.nuis` and `nsd.nuis` configure the grid.
+`param.sd` supports scalar parameter uncertainty and requires a grid interval
+without a threshold; its sign summaries remain missing. The `contrasts` option
+requests covariance-based posterior contrasts inside the native engine. The
+primitive bridge returns extra interval/contrast matrices; public `lfcShrink()`
+keeps the selected-coefficient result-table shape. This is separate from its
+unsupported `contrast=` coefficient-selection argument for apeglm. See
+[posterior analysis scope and explicit source corrections](native-posterior-analysis-development.md).
 
 MAP-only `apeMethod="nbinomC*"` and `apeMethod="betabinC*"` use native random
 starts. The wrapper imports stored `.Random.seed` and writes back the advanced

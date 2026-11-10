@@ -55,7 +55,7 @@ fn psi_difference(x: f64, k: f64) -> f64 {
     }
     out
 }
-fn log_rising(x: f64, k: f64) -> f64 {
+pub(super) fn log_rising(x: f64, k: f64) -> f64 {
     if k == 0.0 {
         return 0.0;
     }

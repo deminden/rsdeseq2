@@ -6,11 +6,12 @@ use rsdeseq2::{
     matrix::{MatrixOrder, MatrixView},
     shrinkage::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosterior,
-        NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions, PosteriorOffsets,
-        PosteriorRng, RegressionLikelihood, RegressionMethod, RegressionOptimizer,
-        RegressionPosteriorInput, RegressionPosteriorOptions, RestrictedRegressionLikelihood,
-        fit_negative_binomial_posterior_with_rng, fit_regression_posterior,
-        fit_regression_posterior_with_rng,
+        NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions, PosteriorAnalysisOptions,
+        PosteriorIntervalKind, PosteriorIntervalOptions, PosteriorOffsets, PosteriorRng,
+        RegressionLikelihood, RegressionMethod, RegressionOptimizer, RegressionPosteriorInput,
+        RegressionPosteriorOptions, RestrictedRegressionLikelihood,
+        fit_negative_binomial_posterior, fit_negative_binomial_posterior_with_rng,
+        fit_regression_posterior, fit_regression_posterior_with_rng,
     },
 };
 use serde::Deserialize;
@@ -42,10 +43,62 @@ pub struct Case {
     pub optimizer: String,
     pub bounds: [String; 2],
     pub log_link: bool,
-    pub threshold: String,
+    pub threshold: Option<String>,
+    pub analysis: Option<Analysis>,
     pub likelihood: Option<Value>,
     pub rng_state: Option<Vec<String>>,
     pub flip_sign: Option<bool>,
+}
+#[derive(Deserialize)]
+pub struct Analysis {
+    pub kind: String,
+    pub level: String,
+    pub grid_intervals: usize,
+    pub grid_standard_deviations: String,
+    pub nuisance_points: usize,
+    pub nuisance_standard_deviations: String,
+    pub contrasts: Option<Matrix>,
+    pub parameter_standard_errors: Option<Vec<String>>,
+}
+impl Analysis {
+    fn options(&self) -> Result<PosteriorAnalysisOptions, Box<dyn Error>> {
+        Ok(PosteriorAnalysisOptions {
+            interval: Some(PosteriorIntervalOptions {
+                kind: match self.kind.as_str() {
+                    "laplace" => PosteriorIntervalKind::Laplace,
+                    "HPD" => PosteriorIntervalKind::HighestDensity,
+                    "credible" => PosteriorIntervalKind::EqualTail,
+                    _ => return Err("invalid interval kind".into()),
+                },
+                level: number(&self.level)?,
+                grid_intervals: self.grid_intervals,
+                grid_standard_deviations: number(&self.grid_standard_deviations)?,
+                nuisance_points: self.nuisance_points,
+                nuisance_standard_deviations: number(&self.nuisance_standard_deviations)?,
+            }),
+            contrasts: self
+                .contrasts
+                .as_ref()
+                .map(|m| {
+                    let v = numbers(&m.values)?;
+                    let view = m.view(&v)?;
+                    Ok::<_, Box<dyn Error>>(rsdeseq2::matrix::RowMajorMatrix::from_row_major(
+                        m.rows,
+                        m.columns,
+                        (0..m.rows)
+                            .flat_map(|i| (0..m.columns).map(move |j| *view.get(i, j).unwrap()))
+                            .collect(),
+                    )?)
+                })
+                .transpose()?,
+            parameter_standard_errors: self
+                .parameter_standard_errors
+                .as_ref()
+                .map(|s| numbers(s))
+                .transpose()?,
+            ..Default::default()
+        })
+    }
 }
 #[derive(Deserialize)]
 pub struct Leaf {
@@ -123,7 +176,7 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             })
             .transpose()?,
     };
-    let options = RegressionPosteriorOptions {
+    let mut options = RegressionPosteriorOptions {
         posterior: NegativeBinomialPosteriorOptions {
             prior: CauchyCoefficientPrior {
                 nuisance: c.nuisance.clone(),
@@ -132,7 +185,13 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
                 adapted_variance: None,
             },
             coefficient: Some(c.coefficient),
-            threshold: Some(number(&c.threshold)?),
+            threshold: c.threshold.as_ref().map(|v| number(v)).transpose()?,
+            analysis: c
+                .analysis
+                .as_ref()
+                .map(Analysis::options)
+                .transpose()?
+                .unwrap_or_default(),
             flip_sign: c.flip_sign.unwrap_or(true),
             ..Default::default()
         },
@@ -145,7 +204,7 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             }
         },
         method: match c.method.as_str() {
-            "general" | "nbinomC*" => RegressionMethod::General,
+            "general" | "nbinomC*" | "nbinomCR" | "nbinomC" => RegressionMethod::General,
             "nbinomR" => RegressionMethod::NegativeBinomialR,
             "betabinR" => RegressionMethod::BetaBinomialR,
             "betabinCR" => RegressionMethod::BetaBinomialCR,
@@ -164,7 +223,14 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
         log_link: c.log_link,
         bounds: (number(&c.bounds[0])?, number(&c.bounds[1])?),
     };
-    if c.method == "nbinomC*" {
+    if c.method != "general" && c.analysis.as_ref().is_some_and(|a| a.kind != "laplace") {
+        options.posterior.analysis.grid_likelihood = c
+            .likelihood
+            .as_ref()
+            .map(|v| likelihood(v).map(|f| RegressionLikelihood::Restricted(Arc::new(f))))
+            .transpose()?;
+    }
+    if c.method.starts_with("nbinomC") {
         let parameter = input.parameters.ok_or("missing NB dispersions")?;
         if parameter.n_cols() != 1 {
             return Err("NB dispersions require one column".into());
@@ -172,21 +238,23 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
         let dispersions = (0..parameter.n_rows())
             .map(|i| parameter.get(i, 0).copied())
             .collect::<Result<Vec<_>, _>>()?;
-        let mut rng = PosteriorRng::from_r_seed(&super::random::state(
-            c.rng_state.as_deref().ok_or("missing random state")?,
-        )?)?;
-        return Ok(fit_negative_binomial_posterior_with_rng(
-            NegativeBinomialPosteriorInput {
-                counts: input.observations,
-                design: input.design,
-                dispersions: &dispersions,
-                offsets: input.offsets,
-                weights: input.weights,
-                mle: input.mle,
-            },
-            &options.posterior,
-            &mut rng,
-        )?);
+        let input = NegativeBinomialPosteriorInput {
+            counts: input.observations,
+            design: input.design,
+            dispersions: &dispersions,
+            offsets: input.offsets,
+            weights: input.weights,
+            mle: input.mle,
+        };
+        let mut posterior = options.posterior;
+        posterior.check_opposite_start = c.method == "nbinomCR";
+        posterior.map_only = c.method != "nbinomCR";
+        return Ok(if let Some(state) = &c.rng_state {
+            let mut rng = PosteriorRng::from_r_seed(&super::random::state(state)?)?;
+            fit_negative_binomial_posterior_with_rng(input, &posterior, &mut rng)?
+        } else {
+            fit_negative_binomial_posterior(input, &posterior)?
+        });
     }
     Ok(if let Some(state) = &c.rng_state {
         let mut rng = PosteriorRng::from_r_seed(&super::random::state(state)?)?;

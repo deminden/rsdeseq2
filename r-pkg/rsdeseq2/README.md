@@ -101,3 +101,10 @@ remain outside this package's implemented scope.
 The Rust core validation summary and benchmark scope are documented in the
 [repository README](../../README.md#validation-and-performance) and
 [benchmark report](../../docs/benchmarks.md).
+
+Local development also supports native apeglm grid sign summaries, scalar
+parameter uncertainty and covariance-based posterior contrasts. The primitive
+engine exposes interval/contrast matrices; `lfcShrink()` keeps its selected-
+coefficient result-table shape. See the
+[posterior analysis scope](../../docs/native-posterior-analysis-development.md)
+for controls, validation and documented original-package grid corrections.

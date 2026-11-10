@@ -8,9 +8,8 @@ use rsdeseq2::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosteriorInput,
         NegativeBinomialPosteriorOptions, PosteriorOffsets, RegressionLikelihood, RegressionMethod,
         RegressionOptimizer, RegressionPosteriorInput, RegressionPosteriorOptions,
-        RestrictedRegressionLikelihood, fit_negative_binomial_posterior,
-        fit_negative_binomial_posterior_with_rng, fit_regression_posterior,
-        fit_regression_posterior_with_rng,
+        fit_negative_binomial_posterior, fit_negative_binomial_posterior_with_rng,
+        fit_regression_posterior, fit_regression_posterior_with_rng,
     },
 };
 fn matrix(v: &Value) -> Result<MatrixView<'_, f64>, String> {
@@ -92,13 +91,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "betabinC*",
         ],
     )?;
-    if choice(
-        field(args, "interval.type"),
-        &["laplace", "HPD", "credible"],
-    )? != "laplace"
-    {
-        return Err("native apeglm grid intervals are not implemented yet".into());
-    }
+    let analysis = super::apeglm_analysis::options(args)?;
     let general = matches!(
         method.as_str(),
         "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC" | "betabinC*"
@@ -111,11 +104,6 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if !general && (optimizer != "BFGS" || !log_link) {
         return Err(
             "native apeglm alternate optimizers/log-link policy are not implemented yet".into(),
-        );
-    }
-    if present(field(args, "contrasts")).is_some() || present(field(args, "param.sd")).is_some() {
-        return Err(
-            "native apeglm contrasts and parameter uncertainty are not implemented yet".into(),
         );
     }
     let counts = matrix(get(args, "Y")?)?;
@@ -209,6 +197,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         .transpose()?;
     let posterior = NegativeBinomialPosteriorOptions {
         prior,
+        analysis,
         coefficient: target,
         threshold,
         flip_sign: field(args, "flip.sign")
@@ -246,18 +235,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         } else if method == "nbinomR" {
             RegressionLikelihood::NegativeBinomial
         } else {
-            let model = get(args, "log.lik")?;
-            match text(get(model, "type")?)? {
-                "negative_binomial" => RegressionLikelihood::NegativeBinomial,
-                "restricted" => {
-                    let (a, e, c) =
-                        super::location_shrinkage::function_parts(get(model, "model")?)?;
-                    RegressionLikelihood::Restricted(std::sync::Arc::new(
-                        RestrictedRegressionLikelihood::new(a, e, c).map_err(|e| e.to_string())?,
-                    ))
-                }
-                _ => return Err("unsupported general likelihood descriptor".into()),
-            }
+            super::apeglm_analysis::likelihood(get(args, "log.lik")?)?
         };
         let bounds = if optimizer == "L-BFGS-B" {
             if let Some(v) = present(field(args, "bounds")) {
@@ -403,6 +381,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "convergence",
             "warnings",
             "random_state",
+            "analysis",
         ],
         vec![
             Value::numbers(summary.mode),
@@ -413,6 +392,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             optional(Some(convergence)),
             Value::new(Data::Text(result.warnings.into_iter().map(Some).collect())),
             super::posterior_rng::encode(result.random_state.as_deref()),
+            super::apeglm_analysis::encode(result.analysis),
         ],
     ))
 }

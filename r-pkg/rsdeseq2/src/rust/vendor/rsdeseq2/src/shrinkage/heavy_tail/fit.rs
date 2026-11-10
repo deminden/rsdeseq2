@@ -62,6 +62,7 @@ pub struct NegativeBinomialPosteriorOptions {
     pub map_only: bool,
     pub check_opposite_start: bool,
     pub hessian_step: f64,
+    pub analysis: super::analysis::PosteriorAnalysisOptions,
 }
 impl Default for NegativeBinomialPosteriorOptions {
     fn default() -> Self {
@@ -74,6 +75,7 @@ impl Default for NegativeBinomialPosteriorOptions {
             map_only: false,
             check_opposite_start: true,
             hessian_step: 1e-3,
+            analysis: Default::default(),
         }
     }
 }
@@ -100,6 +102,7 @@ pub struct NegativeBinomialPosterior {
     pub warnings: Vec<String>,
     /// Advanced random-start state, absent on deterministic fitting routes.
     pub random_state: Option<Vec<i32>>,
+    pub analysis: super::analysis::PosteriorAnalysis,
 }
 /// Numerical columns for frontend presentation, with no frontend arithmetic.
 #[derive(Clone, Debug)]
@@ -279,6 +282,27 @@ pub(super) fn fit_batch(
             "invalid coefficient, multiplier, Hessian step or threshold",
         ));
     }
+    options.analysis.validate(
+        g,
+        p,
+        options.coefficient,
+        options.threshold,
+        options.map_only,
+    )?;
+    if !options.map_only
+        && options.analysis.parameter_standard_errors.is_some()
+        && regression.is_some_and(|(parameters, _)| parameters.is_none_or(|m| m.n_cols() != 1))
+    {
+        return Err(invalid(
+            "parameter uncertainty requires a scalar likelihood parameter",
+        ));
+    }
+    let mut analysis = super::analysis::PosteriorAnalysis::new(
+        &options.analysis,
+        g,
+        options.coefficient,
+        options.map_only,
+    )?;
     let mut prior = options.prior.clone();
     if let Some(mle) = input.mle {
         let coefficient = options
@@ -520,6 +544,33 @@ pub(super) fn fit_batch(
                         });
                     }
                 }
+                if options.analysis.interval.is_some() || options.analysis.contrasts.is_some() {
+                    let density = super::analysis::GridPosteriorRow::new(
+                        &row,
+                        regression,
+                        gene,
+                        dispersion,
+                        &options.analysis,
+                    );
+                    if let Some(summary) = analysis.row(
+                        super::analysis::AnalysisRow {
+                            gene,
+                            mode: &result.par,
+                            covariance: &covariance,
+                            sd: &sd[gene * p..(gene + 1) * p],
+                            coefficient: options.coefficient,
+                            options: &options.analysis,
+                            threshold: options.threshold,
+                            flip_sign: options.flip_sign,
+                        },
+                        |beta, shift| density.value(beta, shift),
+                    )? {
+                        fsr.as_mut().unwrap()[gene] = summary.false_sign_rate;
+                        if let Some(rates) = &mut fsos {
+                            rates[gene] = summary.threshold_rate;
+                        }
+                    }
+                }
             }
         }
         for (j, &value) in result.par.iter().enumerate() {
@@ -545,6 +596,7 @@ pub(super) fn fit_batch(
         false_sign_or_small_rate: fsos,
         threshold_svalues,
         prior,
+        analysis,
         diagnostics,
         warnings,
         random_state: random.as_ref().map(|rng| rng.r_seed()),

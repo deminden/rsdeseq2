@@ -64,3 +64,8 @@ pub use heavy_tail::{
 pub use heavy_tail::{PosteriorRng, PosteriorUniformKind};
 
 pub use heavy_tail::{fit_negative_binomial_posterior_with_rng, fit_regression_posterior_with_rng};
+
+pub use heavy_tail::{
+    PosteriorAnalysis, PosteriorAnalysisOptions, PosteriorGridDiagnostic, PosteriorIntervalKind,
+    PosteriorIntervalOptions,
+};

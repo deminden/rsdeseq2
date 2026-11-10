@@ -145,7 +145,14 @@ pub fn encode(r: NegativeBinomialPosterior, coefficient: usize) -> Value {
     let summary = r
         .coefficient_summary(coefficient, CoefficientScale::Log2)
         .unwrap();
-    json!({"mode":array(r.mode.into_values()),"sd":r.standard_deviation.map(|v|array(v.into_values())),
+    let analysis = &r.analysis;
+    let extra = (analysis.intervals.is_some() || analysis.contrast_mode.is_some()).then(|| json!({
+        "intervals": analysis.intervals.as_ref().map(|m| array(m.as_slice().to_vec())),
+        "contrast_mode": analysis.contrast_mode.as_ref().map(|m| array(m.as_slice().to_vec())),
+        "contrast_sd": analysis.contrast_standard_deviation.as_ref().map(|m| array(m.as_slice().to_vec())),
+        "grid": analysis.grid_diagnostics.iter().map(|d| d.as_ref().map(|d| json!({"monotone":d.monotone,"left":d.outside_left.map(bits),"right":d.outside_right.map(bits),"evaluations":d.evaluations}))).collect::<Vec<_>>()
+    }));
+    let mut result = json!({"mode":array(r.mode.into_values()),"sd":r.standard_deviation.map(|v|array(v.into_values())),
         "fsr":r.false_sign_rate.map(optional),"sign_svalues":r.sign_svalues.map(optional),
         "fsos":r.false_sign_or_small_rate.map(optional),"threshold_svalues":r.threshold_svalues.map(optional),
         "prior_scale":array(vec![r.prior.scale]),"prior_variance":r.prior.adapted_variance.map(|v|array(vec![v])),
@@ -154,7 +161,11 @@ pub fn encode(r: NegativeBinomialPosterior, coefficient: usize) -> Value {
         "summary_mode":array(summary.mode),"summary_sd":optional(summary.standard_deviation),
         "diagnostics":r.diagnostics.into_iter().map(|d|json!({"convergence":d.convergence,
             "function_evaluations":d.function_evaluations,"opposite_start_disagrees":d.opposite_start_disagrees,
-            "laplace_valid":d.laplace_valid})).collect::<Vec<_>>()})
+            "laplace_valid":d.laplace_valid})).collect::<Vec<_>>()});
+    if let Some(extra) = extra {
+        result["analysis"] = extra;
+    }
+    result
 }
 pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
     let priors=input.prior_variance_cases.into_iter().map(|c|{

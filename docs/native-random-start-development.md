@@ -95,8 +95,10 @@ The generators load only original R/apeglm. Fresh paths protect earlier evidence
 The checker reuses accepted count fits and saved original posterior results when
 provided. Deterministic methods remain covered by their unchanged references.
 
-Grid intervals, parameter uncertainty, contrasts, other optimizer/RNG modes,
-advanced ashr methods/options, the final warning/authority audit and combined
+The later [posterior analysis checkpoint](native-posterior-analysis-development.md)
+adds grid intervals, scalar parameter uncertainty and posterior contrasts, while
+preserving every accepted random draw/state and posterior output. Other optimizer/
+RNG modes, advanced ashr methods/options, the final warning/authority audit and combined
 precision/speed/memory/sanitizer/platform/source-bundle checks remain unfinished.
 No unchanged quantification timing or RSS is remeasured here and no optimization
 round is claimed. All work stays local; this is not a release-completion claim.

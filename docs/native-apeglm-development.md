@@ -14,9 +14,10 @@ Current native public methods are `general`, `nbinomR`, `nbinomCR` and MAP-only
 MAP-only random-start `nbinomC*` and `betabinC*` use portable native RNG state.
 General fitting accepts restricted custom likelihood expressions,
 central/noncentral Student-t priors and Gaussian nuisance priors. The general
-and `nbinomR` routes support BFGS and bounded L-BFGS-B. Grid intervals,
-parameter uncertainty, contrasts and
-other optimizer policies still require implementation. Unfinished methods
+and `nbinomR` routes support BFGS and bounded L-BFGS-B. The later
+[posterior analysis checkpoint](native-posterior-analysis-development.md) adds
+grid/Laplace intervals, scalar parameter uncertainty and posterior contrasts.
+Other optimizer policies still require implementation. Unfinished methods
 fail explicitly, with no R calculation fallback. This checkpoint is not a new
 release, and GitHub publication remains unauthorized.
 

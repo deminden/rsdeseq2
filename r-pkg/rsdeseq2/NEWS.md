@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Add shared Rust Laplace/grid intervals, scalar parameter uncertainty and
+  covariance-based posterior contrasts. Restricted grid likelihood expressions
+  support primitive numeric subscripts without executing R functions. Preserve
+  default/random-start output bits and document three original apeglm grid bugs.
+
 * Run default ashr and negative-binomial apeglm shrinkage in shared Rust,
   including prior adaptation, posterior summaries, scale conversion and s-values.
   Restricted ashr likelihood expressions are imported without R execution.
