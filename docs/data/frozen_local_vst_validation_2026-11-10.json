@@ -10,6 +10,36 @@
     "backend_passed": 3,
     "clippy_both_graphs": "passed",
     "direct_frozen_complete_bit_cases": 8,
+    "github_ci": {
+      "R": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "r (current, release)"
+          },
+          {
+            "conclusion": "success",
+            "name": "r (reference, 4.6.2)"
+          }
+        ],
+        "run_id": 42803898206,
+        "source_commit": "5fef4f1bc847bcd356f5edcdb81690632cb9ebdf",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42803898206"
+      },
+      "Rust": {
+        "conclusion": "success",
+        "jobs": [
+          {
+            "conclusion": "success",
+            "name": "rust"
+          }
+        ],
+        "run_id": 42803898692,
+        "source_commit": "5fef4f1bc847bcd356f5edcdb81690632cb9ebdf",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/42803898692"
+      }
+    },
     "gtex_global_gates": 9,
     "gtex_per_contrast_gates": 121,
     "legacy_expression_bit_cases": 188,
@@ -51,6 +81,7 @@
     "final result authority and combined performance/artifact audit"
   ],
   "scope": "Unreleased frozen local VST migration after 0.4.0",
+  "source_implementation_commit": "5fef4f1bc847bcd356f5edcdb81690632cb9ebdf",
   "timing": {
     "discarded_cases": 0,
     "native_initial_matrix_transport": {

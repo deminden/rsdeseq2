@@ -140,8 +140,21 @@ fn build_wald_results_populates_deseq2_shaped_columns() {
     );
     assert_relative_eq!(results.rows[0].lfc_se.unwrap(), 0.5, epsilon = 1e-12);
     assert_relative_eq!(results.rows[0].stat.unwrap(), 4.0, epsilon = 1e-12);
-    assert!(results.rows[0].pvalue.unwrap() < results.rows[1].pvalue.unwrap());
-    assert!(results.rows[0].padj.unwrap() <= results.rows[1].padj.unwrap());
+    assert_relative_eq!(
+        results.rows[0].pvalue.unwrap(),
+        0.00006334248366623996,
+        epsilon = 1e-15
+    );
+    assert_relative_eq!(
+        results.rows[1].pvalue.unwrap(),
+        0.31731050786291415,
+        epsilon = 1e-15
+    );
+    assert_eq!(
+        results.rows[0].padj,
+        results.rows[0].pvalue.map(|p| 2.0 * p)
+    );
+    assert_eq!(results.rows[1].padj, results.rows[1].pvalue);
     assert_eq!(results.rows[0].dispersion, Some(0.1));
     assert_eq!(results.rows[1].converged, Some(false));
     assert_eq!(
@@ -382,8 +395,11 @@ fn build_wald_contrast_results_uses_contrast_columns() {
     assert_eq!(results.rows[0].stat, Some(2.5));
     assert_eq!(results.rows[0].dispersion, Some(0.1));
     assert_eq!(results.rows[1].converged, Some(false));
-    assert!(results.rows[0].padj.is_some());
-    assert!(results.rows[1].padj.is_some());
+    assert_eq!(
+        results.rows[0].padj,
+        contrast.wald.pvalue[0].map(|p| 2.0 * p)
+    );
+    assert_eq!(results.rows[1].padj, contrast.wald.pvalue[1]);
     assert_eq!(results.metadata.test_type, Some(TestType::Wald));
     assert_eq!(results.metadata.result_name.as_deref(), Some("contrast"));
     assert_eq!(

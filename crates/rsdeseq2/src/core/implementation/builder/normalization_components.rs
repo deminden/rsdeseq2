@@ -184,7 +184,7 @@ impl DeseqBuilder {
             &glm_fit.hat_diagonal,
             input.design,
         )?;
-        let mut results = build_wald_results_from_wald(
+        let mut results = build_wald_results_from_wald_unadjusted(
             input.base_mean,
             &glm_fit,
             input.coefficient,
@@ -265,7 +265,7 @@ impl DeseqBuilder {
             &glm_fit.hat_diagonal,
             input.design,
         )?;
-        let mut results = build_wald_contrast_results(
+        let mut results = build_wald_contrast_results_unadjusted(
             base_mean,
             &glm_fit,
             &wald_contrast,
@@ -364,7 +364,7 @@ impl DeseqBuilder {
             &full_fit.hat_diagonal,
             input.full_design,
         )?;
-        let mut results = build_lrt_results(
+        let mut results = build_lrt_results_unadjusted(
             input.base_mean,
             &full_fit,
             &lrt,

@@ -27,7 +27,8 @@ fn build_lrt_results_uses_full_model_beta_and_lrt_pvalue() {
     assert_eq!(results.rows[0].stat, Some(4.0));
     assert_eq!(results.rows[0].pvalue, Some(0.04550026389635853));
     assert_eq!(results.rows[0].dispersion, Some(0.1));
-    assert!(results.rows[0].padj.unwrap() <= results.rows[1].padj.unwrap());
+    assert_eq!(results.rows[0].padj, Some(0.09100052779271706));
+    assert_eq!(results.rows[1].padj, Some(0.31731050786291415));
     assert_eq!(results.metadata.test_type, Some(TestType::Lrt));
     assert_eq!(results.metadata.result_name.as_deref(), Some("Intercept"));
     assert_eq!(
@@ -131,7 +132,8 @@ fn build_lrt_contrast_results_uses_contrast_effect_but_lrt_test_columns() {
     assert_eq!(results.rows[0].dispersion, Some(0.1));
     assert_eq!(results.rows[1].log2_fold_change, Some(-1.0));
     assert_eq!(results.rows[1].stat, Some(1.0));
-    assert!(results.rows[0].padj.unwrap() <= results.rows[1].padj.unwrap());
+    assert_eq!(results.rows[0].padj, Some(0.09100052779271706));
+    assert_eq!(results.rows[1].padj, Some(0.31731050786291415));
     assert_eq!(results.rows[1].converged, Some(false));
     assert_eq!(results.metadata.test_type, Some(TestType::Lrt));
     assert_eq!(results.metadata.result_name.as_deref(), Some("contrast"));

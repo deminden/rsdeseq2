@@ -17,5 +17,8 @@ pub use replacement_policy::{ReplacementRows, RowFlags};
 pub use request::ResultRequest;
 
 pub(crate) use implementation::{
-    build_lrt_projection_results_view, build_wald_contrast_results_view, mask_cooks_policy_rows,
+    build_lrt_projection_results_unadjusted_view, build_lrt_projection_results_view,
+    build_lrt_results_unadjusted, build_wald_contrast_results_unadjusted,
+    build_wald_contrast_results_view, build_wald_results_from_wald_unadjusted,
+    mask_cooks_policy_rows,
 };

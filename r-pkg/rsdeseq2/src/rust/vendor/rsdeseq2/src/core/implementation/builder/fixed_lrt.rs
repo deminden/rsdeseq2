@@ -162,7 +162,7 @@ impl DeseqBuilder {
         })?;
         let view = crate::glm::inference::GlmInferenceView::from(&lrt_output.full_fit);
         let contrast_output = view.estimates()?.project_contrast(contrast)?;
-        lrt_output.results = build_lrt_projection_results_view(
+        lrt_output.results = build_lrt_projection_results_unadjusted_view(
             &stages.base_mean,
             &view,
             &lrt_output.lrt,
@@ -631,7 +631,7 @@ impl DeseqBuilder {
         })?;
         let view = crate::glm::inference::GlmInferenceView::from(&lrt_output.full_fit);
         let contrast_output = view.estimates()?.project_contrast(&numeric_contrast)?;
-        lrt_output.results = build_lrt_projection_results_view(
+        lrt_output.results = build_lrt_projection_results_unadjusted_view(
             &stages.base_mean,
             &view,
             &lrt_output.lrt,

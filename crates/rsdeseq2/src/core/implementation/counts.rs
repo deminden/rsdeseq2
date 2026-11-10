@@ -47,8 +47,8 @@ use crate::options::{
     TestType,
 };
 use crate::results::{
-    build_lrt_projection_results_view, build_lrt_results, build_wald_contrast_results,
-    build_wald_results_from_wald, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
+    build_lrt_projection_results_unadjusted_view, build_lrt_results_unadjusted, build_wald_contrast_results_unadjusted,
+    build_wald_results_from_wald_unadjusted, resolve_cooks_cutoff, DeseqResultRow, DeseqResults,
 };
 use crate::transform::{
     fast_vst_eligible_count as count_fast_vst_eligible_rows,
