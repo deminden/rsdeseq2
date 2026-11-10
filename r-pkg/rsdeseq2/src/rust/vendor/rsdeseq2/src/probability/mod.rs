@@ -4,7 +4,7 @@ mod f_quantile;
 mod gamma;
 mod normal;
 mod normal_log;
-mod quadrature;
+pub(crate) mod quadrature;
 mod student_t;
 
 pub(crate) use f_quantile::f_99_quantile;

@@ -5,7 +5,8 @@ use super::{
 };
 use crate::DeseqError;
 
-/// Supported fixed-mixture families under a normal observation likelihood.
+/// Fixed-mixture families with a normal observation likelihood by default.
+/// Uniform components may explicitly select a Student-t likelihood.
 #[derive(Clone, Debug)]
 pub enum FixedMixture {
     Normal(NormalMixture),
@@ -49,6 +50,24 @@ impl FixedMixture {
                 FixedMixturePosterior::TruncatedNormal(p.posterior(estimate, standard_error)?)
             }
         })
+    }
+    pub(super) fn posterior_at(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        row: usize,
+        observations: usize,
+    ) -> Result<FixedMixturePosterior, DeseqError> {
+        if let Self::TruncatedNormal(p) = self {
+            Ok(FixedMixturePosterior::TruncatedNormal(p.posterior_at(
+                estimate,
+                standard_error,
+                row,
+                observations,
+            )?))
+        } else {
+            self.posterior(estimate, standard_error)
+        }
     }
     /// Condition a complete observation vector, retaining any family-specific
     /// batch-shape semantics required by the established numerical contract.

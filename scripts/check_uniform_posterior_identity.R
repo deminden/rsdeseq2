@@ -11,7 +11,7 @@ referencePath<-if(length(args)==4L)args[[4L]]else file.path(root,'crates/rsdeseq
 reference<-jsonlite::fromJSON(referencePath,simplifyVector=FALSE)
 stopifnot(identical(reference$source$input_encoding,'f64_bits'))
 truncated<-!is.null(reference$cases[[1L]]$means)
-fields<-c('weights',if(truncated)c('means','sds'),'lower','upper','estimates','standard_errors','thresholds')
+fields<-c('weights',if(!is.null(reference$cases[[1L]]$df))'df',if(truncated)c('means','sds'),'lower','upper','estimates','standard_errors','thresholds')
 cases<-lapply(reference$cases,function(c)c[c('name',fields)])
 path<-file.path(out,'input.json');jsonlite::write_json(setNames(list(cases),if(truncated)'truncated_cases'else'uniform_cases'),path,auto_unbox=TRUE,null='null',digits=NA)
 output<-system2(driver,shQuote(normalizePath(path)),stdout=TRUE,stderr=TRUE)

@@ -9,6 +9,10 @@ mod factor_expansion;
 mod formula;
 #[path = "evaluate_r_interface/frozen_local.rs"]
 mod frozen_local;
+#[path = "evaluate_r_interface/likelihood.rs"]
+mod likelihood;
+#[path = "evaluate_r_interface/location_shrinkage.rs"]
+mod location_shrinkage;
 #[path = "evaluate_r_interface/mixture_fit.rs"]
 mod mixture_fit;
 #[path = "evaluate_r_interface/mixture_grid.rs"]
@@ -400,6 +404,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 enum Input {
     Uniform(uniform::Input),
     MixtureGrid(mixture_grid::Input),
+    LocationShrinkage(location_shrinkage::Input),
     NormalLog(normal_log::Input),
     MixtureFit(mixture_fit::Input),
     Posterior(posterior::Input),
@@ -423,6 +428,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let result = match input {
         Input::Uniform(input) => uniform::evaluate(input)?,
         Input::MixtureGrid(input) => mixture_grid::evaluate(input)?,
+        Input::LocationShrinkage(input) => location_shrinkage::evaluate(input)?,
         Input::NormalLog(input) => normal_log::evaluate(input)?,
         Input::MixtureFit(input) => mixture_fit::evaluate(input)?,
         Input::Posterior(input) => posterior::evaluate(input)?,

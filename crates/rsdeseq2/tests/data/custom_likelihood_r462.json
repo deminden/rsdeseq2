@@ -1,0 +1,1534 @@
+{
+  "source": {
+    "R": "4.6.2",
+    "ashr": "2.2.63",
+    "input_encoding": "f64_bits",
+    "cdf_encoding": "cutoff_major"
+  },
+  "cases": [
+    {
+      "name": "logistic",
+      "custom_likelihood": {
+        "name": "custom_logistic",
+        "log_cdf": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "-",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log1p",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "exp",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "/",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "-",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "(",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "call",
+                                                "function_name": "-",
+                                                "arguments": [
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "symbol",
+                                                      "name": "x"
+                                                    }
+                                                  },
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "symbol",
+                                                      "name": "shift"
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "symbol",
+                                    "name": "scale"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3ff0000000000000"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            "shift": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "0000000000000000"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "log_density": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "-",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "-",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "/",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "-",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "(",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "-",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "x"
+                                              }
+                                            },
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "shift"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "symbol",
+                              "name": "scale"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "*",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "literal",
+                              "value": {
+                                "type": "number",
+                                "integer": false,
+                                "values": [
+                                  "4000000000000000"
+                                ],
+                                "dimensions": null,
+                                "names": null,
+                                "dimnames": [
+                                  null,
+                                  null
+                                ],
+                                "attributes": []
+                              }
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "log1p",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "exp",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "/",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "call",
+                                                "function_name": "-",
+                                                "arguments": [
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "call",
+                                                      "function_name": "(",
+                                                      "arguments": [
+                                                        {
+                                                          "name": null,
+                                                          "expression": {
+                                                            "type": "call",
+                                                            "function_name": "-",
+                                                            "arguments": [
+                                                              {
+                                                                "name": null,
+                                                                "expression": {
+                                                                  "type": "symbol",
+                                                                  "name": "x"
+                                                                }
+                                                              },
+                                                              {
+                                                                "name": null,
+                                                                "expression": {
+                                                                  "type": "symbol",
+                                                                  "name": "shift"
+                                                                }
+                                                              }
+                                                            ]
+                                                          }
+                                                        }
+                                                      ]
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "scale"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "symbol",
+                        "name": "scale"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3ff0000000000000"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            "shift": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "0000000000000000"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "first": null,
+        "second": null
+      },
+      "estimates": [
+        "bits:c010000000000000",
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3fd3333333333333",
+        "bits:4000000000000000",
+        "bits:4014000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3ff0000000000000",
+        "bits:4000000000000000",
+        "bits:3fd999999999999a",
+        "bits:3ff0000000000000"
+      ],
+      "thresholds": [
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3ff0000000000000"
+      ],
+      "family": "uniform",
+      "point_mass": true,
+      "nullweight": "bits:4024000000000000",
+      "scales": null,
+      "mode": "bits:0000000000000000",
+      "range": [
+        "bits:fff0000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "alpha": "bits:0000000000000000",
+      "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+      "observation_weights": null,
+      "fixed_prior": true,
+      "df": null,
+      "supplied_prior": {
+        "component_class": "unimix",
+        "weights": [
+          "bits:3fc999999999999a",
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000"
+        ],
+        "means": null,
+        "sds": null,
+        "lower": [
+          "bits:0000000000000000",
+          "bits:bfd999999999999a",
+          "bits:c008000000000000"
+        ],
+        "upper": [
+          "bits:0000000000000000",
+          "bits:3fd999999999999a",
+          "bits:4008000000000000"
+        ]
+      },
+      "posterior_mean": [
+        "-2.6918076550885028",
+        "-0.3710724772612578",
+        "1.3383484788033615e-17",
+        "0.041335477168814624",
+        "1.6922334256571647",
+        "1.4638645025969728"
+      ],
+      "posterior_sd": [
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA"
+      ],
+      "negative_probability": [
+        "0.99942166360767504",
+        "0.53613770657176552",
+        "0.37465201281718996",
+        "0.3795719288823019",
+        "0.024839636211272983",
+        "0.10191263531632186"
+      ],
+      "positive_probability": [
+        "0.00020260337209621987",
+        "0.22949558608345302",
+        "0.37465201281718985",
+        "0.40384018948467676",
+        "0.93657757184120372",
+        "0.79797406239167934"
+      ],
+      "local_false_discovery_rate": [
+        "0.00037573302022874305",
+        "0.23436670734478146",
+        "0.25069597436562019",
+        "0.2165878816330214",
+        "0.038582791947523301",
+        "0.10011330229199883"
+      ],
+      "local_false_sign_rate": [
+        "0.00057833639232496292",
+        "0.46386229342823448",
+        "0.62534798718281004",
+        "0.5961598105153233",
+        "0.063422428158796285",
+        "0.20202593760832069"
+      ],
+      "svalues": [
+        "0.00057833639232496292",
+        "0.1824722488969191",
+        "0.32523279888096829",
+        "0.26520976122059992",
+        "0.032000382275560624",
+        "0.088675567386480636"
+      ],
+      "qvalues": [
+        "0.00037573302022874305",
+        "0.11800528324751074",
+        "0.14012039843386231",
+        "0.088914927223193066",
+        "0.019479262483876023",
+        "0.046357275753250292"
+      ],
+      "cdf": [
+        "0.99756169638404568",
+        "0.19535836336001366",
+        "0.09255509365205887",
+        "0.13205044453382123",
+        "0.00053108148847897611",
+        "0.01341052676149293",
+        "0.99979739662790379",
+        "0.770504413916547",
+        "0.62534798718281015",
+        "0.5961598105153233",
+        "0.063422428158796285",
+        "0.20202593760832069",
+        "0.99999832663980026",
+        "0.97763388973624188",
+        "0.90744490634794106",
+        "0.84934039034746656",
+        "0.17948074117227975",
+        "0.36490592957851509"
+      ],
+      "log_likelihood": "-18.062299034622463",
+      "warnings": []
+    },
+    {
+      "name": "shifted_logistic",
+      "custom_likelihood": {
+        "name": "custom_logistic",
+        "log_cdf": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "-",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log1p",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "exp",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "/",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "-",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "(",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "call",
+                                                "function_name": "-",
+                                                "arguments": [
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "symbol",
+                                                      "name": "x"
+                                                    }
+                                                  },
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "symbol",
+                                                      "name": "shift"
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "symbol",
+                                    "name": "scale"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fe6666666666666"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            "shift": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fc999999999999a"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "log_density": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "-",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "-",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "/",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "-",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "(",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "-",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "x"
+                                              }
+                                            },
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "shift"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "symbol",
+                              "name": "scale"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "*",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "literal",
+                              "value": {
+                                "type": "number",
+                                "integer": false,
+                                "values": [
+                                  "4000000000000000"
+                                ],
+                                "dimensions": null,
+                                "names": null,
+                                "dimnames": [
+                                  null,
+                                  null
+                                ],
+                                "attributes": []
+                              }
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "log1p",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "exp",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "/",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "call",
+                                                "function_name": "-",
+                                                "arguments": [
+                                                  {
+                                                    "name": null,
+                                                    "expression": {
+                                                      "type": "call",
+                                                      "function_name": "(",
+                                                      "arguments": [
+                                                        {
+                                                          "name": null,
+                                                          "expression": {
+                                                            "type": "call",
+                                                            "function_name": "-",
+                                                            "arguments": [
+                                                              {
+                                                                "name": null,
+                                                                "expression": {
+                                                                  "type": "symbol",
+                                                                  "name": "x"
+                                                                }
+                                                              },
+                                                              {
+                                                                "name": null,
+                                                                "expression": {
+                                                                  "type": "symbol",
+                                                                  "name": "shift"
+                                                                }
+                                                              }
+                                                            ]
+                                                          }
+                                                        }
+                                                      ]
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "scale"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "symbol",
+                        "name": "scale"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fe6666666666666"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            },
+            "shift": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fc999999999999a"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "first": null,
+        "second": null
+      },
+      "estimates": [
+        "bits:c010000000000000",
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3fd3333333333333",
+        "bits:4000000000000000",
+        "bits:4014000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3ff0000000000000",
+        "bits:4000000000000000",
+        "bits:3fd999999999999a",
+        "bits:3ff0000000000000"
+      ],
+      "thresholds": [
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3ff0000000000000"
+      ],
+      "family": "uniform",
+      "point_mass": true,
+      "nullweight": "bits:4024000000000000",
+      "scales": null,
+      "mode": "bits:0000000000000000",
+      "range": [
+        "bits:fff0000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "alpha": "bits:0000000000000000",
+      "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+      "observation_weights": null,
+      "fixed_prior": true,
+      "df": null,
+      "supplied_prior": {
+        "component_class": "unimix",
+        "weights": [
+          "bits:3fc999999999999a",
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000"
+        ],
+        "means": null,
+        "sds": null,
+        "lower": [
+          "bits:0000000000000000",
+          "bits:bfd999999999999a",
+          "bits:c008000000000000"
+        ],
+        "upper": [
+          "bits:0000000000000000",
+          "bits:3fd999999999999a",
+          "bits:4008000000000000"
+        ]
+      },
+      "posterior_mean": [
+        "-2.7892588249032508",
+        "-0.55786554990825576",
+        "-0.06053797245640602",
+        "-0.021319888655019388",
+        "1.8425918540035007",
+        "2.0170103186258741"
+      ],
+      "posterior_sd": [
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA"
+      ],
+      "negative_probability": [
+        "0.9999897753314988",
+        "0.65058948422532159",
+        "0.39190747482337984",
+        "0.39152395253241551",
+        "0.0046137507900199607",
+        "0.038532841179684738"
+      ],
+      "positive_probability": [
+        "3.0375449101445358e-06",
+        "0.15121337159084924",
+        "0.33183321733087279",
+        "0.37778035498030377",
+        "0.98644988010911805",
+        "0.91663648405840203"
+      ],
+      "local_false_discovery_rate": [
+        "7.1871235910574253e-06",
+        "0.19819714418382917",
+        "0.27625930784574737",
+        "0.23069569248728078",
+        "0.0089363691008620353",
+        "0.044830674761913283"
+      ],
+      "local_false_sign_rate": [
+        "1.0224668501201961e-05",
+        "0.34941051577467841",
+        "0.60809252517662016",
+        "0.60847604746758455",
+        "0.013550119890881996",
+        "0.083363515941598021"
+      ],
+      "svalues": [
+        "1.0224668501201961e-05",
+        "0.11158359406891491",
+        "0.21088538029045595",
+        "0.27715049148664406",
+        "0.006780172279691599",
+        "0.032307953500327072"
+      ],
+      "qvalues": [
+        "7.1871235910574253e-06",
+        "0.06299284379254888",
+        "0.12648772925053728",
+        "0.096533413531495263",
+        "0.0044717781122265467",
+        "0.017924743662122124"
+      ],
+      "cdf": [
+        "0.9999006648681743",
+        "0.27412676057504881",
+        "0.073616690983704033",
+        "0.12541774241153991",
+        "2.9350335686130851e-05",
+        "0.0029590427315010601",
+        "0.99999696245508984",
+        "0.84878662840915076",
+        "0.66816678266912721",
+        "0.62221964501969629",
+        "0.013550119890881996",
+        "0.083363515941598021",
+        "0.99999999462396039",
+        "0.99385217826724503",
+        "0.95317049517772023",
+        "0.88432765193826368",
+        "0.063161766967703037",
+        "0.17002817840351783"
+      ],
+      "log_likelihood": "-20.054386130534684",
+      "warnings": []
+    },
+    {
+      "name": "laplace",
+      "custom_likelihood": {
+        "name": "custom_laplace",
+        "log_cdf": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "ifelse",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "<",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "symbol",
+                        "name": "x"
+                      }
+                    },
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "literal",
+                        "value": {
+                          "type": "number",
+                          "integer": false,
+                          "values": [
+                            "0000000000000000"
+                          ],
+                          "dimensions": null,
+                          "names": null,
+                          "dimnames": [
+                            null,
+                            null
+                          ],
+                          "attributes": []
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "+",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "log",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "literal",
+                              "value": {
+                                "type": "number",
+                                "integer": false,
+                                "values": [
+                                  "3fe0000000000000"
+                                ],
+                                "dimensions": null,
+                                "names": null,
+                                "dimnames": [
+                                  null,
+                                  null
+                                ],
+                                "attributes": []
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "/",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "symbol",
+                              "name": "x"
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "symbol",
+                              "name": "scale"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log1p",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "*",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "-",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "literal",
+                                    "value": {
+                                      "type": "number",
+                                      "integer": false,
+                                      "values": [
+                                        "3fe0000000000000"
+                                      ],
+                                      "dimensions": null,
+                                      "names": null,
+                                      "dimnames": [
+                                        null,
+                                        null
+                                      ],
+                                      "attributes": []
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "exp",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "call",
+                                    "function_name": "/",
+                                    "arguments": [
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "call",
+                                          "function_name": "-",
+                                          "arguments": [
+                                            {
+                                              "name": null,
+                                              "expression": {
+                                                "type": "symbol",
+                                                "name": "x"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "name": null,
+                                        "expression": {
+                                          "type": "symbol",
+                                          "name": "scale"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fe999999999999a"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "log_density": {
+          "arguments": [
+            "x"
+          ],
+          "expression": {
+            "type": "call",
+            "function_name": "-",
+            "arguments": [
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "/",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "-",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "call",
+                              "function_name": "abs",
+                              "arguments": [
+                                {
+                                  "name": null,
+                                  "expression": {
+                                    "type": "symbol",
+                                    "name": "x"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "symbol",
+                        "name": "scale"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": null,
+                "expression": {
+                  "type": "call",
+                  "function_name": "log",
+                  "arguments": [
+                    {
+                      "name": null,
+                      "expression": {
+                        "type": "call",
+                        "function_name": "*",
+                        "arguments": [
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "literal",
+                              "value": {
+                                "type": "number",
+                                "integer": false,
+                                "values": [
+                                  "4000000000000000"
+                                ],
+                                "dimensions": null,
+                                "names": null,
+                                "dimnames": [
+                                  null,
+                                  null
+                                ],
+                                "attributes": []
+                              }
+                            }
+                          },
+                          {
+                            "name": null,
+                            "expression": {
+                              "type": "symbol",
+                              "name": "scale"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "constants": {
+            "scale": {
+              "type": "number",
+              "integer": false,
+              "values": [
+                "3fe999999999999a"
+              ],
+              "dimensions": null,
+              "names": null,
+              "dimnames": [
+                null,
+                null
+              ],
+              "attributes": []
+            }
+          }
+        },
+        "first": null,
+        "second": null
+      },
+      "estimates": [
+        "bits:c010000000000000",
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3fd3333333333333",
+        "bits:4000000000000000",
+        "bits:4014000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3ff0000000000000",
+        "bits:4000000000000000",
+        "bits:3fd999999999999a",
+        "bits:3ff0000000000000"
+      ],
+      "thresholds": [
+        "bits:bff0000000000000",
+        "bits:0000000000000000",
+        "bits:3ff0000000000000"
+      ],
+      "family": "uniform",
+      "point_mass": true,
+      "nullweight": "bits:4024000000000000",
+      "scales": null,
+      "mode": "bits:0000000000000000",
+      "range": [
+        "bits:fff0000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "alpha": "bits:0000000000000000",
+      "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+      "observation_weights": null,
+      "fixed_prior": true,
+      "df": null,
+      "supplied_prior": {
+        "component_class": "unimix",
+        "weights": [
+          "bits:3fc999999999999a",
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000"
+        ],
+        "means": null,
+        "sds": null,
+        "lower": [
+          "bits:0000000000000000",
+          "bits:bfd999999999999a",
+          "bits:c008000000000000"
+        ],
+        "upper": [
+          "bits:0000000000000000",
+          "bits:3fd999999999999a",
+          "bits:4008000000000000"
+        ]
+      },
+      "posterior_mean": [
+        "-2.7596771038865033",
+        "-0.52068661784262282",
+        "0",
+        "0.08127943134414603",
+        "1.9307443084834315",
+        "1.8718497854451566"
+      ],
+      "posterior_sd": [
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA",
+        "NA"
+      ],
+      "negative_probability": [
+        "0.99994541103040524",
+        "0.67095298851792351",
+        "0.32340867671064544",
+        "0.31823663766967469",
+        "0.0040675357258359709",
+        "0.054736708437370593"
+      ],
+      "positive_probability": [
+        "1.7327016897046051e-05",
+        "0.14295703333869114",
+        "0.32340867671064555",
+        "0.42261884572430852",
+        "0.98868736806760826",
+        "0.8854873580671454"
+      ],
+      "local_false_discovery_rate": [
+        "3.7261952697713844e-05",
+        "0.18608997814338535",
+        "0.35318264657870901",
+        "0.25914451660601678",
+        "0.0072450962065558249",
+        "0.059775933495484018"
+      ],
+      "local_false_sign_rate": [
+        "5.4588969594759895e-05",
+        "0.32904701148207649",
+        "0.67659132328935445",
+        "0.57738115427569148",
+        "0.011312631932391796",
+        "0.11451264193285461"
+      ],
+      "svalues": [
+        "5.4588969594759895e-05",
+        "0.11373171857922942",
+        "0.28481655864699396",
+        "0.20646160571852185",
+        "0.0056836104509932778",
+        "0.041959954278280392"
+      ],
+      "qvalues": [
+        "3.7261952697713844e-05",
+        "0.063287067449530721",
+        "0.14424590549714145",
+        "0.10245855728082794",
+        "0.0036411790796267692",
+        "0.022352763884912519"
+      ],
+      "cdf": [
+        "0.99963678779569232",
+        "0.25167507992700927",
+        "0.030960820896528858",
+        "0.065979310266159358",
+        "4.2361705979739203e-05",
+        "0.0052400988236655267",
+        "0.99998267298310295",
+        "0.85704296666130886",
+        "0.67659132328935445",
+        "0.57738115427569148",
+        "0.011312631932391796",
+        "0.11451264193285461",
+        "0.9999999422435002",
+        "0.99292398908547685",
+        "0.96903917910347126",
+        "0.9040006700203076",
+        "0.043158634307158314",
+        "0.22230037956996532"
+      ],
+      "log_likelihood": "-19.817954236896263",
+      "warnings": [
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced",
+        "NaNs produced"
+      ]
+    }
+  ]
+}

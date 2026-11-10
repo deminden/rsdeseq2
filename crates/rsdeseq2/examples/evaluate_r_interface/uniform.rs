@@ -10,6 +10,7 @@ pub struct Input {
 #[derive(Deserialize)]
 struct Case {
     name: String,
+    df: Option<String>,
     weights: Vec<String>,
     means: Option<Vec<String>>,
     sds: Option<Vec<String>>,
@@ -33,7 +34,13 @@ pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
                 lower,
                 upper,
             )?),
-            (None, None) => FixedMixture::Uniform(UniformMixture::new(weights, lower, upper)?),
+            (None, None) => {
+                let mut prior = UniformMixture::new(weights, lower, upper)?;
+                if let Some(df) = c.df {
+                    prior = prior.with_student_t(super::parse_numeric_input(&df)?)?;
+                }
+                FixedMixture::Uniform(prior)
+            }
             _ => return Err("truncated mixture requires both means and SDs".into()),
         };
         let estimates = super::parse_numeric_inputs(&c.estimates)?;

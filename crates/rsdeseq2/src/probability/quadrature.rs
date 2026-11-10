@@ -2,7 +2,7 @@
 
 // Positive nodes/weights of the 16-point Gauss-Legendre rule, generated using
 // 90-digit Legendre recurrence/Newton iteration, then rounded to f64.
-const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
+pub(crate) const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
     (0.9894009349916499, 0.027152459411754096),
     (0.9445750230732326, 0.062253523938647894),
     (0.8656312023878318, 0.09515851168249279),
