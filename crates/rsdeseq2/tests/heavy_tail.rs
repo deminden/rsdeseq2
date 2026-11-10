@@ -2,6 +2,9 @@ use std::error::Error;
 #[allow(dead_code)]
 #[path = "../examples/evaluate_r_interface/heavy_tail.rs"]
 mod heavy_tail;
+#[allow(dead_code)]
+#[path = "../examples/evaluate_r_interface/random.rs"]
+mod random;
 use rsdeseq2::shrinkage::estimate_cauchy_prior_variance;
 fn bits(x: f64) -> String {
     format!("{:016x}", x.to_bits())

@@ -98,6 +98,8 @@ pub struct NegativeBinomialPosterior {
     pub diagnostics: Vec<PosteriorMapDiagnostic>,
     /// Native fitting warnings in batch/phase order, for frontend presentation.
     pub warnings: Vec<String>,
+    /// Advanced random-start state, absent on deterministic fitting routes.
+    pub random_state: Option<Vec<i32>>,
 }
 /// Numerical columns for frontend presentation, with no frontend arithmetic.
 #[derive(Clone, Debug)]
@@ -190,7 +192,19 @@ pub fn fit_negative_binomial_posterior(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
-    fit_batch(input, options, None)
+    fit_batch(input, options, None, None)
+}
+/// MAP-only random-start fit. One shared N(0,0.5^2) vector is drawn for
+/// the entire batch. On a later fitting error the borrowed RNG remains advanced.
+pub fn fit_negative_binomial_posterior_with_rng(
+    input: NegativeBinomialPosteriorInput<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+    rng: &mut super::random::PosteriorRng,
+) -> Result<NegativeBinomialPosterior, DeseqError> {
+    let mut options = options.clone();
+    options.map_only = true;
+    options.check_opposite_start = false;
+    fit_batch(input, &options, None, Some(rng))
 }
 pub(super) fn fit_batch(
     input: NegativeBinomialPosteriorInput<'_>,
@@ -199,6 +213,7 @@ pub(super) fn fit_batch(
         Option<MatrixView<'_, f64>>,
         &super::regression::RegressionPosteriorOptions,
     )>,
+    mut random: Option<&mut super::random::PosteriorRng>,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
     let g = input.counts.n_rows();
     let n = input.counts.n_cols();
@@ -303,6 +318,7 @@ pub(super) fn fit_batch(
     let mut diagnostics = Vec::with_capacity(g);
     let mut warnings = vec![];
     let mut second_warnings = vec![];
+    let shared_initial = random.as_deref_mut().map(|rng| rng.start_vector(p));
     for gene in 0..g {
         let counts = (0..n)
             .map(|i| *input.counts.at(gene, i))
@@ -346,9 +362,11 @@ pub(super) fn fit_batch(
             size: 1.0 / dispersion,
             prior: &prior,
         };
-        let initial = (0..p)
-            .map(|j| if j % 2 == 0 { 0.1 } else { -0.1 })
-            .collect::<Vec<_>>();
+        let initial = shared_initial.clone().unwrap_or_else(|| {
+            (0..p)
+                .map(|j| if j % 2 == 0 { 0.1 } else { -0.1 })
+                .collect::<Vec<_>>()
+        });
         let general = regression
             .filter(|(_, o)| o.method == super::regression::RegressionMethod::General)
             .map(|(parameters, config)| super::regression::GeneralRow {
@@ -529,5 +547,6 @@ pub(super) fn fit_batch(
         prior,
         diagnostics,
         warnings,
+        random_state: random.as_ref().map(|rng| rng.r_seed()),
     })
 }

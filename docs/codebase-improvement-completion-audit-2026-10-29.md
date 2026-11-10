@@ -18,6 +18,11 @@ three specialized logit methods, corrects shared BFGS stopping policies and
 transports native optimizer warnings. Its original-R warning differences are
 recorded explicitly; advanced options and combined completion checks remain open.
 
+The later [random-start checkpoint](native-random-start-development.md) adds
+portable native RNG state and both MAP-only random-start methods. Direct/wrapped
+posterior, state and error-lifecycle evidence is recorded separately; legacy RNG
+modes, advanced options and the final combined gates remain unfinished.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

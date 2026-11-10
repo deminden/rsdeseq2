@@ -13,6 +13,9 @@ The [beta-binomial checkpoint](native-beta-binomial-development.md) adds three
 logit methods, saturated-row optimizer checks and explicit native warning
 comparisons. Source warning counts and failure-reason wording can differ near
 floating-point plateaus; these differences remain visible in the report.
+The [random-start checkpoint](native-random-start-development.md) adds frozen
+uniform/normal/state tables, 164 posterior profiles and public-session state
+checks, including error handling and integer-NA state-word bits.
 
 ## Accepted benchmark runs
 

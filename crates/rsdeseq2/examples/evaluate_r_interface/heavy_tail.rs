@@ -6,7 +6,8 @@ use rsdeseq2::{
     shrinkage::{
         CauchyCoefficientPrior, CoefficientMle, CoefficientScale, NegativeBinomialPosterior,
         NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions, PosteriorOffsets,
-        estimate_cauchy_prior_variance, fit_negative_binomial_posterior,
+        PosteriorRng, estimate_cauchy_prior_variance, fit_negative_binomial_posterior,
+        fit_negative_binomial_posterior_with_rng,
     },
 };
 use serde::Deserialize;
@@ -55,6 +56,7 @@ pub struct Case {
     pub threshold: String,
     pub flip_sign: bool,
     pub map_only: bool,
+    pub rng_state: Option<Vec<String>>,
 }
 pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
     let y = numbers(&c.counts.values)?;
@@ -130,7 +132,12 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             })
             .transpose()?,
     };
-    Ok(fit_negative_binomial_posterior(input, &options)?)
+    Ok(if let Some(state) = &c.rng_state {
+        let mut rng = PosteriorRng::from_r_seed(&super::random::state(state)?)?;
+        fit_negative_binomial_posterior_with_rng(input, &options, &mut rng)?
+    } else {
+        fit_negative_binomial_posterior(input, &options)?
+    })
 }
 pub fn encode(r: NegativeBinomialPosterior, coefficient: usize) -> Value {
     let array = |v: Vec<f64>| v.into_iter().map(bits).collect::<Vec<_>>();
@@ -143,6 +150,7 @@ pub fn encode(r: NegativeBinomialPosterior, coefficient: usize) -> Value {
         "fsos":r.false_sign_or_small_rate.map(optional),"threshold_svalues":r.threshold_svalues.map(optional),
         "prior_scale":array(vec![r.prior.scale]),"prior_variance":r.prior.adapted_variance.map(|v|array(vec![v])),
         "nuisance":r.prior.nuisance,"warnings":r.warnings,
+        "random_state":r.random_state.as_ref().map(|v|super::random::encode_state(v)),
         "summary_mode":array(summary.mode),"summary_sd":optional(summary.standard_deviation),
         "diagnostics":r.diagnostics.into_iter().map(|d|json!({"convergence":d.convergence,
             "function_evaluations":d.function_evaluations,"opposite_start_disagrees":d.opposite_start_disagrees,

@@ -60,3 +60,7 @@ pub use heavy_tail::{
     RegressionLikelihood, RegressionOptimizer, RegressionPosteriorInput,
     RegressionPosteriorOptions, fit_regression_posterior,
 };
+
+pub use heavy_tail::{PosteriorRng, PosteriorUniformKind};
+
+pub use heavy_tail::{fit_negative_binomial_posterior_with_rng, fit_regression_posterior_with_rng};

@@ -16,6 +16,9 @@
   validation. Preserve native optimizer warnings through the R interface.
 * Correct shared BFGS metric resets, convergence probes and iteration counting;
   retain all previous posterior reference values and precision bounds.
+* Add MAP-only `nbinomC*` and `betabinC*` with native random starts, portable
+  MT19937/L'Ecuyer-CMRG Inversion state import/export and post-error state updates.
+  Preserve all integer state-word bits. R random-generation functions are not used.
 
 * Import standard saved DESeq2 local-dispersion coefficients without refitting.
   Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.

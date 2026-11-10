@@ -301,7 +301,10 @@ standard deviations and s-values. In local development, default optional
 shrinkage workflows run in the shared Rust engine. Native apeglm currently
 supports \code{general}, \code{nbinomR}, \code{nbinomCR} and MAP-only
 \code{nbinomC}, plus \code{betabinR}, \code{betabinCR} and MAP-only
-\code{betabinC}. Beta-binomial \code{param} contains a concentration column
+\code{betabinC}. The MAP-only random-start methods \code{nbinomC*} and \code{betabinC*} support
+Mersenne-Twister and L'Ecuyer-CMRG with Inversion normals. The wrapper imports
+stored \code{.Random.seed} and writes back the advanced native state. Other RNG
+configurations are explicitly unsupported. Beta-binomial \code{param} contains a concentration column
 followed by one trial-count column per sample. These methods use a logit link
 and ignore supplied offsets after checking their shape.
 General likelihood functions are translated from restricted

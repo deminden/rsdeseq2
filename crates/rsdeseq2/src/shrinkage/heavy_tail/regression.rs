@@ -32,6 +32,7 @@ pub enum RegressionMethod {
     BetaBinomialR,
     BetaBinomialCR,
     BetaBinomialC,
+    BetaBinomialCStar,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct RegressionPosteriorInput<'a> {
@@ -75,6 +76,30 @@ pub fn fit_regression_posterior(
     input: RegressionPosteriorInput<'_>,
     options: &RegressionPosteriorOptions,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
+    fit_regression_impl(input, options, None)
+}
+/// Shared random-start beta-binomial fitting with caller-owned portable state.
+/// Use BetaBinomialCStar; errors after drawing leave the RNG advanced.
+pub fn fit_regression_posterior_with_rng(
+    input: RegressionPosteriorInput<'_>,
+    options: &RegressionPosteriorOptions,
+    rng: &mut super::random::PosteriorRng,
+) -> Result<NegativeBinomialPosterior, DeseqError> {
+    if options.method != RegressionMethod::BetaBinomialCStar {
+        return Err(invalid(
+            "random-start regression requires BetaBinomialCStar",
+        ));
+    }
+    fit_regression_impl(input, options, Some(rng))
+}
+fn fit_regression_impl(
+    input: RegressionPosteriorInput<'_>,
+    options: &RegressionPosteriorOptions,
+    random: Option<&mut super::random::PosteriorRng>,
+) -> Result<NegativeBinomialPosterior, DeseqError> {
+    if options.method == RegressionMethod::BetaBinomialCStar && random.is_none() {
+        return Err(invalid("random-start regression requires a native RNG"));
+    }
     if input.parameters.is_none() {
         return Err(invalid("regression likelihood parameters must be supplied"));
     }
@@ -102,6 +127,7 @@ pub fn fit_regression_posterior(
         RegressionMethod::BetaBinomialR
             | RegressionMethod::BetaBinomialCR
             | RegressionMethod::BetaBinomialC
+            | RegressionMethod::BetaBinomialCStar
     );
     if beta_binomial {
         if !matches!(options.likelihood, RegressionLikelihood::BetaBinomial) {
@@ -182,7 +208,10 @@ pub fn fit_regression_posterior(
         vec![1.0; input.observations.n_rows()]
     };
     let mut posterior = options.posterior.clone();
-    posterior.map_only |= options.method == RegressionMethod::BetaBinomialC;
+    posterior.map_only |= matches!(
+        options.method,
+        RegressionMethod::BetaBinomialC | RegressionMethod::BetaBinomialCStar
+    );
     super::fit::fit_batch(
         super::fit::NegativeBinomialPosteriorInput {
             counts: input.observations,
@@ -198,6 +227,7 @@ pub fn fit_regression_posterior(
         },
         &posterior,
         Some((input.parameters, options)),
+        random,
     )
 }
 pub(super) struct GeneralRow<'a> {

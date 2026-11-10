@@ -11,10 +11,11 @@ package at runtime; original apeglm remains the independent comparison engine.
 The full [Rust-only migration](rust-only-wrapper-migration.md) remains open.
 Current native public methods are `general`, `nbinomR`, `nbinomCR` and MAP-only
 `nbinomC`, plus beta-binomial `betabinR`, `betabinCR` and MAP-only `betabinC`.
+MAP-only random-start `nbinomC*` and `betabinC*` use portable native RNG state.
 General fitting accepts restricted custom likelihood expressions,
 central/noncentral Student-t priors and Gaussian nuisance priors. The general
-and `nbinomR` routes support BFGS and bounded L-BFGS-B. Random-start methods,
-grid intervals, parameter uncertainty, contrasts and
+and `nbinomR` routes support BFGS and bounded L-BFGS-B. Grid intervals,
+parameter uncertainty, contrasts and
 other optimizer policies still require implementation. Unfinished methods
 fail explicitly, with no R calculation fallback. This checkpoint is not a new
 release, and GitHub publication remains unauthorized.
@@ -95,6 +96,11 @@ the logit family, three specialized methods and native optimizer warnings.
 Its saturated profiles correct BFGS metric resets, convergence probes and the
 accepted-gradient iteration budget, improving the existing general/`nbinomR`
 comparison without changing the default negative-binomial prefit settings.
+
+The later [random-start checkpoint](native-random-start-development.md) supplies
+native MT19937/L'Ecuyer-CMRG Inversion draws, session-state import/export,
+failure-state handling and the two MAP-only random-start methods. Other R RNG
+modes and the advanced interval/optimizer surface remain outside that checkpoint.
 
 ## Reproduction
 

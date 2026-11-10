@@ -153,6 +153,14 @@ coefficient, parameter and offset vectors come from the native request. The
 canonical original `apeglm::logLikNB` is recognized without execution. BFGS and
 L-BFGS-B run in Rust. See [validation and remaining scope](native-regression-development.md).
 
+MAP-only `apeMethod="nbinomC*"` and `apeMethod="betabinC*"` use native random
+starts. The wrapper imports stored `.Random.seed` and writes back the advanced
+state; no R random-generation function is called. The default Mersenne-Twister
+and L'Ecuyer-CMRG states with Inversion normals are supported, including states
+from parallel streams. Use `set.seed()` before a reproducible call. Missing
+state is initialized in Rust. Other RNG configurations fail explicitly; see
+[state, failure and precision checks](native-random-start-development.md).
+
 The package also exposes primitive matrix helpers:
 
 - `estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"), geoMeans = NULL, controlGenes = NULL, native = TRUE)`
