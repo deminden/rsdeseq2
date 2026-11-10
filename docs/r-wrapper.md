@@ -132,6 +132,12 @@ factors remains unsupported when DESeq2 cannot resolve its coefficient names.
 Ordered factors use polynomial coefficients; choose a named coefficient or a
 numeric contrast instead of a treatment-style factor-level contrast.
 
+Local ashr `optmethod` also accepts `mixEM`, `w_mixEM`, `mixVBEM` and
+`cxxMixSquarem`, using the shared native engine. Their K=1 EM controls and
+variational `prior="unit"`/positive fractional priors are supported. Interior-point
+and higher-order extrapolation remain unavailable. See the
+[optimizer scope, controls and explicit original-package corrections](native-ashr-optimizer-development.md).
+
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
 `etruncFUN(a, b)` and `e2truncFUN(a, b)`. Each function must contain one supported

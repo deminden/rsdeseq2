@@ -9,7 +9,8 @@ adds translated custom likelihoods, general fitting and `nbinomR`. The later
 [beta-binomial checkpoint](native-beta-binomial-development.md) adds the
 specialized logit methods. The [random-start checkpoint](native-random-start-development.md)
 adds portable native state for both MAP-only random-start methods. Advanced
-options and final combined checks remain open. Further development/commits stay local until
+[ashr optimizer options](native-ashr-optimizer-development.md) now share native
+EM and variational fitting. Other advanced options and final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R
@@ -67,7 +68,8 @@ artifacts and do not certify a replacement implementation.
 5. **Shrinkage and transforms.** Audit all scale conversion, posterior summaries,
    s-values, prior fitting and threshold processing. Normal shrinkage already
    has a Rust implementation. The local default ashr route now shares native
-   prior fitting and summaries; advanced options still need implementation.
+   prior fitting and summaries; native ordinary/weighted/variational/compiled-style
+   EM is also available. Remaining advanced options still need implementation.
    The default negative-binomial apeglm route now has a standalone implementation
    with independent posterior/tail and direct interface checks. General,
    beta-binomial and portable random-start methods now use the same engine.

@@ -5,30 +5,11 @@ use super::{
     prior::{CauchyCoefficientPrior, invalid},
     regression::{RegressionOptimizer, RegressionPosteriorOptions},
 };
+use crate::probability::digamma_positive as psi;
 use crate::{DeseqError, matrix::MatrixView, probability::stirling_correction};
 use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, OptimResult, optim_lbfgsb_with_gradient};
 
-fn psi(mut x: f64) -> f64 {
-    let mut correction = 0.0;
-    while x < 32.0 {
-        correction -= 1.0 / x;
-        x += 1.0;
-    }
-    let inv = 1.0 / x;
-    let square = inv * inv;
-    correction + x.ln()
-        - 0.5 * inv
-        - square
-            * (1.0 / 12.0
-                + square
-                    * (-1.0 / 120.0
-                        + square
-                            * (1.0 / 252.0
-                                + square
-                                    * (-1.0 / 240.0
-                                        + square * (1.0 / 132.0 - square * (691.0 / 32760.0))))))
-}
 fn psi_difference(x: f64, k: f64) -> f64 {
     if k == 0.0 {
         return 0.0;

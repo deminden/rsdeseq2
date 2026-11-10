@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Add native ordinary, weighted, variational and compiled-style EM mixture
+  fitting with K=1 acceleration controls and unit/fractional variational priors.
+  Correct compiled second-probe convergence and diagnostics; retain independent
+  original-package references and unchanged numerical gates.
+
 * Add shared Rust Laplace/grid intervals, scalar parameter uncertainty and
   covariance-based posterior contrasts. Restricted grid likelihood expressions
   support primitive numeric subscripts without executing R functions. Preserve

@@ -44,6 +44,7 @@ pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
             initial.as_deref(),
             MixtureFitOptions {
                 positive_coordinate_convergence: false,
+                optimizer: Default::default(),
                 max_iterations: c.options.max_iterations,
                 gradient_tolerance: number(&c.options.gradient_tolerance)?,
                 em_iterations: c.options.em_iterations,

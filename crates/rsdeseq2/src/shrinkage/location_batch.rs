@@ -170,7 +170,11 @@ pub fn shrink_location_batch(
         ));
     }
     if grid.dirichlet.len() != grid.initial_weights.len()
-        || grid.dirichlet.iter().any(|v| !v.is_finite() || *v < 1.0)
+        || grid.dirichlet.iter().any(|v| {
+            !v.is_finite()
+                || *v <= 0.0
+                || (!options.fit_options.optimizer.is_variational() && *v < 1.0)
+        })
     {
         return Err(invalid(
             "finite Dirichlet parameters >= 1 must match the prior components",

@@ -30,6 +30,14 @@ batches agree exactly; original-package comparisons and three explicit source
 edge corrections are recorded. Advanced ashr options, warning/method authority
 and the final combined C19/C21/C23 gates remain open.
 
+The later [ashr optimizer checkpoint](native-ashr-optimizer-development.md)
+adds native ordinary/weighted/variational/compiled-style EM, K=1 controls and
+unit/fractional variational priors. Ninety-six complete batches and ninety-seven
+optimizer problems agree exactly across native/wrapped interfaces with R math
+blocked. Independent categorical tests correct compiled second-probe convergence
+and stale/unsafe diagnostics. Remaining likelihood/mode/control/output and final
+C19/C21/C23 authority/combined gates stay open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).
