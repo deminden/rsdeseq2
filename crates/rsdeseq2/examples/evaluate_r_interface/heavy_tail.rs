@@ -142,7 +142,7 @@ pub fn encode(r: NegativeBinomialPosterior, coefficient: usize) -> Value {
         "fsr":r.false_sign_rate.map(optional),"sign_svalues":r.sign_svalues.map(optional),
         "fsos":r.false_sign_or_small_rate.map(optional),"threshold_svalues":r.threshold_svalues.map(optional),
         "prior_scale":array(vec![r.prior.scale]),"prior_variance":r.prior.adapted_variance.map(|v|array(vec![v])),
-        "nuisance":r.prior.nuisance,
+        "nuisance":r.prior.nuisance,"warnings":r.warnings,
         "summary_mode":array(summary.mode),"summary_sd":optional(summary.standard_deviation),
         "diagnostics":r.diagnostics.into_iter().map(|d|json!({"convergence":d.convergence,
             "function_evaluations":d.function_evaluations,"opposite_start_disagrees":d.opposite_start_disagrees,

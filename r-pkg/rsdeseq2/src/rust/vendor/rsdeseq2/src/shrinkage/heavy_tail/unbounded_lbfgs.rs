@@ -49,10 +49,14 @@ fn search(
     direction: &[f64],
     mut step: f64,
     evaluations: &mut usize,
-) -> (Point, f64, bool) {
+) -> (Point, f64, Option<&'static str>) {
     let initial_slope = dot(&initial.gradient, direction);
     if step <= 0.0 || initial_slope > 0.0 || !initial_slope.is_finite() {
-        return (initial.clone(), 0.0, false);
+        return (
+            initial.clone(),
+            0.0,
+            Some("the moving direction increases the objective function value"),
+        );
     }
     let decrease = 1e-4 * initial_slope;
     let curvature = -0.9 * initial_slope;
@@ -85,7 +89,7 @@ fn search(
             break;
         }
         if slope.abs() <= curvature {
-            return (point, step, true);
+            return (point, step, None);
         }
         high = low;
         high_value = low_point.value;
@@ -97,7 +101,7 @@ fn search(
         }
         count += 1;
         if count >= 100 {
-            return (low_point, low, true);
+            return (low_point, low, None);
         }
         step *= 2.0;
     }
@@ -110,20 +114,32 @@ fn search(
             || point.value >= low_point.value
         {
             if step == high {
-                return (low_point, low, false);
+                return (
+                    low_point,
+                    low,
+                    Some(
+                        "the line search routine failed, possibly due to insufficient numeric precision",
+                    ),
+                );
             }
             high = step;
             high_value = point.value;
         } else {
             if slope.abs() <= curvature {
-                return (point, step, true);
+                return (point, step, None);
             }
             if slope * (high - low) >= 0.0 {
                 high = low;
                 high_value = low_point.value;
             }
             if step == low {
-                return (low_point, low, false);
+                return (
+                    low_point,
+                    low,
+                    Some(
+                        "the line search routine failed, possibly due to insufficient numeric precision",
+                    ),
+                );
             }
             low = step;
             low_slope = slope;
@@ -132,15 +148,20 @@ fn search(
         count += 1;
         if count >= 100 {
             let valid = low > 0.0;
-            return (low_point, low, valid);
+            return (low_point, low, (!valid).then_some("the line search routine failed, unable to sufficiently decrease the function value"));
         }
     }
 }
 /// Reference nbinom prefit settings: six corrections, 300 iterations,
 /// gradient tolerances 1e-8 and one-step relative function tolerance 1e-8.
-pub(super) fn minimize(
+pub(super) fn minimize(f: impl FnMut(&[f64]) -> (f64, Vec<f64>), start: Vec<f64>) -> OptimResult {
+    minimize_with_tolerances(f, start, 1e-8, 1e-8)
+}
+pub(super) fn minimize_with_tolerances(
     mut f: impl FnMut(&[f64]) -> (f64, Vec<f64>),
     start: Vec<f64>,
+    function_tolerance: f64,
+    gradient_tolerance: f64,
 ) -> OptimResult {
     let (value, gradient) = f(&start);
     let mut point = Point {
@@ -156,25 +177,29 @@ pub(super) fn minimize(
     let mut message = "initial gradient convergence";
     for iteration in 0..300 {
         let gradient_norm = norm(&point.gradient);
-        if gradient_norm <= 1e-8 || gradient_norm <= 1e-8 * norm(&point.x) {
+        if gradient_norm <= gradient_tolerance
+            || gradient_norm <= gradient_tolerance * norm(&point.x)
+        {
             message = "gradient convergence";
             break;
         }
         let previous = point.clone();
-        let (next, _, success) = search(&mut f, &previous, &direction, step, &mut evaluations);
+        let (next, _, failure) = search(&mut f, &previous, &direction, step, &mut evaluations);
         point = next;
-        if !success {
+        if let Some(failure) = failure {
             convergence = -1;
-            message = "strong-Wolfe line search failed";
+            message = failure;
             break;
         }
         let gradient_norm = norm(&point.gradient);
-        if gradient_norm <= 1e-8 || gradient_norm <= 1e-8 * norm(&point.x) {
+        if gradient_norm <= gradient_tolerance
+            || gradient_norm <= gradient_tolerance * norm(&point.x)
+        {
             message = "gradient convergence";
             break;
         }
         if (previous.value - point.value).abs()
-            <= 1e-8 * point.value.abs().max(previous.value.abs()).max(1.0)
+            <= function_tolerance * point.value.abs().max(previous.value.abs()).max(1.0)
         {
             message = "relative objective convergence";
             break;

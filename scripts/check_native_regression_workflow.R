@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Focused complete bridge/R-free checks and public general/nbinomR comparisons.
 args <- commandArgs(TRUE)
-if (length(args) != 4L) stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR PAIRED_FITS_RDS')
+if (!length(args) %in% c(4L,5L)) stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR PAIRED_FITS_RDS [REFERENCE_JSON]')
 driver <- normalizePath(args[[1L]])
 library(rsdeseq2, lib.loc=normalizePath(args[[2L]]))
 requireNamespace('DESeq2'); requireNamespace('apeglm')
@@ -28,7 +28,7 @@ compare <- function(a,b,bound) {
   error
 }
 blocked <- function(expr) {
-  functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','rank','cumsum','^','%*%','lgamma'),
+  functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','rank','cumsum','^','%*%','lgamma','digamma'),
     stats=c('pnorm','dnorm','dnbinom','dbinom','dt','integrate','quantile','optim','optimHess','uniroot'),
     apeglm=c('apeglm','priorVar','svalue'))
   on.exit(for (package in names(functions)) for (name in functions[[package]])
@@ -40,11 +40,13 @@ blocked <- function(expr) {
 }
 guard <- tryCatch(blocked(stats::dnorm(0)),error=identity)
 stopifnot(inherits(guard,'error'),grepl('executed R math',conditionMessage(guard)))
-reference <- jsonlite::fromJSON(file.path(root,'crates/rsdeseq2/tests/data/regression_posterior_r462.json'), simplifyVector=FALSE)
+reference_path <- if(length(args)==5L)args[[5L]]else file.path(root,'crates/rsdeseq2/tests/data/regression_posterior_r462.json')
+reference <- jsonlite::fromJSON(reference_path,simplifyVector=FALSE)
+beta_binomial <- identical(reference$cases[[1L]]$method,'betabinR')
 input <- file.path(out,'input.json')
 fields <- c('name','observations','design','parameters','weights','offsets','mle','coefficient','nuisance',
   'scale','nuisance_scale','prior_df','prior_mean','nuisance_mean','method','optimizer','bounds','log_link','threshold','likelihood')
-jsonlite::write_json(list(regression_cases=lapply(reference$cases,function(c)c[fields]),density_cases=reference$leaves),input,auto_unbox=TRUE,null='null')
+jsonlite::write_json(list(regression_cases=lapply(reference$cases,function(c)c[fields]),density_cases=if(is.null(reference$leaves))list()else reference$leaves),input,auto_unbox=TRUE,null='null')
 output <- system2(driver,shQuote(normalizePath(input)),stdout=TRUE,stderr=TRUE)
 if (!is.null(attr(output,'status'))) stop(paste(output,collapse='\n'))
 writeLines(output,file.path(out,'standalone.json'))
@@ -73,16 +75,17 @@ wrapped <- lapply(seq_along(reference$cases),function(i) {
   if (inherits(r,'error')) stop(c$name,': ',conditionMessage(r))
   stopifnot(is.null(s$error))
   s <- s$value
-  expected <- list(mode=s$summary_mode,sd=s$summary_sd,svalue=s$sign_svalues,
+  expected <- list(warnings=s$warnings,mode=s$summary_mode,sd=s$summary_sd,svalue=s$sign_svalues,
     threshold_svalue=s$threshold_svalues,prior_scale=s$prior_scale,prior_variance=s$prior_variance,
     nuisance=lapply(s$nuisance,function(v)v+1L),convergence=lapply(s$diagnostics,`[[`,'convergence'))
-  actual <- list(mode=encode(r$posterior_mode),sd=encode_optional(r$posterior_sd),svalue=encode_optional(r$svalue),
+  actual <- list(warnings=as.list(r$warnings),mode=encode(r$posterior_mode),sd=encode_optional(r$posterior_sd),svalue=encode_optional(r$svalue),
     threshold_svalue=encode_optional(r$threshold_svalue),prior_scale=encode(r$prior_control$prior.scale),
     prior_variance=if(is.null(r$prior_control$prior.var))NULL else encode(r$prior_control$prior.var),
     nuisance=as.list(as.integer(r$prior_control$no.shrink)),
     convergence=lapply(r$convergence,function(v)if(is.na(v))NULL else as.integer(v)))
   stopifnot(identical(.formula_canonical(actual),.formula_canonical(expected)))
-  list(name=c$name,value=actual)
+  list(name=c$name,value=actual,original_warning_messages_identical=identical(as.list(r$warnings),c$warnings),
+    original_warning_events_identical=identical(sub(',.*','',r$warnings),sub(',.*','',unlist(c$warnings))))
 })
 jsonlite::write_json(wrapped,file.path(out,'wrapped.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
 # Reuse the accepted count fit. Only the newly changed posterior paths are fitted.
@@ -91,21 +94,48 @@ cached <- readRDS(args[[4L]])
 rust <- cached$rust
 stopifnot(isTRUE(all.equal(as.matrix(SummarizedExperiment::assay(rust,'counts')),fixture$counts,
   check.attributes=TRUE,tolerance=0)))
-settings <- list(general=list(apeMethod='general'),nbinomR=list(apeMethod='nbinomR'))
-if (all(names(settings) %in% names(cached$reference))) {
-  original <- cached$reference[names(settings)]
+if (beta_binomial) {
+  analysis_dds <- rust[seq_len(256L),]
+  fit <- rsdeseq2:::.rsdeseq2_fitted_view(analysis_dds)
+  raw <- rsdeseq2::results(analysis_dds,name='conditionB')
+  observations <- as.matrix(SummarizedExperiment::assay(analysis_dds,'counts'))
+  parameters <- cbind(8,observations+20)
+  settings <- list(betabinR=list(apeMethod='betabinR',param=parameters),
+    betabinCR=list(apeMethod='betabinCR',param=parameters),betabinC=list(apeMethod='betabinC',param=parameters))
+  original <- if(all(names(settings)%in%names(cached$reference)))cached$reference[names(settings)]else lapply(names(settings),function(method) {
+    warnings <- character()
+    r <- withCallingHandlers(apeglm::apeglm(Y=observations,x=fit$design,param=parameters,coef=2L,
+      mle=cbind(raw$log2FoldChange,raw$lfcSE)*log(2),threshold=.5*log(2),method=method),warning=function(w) {
+        warnings<<-c(warnings,conditionMessage(w));invokeRestart('muffleWarning')})
+    list(log2FoldChange=r$map[,2L]/log(2),lfcSE=r$sd[,2L]/log(2),svalue=apeglm::svalue(r$thresh),warnings=warnings)
+  })
+  names(original) <- names(settings)
 } else {
-  original_fit <- DESeq2::DESeq(DESeq2::DESeqDataSetFromMatrix(fixture$counts,fixture$colData,~condition),fitType='mean',quiet=TRUE)
-  coefficient <- tail(DESeq2::resultsNames(original_fit),1L)
-  original <- lapply(settings,function(options) do.call(DESeq2::lfcShrink,
-    c(list(dds=original_fit,coef=coefficient,type='apeglm',lfcThreshold=.5,quiet=TRUE),options)))
+  analysis_dds <- rust
+  settings <- list(general=list(apeMethod='general'),nbinomR=list(apeMethod='nbinomR'))
+  if (all(names(settings) %in% names(cached$reference))) {
+    original <- cached$reference[names(settings)]
+  } else {
+    original_fit <- DESeq2::DESeq(DESeq2::DESeqDataSetFromMatrix(fixture$counts,fixture$colData,~condition),fitType='mean',quiet=TRUE)
+    coefficient <- tail(DESeq2::resultsNames(original_fit),1L)
+    original <- lapply(settings,function(options) do.call(DESeq2::lfcShrink,
+      c(list(dds=original_fit,coef=coefficient,type='apeglm',lfcThreshold=.5,quiet=TRUE),options)))
+  }
+  # This expression is imported as syntax. R never evaluates its body in a
+  # candidate call, even though the function is accepted by the public API.
+  custom <- function(y,x,beta,param,offset)stats::dnbinom(y,mu=exp(x%*%beta+offset),size=1/param,log=TRUE)
+  settings$custom <- list(apeMethod='general',log.lik=custom)
 }
-# The custom density expression goes through the public closure importer, then
-# runs in Rust. Its body is never evaluated by R during a candidate call.
-custom <- function(y,x,beta,param,offset)stats::dnbinom(y,mu=exp(x%*%beta+offset),size=1/param,log=TRUE)
-settings$custom <- list(apeMethod='general',log.lik=custom)
-actual <- lapply(settings,function(options)blocked(do.call(rsdeseq2::lfcShrink,
-  c(list(dds=rust,coef='conditionB',type='apeglm',lfcThreshold=.5,quiet=TRUE),options))))
+public_warnings <- list()
+actual <- lapply(names(settings),function(name) {
+  warnings <- character()
+  r <- withCallingHandlers(blocked(do.call(rsdeseq2::lfcShrink,
+    c(list(dds=analysis_dds,coef='conditionB',type='apeglm',lfcThreshold=.5,quiet=TRUE),settings[[name]]))),warning=function(w) {
+      warnings<<-c(warnings,conditionMessage(w));invokeRestart('muffleWarning')})
+  public_warnings[[name]]<<-warnings
+  r
+})
+names(actual)<-names(settings)
 errors <- lapply(names(settings),function(name) {
   a <- actual[[name]]; b <- original[[if(name=='custom')'general'else name]]
   stopifnot(identical(DESeq2::priorInfo(a)$engine,'Rust'))
@@ -114,7 +144,11 @@ errors <- lapply(names(settings),function(name) {
 })
 saveRDS(list(rust=rust,reference=original,actual=actual),file.path(out,'paired_fits.rds'))
 jsonlite::write_json(list(R=as.character(getRversion()),DESeq2=as.character(packageVersion('DESeq2')),
-  apeglm=as.character(packageVersion('apeglm')),genes=nrow(fixture$counts),complete_native_standalone_batches=length(wrapped),
+  apeglm=as.character(packageVersion('apeglm')),genes=nrow(analysis_dds),complete_native_standalone_batches=length(wrapped),
+  warning_messages_identical=sum(vapply(wrapped,function(x)isTRUE(x$original_warning_messages_identical),logical(1))),
+  warning_events_identical=sum(vapply(wrapped,function(x)isTRUE(x$original_warning_events_identical),logical(1))),
+  public_warning_counts=lapply(public_warnings,length),
+  original_public_warning_counts=if(beta_binomial)lapply(original,function(v)length(v$warnings))else NULL,
   R_calculations_blocked=TRUE,existing_bounds_unchanged=TRUE,public_errors=errors),
   file.path(out,'validation.json'),auto_unbox=TRUE,pretty=TRUE,null='null',digits=NA)
-cat(length(wrapped),'general/analytic NB batches match standalone bits or reject together; public general/nbinomR/custom checks pass with R math blocked\n')
+cat(length(wrapped),'regression batches match standalone bits or reject together; public method checks pass with R math blocked\n')

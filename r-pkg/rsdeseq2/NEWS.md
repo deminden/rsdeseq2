@@ -11,6 +11,11 @@
   bounded L-BFGS-B. Translate restricted five-argument likelihood expressions,
   matrix products and supported density calls without invoking R callbacks.
   Custom formula functions remain unsupported.
+* Add native beta-binomial logit shrinkage: `betabinR`, `betabinCR` and MAP-only
+  `betabinC`, with analytic scores, zero-success rows and concentration/trial
+  validation. Preserve native optimizer warnings through the R interface.
+* Correct shared BFGS metric resets, convergence probes and iteration counting;
+  retain all previous posterior reference values and precision bounds.
 
 * Import standard saved DESeq2 local-dispersion coefficients without refitting.
   Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.

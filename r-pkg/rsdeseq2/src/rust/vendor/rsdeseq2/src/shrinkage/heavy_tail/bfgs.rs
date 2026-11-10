@@ -1,5 +1,9 @@
 //! Standalone inverse-BFGS with safeguarded Armijo steps and metric restarts.
 //! The update is the standard rank-two inverse-Hessian formula; no R code runs.
+//! Reference stopping policy includes periodic metric resets, a fresh-metric
+//! convergence probe retaining the previous score, and an iteration budget
+//! counted by accepted gradient updates, including the initial gradient.
+//! These policies are independently exercised by the saturated BB profiles.
 use nalgebra::{DMatrix, DVector};
 use rcompat_lbfgsb::{OptimCounts, OptimResult};
 pub(super) fn minimize(
@@ -11,9 +15,16 @@ pub(super) fn minimize(
     let mut count = 1;
     let mut inverse = DMatrix::identity(p, p);
     let mut fresh = true;
+    let mut metric_age = 0;
     let mut convergence = 0;
     let mut message = "BFGS relative objective convergence";
-    for iteration in 0..100 {
+    let mut accepted_gradients = 1;
+    while accepted_gradients < 100 {
+        if metric_age > 2 * p {
+            inverse = DMatrix::identity(p, p);
+            fresh = true;
+            metric_age = 0;
+        }
         let g = DVector::from_column_slice(&gradient);
         let mut direction = -&inverse * &g;
         let mut slope = direction.dot(&g);
@@ -23,6 +34,7 @@ pub(super) fn minimize(
             direction = -&g;
             slope = -g.dot(&g);
             fresh = true;
+            metric_age = 0;
         }
         if slope == 0.0 {
             break;
@@ -54,6 +66,7 @@ pub(super) fn minimize(
             }
             inverse = DMatrix::identity(p, p);
             fresh = true;
+            metric_age = 0;
             continue;
         };
         let small =
@@ -62,15 +75,18 @@ pub(super) fn minimize(
         let y = DVector::from_iterator(p, next_gradient.iter().zip(&gradient).map(|(a, b)| a - b));
         x = next;
         value = next_value;
-        gradient = next_gradient;
         if small {
             if fresh {
                 break;
             }
             inverse = DMatrix::identity(p, p);
             fresh = true;
+            metric_age = 0;
             continue;
         }
+        gradient = next_gradient;
+        accepted_gradients += 1;
+        metric_age += 1;
         let curvature = s.dot(&y);
         if curvature > 0.0 && curvature.is_finite() {
             let hy = &inverse * &y;
@@ -81,8 +97,9 @@ pub(super) fn minimize(
         } else {
             inverse = DMatrix::identity(p, p);
             fresh = true;
+            metric_age = 0;
         }
-        if iteration == 99 {
+        if accepted_gradients == 100 {
             convergence = 1;
             message = "BFGS iteration limit";
         }

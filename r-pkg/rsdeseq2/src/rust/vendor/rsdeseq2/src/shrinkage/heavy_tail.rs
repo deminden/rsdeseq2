@@ -1,4 +1,5 @@
 //! Standalone heavy-tailed negative-binomial posterior fitting.
+mod beta_binomial;
 mod bfgs;
 mod density;
 mod fit;

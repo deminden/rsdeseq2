@@ -15,6 +15,7 @@ use std::{cell::RefCell, sync::Arc};
 #[derive(Clone, Debug)]
 pub enum RegressionLikelihood {
     NegativeBinomial,
+    BetaBinomial,
     Restricted(Arc<RestrictedRegressionLikelihood>),
 }
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,6 +29,9 @@ pub enum RegressionMethod {
     #[default]
     General,
     NegativeBinomialR,
+    BetaBinomialR,
+    BetaBinomialCR,
+    BetaBinomialC,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct RegressionPosteriorInput<'a> {
@@ -93,6 +97,70 @@ pub fn fit_regression_posterior(
             "negative-binomial likelihood requires one dispersion per row",
         ));
     }
+    let beta_binomial = matches!(
+        options.method,
+        RegressionMethod::BetaBinomialR
+            | RegressionMethod::BetaBinomialCR
+            | RegressionMethod::BetaBinomialC
+    );
+    if beta_binomial {
+        if !matches!(options.likelihood, RegressionLikelihood::BetaBinomial) {
+            return Err(invalid(
+                "beta-binomial method requires its matching likelihood",
+            ));
+        }
+        let parameters = input.parameters.unwrap();
+        if parameters.n_cols() != input.observations.n_cols() + 1 {
+            return Err(invalid(
+                "beta-binomial parameters require concentration and one trial count per sample",
+            ));
+        }
+        for i in 0..parameters.n_rows() {
+            if !parameters.at(i, 0).is_finite() || *parameters.at(i, 0) <= 0.0 {
+                return Err(invalid(
+                    "beta-binomial concentration must be positive and finite",
+                ));
+            }
+            for j in 0..input.observations.n_cols() {
+                let n = *parameters.at(i, j + 1);
+                let y = *input.observations.at(i, j);
+                if !n.is_finite() || n < 0.0 || y < 0.0 || y > n {
+                    return Err(invalid(
+                        "beta-binomial successes must lie between zero and finite trial counts",
+                    ));
+                }
+            }
+        }
+        match input.offsets {
+            PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m)
+                if m.n_rows() != input.observations.n_rows()
+                    || m.n_cols() != input.observations.n_cols() =>
+            {
+                return Err(invalid(
+                    "ignored beta-binomial offsets must still match observation shape",
+                ));
+            }
+            PosteriorOffsets::SizeFactors(s) if s.len() != input.observations.n_cols() => {
+                return Err(invalid(
+                    "ignored beta-binomial size factors must match samples",
+                ));
+            }
+            _ => {}
+        }
+    } else if matches!(options.likelihood, RegressionLikelihood::BetaBinomial) {
+        return Err(invalid(
+            "beta-binomial likelihood requires a beta-binomial method",
+        ));
+    }
+    if options.method != RegressionMethod::General
+        && (options.prior_df != 1.0
+            || options.prior_noncentrality != 0.0
+            || options.nuisance_mean != 0.0)
+    {
+        return Err(invalid(
+            "specialized posterior methods require zero-centered Cauchy priors",
+        ));
+    }
     if options.method == RegressionMethod::NegativeBinomialR
         && (!matches!(options.likelihood, RegressionLikelihood::NegativeBinomial)
             || options.prior_df != 1.0
@@ -113,16 +181,22 @@ pub fn fit_regression_posterior(
     } else {
         vec![1.0; input.observations.n_rows()]
     };
+    let mut posterior = options.posterior.clone();
+    posterior.map_only |= options.method == RegressionMethod::BetaBinomialC;
     super::fit::fit_batch(
         super::fit::NegativeBinomialPosteriorInput {
             counts: input.observations,
             design: input.design,
             dispersions: &dispersions,
-            offsets: input.offsets,
+            offsets: if beta_binomial {
+                PosteriorOffsets::None
+            } else {
+                input.offsets
+            },
             weights: input.weights,
             mle: input.mle,
         },
-        &options.posterior,
+        &posterior,
         Some((input.parameters, options)),
     )
 }
@@ -149,6 +223,11 @@ impl GeneralRow<'_> {
                 self.parameters.as_deref(),
                 self.offsets,
             )?,
+            RegressionLikelihood::BetaBinomial => {
+                return Err(invalid(
+                    "beta-binomial likelihood must use analytic regression rows",
+                ));
+            }
             RegressionLikelihood::NegativeBinomial => {
                 let dispersion = self
                     .parameters

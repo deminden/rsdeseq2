@@ -300,7 +300,11 @@ shrinkage supports named/indexed Wald coefficients and returns posterior
 standard deviations and s-values. In local development, default optional
 shrinkage workflows run in the shared Rust engine. Native apeglm currently
 supports \code{general}, \code{nbinomR}, \code{nbinomCR} and MAP-only
-\code{nbinomC}. General likelihood functions are translated from restricted
+\code{nbinomC}, plus \code{betabinR}, \code{betabinCR} and MAP-only
+\code{betabinC}. Beta-binomial \code{param} contains a concentration column
+followed by one trial-count column per sample. These methods use a logit link
+and ignore supplied offsets after checking their shape.
+General likelihood functions are translated from restricted
 five-argument expressions, with matrix products and supported density calls;
 the wrapper never executes these functions. BFGS and L-BFGS-B run in Rust.
 Other advanced optional methods

@@ -96,6 +96,8 @@ pub struct NegativeBinomialPosterior {
     pub threshold_svalues: Option<Vec<Option<f64>>>,
     pub prior: CauchyCoefficientPrior,
     pub diagnostics: Vec<PosteriorMapDiagnostic>,
+    /// Native fitting warnings in batch/phase order, for frontend presentation.
+    pub warnings: Vec<String>,
 }
 /// Numerical columns for frontend presentation, with no frontend arithmetic.
 #[derive(Clone, Debug)]
@@ -201,7 +203,7 @@ pub(super) fn fit_batch(
     let g = input.counts.n_rows();
     let n = input.counts.n_cols();
     let p = input.design.n_cols();
-    if g == 0 || input.design.n_rows() != n || input.dispersions.len() != g {
+    if g == 0 || n == 0 || p == 0 || input.design.n_rows() != n || input.dispersions.len() != g {
         return Err(invalid(
             "nonempty counts, sample-aligned design and gene-aligned dispersions are required",
         ));
@@ -299,6 +301,8 @@ pub(super) fn fit_batch(
         .filter(|_| options.coefficient.is_some())
         .map(|_| vec![None; g]);
     let mut diagnostics = Vec::with_capacity(g);
+    let mut warnings = vec![];
+    let mut second_warnings = vec![];
     for gene in 0..g {
         let counts = (0..n)
             .map(|i| *input.counts.at(gene, i))
@@ -357,12 +361,42 @@ pub(super) fn fit_batch(
                 options: config,
                 error: std::cell::RefCell::new(None),
             });
+        let beta_parameters = regression
+            .filter(|(_, config)| {
+                matches!(
+                    config.likelihood,
+                    super::regression::RegressionLikelihood::BetaBinomial
+                )
+            })
+            .map(|(parameters, _)| {
+                let parameters = parameters.unwrap();
+                (0..parameters.n_cols())
+                    .map(|j| *parameters.at(gene, j))
+                    .collect::<Vec<_>>()
+            });
+        let beta_binomial = beta_parameters
+            .as_ref()
+            .map(|parameters| super::beta_binomial::Row {
+                design: input.design,
+                successes: &row.counts,
+                trials: &parameters[1..],
+                weights: &row.weights,
+                concentration: parameters[0],
+                prior: &prior,
+            });
         let mut result = if let Some(general) = &general {
             general.optimize(
                 (0..p)
                     .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
                     .collect(),
             )?
+        } else if let Some(beta_binomial) = &beta_binomial {
+            let (_, config) = regression.unwrap();
+            if config.method == super::regression::RegressionMethod::BetaBinomialR {
+                beta_binomial.optimize(vec![0.0; p], config)?
+            } else {
+                beta_binomial.prefit(initial.clone())?
+            }
         } else {
             if nb_r {
                 let (_, config) = regression.unwrap();
@@ -387,8 +421,14 @@ pub(super) fn fit_batch(
                 optimize(&row, initial.clone())?
             }
         };
+        if (regression.is_none() || beta_binomial.is_some()) && result.convergence < 0 {
+            warnings.push(result.message.clone());
+        }
         let disagreement = if regression.is_none() && options.check_opposite_start {
             let second = optimize(&row, initial.into_iter().map(|v| -v).collect())?;
+            if second.convergence < 0 {
+                second_warnings.push(second.message.clone());
+            }
             result
                 .par
                 .iter()
@@ -400,13 +440,25 @@ pub(super) fn fit_batch(
         if regression.is_none() && !options.map_only && (result.convergence != 0 || disagreement) {
             result = refine(&row, result.par)?;
         }
-        for (j, &value) in result.par.iter().enumerate() {
-            modes.as_mut_slice()[gene * p + j] = value;
-        }
         let mut laplace_valid = false;
         if let Some(sd) = &mut sd {
             let h = if let Some(general) = &general {
                 general.hessian(&result.par, options.hessian_step)
+            } else if let Some(beta_binomial) = &beta_binomial {
+                let (_, config) = regression.unwrap();
+                let h = beta_binomial.hessian(&result.par, options.hessian_step);
+                let invalid_covariance = h
+                    .clone()
+                    .try_inverse()
+                    .is_none_or(|m| m.diagonal().iter().any(|v| !v.is_finite() || *v <= 0.0));
+                if config.method == super::regression::RegressionMethod::BetaBinomialCR
+                    && (result.convergence != 0 || invalid_covariance)
+                {
+                    result = beta_binomial.optimize(result.par, config)?;
+                    beta_binomial.hessian(&result.par, options.hessian_step)
+                } else {
+                    h
+                }
             } else {
                 row.hessian(&result.par, options.hessian_step)
             };
@@ -452,6 +504,9 @@ pub(super) fn fit_batch(
                 }
             }
         }
+        for (j, &value) in result.par.iter().enumerate() {
+            modes.as_mut_slice()[gene * p + j] = value;
+        }
         diagnostics.push(PosteriorMapDiagnostic {
             convergence: Some(result.convergence),
             function_evaluations: result.counts.function,
@@ -461,6 +516,7 @@ pub(super) fn fit_batch(
     }
     let sign_svalues = fsr.as_ref().map(|v| svalues(v)).transpose()?;
     let threshold_svalues = fsos.as_ref().map(|v| svalues(v)).transpose()?;
+    warnings.extend(second_warnings);
     Ok(NegativeBinomialPosterior {
         mode: RowMajorMatrix::from_row_major(g, p, modes)?,
         standard_deviation: sd
@@ -472,5 +528,6 @@ pub(super) fn fit_batch(
         threshold_svalues,
         prior,
         diagnostics,
+        warnings,
     })
 }

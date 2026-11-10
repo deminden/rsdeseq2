@@ -109,8 +109,17 @@ fn regression_density_expressions_preserve_independent_precision() {
 }
 #[test]
 fn general_and_analytic_nb_regression_match_original_apeglm() {
+    compare_posteriors(reference());
+}
+#[test]
+fn beta_binomial_r_and_fast_methods_match_original_apeglm() {
+    compare_posteriors(
+        serde_json::from_str(include_str!("data/beta_binomial_posterior_r462.json")).unwrap(),
+    );
+}
+fn compare_posteriors(reference: serde_json::Value) {
     let mut failures = vec![];
-    for c in reference()["cases"].as_array().unwrap() {
+    for c in reference["cases"].as_array().unwrap() {
         let input: regression::Case = serde_json::from_value(c.clone()).unwrap();
         let actual = regression::run(&input);
         if c["expected_error"].is_string() {
@@ -135,6 +144,23 @@ fn general_and_analytic_nb_regression_match_original_apeglm() {
                 continue;
             }
         };
+        let warning_events = |v: &[String]| {
+            v.iter()
+                .map(|v| v.split(',').next().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        };
+        let expected_warnings = c["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            warning_events(&r.warnings),
+            warning_events(&expected_warnings),
+            "{} warning events",
+            input.name
+        );
         let reorder = |m: &rsdeseq2::matrix::RowMajorMatrix<f64>| {
             (0..input.design.columns)
                 .flat_map(|j| (0..input.observations.rows).map(move |i| *m.get(i, j).unwrap()))
@@ -144,7 +170,15 @@ fn general_and_analytic_nb_regression_match_original_apeglm() {
             ("mode", reorder(&r.mode), 0.01 * std::f64::consts::LN_2),
             (
                 "sd",
-                reorder(r.standard_deviation.as_ref().unwrap()),
+                r.standard_deviation
+                    .as_ref()
+                    .map(reorder)
+                    .unwrap_or_else(|| {
+                        vec![
+                            f64::from_bits(0x7ff0_0000_0000_07a2);
+                            input.observations.rows * input.design.columns
+                        ]
+                    }),
                 0.01 * std::f64::consts::LN_2,
             ),
             (
@@ -220,4 +254,29 @@ fn general_and_analytic_nb_regression_match_original_apeglm() {
         failures.len(),
         failures.join("\n")
     );
+}
+
+#[test]
+fn beta_binomial_domain_and_parameter_shapes_are_rejected_before_fitting() {
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("data/beta_binomial_posterior_r462.json")).unwrap();
+    let case =
+        || serde_json::from_value::<regression::Case>(reference["cases"][0].clone()).unwrap();
+    let reject = |c: &regression::Case, reason: &str| {
+        let error = regression::run(c).unwrap_err().to_string();
+        assert!(error.contains(reason), "{error}");
+    };
+    for theta in ["0", "-1", "NaN"] {
+        let mut c = case();
+        c.parameters.as_mut().unwrap().values[0] = theta.into();
+        reject(&c, "concentration");
+    }
+    let mut c = case();
+    c.observations.values[0] = "11".into();
+    reject(&c, "successes");
+    let mut c = case();
+    let m = c.parameters.as_mut().unwrap();
+    m.columns -= 1;
+    m.values.truncate(m.rows * m.columns);
+    reject(&c, "one trial count");
 }

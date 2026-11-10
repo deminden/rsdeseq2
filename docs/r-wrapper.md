@@ -123,7 +123,8 @@ including restricted custom likelihood expressions. Advanced optimizer,
 estimated-mode and output-subset options remain unfinished and fail explicitly;
 see the [development scope](shrinkage-component-development.md). Released 0.4.0
 uses the original ashr package. Local `type="apeglm"` default negative-binomial
-and MAP-only workflows, general likelihoods and `nbinomR` now use Rust; its remaining optional methods are listed
+and MAP-only workflows, general likelihoods, `nbinomR` and beta-binomial methods
+now use Rust; its remaining optional methods are listed
 in the [native development scope](native-apeglm-development.md). It handles named/indexed Wald coefficients, including
 posterior SDs and s-values, but not contrasts. Formula interactions are
 rejected for normal shrinkage. Factor-level contrast syntax for transformed

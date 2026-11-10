@@ -115,6 +115,7 @@
     if (is.null(apeArguments$log.lik)) stop("general apeglm requires a likelihood function", call. = FALSE)
   } else apeArguments$log.lik <- NULL
   apeFit <- .rsdeseq2_formula_request(list(operation = "apeglm_shrinkage", arguments = apeArguments))
+  for (message in apeFit$warnings) warning(message, call. = FALSE)
   if (length(apeFit$posterior_mode) != nrow(counts)) {
     stop("apeglm returned a coefficient matrix with an incompatible row count", call. = FALSE)
   }
