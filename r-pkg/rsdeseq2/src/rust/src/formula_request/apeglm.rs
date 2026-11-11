@@ -97,12 +97,18 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC" | "betabinC*"
     );
     let compiled_nb = method.starts_with("nbinomC");
-    let optimizer = if compiled_nb {
-        "BFGS".to_string()
+    let optimizer_name = if compiled_nb {
+        "BFGS"
     } else {
-        choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?
+        field(args, "optim.method")
+            .map(text)
+            .transpose()?
+            .unwrap_or("BFGS")
     };
-    let log_link = if matches!(method.as_str(), "nbinomC" | "nbinomC*") {
+    let optimizer = RegressionOptimizer::from_r_method(optimizer_name);
+    let log_link = if method == "general" || method.starts_with("betabin") {
+        false
+    } else if matches!(method.as_str(), "nbinomC" | "nbinomC*") {
         true
     } else {
         field(args, "log.link")
@@ -265,13 +271,9 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         } else {
             super::apeglm_analysis::likelihood(get(args, "log.lik")?)?
         };
-        let bounds = if optimizer == "L-BFGS-B" {
+        let bounds = if optimizer_name == "L-BFGS-B" {
             if let Some(v) = present(field(args, "bounds")) {
-                let v = numbers(v)?;
-                if v.len() != 2 {
-                    return Err("bounds requires two values".into());
-                }
-                (v[0], v[1])
+                RegressionOptimizer::r_bounds(optimizer_name, numbers(v)?)
             } else {
                 (f64::NEG_INFINITY, f64::INFINITY)
             }
@@ -292,11 +294,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             prior_df,
             prior_noncentrality: prior_ncp,
             nuisance_mean,
-            optimizer: if optimizer == "BFGS" {
-                RegressionOptimizer::Bfgs
-            } else {
-                RegressionOptimizer::Lbfgsb
-            },
+            optimizer,
             method: match method.as_str() {
                 "nbinomR" => RegressionMethod::NegativeBinomialR,
                 "betabinR" => RegressionMethod::BetaBinomialR,

@@ -148,6 +148,9 @@ impl Row<'_> {
                 )
                 .map_err(|e| invalid(&e.to_string()))
             }
+            RegressionOptimizer::Unsupported => Err(invalid(
+                "unsupported posterior optimizer; use BFGS or L-BFGS-B",
+            )),
         }
     }
     pub fn prefit(&self, start: Vec<f64>) -> Result<OptimResult, DeseqError> {
