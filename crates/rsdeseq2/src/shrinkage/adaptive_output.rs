@@ -1,13 +1,12 @@
 //! Selection of fields consumed by the DESeq-style adaptive shrinkage wrapper.
 use super::{
     AdaptiveShrinkageQuery, LocationShrinkage, LocationShrinkageOptions,
-    adaptive_result::adaptive_shrinkage_impl,
-    location_batch::{RateOutputs, shrink_location_batch_with_rates},
+    adaptive_result::adaptive_shrinkage_impl, location_batch::shrink_location_batch_with_outputs,
 };
 use crate::DeseqError;
 
 /// Original ashr output selection, projected onto fields used by lfcShrink.
-/// Other original output names do not select any of these four fields.
+/// Additional original summary selections preserve their evaluation diagnostics.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AdaptiveOutputSelection {
     pub posterior_mean: bool,
@@ -16,6 +15,13 @@ pub struct AdaptiveOutputSelection {
     pub fitted_prior: bool,
     /// Q-value selection also controls its missing-value recycling warning.
     pub qvalues: bool,
+    pub negative_probability: bool,
+    pub positive_probability: bool,
+    pub local_false_sign_rate: bool,
+    pub local_false_discovery_rate: bool,
+    pub log_likelihood: bool,
+    pub log_likelihood_ratio: bool,
+    pub flash_data: bool,
 }
 impl AdaptiveOutputSelection {
     /// Numeric levels use inequalities, including fractional and infinite levels.
@@ -30,6 +36,13 @@ impl AdaptiveOutputSelection {
             svalues: level > 1.0 && level != 4.0 && level != 5.0,
             fitted_prior: level != 5.0,
             qvalues: level > 1.0 && level != 4.0 && level != 5.0,
+            negative_probability: level > 1.0 && level != 4.0 && level != 5.0,
+            positive_probability: level > 1.0 && level != 4.0 && level != 5.0,
+            local_false_sign_rate: level > 1.0 && level != 4.0 && level != 5.0,
+            local_false_discovery_rate: level > 1.0 && level != 4.0 && level != 5.0,
+            log_likelihood: level > 0.0 && level != 4.0 && level != 5.0,
+            log_likelihood_ratio: level > 0.0 && level != 4.0 && level != 5.0,
+            flash_data: level == 4.0 || level == 5.0,
         })
     }
     /// Named output subsets use exact names; duplicates/unknown names are inert.
@@ -42,6 +55,13 @@ impl AdaptiveOutputSelection {
                 "svalue" => selected.svalues = true,
                 "fitted_g" => selected.fitted_prior = true,
                 "qvalue" => selected.qvalues = true,
+                "NegativeProb" => selected.negative_probability = true,
+                "PositiveProb" => selected.positive_probability = true,
+                "lfsr" => selected.local_false_sign_rate = true,
+                "lfdr" => selected.local_false_discovery_rate = true,
+                "loglik" => selected.log_likelihood = true,
+                "logLR" => selected.log_likelihood_ratio = true,
+                "flash_data" => selected.flash_data = true,
                 _ => {}
             }
         }
@@ -82,13 +102,9 @@ pub fn adaptive_shrinkage_with_output(
         ));
     }
     let use_svalues = output.svalues && query.svalues;
-    let rates = RateOutputs {
-        svalues: output.svalues,
-        qvalues: output.qvalues,
-    };
     if !output.posterior_mean && !output.posterior_sd && !use_svalues {
         return Ok(SelectedAdaptiveShrinkageResult {
-            fit: shrink_location_batch_with_rates(estimates, standard_errors, options, rates)?,
+            fit: shrink_location_batch_with_outputs(estimates, standard_errors, options, output)?,
             posterior_mean: None,
             posterior_sd: None,
             svalues: None,
@@ -103,7 +119,7 @@ pub fn adaptive_shrinkage_with_output(
             svalues: use_svalues,
             ..query
         },
-        rates,
+        output,
     )?;
     Ok(SelectedAdaptiveShrinkageResult {
         fit: result.fit,

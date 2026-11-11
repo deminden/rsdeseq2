@@ -1,0 +1,211 @@
+{
+  "base_commit": "a83221d00524c8b83d58da4f5c069ff59647466b",
+  "files": {
+    ".github/workflows/r.yml": "f23956ec569e112d19f821027ae9a58c4a1f93864e289aa6a9f480206da688bc",
+    "crates/rsdeseq2/examples/evaluate_r_interface/ashr_output.rs": "f4762b2094a398fb7faa055253822da3beab47b74429218844661dab21338402",
+    "crates/rsdeseq2/examples/evaluate_r_interface/location_shrinkage.rs": "135e574326abf0a0ea7e75976b06c2a17befd064cf4c13c3d9ad12cd3c8baa34",
+    "crates/rsdeseq2/src/shrinkage/adaptive_output.rs": "fcdc731475e3fc0c3a0060188faa7e30c658dfc916ec8af03802250a4cf2995c",
+    "crates/rsdeseq2/src/shrinkage/adaptive_result.rs": "36a0e6b2da8e6ceff679065c372239e3e145b42498590c8a24eadb47092bdf3e",
+    "crates/rsdeseq2/src/shrinkage/builtin_likelihood.rs": "10dc2ab0fbe66764612af807a83af7228cb69aad5d22bfbe738eaad3f4e66539",
+    "crates/rsdeseq2/src/shrinkage/likelihood_diagnostics.rs": "80113639291d24d5684c86e46c1e741d782646058eb7dd1e8712e07523507281",
+    "crates/rsdeseq2/src/shrinkage/location_batch.rs": "d3758a21a029945115c603ac6c2ad6d5d04b6b50ffebd908249f51bf131a1fda",
+    "crates/rsdeseq2/src/shrinkage/location_fit.rs": "4bd4d2fa4f3f6aceb266a1d2f9fd36282d714e8ca5d273b399ee8eede0ed2aa0",
+    "crates/rsdeseq2/src/shrinkage/location_mode.rs": "2cd20ff6a135e60d664259a47a85588924a1aff1075415885389961c2854f8d6",
+    "crates/rsdeseq2/src/shrinkage/normal_mixture_captures.rs": "5576d8c0fba6cf7c6fcbd48d4d1e301e7d0523b4ccf385617857c444c536a688",
+    "crates/rsdeseq2/tests/ashr_mode.rs": "a239506ccc4b184fb99ed140aa452113c7a73955d2d71d09d9a257902e6b5a6c",
+    "crates/rsdeseq2/tests/ashr_output.rs": "40f6e88fd2de012ee8facbd11698fa925d20aa9ed38dcc7fe697d2fee9150647",
+    "crates/rsdeseq2/tests/data/likelihood_warnings_r462.json": "ba477fe59857a31acd2292d6260e98bd865d8a46fddeec4d1f9ac414d26f2379",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "bfc6d52826acd2cc638627fddeb439bb9b3426c535ba4f8b6555b4aaa2033e54",
+    "docs/native-capture-policy-development.md": "7799f13a1b5a3ea51ec361cb455973fa29c05dc70c80fba00b52115316c94108",
+    "docs/native-likelihood-warning-development.md": "54e6e09057c2664d5938d67058004c5583aca0f3e885dbe06277e14094b21540",
+    "docs/native-numerical-authority-audit.md": "95058ed79887292b19027467276e393c8d288912791cd1a67b61b203a80cf49d",
+    "docs/rust-only-wrapper-migration.md": "fbd9a5aebd8a1d6c3d877e00213f8793d4aeeed5fb2595e237d49f8c02a435fe",
+    "docs/testing-parity.md": "a055c1e5d7da232ab1fd7e053e56c0a45052047349c75467bb4f6f9ee64c6dd5",
+    "r-pkg/rsdeseq2/NEWS.md": "054dd8d5cf9d3b729736d605a4bed2adf97b081da04df4ddd80cc05840c9187a",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/adaptive_output.rs": "fcdc731475e3fc0c3a0060188faa7e30c658dfc916ec8af03802250a4cf2995c",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/adaptive_result.rs": "36a0e6b2da8e6ceff679065c372239e3e145b42498590c8a24eadb47092bdf3e",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/builtin_likelihood.rs": "10dc2ab0fbe66764612af807a83af7228cb69aad5d22bfbe738eaad3f4e66539",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/likelihood_diagnostics.rs": "80113639291d24d5684c86e46c1e741d782646058eb7dd1e8712e07523507281",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_batch.rs": "d3758a21a029945115c603ac6c2ad6d5d04b6b50ffebd908249f51bf131a1fda",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_fit.rs": "4bd4d2fa4f3f6aceb266a1d2f9fd36282d714e8ca5d273b399ee8eede0ed2aa0",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_mode.rs": "2cd20ff6a135e60d664259a47a85588924a1aff1075415885389961c2854f8d6",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/normal_mixture_captures.rs": "5576d8c0fba6cf7c6fcbd48d4d1e301e7d0523b4ccf385617857c444c536a688",
+    "r-pkg/rsdeseq2/tests/testthat/test-ashr-builtins.R": "b2d746c61adc1feeaa8ed74a2415dd23ad5b6dfbbc6ccd08f09a621ba1788120",
+    "scripts/check_native_ashr_mode.R": "2453434a4a2f89229093a75f782f140a2b44ff16a10ec80ed11ee006e35f201e",
+    "scripts/check_native_ashr_output.R": "a3fcd48bd87d517fdf9ce6e215374cf88929f9d08488b5b11870b42e5d6b7517",
+    "scripts/generate_likelihood_warning_reference.R": "b2f072ab843c26d790ea15ee28ede09e36c0bfbc68a548580bb3f4fbc7b9be52"
+  },
+  "runtime_manifest": "results/native-likelihood-warning-audit/build-source.json",
+  "runtime_manifest_sha256": "014614e2b1db4aaa6c5a42a45f11fa4984828acfc15a06c48958d446a4502ab6",
+  "runtime_paths": 628,
+  "changed_runtime_paths": [
+    "crates/rsdeseq2/src/shrinkage/adaptive_output.rs",
+    "crates/rsdeseq2/src/shrinkage/adaptive_result.rs",
+    "crates/rsdeseq2/src/shrinkage/builtin_likelihood.rs",
+    "crates/rsdeseq2/src/shrinkage/likelihood_diagnostics.rs",
+    "crates/rsdeseq2/src/shrinkage/location_batch.rs",
+    "crates/rsdeseq2/src/shrinkage/location_fit.rs",
+    "crates/rsdeseq2/src/shrinkage/location_mode.rs",
+    "crates/rsdeseq2/src/shrinkage/normal_mixture_captures.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/adaptive_output.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/adaptive_result.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/builtin_likelihood.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/likelihood_diagnostics.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_batch.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_fit.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_mode.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/normal_mixture_captures.rs"
+  ],
+  "artifact_manifest": "results/native-likelihood-warning-audit/artifacts.json",
+  "artifact_manifest_sha256": "3af5d7d54e4ca2742c3fc8e39e2b1560155f9f9e826784ab978e16256c4ea79e",
+  "artifacts": 151,
+  "gates": {
+    "original_ashr": "2.2-63",
+    "original_R": "4.6.2",
+    "selected_output_profiles": 34,
+    "mode_search_profiles": 2,
+    "original_warning_messages_order_and_multiplicity": "exact",
+    "existing_numerical_bounds": "unchanged",
+    "actual_native_wrapped_output": {
+      "complete_native_standalone_batches": 34,
+      "R_calculations_blocked": true,
+      "public_errors": [],
+      "public_warning_profiles": [],
+      "existing_bounds_unchanged": true
+    },
+    "actual_native_wrapped_modes": {
+      "complete_native_standalone_batches": 2,
+      "R_calculations_blocked": true,
+      "R_scalar_optimizer_blocked": true,
+      "public_errors": [],
+      "existing_bounds_unchanged": true
+    },
+    "R_calculations_blocked": true,
+    "both_R_CI_lanes": "new output/mode warning checks added; local commands pass",
+    "public_selected_profiles": [
+      {
+        "profile": "level_one",
+        "mean": 6.66133814775094e-16,
+        "sd": 4.413136522885e-15,
+        "svalue": 0
+      },
+      {
+        "profile": "level_four",
+        "mean": 6.66133814775094e-16,
+        "sd": 4.413136522885e-15,
+        "svalue": 0
+      },
+      {
+        "profile": "named_mean",
+        "mean": 6.66133814775094e-16,
+        "sd": 0,
+        "svalue": 0
+      },
+      {
+        "profile": "named_sd",
+        "mean": 0,
+        "sd": 4.413136522885e-15,
+        "svalue": 0
+      },
+      {
+        "profile": "named_no_prior",
+        "mean": 6.66133814775094e-16,
+        "sd": 4.413136522885e-15,
+        "svalue": 1.85037170770867e-17
+      },
+      {
+        "profile": "threshold_four",
+        "mean": 6.66133814775094e-16,
+        "sd": 4.413136522885e-15,
+        "svalue": 2.22044604925031e-16
+      }
+    ],
+    "public_recycled_profiles": [
+      {
+        "outputlevel": 1,
+        "warnings": 23,
+        "mean": 1.11022302462516e-16,
+        "sd": 3.88578058618805e-16,
+        "svalue": 0
+      },
+      {
+        "outputlevel": 2,
+        "warnings": 74,
+        "mean": 1.11022302462516e-16,
+        "sd": 3.88578058618805e-16,
+        "svalue": 1.38777878078145e-17
+      },
+      {
+        "outputlevel": 4,
+        "warnings": 22,
+        "mean": 1.11022302462516e-16,
+        "sd": 3.88578058618805e-16,
+        "svalue": 0
+      }
+    ],
+    "public_mode_profiles": [
+      {
+        "profile": "normal",
+        "mean": 3.44169137633799e-15,
+        "sd": 6.60582699651968e-15,
+        "svalue": 4.85722573273506e-17
+      },
+      {
+        "profile": "expanded",
+        "mean": 6.43152198165353e-13,
+        "sd": 4.08562073062058e-14,
+        "svalue": 1.12271303365219e-14
+      },
+      {
+        "profile": "alpha",
+        "mean": 3.44169137633799e-15,
+        "sd": 6.60582699651968e-15,
+        "svalue": 4.85722573273506e-17
+      },
+      {
+        "profile": "em",
+        "mean": 3.60852838865444e-05,
+        "sd": 2.34193262982352e-06,
+        "svalue": 6.30574321709709e-07
+      },
+      {
+        "profile": "student",
+        "mean": 1.82076576038526e-14,
+        "sd": 6.24500451351651e-15,
+        "svalue": 4.5102810375397e-17
+      },
+      {
+        "profile": "logistic",
+        "mean": 4.03874378385183e-10,
+        "sd": 0,
+        "svalue": 2.63677968348475e-16
+      }
+    ],
+    "count_fits": "reused immutable cached inputs",
+    "prior_replay_sets_exact": 27,
+    "committed_core_reference_files_unchanged": 214,
+    "focused_Rust_tests": 18,
+    "mode_output_followup_tests": 7,
+    "targeted_R_tests": "ashr-builtins and posterior-primitives pass",
+    "clippy": "root and R backend all targets pass with warnings denied",
+    "format_vendor_whitespace": "pass",
+    "production_R_numerical_guard": {
+      "files": 39,
+      "status": "pass"
+    },
+    "whole_source_runtime_bindings": "current runtime paths match built snapshot"
+  },
+  "fixture_metadata_correction": {
+    "field": "restricted mode nullweight",
+    "old_description": "inherited null-biased label",
+    "correct_description": "uniform, matching original call",
+    "original_outputs_traces_and_warnings": "unchanged"
+  },
+  "remaining": [
+    "C19/C21 full supported method, option, warning and state inventory",
+    "C23 combined current-source precision, speed/RSS, package/sanitizer/platform and local source bundle"
+  ],
+  "new_performance_claim": false,
+  "optimization_round_counted": false,
+  "publication_authorized": false
+}

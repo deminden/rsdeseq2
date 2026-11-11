@@ -208,7 +208,9 @@ pub fn estimate_location_mode(
                 .grid
                 .prior_with_likelihood(&fitted.fitted_weights, &trial_options.likelihood)?
                 .orient_for(&fitted.x, &fitted.se, 0..estimates.len())?;
-            if let LocationLikelihood::Restricted(f) = &trial_options.likelihood {
+            if let Some(f) =
+                super::likelihood_diagnostics::WarningLikelihood::new(&trial_options.likelihood)
+            {
                 trial_warnings.extend(super::likelihood_diagnostics::likelihood(
                     f,
                     &fitted.grid.components,

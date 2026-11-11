@@ -1,6 +1,41 @@
 //! Preserve optional-method diagnostics without repeating statistical work.
 //! Cached warning sequences follow the original full-summary operation graph.
-use super::{MixtureComponents, RestrictedLikelihood};
+use super::{
+    AdaptiveOutputSelection, BuiltinLocationLikelihood, LocationLikelihood, MixtureComponents,
+    RestrictedLikelihood,
+};
+#[derive(Clone, Copy)]
+pub(super) enum WarningLikelihood<'a> {
+    Restricted(&'a RestrictedLikelihood),
+    Recycled(&'a BuiltinLocationLikelihood),
+}
+impl<'a> WarningLikelihood<'a> {
+    pub(super) fn new(likelihood: &'a LocationLikelihood) -> Option<Self> {
+        match likelihood {
+            LocationLikelihood::Restricted(f) => Some(Self::Restricted(f)),
+            LocationLikelihood::Builtin(b) if b.has_recycling_warning() => Some(Self::Recycled(b)),
+            _ => None,
+        }
+    }
+    fn cdf_warnings(self, x: &[f64]) -> Vec<String> {
+        match self {
+            Self::Restricted(f) => f.cdf_warnings(x),
+            Self::Recycled(b) => b.capture_warnings(),
+        }
+    }
+    fn density_warnings(self, x: &[f64]) -> Vec<String> {
+        match self {
+            Self::Restricted(f) => f.density_warnings(x),
+            Self::Recycled(b) => b.capture_warnings(),
+        }
+    }
+    fn moment_warnings(self, a: &[f64], b: &[f64], order: u8) -> Vec<String> {
+        match self {
+            Self::Restricted(f) => f.moment_warnings(a, b, order),
+            Self::Recycled(f) => f.capture_warnings(),
+        }
+    }
+}
 #[derive(Default)]
 pub(super) struct Diagnostics {
     pub likelihood: Vec<String>,
@@ -19,7 +54,7 @@ fn coordinates(x: &[f64], s: &[f64], ends: &[f64], reverse: bool) -> Vec<f64> {
         .collect()
 }
 pub(super) fn likelihood(
-    f: &RestrictedLikelihood,
+    f: WarningLikelihood<'_>,
     components: &MixtureComponents,
     x: &[f64],
     s: &[f64],
@@ -33,7 +68,7 @@ pub(super) fn likelihood(
     warnings
 }
 pub(super) fn cdf(
-    f: &RestrictedLikelihood,
+    f: WarningLikelihood<'_>,
     components: &MixtureComponents,
     x: &[f64],
     s: &[f64],
@@ -60,7 +95,7 @@ pub(super) fn cdf(
 }
 impl Diagnostics {
     pub(super) fn new(
-        f: &RestrictedLikelihood,
+        f: WarningLikelihood<'_>,
         components: &MixtureComponents,
         x: &[f64],
         s: &[f64],
@@ -84,9 +119,10 @@ impl Diagnostics {
         }
         d
     }
-    pub(super) fn append_full_summary(
+    pub(super) fn append_selected_summary(
         &self,
         out: &mut Vec<String>,
+        outputs: AdaptiveOutputSelection,
         svalue: &[String],
         qvalue: &[String],
     ) {
@@ -96,20 +132,36 @@ impl Diagnostics {
         negative.extend_from_slice(&self.likelihood);
         let mut sign = negative.clone();
         sign.extend_from_slice(&self.likelihood);
-        // NegativeProb, PositiveProb, lfsr, svalue, lfdr, qvalue, PM, PSD.
-        out.extend_from_slice(&negative);
-        out.extend_from_slice(&sign);
-        out.extend_from_slice(&sign);
-        out.extend_from_slice(&sign);
-        out.extend_from_slice(svalue);
-        out.extend_from_slice(&self.likelihood);
-        out.extend_from_slice(&self.likelihood);
-        out.extend_from_slice(qvalue);
-        out.extend_from_slice(&self.likelihood);
-        out.extend_from_slice(&self.mean);
-        out.extend_from_slice(&self.likelihood);
-        out.extend_from_slice(&self.second);
-        out.extend_from_slice(&self.likelihood);
-        out.extend_from_slice(&self.mean);
+        // Original set_resfns order is independent of the supplied name order.
+        if outputs.negative_probability {
+            out.extend_from_slice(&negative);
+        }
+        if outputs.positive_probability {
+            out.extend_from_slice(&sign);
+        }
+        if outputs.local_false_sign_rate {
+            out.extend_from_slice(&sign);
+        }
+        if outputs.svalues {
+            out.extend_from_slice(&sign);
+            out.extend_from_slice(svalue);
+        }
+        if outputs.local_false_discovery_rate {
+            out.extend_from_slice(&self.likelihood);
+        }
+        if outputs.qvalues {
+            out.extend_from_slice(&self.likelihood);
+            out.extend_from_slice(qvalue);
+        }
+        if outputs.posterior_mean {
+            out.extend_from_slice(&self.likelihood);
+            out.extend_from_slice(&self.mean);
+        }
+        if outputs.posterior_sd {
+            out.extend_from_slice(&self.likelihood);
+            out.extend_from_slice(&self.second);
+            out.extend_from_slice(&self.likelihood);
+            out.extend_from_slice(&self.mean);
+        }
     }
 }

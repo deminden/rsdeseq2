@@ -54,8 +54,13 @@ pub(super) fn import(
     let expanded = (0..components)
         .map(|j| weights[j % weights.len()])
         .collect();
-    BuiltinLocationLikelihood::normal_mixture_by_observation(
+    let likelihood = BuiltinLocationLikelihood::normal_mixture_by_observation(
         expanded,
         MatrixView::new(scales.n_rows(), components, &values, MatrixOrder::RowMajor)?,
-    )
+    )?;
+    Ok(if components.is_multiple_of(weights.len().min(k)) {
+        likelihood
+    } else {
+        likelihood.with_recycling_warning()
+    })
 }

@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Preserve normal-mixture capture recycling warnings and output-dependent
+  warning order/multiplicity in shared Rust, including mode searches. Check
+  actual native/wrapped diagnostic identity and original-package warning
+  sequences without changing numerical kernels or accepted outputs.
+
 * Preserve R term order, polynomial matrix-variable grouping and interaction
   coding in complete native formula fits. Accept matching reduced LRT offsets,
   canonicalize unused sample factors with matrix normalization, and validate
