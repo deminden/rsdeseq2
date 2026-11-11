@@ -46,11 +46,13 @@ Detailed status lives in
 
 ## Validation and Performance
 
-Version 0.4.0 takes 36.27 seconds versus DESeq2's 189.25 seconds across
-eleven GTEx contrasts: an observed 5.22× summed process-time ratio. Rust peak
-RSS is 213–302 MiB, 82.8–86.7% below the matched DESeq2 process.
+Current development takes 43.86 seconds versus DESeq2's 245.68 seconds across
+eleven GTEx contrasts: an observed 5.60× summed process-time ratio. Rust peak
+RSS is 213–302 MiB, 82.7–86.5% below the matched DESeq2 process.
 Comparisons use native R 4.6.2 / DESeq2 1.52.0 on Apple M5, with one fitting/BLAS
-worker. These are single-pass observations with no discarded outliers.
+worker. These are single-pass observations with no discarded outliers. Other
+user and system workloads were active; small development speed changes cannot
+be inferred from these measurements.
 
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex, including biological comparisons and reproducible blocked/unblocked

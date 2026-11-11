@@ -1,6 +1,6 @@
 # Current standalone and R wrapper contract
 
-This inventory describes local development after `6fea9b6`, following the
+This inventory describes local development through `48917a0`, following the
 published 0.4.0 source. It maps the supported public surface to its numerical
 owner and evidence. It is not a claim of complete DESeq2 compatibility or final
 release acceptance. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
@@ -119,7 +119,7 @@ and every R RNG/optimizer family remain outside the documented supported scope.
 This inventory does not turn them into newly completed features or remove a
 previously supported method. Source-bound reports retain their original scope.
 
-## Remaining completion evidence
+## Current completion evidence
 
 The [combined-suite audit](native-plan-audit-development.md) identified a default
 ashr sparse SQP discrepancy in the existing 18-gene subset test. The subsequent
@@ -128,17 +128,17 @@ and passes the unchanged original-comparison bound. Supported here describes
 the intended API contract, not proof that every implementation route has
 already passed final combined acceptance.
 
-This inventory makes the remaining audit finite. C19/C21 still require a
-requirement-by-requirement reconciliation of these entry routes, supported
-options, warnings, state changes and forwarding adapters against current tests
-and actual interface outputs. A collection of successful primitive tests alone
-does not close the complete-workflow requirement.
+The [final local acceptance audit](final-plan-local-acceptance.md) now reconciles
+these entry routes, supported options, warnings, state changes and forwarding
+adapters against current tests and complete actual interface outputs. C19/C21
+are closed locally. Matrix and formula fits, replacement-aware later queries,
+posterior workflows and independent references establish different parts of
+that contract; primitive identity alone would not establish accuracy.
 
-C23 additionally requires the final combined source to pass frozen GTEx and
-held-out precision gates, actual standalone/wrapped checks, current speed and
-whole-process RSS measurements, Rust/R/Python checks, MSRV, boundary sanitizers,
-source/package checks and required platform gates. The new formula-fitting
-oracle has not yet been independently regenerated on Linux. Earlier timing and
-package artifacts cannot certify later source changes. Rebuild and hash the
-local release bundle only after reconciling these results. GitHub push, tagging
-and publication require a new user instruction.
+C23's current local frozen GTEx/held-out precision gates, standalone/wrapped
+checks, paired speed/RSS measurements, Rust/R/Python checks, MSRV and boundary
+sanitizers pass. Package evidence is reused only after source-hash comparison.
+The latest-commit bundle and required platform gates remain release requirements;
+the new formula-fitting and sparse SQP oracles have not been independently
+regenerated on Linux. GitHub push, tagging and publication require a new user
+instruction.

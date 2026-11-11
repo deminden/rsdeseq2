@@ -27,9 +27,11 @@ are useful preparation; successful target jobs remain required for publication.
 
 The [current supported contract](native-supported-contract.md) describes the
 shared Rust implementation after the published 0.4.0 source, including native
-frozen-local VST and supported ashr/apeglm calculations. C19/C21 authority
-reconciliation and C23 combined current-source checks remain open. Historical
-release evidence below must not be relabeled as validation of later code.
+frozen-local VST and supported ashr/apeglm calculations. The
+[final local acceptance audit](final-plan-local-acceptance.md) closes C19/C21
+locally and records the current combined checks, measurements and remaining
+C23 artifact/platform gates. Historical release evidence below must not be
+relabeled as validation of later code.
 Development stays local; push, tagging and publication wait for a new user
 instruction.
 
