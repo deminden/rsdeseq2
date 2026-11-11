@@ -106,6 +106,13 @@ fn legacy_qvalues(rates: &[f64], warnings: &mut Vec<String>) -> Vec<f64> {
     result
 }
 
+/// Internal output policy for cumulative error-rate summaries and warnings.
+#[derive(Clone, Copy)]
+pub(super) struct RateOutputs {
+    pub svalues: bool,
+    pub qvalues: bool,
+}
+
 /// Prepare, fit and summarize a complete observation batch without an R runtime.
 /// Excluded observations use prior summaries; raw requested CDFs retain their
 /// separate missing/zero/infinite-SE policy. Supplied grids permit fixed priors.
@@ -113,6 +120,22 @@ pub fn shrink_location_batch(
     estimates: &[f64],
     standard_errors: &[f64],
     options: &LocationShrinkageOptions,
+) -> Result<LocationShrinkage, DeseqError> {
+    shrink_location_batch_with_rates(
+        estimates,
+        standard_errors,
+        options,
+        RateOutputs {
+            svalues: true,
+            qvalues: true,
+        },
+    )
+}
+pub(super) fn shrink_location_batch_with_rates(
+    estimates: &[f64],
+    standard_errors: &[f64],
+    options: &LocationShrinkageOptions,
+    rates: RateOutputs,
 ) -> Result<LocationShrinkage, DeseqError> {
     if standard_errors.len() != estimates.len() && standard_errors.len() != 1 {
         return Err(invalid("SEs must have length one or match estimates"));
@@ -350,8 +373,16 @@ pub fn shrink_location_batch(
         .collect::<Vec<_>>();
     let mut sign_warnings = vec![];
     let mut null_warnings = vec![];
-    let svalues = legacy_qvalues(&lfsr, &mut sign_warnings);
-    let qvalues = legacy_qvalues(&lfdr, &mut null_warnings);
+    let svalues = if rates.svalues {
+        legacy_qvalues(&lfsr, &mut sign_warnings)
+    } else {
+        vec![]
+    };
+    let qvalues = if rates.qvalues {
+        legacy_qvalues(&lfdr, &mut null_warnings)
+    } else {
+        vec![]
+    };
     if let LocationLikelihood::Restricted(f) = &options.likelihood {
         let raw = super::likelihood_diagnostics::Diagnostics::new(f, &grid.components, &x, &se);
         warnings.extend_from_slice(&raw.likelihood);

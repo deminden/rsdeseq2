@@ -99,7 +99,7 @@
     res$svalue <- ashFit$result$svalue
   } else if (svalue) {
     res$svalue <- ashFit$result$svalue
-    res <- res[, c("baseMean", "log2FoldChange", "lfcSE", "svalue"), drop = FALSE]
+    res <- res[, intersect(c("baseMean", "log2FoldChange", "lfcSE", "svalue"), names(res)), drop = FALSE]
   } else {
     outputColumns <- intersect(
       c("baseMean", "log2FoldChange", "lfcSE", "pvalue", "padj"),

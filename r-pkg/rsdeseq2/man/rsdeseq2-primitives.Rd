@@ -317,6 +317,9 @@ not added as coefficient result-table columns. Restricted regression expressions
 support primitive numeric one-dimensional subscripts.
 Native ashr also supports ordinary, weighted, variational and compiled-style
 EM with scalar or higher-order RRE/MPE controls and positive variational priors.
+Numeric \code{outputlevel} and exact named subsets select posterior fields and
+fitted priors. Omitted fields remain absent; positive thresholds require
+\code{PosteriorMean} and \code{fitted_g}, including at level four.
 Native interior-point mixture fitting accepts a relative dual-gap tolerance.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.

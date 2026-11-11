@@ -329,3 +329,9 @@ adds 54 full/primitive requests, independent affine fixed points and 90-decimal
 convex KKT certificates. Native/wrapped outputs and controlled rejection decisions
 are exact. Original Mosek-backed mixIP is not executed; unregularized original SQP
 and the independent certificates provide separately identified convex references.
+
+The local [output-selection checkpoint](native-ashr-output-development.md) adds
+67 original-package selection/missingness cases with exact native/wrapped output
+bits and six public 128-gene profiles. Conjugate normal checks also run in the R
+posterior test file. Numeric levels and exact subsets preserve absent fields and
+unchanged numerical bounds; positive thresholds require means and fitted priors.

@@ -3,6 +3,7 @@
 //! Default R shrinkage routes share these implementations. Advanced optional
 //! methods remain under development; see the documented migration scope.
 mod adaptive_grid;
+mod adaptive_output;
 mod adaptive_result;
 mod beta_normalization;
 mod component_summary;
@@ -50,6 +51,9 @@ pub use likelihood::LocationLikelihood;
 
 pub use location_query::{LocationCdfOptions, location_cdf_batch, threshold_svalues};
 
+pub use adaptive_output::{
+    AdaptiveOutputSelection, SelectedAdaptiveShrinkageResult, adaptive_shrinkage_with_output,
+};
 pub use adaptive_result::{AdaptiveShrinkageQuery, AdaptiveShrinkageResult, adaptive_shrinkage};
 pub use heavy_tail::RegressionMethod;
 pub use heavy_tail::RestrictedRegressionLikelihood;

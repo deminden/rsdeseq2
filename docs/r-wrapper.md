@@ -119,8 +119,8 @@ posterior contrast. Numeric contrasts require a supplied result table; list
 contrasts average selected coefficients and need supplied results when their
 names are absent from the unshrunk design. The local development
 `type="ashr"` route uses shared Rust fitting, posterior means/SDs and s-values,
-including restricted custom likelihood expressions. Advanced optimizer,
-estimated-mode and output-subset options remain unfinished and fail explicitly;
+including restricted custom likelihood expressions. Estimated-mode and remaining
+likelihood/control options remain unfinished and fail explicitly;
 see the [development scope](shrinkage-component-development.md). Released 0.4.0
 uses the original ashr package. Local `type="apeglm"` default negative-binomial
 and MAP-only workflows, general likelihoods, `nbinomR` and beta-binomial methods
@@ -139,6 +139,11 @@ uses a log-barrier solver with `control=list(rtol=...)`. Higher-order `mixEM`,
 `w_mixEM` and `mixVBEM` accept `control=list(K=2,method="mpe",square=TRUE)`.
 See the [advanced optimizer scope and reference limits](native-ashr-advanced-optimizer-development.md). See the
 [optimizer scope, controls and explicit original-package corrections](native-ashr-optimizer-development.md).
+
+Numeric `outputlevel` and exact named subsets select the posterior fields and
+fitted prior returned by the local wrapper. Positive-threshold queries require
+`PosteriorMean` and `fitted_g`, including at level four. Omitted fields remain
+absent. See [output selection and validation](native-ashr-output-development.md).
 
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions

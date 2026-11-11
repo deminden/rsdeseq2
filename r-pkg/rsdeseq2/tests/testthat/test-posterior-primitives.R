@@ -21,6 +21,37 @@ testthat::test_that('posterior bridge preserves point masses and validates compl
     testthat::expect_error(.rsdeseq2_formula_request(list(operation='posterior_svalues',rates=rate)))
 })
 
+testthat::test_that('selected adaptive outputs preserve conjugate values and omitted fields', {
+  x <- c(-1,0,2); se <- rep(.5,3)
+  prior <- structure(data.frame(pi=1,mean=0,sd=1),class='normalmix')
+  run <- function(output,threshold=0) .rsdeseq2_native_ash(
+    list(betahat=x,sebetahat=se,method='shrink',mixcompdist='normal',g=prior,
+      fixg=TRUE,outputlevel=output),x,se,threshold,TRUE)
+  mean <- .8*x; sd <- rep(sqrt(.2),3)
+  for(level in c(1,4)) {
+    answer <- run(level)
+    testthat::expect_equal(answer$result$PosteriorMean,mean,tolerance=2e-12)
+    testthat::expect_equal(answer$result$PosteriorSD,sd,tolerance=2e-12)
+    testthat::expect_null(answer$result$svalue)
+    testthat::expect_equal(answer$fitted_g$pi,1)
+  }
+  answer <- run(c('PosteriorMean','svalue'))
+  testthat::expect_equal(answer$result$PosteriorMean,mean,tolerance=2e-12)
+  testthat::expect_null(answer$result$PosteriorSD)
+  testthat::expect_null(answer$fitted_g)
+  rates <- stats::pnorm(-abs(mean)/sd)
+  expected <- numeric(3);expected[order(rates)]<-cumsum(sort(rates))/seq_along(rates)
+  testthat::expect_equal(answer$result$svalue,expected,tolerance=2e-12)
+  answer <- run(5)
+  testthat::expect_null(answer$result$PosteriorMean)
+  testthat::expect_null(answer$result$PosteriorSD)
+  testthat::expect_null(answer$fitted_g)
+  rates <- ifelse(mean>0,stats::pnorm(.25,mean,sd),stats::pnorm(-.25,mean,sd,lower.tail=FALSE))
+  expected[order(rates)]<-cumsum(sort(rates))/seq_along(rates)
+  testthat::expect_equal(run(4,.25)$result$svalue,expected,tolerance=2e-12)
+  testthat::expect_error(run(5,.25),'PosteriorMean and fitted_g')
+})
+
 testthat::test_that('native mixture fitting retains weighted prior modes and diagnostics', {
   request<-list(operation='posterior_fit_mixture',observations=2L,components=2L,
     log_likelihoods=c(0,-Inf,-Inf,0),observation_weights=c(3,1),dirichlet=c(2,2),initial_weights=NULL,

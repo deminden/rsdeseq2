@@ -3,8 +3,9 @@ use super::location_shrinkage::{mixture, restricted_likelihood, supplied_with_po
 use super::posterior::{numbers, scalar};
 use super::{Data, Value, fields, get, named, text};
 use rsdeseq2::shrinkage::{
-    AdaptiveMethod, AdaptiveShrinkageQuery, LocationLikelihood, LocationShrinkageOptions,
-    MixtureGridOptions, MixturePriorPenalty, adaptive_shrinkage,
+    AdaptiveMethod, AdaptiveOutputSelection, AdaptiveShrinkageQuery, LocationLikelihood,
+    LocationShrinkageOptions, MixtureGridOptions, MixturePriorPenalty,
+    adaptive_shrinkage_with_output,
 };
 pub(super) fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
     let Data::List(values) = &v.data else {
@@ -263,11 +264,20 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if optimizer.is_sqp() {
         controls(field(args, "control"), &mut options)?;
     }
-    let output = number(args, "outputlevel", 2.0)?;
-    if output < 2.0 || output.is_nan() || output == 4.0 || output == 5.0 {
-        return Err("native ashr outputlevel subset is not implemented yet".into());
+    let output = match field(args, "outputlevel").map(|v| &v.data) {
+        None => AdaptiveOutputSelection::level(2.0),
+        Some(Data::Number { values, .. }) => match values.as_slice() {
+            [level] => AdaptiveOutputSelection::level(*level),
+            _ => return Err("outputlevel requires one numeric level or a text subset".into()),
+        },
+        Some(Data::Text(names)) => Ok(AdaptiveOutputSelection::names(
+            names.iter().flatten().map(String::as_str),
+        )),
+        Some(Data::Null | Data::Logical(_)) => Ok(AdaptiveOutputSelection::default()),
+        _ => return Err("outputlevel requires one numeric level or a text subset".into()),
     }
-    let result = adaptive_shrinkage(
+    .map_err(|e| e.to_string())?;
+    let result = adaptive_shrinkage_with_output(
         numbers(get(args, "betahat")?)?,
         numbers(get(args, "sebetahat")?)?,
         &options,
@@ -277,10 +287,20 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             lfc_threshold: scalar(get(request, "lfc_threshold")?)?,
             svalues: flag(get(request, "svalue")?)?,
         },
+        output,
     )
     .map_err(|e| e.to_string())?;
     input_warnings.extend(result.fit.warnings);
-    let fitted = mixture(result.fit.fitted_grid.components, result.fit.fitted_weights);
+    let fitted = if result.fitted_prior {
+        mixture(result.fit.fitted_grid.components, result.fit.fitted_weights)
+    } else {
+        Value::new(Data::Null)
+    };
+    let optional = |values: Option<Vec<f64>>| {
+        values
+            .map(Value::numbers)
+            .unwrap_or_else(|| Value::new(Data::Null))
+    };
     Ok(named(
         &[
             "posterior_mean",
@@ -290,12 +310,9 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "warnings",
         ],
         vec![
-            Value::numbers(result.posterior_mean),
-            Value::numbers(result.posterior_sd),
-            result
-                .svalues
-                .map(Value::numbers)
-                .unwrap_or_else(|| Value::new(Data::Null)),
+            optional(result.posterior_mean),
+            optional(result.posterior_sd),
+            optional(result.svalues),
             fitted,
             Value::new(Data::Text(input_warnings.into_iter().map(Some).collect())),
         ],

@@ -64,11 +64,11 @@
     lfc_threshold = lfcThreshold, svalue = svalue))
   for (message in native$warnings) warning(message, call. = FALSE)
   prior <- native$fitted_prior
-  fitted <- switch(prior$component_class,
+  fitted <- if (is.null(prior)) NULL else switch(prior$component_class,
     normalmix = data.frame(pi = prior$weights, mean = prior$means, sd = prior$sds),
     unimix = data.frame(pi = prior$weights, a = prior$lower, b = prior$upper),
     tnormalmix = data.frame(pi = prior$weights, mean = prior$means, sd = prior$sds, a = prior$lower, b = prior$upper))
-  class(fitted) <- prior$component_class
+  if (!is.null(prior)) class(fitted) <- prior$component_class
   list(result = list(PosteriorMean = native$posterior_mean, PosteriorSD = native$posterior_sd,
       svalue = native$svalue), fitted_g = fitted)
 }
