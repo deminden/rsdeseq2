@@ -15,6 +15,7 @@ mod fixed_mixture;
 mod gamma_normalization;
 mod gamma_probability;
 mod heavy_tail;
+mod large_shape;
 mod likelihood;
 mod likelihood_diagnostics;
 mod location_batch;

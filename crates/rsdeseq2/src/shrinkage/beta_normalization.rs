@@ -127,10 +127,24 @@ pub(super) fn log_regularized_beta(a: f64, b: f64, x: f64) -> f64 {
     if x >= 1.0 {
         return 0.0;
     }
+    if a.max(b) >= 1e5 {
+        if b == 1.0 {
+            return a * x.ln();
+        }
+        if a == 1.0 {
+            return (-(b * (-x).ln_1p()).exp_m1()).ln();
+        }
+    }
+    if super::large_shape::beta_large(a, b) {
+        return super::large_shape::beta_log_probability(a, b, x, true);
+    }
     let reflect = x >= (a + 1.0) / (a + b + 2.0);
     let (a, b, x) = if reflect { (b, a, 1.0 - x) } else { (a, b, x) };
-    let log = a * x.ln() + b * (-x).ln_1p() - statrs::function::beta::ln_beta(a, b)
-        + fraction(a, b, x).ln()
-        - a.ln();
+    let normalization = if a.max(b) >= 1e5 {
+        super::large_shape::log_beta(a, b)
+    } else {
+        statrs::function::beta::ln_beta(a, b)
+    };
+    let log = a * x.ln() + b * (-x).ln_1p() - normalization + fraction(a, b, x).ln() - a.ln();
     if reflect { (-log.exp()).ln_1p() } else { log }
 }

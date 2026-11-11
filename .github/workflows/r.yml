@@ -37,6 +37,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Check committed Rust vendor and package versions
         run: scripts/sync_r_vendor.sh --check
+      - name: Reject production R numerical calculations
+        run: Rscript --vanilla scripts/audit_r_numerical_boundary.R r-pkg/rsdeseq2/R
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran
       - run: mkdir -p "$R_LIBS_USER"

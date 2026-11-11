@@ -61,6 +61,9 @@ fn gamma_density(x: f64, a: f64, rate: f64) -> f64 {
             f64::NEG_INFINITY
         };
     }
+    if a >= 1e5 {
+        return super::large_shape::gamma_log_density(x, a, rate);
+    }
     a * rate.ln() + (a - 1.0) * x.ln() - rate * x - statrs::function::gamma::ln_gamma(a)
 }
 fn beta_density(x: f64, a: f64, b: f64) -> f64 {
@@ -88,7 +91,15 @@ fn beta_density(x: f64, a: f64, b: f64) -> f64 {
             f64::NEG_INFINITY
         };
     }
-    (a - 1.0) * x.ln() + (b - 1.0) * (-x).ln_1p() - statrs::function::beta::ln_beta(a, b)
+    if super::large_shape::beta_large(a, b) {
+        return super::large_shape::beta_log_density(x, a, b);
+    }
+    let normalization = if a.max(b) >= 1e5 {
+        super::large_shape::log_beta(a, b)
+    } else {
+        statrs::function::beta::ln_beta(a, b)
+    };
+    (a - 1.0) * x.ln() + (b - 1.0) * (-x).ln_1p() - normalization
 }
 // Source zero-mass intervals select the denser endpoint (right on a tie).
 fn moment(

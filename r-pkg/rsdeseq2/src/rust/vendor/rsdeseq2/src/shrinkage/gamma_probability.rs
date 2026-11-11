@@ -17,6 +17,9 @@ pub(super) fn log_gamma_probability(a: f64, x: f64, lower: bool) -> f64 {
     if x.is_infinite() {
         return if lower { 0.0 } else { f64::NEG_INFINITY };
     }
+    if a >= 1e5 {
+        return super::large_shape::gamma_log_probability(a, x, lower);
+    }
     let front = a * x.ln() - x - statrs::function::gamma::ln_gamma(a);
     let (value, direct_lower) = if x < a + 1.0 {
         let mut term = 1.0 / a;

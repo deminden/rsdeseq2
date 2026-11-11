@@ -363,3 +363,10 @@ output bits agree with R calculations blocked. Sixteen public count profiles
 cover fixed/default modes, automatic grids and default FDR across four links.
 Seventeen earlier accepted replay sets remain exact. Analytical gamma/beta
 identities and mixed-row batch-orientation cases supplement original references.
+
+The [large-shape correction](native-large-shape-development.md) adds 41 original
+kernel profiles and independent 100-decimal density truths. All 41 actual
+native/wrapped batches are exact and twenty earlier replay sets are unchanged.
+A production-R AST guard, also run by the R CI workflow, rejects numerical calls
+without mistaking quoted templates for execution. Its lexical scope does not
+replace runtime firewalls or the final authority audit.

@@ -15,7 +15,7 @@ pub(crate) const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
 
 // Integrate a nonnegative, rapidly decreasing tail in a caller-scaled
 // coordinate, using successively doubled panels and compensated summation.
-pub(super) fn integrate_positive_tail(density: impl Fn(f64) -> f64) -> f64 {
+pub(crate) fn integrate_positive_tail(density: impl Fn(f64) -> f64) -> f64 {
     let mut integral = 0.0;
     let mut compensation = 0.0;
     let mut left = 0.0;

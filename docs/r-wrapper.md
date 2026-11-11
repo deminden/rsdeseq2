@@ -407,3 +407,8 @@ Rust fit stored in its metadata and updated size or normalization factors.
 `estimateDispersionsRust()` runs the same Rust fit pipeline and returns its
 final per-gene dispersion estimates. The package does not populate every
 DESeq2 diagnostic assay or support every DESeq2 fitting option.
+
+Local large-shape gamma/beta/log-F kernels use scaled native integrals, with
+[original and high-precision validation](native-large-shape-development.md).
+A production-R numerical-call guard supplements runtime interface checks;
+remaining method/capture policies are listed in the [authority audit](native-numerical-authority-audit.md).

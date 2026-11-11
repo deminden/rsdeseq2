@@ -75,15 +75,32 @@ pub(super) fn log_density(x: f64, d1: f64, d2: f64) -> f64 {
     }
     if d2.is_infinite() {
         let a = d1 / 2.0;
+        if a >= 1e5 {
+            return super::large_shape::gamma_log_density(f, a, a) + x;
+        }
         return a * a.ln() - statrs::function::gamma::ln_gamma(a) + a * x - a * f;
     }
     if d1.is_infinite() {
         let b = d2 / 2.0;
+        if b >= 1e5 {
+            return super::large_shape::gamma_log_density(1.0 / f, b, b) - x;
+        }
         return b * b.ln() - statrs::function::gamma::ln_gamma(b) - b * x - b / f;
     }
     let a = d1 / 2.0;
     let b = d2 / 2.0;
     let z = (d1 / d2).ln() + x;
+    if super::large_shape::beta_large(a, b) {
+        return super::large_shape::beta_logit_density(a, b, x);
+    }
+    if a.max(b) >= 1e5 {
+        let numerator = if z > 0.0 {
+            -b * z - (a + b) * (-z).exp().ln_1p()
+        } else {
+            a * z - (a + b) * z.exp().ln_1p()
+        };
+        return numerator - super::large_shape::log_beta(a, b);
+    }
     a * z - (a + b) * softplus(z) - statrs::function::beta::ln_beta(a, b)
 }
 pub(super) fn truncated_mean(a: f64, b: f64, d1: f64, d2: f64) -> f64 {
