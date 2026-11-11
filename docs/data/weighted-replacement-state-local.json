@@ -1,0 +1,71 @@
+{
+  "artifact_manifest": "results/native-weighted-replacement-state/artifacts.json",
+  "artifact_manifest_sha256": "170392da51b25c9a00a7d72efadce7eda1e31ff8965becb70c513a96394227e4",
+  "base_commit": "3d2f453ed9f176d348497fdbea7362be9f1da2a0",
+  "changed_runtime_paths": [
+    "crates/rsdeseq2/src/core/fitted_results.rs",
+    "crates/rsdeseq2/src/core/implementation/fit_state.rs",
+    "crates/rsdeseq2/src/core/replacement_fit.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/fitted_results.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/implementation/fit_state.rs",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/replacement_fit.rs"
+  ],
+  "files": {
+    "crates/rsdeseq2/src/core/fitted_results.rs": "6b7171ba3b91075536a3e16154fdbe55281606ea6991436785926951770a2e8b",
+    "crates/rsdeseq2/src/core/implementation/fit_state.rs": "60aa0ad696869b8b015ea2189cb24d3f4192e32e7a936859735c895e59a039ed",
+    "crates/rsdeseq2/src/core/replacement_fit.rs": "2d2d52ddb8de45213965a7e5b8a55d655b86212ba32d92b6d1f9d520d843b17c",
+    "crates/rsdeseq2/tests/data/weighted_replacement_state_r462.json": "f769ea576fc21fa780920529d30928af8a201e68f9cadf7ee521fc21b55b040c",
+    "crates/rsdeseq2/tests/weighted_refit_metadata.rs": "a2b27a1ae686988e1bdd8919c7295dc572c4de6853720686d254f46a0991f42f",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "ff7abd3eac485a46eae157e8c9700ef7f99579e436de6b907c0c26df669387ba",
+    "docs/native-numerical-authority-audit.md": "59f01c91e60f5fd666868530ad5cc722aee751573060cfd39c65e7d761736c5d",
+    "docs/r-wrapper.md": "f1fe8333f07bb111ac5915956e2bcb890bc76f920e209567d79d8b8fcd9cec85",
+    "docs/rust-only-wrapper-migration.md": "319c1f228f70ba338419aff0bd1f165e54355d11c6666e3e8f1053539ca613d6",
+    "docs/testing-parity.md": "9ee8ad25d884e7a514fbb4e6620230138b7d912f006b1f2a30dba6a272e442e5",
+    "docs/weighted-replacement-state-correction.md": "9d9a5739f8c1326defd06bcc1b9d901fb6a27ba687b53f46854b2f75f1da3d0c",
+    "r-pkg/rsdeseq2/NEWS.md": "1993bdc89343796bdc1999c82e7ee0f525a2ee3596f3b0b9865cacf528ca36ba",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/fitted_results.rs": "6b7171ba3b91075536a3e16154fdbe55281606ea6991436785926951770a2e8b",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/implementation/fit_state.rs": "60aa0ad696869b8b015ea2189cb24d3f4192e32e7a936859735c895e59a039ed",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/replacement_fit.rs": "2d2d52ddb8de45213965a7e5b8a55d655b86212ba32d92b6d1f9d520d843b17c",
+    "scripts/check_fresh_fit_identity.R": "ec5d812a34f359c6a73afe907882ac3543cb12a646edb6fa87608095cc072d04",
+    "scripts/generate_weighted_replacement_state_reference.R": "3362693490532e70ba6e9fd85a22b4f9a9257713f8e862b6afaee3a83e63ef04"
+  },
+  "gates": {
+    "connected_Rust_tests": 153,
+    "fitting_objectives_controls_dependencies_bounds": "unchanged",
+    "formatting_vendor_integrity": "passed",
+    "fresh_fits_and_queries": {
+      "R_calculations_blocked": true,
+      "complete_fresh_fit_cases": 31,
+      "controlled_rejections": 4,
+      "floating_point_bits_including_missing_values": "exact",
+      "later_queries": 113,
+      "valid": 27
+    },
+    "old_core_reference_files_unchanged": 211,
+    "prior_complete_fresh_payloads_unchanged": 24,
+    "prior_later_queries_unchanged": 86,
+    "production_R_lexical_guard": "39 files, eight negative controls passed",
+    "root_backend_clippy": "passed"
+  },
+  "independent_reference": {
+    "DESeq2": "1.52.0",
+    "R": "4.6.2",
+    "actual_original_fits": 8,
+    "after_failing_state_cases": 0,
+    "base_mean_variance_bound": "1e-10 + 1e-12 * abs(reference)",
+    "before_failing_state_cases": 4,
+    "flags_counts_missingness": "exact",
+    "missingness_source": "Public results columns and separately validated betaConv/fullBetaConv vectors; missing/empty columns rejected"
+  },
+  "limitations": [
+    "Only the identified state defect is closed; full supported-option/warning/state and factor/formula query audits remain open.",
+    "The original exploratory probe did not validate generic statistic metadata columns; accepted reference uses actual public columns with length checks. Rejected draft artifacts are excluded.",
+    "No new speed/RSS measurement or optimization round.",
+    "Final combined GTEx/held-out precision, performance/RSS, sanitizer/MSRV/platform/package and source-bundle gates remain open.",
+    "No push, tag, publication or version bump."
+  ],
+  "runtime_source_manifest": "results/native-weighted-replacement-state/build-source.json",
+  "runtime_source_paths": 626,
+  "scope": "Refresh allZero after actual replacement, preserving failed-weight diagnostics separately",
+  "status": "local state correction; C19/C21/C23 remain open"
+}

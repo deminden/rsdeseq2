@@ -24,6 +24,10 @@ Standalone callers can now retain the merged fit and plan and use
 [query follow-up](native-replacement-query-development.md) verifies 86 numerical
 requests against actual wrapped calls, including missing-value bits and complete
 filtering metadata. Factor/formula and broader state coverage remain under audit.
+After actual replacement, `allZero` now reflects refreshed count zeros even for
+an unrelated row skipped because of its weights. Its failed-fit diagnostics stay
+missing; disabled/no-refit replacement retains the initial skip flag. See the
+[independent state correction](weighted-replacement-state-correction.md).
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 

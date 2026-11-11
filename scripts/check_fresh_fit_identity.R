@@ -24,13 +24,20 @@ profiles<-list(
  parametric=list(fit_type='parametric',counts=large$counts,design=cbind(Intercept=1,conditionB=rep(0:1,each=6))),
  local=list(fit_type='local'),
  weighted_failed=list(weights=failed),weighted_local_lrt=list(test='LRT',fit_type='local',weights=weights),
+ weighted_failed_lrt=list(test='LRT',weights=failed,factors=factors),
+ weighted_failed_no_refit_wald=list(weights=failed,size=size,min_replicates=3L),
+ weighted_failed_no_refit_lrt=list(test='LRT',weights=failed,factors=factors,min_replicates=3L),
  factor_precedence=list(size=size,factors=factors),multiworker=list(threads=4L),
  enabled_no_refit_wald=list(min_replicates=3L),enabled_no_refit_lrt=list(test='LRT',min_replicates=3L),
  weighted_enabled_no_refit=list(min_replicates=3L,weights=weights),
  replacement_wald=list(counts=replaced,min_replicates=3L),replacement_lrt=list(test='LRT',counts=replaced,min_replicates=3L),
  replacement_weighted_wald=list(counts=replaced,min_replicates=3L,weights=weights),
  replacement_weighted_lrt=list(test='LRT',counts=replaced,min_replicates=3L,weights=weights,factors=factors),
+ replacement_weighted_failed_wald=list(counts=replaced,min_replicates=3L,weights=failed,size=size),
+ replacement_weighted_failed_lrt=list(test='LRT',counts=replaced,min_replicates=3L,weights=failed,factors=factors),
  newzero_wald=list(counts=newzero,min_replicates=3L),newzero_lrt=list(test='LRT',counts=newzero,min_replicates=3L),
+ newzero_weighted_failed_wald=list(counts=newzero,min_replicates=3L,weights=failed,size=size),
+ newzero_weighted_failed_lrt=list(test='LRT',counts=newzero,min_replicates=3L,weights=failed,factors=factors),
  unreplaceable=list(counts=replaced,min_replicates=7L),
  weighted_unreplaceable=list(counts=replaced,min_replicates=7L,weights=weights),
  bad_reduced=list(test='LRT',reduced=matrix(1:8,8,1),error='nested'),
@@ -125,6 +132,8 @@ records<-lapply(seq_along(cases),function(i){
  if(startsWith(c$name,'newzero_'))stopifnot(fit$nRefit>0L,!any(fit$refitRows),any(fit$newAllZeroRows))
  if(grepl('no_refit',c$name,fixed=TRUE))stopifnot(fit$nRefit==0L)
  if(grepl('unreplaceable',c$name,fixed=TRUE))stopifnot(fit$nRefit==0L,!any(fit$replaceable),all(is.na(fit$replace)))
+ if(grepl('weighted_failed',c$name,fixed=TRUE))stopifnot(fit$allZero[[39L]] == (fit$nRefit == 0L),
+  is.na(fit$rawStat[[39L]]),is.na(fit$rawPvalue[[39L]]),is.na(fit$results$converged[[39L]]))
  list(name=c$name,value=actual)
 })
 names(records)<-names(profiles)

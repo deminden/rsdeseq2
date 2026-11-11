@@ -35,7 +35,9 @@ pub struct DeseqFit {
     /// Per-gene all-zero flags, matching DESeq2 `allZero`.
     ///
     /// For design-aware observation-weight stages, rows with `weightsFail` are
-    /// also marked true, matching DESeq2's downstream skip behavior.
+    /// also marked true, matching DESeq2's downstream skip behavior. Actual
+    /// replacement recomputes raw count-zero metadata for all rows before
+    /// selected refits; retain `weights_fail` separately for missing diagnostics.
     pub all_zero: Vec<bool>,
     /// Gene-wise dispersion estimates.
     pub disp_gene_est: Option<Vec<f64>>,

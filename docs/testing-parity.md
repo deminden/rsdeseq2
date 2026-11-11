@@ -405,3 +405,10 @@ and Wald threshold/t requests. Shared adjusted-value formatting preserves the
 explicit caller missing marker; runtime negative controls also block R lowess,
 quantile and adjustment execution. Original-DESeq2 state parity remains a
 separate requirement from agreement between the two interfaces.
+
+The [weighted state panel](weighted-replacement-state-correction.md) adds eight
+actual original-DESeq2 fits with validated public missingness/convergence fields.
+It exposes four old flag failures without changing earlier reference files or
+bounds. The fresh-fit checker now covers 31 fitting requests and 113 later
+queries, including failed-weight rows with no refits, ordinary replacement and
+new-zero-only replacement in both tests.

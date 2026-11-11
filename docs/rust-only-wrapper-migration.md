@@ -47,6 +47,9 @@ The [later-query follow-up](native-replacement-query-development.md) supplies an
 explicit replacement-aware request path and shared missing-value transport
 formatting. It verifies 86 later queries with raw bit comparisons; broader
 factor/formula and supported-state reconciliation remains open.
+The [weighted replacement state correction](weighted-replacement-state-correction.md)
+refreshes raw zero metadata separately from weight-failure diagnostics, with
+eight original fits and 31 fresh-fit/113 later-query cross-interface checks.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
