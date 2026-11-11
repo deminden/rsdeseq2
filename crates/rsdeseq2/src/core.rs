@@ -6,5 +6,6 @@
 mod execution;
 mod fitted_results;
 mod implementation;
+mod replacement_fit;
 
 pub use implementation::*;

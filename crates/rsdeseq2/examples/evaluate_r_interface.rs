@@ -17,6 +17,8 @@ mod em_fit;
 mod factor_expansion;
 #[path = "evaluate_r_interface/formula.rs"]
 mod formula;
+#[path = "evaluate_r_interface/fresh_fit.rs"]
+mod fresh_fit;
 #[path = "evaluate_r_interface/frozen_local.rs"]
 mod frozen_local;
 #[path = "evaluate_r_interface/heavy_tail.rs"]
@@ -418,6 +420,7 @@ fn statistics(input: StatisticsInput) -> Result<serde_json::Value, Box<dyn Error
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Input {
+    FreshFit(fresh_fit::Input),
     Random(random::Input),
     Regression(regression::Input),
     HeavyTail(heavy_tail::Input),
@@ -450,6 +453,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("expected an input JSON path")?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     let result = match input {
+        Input::FreshFit(input) => fresh_fit::evaluate(input),
         Input::Random(input) => random::evaluate(input)?,
         Input::Regression(input) => regression::evaluate(input)?,
         Input::HeavyTail(input) => heavy_tail::evaluate(input)?,

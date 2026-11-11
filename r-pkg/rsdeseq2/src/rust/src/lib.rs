@@ -170,9 +170,6 @@ unsafe fn copy_counts_to_r(counts: &CountMatrix, output: &mut [f64]) -> Result<(
     Ok(())
 }
 
-// Merge fitted rows and diagnostics after Cook's replacement.
-include!("lib/refit.rs");
-
 // Size factors, normalized counts and base metadata exports.
 include!("lib/normalization.rs");
 

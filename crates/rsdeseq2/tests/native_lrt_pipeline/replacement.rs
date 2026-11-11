@@ -68,6 +68,49 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
         assert_eq!(output.results.rows[gene].lfc_se, Some(0.0));
         assert_eq!(output.results.rows[gene].dispersion, None);
     }
+    let (merged, final_results, plan) = CooksReplacementTestOutput::Lrt(output.clone())
+        .into_merged_fit()
+        .unwrap();
+    assert_eq!(final_results, output.results);
+    assert_eq!(plan, output.refit_plan);
+    let bits = |values: &[f64]| values.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+    assert_eq!(
+        bits(merged.cooks.as_ref().unwrap().as_slice()),
+        bits(output.original_fit.cooks.as_ref().unwrap().as_slice())
+    );
+    for gene in 0..counts.n_genes() {
+        let source = if plan.refit_rows.contains(&gene) {
+            output.refit_fit.as_ref().unwrap()
+        } else {
+            &output.original_fit
+        };
+        for (actual, expected) in [
+            (&merged.beta_covariance, &source.beta_covariance),
+            (&merged.reduced_mu, &source.reduced_mu),
+        ] {
+            assert_eq!(
+                bits(actual.as_ref().unwrap().row(gene).unwrap()),
+                bits(expected.as_ref().unwrap().row(gene).unwrap())
+            );
+        }
+        assert_eq!(
+            merged.reduced_log_like.as_ref().unwrap()[gene].to_bits(),
+            source.reduced_log_like.as_ref().unwrap()[gene].to_bits()
+        );
+        assert_eq!(
+            merged.beta_optim_objective.as_ref().unwrap()[gene].to_bits(),
+            source.beta_optim_objective.as_ref().unwrap()[gene].to_bits()
+        );
+    }
+    let mut invalid = output;
+    invalid.refit_plan.new_all_zero_rows.push(counts.n_genes());
+    assert!(
+        CooksReplacementTestOutput::Lrt(invalid)
+            .into_merged_fit()
+            .unwrap_err()
+            .to_string()
+            .contains("out of range")
+    );
 }
 
 #[test]

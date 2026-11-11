@@ -14,6 +14,11 @@ provenance. Older offset fits without it may require the original input.
 Local fitted LRT metadata imports the degrees of freedom stored by Rust rather
 than recomputing it from dimensions in R. Ordinary Wald/LRT fitting enters the
 same core dispatcher; see the [fit-route audit](native-fit-route-audit.md).
+Replacement fits also share the standalone row merger. The
+[fresh-fit checkpoint](native-fresh-fit-development.md) records exact numerical
+identity across 24 fitting requests and corrections for weighted replacement
+summaries and unnamed matrix output metadata. Later replacement-aware result
+query context remains under audit.
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 
