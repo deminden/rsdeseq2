@@ -1,0 +1,40 @@
+# Native numerical authority: current audit
+
+The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md) and the strict
+[one-engine requirement](rust-only-wrapper-migration.md) remain the scope. This
+is an in-progress audit, not a declaration that C19/C21/C23 are complete.
+
+| Area | Inspected evidence | Disposition / next action |
+| --- | --- | --- |
+| Production R statistical calls | AST scan of all 39 R files, seven negative controls; quoted templates excluded; no direct R-evaluation/statistical calls found in the inspected C bridge | Removed one unused Cook's calculation and added the lexical CI guard. Runtime firewalls and complete workflow validation remain separate requirements. |
+| Large-count probability/density precision | Original-only panel, independent 100-digit densities and actual native/wrapped identity | [Corrected](native-large-shape-development.md): 299 baseline failing values become zero, with unchanged bounds. No optimizer is involved. |
+| Fitted result policy and bulk bridge | Existing result-request/prepared-contrast paths, native filtering/BH/Cook's decisions and prior identity artifacts | Implemented paths remain accepted. Complete cross-route authority and combined current-source checks still required. |
+| Canonical normal-mixture captures | Original 2.2-63 constructor inspection and direct matrix experiment | Matrix captures do not implement the intuitive row-weight semantics: equal total lengths flatten SDs/weights to one global mixture. Current native import rejects matrix weights. Add original-only capture/coercion references and implement the actual source policy in Rust. |
+| Compiled negative-binomial option dispatch | Original `nbinomC` with alternate optimizer, `log.link=FALSE` and tight bounds produces identical MAPs | Current native frontend rejects these combinations even though the original MAP-only path ignores them. Replace that rejection with method-specific argument policy; test CR's posterior/fallback behavior separately. This is a main-code contract issue, not an L-BFGS-B precision defect. |
+| Other advanced method/warning/error contracts | Known explicit unsupported cases, prior per-method reports, portable MT/CMRG Inversion state handling | Complete the parameter/capture/default/warning and supported-state inventory; retain explicit, documented errors for invalid or unsupported contracts. Do not introduce an R fallback. |
+| Final combined evidence | Earlier checkpoint-bound GTEx, source, sanitizer, timing/RSS and platform artifacts | Re-run required combined checks and rebuild the local source bundle only after the remaining changes are combined. Earlier artifacts do not certify the final replacement source. |
+
+## Is rcompat-lbfgsb the current precision limiter?
+
+The configured dependency remains `rcompat-lbfgsb 0.3.0`. No present isolated
+library defect has been demonstrated. The current large-shape failures were
+reproduced in probability kernels with no optimizer invocation. Six existing
+hard GTEx R-optim replays and the bounded numerical-gradient check pass their
+unchanged bounds. Those bounds do not imply bitwise agreement in every hard case.
+
+Optimization remains a sensitivity source for sparse/boundary/poorly conditioned
+rows. The earlier [apeglm experiment](native-apeglm-development.md) illustrates
+why a smaller gradient can still produce a worse reference MAP comparison:
+matching the original iteration/stopping policy is distinct from converging
+further on the same mathematical objective. Default apeglm's unbounded prefit
+and stopping policy are implemented in this repository; `rcompat-lbfgsb` supplies
+bounded fitting/fallbacks.
+
+Before changing the dependency, isolate one failing objective with identical
+start, bounds, gradient, scaling and stopping controls. Compare objective values,
+projected gradients, active bounds and traces against R's `optim`, then compare
+the full quantification outputs. The present evidence prioritizes numerical
+kernels and method/argument policy. It does not rule out rare library edge cases.
+
+No current quantification speed/RSS or latest-registry claim is added by this
+audit. Work remains local; pushing/tagging/publication require a new user request.

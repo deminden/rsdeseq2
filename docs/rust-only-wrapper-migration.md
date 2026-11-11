@@ -24,6 +24,10 @@ now use shared Rust probabilities and moments with per-observation parameters;
 [Poisson/binomial likelihoods](native-count-likelihood-development.md) now also
 share native kernels, count-specific modes/grids and complete-batch subtraction
 policy. Complete option/parameter/authority and combined checks remain open.
+[Large-shape kernels](native-large-shape-development.md) now retain gamma/beta
+precision at large counts; a lexical production-R numerical-call guard supplements
+runtime identity/firewall checks. See the [current authority audit](native-numerical-authority-audit.md)
+for remaining capture/method policies and combined gates.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

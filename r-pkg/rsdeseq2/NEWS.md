@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Correct large-count gamma/beta probabilities, moments and log-F densities with
+  scaled native integrals and stable normalization. Preserve numerical gates and
+  optimizer settings. Remove an unused R Cook's helper and guard production R
+  sources against direct statistical calls in CI.
+
 * Add standalone Poisson identity/log and binomial identity/logit likelihoods,
   count-specific mode/grid/FDR defaults, and batch-wide CDF orientation. Import
   canonical stored primitive parameters without executing R closures. Share

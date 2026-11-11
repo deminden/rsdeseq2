@@ -81,6 +81,14 @@ kernel, 24 complete and twelve mode requests agree exactly across interfaces;
 sixteen public profiles retain existing gates and seventeen accepted replay sets
 are unchanged. Full C19/C21/C23 option/authority/combined gates remain open.
 
+The [large-shape correction](native-large-shape-development.md) fixes 299
+independent gamma/beta/log-F value failures without changing optimizer settings
+or precision gates. Forty-one actual bridge/standalone kernel batches agree
+exactly, and twenty earlier replay sets are unchanged. A lexical guard rejects
+production R numerical calls; the [current authority audit](native-numerical-authority-audit.md)
+records concrete remaining matrix-capture and method-option policies. Full
+C19/C21/C23 contract and combined gates remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

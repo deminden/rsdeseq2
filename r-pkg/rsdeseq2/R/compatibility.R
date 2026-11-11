@@ -302,18 +302,6 @@
   cooks
 }
 
-.rsdeseq2_low_count_cooks_spares_row <- function(countsRow, cooksRow) {
-  if (all(is.na(cooksRow))) {
-    return(FALSE)
-  }
-  maxIdx <- which.max(cooksRow)
-  if (length(maxIdx) == 0L || is.na(cooksRow[[maxIdx]]) || !is.finite(cooksRow[[maxIdx]])) {
-    return(FALSE)
-  }
-  outCount <- countsRow[[maxIdx]]
-  sum(countsRow > outCount) >= 3L
-}
-
 .rsdeseq2_cooks_cutoff_output <- function(pvalue, maxCooks, cooksOutlier) {
   out <- data.frame(
     pvalue = pvalue,
