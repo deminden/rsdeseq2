@@ -93,6 +93,7 @@ jobs:
           Rscript --vanilla scripts/check_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-posterior
           Rscript --vanilla scripts/check_mixture_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-prior-fitting
           Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-likelihood-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
+          Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fixed-controls - crates/rsdeseq2/tests/data/fixed_prior_controls_r462.json
           Rscript --vanilla scripts/check_native_ashr_mode.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-mode-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
           Rscript --vanilla scripts/check_normal_log_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-log-tails
           Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform

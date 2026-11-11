@@ -25,6 +25,7 @@ mod location_mode;
 mod location_query;
 mod log_f;
 mod log_f_quadrature;
+mod mixture_controls;
 mod mixture_fit;
 mod normal_mixture;
 mod normal_mixture_captures;
@@ -33,6 +34,8 @@ mod svalue;
 mod truncated_normal_mixture;
 mod truncated_standard;
 mod uniform_mixture;
+
+pub use mixture_controls::ashr_mixture_fit_options;
 
 pub use mixture_fit::{
     InteriorPointOptions, MixtureFit, MixtureFitOptions, MixtureOptimizer, MixtureSqpOptions,

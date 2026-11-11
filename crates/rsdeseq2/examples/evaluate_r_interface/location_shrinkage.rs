@@ -79,13 +79,12 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
     if c.range.len() != 2 {
         return Err("location range requires two bounds".into());
     }
-    let optimizer = c
-        .optimizer
-        .as_ref()
-        .filter(|m| m.as_str() != "mixSQP")
-        .map(|m| super::em_fit::policy(m, &c.control))
-        .transpose()?
-        .unwrap_or_default();
+    let fit_options = super::em_fit::fit_options(
+        c.optimizer.as_deref().unwrap_or("mixSQP"),
+        &c.control,
+        c.fixed_prior,
+    )?;
+    let optimizer = fit_options.optimizer;
     let penalty = if let Some(p) = &c.penalty {
         if p == "unit" {
             MixturePriorPenalty::Unit
@@ -135,7 +134,7 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
     } else {
         None
     };
-    let mut result = LocationShrinkageOptions {
+    let result = LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: c.family.parse()?,
             scales: c.scales.as_ref().map(|v| numbers(v)).transpose()?,
@@ -148,10 +147,7 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
             ..Default::default()
         },
         supplied_grid,
-        fit_options: rsdeseq2::shrinkage::MixtureFitOptions {
-            optimizer,
-            ..LocationShrinkageOptions::default().fit_options
-        },
+        fit_options,
         fixed_prior: c.fixed_prior,
         likelihood: if let Some(value) = &c.builtin_likelihood {
             LocationLikelihood::Builtin(super::builtin_likelihood::model(value)?)
@@ -174,9 +170,6 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
             .transpose()?,
         thresholds: numbers(&c.thresholds)?,
     };
-    if optimizer.is_sqp() {
-        super::em_fit::sqp_controls(&c.control, &mut result.fit_options)?;
-    }
     Ok(result)
 }
 pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {

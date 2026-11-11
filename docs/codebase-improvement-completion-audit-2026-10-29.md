@@ -56,6 +56,13 @@ traces preserve existing bounds and exact native/wrapped diagnostics; 27 accepte
 replay sets stay unchanged. This closes specific findings, not the remaining
 supported-contract inventory or C19/C21/C23 combined acceptance.
 
+The [fixed-prior control checkpoint](native-fixed-prior-controls-development.md)
+consolidates optimizer-control translation in standalone Rust and corrects eager
+validation of unused controls. Twenty-six independent requests preserve the
+original acceptance decisions and numerical bounds, and all 29 prior replay sets
+remain exact. The broader supported contract inventory and final combined
+C19/C21/C23 checks stay open.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

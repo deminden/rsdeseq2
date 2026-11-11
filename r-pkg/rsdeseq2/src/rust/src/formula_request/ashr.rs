@@ -126,7 +126,14 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "w_mixEM",
         ],
     )?;
-    let optimizer = super::ashr_optimizer::policy(&optmethod, field(args, "control"))?;
+    let fixed_prior = field(args, "fixg").map(flag).transpose()?.unwrap_or(false);
+    let fit_options = rsdeseq2::shrinkage::ashr_mixture_fit_options(
+        &optmethod,
+        field(args, "control"),
+        fixed_prior,
+    )
+    .map_err(|e| e.to_string())?;
+    let optimizer = fit_options.optimizer;
     let method = if field(args, "method").is_some() {
         Some(
             if choice(field(args, "method"), &["fdr", "shrink"])? == "shrink" {
@@ -213,7 +220,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         }
         .with_ashr_method(method, point_mass, penalty, nullweight)
         .map_err(|e| e.to_string())?,
-        fixed_prior: field(args, "fixg").map(flag).transpose()?.unwrap_or(false),
+        fixed_prior,
         alpha: number(args, "alpha", 0.0)?,
         prune_threshold: number(args, "pi_thresh", 1e-10)?,
         observation_weights: optional_numbers(field(args, "weights"))?,
@@ -278,10 +285,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             );
         }
     }
-    options.fit_options.optimizer = optimizer;
-    if optimizer.is_sqp() {
-        super::ashr_sqp::controls(field(args, "control"), &mut options.fit_options)?;
-    }
+    options.fit_options = fit_options;
     if count_likelihood && field(args, "mode").is_none() && field(args, "g").is_none() {
         mode_search = Some(PriorModeSearch::ObservationRange);
     }

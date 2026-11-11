@@ -1,0 +1,3064 @@
+{
+  "scope": "fixed_prior_controls",
+  "source": {
+    "R": "4.6.2",
+    "ashr": "2.2.63"
+  },
+  "cases": [
+    {
+      "name": "mixSQP_1",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixSQP_1",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixSQP",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixSQP_2",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixSQP_2",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixSQP",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixSQP_3",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixSQP_3",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixSQP",
+        "control": {
+          "maxiter.sqp": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixSQP_4",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixSQP_4",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixSQP",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "Argument \"control\" contains unknown parameter names",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixIP_5",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixIP_5",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixIP",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": [
+        "Due to absence of package REBayes, switching to EM algorithm\n"
+      ]
+    },
+    {
+      "name": "mixIP_6",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixIP_6",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixIP",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": [
+        "Due to absence of package REBayes, switching to EM algorithm\n"
+      ]
+    },
+    {
+      "name": "mixIP_7",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixIP_7",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixIP",
+        "control": {
+          "rtol": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": [
+        "Due to absence of package REBayes, switching to EM algorithm\n"
+      ]
+    },
+    {
+      "name": "mixIP_8",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixIP_8",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixIP",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "unknown names in control: unused",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": [
+        "Due to absence of package REBayes, switching to EM algorithm\n"
+      ]
+    },
+    {
+      "name": "mixEM_9",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixEM_9",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixEM",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixEM_10",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixEM_10",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixEM",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixEM_11",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixEM_11",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixEM",
+        "control": {
+          "maxiter": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixEM_12",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixEM_12",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixEM",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "unknown names in control: unused",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "w_mixEM_13",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "w_mixEM_13",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "w_mixEM",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "w_mixEM_14",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "w_mixEM_14",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "w_mixEM",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "w_mixEM_15",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "w_mixEM_15",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "w_mixEM",
+        "control": {
+          "maxiter": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "w_mixEM_16",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "w_mixEM_16",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "w_mixEM",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "unknown names in control: unused",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixVBEM_17",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixVBEM_17",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixVBEM",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixVBEM_18",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixVBEM_18",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixVBEM",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixVBEM_19",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixVBEM_19",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixVBEM",
+        "control": {
+          "maxiter": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixVBEM_20",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixVBEM_20",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "mixVBEM",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "unknown names in control: unused",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "cxxMixSquarem_21",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "cxxMixSquarem_21",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "cxxMixSquarem",
+        "control": {
+          "unused": "ignored"
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "cxxMixSquarem_22",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "cxxMixSquarem_22",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "cxxMixSquarem",
+        "control": "not a list"
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "cxxMixSquarem_23",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "cxxMixSquarem_23",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "cxxMixSquarem",
+        "control": {
+          "maxiter": -1
+        }
+      },
+      "expected_error": null,
+      "posterior_mean": [
+        "-1.9447737117574451",
+        "-0.09142769993746877",
+        "0",
+        "0.11587729427027252",
+        "1.2880888448549717",
+        "3.846153691726919"
+      ],
+      "posterior_sd": [
+        "0.30468596883771848",
+        "0.26910212221455576",
+        "0.38207697458515927",
+        "0.49575764560016744",
+        "0.87708182274884128",
+        "0.3922325394045354"
+      ],
+      "svalues": [
+        "3.0716245658177129e-09",
+        "0.31466555688699704",
+        "0.39413015109436689",
+        "0.21362104663073309",
+        "0.046580530024098149",
+        "1.7192494011008896e-20"
+      ],
+      "fitted_prior": true,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "cxxMixSquarem_24",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "cxxMixSquarem_24",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": false,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "cxxMixSquarem",
+        "control": {
+          "unused": "invalid when fitted"
+        }
+      },
+      "expected_error": "unknown names in control: unused",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "not_an_optimizer_25",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "not_an_optimizer_25",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": {
+          "component_class": "normalmix",
+          "weights": [
+            "bits:3fe0000000000000",
+            "bits:3fd3333333333333",
+            "bits:3fc999999999999a"
+          ],
+          "means": [
+            "bits:0000000000000000",
+            "bits:0000000000000000",
+            "bits:0000000000000000"
+          ],
+          "sds": [
+            "bits:0000000000000000",
+            "bits:3fe0000000000000",
+            "bits:4000000000000000"
+          ],
+          "lower": null,
+          "upper": null
+        },
+        "df": null,
+        "optimizer": "not_an_optimizer",
+        "control": []
+      },
+      "expected_error": "'arg' should be one of “mixSQP”, “mixIP”, “cxxMixSquarem”, “mixEM”, “mixVBEM”, “w_mixEM”",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    },
+    {
+      "name": "mixSQP_26",
+      "estimates": [
+        "bits:c000000000000000",
+        "bits:bfd999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe999999999999a",
+        "bits:4000000000000000",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3ff3333333333333",
+        "bits:3fe6666666666666",
+        "bits:3fd999999999999a"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "location": {
+        "name": "mixSQP_26",
+        "estimates": [
+          "bits:c000000000000000",
+          "bits:bfd999999999999a",
+          "bits:0000000000000000",
+          "bits:3fe999999999999a",
+          "bits:4000000000000000",
+          "bits:4010000000000000"
+        ],
+        "standard_errors": [
+          "bits:3fd3333333333333",
+          "bits:3fe0000000000000",
+          "bits:3ff0000000000000",
+          "bits:3ff3333333333333",
+          "bits:3fe6666666666666",
+          "bits:3fd999999999999a"
+        ],
+        "thresholds": [],
+        "family": "normal",
+        "point_mass": false,
+        "nullweight": null,
+        "scales": null,
+        "mode": "bits:0000000000000000",
+        "range": [
+          "bits:fff0000000000000",
+          "bits:7ff0000000000000"
+        ],
+        "alpha": "bits:0000000000000000",
+        "prune_threshold": "bits:3ddb7cdfd9d7bdbb",
+        "observation_weights": null,
+        "fixed_prior": true,
+        "supplied_prior": null,
+        "df": null,
+        "optimizer": "mixSQP",
+        "control": "unused"
+      },
+      "expected_error": "If fixg = TRUE then you must specify g!",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": [],
+      "original_messages": []
+    }
+  ]
+}

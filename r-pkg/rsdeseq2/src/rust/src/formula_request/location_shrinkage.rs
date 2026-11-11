@@ -169,11 +169,19 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if range.len() != 2 {
         return Err("location range requires two bounds".into());
     }
-    let optimizer = super::ashr::field(request, "optimizer")
+    let fixed_prior = flag(get(request, "fixed_prior")?)?;
+    let method = super::ashr::field(request, "optimizer")
         .filter(|v| !matches!(v.data, Data::Null))
-        .map(|v| super::ashr_optimizer::policy(text(v)?, super::ashr::field(request, "control")))
+        .map(text)
         .transpose()?
-        .unwrap_or_default();
+        .unwrap_or("mixSQP");
+    let fit_options = rsdeseq2::shrinkage::ashr_mixture_fit_options(
+        method,
+        super::ashr::field(request, "control"),
+        fixed_prior,
+    )
+    .map_err(|e| e.to_string())?;
+    let optimizer = fit_options.optimizer;
     let nullweight = get(request, "nullweight")?;
     let penalty = if let Some(p) =
         super::ashr::field(request, "penalty").filter(|v| !matches!(v.data, Data::Null))
@@ -189,7 +197,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         MixturePriorPenalty::NullBiased(scalar(nullweight)?)
     };
     let df = get(request, "df")?;
-    let mut options = LocationShrinkageOptions {
+    let options = LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: text(get(request, "family")?)?
                 .parse()
@@ -208,11 +216,8 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             &penalty,
             optimizer.is_variational(),
         )?,
-        fit_options: rsdeseq2::shrinkage::MixtureFitOptions {
-            optimizer,
-            ..LocationShrinkageOptions::default().fit_options
-        },
-        fixed_prior: flag(get(request, "fixed_prior")?)?,
+        fit_options,
+        fixed_prior,
         likelihood: if let Some(b) = super::ashr::field(request, "builtin_likelihood")
             .filter(|v| !matches!(v.data, Data::Null))
         {
@@ -237,12 +242,6 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         observation_weights: optional(get(request, "observation_weights")?)?,
         thresholds: numbers(get(request, "thresholds")?)?.to_vec(),
     };
-    if optimizer.is_sqp() {
-        super::ashr_sqp::controls(
-            super::ashr::field(request, "control"),
-            &mut options.fit_options,
-        )?;
-    }
     shrink_location_batch(
         numbers(get(request, "estimates")?)?,
         numbers(get(request, "standard_errors")?)?,

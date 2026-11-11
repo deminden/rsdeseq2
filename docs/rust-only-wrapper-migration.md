@@ -325,3 +325,9 @@ retains nonmultiple capture-recycling provenance and selected-summary/mode-searc
 diagnostics entirely in shared Rust. Both frontends forward the same warnings
 and preserve numerical outputs. This is a specific contract correction; the
 broader inventory and final C19/C21/C23 gates remain open.
+
+The [fixed-prior control checkpoint](native-fixed-prior-controls-development.md)
+moves the duplicated SQP/EM/interior control translators into standalone Rust.
+Both frontends skip unused controls for fixed priors and preserve active-fit
+validation. Twenty-six requests agree across actual interfaces; all 29 previous
+payload sets remain exact. Broader inventory and combined acceptance remain open.

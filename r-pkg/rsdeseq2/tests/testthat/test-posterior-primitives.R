@@ -145,3 +145,22 @@ testthat::test_that('posterior methods ignore controls that their source dispatc
   testthat::expect_identical(run(utils::modifyList(arguments,list(log.link=c(TRUE,FALSE)))),expected)
   testthat::expect_true(all(is.finite(expected$posterior_mode)))
 })
+
+testthat::test_that('fixed priors ignore controls without disabling active-fit validation', {
+  testthat::skip_if_not_installed('ashr')
+  x <- c(-2,-.4,0,.8,2,4)
+  se <- c(.3,.5,1,1.2,.7,.4)
+  prior <- ashr::normalmix(c(.5,.3,.2),rep(0,3),c(0,.5,2))
+  for (optimizer in c('mixSQP','mixIP','mixEM','w_mixEM','mixVBEM','cxxMixSquarem')) {
+    arguments <- list(betahat=x,sebetahat=se,mixcompdist='normal',method='shrink',g=prior,
+      fixg=TRUE,optmethod=optimizer,control='unused while fixed')
+    original <- suppressMessages(do.call(ashr::ash,arguments))
+    actual <- .rsdeseq2_native_ash(arguments,x,se,0,TRUE)
+    testthat::expect_equal(actual$result$PosteriorMean,original$result$PosteriorMean,tolerance=2e-6)
+    testthat::expect_equal(actual$result$PosteriorSD,original$result$PosteriorSD,tolerance=2e-6)
+    testthat::expect_equal(actual$result$svalue,original$result$svalue,tolerance=2e-6)
+    arguments$fixg <- FALSE
+    arguments$control <- list(unused='must be rejected when active')
+    testthat::expect_error(.rsdeseq2_native_ash(arguments,x,se,0,TRUE),'control')
+  }
+})

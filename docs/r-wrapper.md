@@ -449,3 +449,8 @@ Local large-shape gamma/beta/log-F kernels use scaled native integrals, with
 [original and high-precision validation](native-large-shape-development.md).
 A production-R numerical-call guard supplements runtime interface checks;
 remaining method/capture policies are listed in the [authority audit](native-numerical-authority-audit.md).
+
+Optimizer controls for ashr fixed-prior (`fixg=TRUE`) requests are unused and are
+not inspected. The optimizer name and the supplied prior remain validated.
+Active fitting retains control validation. Both interfaces share the standalone
+Rust control policy; see the [control checkpoint](native-fixed-prior-controls-development.md).
