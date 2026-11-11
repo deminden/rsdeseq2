@@ -383,3 +383,8 @@ adds 21 independent method-control profiles, including four controlled errors
 and genuine source-traced refinement. All 21 actual native/wrapped outputs are
 exact; 24 earlier accepted panels and all 209 prior oracle files are unchanged.
 R frontend checks also cover malformed controls that original dispatch ignores.
+
+The [fit-route audit](native-fit-route-audit.md) removes duplicate R LRT degrees
+of freedom and adapter test dispatch. All 189 actual result-interface cases and
+four complete paired fitted-workflow payloads remain exact. One/two-df LRT and
+Wald NULL/type assertions supplement the existing fit and malformed-boundary tests.

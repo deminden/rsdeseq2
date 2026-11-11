@@ -227,6 +227,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     uint8_t *new_all_zero_values = (uint8_t *)R_alloc(n_genes, sizeof(uint8_t));
     SEXP n_refit_out = PROTECT(Rf_allocVector(INTSXP, 1));
     size_t n_refit_value = 0;
+    int lrt_df_value = 0;
     check_rust_backend(rsdeseq2_r_fit(n_genes, n_samples, REAL(counts),
         size_factors_input == R_NilValue ? NULL : REAL(size_factors_input),
         normalization_factors == R_NilValue ? NULL : REAL(normalization_factors),
@@ -238,7 +239,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out),
         &replacement_owner,
         replace_values, replaceable_values, refit_rows_values, new_all_zero_values, &n_refit_value, REAL(size_factors_out),
-        REAL(dispersions_out), REAL(disp_fit_out), REAL(base_var_out), LOGICAL(all_zero_out)));
+        REAL(dispersions_out), REAL(disp_fit_out), REAL(base_var_out), LOGICAL(all_zero_out), &lrt_df_value));
     SEXP replace_counts_out = PROTECT(rsdeseq2_finish_replacement(
         &replacement_owner, n_genes, n_samples, replacement_continuation));
     INTEGER(n_refit_out)[0] = (int)n_refit_value;
@@ -310,7 +311,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         if (replace_counts_out != R_NilValue)
             Rf_setAttrib(replace_counts_out, R_DimNamesSymbol, count_dimnames);
     }
-    SEXP fit = PROTECT(Rf_allocVector(VECSXP, 17));
+    SEXP fit = PROTECT(Rf_allocVector(VECSXP, 18));
     SET_VECTOR_ELT(fit, 0, out);
     SET_VECTOR_ELT(fit, 1, beta);
     SET_VECTOR_ELT(fit, 2, beta_se);
@@ -328,7 +329,8 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SET_VECTOR_ELT(fit, 14, all_zero_out);
     SET_VECTOR_ELT(fit, 15, refit_rows_out);
     SET_VECTOR_ELT(fit, 16, new_all_zero_out);
-    SEXP fit_names = PROTECT(Rf_allocVector(STRSXP, 17));
+    SET_VECTOR_ELT(fit, 17, Rf_asInteger(test_type) == 1 ? Rf_ScalarInteger(lrt_df_value) : R_NilValue);
+    SEXP fit_names = PROTECT(Rf_allocVector(STRSXP, 18));
     SET_STRING_ELT(fit_names, 0, Rf_mkChar("results"));
     SET_STRING_ELT(fit_names, 1, Rf_mkChar("beta"));
     SET_STRING_ELT(fit_names, 2, Rf_mkChar("betaSE"));
@@ -346,6 +348,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SET_STRING_ELT(fit_names, 14, Rf_mkChar("allZero"));
     SET_STRING_ELT(fit_names, 15, Rf_mkChar("refitRows"));
     SET_STRING_ELT(fit_names, 16, Rf_mkChar("newAllZeroRows"));
+    SET_STRING_ELT(fit_names, 17, Rf_mkChar("lrtDf"));
     Rf_setAttrib(fit, R_NamesSymbol, fit_names);
     UNPROTECT(27);
     return fit;

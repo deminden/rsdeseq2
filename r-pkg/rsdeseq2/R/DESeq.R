@@ -244,7 +244,7 @@ DESeq <- function(object,
       resultsNames = colnames(design),
       lrtStat = if (test == "LRT") rawStat else NULL,
       lrtPvalue = if (test == "LRT") rawPvalue else NULL,
-      lrtDf = if (test == "LRT") ncol(design) - ncol(reduced) else NULL
+      lrtDf = results$lrtDf
     ),
     class = "rsdeseq2RustFit"
   )

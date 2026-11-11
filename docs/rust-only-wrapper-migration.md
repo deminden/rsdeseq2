@@ -35,6 +35,9 @@ refinement policy in Rust. All 38 new native/wrapped batches agree exactly and
 The [regression method policy follow-up](native-regression-method-policy-development.md)
 shares scalar-bound normalization and ignored/deferred controls across general,
 beta-binomial and compiled-NB paths, with 21 further exact interface cases.
+The [fit-route audit](native-fit-route-audit.md) now imports core LRT degrees
+of freedom and forwards ordinary fits through one core test dispatcher. All
+189 actual result-interface cases and four paired fresh-fit payloads remain exact.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

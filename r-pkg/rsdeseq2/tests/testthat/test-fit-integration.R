@@ -9,6 +9,7 @@ testthat::test_that("Rust DESeq fit exposes coefficients for name and contrast r
   by_contrast <- results(fit, contrast = c(0, 1), independentFiltering = FALSE)
 
   testthat::expect_s3_class(fit, "rsdeseq2RustFit")
+  testthat::expect_null(fit$lrtDf)
   testthat::expect_equal(dim(fit$beta), c(nrow(counts), ncol(design)))
   testthat::expect_equal(dim(fit$betaCovariance), c(nrow(counts), ncol(design), ncol(design)))
   testthat::expect_equal(names(fit$sizeFactors), colnames(counts))
@@ -58,21 +59,24 @@ testthat::test_that("Rust DESeq fit exposes coefficients for name and contrast r
 testthat::test_that("Rust LRT fit returns model-comparison results and selected coefficients", {
   counts <- .rsdeseq2_test_counts()
   condition <- factor(rep(c("A", "B"), each = 4), levels = c("A", "B"))
-  data <- data.frame(condition = condition)
+  data <- data.frame(condition = condition, dose = rep(1:4, 2))
 
-  fit <- DESeq(
-    list(counts = counts, design = stats::model.matrix(~ condition)),
-    fitType = "mean",
-    test = "LRT",
-    reduced = stats::model.matrix(~ 1, data = data)
-  )
-  default <- results(fit, independentFiltering = FALSE)
-  selected <- results(fit, name = "conditionB", independentFiltering = FALSE)
+  for (df in 1:2) {
+    fit <- DESeq(
+      list(counts = counts, design = stats::model.matrix(if (df == 1L) ~ condition else ~ condition + dose, data)),
+      fitType = "mean",
+      test = "LRT",
+      reduced = stats::model.matrix(~ 1, data = data)
+    )
+    default <- results(fit, independentFiltering = FALSE)
+    selected <- results(fit, name = "conditionB", independentFiltering = FALSE)
 
-  testthat::expect_equal(fit$lrtDf, 1L)
-  testthat::expect_true(all(is.finite(default$pvalue)))
-  testthat::expect_true(all(is.finite(selected$log2FoldChange)))
-  testthat::expect_equal(unname(default$stat), unname(fit$lrtStat))
+    testthat::expect_identical(fit$lrtDf, df)
+    testthat::expect_true(all(is.finite(default$pvalue)))
+    testthat::expect_equal(unname(default$pvalue), stats::pchisq(default$stat, df, lower.tail = FALSE), tolerance = 2e-12)
+    testthat::expect_true(all(is.finite(selected$log2FoldChange)))
+    testthat::expect_equal(unname(default$stat), unname(fit$lrtStat))
+  }
 })
 
 testthat::test_that("Rust DESeq accepts a Bioconductor DESeqDataSet", {
