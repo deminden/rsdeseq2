@@ -15,69 +15,15 @@ use rsdeseq2::{
 fn reference() -> serde_json::Value {
     serde_json::from_str(include_str!("data/continuous_likelihood_r462.json")).unwrap()
 }
+#[path = "common/builtin_checks.rs"]
+mod checks;
 #[test]
 fn continuous_kernels_match_original_scalar_and_row_parameters() {
-    let mut failures = vec![];
-    for c in reference()["kernel_cases"].as_array().unwrap() {
-        let input: builtin_likelihood::Case = serde_json::from_value(c.clone()).unwrap();
-        let result = builtin_likelihood::run(&input);
-        if c["expected_error"].is_string() {
-            assert!(result.is_err(), "{}", input.name);
-            continue;
-        }
-        let r = result.unwrap();
-        for (i, name) in ["log_cdf", "log_density", "first", "second"]
-            .iter()
-            .enumerate()
-        {
-            compare(
-                &r[i],
-                &c[name],
-                if i < 2 { 2e-8 } else { 2e-6 },
-                2e-12,
-                &format!("{} {name}", input.name),
-                &mut failures,
-            );
-        }
-    }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    checks::kernels(reference());
 }
 #[test]
 fn complete_continuous_fits_preserve_original_summaries_and_missingness() {
-    let mut failures = vec![];
-    for c in reference()["cases"].as_array().unwrap() {
-        let input: location_shrinkage::Case = serde_json::from_value(c.clone()).unwrap();
-        let r = location_shrinkage::run(&input);
-        if c["expected_error"].is_string() {
-            assert!(r.is_err(), "{}", input.name);
-            continue;
-        }
-        let r = r.unwrap_or_else(|e| panic!("{}: {e}", input.name));
-        for (name, v) in [
-            ("posterior_mean", &r.posterior_mean),
-            ("posterior_sd", &r.posterior_sd),
-            ("svalues", &r.svalues),
-            ("cdf", &r.cdf),
-        ] {
-            compare(
-                v,
-                &c[name],
-                2e-6,
-                0.0,
-                &format!("{} {name}", input.name),
-                &mut failures,
-            );
-        }
-        compare(
-            &[r.log_likelihood],
-            &serde_json::json!([c["log_likelihood"]]),
-            2e-6,
-            0.0,
-            &format!("{} likelihood", input.name),
-            &mut failures,
-        );
-    }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    checks::complete_fits(reference());
 }
 #[test]
 fn logistic_identity_and_observation_geometry_have_independent_solutions() {

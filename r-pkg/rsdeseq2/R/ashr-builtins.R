@@ -2,6 +2,7 @@
 # functions or reproduce its statistical calculations in the wrapper.
 .rsdeseq2_native_ash_builtin <- function(lik) {
   kind <- lik[["name"]]
+  if (identical(kind, "pois") || identical(kind, "binom")) return(.rsdeseq2_native_ash_count(lik))
   if (!identical(kind, "normalmix") && !identical(kind, "logF")) return(NULL)
   parameters <- if (kind == "normalmix") c("pilik", "sdlik") else c("df1", "df2")
   fields <- if (kind == "normalmix") c("lcdfFUN", "lpdfFUN", "etruncFUN", "e2truncFUN") else c("lcdfFUN", "lpdfFUN", "etruncFUN")

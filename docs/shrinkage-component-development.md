@@ -237,7 +237,11 @@ native integration with original missingness and tail-cancellation behavior.
 Eleven kernel and 21 full requests agree exactly; fifteen accepted replay sets
 retain their outputs.
 
-Still open: Poisson/binomial likelihood families,
+The [count-likelihood checkpoint](native-count-likelihood-development.md) adds
+Poisson identity/log and binomial identity/logit noise, count-specific default
+modes/grids/null weights, and shared complete-batch CDF orientation.
+
+Still open: the complete option/parameter/method contract,
 the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.

@@ -21,7 +21,9 @@ now share active-set, line-search, regularization and optional spectral fitting;
 default outputs retain their accepted bits. Canonical
 [normal-mixture/log-F likelihoods](native-continuous-likelihood-development.md)
 now use shared Rust probabilities and moments with per-observation parameters;
-Poisson/binomial and complete authority/combined checks remain open.
+[Poisson/binomial likelihoods](native-count-likelihood-development.md) now also
+share native kernels, count-specific modes/grids and complete-batch subtraction
+policy. Complete option/parameter/authority and combined checks remain open.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

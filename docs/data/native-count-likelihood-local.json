@@ -1,0 +1,207 @@
+{
+  "artifacts": {
+    "results/native-count-likelihoods/accepted-replay.json": "a924880562869a8c608af170c408177ddf1a4423df40168ee17a88b33828f4ea",
+    "results/native-count-likelihoods/backend-clippy-final.log": "6ec3121034a22f54063a0e80f779792f00b68d563966617201aef0b7c055a580",
+    "results/native-count-likelihoods/build-final.log": "b1f295b6553af795b05e0d5c285347a19bd3f437b1cb789cd44aa35b206040a4",
+    "results/native-count-likelihoods/build-source-final.json": "428de3f39350ad1cf83c890979c895438cc6483688f423c86844670f6e25e815",
+    "results/native-count-likelihoods/clippy-final.log": "49de1333d5193e54a1402bba60b23d073dfafa6f82ee58a898ff8b4c7e0a863d",
+    "results/native-count-likelihoods/connected-tests-final.log": "86af9f77382df7e41be1d1cad4b1f0d32ff3c487641b773dc32da4346ce98382",
+    "results/native-count-likelihoods/evaluate-r-interface": "11f032e0942ab035ef272856825be062d3ab6bea83d648be184888ab2d73f5b3",
+    "results/native-count-likelihoods/existing-oracles-unchanged.json": "e6a71af2f53437552da810b23655de1c00444c1a27d86340094e2558f069e26a",
+    "results/native-count-likelihoods/gamma-test-final.log": "73d7274f723150d02aa4067bfd588ad7100eb0c145587d5775351ccb483481cd",
+    "results/native-count-likelihoods/install-final.log": "6ff3ec0d92af0dcdee42356a59e06ea8e46a5e6369a54b83d1279291d4055460",
+    "results/native-count-likelihoods/kronrod-test-final.log": "bc96f4033f83dc67d89a5e810d05189707335ee07083d76993723b5b33d69a19",
+    "results/native-count-likelihoods/local-library-final/rsdeseq2/libs/rsdeseq2.so": "9b9994b917bb4625347966c7680206472af9f8d0a723df9b222af2c7b2126950",
+    "results/native-count-likelihoods/location-identity-final.log": "c15f7ed0d07a1f2328bbbb3bf82fc162d0d3c7e5ea54eb85ecac8e8bd60a505a",
+    "results/native-count-likelihoods/location-identity-final/input.json": "b42a1cf50ccbda40dc98226480f4d901ae891307194adb66a735d88fa4c79baa",
+    "results/native-count-likelihoods/location-identity-final/standalone.json": "f7dcf4961579f326d80d1cd6a26f71a7048a298e07c8f018af227628c98ddb03",
+    "results/native-count-likelihoods/location-identity-final/validation.json": "a017c07c0256db30c0e781a6811eff830f715cc136034cc6920a021e712a8b5b",
+    "results/native-count-likelihoods/location-identity-final/wrapped.json": "4847fe332d99251efb9080c99a24c0a9fb4b1e78b5e95b98db91dcb870170ec9",
+    "results/native-count-likelihoods/r-tests-final.log": "a844c8b5873ecaa01f868db4c445c47a91fe1290f3d2781ccb8c87f101c9e00e",
+    "results/native-count-likelihoods/replay.py": "a57a8e5ade966d55e8c3a43c156f2716c53a888dd75bcce91aac43eac53ecbca",
+    "results/native-count-likelihoods/workflow-final.log": "03faba16d7ba4588db34baf851249da417c7d569d23f363c5be27f97b363425e",
+    "results/native-count-likelihoods/workflow-final/kernels/input.json": "b5e98c5cb6f864719cc45a1e0045559e6f5bec7da3de52c010f88b10f5cb3c1b",
+    "results/native-count-likelihoods/workflow-final/kernels/standalone.json": "dba2d3a68ee2e79a3522525429a1f47c9b39f49e2a9b37d1d40ce8142f2f76db",
+    "results/native-count-likelihoods/workflow-final/kernels/wrapped.json": "f51bd0826c2b861c7447ffadfda4987a7e576e2ca0f7c2a9f7444b8fd7c9c93f",
+    "results/native-count-likelihoods/workflow-final/modes/input.json": "1eaa9ec11ebb0350dc701eaba3da0c5b7e7caa5e3f325557a19a246ef31e9a8b",
+    "results/native-count-likelihoods/workflow-final/modes/standalone.json": "7802903883e0cd7b4aeb0abcf180028fa21b5f76ea354131b988f8e79aaa6def",
+    "results/native-count-likelihoods/workflow-final/modes/wrapped.json": "dca42333acc9487a83b002d93ec825d9b43e745ae662de6bdc7d44090c38f1df",
+    "results/native-count-likelihoods/workflow-final/validation.json": "9f1689968aa257907560968a66f0edd2c7a58acde353be06fc3826418cad30fa"
+  },
+  "base_commit": "543a57e3a11254e001694f0188d6d6478b6913f5",
+  "files": {
+    "crates/rsdeseq2/examples/evaluate_r_interface/builtin_likelihood.rs": "1c794da5679cbb8ec2c9b6c6124975d4d27fc5773d3844abd80faf3ca08f767a",
+    "crates/rsdeseq2/src/shrinkage.rs": "619804b8e001b7e30dce812a1a001e06ea1af9a1adaa6b131e73dc6e6209ff20",
+    "crates/rsdeseq2/src/shrinkage/builtin_likelihood.rs": "7dc9a62f0c383fb67a32ae8fffc2f55252e419c1f4126be92cbdf25874543b76",
+    "crates/rsdeseq2/src/shrinkage/count_likelihood.rs": "6366490549c7c09ca43baa358a9f8e95af173eab24acc0ecd57ba60561abd21c",
+    "crates/rsdeseq2/src/shrinkage/fixed_mixture.rs": "4791cd59511fdaa0ccd1400d30cde83ff7dadd6689b0da8251ba6f9c9439bec7",
+    "crates/rsdeseq2/src/shrinkage/location_batch.rs": "ff397ec6d81c6c26d5d737ef4af2d7c05badbee9f2cbeec60fff6a8e02da1cdf",
+    "crates/rsdeseq2/src/shrinkage/location_fit.rs": "701edd2a2a448c89c6a54f9ba28115866954216b5e5a8f56195f862227464748",
+    "crates/rsdeseq2/src/shrinkage/location_mode.rs": "1dd63007bcfdaca7917089a05256b1830f4efd6504772953ea0db7faa444ec58",
+    "crates/rsdeseq2/src/shrinkage/location_query.rs": "99710b6e0385a7bde79541459c12989919ffa1a9c93f34b3c0b785cca313ac0d",
+    "crates/rsdeseq2/src/shrinkage/uniform_mixture.rs": "213a7173a388f6a66c2b482450df5c8810bd9b1d6a874d9ce7e3ffc86b77a779",
+    "crates/rsdeseq2/tests/common/builtin_checks.rs": "25e5bd7804e4adc05c6038e637a5481e615c29ef9ce95a36f70ac4ad7ba5ff8a",
+    "crates/rsdeseq2/tests/continuous_likelihood.rs": "521c0b1df38ead5a920ad902866db4b251ac59c88e7105877b9bae53421371bc",
+    "crates/rsdeseq2/tests/count_likelihood.rs": "973751a6f3a84b956b97c6a6fe4ca9b50bba7f7e659dd66677d5a7cac5a175fe",
+    "crates/rsdeseq2/tests/data/count_likelihood_r462.json": "4d355c0a3968a931f79390e2392b1ddf6da03daea3880004ada726ad11431def",
+    "crates/rsdeseq2/tests/data/count_mode_r462.json": "a0841f00b9bf42d6b62b38e4e2afb28ecb476561f7788ca5d4e415dc66eab395",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "f18b844293b3ec3f56635bc3dc244bc4cd9d2129535f2400cb0db266e0992e04",
+    "docs/native-count-likelihood-development.md": "3289367331edd4a2930406607284f0ac847a69075a39724590a0757606298800",
+    "docs/r-wrapper.md": "4d8e522a68b2bd628a3550e5df4e92e5b8738fcc8daa7067c78188ea29b5c97b",
+    "docs/rust-only-wrapper-migration.md": "a795e90175646cc0989d080c0f061859d6abbca85690b73d1737191e758186ce",
+    "docs/shrinkage-component-development.md": "8ddecf6eaab3e69216f46d0d1aeb254211c089af15d92ebb119556647c952b2c",
+    "docs/testing-parity.md": "2beffc184a6061ab657060f6d140787d64c80a656f14793837405d4bbfc8bbc1",
+    "r-pkg/rsdeseq2/NEWS.md": "298181d981aff8a965e550fe654c51572fef61ab608f5e17e889261013355815",
+    "r-pkg/rsdeseq2/R/ashr-builtins.R": "bf4df0e32071aec0b4c4c259cc0a674b9dd3a6dafd8624df8dc682e7fd66ebb8",
+    "r-pkg/rsdeseq2/R/ashr-count-likelihoods.R": "1cdb1de844e6a9f49527ab9d6d076ad5fe83af4d0fdc5105f47d400fe618afcf",
+    "r-pkg/rsdeseq2/README.md": "8e893ec09c2fbb648ca77c04da41c061c61e5d928e052bc1136993addca077bd",
+    "r-pkg/rsdeseq2/man/rsdeseq2-primitives.Rd": "40008f65e381a99344f563815a9e332b4c298bf6c4aa9b71b5e5299381069f6f",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/ashr.rs": "cfbb16c625921490b79c3660472a98747b9574eab0f21c07c4cefe2753f27f89",
+    "r-pkg/rsdeseq2/src/rust/src/formula_request/location_shrinkage.rs": "4722887fedf96713289261e885dc9069ad6be52c8dbc5b758fa4615c95b3a5cf",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage.rs": "619804b8e001b7e30dce812a1a001e06ea1af9a1adaa6b131e73dc6e6209ff20",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/builtin_likelihood.rs": "7dc9a62f0c383fb67a32ae8fffc2f55252e419c1f4126be92cbdf25874543b76",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/count_likelihood.rs": "6366490549c7c09ca43baa358a9f8e95af173eab24acc0ecd57ba60561abd21c",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/fixed_mixture.rs": "4791cd59511fdaa0ccd1400d30cde83ff7dadd6689b0da8251ba6f9c9439bec7",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_batch.rs": "ff397ec6d81c6c26d5d737ef4af2d7c05badbee9f2cbeec60fff6a8e02da1cdf",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_fit.rs": "701edd2a2a448c89c6a54f9ba28115866954216b5e5a8f56195f862227464748",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_mode.rs": "1dd63007bcfdaca7917089a05256b1830f4efd6504772953ea0db7faa444ec58",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/location_query.rs": "99710b6e0385a7bde79541459c12989919ffa1a9c93f34b3c0b785cca313ac0d",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/shrinkage/uniform_mixture.rs": "213a7173a388f6a66c2b482450df5c8810bd9b1d6a874d9ce7e3ffc86b77a779",
+    "r-pkg/rsdeseq2/tests/testthat/test-ashr-count-likelihoods.R": "864eedfdfb8d387352ac29c19c15c3ca59bbc6b8e0e4cd6061479444dcff2381",
+    "scripts/check_location_shrinkage_identity.R": "c264ef62f8e773279494f620b96ca8beea485355bd90a2fc7c332a3662f2894b",
+    "scripts/check_native_count_likelihoods.R": "d60d7fa847612309426e544d75ea01defd09e3246b332a665118f7b1dc7eae6c",
+    "scripts/generate_count_likelihood_reference.R": "997682bccfad21e9c9845075b0ac5e3bc74a42e64c82cd7e8dae57c1738d323a",
+    "scripts/generate_count_mode_reference.R": "d9864bce699e167fc494ad01e96f9e80078c2a72d7b2c1ffab2b549e2da52f99"
+  },
+  "gates": {
+    "complete_posterior_cdf_likelihood_absolute": 2e-06,
+    "estimated_mode_absolute": 2e-06,
+    "existing_oracle_files_unchanged": 203,
+    "kernel_log_cdf_density_absolute": 2e-08,
+    "kernel_moments_absolute": 2e-06,
+    "kernel_relative": 2e-12,
+    "mode_bounds": "exact bits",
+    "mode_evaluations": "original trace length minus final reevaluation",
+    "no_accepted_tolerance_widened": true,
+    "public_posterior_absolute": 0.001,
+    "public_svalue_absolute": 0.02
+  },
+  "performance_claim": "No unchanged quantification timing/RSS retest; cached count fits reused; no added runtime dependencies; zero counted optimization rounds",
+  "publication_authorized": false,
+  "published_release_unchanged": true,
+  "remaining": [
+    "complete option/parameter/method/warning/verbose/error and authority audit",
+    "final combined precision/speed/memory/sanitizer/platform/source-bundle gates"
+  ],
+  "runtime_files": 619,
+  "runtime_manifest": "results/native-count-likelihoods/build-source-final.json",
+  "status": "local development checkpoint; full plan remains active",
+  "validation": {
+    "DESeq2": "1.52.0",
+    "R": "4.6.2",
+    "R_assertions": 111,
+    "R_calculations_blocked": true,
+    "accepted_payloads_unchanged": true,
+    "accepted_replay_sets": 17,
+    "ashr": "2.2-63",
+    "backend_clippy": "passed",
+    "complete_profiles": 24,
+    "connected_rust_tests": 29,
+    "core_clippy": "passed",
+    "kernel_profiles": 12,
+    "kernel_rows": 108,
+    "maximum_public_mean_absolute": 2.90554417747835e-08,
+    "mode_profiles": 12,
+    "mode_rows": 72,
+    "native_wrapped_bits": "exact",
+    "native_wrapped_complete_batches": 48,
+    "numerical_unit_tests": 2,
+    "public_errors": {
+      "binom_identity_automatic_grid": {
+        "mean": 5.44009282066327e-15,
+        "sd": 0,
+        "svalue": 0
+      },
+      "binom_identity_default_fdr": {
+        "mean": 5.55666623824891e-14,
+        "sd": 0,
+        "svalue": 0
+      },
+      "binom_identity_default_mode": {
+        "mean": 1.98729921407903e-14,
+        "sd": 0,
+        "svalue": 0
+      },
+      "binom_identity_fixed_mode": {
+        "mean": 4.65183447317941e-14,
+        "sd": 0,
+        "svalue": 0
+      },
+      "binom_logit_automatic_grid": {
+        "mean": 2.90554417747835e-08,
+        "sd": 1.22297995397425e-07,
+        "svalue": 1.21632846156183e-08
+      },
+      "binom_logit_default_fdr": {
+        "mean": 4.92890728231998e-11,
+        "sd": 5.09696729267262e-11,
+        "svalue": 2.21954815637915e-11
+      },
+      "binom_logit_default_mode": {
+        "mean": 1.94569516054344e-09,
+        "sd": 4.42430408975625e-09,
+        "svalue": 2.33201138954975e-10
+      },
+      "binom_logit_fixed_mode": {
+        "mean": 8.88178419700125e-15,
+        "sd": 5.03069808033274e-14,
+        "svalue": 0.0126322944270477
+      },
+      "pois_identity_automatic_grid": {
+        "mean": 4.38182823359057e-12,
+        "sd": 0,
+        "svalue": 0
+      },
+      "pois_identity_default_fdr": {
+        "mean": 2.02948768901479e-13,
+        "sd": 0,
+        "svalue": 0
+      },
+      "pois_identity_default_mode": {
+        "mean": 2.02948768901479e-13,
+        "sd": 0,
+        "svalue": 0
+      },
+      "pois_identity_fixed_mode": {
+        "mean": 9.01501095995627e-14,
+        "sd": 0,
+        "svalue": 0
+      },
+      "pois_log_automatic_grid": {
+        "mean": 2.27402443542246e-08,
+        "sd": 0,
+        "svalue": 3.46796619199452e-10
+      },
+      "pois_log_default_fdr": {
+        "mean": 1.28543575783624e-08,
+        "sd": 0,
+        "svalue": 1.69979058606273e-10
+      },
+      "pois_log_default_mode": {
+        "mean": 1.04256407951198e-08,
+        "sd": 0,
+        "svalue": 1.37995802285129e-10
+      },
+      "pois_log_fixed_mode": {
+        "mean": 2.20696350083927e-10,
+        "sd": 1.12221343329111e-10,
+        "svalue": 3.44723138923086e-11
+      }
+    },
+    "public_profiles": 16,
+    "rejected_complete_profiles": 4,
+    "valid_complete_profiles": 20,
+    "valid_complete_rows": 120,
+    "vendor_integrity": "passed"
+  }
+}

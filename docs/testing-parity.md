@@ -356,3 +356,10 @@ Seven public profiles retain unchanged bounds, one invalid profile rejects in
 both engines, and fifteen accepted replay sets remain exact. Tail-cancellation
 cases guard ordinary CDF arithmetic; analytical logistic and quadrature checks
 provide independent solutions alongside source parity.
+
+The local [count-likelihood checkpoint](native-count-likelihood-development.md)
+adds twelve kernel, 24 complete and twelve estimated-mode profiles. Native/wrapped
+output bits agree with R calculations blocked. Sixteen public count profiles
+cover fixed/default modes, automatic grids and default FDR across four links.
+Seventeen earlier accepted replay sets remain exact. Analytical gamma/beta
+identities and mixed-row batch-orientation cases supplement original references.

@@ -160,6 +160,11 @@ row-specific degrees of freedom retain complete-observation alignment. Uniform
 priors are supported; original log-F missing SDs and unsupported normal priors
 are retained. See [continuous likelihoods and limits](native-continuous-likelihood-development.md).
 
+Canonical `ashr::lik_pois` and `ashr::lik_binom` objects also import stored
+primitive counts and parameters without calling their functions. Identity/log
+and identity/logit links, count-specific mode/grid/FDR defaults and original
+intensity/probability moments run in Rust. See [count likelihoods and limits](native-count-likelihood-development.md).
+
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
 `etruncFUN(a, b)` and `e2truncFUN(a, b)`. Each function must contain one supported

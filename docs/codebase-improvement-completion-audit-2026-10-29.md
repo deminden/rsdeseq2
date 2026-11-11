@@ -74,6 +74,13 @@ valid public profiles retain existing bounds and one invalid profile rejects in
 both engines. Fifteen accepted replay sets are unchanged. Poisson/binomial
 families and full C19/C21/C23 authority/combined gates remain open.
 
+The subsequent [count-likelihood checkpoint](native-count-likelihood-development.md)
+adds Poisson identity/log and binomial identity/logit calculations, count-specific
+mode/grid/FDR defaults and batch-wide CDF orientation in shared Rust. Twelve
+kernel, 24 complete and twelve mode requests agree exactly across interfaces;
+sixteen public profiles retain existing gates and seventeen accepted replay sets
+are unchanged. Full C19/C21/C23 option/authority/combined gates remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

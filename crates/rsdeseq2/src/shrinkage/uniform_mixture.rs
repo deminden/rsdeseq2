@@ -9,6 +9,7 @@ use crate::{DeseqError, errors::invalid_dimensions};
 #[derive(Clone, Debug)]
 pub struct UniformMixture {
     log_weights: Vec<f64>,
+    cdf_reversed: Option<bool>,
     likelihood: LocationLikelihood,
     lower: Vec<f64>,
     upper: Vec<f64>,
@@ -69,6 +70,7 @@ impl UniformMixture {
         }
         Ok(Self {
             likelihood: LocationLikelihood::Normal,
+            cdf_reversed: None,
             log_weights: weights.into_iter().map(f64::ln).collect(),
             lower,
             upper,
@@ -84,6 +86,35 @@ impl UniformMixture {
     pub fn with_likelihood(mut self, likelihood: LocationLikelihood) -> Result<Self, DeseqError> {
         self.likelihood = likelihood.validated()?;
         Ok(self)
+    }
+    pub(super) fn has_count_likelihood(&self) -> bool {
+        matches!(&self.likelihood,LocationLikelihood::Builtin(b) if b.is_count())
+    }
+    pub(super) fn orient_for(
+        &mut self,
+        x: &[f64],
+        se: &[f64],
+        rows: impl Iterator<Item = usize> + Clone,
+    ) -> Result<(), DeseqError> {
+        if !self.has_count_likelihood() {
+            return Ok(());
+        }
+        let mut total = 0.0;
+        // Source matrices are column-major: accumulate observations within each component.
+        for (&a, &b) in self.lower.iter().zip(&self.upper) {
+            for i in rows.clone() {
+                let l = self.likelihood.at(i, x.len())?;
+                let d = l.log_cdf((x[i] - a) / se[i]) - l.log_cdf((x[i] - b) / se[i]);
+                if !d.is_nan() {
+                    total += d;
+                }
+            }
+        }
+        if total.is_nan() {
+            return Err(invalid("count-likelihood CDF orientation is undefined"));
+        }
+        self.cdf_reversed = Some(total < 0.0);
+        Ok(())
     }
     /// Component log convolution densities in prior input order.
     pub fn log_likelihoods(
@@ -109,6 +140,29 @@ impl UniformMixture {
         likelihood: &LocationLikelihood,
     ) -> Result<Vec<f64>, DeseqError> {
         observation(estimate, standard_error)?;
+        let reverse = if matches!(likelihood,LocationLikelihood::Builtin(b) if b.is_count()) {
+            match self.cdf_reversed {
+                Some(reverse) => reverse,
+                None => {
+                    let total = self
+                        .lower
+                        .iter()
+                        .zip(&self.upper)
+                        .map(|(&a, &b)| {
+                            likelihood.log_cdf((estimate - a) / standard_error)
+                                - likelihood.log_cdf((estimate - b) / standard_error)
+                        })
+                        .filter(|d| !d.is_nan())
+                        .sum::<f64>();
+                    if total.is_nan() {
+                        return Err(invalid("count-likelihood CDF orientation is undefined"));
+                    }
+                    total < 0.0
+                }
+            }
+        } else {
+            false
+        };
         Ok(self
             .lower
             .iter()
@@ -121,6 +175,11 @@ impl UniformMixture {
                 }
                 let left = likelihood.log_cdf((estimate - a) / standard_error);
                 let right = likelihood.log_cdf((estimate - b) / standard_error);
+                let (left, right) = if reverse {
+                    (right, left)
+                } else {
+                    (left, right)
+                };
                 // Preserve the established orientation and ordinary subtraction semantics.
                 left + (1.0 - language_exp(right - left)).ln() - (b - a).ln()
             })

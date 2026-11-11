@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::error::Error;
 pub fn model(v: &Value) -> Result<BuiltinLocationLikelihood, Box<dyn Error>> {
-    match v["type"].as_str().ok_or("missing built-in type")? {
+    let likelihood = match v["type"].as_str().ok_or("missing built-in type")? {
         "normalmix" => {
             let weights = numbers(&serde_json::from_value::<Vec<String>>(
                 v["weights"].clone(),
@@ -22,17 +22,46 @@ pub fn model(v: &Value) -> Result<BuiltinLocationLikelihood, Box<dyn Error>> {
             let Data::Number { values, .. } = scales.data else {
                 return Err("noise scales require numeric storage".into());
             };
-            Ok(BuiltinLocationLikelihood::normal_mixture_by_observation(
+            Ok::<_, Box<dyn Error>>(BuiltinLocationLikelihood::normal_mixture_by_observation(
                 weights,
                 MatrixView::new(rows, cols, &values, MatrixOrder::RowMajor)?,
             )?)
         }
+        "pois" => Ok(BuiltinLocationLikelihood::poisson(
+            numbers(&serde_json::from_value::<Vec<String>>(v["y"].clone())?)?,
+            numbers(&serde_json::from_value::<Vec<String>>(v["scale"].clone())?)?,
+            match v["link"].as_str() {
+                Some("identity") => rsdeseq2::shrinkage::PoissonLink::Identity,
+                Some("log") => rsdeseq2::shrinkage::PoissonLink::Log,
+                _ => return Err("unknown Poisson link".into()),
+            },
+        )?),
+        "binom" => Ok(BuiltinLocationLikelihood::binomial(
+            numbers(&serde_json::from_value::<Vec<String>>(v["y"].clone())?)?,
+            numbers(&serde_json::from_value::<Vec<String>>(v["trials"].clone())?)?,
+            match v["link"].as_str() {
+                Some("identity") => rsdeseq2::shrinkage::BinomialLink::Identity,
+                Some("logit") => rsdeseq2::shrinkage::BinomialLink::Logit,
+                _ => return Err("unknown binomial link".into()),
+            },
+        )?),
         "logF" => Ok(BuiltinLocationLikelihood::log_f(
             numbers(&serde_json::from_value::<Vec<String>>(v["df1"].clone())?)?,
             numbers(&serde_json::from_value::<Vec<String>>(v["df2"].clone())?)?,
         )?),
         _ => Err("unknown built-in likelihood".into()),
+    }?;
+    if let Some(capture) = v.get("capture_y") {
+        let y = numbers(&serde_json::from_value::<Vec<String>>(capture.clone())?)?;
+        let trials = v
+            .get("capture_trials")
+            .map(|v| serde_json::from_value::<Vec<String>>(v.clone()))
+            .transpose()?
+            .map(|v| numbers(&v))
+            .transpose()?;
+        likelihood.validate_count_captures(&y, trials.as_deref())?;
     }
+    Ok(likelihood)
 }
 #[derive(Deserialize)]
 pub struct Input {

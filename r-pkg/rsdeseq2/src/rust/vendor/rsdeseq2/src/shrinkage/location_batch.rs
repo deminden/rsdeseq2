@@ -147,14 +147,17 @@ pub(super) fn shrink_location_batch_with_rates(
         mut warnings,
     } = super::location_fit::fit_location(estimates, standard_errors, options)?;
     let n = estimates.len();
-    if matches!(&options.likelihood,LocationLikelihood::Builtin(b) if b.name()=="logF")
+    if matches!(&options.likelihood,LocationLikelihood::Builtin(b) if matches!(b.name(),"logF"|"pois"|"binom"))
         && x.iter().chain(&se).any(|v| v.is_nan())
     {
         return Err(invalid(
-            "log-F summaries require nonmissing observation bounds",
+            "this likelihood requires nonmissing observation bounds",
         ));
     }
-    let raw_prior = grid.prior_with_likelihood(&fitted_weights, &options.likelihood)?;
+    let rows = 0..n;
+    let raw_prior = grid
+        .prior_with_likelihood(&fitted_weights, &options.likelihood)?
+        .orient_for(&x, &se, rows.clone())?;
     if let MixtureComponents::TruncatedNormal { lower, upper, .. } = &grid.components
         && options.thresholds.iter().any(|&cutoff| {
             !lower
@@ -187,7 +190,9 @@ pub(super) fn shrink_location_batch_with_rates(
         dirichlet: vec![1.0; keep.len()],
         warnings: vec![],
     };
-    let summary_prior = summary_grid.prior_with_likelihood(&weights, &options.likelihood)?;
+    let summary_prior = summary_grid
+        .prior_with_likelihood(&weights, &options.likelihood)?
+        .orient_for(&x, &se, rows.clone())?;
     let (prior_mean, prior_sd, zero) = summary_grid.components.moments(&weights);
     let prior_negative = summary_grid.components.prior_cdf(&weights, 0.0)?;
     let prior_zero: f64 = weights
