@@ -120,6 +120,7 @@ pub(super) fn fit_mixture(request: &Value) -> Result<Value, String> {
         likelihood_offset: scalar(get(controls, "likelihood_offset")?)?,
         positive_coordinate_convergence: false,
         optimizer: Default::default(),
+        ..Default::default()
     };
     let initial = get(request, "initial_weights")?;
     let initial = if matches!(initial.data, Data::Null) {

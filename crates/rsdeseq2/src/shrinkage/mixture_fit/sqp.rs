@@ -23,6 +23,11 @@ impl Problem {
                 *new += (a / self.mass) * ((w * likelihood) / marginal);
             }
         }
+        if self.low_rank {
+            for w in &mut next {
+                *w = w.max(0.0);
+            }
+        }
         Ok(next)
     }
     pub(super) fn hessian(&self, weights: &[f64]) -> DMatrix<f64> {
@@ -93,8 +98,13 @@ impl Problem {
             }
             let current = DVector::from_column_slice(&weights);
             let linear = DVector::from_column_slice(&gradient) - &hessian * &current;
+            let active_iterations = if options.sqp.automatic_active_iterations {
+                20.min(self.components.saturating_add(1))
+            } else {
+                options.active_iterations
+            };
             let candidate =
-                nonnegative_quadratic(&hessian, &linear, &current, options.active_iterations)?;
+                nonnegative_quadratic(&hessian, &linear, &current, active_iterations, options.sqp)?;
             let direction = &candidate - &current;
             let slope = gradient
                 .iter()
@@ -103,7 +113,9 @@ impl Problem {
                 .sum::<f64>();
             let mut step = 1.0;
             let mut accepted = None;
-            while step >= 1e-8 {
+            let mut backtracks = 0;
+            while step >= options.sqp.minimum_step && backtracks < 10_000 {
+                backtracks += 1;
                 let proposed = weights
                     .iter()
                     .zip(direction.iter())
@@ -111,11 +123,17 @@ impl Problem {
                     .collect::<Vec<_>>();
                 let next = self.objective_gradient(&proposed).0;
                 evaluations += 1;
-                if next.is_finite() && next <= value + 0.01 * step * slope {
+                if next.is_finite()
+                    && next <= value + options.sqp.sufficient_decrease * step * slope
+                {
                     accepted = Some(proposed);
                     break;
                 }
-                step *= 0.75;
+                let smaller = step * options.sqp.step_reduction;
+                if smaller >= step {
+                    break;
+                }
+                step = smaller;
             }
             if let Some(next) = accepted {
                 weights = next;
@@ -125,7 +143,11 @@ impl Problem {
                     false,
                     residual,
                     evaluations,
-                    "SQP line search failed".into(),
+                    if backtracks == 10_000 {
+                        "SQP line search iteration limit reached".into()
+                    } else {
+                        "SQP line search failed".into()
+                    },
                 ));
             }
         }
@@ -160,6 +182,7 @@ fn nonnegative_quadratic(
     c: &DVector<f64>,
     start: &DVector<f64>,
     max_iterations: usize,
+    options: super::MixtureSqpOptions,
 ) -> Result<DVector<f64>, DeseqError> {
     let k = c.len();
     let mut y = start.clone();
@@ -171,7 +194,7 @@ fn nonnegative_quadratic(
             let i = (0..k)
                 .min_by(|&i, &j| gradient[i].total_cmp(&gradient[j]))
                 .unwrap();
-            if gradient[i] >= -1e-10 {
+            if gradient[i] >= -options.active_tolerance {
                 return Ok(y);
             }
             free[i] = true;
@@ -192,7 +215,7 @@ fn nonnegative_quadratic(
             let next = if ridge == 0.0 {
                 1e-15 * scale
             } else {
-                10.0 * ridge
+                options.ridge_multiplier * ridge
             };
             for i in 0..indices.len() {
                 reduced[(i, i)] += next - ridge;
@@ -205,6 +228,14 @@ fn nonnegative_quadratic(
             return Err(invalid(
                 "quadratic solution exceeds the representable range",
             ));
+        }
+        if let Some(threshold) = options.search_direction_threshold
+            && indices
+                .iter()
+                .enumerate()
+                .all(|(n, &i)| (target[n] - y[i]).abs() <= threshold)
+        {
+            return Ok(y);
         }
         let mut step = 1.0_f64;
         let mut blocked = None;
@@ -228,7 +259,7 @@ fn nonnegative_quadratic(
             .filter(|&i| !free[i])
             .min_by(|&i, &j| gradient[i].total_cmp(&gradient[j]));
         if let Some(i) = worst
-            && gradient[i] < -1e-10
+            && gradient[i] < -options.active_tolerance
         {
             free[i] = true;
             continue;

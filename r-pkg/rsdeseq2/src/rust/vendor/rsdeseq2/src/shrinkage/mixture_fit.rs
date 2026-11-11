@@ -18,6 +18,7 @@ pub struct MixtureFitOptions {
     /// Keep false for the general convex fitter's stronger full KKT check.
     pub positive_coordinate_convergence: bool,
     pub optimizer: MixtureOptimizer,
+    pub sqp: MixtureSqpOptions,
 }
 impl Default for MixtureFitOptions {
     fn default() -> Self {
@@ -30,6 +31,7 @@ impl Default for MixtureFitOptions {
             likelihood_offset: 0.0,
             positive_coordinate_convergence: false,
             optimizer: MixtureOptimizer::SequentialQuadratic,
+            sqp: MixtureSqpOptions::default(),
         }
     }
 }
@@ -65,7 +67,11 @@ struct Problem {
     mass: f64,
     components: usize,
     offset: f64,
+    low_rank: bool,
 }
+mod controls;
+mod low_rank;
+pub use controls::MixtureSqpOptions;
 mod em;
 mod interior_point;
 mod polynomial;
@@ -170,6 +176,9 @@ pub fn fit_mixture_proportions(
         );
     }
     let n = log_likelihoods.n_rows();
+    if options.optimizer.is_sqp() {
+        options.sqp.validate()?;
+    }
     let k = log_likelihoods.n_cols();
     if k == 0 {
         return Err(invalid("at least one component is required"));
@@ -280,7 +289,19 @@ pub fn fit_mixture_proportions(
         } else {
             options.likelihood_offset
         },
+        low_rank: false,
     };
+    let approximate = if options.optimizer.is_sqp() {
+        options
+            .sqp
+            .svd_tolerance
+            .map(|tol| problem.truncated(tol))
+            .transpose()?
+            .flatten()
+    } else {
+        None
+    };
+    let optimization = approximate.as_ref().unwrap_or(&problem);
     let interior = match options.optimizer {
         MixtureOptimizer::InteriorPoint(o) => Some(o),
         _ => None,
@@ -297,7 +318,7 @@ pub fn fit_mixture_proportions(
                 Some(f.iterations),
             )
         } else {
-            let (w, c, r, e, m) = problem.solve(start, options)?;
+            let (w, c, r, e, m) = optimization.solve(start, options)?;
             (w, c, r, e, m, None)
         };
     let total = raw_weights.iter().sum::<f64>();
@@ -309,7 +330,7 @@ pub fn fit_mixture_proportions(
     }
     let weights = raw_weights;
     let dual_residual = residual;
-    let objective = problem.objective_gradient(&weights).0;
+    let objective = optimization.objective_gradient(&weights).0;
     let log_likelihood = problem.log_likelihood(&weights);
     let penalized_log_likelihood = log_likelihood
         + problem

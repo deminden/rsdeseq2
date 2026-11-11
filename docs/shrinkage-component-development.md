@@ -227,8 +227,12 @@ The [estimated-mode checkpoint](native-ashr-mode-development.md) adds native
 likelihood-only profiling, original search traces and analytical optima without
 executing posterior moment expressions during the search.
 
+The [SQP-control checkpoint](native-sqp-control-development.md) adds the remaining
+numerical policies, including line search and genuine spectral truncation with
+independent original/exact-SVD comparisons.
+
 Still open: other built-in likelihood families,
-remaining controls, the full warning/integration-failure
+the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.
 Full suites and release checks remain deferred until this work is combined.

@@ -77,6 +77,23 @@ testthat::test_that('native mixture fitting retains weighted prior modes and dia
     testthat::expect_error(.rsdeseq2_formula_request(utils::modifyList(request,change,keep.null=TRUE)))
 })
 
+testthat::test_that('SQP direction controls retain the analytical first EM state', {
+  request<-list(operation='posterior_fit_sqp',observations=4L,components=2L,
+    log_likelihoods=log(c(1,.3,.2,1,.7,.4,.5,1)),observation_weights=NULL,
+    dirichlet=c(1,1),initial_weights=NULL,optimizer='mixSQP',
+    control=list(maxiter.sqp=1,numiter.em=0,zero.threshold.searchdir=2,eps=0))
+  fit<-.rsdeseq2_formula_request(request)
+  expected<-(1/1.3+.2/1.2+.7/1.1+.5/1.5)/4
+  testthat::expect_equal(fit$weights,c(expected,1-expected),tolerance=1e-12)
+  testthat::expect_false(fit$converged)
+  request$control<-list(maxiter.activeset=NULL,convtol.activeset=1e-12)
+  fit<-.rsdeseq2_formula_request(request)
+  testthat::expect_true(fit$converged)
+  testthat::expect_equal(sum(fit$weights),1,tolerance=1e-12)
+  request$control<-list(stepsizereduce=1)
+  testthat::expect_error(.rsdeseq2_formula_request(request),'invalid SQP')
+})
+
 testthat::test_that('log normal tails retain underflowed probabilities through the native bridge', {
   x<-c(-Inf,-40,-8,0,8,40,Inf,NaN)
   actual<-.rsdeseq2_formula_request(list(operation='normal_log_probabilities',arguments=x))

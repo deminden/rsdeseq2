@@ -123,3 +123,6 @@ for omitted fields and positive-threshold requirements.
 
 `mode="estimate"` now runs in Rust; see [mode profiling and bounds](../../docs/native-ashr-mode-development.md)
 for numerical comparisons and the original two-element mode policy.
+
+Local SQP numerical controls now include active-set convergence, line search,
+regularization and optional SVD. See [controls and reference scope](../../docs/native-sqp-control-development.md).

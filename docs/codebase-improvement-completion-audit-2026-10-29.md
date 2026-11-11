@@ -59,6 +59,13 @@ exact, six public profiles retain existing precision gates, and twelve accepted
 replay sets are unchanged. Remaining likelihood/control and full C19/C21/C23
 authority/combined gates stay open.
 
+The later [SQP-control checkpoint](native-sqp-control-development.md) adds native
+line-search, active-set, regularization and optional spectral controls, including
+automatic limits and genuine prior-augmented truncation. Thirty-three full/raw
+requests agree exactly across interfaces, twenty connected Rust tests and 70 R
+assertions pass, and thirteen accepted replay sets are unchanged. Likelihood
+families and full C19/C21/C23 authority/combined gates remain open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

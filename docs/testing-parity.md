@@ -341,3 +341,10 @@ original search profiles, exact native/wrapped requests and six public workflows
 Bounds/counts, posterior/likelihood precision, analytical normal optima and unused
 invalid moment expressions are checked. R scalar optimizers are explicitly
 blocked; twelve earlier complete replay sets retain exact outputs.
+
+The local [SQP-control checkpoint](native-sqp-control-development.md) adds 33
+complete and primitive profiles, including genuine rank-six/seven truncation,
+independent exact-SVD references and analytical direction-cutoff checks. Both
+original and independent spectral outputs retain `2e-6` bounds. Complete R/native
+output bits agree, six public profiles pass, and thirteen accepted replay sets
+remain exact. Original verbose/advisory formatting remains in the authority audit.

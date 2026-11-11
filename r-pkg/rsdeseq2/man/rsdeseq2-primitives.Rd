@@ -322,6 +322,9 @@ fitted priors. Omitted fields remain absent; positive thresholds require
 \code{PosteriorMean} and \code{fitted_g}, including at level four.
 \code{mode="estimate"} profiles the mixture likelihood in shared Rust without
 R optimization. Two-element mode inputs retain original ashr range semantics.
+SQP numerical controls include active-set, direction, line-search and
+regularization policies, automatic active-set limits and optional spectral
+truncation. The accepted default uses the full matrix.
 Native interior-point mixture fitting accepts a relative dual-gap tolerance.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.
