@@ -126,3 +126,8 @@ for numerical comparisons and the original two-element mode policy.
 
 Local SQP numerical controls now include active-set convergence, line search,
 regularization and optional SVD. See [controls and reference scope](../../docs/native-sqp-control-development.md).
+
+Local canonical normal-mixture/log-F observation likelihoods now share Rust
+probabilities, moments and per-observation parameters. See
+[continuous likelihoods](../../docs/native-continuous-likelihood-development.md)
+for supported priors, original missingness policies and remaining families.

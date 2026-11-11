@@ -10,10 +10,31 @@ use std::sync::Arc;
 pub enum LocationLikelihood {
     Normal,
     StudentT(f64),
+    Builtin(super::BuiltinLocationLikelihood),
     /// Validated elementwise expressions and captured scalar primitives.
     Restricted(Arc<RestrictedLikelihood>),
 }
 impl LocationLikelihood {
+    pub(super) fn validate_observations(&self, n: usize) -> Result<(), DeseqError> {
+        if let Self::Builtin(b) = self {
+            b.validate_observations(n)
+        } else {
+            Ok(())
+        }
+    }
+    pub(super) fn at(
+        &self,
+        row: usize,
+        n: usize,
+    ) -> Result<std::borrow::Cow<'_, Self>, DeseqError> {
+        if let Self::Builtin(b) = self {
+            Ok(std::borrow::Cow::Owned(Self::Builtin(
+                b.for_observation(row, n)?,
+            )))
+        } else {
+            Ok(std::borrow::Cow::Borrowed(self))
+        }
+    }
     pub(super) fn validated(self) -> Result<Self, DeseqError> {
         match self {
             Self::StudentT(df) if df.is_nan() || df <= 0.0 => Err(DeseqError::InvalidOptions {
@@ -27,6 +48,7 @@ impl LocationLikelihood {
         match self {
             Self::Normal => normal_log_cdf(x),
             Self::StudentT(df) => student_t::log_cdf(x, *df),
+            Self::Builtin(b) => b.log_cdf(x),
             Self::Restricted(f) => f.log_cdf(x),
         }
     }
@@ -34,6 +56,7 @@ impl LocationLikelihood {
         match self {
             Self::Normal => log_phi(x),
             Self::StudentT(df) => student_t::log_density(x, *df),
+            Self::Builtin(b) => b.log_density(x),
             Self::Restricted(f) => f.log_density(x),
         }
     }
@@ -47,6 +70,7 @@ impl LocationLikelihood {
                 }
             }
             Self::StudentT(df) => student_t::truncated_moment(a, b, *df, i32::from(order)),
+            Self::Builtin(l) => l.truncated_moment(a, b, order),
             Self::Restricted(f) => f.truncated_moment(a, b, order).unwrap_or(f64::NAN),
         }
     }

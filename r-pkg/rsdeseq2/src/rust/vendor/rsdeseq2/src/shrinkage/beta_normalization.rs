@@ -119,3 +119,18 @@ pub(super) fn regularized_beta(a: f64, b: f64, x: f64) -> f64 {
         probability
     }
 }
+
+pub(super) fn log_regularized_beta(a: f64, b: f64, x: f64) -> f64 {
+    if x <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if x >= 1.0 {
+        return 0.0;
+    }
+    let reflect = x >= (a + 1.0) / (a + b + 2.0);
+    let (a, b, x) = if reflect { (b, a, 1.0 - x) } else { (a, b, x) };
+    let log = a * x.ln() + b * (-x).ln_1p() - statrs::function::beta::ln_beta(a, b)
+        + fraction(a, b, x).ln()
+        - a.ln();
+    if reflect { (-log.exp()).ln_1p() } else { log }
+}

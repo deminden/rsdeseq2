@@ -45,6 +45,7 @@ pub(super) fn fit_location(
         return Err(invalid("fixed_prior requires a supplied mixture grid"));
     }
     let n = estimates.len();
+    options.likelihood.validate_observations(n)?;
     let mut x = Vec::with_capacity(n);
     let mut se = Vec::with_capacity(n);
     let mut scale = Vec::with_capacity(n);
@@ -122,8 +123,8 @@ pub(super) fn fit_location(
             .checked_mul(k)
             .ok_or_else(|| invalid("likelihood matrix shape overflows"))?;
         let mut ll = vec![];
-        for (&value, &error) in fit_x.iter().zip(&fit_se) {
-            ll.extend(initial_prior.log_likelihoods(value, error)?);
+        for (&row, (&value, &error)) in included.iter().zip(fit_x.iter().zip(&fit_se)) {
+            ll.extend(initial_prior.log_likelihoods_at(value, error, row, n)?);
         }
         let f = super::fit_mixture_proportions(
             crate::matrix::MatrixView::new(

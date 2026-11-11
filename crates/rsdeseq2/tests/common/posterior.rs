@@ -1,6 +1,9 @@
 //! Shared independent-posterior transports and comparison gates.
 use std::error::Error;
 #[allow(dead_code)]
+#[path = "../../examples/evaluate_r_interface/builtin_likelihood.rs"]
+pub(crate) mod builtin_likelihood;
+#[allow(dead_code)]
 #[path = "../../examples/evaluate_r_interface/formula.rs"]
 pub(crate) mod formula;
 #[allow(dead_code)]

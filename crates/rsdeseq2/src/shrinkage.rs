@@ -6,11 +6,13 @@ mod adaptive_grid;
 mod adaptive_output;
 mod adaptive_result;
 mod beta_normalization;
+mod builtin_likelihood;
 mod component_summary;
 mod expression_likelihood;
 mod expression_quadrature;
 mod fixed_mixture;
 mod gamma_normalization;
+mod gamma_probability;
 mod heavy_tail;
 mod likelihood;
 mod likelihood_diagnostics;
@@ -19,6 +21,8 @@ mod location_fit;
 mod location_missing;
 mod location_mode;
 mod location_query;
+mod log_f;
+mod log_f_quadrature;
 mod mixture_fit;
 mod normal_mixture;
 mod student_t;
@@ -49,6 +53,7 @@ pub use location_batch::{LocationShrinkage, LocationShrinkageOptions, shrink_loc
 
 pub use expression_likelihood::{RestrictedFunction, RestrictedLikelihood};
 
+pub use builtin_likelihood::BuiltinLocationLikelihood;
 pub use likelihood::LocationLikelihood;
 
 pub use location_query::{LocationCdfOptions, location_cdf_batch, threshold_svalues};

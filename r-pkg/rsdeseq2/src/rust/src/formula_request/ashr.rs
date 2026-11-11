@@ -225,32 +225,39 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         return Err("normal mixture for Student-t likelihood is not implemented".into());
     }
     let mut input_warnings = vec![];
-    options.likelihood =
-        if let Some(lik) = field(args, "lik").filter(|v| !matches!(v.data, Data::Null)) {
-            match text(get(lik, "type")?)? {
-                "normal" => LocationLikelihood::Normal,
-                "t" => LocationLikelihood::StudentT(scalar(get(lik, "df")?)?),
-                "restricted" => {
-                    let f = restricted_likelihood(get(lik, "model")?)?;
-                    if family == "normal" && !matches!(f.name(), "normal" | "normalmix") {
-                        return Err("normal mixtures require a normal likelihood".into());
-                    }
-                    if df.is_some() && !matches!(f.name(), "normal" | "t") {
-                        input_warnings
-                            .push("Input df is ignored for this likelihood function".to_string());
-                    }
-                    LocationLikelihood::Restricted(std::sync::Arc::new(f))
+    options.likelihood = if let Some(lik) =
+        field(args, "lik").filter(|v| !matches!(v.data, Data::Null))
+    {
+        match text(get(lik, "type")?)? {
+            "normal" => LocationLikelihood::Normal,
+            "t" => LocationLikelihood::StudentT(scalar(get(lik, "df")?)?),
+            "normalmix" | "logF" => {
+                if df.is_some() {
+                    input_warnings.push("Input df is ignored for this likelihood function".into());
                 }
-                kind => {
-                    return Err(format!(
-                        "native ashr likelihood '{kind}' is not implemented yet"
-                    ));
-                }
+                LocationLikelihood::Builtin(super::location_shrinkage::builtin_likelihood(lik)?)
             }
-        } else {
-            df.map(LocationLikelihood::StudentT)
-                .unwrap_or(LocationLikelihood::Normal)
-        };
+            "restricted" => {
+                let f = restricted_likelihood(get(lik, "model")?)?;
+                if family == "normal" && !matches!(f.name(), "normal" | "normalmix") {
+                    return Err("normal mixtures require a normal likelihood".into());
+                }
+                if df.is_some() && !matches!(f.name(), "normal" | "t") {
+                    input_warnings
+                        .push("Input df is ignored for this likelihood function".to_string());
+                }
+                LocationLikelihood::Restricted(std::sync::Arc::new(f))
+            }
+            kind => {
+                return Err(format!(
+                    "native ashr likelihood '{kind}' is not implemented yet"
+                ));
+            }
+        }
+    } else {
+        df.map(LocationLikelihood::StudentT)
+            .unwrap_or(LocationLikelihood::Normal)
+    };
     options.fit_options.optimizer = optimizer;
     if optimizer.is_sqp() {
         super::ashr_sqp::controls(field(args, "control"), &mut options.fit_options)?;

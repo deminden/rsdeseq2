@@ -39,6 +39,7 @@ pub fn location_cdf_batch(
         return Err(invalid("finite alpha and nonmissing cutoffs are required"));
     }
     let n = estimates.len();
+    options.likelihood.validate_observations(n)?;
     n.checked_mul(weights.len())
         .ok_or_else(|| invalid("posterior shape overflows"))?;
     let mut x = Vec::with_capacity(n);

@@ -348,3 +348,11 @@ independent exact-SVD references and analytical direction-cutoff checks. Both
 original and independent spectral outputs retain `2e-6` bounds. Complete R/native
 output bits agree, six public profiles pass, and thirteen accepted replay sets
 remain exact. Original verbose/advisory formatting remains in the authority audit.
+
+The local [continuous-likelihood checkpoint](native-continuous-likelihood-development.md)
+adds eleven kernel profiles and 21 complete batches with independent original-ashr
+references. Actual native/wrapped outputs agree exactly with R math blocked.
+Seven public profiles retain unchanged bounds, one invalid profile rejects in
+both engines, and fifteen accepted replay sets remain exact. Tail-cancellation
+cases guard ordinary CDF arithmetic; analytical logistic and quadrature checks
+provide independent solutions alongside source parity.
