@@ -1,6 +1,6 @@
 //! Validated result policy, independent of fit execution and presentation.
 use super::{
-    CooksPolicy, DeseqResults, LowCountHeuristic, low_count_eligible_for_frame,
+    CooksPolicy, DeseqResults, LowCountHeuristic, ReplacementRows, low_count_eligible_for_frame,
     mask_cooks_policy_rows, resolve_cooks_cutoff,
 };
 use crate::contrasts::ResultsContrast;
@@ -75,6 +75,42 @@ impl DeseqFit {
         request: &ResultRequest,
         gene_names: Option<&[String]>,
     ) -> Result<DeseqResults, DeseqError> {
+        self.evaluate_result_request(counts, request, gene_names, None)
+    }
+
+    /// Evaluate a later request on a merged replacement fit with its retained plan.
+    ///
+    /// Pass the original counts and the plan returned by `into_merged_fit`.
+    /// Replacement zero rows receive effect/SE/stat/p = 0/0/0/1 before the
+    /// shared Cook's policy and this request's filtering/BH step. Original
+    /// Cook's maxima remain diagnostics; refitted rows are not masked again.
+    pub fn results_for_request_with_replacement(
+        &self,
+        counts: &CountMatrix,
+        request: &ResultRequest,
+        gene_names: Option<&[String]>,
+        plan: &crate::cooks::CooksRefitPlan,
+    ) -> Result<DeseqResults, DeseqError> {
+        self.evaluate_result_request(counts, request, gene_names, Some(plan))
+    }
+
+    fn evaluate_result_request(
+        &self,
+        counts: &CountMatrix,
+        request: &ResultRequest,
+        gene_names: Option<&[String]>,
+        plan: Option<&crate::cooks::CooksRefitPlan>,
+    ) -> Result<DeseqResults, DeseqError> {
+        let replacement = plan.map(ReplacementRows::from_plan).transpose()?;
+        if let Some(rows) = replacement
+            && rows.genes() != self.base_mean.len()
+        {
+            return Err(crate::errors::invalid_dimensions(
+                "replacement result rows",
+                self.base_mean.len(),
+                rows.genes(),
+            ));
+        }
         let design = self
             .design
             .as_ref()
@@ -102,6 +138,22 @@ impl DeseqFit {
                 });
             }
         };
+        if let Some(plan) = plan
+            && plan.has_replaceable_samples()
+            && plan.n_refit > 0
+            && plan.should_refit
+        {
+            if plan.post_refit_max_cooks.len() != results.rows.len() {
+                return Err(crate::errors::invalid_dimensions(
+                    "post-refit maximum Cook's rows",
+                    results.rows.len(),
+                    plan.post_refit_max_cooks.len(),
+                ));
+            }
+            for (row, &maximum) in results.rows.iter_mut().zip(&plan.post_refit_max_cooks) {
+                row.max_cooks = maximum;
+            }
+        }
         let cutoff =
             resolve_cooks_cutoff(request.cooks, design.n_samples(), design.n_coefficients())?;
         if cutoff.is_some() && self.max_cooks.is_none() {
@@ -131,8 +183,22 @@ impl DeseqFit {
         } else {
             None
         };
-        if cutoff.is_some() {
-            mask_cooks_policy_rows(&mut results, CooksPolicy::new(cutoff, heuristic)?)?;
+        let mut policy = CooksPolicy::new(cutoff, heuristic)?;
+        if let Some(rows) = replacement {
+            for (gene, row) in results.rows.iter_mut().enumerate() {
+                if rows.is_zero(gene) {
+                    ReplacementRows::set_zero_values(
+                        &mut row.log2_fold_change,
+                        &mut row.lfc_se,
+                        &mut row.stat,
+                        &mut row.pvalue,
+                    );
+                }
+            }
+            policy = policy.with_replacement(rows);
+        }
+        if cutoff.is_some() || replacement.is_some() {
+            mask_cooks_policy_rows(&mut results, policy)?;
         }
         apply_independent_filtering(&mut results, &request.filtering)?;
         Ok(results)

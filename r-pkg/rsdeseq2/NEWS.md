@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Evaluate later standalone result requests with retained replacement plans.
+  Share eligibility and missing-value formatting; verify 86 later queries and
+  complete filtering metadata against actual R calls with R math blocked.
+
 * Share replacement-fit row merging with the standalone Rust engine, including
   full/reduced and optimizer diagnostics. Preserve raw observation weights in
   replacement base summaries. Retain unnamed covariance dimensions and valid

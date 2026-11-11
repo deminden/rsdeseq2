@@ -43,6 +43,10 @@ replacement-fit merging into the standalone core and checks 24 actual fresh-fit
 requests across interfaces, including weighted replacement and unnamed matrices.
 All exported numerical bits and acceptance decisions agree. Later replacement
 query context and the full warning/option/state audit remain open.
+The [later-query follow-up](native-replacement-query-development.md) supplies an
+explicit replacement-aware request path and shared missing-value transport
+formatting. It verifies 86 later queries with raw bit comparisons; broader
+factor/formula and supported-state reconciliation remains open.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

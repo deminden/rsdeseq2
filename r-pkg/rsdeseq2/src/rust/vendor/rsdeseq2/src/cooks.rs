@@ -139,6 +139,14 @@ impl CooksReplacementMetadataEntry {
 }
 
 impl CooksRefitPlan {
+    /// Whether a public fitting workflow has any samples eligible for replacement.
+    pub fn has_replaceable_samples(&self) -> bool {
+        self.replacement
+            .replaceable_samples
+            .iter()
+            .any(|&value| value)
+    }
+
     /// Summarize the replacement/refit branch in a compact, object-friendly form.
     pub fn metadata(&self) -> CooksReplacementMetadata {
         let n_samples = self.replacement.outlier_cells.n_cols();

@@ -39,6 +39,18 @@ profiles<-list(
 profiles$parametric_boundary<-list(fit_type='parametric',allow_error='dispersion')
 bits<-function(v)lapply(as.numeric(v),function(x)paste0('bits:',hex(x)))
 matrix_descriptor<-function(m)if(is.null(m))NULL else list(rows=nrow(m),columns=ncol(m),values=bits(m))
+query_cases<-function(p){
+ n<-if(is.null(p$design))ncol(design)else ncol(p$design)
+ contrast<-c(rep(0,n-1L),1)
+ query<-function(name,contrast,cooks='auto',filtering=TRUE,alpha=.1,threshold=0,alternative='greaterAbs',df=NULL)
+  list(name=name,contrast=bits(contrast),cooks=cooks,filtering=filtering,alpha=bits(alpha)[[1L]],
+   threshold=bits(threshold)[[1L]],alternative=alternative,df=if(is.null(df))NULL else bits(df)[[1L]],missing=bits(NA_real_)[[1L]])
+ q<-list(query('forward',contrast),query('reverse_unmasked',-contrast,cooks='off',filtering=FALSE),
+  query('fractional_zero_cutoff',contrast*.5,cooks='0',alpha=.05))
+ if(!identical(p$test,'LRT'))q<-c(q,list(query('threshold',contrast,threshold=1),
+  query('threshold_t',contrast,threshold=.5,alternative='less',df=5)))
+ q
+}
 cases<-lapply(names(profiles),function(name){
  p<-profiles[[name]]
  list(name=name,counts=matrix_descriptor(if(is.null(p$counts))counts else p$counts),
@@ -47,7 +59,8 @@ cases<-lapply(names(profiles),function(name){
   size_factors=if(is.null(p$size))NULL else bits(p$size),normalization_factors=matrix_descriptor(p$factors),weights=matrix_descriptor(p$weights),
   fit_type=if(is.null(p$fit_type))'mean'else p$fit_type,test=if(is.null(p$test))'Wald'else p$test,
   threads=if(is.null(p$threads))1L else p$threads,min_replicates=if(is.null(p$min_replicates))0L else p$min_replicates,
-  replacement_cutoff=bits(rsdeseq2:::.rsdeseq2_default_cooks_cutoff(if(is.null(p$design))design else p$design))[[1L]])
+  replacement_cutoff=bits(rsdeseq2:::.rsdeseq2_default_cooks_cutoff(if(is.null(p$design))design else p$design))[[1L]],
+  queries=query_cases(p))
 })
 input<-file.path(out,'input.json');jsonlite::write_json(list(fresh_fit_cases=cases),input,auto_unbox=TRUE,null='null',digits=NA)
 output<-system2(driver,shQuote(normalizePath(input)),stdout=TRUE,stderr=TRUE)
@@ -56,6 +69,19 @@ writeLines(output,file.path(out,'standalone.json'));standalone<-jsonlite::fromJS
 plain<-function(v)if(is.null(v))NULL else as.list(unname(v))
 floats<-function(v)if(is.null(v))NULL else lapply(as.numeric(v),hex)
 row_bits<-function(m)if(is.null(m))NULL else floats(as.vector(t(m)))
+query_values<-function(f,queries)lapply(queries,function(q){
+ cutoff<-switch(q$cooks,auto=TRUE,off=FALSE,as.numeric(q$cooks))
+ r<-blocked(rsdeseq2::results(f,contrast=decode(q$contrast),cooksCutoff=cutoff,
+  alpha=decode(q$alpha),independentFiltering=q$filtering,lfcThreshold=decode(q$threshold),
+  altHypothesis=q$alternative,useT=!is.null(q$df),degreesOfFreedom=if(is.null(q$df))NULL else decode(q$df)))
+ v<-lapply(r[c('baseMean','log2FoldChange','lfcSE','stat','pvalue','padj')],floats)
+ v$filtered<-plain(r$filtered)
+ m<-attr(r,'independentFiltering');scalar<-function(x)if(is.na(x))NULL else hex(x)
+ v$filtering<-list(enabled=m$enabled,theta=floats(m$theta),numRej=plain(m$numRej),
+  selected=if(is.na(m$selected))NULL else m$selected,filterTheta=scalar(m$filterTheta),filterThreshold=scalar(m$filterThreshold),
+  lowessX=if(is.null(m$lo.fit))NULL else floats(m$lo.fit$x),lowessY=if(is.null(m$lo.fit))NULL else floats(m$lo.fit$y),alpha=hex(m$alpha))
+ list(name=q$name,value=v)
+})
 encode<-function(f){
  result<-lapply(f$results,function(v)if(is.logical(v))plain(v)else floats(v))
  list(results=result,rawStat=floats(f$rawStat),rawPvalue=floats(f$rawPvalue),baseMean=floats(f$baseMean),baseVar=floats(f$baseVar),allZero=plain(f$allZero),
@@ -87,7 +113,7 @@ records<-lapply(seq_along(cases),function(i){
  stopifnot(nrow(fit$results)==c$counts$rows,is.null(rownames(fit$beta)),
   is.null(dimnames(fit$betaCovariance)[[1L]]),
   identical(rownames(fit$results),as.character(seq_len(c$counts$rows))))
- actual<-encode(fit);wanted<-expected$value
+ actual<-encode(fit);actual$queries<-query_values(fit,c$queries);wanted<-expected$value
  # Plain JSON canonicalization normalizes integer/logical/list containers;
  # floating-point values are all raw 64-bit encodings, including missing values.
  actual<-jsonlite::fromJSON(jsonlite::toJSON(actual,auto_unbox=TRUE,null='null'),simplifyVector=FALSE)
@@ -106,7 +132,9 @@ stopifnot(identical(canonical(records$mean_estimated$value),canonical(records$mu
 names(records)<-NULL
 jsonlite::write_json(list(cases=records),file.path(out,'wrapped.json'),auto_unbox=TRUE,null='null',pretty=TRUE)
 rejections<-sum(vapply(records,function(c)isTRUE(c$rejected),logical(1)))
+later_queries<-sum(vapply(records,function(r)if(is.null(r$value))0L else length(r$value$queries),integer(1)))
 jsonlite::write_json(list(complete_fresh_fit_cases=length(cases),valid=length(cases)-rejections,
+ later_queries=later_queries,
  controlled_rejections=rejections,R_calculations_blocked=TRUE,
  floating_point_bits_including_missing_values='exact'),file.path(out,'validation.json'),auto_unbox=TRUE,pretty=TRUE)
-cat(length(cases),'complete fresh fits: every numerical output bit and acceptance decision matches; R calculations blocked\n')
+cat(length(cases),'complete fresh fits and',later_queries,'later queries: every numerical output bit and acceptance decision matches; R calculations blocked\n')

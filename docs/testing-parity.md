@@ -396,3 +396,12 @@ weighted replacement and normalization, serial/four-worker identity, unnamed
 matrix metadata and controlled rejections. It runs in both R CI lanes. The new
 original-only weighted fixture isolates replacement summaries from optimizer
 variation; an expanded-prior test also retains a hand-calculated weighted mean.
+
+The [later-query follow-up](native-replacement-query-development.md) reuses those
+fits for 86 numerical requests. All seven query columns, missing-value bits and
+complete filtering numerical metadata agree. It covers reversed/fractional
+contrasts, no eligible replacement samples, zero/disabled/automatic Cook cutoffs,
+and Wald threshold/t requests. Shared adjusted-value formatting preserves the
+explicit caller missing marker; runtime negative controls also block R lowess,
+quantile and adjustment execution. Original-DESeq2 state parity remains a
+separate requirement from agreement between the two interfaces.

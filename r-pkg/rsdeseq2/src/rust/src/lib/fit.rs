@@ -256,11 +256,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
         let n_refit = unsafe { output_slice(n_refit_output, 1, "replacement refit count")? };
         if let Some(output) = &replacement {
             let plan = output;
-            let has_replaceable_samples = plan
-                .replacement
-                .replaceable_samples
-                .iter()
-                .any(|&value| value);
+            let has_replaceable_samples = plan.has_replaceable_samples();
             n_refit[0] = if has_replaceable_samples {
                 plan.n_refit
             } else {

@@ -8,6 +8,26 @@ pub type FilteredPadjColumn = Vec<Option<f64>>;
 /// Filtered adjusted-p-value columns and rejection counts.
 pub type FilteredPAdjustments = (Vec<FilteredPadjColumn>, Vec<usize>);
 
+/// Format an already-decided adjusted p-value for a floating-point transport.
+/// Preserve the incoming missing payload when its row remains in the filtering
+/// population; otherwise use the caller's missing marker. This does not select
+/// a population or calculate an adjustment.
+pub fn format_adjusted_pvalue(
+    adjusted: Option<f64>,
+    unadjusted: f64,
+    filter: f64,
+    threshold: Option<f64>,
+    missing: f64,
+) -> f64 {
+    adjusted.unwrap_or_else(|| {
+        if unadjusted.is_nan() && threshold.is_none_or(|cutoff| filter >= cutoff) {
+            unadjusted
+        } else {
+            missing
+        }
+    })
+}
+
 /// Options for DESeq2-style independent filtering during result assembly.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IndependentFilteringOptions {

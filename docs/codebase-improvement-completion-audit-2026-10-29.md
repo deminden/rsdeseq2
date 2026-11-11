@@ -24,6 +24,12 @@ This closes specific findings, not C19/C21/C23. Later replacement-aware query
 context and full warning/option/state coverage remain to audit before final
 combined acceptance.
 
+The [later-query follow-up](native-replacement-query-development.md) adds an
+explicit replacement-aware standalone request API. All 86 later numerical
+queries, 24 fresh-fit requests and 189 primitive cases agree across interfaces.
+It records an independently confirmed original-DESeq2 weighted rank-failure
+state discrepancy requiring a separate correction. C19/C21/C23 remain open.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

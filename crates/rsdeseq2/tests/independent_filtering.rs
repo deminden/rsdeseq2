@@ -3,6 +3,28 @@ use rsdeseq2::prelude::*;
 use approx::assert_abs_diff_eq;
 
 #[test]
+fn adjusted_value_transport_preserves_missing_payloads_only_in_retained_rows() {
+    use rsdeseq2::independent_filtering::format_adjusted_pvalue;
+    let marker = f64::from_bits(0x7ff00000000007a2);
+    for original in [f64::NAN, marker, f64::from_bits(0xfff8000000000042)] {
+        for threshold in [None, Some(1.0), Some(2.0)] {
+            let actual = format_adjusted_pvalue(None, original, 2.0, threshold, marker);
+            assert_eq!(actual.to_bits(), original.to_bits());
+        }
+        let filtered = format_adjusted_pvalue(None, original, 1.0, Some(2.0), marker);
+        assert_eq!(filtered.to_bits(), marker.to_bits());
+        assert_eq!(
+            format_adjusted_pvalue(Some(0.125), original, 0.0, None, marker),
+            0.125
+        );
+    }
+    assert_eq!(
+        format_adjusted_pvalue(None, 0.01, 1.0, Some(2.0), marker).to_bits(),
+        marker.to_bits()
+    );
+}
+
+#[test]
 fn default_theta_starts_at_fraction_of_zero_filter_values() {
     let theta = default_theta(&[0.0, 0.0, 10.0, 20.0]).unwrap();
 
