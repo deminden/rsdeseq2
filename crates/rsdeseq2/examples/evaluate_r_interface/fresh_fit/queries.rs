@@ -8,7 +8,9 @@ use std::error::Error;
 #[derive(Deserialize)]
 pub struct Query {
     name: String,
+    #[serde(default)]
     contrast: Vec<String>,
+    character: Option<[String; 3]>,
     threshold: String,
     alternative: String,
     df: Option<String>,
@@ -51,8 +53,18 @@ pub fn evaluate(
             "off" => CooksCutoff::Disabled,
             v => CooksCutoff::Threshold(super::super::parse_numeric_input(v)?),
         };
+        let contrast = if let Some([factor, numerator, denominator]) = &q.character {
+            ResultsContrast::Character {
+                factor: factor.clone(),
+                numerator: numerator.clone(),
+                denominator: denominator.clone(),
+                reference: None,
+            }
+        } else {
+            ResultsContrast::Numeric(numbers(&q.contrast)?)
+        };
         let request = ResultRequest::new(
-            ResultsContrast::Numeric(numbers(&q.contrast)?),
+            contrast,
             wald,
             cooks,
             IndependentFilteringOptions {

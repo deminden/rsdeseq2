@@ -14,7 +14,7 @@ use crate::cooks::{
 use crate::design::{r_like_name_candidates as design_name_candidates, DesignMatrix, FormulaModelFrame};
 use crate::design::{
     expanded_formula_design_from_model_frame, expanded_formula_design_with_offsets_from_model_frame,
-    formula_has_offset_terms, ExpandedAdditiveFactorDesign, ExpandedFormulaDesignWithOffsets,
+    ExpandedAdditiveFactorDesign, ExpandedFormulaDesignWithOffsets,
 };
 use crate::dispersion::{
     estimate_dispersion_prior_variance, estimate_gene_wise_dispersions_auto,

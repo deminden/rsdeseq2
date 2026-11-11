@@ -4,6 +4,8 @@ use rsdeseq2::{cooks::CooksRefitPlan, prelude::*};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::error::Error;
+#[path = "fresh_fit/formula_case.rs"]
+mod formula_case;
 #[path = "fresh_fit/queries.rs"]
 mod queries;
 
@@ -15,7 +17,8 @@ pub struct Input {
 pub struct Case {
     pub name: String,
     pub counts: Matrix,
-    pub design: Matrix,
+    pub design: Option<Matrix>,
+    pub formula: Option<formula_case::FormulaCase>,
     pub reduced: Option<Matrix>,
     pub size_factors: Option<Vec<String>>,
     pub normalization_factors: Option<Matrix>,
@@ -53,8 +56,6 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
         raw.n_cols(),
         raw.as_slice().iter().map(|v| *v as u32).collect(),
     )?;
-    let dm = matrix(&c.design)?;
-    let design = DesignMatrix::from_row_major(dm.n_rows(), dm.n_cols(), dm.into_values(), None)?;
     let mut builder = DeseqBuilder::new()
         .automatic_dispersion_means()
         .threads(c.threads)
@@ -91,17 +92,28 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
             None,
         )?);
     }
-    let (fit, results, plan) = if c.min_replicates == 0 {
-        let (f, r) = builder.fit_with_results(&counts, &design)?;
-        (f, r, None)
+    let (fit, results, plan) = if let Some(formula) = &c.formula {
+        formula.fit(builder, &counts, c)?
     } else {
-        let mut options =
-            CooksReplacementOptions::new(super::parse_numeric_input(&c.replacement_cutoff)?);
-        options.min_replicates = c.min_replicates;
-        let (f, r, p) = builder
-            .fit_with_test_results_with_cooks_replacement(&counts, &design, &options)?
-            .into_merged_fit()?;
-        (f, r, Some(p))
+        let dm = matrix(
+            c.design
+                .as_ref()
+                .ok_or("matrix design or formula is required")?,
+        )?;
+        let design =
+            DesignMatrix::from_row_major(dm.n_rows(), dm.n_cols(), dm.into_values(), None)?;
+        if c.min_replicates == 0 {
+            let (f, r) = builder.fit_with_results(&counts, &design)?;
+            (f, r, None)
+        } else {
+            let mut options =
+                CooksReplacementOptions::new(super::parse_numeric_input(&c.replacement_cutoff)?);
+            options.min_replicates = c.min_replicates;
+            let (f, r, p) = builder
+                .fit_with_test_results_with_cooks_replacement(&counts, &design, &options)?
+                .into_merged_fit()?;
+            (f, r, Some(p))
+        }
     };
     let queries = queries::evaluate(&fit, &counts, plan.as_ref(), &c.queries)?;
     let mut output = encode(fit, results, plan)?;
@@ -173,6 +185,9 @@ fn encode(
         "baseMean":floats(&fit.base_mean),"baseVar":floats(&fit.base_var),"allZero":fit.all_zero,
         "sizeFactors":floats(&fit.size_factors),"dispersions":optional(fit.dispersion.as_deref(),g),"dispFit":optional(fit.disp_fit.as_deref(),g),
         "beta":matrix(fit.beta.as_ref()),"betaSE":matrix(fit.beta_se.as_ref()),"betaCovariance":matrix(fit.beta_covariance.as_ref()),
+        "normalizationFactors":matrix(fit.normalization_factors.as_ref()),
+        "design":fit.design.as_ref().map(|d|floats(d.matrix().as_slice())),
+        "reduced":fit.reduced_design.as_ref().map(|d|floats(d.matrix().as_slice())),
         "mu":matrix(fit.mu.as_ref()),"cooks":matrix(fit.cooks.as_ref()),"lrtDf":fit.lrt.as_ref().map(|v|v.degrees_of_freedom),
         "nRefit":n_refit,"replaceCounts":replacement,
         "replace":(0..g).map(|i|plan.as_ref().filter(|_|eligible).and_then(|p|p.replacement.replace[i])).collect::<Vec<_>>(),

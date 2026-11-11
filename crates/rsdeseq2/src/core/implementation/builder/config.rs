@@ -398,29 +398,32 @@ impl DeseqBuilder {
         }
     }
 
-    fn standard_design_from_formula_without_offsets(
-        &self,
-        formula: &str,
-    ) -> Result<DesignMatrix, DeseqError> {
-        Ok(self.formula_design_without_offsets(formula)?.design.standard_design)
-    }
-
-    fn formula_design_without_offsets(
+    fn formula_design_for_fitting(
         &self,
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
-        if formula_has_offset_terms(formula)? {
-            return Err(DeseqError::UnsupportedFeature {
-                feature: "top-level formula workflows with formula offsets".to_string(),
+        let frame = self
+            .model_frame
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
+                reason: "formula design construction requires builder model-frame metadata".into(),
+            })?;
+        crate::design::formula_design_for_fitting_from_model_frame(formula, frame)
+    }
+
+    fn reduced_formula_design(
+        &self,
+        full: &ExpandedFormulaDesignWithOffsets,
+        reduced: &str,
+    ) -> Result<DesignMatrix, DeseqError> {
+        let reduced = self.formula_design_for_fitting(reduced)?;
+        if !reduced.offsets.is_empty() && reduced.offsets != full.offsets {
+            return Err(DeseqError::InvalidOptions {
+                reason: "LRT full and reduced formulas must use the same normalization offsets"
+                    .into(),
             });
         }
-        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
-        if !formula_design.offsets.is_empty() {
-            return Err(DeseqError::UnsupportedFeature {
-                feature: "top-level formula workflows with formula offsets".to_string(),
-            });
-        }
-        Ok(formula_design)
+        Ok(reduced.design.standard_design)
     }
 
     fn with_formula_offsets(
@@ -429,28 +432,48 @@ impl DeseqBuilder {
         formula_design: &ExpandedFormulaDesignWithOffsets,
     ) -> Result<Self, DeseqError> {
         if formula_design.offsets.is_empty() {
-            return Ok(self.clone().model_frame(formula_design.model_frame.clone()));
+            let mut builder = self.clone().model_frame(formula_design.model_frame.clone());
+            if builder.normalization_factors.is_some() {
+                builder.size_factor_options.supplied_size_factors = None;
+            }
+            return Ok(builder);
         }
         if formula_design.offsets.len() != counts.n_samples() {
-            return Err(invalid_dimensions("formula offsets", counts.n_samples(), formula_design.offsets.len()));
+            return Err(invalid_dimensions(
+                "formula offsets",
+                counts.n_samples(),
+                formula_design.offsets.len(),
+            ));
         }
         let mut builder = self.clone().model_frame(formula_design.model_frame.clone());
         if self.normalization_factors.is_none() {
-            let control_gene_indices = self.size_factor_options.control_genes.as_ref()
-                .map(|control| control.to_indices(counts.n_genes())).transpose()?;
+            let control_gene_indices = self
+                .size_factor_options
+                .control_genes
+                .as_ref()
+                .map(|control| control.to_indices(counts.n_genes()))
+                .transpose()?;
             let size_factors = match &self.size_factor_options.supplied_size_factors {
                 Some(values) => values.clone(),
-                None => estimate_size_factors_with_options(counts, self.size_factor_options.method,
-                    self.size_factor_options.geo_means.as_deref(), control_gene_indices.as_deref())?,
+                None => estimate_size_factors_with_options(
+                    counts,
+                    self.size_factor_options.method,
+                    self.size_factor_options.geo_means.as_deref(),
+                    control_gene_indices.as_deref(),
+                )?,
             };
             builder.size_factor_options.supplied_size_factors = Some(size_factors);
         }
-        builder.normalization_factors = Some(crate::normalization::normalization_factors_with_offsets(
-            counts.n_genes(), counts.n_samples(),
-            builder.size_factor_options.supplied_size_factors.as_deref(),
-            self.normalization_factors.as_ref().map(Into::into),
-            &formula_design.offsets,
-        )?);
+        builder.normalization_factors =
+            Some(crate::normalization::normalization_factors_with_offsets(
+                counts.n_genes(),
+                counts.n_samples(),
+                builder.size_factor_options.supplied_size_factors.as_deref(),
+                self.normalization_factors.as_ref().map(Into::into),
+                &formula_design.offsets,
+            )?);
+        // Offsets are now in the matrix factors; sample-only scales are unused.
+        builder.size_factor_options.supplied_size_factors = None;
         Ok(builder)
     }
 }

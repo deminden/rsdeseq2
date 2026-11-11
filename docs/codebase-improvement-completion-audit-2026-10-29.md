@@ -42,6 +42,13 @@ Original execution traces and 32 workflow cases establish the guard separately
 from output equality. All 31 complete fresh-fit payloads and 113 later queries
 remain exact; the broader C19/C21/C23 checkpoints stay open.
 
+The [complete formula-fit correction](native-formula-fit-development.md) now
+checks actual formula-built fits and later factor queries without remapping
+columns. It corrects native term/polynomial ordering, interaction coding, reduced
+offsets and unused size-factor metadata. Independent original-R matrices and
+actual cross-interface checks cover different requirements. This finding does
+not close the broader C19/C21 inventory or C23's combined current-source gates.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

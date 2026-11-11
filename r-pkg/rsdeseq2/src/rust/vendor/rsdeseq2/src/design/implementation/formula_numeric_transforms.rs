@@ -4,9 +4,11 @@ fn expand_formula_numeric_transform_terms(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
+    fitting_order: bool,
 ) -> Result<(String, Vec<FormulaDerivedNumericCovariate>), DeseqError> {
     let mut expanded = String::with_capacity(rhs.len());
     let mut derived = Vec::new();
+    let mut groups = Vec::new();
     let mut remainder = rhs;
     while let Some((start, after_open_idx, transform)) = next_formula_numeric_transform(remainder) {
         expanded.push_str(&remainder[..start]);
@@ -15,15 +17,60 @@ fn expand_formula_numeric_transform_terms(
         let expression = after_open[..close].trim();
         let (replacement, transformed_covariates) =
             formula_numeric_transform_term(transform, expression, factors, numeric_covariates)?;
-        for (name, values) in transformed_covariates {
-            if !derived
+        if fitting_order {
+            let key = formula_offset_key(&format!("{}({expression})", transform.name))?;
+            let group = groups.iter().position(|g| *g == key).unwrap_or_else(|| {
+                groups.push(key);
+                groups.len() - 1
+            });
+            let mut names = derived
                 .iter()
-                .any(|candidate: &FormulaDerivedNumericCovariate| candidate.name == name)
-            {
-                derived.push(FormulaDerivedNumericCovariate { name, values });
+                .filter(|d: &&FormulaDerivedNumericCovariate| d.group == Some(group))
+                .map(|d| d.name.clone())
+                .collect::<Vec<_>>();
+            if names.is_empty() {
+                // Different language expressions may have the same compatibility
+                // alias. Keep both variables; only the completed design can
+                // decide rank (subtraction and interactions may make it valid).
+                for (alias, values) in transformed_covariates {
+                    let mut name = alias.clone();
+                    let mut suffix = 0;
+                    while derived.iter().any(|d| d.name == name)
+                        || numeric_covariates.iter().any(|v| v.name == name)
+                        || factors.iter().any(|f| f.factor == name)
+                    {
+                        suffix += 1;
+                        name = format!("{alias}.{suffix}");
+                    }
+                    names.push(name.clone());
+                    derived.push(FormulaDerivedNumericCovariate {
+                        name,
+                        values,
+                        group: Some(group),
+                    });
+                }
             }
+            let terms = names
+                .iter()
+                .map(|name| formula_variable_term(name))
+                .collect::<Vec<_>>();
+            if terms.len() == 1 {
+                expanded.push_str(&terms[0]);
+            } else {
+                expanded.push_str(&format!("({})", terms.join(" + ")));
+            }
+        } else {
+            for (name, values) in transformed_covariates {
+                if !derived.iter().any(|d| d.name == name) {
+                    derived.push(FormulaDerivedNumericCovariate {
+                        name,
+                        values,
+                        group: None,
+                    });
+                }
+            }
+            expanded.push_str(&replacement);
         }
-        expanded.push_str(&replacement);
         remainder = &after_open[close + 1..];
     }
     expanded.push_str(remainder);

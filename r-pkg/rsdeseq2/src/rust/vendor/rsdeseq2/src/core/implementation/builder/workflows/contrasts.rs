@@ -136,7 +136,7 @@ impl DeseqBuilder {
             });
         }
 
-        let formula_design = self.expanded_formula_design_with_offsets(formula)?;
+        let formula_design = self.formula_design_for_fitting(formula)?;
         self.with_formula_offsets(counts, &formula_design)?
             .fit_with_results_contrast_request::<String>(
                 counts,

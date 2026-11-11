@@ -79,8 +79,8 @@ impl DeseqBuilder {
             });
         }
 
-        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
-        let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
+        let full_formula_design = self.formula_design_for_fitting(full_formula)?;
+        let reduced_design = self.reduced_formula_design(&full_formula_design, reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results(
                 counts,
@@ -138,8 +138,8 @@ impl DeseqBuilder {
             });
         }
 
-        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
-        let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
+        let full_formula_design = self.formula_design_for_fitting(full_formula)?;
+        let reduced_design = self.reduced_formula_design(&full_formula_design, reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_name(
                 counts,
@@ -404,8 +404,8 @@ impl DeseqBuilder {
             });
         }
 
-        let full_formula_design = self.expanded_formula_design_with_offsets(full_formula)?;
-        let reduced_design = self.standard_design_from_formula_without_offsets(reduced_formula)?;
+        let full_formula_design = self.formula_design_for_fitting(full_formula)?;
+        let reduced_design = self.reduced_formula_design(&full_formula_design, reduced_formula)?;
         self.with_formula_offsets(counts, &full_formula_design)?
             .fit_lrt_with_results_contrast_request::<String>(
                 counts,

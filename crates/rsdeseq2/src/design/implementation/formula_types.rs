@@ -2,6 +2,7 @@
 
 struct ExpandedFormulaDesignState<'a> {
     frame_order: Vec<String>,
+    term_order: Option<Vec<Vec<String>>>,
     has_intercept: bool,
     selected_factors: Vec<ExpandedFactorSpec<'a>>,
     selected_numeric_covariates: Vec<ExpandedNumericSpec<'a>>,
@@ -20,6 +21,7 @@ struct FormulaHigherOrderInteractionSpec<'a> {
 struct FormulaDerivedNumericCovariate {
     name: String,
     values: Vec<f64>,
+    group: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -59,6 +61,7 @@ impl Default for ExpandedFormulaDesignState<'_> {
     fn default() -> Self {
         Self {
             frame_order: Vec::new(),
+            term_order: None,
             has_intercept: true,
             selected_factors: Vec::new(),
             selected_numeric_covariates: Vec::new(),

@@ -68,10 +68,23 @@ fn top_level_lrt_formula_helpers_build_full_and_reduced_designs() {
     let offset_err = builder
         .fit_lrt_formula_with_results(&counts, "~ condition", "~ offset(exposure)")
         .unwrap_err();
-    let DeseqError::UnsupportedFeature { feature } = offset_err else {
-        panic!("reduced formula offsets should be rejected as unsupported, got {offset_err:?}");
+    let DeseqError::InvalidOptions { reason } = offset_err else {
+        panic!("mismatched reduced offsets should be rejected, got {offset_err:?}");
     };
-    assert!(feature.contains("formula offsets"));
+    assert!(reason.contains("same normalization offsets"));
+    let (matching_fit, matching_results) = builder
+        .fit_lrt_formula_with_results(
+            &counts,
+            "~ condition + offset(exposure)",
+            "~ offset(exposure)",
+        )
+        .unwrap();
+    assert_lrt_fit_state_matches(
+        &matching_fit,
+        &explicit_offset_fit,
+        "matching reduced offset",
+    );
+    assert_eq!(matching_results.rows, explicit_offset_results.rows);
     assert_lrt_fit_state_matches(&formula_fit, &explicit_fit, "formula LRT default");
     assert_lrt_fit_state_matches(&formula_named_fit, &explicit_fit, "formula LRT named");
     assert_eq!(formula_results.rows, explicit_results.rows);
