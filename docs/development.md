@@ -71,6 +71,11 @@ all R exports to the shared numerical engine and records remaining completion
 gates. New numerical changes must preserve independent bounds and direct
 standalone/wrapped equality.
 
+The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
+the C19/C21 requirements and current combined tests, paired process measurements
+and measured wrapper boundary costs. C23's current platform/artifact gates
+remain explicit; local acceptance does not authorize publication.
+
 ## Commands
 
 ```bash

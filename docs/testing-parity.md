@@ -4,12 +4,18 @@ The [current supported contract](native-supported-contract.md) maps the complete
 public wrapper surface to numerical owners, independent accuracy references and
 actual standalone/wrapped checks. Reports below retain their original checkpoint
 scope; old outstanding-method descriptions are not the current method inventory.
-Final combined source, platform, speed/RSS and release-artifact gates remain open.
+The [final local acceptance audit](final-plan-local-acceptance.md) now records
+1,154 passing Rust tests, 2,867 R assertions and 49 Python tests, current
+GTEx/held-out checks, actual interface identity, MSRV, sanitizers and paired
+speed/RSS measurements. C19/C21 are closed locally; current platform and
+release-artifact gates remain open.
 
-The [latest combined-suite audit](native-plan-audit-development.md) passes
+## Historical migration checkpoints
+
+The preceding [combined-suite audit](native-plan-audit-development.md) passes
 1,153 Rust tests and the supported Python suite. It also reproduces a default
 ashr numerical failure in the existing 18-gene subset test. That test and its
-bound remain intact; the full R suite is not currently certified green.
+bound remain intact; the full R suite was not certified green at that checkpoint.
 That describes the preceding checkpoint. The later
 [sparse SQP correction](native-sparse-sqp-development.md) passes the same test
 and adds nine original complete/primitive profiles with direct interface gates.

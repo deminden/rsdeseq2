@@ -1,9 +1,25 @@
 # Completion audit against C01–C23
 
-Current checkpoint status: approximately **20 of 23 original checkpoints are
-closed**. C19 (complete shared numerical/behavior contract), C21 (cross-route
-authority and forwarding audit) and C23 (combined validation and release
-artifacts) remain open. This count is not a percentage of effort remaining.
+Current local checkpoint status: **22 of 23 original checkpoints are closed**.
+The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
+C19's shared numerical/behavior contract and C21's execution/forwarding contract
+against the current source and complete-workflow evidence. C23 remains open for
+current release artifacts and required platform validation. This count is not
+a percentage of effort remaining, or a claim of cross-platform release readiness.
+
+The accepted runtime is `48917a0`; subsequent documentation and profiling-tool
+changes do not alter its 635 recorded runtime source files. The combined local
+pass retains all original precision bounds, exact native/wrapped checks and
+the recorded background load in its speed/RSS observations. Nothing from this
+development checkpoint has been pushed, tagged or published.
+
+## Historical checkpoint notes
+
+The following entries retain their original source scope and then-current open
+items. Their completion counts and outstanding findings are superseded by the
+current audit above; their measurements and artifacts are not relabeled.
+
+At the preceding checkpoint, approximately 20 of 23 checkpoints were closed.
 The [current supported contract](native-supported-contract.md) now maps all 25
 R exports and the supported method/option families to numerical owners and
 reference/interface evidence. This inventory does not itself close C19/C21 or

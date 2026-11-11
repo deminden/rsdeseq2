@@ -33,9 +33,13 @@ def main():
     parser.add_argument('--cases', nargs='+', help='WORKFLOW_GENESxSAMPLES case names')
     parser.add_argument('--allow-design-origin-migration', action='store_true',
                         help='Validate formula origin and normalize only the schema 1→2 metadata addition')
+    parser.add_argument('--validate-ashr-sqp-correction', action='store_true',
+                        help='Require original ashr accuracy for its two posterior columns; keep all other payload fields exact')
     parser.add_argument('--time-bin', default='/usr/bin/time')
     parser.add_argument('--max-rss-mib', type=float, default=2048)
     args = parser.parse_args()
+    if args.allow_design_origin_migration and args.validate_ashr_sqp_correction:
+        parser.error('Select one explicit payload migration at a time')
     if os.name != 'posix': parser.error('Workflow RSS profiling requires macOS or GNU time on Linux')
     args.output_dir.mkdir(parents=True, exist_ok=True)
     cases = [(f'{w}_{g}x{s}',w,g,s) for w,g,s in CASES]
@@ -50,6 +54,7 @@ def main():
     provenance = dict(rscript=args.rscript, libraries={k:str(v) for k,v in libraries.items()}, repeats=1,
                       max_rss_mib=args.max_rss_mib, status='in_progress', paired=bool(args.candidate_library),
                       allow_design_origin_migration=args.allow_design_origin_migration,
+                      validate_ashr_sqp_correction=args.validate_ashr_sqp_correction,
                       comparison_script_sha256=sha256(ROOT/'scripts/compare_r_workflow_payloads.R'),
                       workflow_script_sha256=sha256(ROOT/'scripts/profile_r_workflow.R'),
                       package_files={label:{str(p.relative_to(lib)):sha256(p) for p in (lib/'rsdeseq2').rglob('*') if p.is_file()} for label,lib in libraries.items()})
@@ -81,10 +86,13 @@ def main():
             outputs[label] = output
             print(f'{name}: {label} {elapsed:.3f}s {rss:.2f} MiB',flush=True)
         if len(outputs) == 2:
-            subprocess.run([args.rscript,'--vanilla',str(ROOT/'scripts/compare_r_workflow_payloads.R'),
+            comparison = [args.rscript,'--vanilla',str(ROOT/'scripts/compare_r_workflow_payloads.R'),
                             str(outputs['baseline']),str(outputs['candidate']),workflow,
-                            'ORIGIN_V2' if args.allow_design_origin_migration else 'STRICT',
-                            str(args.output_dir/f'{name}_comparison.tsv')],check=True,env=env)
+                            'ASHR_SQP' if args.validate_ashr_sqp_correction else 'ORIGIN_V2' if args.allow_design_origin_migration else 'STRICT',
+                            str(args.output_dir/f'{name}_comparison.tsv')]
+            if args.validate_ashr_sqp_correction:
+                comparison.append(str(libraries['candidate']))
+            subprocess.run(comparison,check=True,env=env)
         with (args.output_dir/'runs.tsv').open('w',newline='') as handle:
             writer=csv.DictWriter(handle,fieldnames=list(rows[0]),delimiter='\t');writer.writeheader();writer.writerows(rows)
     provenance['status']='complete'
