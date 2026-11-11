@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Complete direct optimizer diagnostics plus actual public R workflow checks.
 args<-commandArgs(TRUE)
-if(!length(args)%in%c(3L,4L))stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR [PAIRED_FITS_RDS]')
+if(!length(args)%in%c(3L,4L,5L))stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR [PAIRED_FITS_RDS] [REFERENCE_JSON]')
 driver<-normalizePath(args[[1L]])
 library(rsdeseq2,lib.loc=normalizePath(args[[2L]]))
 requireNamespace('ashr');requireNamespace('apeglm')
@@ -10,7 +10,8 @@ root<-normalizePath(file.path(dirname(gsub('~+~',' ',script,fixed=TRUE)),'..'))
 source(file.path(root,'r-pkg/rsdeseq2/tests/testthat/helper-formula.R'))
 source(file.path(root,'scripts/native_posterior_check_helpers.R'))
 out<-args[[3L]];if(dir.exists(out))stop('Use a fresh output directory');dir.create(out,recursive=TRUE)
-reference<-jsonlite::fromJSON(file.path(root,'crates/rsdeseq2/tests/data/ashr_optimizer_r462.json'),simplifyVector=FALSE)
+reference<-jsonlite::fromJSON(if(length(args)==5L)args[[5L]]else file.path(root,'crates/rsdeseq2/tests/data/ashr_optimizer_r462.json'),simplifyVector=FALSE)
+advanced<-!is.null(reference$source$original_mixIP_executed)
 input<-file.path(out,'input.json');jsonlite::write_json(list(em_fit_cases=reference$em_fit_cases),input,auto_unbox=TRUE,null='null',digits=NA)
 output<-system2(driver,shQuote(normalizePath(input)),stdout=TRUE,stderr=TRUE)
 if(!is.null(attr(output,'status')))stop(paste(output,collapse='\n'))
@@ -23,7 +24,9 @@ wrapped<-lapply(seq_along(reference$em_fit_cases),function(i){
  request<-c(list(operation='posterior_fit_em'),c[c('observations','components','log_likelihoods','observation_weights','dirichlet','initial_weights','optimizer','control')])
  for(field in c('log_likelihoods','observation_weights','dirichlet','initial_weights'))if(!is.null(request[[field]]))request[[field]]<-decode(request[[field]])
  request$control<-controls(request$control)
- r<-blocked(rsdeseq2:::.rsdeseq2_formula_request(request))
+ r<-tryCatch(blocked(rsdeseq2:::.rsdeseq2_formula_request(request)),error=identity)
+ if(!is.null(c$expected_error)){stopifnot(inherits(r,'error'),!is.null(standalone$cases[[i]]$error));return(list(name=c$name,rejected=TRUE))}
+ if(inherits(r,'error'))stop(c$name,': ',conditionMessage(r))
  value<-list(weights=encode(r$weights),log_likelihood=hex(r$log_likelihood),penalized_log_likelihood=hex(r$penalized_log_likelihood),converged=r$converged,
    iterations=if(is.null(r$iterations))NULL else as.integer(r$iterations),evaluations=as.integer(r$evaluations),residual=hex(r$residual),weight_sum=hex(r$weight_sum),
    posterior_concentrations=if(is.null(r$posterior_concentrations))NULL else encode(r$posterior_concentrations),optimizer_objective=if(is.null(r$optimizer_objective))NULL else hex(r$optimizer_objective),message=r$message)
@@ -33,12 +36,14 @@ wrapped<-lapply(seq_along(reference$em_fit_cases),function(i){
 })
 jsonlite::write_json(wrapped,file.path(out,'wrapped.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
 public_errors<-NULL
-if(length(args)==4L){
+if(length(args)>=4L){
  cached<-readRDS(args[[4L]]);dds<-cached$rust[seq_len(256L),]
  raw<-rsdeseq2::results(dds,name='conditionB')
  settings<-list(mixEM=list(optmethod='mixEM'),w_mixEM=list(optmethod='w_mixEM',weights=rep(c(.5,1,2,1),64)),
    mixVBEM=list(optmethod='mixVBEM'),cxxMixSquarem=list(optmethod='cxxMixSquarem'))
+ if(advanced)settings<-list(rre=list(optmethod='mixEM',control=list(K=2)),mpe=list(optmethod='mixEM',control=list(K=2,method='mpe')),weighted=list(optmethod='w_mixEM',weights=rep(c(.5,1,2,1),64),control=list(K=2,method='mpe',square=FALSE)),variational=list(optmethod='mixVBEM',control=list(K=2,method='mpe')),interior=list(optmethod='mixIP',control=list(rtol=1e-6)))
  original<-lapply(settings,function(options){
+   if(identical(options$optmethod,'mixIP')){options$optmethod<-'mixSQP';options$control<-list(eps=0,convtol.sqp=1e-12,maxiter.sqp=2000,numiter.em=100,verbose=FALSE)}
    r<-suppressWarnings(do.call(ashr::ash,c(list(betahat=raw$log2FoldChange,sebetahat=raw$lfcSE,mixcompdist='normal',method='shrink'),options)))
    list(mean=ashr::get_pm(r),sd=ashr::get_psd(r),svalue=ashr::get_svalue(r))
  })
@@ -47,5 +52,5 @@ if(length(args)==4L){
    list(profile=name,mean=compare(a$log2FoldChange,b$mean,1e-3),sd=compare(a$lfcSE,b$sd,1e-3),svalue=compare(a$svalue,b$svalue,.02))})
  saveRDS(list(rust=cached$rust,reference=original,actual=actual),file.path(out,'paired_fits.rds'))
 }
-jsonlite::write_json(list(complete_optimizer_batches=length(wrapped),R_calculations_blocked=TRUE,public_errors=public_errors,existing_bounds_unchanged=TRUE),file.path(out,'validation.json'),auto_unbox=TRUE,pretty=TRUE,null='null',digits=NA)
+jsonlite::write_json(list(complete_optimizer_batches=length(wrapped),R_calculations_blocked=TRUE,public_errors=public_errors,interior_reference=if(advanced)'original unregularized mixSQP and independent KKT roots; original Mosek mixIP not executed'else NULL,existing_bounds_unchanged=TRUE),file.path(out,'validation.json'),auto_unbox=TRUE,pretty=TRUE,null='null',digits=NA)
 cat('Native EM optimizer diagnostics match standalone bits:',length(wrapped),'batches\n')

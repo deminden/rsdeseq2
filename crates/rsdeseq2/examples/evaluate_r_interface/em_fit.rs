@@ -3,7 +3,8 @@ use super::{bits, parse_numeric_input as number, parse_numeric_inputs as numbers
 use rsdeseq2::{
     matrix::{MatrixOrder, MatrixView},
     shrinkage::{
-        MixtureFit, MixtureFitOptions, MixtureOptimizer, SquaremOptions, fit_mixture_proportions,
+        InteriorPointOptions, MixtureFit, MixtureFitOptions, MixtureOptimizer,
+        PolynomialExtrapolation, SquaremOptions, fit_mixture_proportions,
     },
 };
 use serde::Deserialize;
@@ -41,17 +42,27 @@ pub(crate) fn policy(method: &str, c: &Value) -> Result<MixtureOptimizer, Box<dy
         }
         Ok(v as usize)
     };
-    if count("K", 1)? != 1 {
-        return Err("higher-order EM extrapolation is not implemented".into());
+    if method == "mixIP" {
+        return Ok(MixtureOptimizer::InteriorPoint(InteriorPointOptions {
+            relative_tolerance: control_number(c, "rtol", 1e-6)?,
+            ..Default::default()
+        }));
     }
-    let method_code = count("method", 3)?;
+    if method == "cxxMixSquarem" && matches!(c.get("method"), Some(Value::String(_))) {
+        return Err("compiled-style EM requires a numeric method control".into());
+    }
+    let method_code = if matches!(c.get("method"), Some(Value::String(_))) {
+        3.0
+    } else {
+        control_number(c, "method", 3.0)?
+    };
     let options = SquaremOptions {
         tolerance: c
             .get("tol")
             .map(|_| control_number(c, "tol", 1e-7))
             .transpose()?,
         max_evaluations: count("maxiter", 5000)?,
-        method: if (1..=3).contains(&method_code) {
+        method: if [1.0, 2.0, 3.0].contains(&method_code) {
             method_code as u8
         } else {
             3
@@ -61,6 +72,12 @@ pub(crate) fn policy(method: &str, c: &Value) -> Result<MixtureOptimizer, Box<dy
         step_multiplier: control_number(c, "mstep", 4.0)?,
         objective_increase: control_number(c, "objfn.inc", 1.0)?,
         square: c.get("square").and_then(Value::as_bool).unwrap_or(true),
+        polynomial_order: count("K", 1)?,
+        polynomial_method: if c.get("method").and_then(Value::as_str) == Some("mpe") {
+            PolynomialExtrapolation::MinimalPolynomial
+        } else {
+            PolynomialExtrapolation::ReducedRank
+        },
     };
     Ok(match method {
         "mixEM" => MixtureOptimizer::Em(options),

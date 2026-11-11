@@ -2,6 +2,12 @@
 //! frontend policy controls. No SQUAREM/ashr source implementation is imported.
 use super::invalid;
 use crate::DeseqError;
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PolynomialExtrapolation {
+    #[default]
+    ReducedRank,
+    MinimalPolynomial,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct SquaremOptions {
     /// None selects min(1e-7, 0.1/n), the source observation-count rule.
@@ -14,6 +20,8 @@ pub struct SquaremOptions {
     pub objective_increase: f64,
     /// Retained for source control transport; both K=1 policies ignore it.
     pub square: bool,
+    pub polynomial_order: usize,
+    pub polynomial_method: PolynomialExtrapolation,
 }
 impl Default for SquaremOptions {
     fn default() -> Self {
@@ -26,12 +34,15 @@ impl Default for SquaremOptions {
             step_multiplier: 4.0,
             objective_increase: 1.0,
             square: true,
+            polynomial_order: 1,
+            polynomial_method: Default::default(),
         }
     }
 }
 impl SquaremOptions {
     pub(super) fn validate(self) -> Result<(), DeseqError> {
-        if self.tolerance.is_some_and(|v| !v.is_finite() || v < 0.0)
+        if self.polynomial_order == 0
+            || self.tolerance.is_some_and(|v| !v.is_finite() || v < 0.0)
             || !(1..=3).contains(&self.method)
             || !self.minimum_step.is_finite()
             || !self.maximum_step.is_finite()
@@ -66,6 +77,9 @@ pub(super) fn run(
     objective: impl Fn(&[f64]) -> f64,
 ) -> Result<Iteration, DeseqError> {
     options.validate()?;
+    if !compiled && options.polynomial_order > 1 {
+        return super::polynomial::run(state, options, tolerance, update, objective);
+    }
     let mut value = objective(&state);
     let mut calls = 0_usize;
     let mut iterations = 1_usize;

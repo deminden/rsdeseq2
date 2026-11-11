@@ -323,3 +323,9 @@ The local [ashr optimizer checkpoint](native-ashr-optimizer-development.md) adds
 output, original iteration/convergence checks, unchanged numerical bounds and
 independent categorical/Dirichlet solutions. Original compiled convergence and
 diagnostic bugs retain their unmodified observations beside explicit corrections.
+
+The local [advanced optimizer checkpoint](native-ashr-advanced-optimizer-development.md)
+adds 54 full/primitive requests, independent affine fixed points and 90-decimal
+convex KKT certificates. Native/wrapped outputs and controlled rejection decisions
+are exact. Original Mosek-backed mixIP is not executed; unregularized original SQP
+and the independent certificates provide separately identified convex references.

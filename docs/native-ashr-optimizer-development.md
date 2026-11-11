@@ -32,8 +32,8 @@ weights and a nonconvergence diagnostic without a fixed-point call. The K=1 R
 policy honors the step-formula choice; the compiled-style policy uses formula 3
 regardless of that argument, as the original does. Both original K=1 methods
 ignore `square`; the native interface retains that control behavior. Trace
-controls are validated but native progress text is not emitted. Higher-order
-`K>1` extrapolation and interior-point fitting remain unsupported.
+controls are validated but native progress text is not emitted. The later [advanced optimizer checkpoint](native-ashr-advanced-optimizer-development.md)
+adds higher-order cycling and native interior-point fitting.
 
 The compiled-style fixed-point map retains extrapolated signed weights, unlike
 R EM's positive-clipped map. Rejecting or clipping these candidates changes its
@@ -111,6 +111,6 @@ Rscript scripts/check_native_ashr_optimizers.R "$DRIVER" "$R_LIBRARY" "$FRESH_OP
 
 The optional fourth optimizer-checker argument reuses an accepted count-fit
 snapshot for the public comparisons. Fresh output paths preserve previous
-artifacts. Still open: interior-point/higher-order optimization, remaining SQP
-controls, estimated modes, other likelihood families, output subsets and the
+artifacts. The later [advanced checkpoint](native-ashr-advanced-optimizer-development.md)
+adds interior-point/higher-order fitting. Still open: remaining SQP controls, estimated modes, other likelihood families, output subsets and the
 complete warning/error/authority contract. C19/C21/C23 are not closed here.

@@ -38,6 +38,14 @@ blocked. Independent categorical tests correct compiled second-probe convergence
 and stale/unsafe diagnostics. Remaining likelihood/mode/control/output and final
 C19/C21/C23 authority/combined gates stay open.
 
+The subsequent [advanced optimizer checkpoint](native-ashr-advanced-optimizer-development.md)
+adds higher-order RRE/MPE cycling and genuine native interior-point fitting.
+Fifty-four full and primitive requests preserve numerical/iteration/convergence
+bounds and exact wrapped/native identity. Weighted/unweighted 90-decimal KKT
+certificates establish convex optima independently; the original Mosek-backed
+method was not run. Remaining likelihood/mode/control/output and final combined
+C19/C21/C23 gates stay open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

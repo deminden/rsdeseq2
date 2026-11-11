@@ -10,7 +10,8 @@ adds translated custom likelihoods, general fitting and `nbinomR`. The later
 specialized logit methods. The [random-start checkpoint](native-random-start-development.md)
 adds portable native state for both MAP-only random-start methods. Advanced
 [ashr optimizer options](native-ashr-optimizer-development.md) now share native
-EM and variational fitting. Other advanced options and final combined checks remain open. Further development/commits stay local until
+EM and variational fitting. [Higher-order cycling and native interior-point
+fitting](native-ashr-advanced-optimizer-development.md) are also implemented. Other advanced options and final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R

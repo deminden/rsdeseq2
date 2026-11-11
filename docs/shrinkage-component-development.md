@@ -215,8 +215,11 @@ adds ordinary/weighted/variational/compiled-style EM, their K=1 controls and
 positive variational priors. Default SQP and the accepted numerical gates remain
 unchanged.
 
-Still open: other built-in likelihood families, interior-point/higher-order
-optimizers, estimated
+The later [cycling/interior checkpoint](native-ashr-advanced-optimizer-development.md)
+adds higher-order RRE/MPE and a separate native barrier solver, with independent
+KKT certificates and explicit original-Mosek comparison limits.
+
+Still open: other built-in likelihood families, estimated
 modes, remaining controls/output subsets, the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.

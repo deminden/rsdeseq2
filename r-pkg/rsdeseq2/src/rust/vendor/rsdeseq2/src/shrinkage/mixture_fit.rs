@@ -41,7 +41,7 @@ pub struct MixtureFit {
     pub log_likelihood: f64,
     pub penalized_log_likelihood: f64,
     pub converged: bool,
-    /// One-sided dual-feasibility residual before final weight normalization.
+    /// Convex dual/KKT residual, or last fixed-point residual for EM.
     pub dual_residual: f64,
     pub optimizer_weight_sum: f64,
     pub function_evaluations: usize,
@@ -67,9 +67,12 @@ struct Problem {
     offset: f64,
 }
 mod em;
+mod interior_point;
+mod polynomial;
 mod sqp;
 mod squarem;
-pub use squarem::SquaremOptions;
+pub use interior_point::InteriorPointOptions;
+pub use squarem::{PolynomialExtrapolation, SquaremOptions};
 
 /// Distinct native weight-fitting policies; the existing SQP path is the default.
 #[derive(Clone, Copy, Debug, Default)]
@@ -80,6 +83,7 @@ pub enum MixtureOptimizer {
     WeightedEm(SquaremOptions),
     VariationalEm(SquaremOptions),
     CxxEm(SquaremOptions),
+    InteriorPoint(InteriorPointOptions),
 }
 impl MixtureOptimizer {
     pub fn is_variational(self) -> bool {
@@ -154,7 +158,9 @@ pub fn fit_mixture_proportions(
     initial_weights: Option<&[f64]>,
     options: MixtureFitOptions,
 ) -> Result<MixtureFit, DeseqError> {
-    if !options.optimizer.is_sqp() {
+    if !options.optimizer.is_sqp()
+        && !matches!(options.optimizer, MixtureOptimizer::InteriorPoint(_))
+    {
         return em::fit(
             log_likelihoods,
             observation_weights,
@@ -269,10 +275,31 @@ pub fn fit_mixture_proportions(
         prior_counts,
         mass,
         components: k,
-        offset: options.likelihood_offset,
+        offset: if matches!(options.optimizer, MixtureOptimizer::InteriorPoint(_)) {
+            0.0
+        } else {
+            options.likelihood_offset
+        },
     };
-    let (mut raw_weights, converged, residual, evaluations, message) =
-        problem.solve(start, options)?;
+    let interior = match options.optimizer {
+        MixtureOptimizer::InteriorPoint(o) => Some(o),
+        _ => None,
+    };
+    let (mut raw_weights, converged, residual, evaluations, message, interior_iterations) =
+        if let Some(o) = interior {
+            let f = problem.solve_interior_point(start, o)?;
+            (
+                f.weights,
+                f.converged,
+                f.residual,
+                f.evaluations,
+                f.message,
+                Some(f.iterations),
+            )
+        } else {
+            let (w, c, r, e, m) = problem.solve(start, options)?;
+            (w, c, r, e, m, None)
+        };
     let total = raw_weights.iter().sum::<f64>();
     if !total.is_finite() || total <= 0.0 {
         return Err(invalid("optimizer returned invalid total weight"));
@@ -309,8 +336,8 @@ pub fn fit_mixture_proportions(
         optimizer_weight_sum: total,
         function_evaluations: evaluations,
         message,
-        iterations: None,
+        iterations: interior_iterations,
         posterior_concentrations: None,
-        optimizer_objective: None,
+        optimizer_objective: interior.map(|_| objective),
     })
 }

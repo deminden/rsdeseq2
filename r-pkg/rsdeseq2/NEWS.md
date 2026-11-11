@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Add native cycling RRE/MPE and squared polynomial acceleration, plus a separate
+  interior-point mixture solver. Retain independent original cycling and
+  high-precision KKT references; direct Mosek comparison is not claimed.
+
 * Add native ordinary, weighted, variational and compiled-style EM mixture
   fitting with K=1 acceleration controls and unit/fractional variational priors.
   Correct compiled second-probe convergence and diagnostics; retain independent

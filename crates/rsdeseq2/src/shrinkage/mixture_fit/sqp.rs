@@ -25,7 +25,7 @@ impl Problem {
         }
         Ok(next)
     }
-    fn hessian(&self, weights: &[f64]) -> DMatrix<f64> {
+    pub(super) fn hessian(&self, weights: &[f64]) -> DMatrix<f64> {
         let k = self.components;
         let mut h = DMatrix::zeros(k, k);
         for (row, &a) in self
