@@ -52,6 +52,17 @@ testthat::test_that('selected adaptive outputs preserve conjugate values and omi
   testthat::expect_error(run(5,.25),'PosteriorMean and fitted_g')
 })
 
+testthat::test_that('estimated prior modes recover an analytical normal profile without R fitting', {
+  x<-c(-2,1,3);se<-c(1,2,.5);truth<-10.25/5.25
+  arguments<-list(betahat=x,sebetahat=se,method='shrink',mixcompdist='normal',mixsd=0,mode='estimate')
+  answer<-.rsdeseq2_native_ash(arguments,x,se,0,FALSE)
+  testthat::expect_equal(answer$fitted_g$mean,truth,tolerance=1e-8)
+  testthat::expect_equal(answer$result$PosteriorMean,rep(truth,3),tolerance=1e-8)
+  testthat::expect_equal(answer$result$PosteriorSD,rep(0,3),tolerance=1e-12)
+  arguments$mode<-rep(1,3)
+  testthat::expect_error(.rsdeseq2_native_ash(arguments,x,se,0,FALSE),'mode requires')
+})
+
 testthat::test_that('native mixture fitting retains weighted prior modes and diagnostics', {
   request<-list(operation='posterior_fit_mixture',observations=2L,components=2L,
     log_likelihoods=c(0,-Inf,-Inf,0),observation_weights=c(3,1),dirichlet=c(2,2),initial_weights=NULL,

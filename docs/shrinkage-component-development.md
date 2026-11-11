@@ -223,8 +223,12 @@ The [output-selection checkpoint](native-ashr-output-development.md) adds numeri
 and named subsets of the wrapper's posterior fields and fitted prior, including
 explicit threshold dependencies and native/wrapped missing-field identity.
 
-Still open: other built-in likelihood families, estimated
-modes, remaining controls, the full warning/integration-failure
+The [estimated-mode checkpoint](native-ashr-mode-development.md) adds native
+likelihood-only profiling, original search traces and analytical optima without
+executing posterior moment expressions during the search.
+
+Still open: other built-in likelihood families,
+remaining controls, the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.
 Full suites and release checks remain deferred until this work is combined.

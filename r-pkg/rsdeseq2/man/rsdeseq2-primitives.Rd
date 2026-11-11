@@ -320,6 +320,8 @@ EM with scalar or higher-order RRE/MPE controls and positive variational priors.
 Numeric \code{outputlevel} and exact named subsets select posterior fields and
 fitted priors. Omitted fields remain absent; positive thresholds require
 \code{PosteriorMean} and \code{fitted_g}, including at level four.
+\code{mode="estimate"} profiles the mixture likelihood in shared Rust without
+R optimization. Two-element mode inputs retain original ashr range semantics.
 Native interior-point mixture fitting accepts a relative dual-gap tolerance.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.

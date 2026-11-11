@@ -120,3 +120,6 @@ for controls and reference limits.
 Numeric `outputlevel` and exact named subsets select local ashr posterior fields
 and fitted priors. See [output selection](../../docs/native-ashr-output-development.md)
 for omitted fields and positive-threshold requirements.
+
+`mode="estimate"` now runs in Rust; see [mode profiling and bounds](../../docs/native-ashr-mode-development.md)
+for numerical comparisons and the original two-element mode policy.

@@ -335,3 +335,9 @@ The local [output-selection checkpoint](native-ashr-output-development.md) adds
 bits and six public 128-gene profiles. Conjugate normal checks also run in the R
 posterior test file. Numeric levels and exact subsets preserve absent fields and
 unchanged numerical bounds; positive thresholds require means and fitted priors.
+
+The local [estimated-mode checkpoint](native-ashr-mode-development.md) adds 26
+original search profiles, exact native/wrapped requests and six public workflows.
+Bounds/counts, posterior/likelihood precision, analytical normal optima and unused
+invalid moment expressions are checked. R scalar optimizers are explicitly
+blocked; twelve earlier complete replay sets retain exact outputs.

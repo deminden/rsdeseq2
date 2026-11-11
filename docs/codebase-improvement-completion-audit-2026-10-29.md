@@ -52,6 +52,13 @@ fitted prior. Sixty-seven native/wrapped cases agree exactly; six public profile
 preserve existing precision gates and omitted columns/metadata. The remaining
 likelihood/mode/control and full C19/C21/C23 gates stay open.
 
+The later [estimated-mode checkpoint](native-ashr-mode-development.md) adds native
+likelihood-only profiling with original search traces, analytical optima and
+restricted-likelihood coverage. Twenty-six complete native/wrapped requests are
+exact, six public profiles retain existing precision gates, and twelve accepted
+replay sets are unchanged. Remaining likelihood/control and full C19/C21/C23
+authority/combined gates stay open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

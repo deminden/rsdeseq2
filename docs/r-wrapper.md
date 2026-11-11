@@ -119,7 +119,7 @@ posterior contrast. Numeric contrasts require a supplied result table; list
 contrasts average selected coefficients and need supplied results when their
 names are absent from the unshrunk design. The local development
 `type="ashr"` route uses shared Rust fitting, posterior means/SDs and s-values,
-including restricted custom likelihood expressions. Estimated-mode and remaining
+including restricted custom likelihood expressions and estimated modes. Remaining
 likelihood/control options remain unfinished and fail explicitly;
 see the [development scope](shrinkage-component-development.md). Released 0.4.0
 uses the original ashr package. Local `type="apeglm"` default negative-binomial
@@ -144,6 +144,10 @@ Numeric `outputlevel` and exact named subsets select the posterior fields and
 fitted prior returned by the local wrapper. Positive-threshold queries require
 `PosteriorMean` and `fitted_g`, including at level four. Omitted fields remain
 absent. See [output selection and validation](native-ashr-output-development.md).
+
+`mode="estimate"` profiles the fitted mixture likelihood in Rust. See
+[estimated modes and bounds](native-ashr-mode-development.md) for two-element
+mode compatibility, native explicit intervals and independent comparisons.
 
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
