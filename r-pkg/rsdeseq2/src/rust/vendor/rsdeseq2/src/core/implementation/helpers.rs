@@ -250,6 +250,7 @@ fn replacement_refit_plan_from_original(
     design: &DesignMatrix,
     original_fit: &DeseqFit,
     replacement_options: &CooksReplacementOptions,
+    observation_weights: Option<&RowMajorMatrix<f64>>,
 ) -> Result<CooksRefitPlan, DeseqError> {
     let original_cooks = original_fit
         .cooks
@@ -263,7 +264,7 @@ fn replacement_refit_plan_from_original(
         }
         None => normalized_counts(counts, &original_fit.size_factors)?,
     };
-    prepare_cooks_replacement_refit(
+    prepare_cooks_replacement_refit_with_weights(
         counts,
         &normalized,
         &original_fit.size_factors,
@@ -271,6 +272,7 @@ fn replacement_refit_plan_from_original(
         original_cooks,
         design,
         replacement_options,
+        observation_weights,
     )
 }
 

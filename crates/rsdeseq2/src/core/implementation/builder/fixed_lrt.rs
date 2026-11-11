@@ -81,6 +81,7 @@ impl DeseqBuilder {
             full_design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -248,6 +249,7 @@ impl DeseqBuilder {
             full_design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -737,6 +739,7 @@ impl DeseqBuilder {
             full_design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {

@@ -177,7 +177,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_cooks_replacement(
     let original = fit_expanded_beta_prior_wald_results(input.clone(), coefficient)?;
     let cooks = beta_prior_cooks_output(input.counts, input.size_factors, &original.fit)?;
     let normalized = normalized_counts(input.counts, input.size_factors)?;
-    let refit_plan = prepare_cooks_replacement_refit(
+    let refit_plan = prepare_cooks_replacement_refit_with_weights(
         input.counts,
         &normalized,
         input.size_factors,
@@ -185,6 +185,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_cooks_replacement(
         &cooks.cooks,
         input.design.standard_design,
         replacement_options,
+        input.weights,
     )?;
 
     let refit = if refit_plan.should_refit {
@@ -236,7 +237,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
     let original = fit_expanded_beta_prior_wald_contrast_results(input.clone(), contrast)?;
     let cooks = beta_prior_cooks_output(input.counts, input.size_factors, &original.fit)?;
     let normalized = normalized_counts(input.counts, input.size_factors)?;
-    let refit_plan = prepare_cooks_replacement_refit(
+    let refit_plan = prepare_cooks_replacement_refit_with_weights(
         input.counts,
         &normalized,
         input.size_factors,
@@ -244,6 +245,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
         &cooks.cooks,
         input.design.standard_design,
         replacement_options,
+        input.weights,
     )?;
 
     let refit = if refit_plan.should_refit {
@@ -359,7 +361,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weigh
     )?;
     let normalized = normalized_counts_with_factors(input.counts, input.normalization_factors)?;
     let replacement_size_factors = vec![1.0; input.counts.n_samples()];
-    let refit_plan = prepare_cooks_replacement_refit(
+    let refit_plan = prepare_cooks_replacement_refit_with_weights(
         input.counts,
         &normalized,
         &replacement_size_factors,
@@ -367,6 +369,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weigh
         &cooks.cooks,
         input.design.standard_design,
         replacement_options,
+        input.weights,
     )?;
 
     let refit = if refit_plan.should_refit {
@@ -429,7 +432,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_
     )?;
     let normalized = normalized_counts_with_factors(input.counts, input.normalization_factors)?;
     let replacement_size_factors = vec![1.0; input.counts.n_samples()];
-    let refit_plan = prepare_cooks_replacement_refit(
+    let refit_plan = prepare_cooks_replacement_refit_with_weights(
         input.counts,
         &normalized,
         &replacement_size_factors,
@@ -437,6 +440,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_
         &cooks.cooks,
         input.design.standard_design,
         replacement_options,
+        input.weights,
     )?;
 
     let refit = if refit_plan.should_refit {

@@ -1,6 +1,6 @@
 use crate::glm::inference::GlmInferenceView;
 use crate::cooks::{
-    calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
+    calculate_cooks_distance, prepare_cooks_replacement_refit_with_weights, CooksOutput, CooksRefitPlan,
     CooksReplacementOptions,
 };
 use crate::core::CountMatrix;

@@ -112,6 +112,32 @@ pub fn prepare_cooks_replacement_refit(
     model_matrix: &DesignMatrix,
     options: &CooksReplacementOptions,
 ) -> Result<CooksRefitPlan, DeseqError> {
+    prepare_cooks_replacement_refit_with_weights(
+        counts,
+        normalized_counts,
+        size_factors,
+        normalization_factors,
+        cooks,
+        model_matrix,
+        options,
+        None,
+    )
+}
+
+/// Prepare replacement/refit metadata using the original observation weights.
+/// Weights affect base means/variances, not trimmed replacement counts. Pass raw
+/// assay weights, before row normalization used by the GLM score.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_cooks_replacement_refit_with_weights(
+    counts: &CountMatrix,
+    normalized_counts: &RowMajorMatrix<f64>,
+    size_factors: &[f64],
+    normalization_factors: Option<&RowMajorMatrix<f64>>,
+    cooks: &RowMajorMatrix<f64>,
+    model_matrix: &DesignMatrix,
+    options: &CooksReplacementOptions,
+    observation_weights: Option<&RowMajorMatrix<f64>>,
+) -> Result<CooksRefitPlan, DeseqError> {
     let replacement = replace_outlier_counts(
         counts,
         normalized_counts,
@@ -130,8 +156,16 @@ pub fn prepare_cooks_replacement_refit(
             crate::normalization::normalized_counts(&replacement.replaced_counts, size_factors)?
         }
     };
-    let replaced_base_mean = base_mean(&replaced_normalized_counts)?;
-    let replaced_base_var = base_variance(&replaced_normalized_counts)?;
+    let (replaced_base_mean, replaced_base_var) = match observation_weights {
+        Some(weights) => (
+            crate::normalization::base_mean_with_weights(&replaced_normalized_counts, weights)?,
+            crate::normalization::base_variance_with_weights(&replaced_normalized_counts, weights)?,
+        ),
+        None => (
+            base_mean(&replaced_normalized_counts)?,
+            base_variance(&replaced_normalized_counts)?,
+        ),
+    };
     let replaced_all_zero = replacement.replaced_counts.all_zero_flags();
 
     let mut n_refit = 0;
