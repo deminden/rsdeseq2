@@ -23,6 +23,10 @@ fn recycled_likelihood_warnings_follow_selected_original_operations() {
     check_reference(include_str!("data/likelihood_warnings_r462.json"));
 }
 
+#[test]
+fn fixed_prior_controls_are_ignored_until_fitting_requires_them() {
+    check_reference(include_str!("data/fixed_prior_controls_r462.json"));
+}
 fn check_reference(source: &str) {
     let reference: serde_json::Value = serde_json::from_str(source).unwrap();
     let mut failures = vec![];

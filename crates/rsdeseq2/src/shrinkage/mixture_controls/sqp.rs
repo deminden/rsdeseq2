@@ -1,8 +1,5 @@
-//! SQP control translation; numerical effects are implemented by the core.
-use super::ashr::flag;
-use super::posterior::scalar;
-use super::{Data, Value, fields};
-use rsdeseq2::shrinkage::MixtureFitOptions;
+//! SQP control names translate to the shared typed fitting options.
+use super::{Data, MixtureFitOptions, Value, fields, flag, scalar};
 pub(super) fn controls(
     value: Option<&Value>,
     options: &mut MixtureFitOptions,

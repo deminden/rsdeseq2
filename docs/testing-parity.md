@@ -433,3 +433,9 @@ independent selected-output cases and two mode-search traces. It requires exact
 warning message order/count alongside the existing numerical gates. Both R CI
 lanes compare actual native/wrapped bits with R math/search blocked; targeted R
 tests separately call original ashr. Twenty-seven prior replay sets remain exact.
+
+The [fixed-prior control panel](native-fixed-prior-controls-development.md) adds
+18 required successes and eight required rejections from original ashr. It
+corrects twelve old standalone acceptance decisions without changing any old
+oracle or bound. Both R CI lanes verify actual interface bits with R math blocked;
+six cached public profiles and targeted R tests cover the public adapter.

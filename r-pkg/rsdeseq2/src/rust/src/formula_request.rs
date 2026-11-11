@@ -4,11 +4,10 @@ use rsdeseq2::design::expression::{
     self, Argument, Data, EvaluationOptions, Expression, Value, frame, wire,
 };
 use std::ptr;
-mod ashr;
-mod ashr_optimizer;
-mod ashr_sqp;
 mod apeglm;
 mod apeglm_analysis;
+mod ashr;
+mod ashr_optimizer;
 mod frozen_local;
 mod location_shrinkage;
 mod posterior;
@@ -142,7 +141,7 @@ fn dispatch(request: &Value) -> Result<Value, String> {
         "posterior_svalues" => posterior::ordered_svalues(request),
         "posterior_fit_mixture" => posterior::fit_mixture(request),
         "posterior_fit_em" | "posterior_fit_sqp" => ashr_optimizer::fit(request),
-        "posterior_builtin_likelihood"=>location_shrinkage::builtin_values(request),
+        "posterior_builtin_likelihood" => location_shrinkage::builtin_values(request),
         "normal_log_probabilities" => posterior::normal_log(request),
         "ashr_shrinkage" => ashr::evaluate(request),
         "apeglm_shrinkage" => apeglm::evaluate(request),

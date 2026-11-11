@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Share SQP/EM/interior optimizer control parsing in standalone Rust. Ignore
+  unused controls for fixed-prior ashr requests while retaining active-control,
+  optimizer-name and missing-prior validation. Preserve numerical outputs and
+  add original-package acceptance and exact interface checks.
+
 * Preserve normal-mixture capture recycling warnings and output-dependent
   warning order/multiplicity in shared Rust, including mode searches. Check
   actual native/wrapped diagnostic identity and original-package warning

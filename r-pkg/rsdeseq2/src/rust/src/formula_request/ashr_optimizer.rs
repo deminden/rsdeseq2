@@ -1,88 +1,5 @@
-//! Optimizer selection and primitive controls; no R numerical execution.
-use super::ashr::{field, flag, number};
-use super::{Data, Value, fields};
-use rsdeseq2::shrinkage::{
-    InteriorPointOptions, MixtureOptimizer, PolynomialExtrapolation, SquaremOptions,
-};
-fn count(value: f64, name: &str) -> Result<usize, String> {
-    if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > i32::MAX as f64 {
-        return Err(format!("control '{name}' requires a nonnegative integer"));
-    }
-    Ok(value as usize)
-}
-pub(super) fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOptimizer, String> {
-    if method == "mixSQP" {
-        return Ok(MixtureOptimizer::SequentialQuadratic);
-    }
-    if method == "mixIP" {
-        let mut options = InteriorPointOptions::default();
-        if let Some(c) = control.filter(|v| !matches!(&v.data,Data::List(v) if v.is_empty())) {
-            let (names, _) = fields(c)?;
-            for name in names {
-                if name != "rtol" {
-                    return Err(format!("unknown interior-point control '{name}'"));
-                }
-            }
-            options.relative_tolerance = number(c, "rtol", 1e-6)?;
-        }
-        return Ok(MixtureOptimizer::InteriorPoint(options));
-    }
-    let mut options = SquaremOptions::default();
-    if let Some(control) =
-        control.filter(|v| !matches!(&v.data,Data::List(values) if values.is_empty()))
-    {
-        let (names, _) = fields(control)?;
-        for name in names {
-            match name.as_str() {
-                "tol" => options.tolerance = Some(number(control, name, 1e-7)?),
-                "maxiter" => options.max_evaluations = count(number(control, name, 5000.0)?, name)?,
-                "method" => match &field(control, name).unwrap().data {
-                    Data::Text(v) => {
-                        if method == "cxxMixSquarem" {
-                            return Err(
-                                "compiled-style EM requires a numeric method control".into()
-                            );
-                        }
-                        options.polynomial_method = if v.as_slice() == [Some("mpe".into())] {
-                            PolynomialExtrapolation::MinimalPolynomial
-                        } else {
-                            PolynomialExtrapolation::ReducedRank
-                        };
-                    }
-                    _ => {
-                        let v = number(control, name, 3.0)?;
-                        options.method = if [1.0, 2.0, 3.0].contains(&v) {
-                            v as u8
-                        } else {
-                            3
-                        };
-                    }
-                },
-                "step.min0" => options.minimum_step = number(control, name, 1.0)?,
-                "step.max0" => options.maximum_step = number(control, name, 1.0)?,
-                "mstep" => options.step_multiplier = number(control, name, 4.0)?,
-                "objfn.inc" => options.objective_increase = number(control, name, 1.0)?,
-                "square" => options.square = flag(field(control, name).unwrap())?,
-                "trace" => {
-                    flag(field(control, name).unwrap())?;
-                }
-                "kr" => {
-                    number(control, name, 1.0)?;
-                }
-                "K" => options.polynomial_order = count(number(control, name, 1.0)?, name)?,
-                _ => return Err(format!("unknown squared-EM control '{name}'")),
-            }
-        }
-    }
-    Ok(match method {
-        "mixEM" => MixtureOptimizer::Em(options),
-        "w_mixEM" => MixtureOptimizer::WeightedEm(options),
-        "mixVBEM" => MixtureOptimizer::VariationalEm(options),
-        "cxxMixSquarem" => MixtureOptimizer::CxxEm(options),
-        _ => return Err("unknown native ashr optimizer".into()),
-    })
-}
-
+//! Direct primitive mixture transport; control policy lives in standalone core.
+use super::{Data, Value};
 /// Direct primitive API used to verify optimizer diagnostics independently of
 /// component/grid preparation and public result-table presentation.
 pub(super) fn fit(request: &Value) -> Result<Value, String> {
@@ -90,7 +7,7 @@ pub(super) fn fit(request: &Value) -> Result<Value, String> {
     use super::{get, named, text};
     use rsdeseq2::{
         matrix::{MatrixOrder, MatrixView},
-        shrinkage::{MixtureFitOptions, fit_mixture_proportions},
+        shrinkage::fit_mixture_proportions,
     };
     let count = |name| super::integer(get(request, name)?);
     let matrix = MatrixView::new(
@@ -108,18 +25,12 @@ pub(super) fn fit(request: &Value) -> Result<Value, String> {
             numbers(v).map(Some)
         }
     };
-    let optimizer = policy(text(get(request, "optimizer")?)?, field(request, "control"))?;
-    let mut options = if optimizer.is_sqp() {
-        rsdeseq2::shrinkage::LocationShrinkageOptions::default().fit_options
-    } else {
-        MixtureFitOptions {
-            optimizer,
-            ..Default::default()
-        }
-    };
-    if optimizer.is_sqp() {
-        super::ashr_sqp::controls(field(request, "control"), &mut options)?;
-    }
+    let options = rsdeseq2::shrinkage::ashr_mixture_fit_options(
+        text(get(request, "optimizer")?)?,
+        super::ashr::field(request, "control"),
+        false,
+    )
+    .map_err(|e| e.to_string())?;
     let f = fit_mixture_proportions(
         matrix,
         optional("observation_weights")?,
