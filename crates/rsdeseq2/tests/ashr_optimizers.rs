@@ -166,8 +166,8 @@ fn em_validation_does_not_silently_change_optimizer_or_prior_semantics() {
     c["observation_weights"] = serde_json::json!(["1"]);
     variants.push((c, "weighted EM"));
     let mut c = base.clone();
-    c["control"] = serde_json::json!({"K":2});
-    variants.push((c, "higher-order"));
+    c["control"] = serde_json::json!({"K":5});
+    variants.push((c, "polynomial order"));
     let mut c = base.clone();
     c["control"] = serde_json::json!({"tol":-1});
     variants.push((c, "controls"));

@@ -316,8 +316,9 @@ extra interval/contrast matrices are available through the primitive engine,
 not added as coefficient result-table columns. Restricted regression expressions
 support primitive numeric one-dimensional subscripts.
 Native ashr also supports ordinary, weighted, variational and compiled-style
-EM with K=1 controls and positive variational priors. Interior-point and
-higher-order optimization, along with other advanced optional methods,
+EM with scalar or higher-order RRE/MPE controls and positive variational priors.
+Native interior-point mixture fitting accepts a relative dual-gap tolerance.
+Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.
 Formula interactions and transformed-factor
 normal contrasts are not implemented.

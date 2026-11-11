@@ -112,3 +112,7 @@ for controls, validation and documented original-package grid corrections.
 Native ashr development also supports `mixEM`, `w_mixEM`, `mixVBEM` and
 `cxxMixSquarem`, with K=1 acceleration controls and variational unit/fractional
 priors. See [optimizer validation and scope](../../docs/native-ashr-optimizer-development.md).
+
+Higher-order RRE/MPE cycling and native interior-point mixture fitting are also
+available in local development. See the [advanced optimizer scope](../../docs/native-ashr-advanced-optimizer-development.md)
+for controls and reference limits.

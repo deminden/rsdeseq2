@@ -1,7 +1,9 @@
 //! Optimizer selection and primitive controls; no R numerical execution.
 use super::ashr::{field, flag, number};
 use super::{Data, Value, fields};
-use rsdeseq2::shrinkage::{MixtureOptimizer, SquaremOptions};
+use rsdeseq2::shrinkage::{
+    InteriorPointOptions, MixtureOptimizer, PolynomialExtrapolation, SquaremOptions,
+};
 fn count(value: f64, name: &str) -> Result<usize, String> {
     if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > i32::MAX as f64 {
         return Err(format!("control '{name}' requires a nonnegative integer"));
@@ -13,7 +15,17 @@ pub(super) fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOpt
         return Ok(MixtureOptimizer::SequentialQuadratic);
     }
     if method == "mixIP" {
-        return Err("native ashr interior-point optimization is not implemented yet".into());
+        let mut options = InteriorPointOptions::default();
+        if let Some(c) = control.filter(|v| !matches!(&v.data,Data::List(v) if v.is_empty())) {
+            let (names, _) = fields(c)?;
+            for name in names {
+                if name != "rtol" {
+                    return Err(format!("unknown interior-point control '{name}'"));
+                }
+            }
+            options.relative_tolerance = number(c, "rtol", 1e-6)?;
+        }
+        return Ok(MixtureOptimizer::InteriorPoint(options));
     }
     let mut options = SquaremOptions::default();
     if let Some(control) =
@@ -24,10 +36,28 @@ pub(super) fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOpt
             match name.as_str() {
                 "tol" => options.tolerance = Some(number(control, name, 1e-7)?),
                 "maxiter" => options.max_evaluations = count(number(control, name, 5000.0)?, name)?,
-                "method" => {
-                    let n = count(number(control, name, 3.0)?, name)?;
-                    options.method = if (1..=3).contains(&n) { n as u8 } else { 3 };
-                }
+                "method" => match &field(control, name).unwrap().data {
+                    Data::Text(v) => {
+                        if method == "cxxMixSquarem" {
+                            return Err(
+                                "compiled-style EM requires a numeric method control".into()
+                            );
+                        }
+                        options.polynomial_method = if v.as_slice() == [Some("mpe".into())] {
+                            PolynomialExtrapolation::MinimalPolynomial
+                        } else {
+                            PolynomialExtrapolation::ReducedRank
+                        };
+                    }
+                    _ => {
+                        let v = number(control, name, 3.0)?;
+                        options.method = if [1.0, 2.0, 3.0].contains(&v) {
+                            v as u8
+                        } else {
+                            3
+                        };
+                    }
+                },
                 "step.min0" => options.minimum_step = number(control, name, 1.0)?,
                 "step.max0" => options.maximum_step = number(control, name, 1.0)?,
                 "mstep" => options.step_multiplier = number(control, name, 4.0)?,
@@ -39,13 +69,7 @@ pub(super) fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOpt
                 "kr" => {
                     number(control, name, 1.0)?;
                 }
-                "K" => {
-                    if count(number(control, name, 1.0)?, name)? != 1 {
-                        return Err(
-                            "higher-order native EM extrapolation is not implemented yet".into(),
-                        );
-                    }
-                }
+                "K" => options.polynomial_order = count(number(control, name, 1.0)?, name)?,
                 _ => return Err(format!("unknown squared-EM control '{name}'")),
             }
         }

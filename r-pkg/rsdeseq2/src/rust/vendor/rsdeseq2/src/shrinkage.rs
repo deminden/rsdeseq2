@@ -25,7 +25,8 @@ mod truncated_standard;
 mod uniform_mixture;
 
 pub use mixture_fit::{
-    MixtureFit, MixtureFitOptions, MixtureOptimizer, SquaremOptions, fit_mixture_proportions,
+    InteriorPointOptions, MixtureFit, MixtureFitOptions, MixtureOptimizer, PolynomialExtrapolation,
+    SquaremOptions, fit_mixture_proportions,
 };
 pub use normal_mixture::{NormalMixture, NormalMixturePosterior};
 pub use svalue::svalues;

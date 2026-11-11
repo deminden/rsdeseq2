@@ -134,8 +134,10 @@ numeric contrast instead of a treatment-style factor-level contrast.
 
 Local ashr `optmethod` also accepts `mixEM`, `w_mixEM`, `mixVBEM` and
 `cxxMixSquarem`, using the shared native engine. Their K=1 EM controls and
-variational `prior="unit"`/positive fractional priors are supported. Interior-point
-and higher-order extrapolation remain unavailable. See the
+variational `prior="unit"`/positive fractional priors are supported. Native `mixIP`
+uses a log-barrier solver with `control=list(rtol=...)`. Higher-order `mixEM`,
+`w_mixEM` and `mixVBEM` accept `control=list(K=2,method="mpe",square=TRUE)`.
+See the [advanced optimizer scope and reference limits](native-ashr-advanced-optimizer-development.md). See the
 [optimizer scope, controls and explicit original-package corrections](native-ashr-optimizer-development.md).
 
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
