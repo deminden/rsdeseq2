@@ -4,6 +4,15 @@ Current checkpoint status: approximately **20 of 23 original checkpoints are
 closed**. C19 (complete shared numerical/behavior contract), C21 (cross-route
 authority and forwarding audit) and C23 (combined validation and release
 artifacts) remain open. This count is not a percentage of effort remaining.
+The [current supported contract](native-supported-contract.md) now maps all 25
+R exports and the supported method/option families to numerical owners and
+reference/interface evidence. This inventory does not itself close C19/C21 or
+replace final current-source execution checks.
+The [combined-suite audit](native-plan-audit-development.md) passes the full
+Rust workspace after correcting an outdated formula metadata assertion, but
+reproduces an unresolved default-ashr sparse SQP discrepancy in the existing
+gene-subset test. Its original-comparison bound remains unchanged. This is
+concrete C19 implementation work, not only a documentation/release gate.
 The [capture/control checkpoint](native-capture-policy-development.md) closes
 two specific authority findings with 38 exact native/wrapped cases and 21
 unchanged accepted panels, without closing those broader checkpoints. Final

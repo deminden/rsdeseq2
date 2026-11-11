@@ -65,9 +65,11 @@ The [test-quality report](testing-parity.md) describes required oracle checks,
 CLI routing assertions, the compact GTEx panel and full replay commands.
 
 The [shared inference report](rust-only-inference-2026-10-29.md) documents the
-standalone probability kernels, the independent reference generator and the
-remaining Rust-only migration. New numerical changes must preserve independent
-bounds and direct standalone/wrapped equality.
+standalone probability kernels and independent reference generator at that
+checkpoint. The [current supported contract](native-supported-contract.md) maps
+all R exports to the shared numerical engine and records remaining completion
+gates. New numerical changes must preserve independent bounds and direct
+standalone/wrapped equality.
 
 ## Commands
 

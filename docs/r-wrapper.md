@@ -1,9 +1,13 @@
-# R Backend
+# R wrapper
 
-The [0.4.0 candidate report](release-0.4.0.md) records the current validation and
-remaining Rust-only migration work. The earlier
-[implementation progress report](codebase-improvement-progress-2026-10-29.md)
-describes its historical checkpoint.
+The current local implementation uses the standalone Rust numerical engine for
+fitting, inference, transforms and all supported shrinkage methods. R handles
+argument translation, identifier alignment and R/Bioconductor objects. The
+[current supported contract](native-supported-contract.md) maps every public
+export to its numerical owner and independent/interface evidence. Final
+combined validation remains open; the [0.4.0 report](release-0.4.0.md) describes
+the earlier published source, not the later development implementation.
+
 Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
 (disabled), or a non-negative finite cutoff, and rejects unused arguments.
 Dataset result/shrinkage access validates retained fit inputs and maps unique
@@ -11,27 +15,16 @@ gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
 are composed from retained base normalization once; repeated fitting reuses that
 provenance. Older offset fits without it may require the original input.
 
-Local fitted LRT metadata imports the degrees of freedom stored by Rust rather
-than recomputing it from dimensions in R. Ordinary Wald/LRT fitting enters the
-same core dispatcher; see the [fit-route audit](native-fit-route-audit.md).
-Replacement fits also share the standalone row merger. The
-[fresh-fit checkpoint](native-fresh-fit-development.md) records exact numerical
-identity across 24 fitting requests and corrections for weighted replacement
-summaries and unnamed matrix output metadata. Later replacement-aware result
-query context remains under audit.
-Standalone callers can now retain the merged fit and plan and use
-`results_for_request_with_replacement` for later requests. The
-[query follow-up](native-replacement-query-development.md) verifies 86 numerical
-requests against actual wrapped calls, including missing-value bits and complete
-filtering metadata. Factor/formula and broader state coverage remain under audit.
-After actual replacement, `allZero` now reflects refreshed count zeros even for
-an unrelated row skipped because of its weights. Its failed-fit diagnostics stay
-missing; disabled/no-refit replacement retains the initial skip flag. See the
-[independent state correction](weighted-replacement-state-correction.md).
-The shared engine also skips refitting unchanged counts when no sample is eligible
-for replacement. Raw standalone planner metadata still describes candidates;
-`requires_refit()` determines execution. See the
-[execution evidence](replacement-execution-correction.md).
+Wald/LRT fits share the core dispatcher, including stored LRT degrees of freedom
+and replacement-fit merging. Later standalone requests can retain the merged
+fit and plan and use `results_for_request_with_replacement`. The matrix-fit
+checks cover 31 requests and 113 later queries. Complete formula-fit checks
+cover another 33 requests and 96 queries without column remapping; see the
+[formula-fit report](native-formula-fit-development.md).
+After replacement, raw count-zero metadata and weighted failure diagnostics
+remain separate. Fits skip unnecessary replacement refits when no samples are
+eligible. See the [state correction](weighted-replacement-state-correction.md)
+and [execution evidence](replacement-execution-correction.md).
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 
@@ -129,7 +122,9 @@ the standard one-dimensional quadratic Gaussian DESeq2 profile. The
 the independent references and direct interface checks. These development
 changes do not alter the published 0.4.0 artifacts.
 Design-aware rlog reuses an existing `dispFit` column when
-`blind=FALSE`. Broader local-VST and fast-subset edge cases remain open.
+`blind=FALSE`. The supported saved-fit profiles and strict fast-subset behavior
+have independent fixtures; broader unrepresented profiles are not certified by
+those checks.
 
 `lfcShrink()` currently accepts a dataset fitted by `rsdeseq2::DESeq()` and
 either a coefficient name/index or an expanded-design factor-level, numeric, or
@@ -142,14 +137,14 @@ contrasts average selected coefficients and need supplied results when their
 names are absent from the unshrunk design. The local development
 `type="ashr"` route uses shared Rust fitting, posterior means/SDs and s-values,
 including restricted custom likelihood expressions, estimated modes and SQP
-numerical controls. Remaining built-in likelihood options fail explicitly;
-see the [development scope](shrinkage-component-development.md). Released 0.4.0
-uses the original ashr package. Local `type="apeglm"` default negative-binomial
-and MAP-only workflows, general likelihoods, `nbinomR` and beta-binomial methods
-now use Rust; its remaining optional methods are listed
-in the [native development scope](native-apeglm-development.md). It handles named/indexed Wald coefficients, including
-posterior SDs and s-values, but not contrasts. Formula interactions are
-rejected for normal shrinkage. Factor-level contrast syntax for transformed
+numerical controls. Normal/t, canonical normal-mixture/log-F and Poisson/binomial
+likelihoods are supported as detailed below. Released 0.4.0 uses the original
+ashr package. Local `type="apeglm"` supports all nine declared method names:
+`general`, `nbinomR`, `nbinomCR`, `nbinomC`, `nbinomC*`, `betabinR`, `betabinCR`,
+`betabinC` and `betabinC*`. Their [method and analysis limits](native-supported-contract.md)
+remain explicit. It handles named/indexed Wald coefficients, including
+posterior SDs and s-values, but not the public `contrast=` selection argument.
+Formula interactions are rejected for normal shrinkage. Factor-level contrast syntax for transformed
 factors remains unsupported when DESeq2 cannot resolve its coefficient names.
 Ordered factors use polynomial coefficients; choose a named coefficient or a
 numeric contrast instead of a treatment-style factor-level contrast.

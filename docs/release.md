@@ -23,7 +23,17 @@ versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
 
-## Version 0.4.0
+## Current local development
+
+The [current supported contract](native-supported-contract.md) describes the
+shared Rust implementation after the published 0.4.0 source, including native
+frozen-local VST and supported ashr/apeglm calculations. C19/C21 authority
+reconciliation and C23 combined current-source checks remain open. Historical
+release evidence below must not be relabeled as validation of later code.
+Development stays local; push, tagging and publication wait for a new user
+instruction.
+
+## Version 0.4.0 — historical source
 
 The [0.4.0 release report](release-0.4.0.md) gathers the validated changes since
 0.3.1. The minor version reflects formula-coding, input-validation and fitted-state
@@ -31,8 +41,9 @@ corrections. It includes independent original-R references, direct standalone/R
 identity checks, current GTEx precision/speed/RSS evidence and a checked source
 package. All package and lockfile versions agree at 0.4.0.
 
-The Rust-only wrapper migration remains in progress. Frozen local VST and optional
-ashr/apeglm calculations still involve R; this release does not claim otherwise.
+At that release checkpoint the Rust-only wrapper migration was in progress:
+frozen local VST and optional ashr/apeglm calculations still involved R. That
+historical release does not claim the later native implementations.
 The coordinated workflow validates each release tag before publishing the checked
 source packages and five target archives. The release report records the final
 paired measurements and the visible compiled-code warning.

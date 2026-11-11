@@ -79,9 +79,10 @@ The default optional shrinkage workflows, general apeglm likelihoods,
 `nbinomR` and beta-binomial `betabinR`/`betabinCR`/`betabinC` run in Rust.
 General likelihood functions are translated from
 restricted expressions without R execution. MAP-only `nbinomC*` and `betabinC*`
-use native random starts with portable R state import/export. Advanced method options
-remain unfinished and fail explicitly; see the
-[migration plan](../../docs/rust-only-wrapper-migration.md). Ordered factors use
+use native random starts with portable R state import/export. The
+[current supported contract](../../docs/native-supported-contract.md) records
+method/analysis options, explicit unsupported cases and remaining parity gates.
+Ordered factors use
 polynomial coordinates; select their named coefficients or supply numeric
 contrasts rather than treatment-style factor-level contrasts.
 

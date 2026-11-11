@@ -754,91 +754,62 @@ Smaller errors arose from MAP dispersion line-search sensitivity, and the
 largest adjusted-p-value errors reflected Benjamini-Hochberg propagation from
 upstream p-values.
 
-## Missing
+## Supported scope and limits
 
-- Mature wrapper-facing interface around the Rust core.
-- Complete formula parsing in Rust, including arbitrary R expressions, splines,
-  and full R-compatible formula semantics beyond the supported native formula
-  subset.
-- Full DESeq2 dispersion estimation, including broader weighted dispersion
-  edge-case parity, broader synthetic `locfit` edge-case parity, glmGamPoi trend
-  type, and end-to-end dispersion parity across more designs.
-- High-level propagation of observation-weight `weights_fail` flags through
-  complete DESeq2-like builder and unimplemented wrapper workflows.
-- Direct weighted low-level `fitNbinomGLMs` parity for rows that DESeq2 marks
-  `weightsFail` but still returns ridge-stabilized coefficients when that
-  internal function is called directly.
-- Broader DESeq2 parity fixtures for unstable or non-converged rows routed
-  through the bounded optim fallback.
-- DESeq2-style `results(contrast=...)` semantics are implemented for primitive
-  Rust, CLI, and R wrapper already-fitted result routes: character triplets,
-  coefficient-list/listValues, numeric contrasts, factor-level reference
-  inference from fitted metadata where available, explicit fitted-object
-  factor-level routes with caller-supplied sample levels, contrast-specific
-  all-zero behavior for character and two-sided numeric/list contrasts,
-  `contrast` precedence over `name`, and fitted-object dispatch from stored
-  Wald or LRT state. The R package has a limited fitted `DESeqDataSet` route
-  that stores Rust fit metadata and dispatches its own `results()` and
-  `resultsNames()` helpers. Complete Bioconductor object semantics and
-  additional contrast-aware Cook's/refit edge cases remain unsupported.
-- Cook's outlier replacement behavior outside the documented wrapper routes
-  and remaining DESeq2 edge cases. Fitted dataset wrappers attach original and
-  replacement assays, row flags, and replacement/refit result metadata.
-- General Wald and LRT tests with native dispersion estimation beyond the
-  supported limited linear-mu/GLM-mu branches and without generated DESeq2
-  references for all native LRT intermediates.
-- Full Bioconductor result-object metadata. Lightweight `DeseqFit` and
-  `DeseqResults` metadata views exist for implemented diagnostics, result
-  columns, test type, p-value adjustment method, Wald threshold settings,
-  comparison-aware column descriptions, effect/test description labels,
-  table-level scalar metadata, typed result-table output, regular and tidy TSV
-  result export, result-metadata export, and independent-filtering metadata
-  including paired `filterNumRej`- and `lo.fit`-shaped views plus scalar
-  metadata entries. R dataset result tables also carry Bioconductor column
-  descriptions and independent-filtering/replacement metadata.
-  Shared internal all-zero row expansion helpers exist for compact GLM outputs
-  and full-length masked vectors.
-- Complete DESeq2 `results()` semantics for arbitrary `DESeqDataSet` objects.
-  The R package dispatches supported name and contrast requests through the fit
-  it stores after `rsdeseq2::DESeq()`; it does not provide all DESeq2 result
-  metadata or edge-case behavior.
-- Some DESeq2 fast-VST subset edge cases and broader dataset-level local-VST
-  fixtures. Local integration uses the R-compatible FMM spline implementation.
-  Dataset-based `vst()`, full-data `varianceStabilizingTransformation()`,
-  and `rlog()` are implemented, including frozen-intercept rlog reuse, but
-  need broader numerical fixture coverage. Mean-fit, parametric, local,
-  fast-subset selection/subsetting, automatic GLM-mu VST, blind automatic VST,
-  and fit-state VST helpers are also available for normalized-count matrices
-  and fitted trends.
-  Low-level rlog sample-effect ridge fitting is available when callers supply
-  dispersions, with helpers to estimate the sample-effect prior variance from
-  normalized counts, `baseMean`, and `dispFit`, or to estimate that prior and
-  fit in one call for size-factor and normalization-factor inputs. `DeseqFit`
-  can run the same rlog path using fitted trend dispersions in stored fit
-  state. Builder-level `rlog_glm_mu` and `blind_rlog_glm_mu` helpers compose
-  the GLM-mu gene-wise and trend dispersion path with fit-state rlog, with
-  `*_with_fit` variants that retain the dispersion fit state for diagnostics.
-  The native CLI exposes this path through `rlog` for blind and design-aware
-  GLM-mu trend workflows.
-- Normal `lfcShrink()` is available for named or indexed Wald coefficients and
-  expanded-design factor-level, numeric, and list contrasts on
-  `rsdeseq2::DESeq()`-fitted datasets. Optional `ashr` shrinkage supports
-  posterior means/SDs and s-values; optional `apeglm` supports named/indexed
-  Wald coefficients, posterior SDs, and s-values. Numeric normal contrasts
-  require a supplied result table; list contrasts average selected expanded
-  coefficients. DESeq2-cleaned coefficient aliases work for transformed-factor
-  formulas, while factor-level contrast syntax remains unsupported when DESeq2
-  cannot resolve its coefficient names. Formula interactions remain rejected.
-- Top-level builder Wald helpers route through the implemented GLM-mu path.
-  Top-level LRT helpers can store a reduced design on the builder and route
-  default, named-coefficient, numeric-contrast, coefficient-name contrast, and
-  factor-level contrast result requests, including the typed top-level
-  replacement-refit helpers, through the implemented GLM-mu LRT path.
+The current development R wrapper shares numerical kernels with the standalone
+Rust library. The [supported contract](native-supported-contract.md) maps all
+public exports, option families and evidence, including the limits of saved
+objects and primitive fit inputs. The sections above retain their recorded
+release/workload scope; they do not establish final acceptance of later source.
+
+Implemented routes include native normalization, mean/parametric/local
+dispersion fitting, Wald/LRT tests, coefficient and supported numeric/list/factor
+contrasts, Cook's masking and replacement, independent filtering/BH, VST/rlog,
+and normal/ashr/apeglm shrinkage. Complete matrix and formula fits, later
+replacement-aware requests, warning sequences and optimizer-control dispatch
+have separate original-reference and cross-interface checks. High-level
+weighted failure flags are propagated through fitting and replacement; see the
+[independent state correction](weighted-replacement-state-correction.md).
+
+Remaining compatibility limits include:
+
+- Arbitrary R expressions, custom formula functions, splines and the full R
+  formula/class grammar beyond the declared native subset.
+- glmGamPoi dispersion fitting and broader unrepresented unstable, weighted or
+  local-fit designs. Existing fixtures establish their supported branches;
+  they do not certify every possible dataset.
+- Direct low-level weighted `fitNbinomGLMs` rows for which original DESeq2
+  reports `weightsFail` but still returns ridge-stabilized coefficients. This
+  is distinct from the implemented high-level failure-state propagation.
+- Full Bioconductor metadata and `DESeq2::results()` behavior for arbitrary
+  original fitted objects. `rsdeseq2::results()` reads its own retained fit or
+  a supported primitive representation; absent count/design/provenance cannot
+  be reconstructed from a result table.
+- Saved local-dispersion profiles outside the validated one-dimensional
+  quadratic Gaussian locfit representation, and custom closures outside the
+  restricted translated-expression contract.
+- Normal-shrinkage formula interactions and unsupported transformed/ordered
+  treatment-style factor selectors. Named/numeric selectors remain available
+  where documented. Numeric normal contrasts need supplied results.
+- The public apeglm `contrast=` coefficient-selection argument, refinement
+  optimizers other than BFGS/L-BFGS-B, and random-start RNG configurations other
+  than Mersenne-Twister or L'Ecuyer-CMRG with Inversion normals. Native posterior
+  contrast analysis is a separate supported option, not a replacement selector.
+- Unsupported prior/likelihood combinations and malformed active controls.
+  Explicit errors and documented ignored/deferred controls are part of the
+  contract; there is no production R calculation fallback.
+
+Final current-source precision, performance, RSS, package and platform checks
+remain open under C19/C21/C23. Earlier checkpoint measurements are retained as
+historical evidence, not a guarantee for the final combined artifact.
 
 ## Known Deviations
 
-The Rust core accepts primitive matrices and explicit options. Formula
-semantics and model-matrix generation require wrapper support.
+The Rust core accepts primitive matrices, explicit options and the supported
+formula/model-frame representation. Formula expressions and model-matrix values
+are evaluated in Rust. The R wrapper translates R syntax and stored metadata;
+it does not compute a separate design matrix. See the
+[complete-fit layout and compatibility helpers](native-formula-fit-development.md).
 
 Gene/sample normalization factors are supported for normalized-count metadata,
 supplied-dispersion fixed Wald/LRT pipelines, and the supported native linear-mu

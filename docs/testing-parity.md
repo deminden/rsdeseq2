@@ -1,5 +1,16 @@
 # Numerical tests and parity checks
 
+The [current supported contract](native-supported-contract.md) maps the complete
+public wrapper surface to numerical owners, independent accuracy references and
+actual standalone/wrapped checks. Reports below retain their original checkpoint
+scope; old outstanding-method descriptions are not the current method inventory.
+Final combined source, platform, speed/RSS and release-artifact gates remain open.
+
+The [latest combined-suite audit](native-plan-audit-development.md) passes
+1,153 Rust tests and the supported Python suite. It also reproduces a default
+ashr numerical failure in the existing 18-gene subset test. That test and its
+bound remain intact; the full R suite is not currently certified green.
+
 Local default ashr and negative-binomial apeglm migration checks are recorded
 separately in [ashr development](shrinkage-component-development.md) and
 [apeglm development](native-apeglm-development.md). They combine independent
