@@ -2,6 +2,9 @@
 use super::{DeseqError, invalid};
 #[derive(Clone, Copy, Debug)]
 pub struct MixtureSqpOptions {
+    /// Use ashr/mixSQP's EM floors and direction-based active-set transitions.
+    /// The general convex fitter retains its full-KKT target-coordinate policy.
+    pub ashr_compatibility: bool,
     pub active_tolerance: f64,
     /// None retains the established native direction policy.
     pub search_direction_threshold: Option<f64>,
@@ -18,6 +21,7 @@ pub struct MixtureSqpOptions {
 impl Default for MixtureSqpOptions {
     fn default() -> Self {
         Self {
+            ashr_compatibility: false,
             active_tolerance: 1e-10,
             search_direction_threshold: None,
             sufficient_decrease: 0.01,

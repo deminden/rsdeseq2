@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Match original ashr's sparse SQP EM/active-set iteration policy in Rust,
+  including the condition-based approximate direction solve. Correct the
+  existing reordered-gene subset comparison without relaxing its precision
+  bound; preserve the general convex fitter's full-KKT policy.
+
 * Share SQP/EM/interior optimizer control parsing in standalone Rust. Ignore
   unused controls for fixed-prior ashr requests while retaining active-control,
   optimizer-name and missing-prior validation. Preserve numerical outputs and

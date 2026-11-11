@@ -1,6 +1,6 @@
 # Current standalone and R wrapper contract
 
-This inventory describes local development through `6e85f68`, after the
+This inventory describes local development after `6fea9b6`, following the
 published 0.4.0 source. It maps the supported public surface to its numerical
 owner and evidence. It is not a claim of complete DESeq2 compatibility or final
 release acceptance. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
@@ -121,13 +121,12 @@ previously supported method. Source-bound reports retain their original scope.
 
 ## Remaining completion evidence
 
-The [current combined-suite audit](native-plan-audit-development.md) identifies
-one concrete open C19 finding: default ashr shrinkage on the existing 18-gene
-subset differs from original ashr's sparse SQP stopping path. Identical primitive
-inputs reproduce the difference without fitted-object mapping. The existing
-original-comparison test remains failing, with its precision bound unchanged.
-Supported here describes the intended API contract, not proof that every
-implementation route has already passed final acceptance.
+The [combined-suite audit](native-plan-audit-development.md) identified a default
+ashr sparse SQP discrepancy in the existing 18-gene subset test. The subsequent
+[shared Rust correction](native-sparse-sqp-development.md) closes that finding
+and passes the unchanged original-comparison bound. Supported here describes
+the intended API contract, not proof that every implementation route has
+already passed final combined acceptance.
 
 This inventory makes the remaining audit finite. C19/C21 still require a
 requirement-by-requirement reconciliation of these entry routes, supported

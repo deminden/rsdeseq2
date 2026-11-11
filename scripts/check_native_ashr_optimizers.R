@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Complete direct optimizer diagnostics plus actual public R workflow checks.
 args<-commandArgs(TRUE)
-if(!length(args)%in%c(3L,4L,5L))stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR [PAIRED_FITS_RDS] [REFERENCE_JSON]')
+if(!length(args)%in%c(3L,4L,5L))stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR [PAIRED_FITS_RDS_OR_DASH] [REFERENCE_JSON]')
 driver<-normalizePath(args[[1L]])
 library(rsdeseq2,lib.loc=normalizePath(args[[2L]]))
 requireNamespace('ashr');requireNamespace('apeglm')
@@ -38,7 +38,7 @@ wrapped<-lapply(seq_along(reference$em_fit_cases),function(i){
 })
 jsonlite::write_json(wrapped,file.path(out,'wrapped.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
 public_errors<-NULL
-if(length(args)>=4L){
+if(length(args)>=4L && args[[4L]]!='-'){
  cached<-readRDS(args[[4L]]);dds<-cached$rust[seq_len(256L),]
  raw<-rsdeseq2::results(dds,name='conditionB')
  settings<-list(mixEM=list(optmethod='mixEM'),w_mixEM=list(optmethod='w_mixEM',weights=rep(c(.5,1,2,1),64)),

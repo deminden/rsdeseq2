@@ -10,6 +10,10 @@ The [latest combined-suite audit](native-plan-audit-development.md) passes
 1,153 Rust tests and the supported Python suite. It also reproduces a default
 ashr numerical failure in the existing 18-gene subset test. That test and its
 bound remain intact; the full R suite is not currently certified green.
+That describes the preceding checkpoint. The later
+[sparse SQP correction](native-sparse-sqp-development.md) passes the same test
+and adds nine original complete/primitive profiles with direct interface gates.
+Its source-package check and current evidence are recorded separately.
 
 Local default ashr and negative-binomial apeglm migration checks are recorded
 separately in [ashr development](shrinkage-component-development.md) and

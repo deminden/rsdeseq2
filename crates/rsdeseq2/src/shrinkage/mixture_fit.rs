@@ -102,12 +102,23 @@ impl MixtureOptimizer {
 
 impl Problem {
     fn objective_gradient(&self, weights: &[f64]) -> (f64, Vec<f64>) {
+        self.objective_gradient_with_policy(weights, false)
+    }
+    fn objective_gradient_with_policy(&self, weights: &[f64], ashr: bool) -> (f64, Vec<f64>) {
         // Without an equality constraint, minimize
         // sum(w) - (sum_i a_i log(L_i w) + sum_k b_k log(w_k))/N,
         // where N = sum(a) + sum(b). At zero offset the optimum has sum(w) == 1;
         // a nonzero offset is included in both logarithm and derivative below.
         let mut objective = weights.iter().sum::<f64>();
-        let mut gradient = vec![1.0; self.components];
+        let mut gradient = vec![if ashr { 0.0 } else { 1.0 }; self.components];
+        if ashr {
+            for ((&count, &w), gradient) in self.prior_counts.iter().zip(weights).zip(&mut gradient)
+            {
+                if count != 0.0 {
+                    *gradient = -(count / self.mass) / (w + self.offset);
+                }
+            }
+        }
         for (row, &a) in self
             .likelihoods
             .chunks_exact(self.components)
@@ -124,13 +135,24 @@ impl Problem {
             }
             objective -= (a / self.mass) * marginal.ln();
             for (gradient, &likelihood) in gradient.iter_mut().zip(row) {
-                *gradient -= (a / self.mass) * (likelihood / marginal);
+                *gradient -= if ashr {
+                    ((a / self.mass) / marginal) * likelihood
+                } else {
+                    (a / self.mass) * (likelihood / marginal)
+                };
             }
         }
         for ((&count, &w), gradient) in self.prior_counts.iter().zip(weights).zip(&mut gradient) {
             if count != 0.0 {
                 objective -= (count / self.mass) * (w + self.offset).ln();
-                *gradient -= (count / self.mass) / (w + self.offset);
+                if !ashr {
+                    *gradient -= (count / self.mass) / (w + self.offset);
+                }
+            }
+        }
+        if ashr {
+            for gradient in &mut gradient {
+                *gradient += 1.0;
             }
         }
         (objective, gradient)

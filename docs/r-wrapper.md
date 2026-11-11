@@ -170,6 +170,9 @@ The local SQP adapter supports active-set, direction, line-search, regularizatio
 and optional `tol.svd` controls, including `maxiter.activeset=NULL`. See
 [numerical controls and validation](native-sqp-control-development.md) for default
 full-matrix preservation, spectral fallback and remaining diagnostic scope.
+The subsequent [sparse SQP correction](native-sparse-sqp-development.md) uses the
+source EM/working-set policy and condition-based direction solve. It fixes the
+existing reordered-gene subset comparison without changing its precision bound.
 
 Local canonical `ashr::lik_normalmix` and `ashr::lik_logF` objects import stored
 primitive parameters without executing their closures. Noise SD matrices and

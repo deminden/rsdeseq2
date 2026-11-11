@@ -91,6 +91,8 @@ jobs:
           Rscript --vanilla scripts/check_native_factor_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-factors
           Rscript --vanilla scripts/check_frozen_local_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-frozen-local
           Rscript --vanilla scripts/check_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-posterior
+          Rscript --vanilla scripts/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp crates/rsdeseq2/tests/data/sparse_sqp_r462.json
+          Rscript --vanilla scripts/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics - crates/rsdeseq2/tests/data/sparse_sqp_r462.json
           Rscript --vanilla scripts/check_mixture_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-prior-fitting
           Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-likelihood-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
           Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fixed-controls - crates/rsdeseq2/tests/data/fixed_prior_controls_r462.json
