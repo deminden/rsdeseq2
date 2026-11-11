@@ -1,0 +1,68 @@
+{
+  "artifact_manifest": "results/native-fresh-fit/accepted-artifacts.json",
+  "artifact_manifest_sha256": "338299fbfffdc28bfea24ba1eeda5261f65ea26db691739d0700ad7281a7db92",
+  "base_commit": "d39ca5eb028b7040005fd28664df78727f25a0e7",
+  "files": {
+    ".github/workflows/r.yml": "8aa19b2754eb490311a2ae33be68f050ce3e789793b8daa67ca56853b60a3b4c",
+    "crates/rsdeseq2/examples/evaluate_r_interface.rs": "c090b15033f2b7fb83ae476d4678a7b817e06189587a8aa06b329f305cfdb488",
+    "crates/rsdeseq2/examples/evaluate_r_interface/fresh_fit.rs": "41f4c3904a992dcffb3e90fbef4ac0e2ab17b58a8f45729e3b9512056923f6dd",
+    "crates/rsdeseq2/src/core.rs": "03118c54ff362b9a34099671b59e9c81ba61fa91f94fbb257dceef5ad8034728",
+    "crates/rsdeseq2/src/core/replacement_fit.rs": "eee8205ac188aa7dcc1374df2b0f0ff02d97eced7659dc0212f7f8f67df0b8d0",
+    "crates/rsdeseq2/tests/native_lrt_pipeline/replacement.rs": "188e554919a1b3b1cdd5d78d7875320efefa7015ea237004ff34d19ee1cc7de0",
+    "docs/codebase-improvement-completion-audit-2026-10-29.md": "239d298f2fbb682fa83aa5d14867d6f8dd2eea61b26eda582cf59adbe1bfadc5",
+    "docs/native-fresh-fit-development.md": "03c0512726ae9f437b070363507e4f1c48163e15c4c025760aba400bafab4b3a",
+    "docs/native-numerical-authority-audit.md": "7a1915ecd25be2a9aa7cf521e7857e26bfd408c8d71de3c4e89bd2258cdbb6e6",
+    "docs/r-wrapper.md": "ca78487307f91d6786b7db9e0e36348d78aa122194405825dc2c9efe62032d76",
+    "docs/rust-only-wrapper-migration.md": "a28fdb8595c6daa8b7c0f5c9cc637e6d76b63cb1fd441651e6473c7139ce8976",
+    "docs/testing-parity.md": "4a98e7ef52709e7d716ab01bc6dea190b3c6252684b0fbc89ba8aa2a477ef08e",
+    "r-pkg/rsdeseq2/NEWS.md": "aa09e3be0d8e61f2137eda286539babc22e9b78611ceb1e8fe51fd09e4411538",
+    "r-pkg/rsdeseq2/R/DESeq.R": "e541a5388bdfc70952e66de7c10e795df083e4f6050daa622528d343d8d49342",
+    "r-pkg/rsdeseq2/src/entrypoint.c": "9b207464609807ae3b39716edd992107b3040c4eb69f3ab8ea9f603ecb2e0306",
+    "r-pkg/rsdeseq2/src/rust/src/lib.rs": "37e1bea24bdf69b27324a68579a6b2483e2bc0f71574e9f08cdfc5230c32152e",
+    "r-pkg/rsdeseq2/src/rust/src/lib/fit.rs": "c282bf14ab71404bb2f893e9e80cad2889946c641fdc018b23629c7eec49fa33",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core.rs": "03118c54ff362b9a34099671b59e9c81ba61fa91f94fbb257dceef5ad8034728",
+    "r-pkg/rsdeseq2/src/rust/vendor/rsdeseq2/src/core/replacement_fit.rs": "eee8205ac188aa7dcc1374df2b0f0ff02d97eced7659dc0212f7f8f67df0b8d0",
+    "scripts/check_fresh_fit_identity.R": "9bf338add2aa07cc5d4b5fd3de638f797930c58a2a43f664dbb946414fb11f18"
+  },
+  "gates": {
+    "R_fit_boundary_normalization_tests": "passed for main correction; final expanded-prior weighted caller follow-up has focused Rust coverage",
+    "connected_Rust_tests_passed": 196,
+    "earlier_accepted_payload_sets_exact": 25,
+    "fresh_fit_identity": {
+      "R_calculations_blocked": true,
+      "complete_fresh_fit_cases": 24,
+      "controlled_rejections": 4,
+      "floating_point_bits_including_missing_values": "exact",
+      "valid": 20
+    },
+    "numerical_bounds_and_optimizer_controls": "unchanged",
+    "pre_correction_reference_files_unchanged": 210,
+    "root_and_backend_clippy": "passed"
+  },
+  "limitations": [
+    "The paired pass precedes the final four expanded-prior weighted planning call-site corrections; it is not final combined release certification.",
+    "Keep replacement plan and final results with merged fit; bare ResultRequest does not carry replacement context.",
+    "Full supported-option/warning/state audit and later-query reconciliation remain open.",
+    "Final combined GTEx/held-out precision, time/RSS, sanitizer/MSRV/platform/package checks and source bundle remain open.",
+    "No push, tag, publication or version bump."
+  ],
+  "paired_one_pass": {
+    "baseline_commit": "3d36759",
+    "baseline_max_rss_mib": 1133.40625,
+    "baseline_total_process_s": 88.247042417,
+    "candidate_max_rss_mib": 1133.234375,
+    "candidate_total_process_s": 88.181203791,
+    "complete_payloads_byte_identical": 20,
+    "measured_source_manifest": "results/native-fresh-fit/paired-build-source.json",
+    "optimization_rounds_counted": 0,
+    "source_scope": "results/native-fresh-fit/paired-source-scope.json",
+    "workflows": 20
+  },
+  "removed_paths": [
+    "r-pkg/rsdeseq2/src/rust/src/lib/refit.rs"
+  ],
+  "runtime_source_manifest": "results/native-fresh-fit/accepted-build-source.json",
+  "runtime_source_paths": 626,
+  "scope": "Shared standalone replacement-fit state, unnamed matrix metadata and complete fresh-fit interface checker",
+  "status": "local checkpoint; C19/C21/C23 remain open"
+}

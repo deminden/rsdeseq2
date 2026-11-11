@@ -388,3 +388,11 @@ The [fit-route audit](native-fit-route-audit.md) removes duplicate R LRT degrees
 of freedom and adapter test dispatch. All 189 actual result-interface cases and
 four complete paired fitted-workflow payloads remain exact. One/two-df LRT and
 Wald NULL/type assertions supplement the existing fit and malformed-boundary tests.
+
+The [fresh-fit checker](native-fresh-fit-development.md) compares actual public
+R fits with R-free fits for 24 requests, with R math blocked and raw floating-point
+bits preserved. It includes required successful parametric/local/mean fits,
+weighted replacement and normalization, serial/four-worker identity, unnamed
+matrix metadata and controlled rejections. It runs in both R CI lanes. The new
+original-only weighted fixture isolates replacement summaries from optimizer
+variation; an expanded-prior test also retains a hand-calculated weighted mean.

@@ -127,28 +127,8 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                     &replacement_options,
                 )
                 .map_err(|error| error.to_string())?;
-            let (mut merged_fit, refit_fit, plan, results) = match output {
-                rsdeseq2::prelude::CooksReplacementTestOutput::Wald(output) => (
-                    output.original_fit,
-                    output.refit_fit,
-                    output.refit_plan,
-                    output.results,
-                ),
-                rsdeseq2::prelude::CooksReplacementTestOutput::Lrt(output) => (
-                    output.original_fit,
-                    output.refit_fit,
-                    output.refit_plan,
-                    output.results,
-                ),
-            };
-            if let Some(refit_fit) = &refit_fit {
-                merge_refit_fit_rows(&mut merged_fit, refit_fit, &plan.refit_rows)?;
-            }
-            for &row in &plan.new_all_zero_rows {
-                merged_fit.base_mean[row] = 0.0;
-                merged_fit.base_var[row] = 0.0;
-                merged_fit.all_zero[row] = true;
-            }
+            let (merged_fit, results, plan) = output.into_merged_fit()
+                .map_err(|error| error.to_string())?;
             (merged_fit, results, Some(plan))
         };
         lrt_df[0] = fit.lrt.as_ref().map(|lrt| i32::try_from(lrt.degrees_of_freedom)

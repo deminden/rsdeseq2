@@ -16,6 +16,14 @@ LRT degrees-of-freedom calculation and adapter test dispatch. It preserves 189
 actual interface cases and four complete fresh-workflow payloads. Broader
 authority reconciliation and final combined gates remain open.
 
+The [fresh-fit checkpoint](native-fresh-fit-development.md) shares replacement-fit
+merging in the standalone engine and corrects raw-weight summaries and unnamed
+matrix metadata. All 24 actual fresh-fit cases agree in exported numerical bits
+and acceptance decisions; 25 earlier accepted payload sets are unchanged.
+This closes specific findings, not C19/C21/C23. Later replacement-aware query
+context and full warning/option/state coverage remain to audit before final
+combined acceptance.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

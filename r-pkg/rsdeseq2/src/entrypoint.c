@@ -267,12 +267,16 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     SEXP names = PROTECT(Rf_allocVector(STRSXP, n_columns));
     for (size_t column = 0; column < n_columns; ++column) SET_STRING_ELT(names, column, Rf_mkChar(columns[column]));
     Rf_setAttrib(out, R_NamesSymbol, names);
-    SEXP row_names = PROTECT(Rf_allocVector(STRSXP, n_genes));
     SEXP dimnames = Rf_getAttrib(counts, R_DimNamesSymbol);
     SEXP gene_names = dimnames == R_NilValue ? R_NilValue : VECTOR_ELT(dimnames, 0);
+    SEXP row_names = PROTECT(Rf_allocVector(gene_names == R_NilValue ? INTSXP : STRSXP,
+        gene_names == R_NilValue ? (n_genes ? 2 : 0) : n_genes));
     if (gene_names == R_NilValue) {
-        for (size_t gene = 0; gene < n_genes; ++gene) SET_STRING_ELT(row_names, gene, Rf_mkChar(""));
-        Rf_setAttrib(out, R_RowNamesSymbol, R_NilValue);
+        if (n_genes) {
+            INTEGER(row_names)[0] = NA_INTEGER;
+            INTEGER(row_names)[1] = -(int)n_genes;
+        }
+        Rf_setAttrib(out, R_RowNamesSymbol, row_names);
     } else {
         for (size_t gene = 0; gene < n_genes; ++gene) SET_STRING_ELT(row_names, gene, STRING_ELT(gene_names, gene));
         Rf_setAttrib(out, R_RowNamesSymbol, row_names);

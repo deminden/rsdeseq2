@@ -38,6 +38,11 @@ beta-binomial and compiled-NB paths, with 21 further exact interface cases.
 The [fit-route audit](native-fit-route-audit.md) now imports core LRT degrees
 of freedom and forwards ordinary fits through one core test dispatcher. All
 189 actual result-interface cases and four paired fresh-fit payloads remain exact.
+The subsequent [fresh-fit checkpoint](native-fresh-fit-development.md) moves
+replacement-fit merging into the standalone core and checks 24 actual fresh-fit
+requests across interfaces, including weighted replacement and unnamed matrices.
+All exported numerical bits and acceptance decisions agree. Later replacement
+query context and the full warning/option/state audit remain open.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

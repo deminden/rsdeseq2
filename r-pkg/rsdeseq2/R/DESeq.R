@@ -206,7 +206,7 @@ DESeq <- function(object,
   names(results$dispFit) <- rownames(counts)
   dimnames(results$mu) <- dimnames(counts)
   dimnames(results$cooks) <- dimnames(counts)
-  dimnames(results$betaCovariance)[[1L]] <- rownames(counts)
+  dimnames(results$betaCovariance)[1L] <- list(rownames(counts))
   fit <- structure(
     list(
       schemaVersion = 2L,

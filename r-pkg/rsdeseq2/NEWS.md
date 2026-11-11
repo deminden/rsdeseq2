@@ -1,5 +1,11 @@
 # Development after 0.4.0
 
+* Share replacement-fit row merging with the standalone Rust engine, including
+  full/reduced and optimizer diagnostics. Preserve raw observation weights in
+  replacement base summaries. Retain unnamed covariance dimensions and valid
+  automatic result-table row names. Compare complete fresh-fit numerical bits
+  across both interfaces in CI.
+
 * Import LRT degrees of freedom directly from the Rust fit. Forward ordinary
   Wald/LRT calls through the shared core dispatcher and guard against duplicate
   statistical dimension calculations in production R.
