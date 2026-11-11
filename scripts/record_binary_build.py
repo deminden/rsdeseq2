@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 from release_artifact_manifest import sha256, source_identity
+from check_release_target import RELEASE_TESTS
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--binary', type=Path, required=True)
@@ -19,6 +20,4 @@ if validation['source_commit'] != source_identity():
 args.output.write_text(json.dumps(dict(source_commit=source_identity(), target=args.target,
     validation_sha256=sha256(args.validation), binary_sha256=sha256(args.binary),
     archive_sha256=sha256(args.archive), rustc=subprocess.check_output(['rustc','-vV'],text=True),
-    profile='release', numerical_tests=['model_validity','wald_reference','lrt_reference',
-        'dispersion_reference','gtex_real_wald_parity','thread_invariance','cli',
-        'frozen_local_vst']), indent=2)+'\n')
+    profile='release', numerical_tests=list(RELEASE_TESTS)), indent=2)+'\n')

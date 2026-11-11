@@ -5,6 +5,12 @@ tests cover the implemented statistical pipeline.
 
 ## Validation and artifact gate
 
+`platform-checks.yml` runs the five target/profile numerical panels on branch
+pushes, pull requests and manual checks. It has read-only repository permissions
+and does not package, upload or publish artifacts. It shares the exact test list
+and command runner with the tagged binary workflow and provenance records, so
+platform validation can finish before a release tag exists.
+
 Tag publication is coordinated by `release.yml`. The shared validation workflow
 requires Rust/Python checks, the pinned R reference package check, the full GTEx
 oracle and the advertised minimum compiler build. The current-package R lane is

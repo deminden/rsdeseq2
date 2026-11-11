@@ -80,3 +80,26 @@ These commands are locally tested on macOS. The Linux run and other current
 platform gates remain open; wiring a required CI step is not evidence that it
 has run successfully. All development and rebuilt artifacts stay local until a
 new publication instruction.
+
+## Check platforms without publishing
+
+The `Platform checks` workflow now runs the same eight release-profile numerical
+and CLI integration suites on Linux x86-64/ARM64, macOS Intel/ARM64 and Windows
+x86-64 for branch pushes, pull requests or manual checks. The existing release
+workflow and its provenance writer share `scripts/check_release_target.py`'s
+test list. The CI-only workflow has read-only permissions and contains no
+packaging, artifact upload, release, tag or registry operation.
+The [local platform-path audit](data/platform-validation-local.json) records the
+workflow lint, matching matrix, native runner results and environment limits.
+
+For a locally runnable target, use:
+
+```sh
+python scripts/check_release_target.py --target aarch64-apple-darwin
+```
+
+This ARM Mac cannot execute Intel binaries in its current configuration, lacks a
+Linux C cross-compiler and has no local Linux/Windows runtime. The remaining
+platform gates require suitable runners. Branch-only CI needs a new user
+authorization because the current development commits are still local; tags and
+publication remain separate actions.

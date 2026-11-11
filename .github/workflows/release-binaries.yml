@@ -93,11 +93,7 @@ jobs:
         run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
 
       - name: Numerical checks on shipped target and release profile
-        run: >-
-          cargo test --release --locked -p rsdeseq2 --target ${{ matrix.target }}
-          --test model_validity --test wald_reference --test lrt_reference
-          --test dispersion_reference --test gtex_real_wald_parity
-          --test thread_invariance --test cli --test frozen_local_vst
+        run: python3 scripts/check_release_target.py --target ${{ matrix.target }}
 
       - name: Stage files
         shell: bash
