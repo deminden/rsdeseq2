@@ -32,6 +32,9 @@ frozen-local VST and supported ashr/apeglm calculations. The
 locally and records the current combined checks, measurements and remaining
 C23 artifact/platform gates. Historical release evidence below must not be
 relabeled as validation of later code.
+The [warning/platform follow-up](native-sqp-warning-platform-gates.md) records
+the corrected SQP diagnostics, fresh platform-oracle gates and separately rebuilt
+local source/package artifacts.
 Development stays local; push, tagging and publication wait for a new user
 instruction.
 

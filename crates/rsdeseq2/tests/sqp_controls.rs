@@ -16,9 +16,18 @@ use rsdeseq2::{
 fn sqp_control_profiles_match_original_numerical_outputs() {
     let mut r: serde_json::Value =
         serde_json::from_str(include_str!("data/sqp_controls_r462.json")).unwrap();
-    let sparse: serde_json::Value =
-        serde_json::from_str(include_str!("data/sparse_sqp_r462.json")).unwrap();
+    // A separately regenerated original-package panel checks this platform;
+    // neither branch writes or replaces the committed oracle.
+    let fresh = std::env::var_os("RSDESEQ2_SPARSE_SQP_REFERENCE")
+        .map(|path| std::fs::read_to_string(path).expect("read fresh sparse SQP reference"));
+    let sparse: serde_json::Value = serde_json::from_str(
+        fresh
+            .as_deref()
+            .unwrap_or(include_str!("data/sparse_sqp_r462.json")),
+    )
+    .unwrap();
     for key in ["cases", "em_fit_cases"] {
+        assert_eq!(sparse[key].as_array().unwrap().len(), 9, "{key}");
         r[key]
             .as_array_mut()
             .unwrap()
@@ -40,6 +49,14 @@ fn sqp_control_profiles_match_original_numerical_outputs() {
             }
         };
         let target = c;
+        if let Some(expected) = target.get("warnings")
+            && serde_json::to_value(&f.warnings).unwrap() != *expected
+        {
+            failures.push(format!(
+                "{} warnings: {:?} vs {expected}",
+                input.name, f.warnings
+            ));
+        }
         for (field, value) in [
             ("posterior_mean", &f.posterior_mean),
             ("posterior_sd", &f.posterior_sd),

@@ -1,10 +1,11 @@
 # GTEx native Wald comparison — current local development
 
-Measurements at `48917a0` use native R 4.6.2 / DESeq2 1.52.0 in
+Measurements after the [SQP warning correction](native-sqp-warning-platform-gates.md)
+use native R 4.6.2 / DESeq2 1.52.0 in
 `deseq2-r462-native`, Apple M5/macOS 27.2, one Rust/BLAS worker and one paired
 pass over eleven full contrasts. All 56,200 genes are retained in each contrast.
 The tested CLI SHA-256 is
-`0387fdccecf88c7a6bbd4375aa95f9ad8e54b877a17bce28c682d7c4cd692f11`.
+`447ff5b2df1d2f55b94d4940c2c6507cb5063c859e4d6e3c667bae3c8982a780`.
 The directory named `sex_female_vs_male` tests male versus female.
 
 ## Precision
@@ -32,36 +33,35 @@ independent Pasilla Wald/LRT checks also pass with all eight exports exact.
 
 | Contrast group | Rust (s) | DESeq2 (s) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 7.80 | 39.32 | 5.04× |
-| Male vs female | 3.72 | 29.70 | 7.98× |
-| Male age 4 vs 3 | 2.73 | 15.78 | 5.79× |
-| Blocked random splits | 4.37 | 22.83 | 5.22× |
-| Unblocked random splits | 2.59 | 15.16 | 5.84× |
+| Original blocked | 5.96 | 31.03 | 5.20× |
+| Male vs female | 2.75 | 17.69 | 6.42× |
+| Male age 4 vs 3 | 2.38 | 14.54 | 6.10× |
+| Blocked random splits | 4.39 | 23.71 | 5.40× |
+| Unblocked random splits | 3.43 | 19.63 | 5.72× |
 
 | Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 297.42 | 1764.75 | 5.93× |
-| Male vs female | 241.64 | 1691.23 | 7.00× |
-| Male age 4 vs 3 | 213.00 | 1579.69 | 7.42× |
-| Blocked random splits | 300.47 | 1756.91 | 5.85× |
-| Unblocked random splits | 242.73 | 1632.47 | 6.73× |
+| Original blocked | 304.62 | 1571.23 | 5.16× |
+| Male vs female | 243.05 | 1689.53 | 6.95× |
+| Male age 4 vs 3 | 213.61 | 1600.56 | 7.49× |
+| Blocked random splits | 304.41 | 1681.58 | 5.52× |
+| Unblocked random splits | 244.09 | 1643.09 | 6.73× |
 
-Summed time is **43.86 seconds for Rust versus 245.68 seconds for DESeq2**, an observed **5.60×** ratio.
+Summed time is **43.33 seconds for Rust versus 242.12 seconds for DESeq2**, an observed **5.59×** ratio.
 Groups report medians over distinct contrasts; group ratios divide those medians.
 Peak whole-process memory includes
 interpreter/libraries; no outlier was removed and no unchanged case was retimed
 within the final paired pass. These are process observations, not estimates of
 run-to-run variability.
 
-The current candidate takes 43.860 s versus the validated local `d64d2f2`
-candidate's 45.597 s (−3.810% elapsed), with 301.938 versus 305.813 MiB maximum
-RSS. This baseline is an unpublished local bundle, not the published release.
-Twenty paired R workflows take 90.745 versus 91.190 s, with 1,134.563 versus
-1,133.141 MiB maximum RSS, all below the predeclared 2 GiB budget. Nineteen
-payloads are byte-identical; the two corrected ashr posterior columns in the
-twentieth pass the independent original oracle with all other fields exact.
-The R baseline is the pre-SQP `6e85f68` library. The main README compares
-memory against original DESeq2 only.
+The current candidate takes 43.328 s versus the pre-warning-correction
+`48917a0` candidate's 46.476 s (−6.774% elapsed), with 307.469 versus 308.000 MiB
+maximum RSS. This is a local development baseline, not a published release.
+Twenty paired R workflows take 89.638 versus 89.423 s (+0.240% elapsed), with
+1,133.391 versus 1,133.859 MiB maximum RSS, all below the predeclared 2 GiB budget.
+All twenty complete payloads are byte-identical under strict comparison; no
+numerical migration exception is enabled. The main README compares memory
+against original DESeq2 only.
 
 Other user calculations, virtualization and system indexing were active during
 the run. Load snapshots are retained with the raw logs. The measurement task
@@ -71,13 +71,13 @@ by this loaded single pass, and no optimization round is counted.
 
 ## Evidence
 
-- [Current per-contrast summary](data/final_plan_native_summary.tsv),
-  [individual runs](data/final_plan_native_timings.tsv),
-  [group aggregation](data/final_plan_native_groups.tsv), and
-  [source/acceptance/provenance hashes](data/final_plan_local_acceptance.json).
-- [Current timed original-R precision](data/final_plan_native_precision.tsv),
-  [R workflow runs and payload hashes](data/final_plan_r_workflows.tsv),
-  [stage times](data/final_plan_r_stages.tsv) and
+- [Current per-contrast summary](data/native_sqp_warning_native_summary.tsv),
+  [individual runs](data/native_sqp_warning_native_timings.tsv),
+  [group aggregation](data/native_sqp_warning_native_groups.tsv), and
+  [source/acceptance/provenance hashes](data/native-sqp-warning-local.json).
+- [Current timed original-R precision](data/native_sqp_warning_native_precision.tsv),
+  [R workflow runs and payload hashes](data/native_sqp_warning_r_workflows.tsv),
+  [stage times](data/native_sqp_warning_r_stages.tsv) and
   [measured wrapper boundary costs](data/final_plan_r_boundary.tsv).
 - [Frozen precision gates](data/release_0.4.0_gtex_precision.tsv),
   [global gates](data/release_0.4.0_gtex_global_precision.tsv), and
@@ -86,6 +86,8 @@ by this loaded single pass, and no optimization round is counted.
   The new formula/SQP independent Linux references and current platform jobs
   remain open. [Earlier Linux reference evidence](linux_numerical_parity.md)
   and [0.4.0 release scope](release-0.4.0.md) retain their historical scope.
+- The [initial combined audit](data/final_plan_local_acceptance.json) retains
+  its previous executable/package identities and measurements.
 - The preceding release comparison remains in the
   [release report](release-0.4.0.md) and its original
   [summary](data/release_0.4.0_final_native_summary.tsv),

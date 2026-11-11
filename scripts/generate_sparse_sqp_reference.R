@@ -80,6 +80,7 @@ suppressMessages(untrace('estimate_mixprop', where=asNamespace('ashr')))
 jsonlite::write_json(list(source=list(R=as.character(getRversion()),
   platform=R.version$platform, DESeq2=as.character(packageVersion('DESeq2')),
   ashr=as.character(packageVersion('ashr')), mixsqp=as.character(packageVersion('mixsqp')),
+  BLAS=unname(extSoftVersion()[['BLAS']]),LAPACK=La_library(),
   optimizer_family='SQP'),
   cases=cases, em_fit_cases=direct), args[[1L]], auto_unbox=TRUE,
   pretty=TRUE, null='null', digits=NA)

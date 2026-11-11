@@ -9,6 +9,10 @@ The [final local acceptance audit](final-plan-local-acceptance.md) now records
 GTEx/held-out checks, actual interface identity, MSRV, sanitizers and paired
 speed/RSS measurements. C19/C21 are closed locally; current platform and
 release-artifact gates remain open.
+The [warning/platform follow-up](native-sqp-warning-platform-gates.md) adds fresh
+platform reference inputs to the existing formula/SQP tests and asserts the
+original warning sequence. The pinned Linux lane must generate and test those
+references; that run is still pending.
 
 ## Historical migration checkpoints
 

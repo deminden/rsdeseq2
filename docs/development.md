@@ -75,6 +75,10 @@ The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
 the C19/C21 requirements and current combined tests, paired process measurements
 and measured wrapper boundary costs. C23's current platform/artifact gates
 remain explicit; local acceptance does not authorize publication.
+The [warning/platform follow-up](native-sqp-warning-platform-gates.md) also
+requires fresh original-R complete-formula and sparse-SQP references in the
+pinned Linux lane, alongside the saved-reference tests. It documents a corrected
+warning omission found by strengthening those assertions.
 
 ## Commands
 
