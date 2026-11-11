@@ -214,7 +214,7 @@ impl CooksReplacementTestOutput {
                 return Err(invalid("replacement refit designs do not match"));
             }
             merge_refit_fit_rows(&mut fit, refit, &plan.refit_rows)?;
-        } else if !plan.refit_rows.is_empty() {
+        } else if plan.has_replaceable_samples() && !plan.refit_rows.is_empty() {
             return Err(invalid("replacement rows require a refitted model"));
         }
         if plan.new_all_zero_rows.iter().any(|&i| {

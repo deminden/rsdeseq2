@@ -77,11 +77,12 @@ pub struct CooksRefitPlan {
     pub replaced_all_zero: Vec<bool>,
     /// Number of genes with `replace == TRUE`, matching `sum(replace, na.rm=TRUE)`.
     pub n_refit: usize,
-    /// Genes that should be refit after replacement.
+    /// Candidate genes for refitting, before the workflow eligibility guard.
     pub refit_rows: Vec<usize>,
     /// Replaced genes that became all-zero after replacement.
     pub new_all_zero_rows: Vec<usize>,
-    /// Whether DESeq2 would enter the replacement-refit branch.
+    /// Whether candidate rows need refitting, before sample eligibility.
+    /// Use [`Self::requires_refit`] to choose workflow execution.
     pub should_refit: bool,
     /// `maxCooks` after replacement refit, using original Cook's distances with
     /// replaceable sample columns ignored by zeroing, matching DESeq2.
@@ -93,7 +94,7 @@ pub struct CooksRefitPlan {
 pub struct CooksReplacementMetadata {
     /// Number of genes with `replace == TRUE`, matching `sum(replace, na.rm=TRUE)`.
     pub n_refit: usize,
-    /// Number of replacement-marked genes refit by the GLM.
+    /// Number of replacement-marked candidate genes for GLM refitting.
     pub n_refit_rows: usize,
     /// Number of replacement-marked genes that became all-zero.
     pub n_new_all_zero: usize,
@@ -103,7 +104,7 @@ pub struct CooksReplacementMetadata {
     pub n_replaced_cells: usize,
     /// Number of samples eligible for Cook's outlier replacement.
     pub n_replaceable_samples: usize,
-    /// Whether DESeq2 would enter the replacement-refit branch.
+    /// Candidate refit condition before sample eligibility is applied.
     pub should_refit: bool,
 }
 
@@ -145,6 +146,13 @@ impl CooksRefitPlan {
             .replaceable_samples
             .iter()
             .any(|&value| value)
+    }
+
+    /// Whether a fitting workflow should execute the candidate refit.
+    /// The raw planner's `should_refit` and row metadata remain available even
+    /// when no sample is eligible; those candidates must not trigger fitting.
+    pub fn requires_refit(&self) -> bool {
+        self.should_refit && self.has_replaceable_samples()
     }
 
     /// Summarize the replacement/refit branch in a compact, object-friendly form.

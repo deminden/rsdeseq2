@@ -412,3 +412,10 @@ It exposes four old flag failures without changing earlier reference files or
 bounds. The fresh-fit checker now covers 31 fitting requests and 113 later
 queries, including failed-weight rows with no refits, ordinary replacement and
 new-zero-only replacement in both tests.
+
+The [execution panel](replacement-execution-correction.md) traces original
+DESeq2 to distinguish skipped refits from output-equivalent unnecessary work.
+Its eight profiles and two positive controls back one 32-case native/fixed
+regression matrix; an existing expanded-prior fixture covers four more routes.
+All 31 complete fresh-fit payloads and 113 later queries retain their previous
+bits. No timing threshold substitutes for the structural execution check.

@@ -50,6 +50,9 @@ factor/formula and supported-state reconciliation remains open.
 The [weighted replacement state correction](weighted-replacement-state-correction.md)
 refreshes raw zero metadata separately from weight-failure diagnostics, with
 eight original fits and 31 fresh-fit/113 later-query cross-interface checks.
+The [execution correction](replacement-execution-correction.md) then skips
+ineligible replacement refits throughout the shared engine while preserving
+those complete outputs and the public raw-planner contract.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

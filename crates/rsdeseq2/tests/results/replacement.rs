@@ -170,7 +170,7 @@ fn fit_expanded_beta_prior_wald_results_with_cooks_replacement_skips_unmarked_ro
     };
 
     let output = fit_expanded_beta_prior_wald_results_with_cooks_replacement(
-        input,
+        input.clone(),
         1,
         &CooksReplacementOptions::new(f64::MAX),
     )
@@ -181,6 +181,36 @@ fn fit_expanded_beta_prior_wald_results_with_cooks_replacement_skips_unmarked_ro
     assert!(output.refit.is_none());
     assert_eq!(output.refit_plan.replacement.replaced_counts, counts);
     assert_eq!(output.results.rows[0].base_mean, base_mean[0]);
+
+    // Distinguish no candidate rows from real candidates in ineligible samples.
+    let mut ineligible = CooksReplacementOptions::new(0.0);
+    ineligible.min_replicates = 3;
+    ineligible.which_samples = Some(vec![false; counts.n_samples()]);
+    let factors = RowMajorMatrix::from_row_major(2, 4, vec![1.0; 8]).unwrap();
+    let normalized = ExpandedBetaPriorWaldNormalizedResultsInput {
+        counts: &counts,
+        design: input.design,
+        normalization_factors: &factors,
+        weights: None,
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: None,
+        options: input.options.clone(),
+    };
+    let outputs = [
+        fit_expanded_beta_prior_wald_results_with_cooks_replacement(input.clone(), 1, &ineligible).unwrap(),
+        fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(input, &[0.0,1.0], &ineligible).unwrap(),
+        fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(normalized.clone(), 1, &ineligible).unwrap(),
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(normalized, &[0.0,1.0], &ineligible).unwrap(),
+    ];
+    for output in outputs {
+        assert!(output.refit_plan.n_refit > 0 && output.refit_plan.should_refit);
+        assert!(!output.refit_plan.requires_refit());
+        assert!(output.refit.is_none());
+        assert_eq!(output.refit_plan.replacement.replaced_counts, counts);
+        assert_eq!(output.results.rows, output.original.results.rows);
+    }
 }
 
 #[test]
