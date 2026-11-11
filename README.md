@@ -153,16 +153,16 @@ and finite/NA patterns match throughout.
 
 | Contrast group | Rust (s) | DESeq2 (s) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 7.80 | 39.32 | 5.04× |
-| Male vs female | 3.72 | 29.70 | 7.98× |
-| Male age 4 vs 3 | 2.73 | 15.78 | 5.79× |
-| Blocked random splits | 4.37 | 22.83 | 5.22× |
-| Unblocked random splits | 2.59 | 15.16 | 5.84× |
+| Original blocked | 5.96 | 31.03 | 5.20× |
+| Male vs female | 2.75 | 17.69 | 6.42× |
+| Male age 4 vs 3 | 2.38 | 14.54 | 6.10× |
+| Blocked random splits | 4.39 | 23.71 | 5.40× |
+| Unblocked random splits | 3.43 | 19.63 | 5.72× |
 
 One process run per tool and contrast on Apple M5/macOS, with one fitting/BLAS
 thread. Multiple-contrast groups show medians across distinct contrasts. Timings
 include startup, loading, fitting and completed output. Summed time is
-**43.86 seconds for Rust versus 245.68 seconds for DESeq2**, an observed **5.60×** ratio.
+**43.33 seconds for Rust versus 242.12 seconds for DESeq2**, an observed **5.59×** ratio.
 These are single-pass observations, without discarded outliers. Other user and
 system workloads were active; the measurements do not establish small speed
 changes between development revisions.
@@ -171,15 +171,15 @@ changes between development revisions.
 
 | Contrast group | Rust peak RSS (MiB) | DESeq2 peak RSS (MiB) | DESeq2 / Rust |
 | --- | ---: | ---: | ---: |
-| Original blocked | 297.42 | 1764.75 | 5.93× |
-| Male vs female | 241.64 | 1691.23 | 7.00× |
-| Male age 4 vs 3 | 213.00 | 1579.69 | 7.42× |
-| Blocked random splits | 300.47 | 1756.91 | 5.85× |
-| Unblocked random splits | 242.73 | 1632.47 | 6.73× |
+| Original blocked | 304.62 | 1571.23 | 5.16× |
+| Male vs female | 243.05 | 1689.53 | 6.95× |
+| Male age 4 vs 3 | 213.61 | 1600.56 | 7.49× |
+| Blocked random splits | 304.41 | 1681.58 | 5.52× |
+| Unblocked random splits | 244.09 | 1643.09 | 6.73× |
 
 Peak whole-process RSS from the same runs; MiB = 2^20 bytes, including the R
 interpreter and libraries. Groups show medians across distinct contrasts.
-Rust peaks at **213–302 MiB**, using **82.7–86.5% less peak RSS than DESeq2**.
+Rust peaks at **214–307 MiB**, using **80.6–86.7% less peak RSS than DESeq2**.
 
 Per-contrast measurements, provenance, precision checks and reproducible scripts
 are in the [current comparison](docs/gtex-native-wald-benchmark.md).

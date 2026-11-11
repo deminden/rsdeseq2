@@ -47,7 +47,10 @@ about `3.9e-15`, has maximum mean/SD differences of approximately
 The additional original-only generator records nine complete and nine primitive
 profiles: default/no-EM, explicit 14/20 and automatic active-set budgets, a short
 SQP run, reversed observation order and full-data controls. All preserve the
-existing SQP `2e-6` numerical bounds, original convergence decisions and warnings.
+existing SQP `2e-6` numerical bounds and original convergence decisions.
+The complete original warning list was not asserted at this checkpoint. The
+later [warning/platform follow-up](native-sqp-warning-platform-gates.md) detects
+and corrects a missing mixsqp nonconvergence warning, and adds that assertion.
 Maximum complete-profile mean/SD/s-value errors are about
 `7.2e-15 / 3.3e-15 / 2.1e-15`. Six 256-gene public control profiles and three
 1,200-gene default/sign/threshold workflows also pass their existing original

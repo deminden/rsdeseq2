@@ -66,6 +66,17 @@ jobs:
       - name: Independently regenerate Linux formula references
         if: matrix.lane == 'reference'
         run: python scripts/check_linux_formula_references.py --output-dir regenerated-formula-references
+      - name: Independently generate complete formula and sparse SQP references
+        if: matrix.lane == 'reference'
+        run: |
+          Rscript --vanilla scripts/generate_formula_fitting_reference.R formula-fitting-reference.json
+          Rscript --vanilla scripts/generate_sparse_sqp_reference.R sparse-sqp-reference.json
+      - name: Check fresh platform oracles without changing saved references
+        if: matrix.lane == 'reference'
+        env:
+          RSDESEQ2_FORMULA_FITTING_REFERENCE: ${{ github.workspace }}/formula-fitting-reference.json
+          RSDESEQ2_SPARSE_SQP_REFERENCE: ${{ github.workspace }}/sparse-sqp-reference.json
+        run: cargo test --locked -p rsdeseq2 --test formula_fitting --test sqp_controls
       - name: Independently record uniform posterior references
         if: matrix.lane == 'reference'
         run: Rscript --vanilla scripts/generate_uniform_posterior_reference.R uniform-posterior-reference.json
@@ -76,10 +87,24 @@ jobs:
           name: uniform-reference-${{ github.sha }}
           path: uniform-posterior-reference.json
           if-no-files-found: error
+      - name: Save independent complete-formula and sparse-SQP references
+        if: matrix.lane == 'reference'
+        uses: actions/upload-artifact@v4
+        with:
+          name: formula-sqp-reference-${{ github.sha }}
+          path: |
+            formula-fitting-reference.json
+            sparse-sqp-reference.json
+          if-no-files-found: error
       - name: Build package
-        run: R CMD build r-pkg/rsdeseq2
+        id: r-source
+        run: |
+          R CMD build r-pkg/rsdeseq2
+          Rscript --vanilla -e 'version <- read.dcf("r-pkg/rsdeseq2/DESCRIPTION")[1L, "Version"]; cat(paste0("archive=rsdeseq2_", version, ".tar.gz\n"), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)'
       - name: Package check
-        run: R CMD check --no-manual --no-build-vignettes rsdeseq2_*.tar.gz
+        env:
+          RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
+        run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
       - name: Require standalone and wrapped primitives to be bit-identical
         run: |
           cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
@@ -101,6 +126,8 @@ jobs:
           Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform
           if [ "${{ matrix.lane }}" = reference ]; then
             Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform-live uniform-posterior-reference.json
+            Rscript --vanilla scripts/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-live sparse-sqp-reference.json
+            Rscript --vanilla scripts/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics-live - sparse-sqp-reference.json
           fi
       - name: Check strict workflow and original-ashr comparison gates
         if: matrix.lane == 'reference'
@@ -114,6 +141,6 @@ jobs:
         with:
           name: r-source-${{ github.sha }}
           path: |
-            rsdeseq2_*.tar.gz
+            ${{ steps.r-source.outputs.archive }}
             R-reference-session.txt
           if-no-files-found: error

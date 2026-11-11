@@ -48,5 +48,6 @@ cases<-lapply(names(formulas),function(name){
 factors<-lapply(c("condition","batch"),function(name)list(name=name,sample_levels=as.list(as.character(d[[name]])),
  levels=as.list(levels(d[[name]])),reference=levels(d[[name]])[[1L]]))
 numeric<-lapply(c("exposure","u"),function(name)list(name=name,values=bits(d[[name]])))
-jsonlite::write_json(list(source=list(R=as.character(getRversion())),samples=nrow(d),
+jsonlite::write_json(list(source=list(R=as.character(getRversion()),platform=R.version$platform,
+ BLAS=unname(extSoftVersion()[['BLAS']]),LAPACK=La_library()),samples=nrow(d),
  factors=factors,numeric=numeric,cases=cases),args[[1L]],auto_unbox=TRUE,pretty=TRUE,null="null",digits=NA)

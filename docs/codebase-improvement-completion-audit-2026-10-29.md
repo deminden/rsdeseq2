@@ -7,11 +7,13 @@ against the current source and complete-workflow evidence. C23 remains open for
 current release artifacts and required platform validation. This count is not
 a percentage of effort remaining, or a claim of cross-platform release readiness.
 
-The accepted runtime is `48917a0`; subsequent documentation and profiling-tool
-changes do not alter its 635 recorded runtime source files. The combined local
-pass retains all original precision bounds, exact native/wrapped checks and
-the recorded background load in its speed/RSS observations. Nothing from this
-development checkpoint has been pushed, tagged or published.
+The combined local pass at `48917a0` retains all original precision bounds,
+exact native/wrapped checks and the recorded background load in its speed/RSS
+observations. The later [warning/platform follow-up](native-sqp-warning-platform-gates.md)
+strengthens the fresh Linux oracle gates and corrects an independently detected
+SQP warning omission. Its source/package identities and checks are recorded
+separately; earlier measurements keep their tested artifact identities. Nothing
+from this development checkpoint has been pushed, tagged or published.
 
 ## Historical checkpoint notes
 

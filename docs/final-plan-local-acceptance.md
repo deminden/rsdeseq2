@@ -6,11 +6,16 @@ below. C23 remains open until current release artifacts and required platform
 validation are reconciled. This is a requirement count, not an estimate of
 remaining effort or complete Bioconductor compatibility.
 
-The numerical source is `48917a0`. All 635 paths in its recorded runtime-source
-manifest still match. Changes made while gathering this report affect profiling
+The initial combined pass records numerical source `48917a0`; all 635 runtime
+paths matched when it was accepted at `63ffc62`. Changes made while gathering
+that initial report affect profiling
 tools, their acceptance tests/CI wiring, documentation and exported measurements.
 No statistical source, reference value, precision tolerance, dependency lockfile
-or package version changes to obtain acceptance.
+or package version changes to obtain that acceptance. The later
+[warning/platform follow-up](native-sqp-warning-platform-gates.md) adds stronger
+fresh-reference gates and corrects a missing SQP warning. Its rebuilt package,
+source identities and final measurements are recorded separately; the initial
+measurements below retain their original artifact scope.
 
 The [machine-readable report](data/final_plan_local_acceptance.json) binds the
 local artifacts by SHA-256. Raw process logs, before/after payloads and package
@@ -26,7 +31,7 @@ artifacts remain under `results/final-combined-48917a0/` and
 | One statistical masking/adjustment policy | Shared `results/cooks_policy.rs`, `replacement_policy.rs` and `independent_filtering.rs` own masking, replacement-zero values, quantiles, lowess and BH. Each request recomputes its own filtering decisions. | Original policy/filter references; unchanged Rust/R bounds and missingness; later replacement-aware requests and alpha/selector variants. |
 | Complete fitting and retained state, not only primitives | The R fit adapter constructs the core builder and uses its shared test dispatch and replacement merge. Later standalone requests explicitly retain replacement plans. | 31 matrix-fit requests: 27 successes, four controlled rejections and 113 later queries; all exported floating-point bits, missing values and acceptance decisions agree. |
 | Formula preparation and complete formula fits | Core frame/matrix/expression preparation owns supported transforms, factor coding, offsets and polynomial/term ordering. Custom formula functions reject without execution. | 32 independently generated original-R matrix profiles; 33 actual formula requests: 29 successes, four rejections and 96 later queries, without column remapping. |
-| Transforms and posterior methods also run without R calculations | Native saved-local VST, restricted dispersion/likelihood expressions, normal/ashr/apeglm families, controls, mode search, random state and posterior summaries use core modules. | The [25-export supported inventory](native-supported-contract.md) links each family to independent accuracy and actual interface checks. All 29 replay sets retain fields, shapes, acceptance, finite/missing patterns, categorical diagnostics and warnings. |
+| Transforms and posterior methods also run without R calculations | Native saved-local VST, restricted dispersion/likelihood expressions, normal/ashr/apeglm families, controls, mode search, random state and posterior summaries use core modules. | The [25-export supported inventory](native-supported-contract.md) links each family to independent accuracy and actual interface checks. At the initial combined checkpoint, all 29 replay sets retain fields, shapes, acceptance, finite/missing patterns, categorical diagnostics and warnings. The later warning follow-up intentionally corrects an omitted source warning and records its separate preservation checks. |
 | Correct sparse SQP compatibility rather than a wider tolerance | Shared SQP now follows the original active-set budget, EM floors, operation order and condition-based direction solve. | [Sparse SQP report](native-sparse-sqp-development.md): nine full and nine primitive original profiles pass the existing `2e-6` bound. The unchanged public reordered-subset test passes its original `1e-5` bound. Ten replay sets intentionally change SQP numbers/diagnostics; nineteen are fully exact. |
 | No R numerical fallback | R transports arguments/metadata and assembles objects; C marshals buffers; Rust owns statistical calculations. | The current production-R call guard checks 39 files with eight rejection controls. Actual identity tests block R numerical calls. A separate own C/Rust bridge scan finds no R evaluation/math callback entry points; this lexical check alone is not a behavioral proof. |
 | Preserve independent precision limits | Existing references and bounds remain unchanged. Interface identity is checked separately from agreement with original packages. | Full Rust and R suites, 121 per-contrast plus nine global frozen GTEx gates, independent held-out Wald/LRT checks and the full 56,200-gene Wald test pass. All 213 core reference/input files and their four README files are unchanged since `48917a0`. |
@@ -70,7 +75,7 @@ These measurements use fitted-list results, not complete dataset validation;
 the twenty workflow profiles cover the latter separately. They establish the
 cost boundary and batching behavior, not a new total-quantification speed round.
 
-## C23: current local checks and release limitations
+## C23: initial combined local checks and release limitations
 
 | Gate | Current evidence | Disposition |
 | --- | --- | --- |
@@ -88,7 +93,7 @@ cost boundary and batching behavior, not a new total-quantification speed round.
 | Latest-commit artifacts | Verified crate, source archive, checked R tarball, macOS executable, provenance and checksums must bind to the final documentation/tooling commit. | Required after commit |
 | Current platform validation | Earlier released-source CI is historical. Current five-target binary gates and independent Linux regeneration of the new formula/SQP references have not run. | Open |
 
-### Total time and memory
+### Initial combined total time and memory
 
 The native panel uses the current CLI and a separately frozen **validated
 0.4.0 `d64d2f2` candidate**. That baseline bundle was local and unpublished;

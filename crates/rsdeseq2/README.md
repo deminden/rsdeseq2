@@ -46,9 +46,9 @@ Detailed status lives in
 
 ## Validation and Performance
 
-Current development takes 43.86 seconds versus DESeq2's 245.68 seconds across
-eleven GTEx contrasts: an observed 5.60× summed process-time ratio. Rust peak
-RSS is 213–302 MiB, 82.7–86.5% below the matched DESeq2 process.
+Current development takes 43.33 seconds versus DESeq2's 242.12 seconds across
+eleven GTEx contrasts: an observed 5.59× summed process-time ratio. Rust peak
+RSS is 214–307 MiB, 80.6–86.7% below the matched DESeq2 process.
 Comparisons use native R 4.6.2 / DESeq2 1.52.0 on Apple M5, with one fitting/BLAS
 worker. These are single-pass observations with no discarded outliers. Other
 user and system workloads were active; small development speed changes cannot
