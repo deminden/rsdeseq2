@@ -1,5 +1,11 @@
 # Development after 0.4.0
 
+* Preserve R term order, polynomial matrix-variable grouping and interaction
+  coding in complete native formula fits. Accept matching reduced LRT offsets,
+  canonicalize unused sample factors with matrix normalization, and validate
+  expression aliases after formula subtraction. Add complete formula-fit and
+  later factor-query identity checks to both R CI lanes.
+
 * Skip unnecessary native, fixed-dispersion and expanded-prior refits when no
   sample is eligible for replacement. Preserve candidate planner metadata and
   all compared fitting/query outputs; verify execution with original traces.

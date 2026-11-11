@@ -419,3 +419,11 @@ Its eight profiles and two positive controls back one 32-case native/fixed
 regression matrix; an existing expanded-prior fixture covers four more routes.
 All 31 complete fresh-fit payloads and 113 later queries retain their previous
 bits. No timing threshold substitutes for the structural execution check.
+
+The [formula-fit panel](native-formula-fit-development.md) adds 32 independent
+original-R matrices/offsets without column mapping. Complete public native
+formula fits and later numeric/character requests are separately checked against
+actual wrapped workflows under the R numerical firewall in both R CI lanes.
+Matrix-workflow identity now includes effective normalization and full/reduced
+design arrays as well as the previous fitted/result fields. Previously absent
+fields are excluded only when comparing against the older saved schema.

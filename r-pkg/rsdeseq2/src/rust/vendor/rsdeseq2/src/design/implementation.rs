@@ -60,6 +60,7 @@ include!("implementation/formula_assembly.rs");
 // Compatibility labels/order translated to the shared matrix product plan.
 include!("implementation/formula_matrix_plan.rs");
 include!("implementation/formula_ordered_plan.rs");
+include!("implementation/formula_fitting.rs");
 
 // Formula-specific validation helpers.
 include!("implementation/formula_validation.rs");

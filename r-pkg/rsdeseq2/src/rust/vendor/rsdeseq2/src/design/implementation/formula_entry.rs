@@ -50,6 +50,15 @@ pub fn expanded_formula_design_with_offsets<'a>(
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
+    formula_design_with_column_order(formula, factors, numeric_covariates, false)
+}
+
+fn formula_design_with_column_order<'a>(
+    formula: &str,
+    factors: &'a [ExpandedFactorSpec<'a>],
+    numeric_covariates: &'a [ExpandedNumericSpec<'a>],
+    fitting_order: bool,
+) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
     let rhs = formula_rhs(formula)?;
     let (rhs, offsets) = extract_formula_offsets(rhs, factors, numeric_covariates)?;
     let (rhs, derived_factor_covariates) = expand_formula_factor_transform_terms(&rhs, factors)?;
@@ -66,8 +75,12 @@ pub fn expanded_formula_design_with_offsets<'a>(
             }),
     );
     validate_formula_factor_name_collisions(&all_factors)?;
-    let (rhs, derived_numeric_covariates) =
-        expand_formula_numeric_transform_terms(&rhs, &all_factors, numeric_covariates)?;
+    let (rhs, derived_numeric_covariates) = expand_formula_numeric_transform_terms(
+        &rhs,
+        &all_factors,
+        numeric_covariates,
+        fitting_order,
+    )?;
     let mut all_numeric_covariates =
         Vec::with_capacity(numeric_covariates.len() + derived_numeric_covariates.len());
     all_numeric_covariates.extend(numeric_covariates.iter().cloned());
@@ -79,66 +92,90 @@ pub fn expanded_formula_design_with_offsets<'a>(
     }));
     validate_formula_numeric_covariate_name_collisions(&all_numeric_covariates)?;
     validate_formula_factor_numeric_name_collisions(&all_factors, &all_numeric_covariates)?;
-    let mut state = ExpandedFormulaDesignState::default();
+    let mut state = ExpandedFormulaDesignState {
+        term_order: fitting_order.then(Vec::new),
+        ..Default::default()
+    };
 
     let rhs = expand_parenthesized_formula_terms(&rhs)?;
     state.frame_order = super::formula_origin::formula_variables(&format!("~{rhs}"))?;
     for (sign, raw_term) in split_formula_signed_terms(&rhs)? {
-        let term = raw_term.trim();
-        if term.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula '{formula}' contains an empty term"),
-            });
-        }
-        if sign < 0 {
-            remove_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
-            continue;
-        }
-        if term == "1" {
-            state.has_intercept = true;
-            continue;
-        }
-        if term == "0" || term == "-1" {
-            state.has_intercept = false;
-            continue;
-        }
-        if formula_contains_top_level(term, '^')? {
-            add_power_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
-            continue;
-        }
-        if formula_contains_top_level(term, '(')? || formula_contains_top_level(term, ')')? {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula term '{term}' is not supported by the primitive parser"),
-            });
-        }
-        if formula_contains_top_level(term, '/')? {
-            add_nested_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
-            continue;
-        }
-        if formula_contains_top_level(term, '*')? {
-            add_star_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
-            continue;
-        }
-        if formula_contains_top_level(term, ':')? {
-            add_interaction_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
-            continue;
-        }
-        add_main_formula_term(
-            term,
-            &all_factors,
-            &all_numeric_covariates,
-            &mut state.selected_factors,
-            &mut state.selected_numeric_covariates,
-        )?;
+        (|| -> Result<(), DeseqError> {
+            let term = raw_term.trim();
+            if term.is_empty() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!("formula '{formula}' contains an empty term"),
+                });
+            }
+            if sign < 0 {
+                remove_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
+                return Ok(());
+            }
+            if term == "1" {
+                state.has_intercept = true;
+                return Ok(());
+            }
+            if term == "0" || term == "-1" {
+                state.has_intercept = false;
+                return Ok(());
+            }
+            if formula_contains_top_level(term, '^')? {
+                add_power_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
+                return Ok(());
+            }
+            if formula_contains_top_level(term, '(')? || formula_contains_top_level(term, ')')? {
+                return Err(DeseqError::InvalidOptions {
+                    reason: format!(
+                        "formula term '{term}' is not supported by the primitive parser"
+                    ),
+                });
+            }
+            if formula_contains_top_level(term, '/')? {
+                add_nested_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
+                return Ok(());
+            }
+            if formula_contains_top_level(term, '*')? {
+                add_star_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
+                return Ok(());
+            }
+            if formula_contains_top_level(term, ':')? {
+                add_interaction_formula_term(
+                    term,
+                    &all_factors,
+                    &all_numeric_covariates,
+                    &mut state,
+                )?;
+                return Ok(());
+            }
+            add_main_formula_term(
+                term,
+                &all_factors,
+                &all_numeric_covariates,
+                &mut state.selected_factors,
+                &mut state.selected_numeric_covariates,
+            )?;
+            Ok(())
+        })()?;
+        refresh_formula_term_order(&mut state);
     }
 
     let model_frame = formula_model_frame_from_specs(&all_factors, &all_numeric_covariates);
-    let mut design = expanded_formula_design_from_state(
-        &state,
-        &all_factors,
-        &all_numeric_covariates,
-        &derived_factor_covariates,
-    )?;
+    let mut design = if fitting_order {
+        formula_fitting_design(
+            &state,
+            &all_factors,
+            &all_numeric_covariates,
+            &derived_factor_covariates,
+            &derived_numeric_covariates,
+        )?
+    } else {
+        expanded_formula_design_from_state(
+            &state,
+            &all_factors,
+            &all_numeric_covariates,
+            &derived_factor_covariates,
+        )?
+    };
     let origin = DesignOrigin::formula(super::formula_origin::formula_variables(formula)?)?
         .with_ordered_factors(
             derived_factor_covariates

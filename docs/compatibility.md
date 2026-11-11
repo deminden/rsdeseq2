@@ -22,6 +22,14 @@ rows. Standalone raw-plan fields remain available; `requires_refit()` selects
 actual workflow execution. The [execution correction](replacement-execution-correction.md)
 preserves all compared result bits while removing unnecessary second fits.
 
+Complete native formula workflows now preserve R term order and matrix-valued
+polynomial grouping through the shared Rust matrix engine. Matching reduced LRT
+offsets are accepted and unused sample-factor metadata is canonicalized when
+formula workflows use matrix normalization. Existing expanded compatibility
+helpers retain their historical layout; use
+`formula_design_for_fitting_from_model_frame()` for positional contrasts matching
+complete formula fits. See the [formula-fit correction](native-formula-fit-development.md).
+
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).
 

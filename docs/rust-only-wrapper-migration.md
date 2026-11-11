@@ -312,3 +312,10 @@ interface cases and twenty exact paired R payloads. The combined target no-refit
 pair reduces RSS 1.016 MiB. Its earlier unsuccessful memory attempt remains
 recorded. The formula/VST/posterior ports, initial redundant native adjustment
 and final combined performance/memory/source reconciliation above remain open.
+
+The [complete formula-fit checkpoint](native-formula-fit-development.md) extends
+actual interface checking beyond R-prepared matrices. Native formula workflows
+preserve R term/polynomial order, interaction coding and reduced-offset policy
+using shared Rust preparation; raw compatibility matrix helpers keep their
+explicit layout. Current-source combined acceptance and the remaining supported
+warning/option/state inventory are still required before C19/C21/C23 close.

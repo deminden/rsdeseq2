@@ -8,6 +8,7 @@ root<-normalizePath(file.path(dirname(gsub('~+~',' ',script,fixed=TRUE)),'..'))
 source(file.path(root,'r-pkg/rsdeseq2/tests/testthat/helper-fit-data.R'))
 source(file.path(root,'r-pkg/rsdeseq2/tests/testthat/helper-formula.R'))
 source(file.path(root,'scripts/native_posterior_check_helpers.R'))
+source(file.path(root,'scripts/fresh_fit_check_helpers.R'))
 out<-args[[3L]];if(dir.exists(out))stop('Use a fresh output directory');dir.create(out,recursive=TRUE)
 counts<-.rsdeseq2_test_counts();counts[nrow(counts),]<-0
 design<-cbind(Intercept=1,conditionB=rep(0:1,each=4));reduced<-matrix(1,8,1)
@@ -44,8 +45,6 @@ profiles<-list(
  bad_rank=list(design=matrix(1,8,2),error='rank'),
  bad_counts=list(counts=replace(counts,1,.5),error='count'))
 profiles$parametric_boundary<-list(fit_type='parametric',allow_error='dispersion')
-bits<-function(v)lapply(as.numeric(v),function(x)paste0('bits:',hex(x)))
-matrix_descriptor<-function(m)if(is.null(m))NULL else list(rows=nrow(m),columns=ncol(m),values=bits(m))
 query_cases<-function(p){
  n<-if(is.null(p$design))ncol(design)else ncol(p$design)
  contrast<-c(rep(0,n-1L),1)
@@ -73,35 +72,6 @@ input<-file.path(out,'input.json');jsonlite::write_json(list(fresh_fit_cases=cas
 output<-system2(driver,shQuote(normalizePath(input)),stdout=TRUE,stderr=TRUE)
 if(!is.null(attr(output,'status')))stop(paste(output,collapse='\n'))
 writeLines(output,file.path(out,'standalone.json'));standalone<-jsonlite::fromJSON(paste(output,collapse='\n'),simplifyVector=FALSE)$cases
-plain<-function(v)if(is.null(v))NULL else as.list(unname(v))
-floats<-function(v)if(is.null(v))NULL else lapply(as.numeric(v),hex)
-row_bits<-function(m)if(is.null(m))NULL else floats(as.vector(t(m)))
-query_values<-function(f,queries)lapply(queries,function(q){
- cutoff<-switch(q$cooks,auto=TRUE,off=FALSE,as.numeric(q$cooks))
- r<-blocked(rsdeseq2::results(f,contrast=decode(q$contrast),cooksCutoff=cutoff,
-  alpha=decode(q$alpha),independentFiltering=q$filtering,lfcThreshold=decode(q$threshold),
-  altHypothesis=q$alternative,useT=!is.null(q$df),degreesOfFreedom=if(is.null(q$df))NULL else decode(q$df)))
- v<-lapply(r[c('baseMean','log2FoldChange','lfcSE','stat','pvalue','padj')],floats)
- v$filtered<-plain(r$filtered)
- m<-attr(r,'independentFiltering');scalar<-function(x)if(is.na(x))NULL else hex(x)
- v$filtering<-list(enabled=m$enabled,theta=floats(m$theta),numRej=plain(m$numRej),
-  selected=if(is.na(m$selected))NULL else m$selected,filterTheta=scalar(m$filterTheta),filterThreshold=scalar(m$filterThreshold),
-  lowessX=if(is.null(m$lo.fit))NULL else floats(m$lo.fit$x),lowessY=if(is.null(m$lo.fit))NULL else floats(m$lo.fit$y),alpha=hex(m$alpha))
- list(name=q$name,value=v)
-})
-encode<-function(f){
- result<-lapply(f$results,function(v)if(is.logical(v))plain(v)else floats(v))
- list(results=result,rawStat=floats(f$rawStat),rawPvalue=floats(f$rawPvalue),baseMean=floats(f$baseMean),baseVar=floats(f$baseVar),allZero=plain(f$allZero),
-  sizeFactors=floats(f$sizeFactors),dispersions=floats(f$dispersions),dispFit=floats(f$dispFit),
-  beta=row_bits(f$beta),betaSE=row_bits(f$betaSE),betaCovariance=floats(as.vector(aperm(f$betaCovariance,c(3,2,1)))),
-  mu=row_bits(f$mu),cooks=row_bits(f$cooks),lrtDf=f$lrtDf,nRefit=f$nRefit,replaceCounts=row_bits(f$replaceCounts),
-  replace=plain(f$replace),replaceable=plain(f$replaceable),refitRows=plain(f$refitRows),newAllZeroRows=plain(f$newAllZeroRows))
-}
-canonical<-function(x){
- if(!is.list(x))return(x)
- if(!is.null(names(x)))x<-x[sort(names(x))]
- lapply(x,canonical)
-}
 records<-lapply(seq_along(cases),function(i){
  c<-cases[[i]];p<-profiles[[c$name]]
  fit<-tryCatch(blocked(rsdeseq2::DESeq(list(counts=matrix_input(c$counts),design=matrix_input(c$design)),
