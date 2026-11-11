@@ -23,8 +23,8 @@ struct Prior {
 #[derive(Deserialize)]
 pub struct Case {
     pub name: String,
-    estimates: Vec<String>,
-    standard_errors: Vec<String>,
+    pub(super) estimates: Vec<String>,
+    pub(super) standard_errors: Vec<String>,
     thresholds: Vec<String>,
     family: String,
     point_mass: bool,
@@ -74,13 +74,14 @@ pub fn encode(r: LocationShrinkage) -> Value {
     let fit=r.fit.map(|f|json!({"weights":array(f.weights),"log_likelihood":array(vec![f.log_likelihood]),"penalized_log_likelihood":array(vec![f.penalized_log_likelihood]),"dual_residual":array(vec![f.dual_residual]),"optimizer_weight_sum":array(vec![f.optimizer_weight_sum]),"function_evaluations":array(vec![f.function_evaluations as f64]),"converged":[f.converged],"message":[f.message]}));
     json!({"fitted_prior":mixture(r.fitted_grid.components,r.fitted_weights),"fit":fit,"posterior_mean":array(r.posterior_mean),"posterior_sd":array(r.posterior_sd),"negative_probability":array(r.negative_probability),"positive_probability":array(r.positive_probability),"local_false_discovery_rate":array(r.local_false_discovery_rate),"local_false_sign_rate":array(r.local_false_sign_rate),"svalues":array(r.svalues),"qvalues":array(r.qvalues),"cdf":array(r.cdf),"log_likelihood":array(vec![r.log_likelihood]),"warnings":r.warnings})
 }
-pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
+pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
     if c.range.len() != 2 {
         return Err("location range requires two bounds".into());
     }
     let optimizer = c
         .optimizer
         .as_ref()
+        .filter(|m| m.as_str() != "mixSQP")
         .map(|m| super::em_fit::policy(m, &c.control))
         .transpose()?
         .unwrap_or_default();
@@ -133,7 +134,7 @@ pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
     } else {
         None
     };
-    let options = LocationShrinkageOptions {
+    Ok(LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: c.family.parse()?,
             scales: c.scales.as_ref().map(|v| numbers(v)).transpose()?,
@@ -169,7 +170,10 @@ pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
             .map(|v| numbers(v))
             .transpose()?,
         thresholds: numbers(&c.thresholds)?,
-    };
+    })
+}
+pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
+    let options = options(c)?;
     Ok(shrink_location_batch(
         &numbers(&c.estimates)?,
         &numbers(&c.standard_errors)?,

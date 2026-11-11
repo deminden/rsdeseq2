@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Estimate ashr prior modes with shared Rust likelihood profiling. Reuse fitting
+  preparation without posterior moments, preserve source search bounds and
+  warnings, and expose explicit native intervals and search diagnostics.
+
 * Select ashr posterior fields and fitted priors with numeric output levels or
   exact named subsets in Rust. Preserve omitted columns and require posterior
   means/prior for thresholded s-values; retain original numerical references.

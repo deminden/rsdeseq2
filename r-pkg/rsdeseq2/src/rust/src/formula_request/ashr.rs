@@ -4,8 +4,8 @@ use super::posterior::{numbers, scalar};
 use super::{Data, Value, fields, get, named, text};
 use rsdeseq2::shrinkage::{
     AdaptiveMethod, AdaptiveOutputSelection, AdaptiveShrinkageQuery, LocationLikelihood,
-    LocationShrinkageOptions, MixtureGridOptions, MixturePriorPenalty,
-    adaptive_shrinkage_with_output,
+    LocationShrinkageOptions, MixtureGridOptions, MixturePriorPenalty, PriorModeSearch,
+    adaptive_shrinkage_with_output, estimate_location_mode,
 };
 pub(super) fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
     let Data::List(values) = &v.data else {
@@ -198,6 +198,32 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if field(args, "mode").is_some() && field(args, "g").is_some() {
         return Err("specify either mode or g, not both".into());
     }
+    let (mode, mode_search) = match field(args, "mode").map(|v| &v.data) {
+        None => (0.0, None),
+        Some(Data::Number { values, .. }) => match values.as_slice() {
+            [mode] => (*mode, None),
+            [seed, _] => (
+                0.0,
+                Some(if seed.is_nan() {
+                    PriorModeSearch::ObservationRange
+                } else {
+                    // Original ashr's scalar ifelse retains only the first entry.
+                    PriorModeSearch::ExpandedObservationRange(*seed)
+                }),
+            ),
+            _ => {
+                return Err(
+                    "mode requires one fixed value, two numeric values or 'estimate'".into(),
+                );
+            }
+        },
+        Some(Data::Text(values))
+            if values.len() == 2 || values.iter().flatten().any(|v| v == "estimate") =>
+        {
+            (0.0, Some(PriorModeSearch::ObservationRange))
+        }
+        _ => return Err("mode requires one fixed value, two numeric values or 'estimate'".into()),
+    };
     let mut options = LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: family
@@ -205,7 +231,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
                 .map_err(|e: rsdeseq2::DeseqError| e.to_string())?,
             scales: optional_numbers(field(args, "mixsd"))?,
             grid_multiplier: number(args, "gridmult", std::f64::consts::SQRT_2)?,
-            mode: number(args, "mode", 0.0)?,
+            mode,
             range: (lower, upper),
             concentrated_initialization: !optimizer.is_sqp(),
             variational_prior: optimizer.is_variational(),
@@ -263,6 +289,17 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     options.fit_options.optimizer = optimizer;
     if optimizer.is_sqp() {
         controls(field(args, "control"), &mut options)?;
+    }
+    if let Some(search) = mode_search {
+        let estimate = estimate_location_mode(
+            numbers(get(args, "betahat")?)?,
+            numbers(get(args, "sebetahat")?)?,
+            &options,
+            search,
+        )
+        .map_err(|e| e.to_string())?;
+        options.grid.mode = estimate.mode;
+        input_warnings.extend(estimate.warnings);
     }
     let output = match field(args, "outputlevel").map(|v| &v.data) {
         None => AdaptiveOutputSelection::level(2.0),

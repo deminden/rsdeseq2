@@ -15,7 +15,9 @@ mod heavy_tail;
 mod likelihood;
 mod likelihood_diagnostics;
 mod location_batch;
+mod location_fit;
 mod location_missing;
+mod location_mode;
 mod location_query;
 mod mixture_fit;
 mod normal_mixture;
@@ -76,3 +78,5 @@ pub use heavy_tail::{
     PosteriorAnalysis, PosteriorAnalysisOptions, PosteriorGridDiagnostic, PosteriorIntervalKind,
     PosteriorIntervalOptions,
 };
+
+pub use location_mode::{LocationModeEstimate, PriorModeSearch, estimate_location_mode};

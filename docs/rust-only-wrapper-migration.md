@@ -13,8 +13,10 @@ adds portable native state for both MAP-only random-start methods. Advanced
 EM and variational fitting. [Higher-order cycling and native interior-point
 fitting](native-ashr-advanced-optimizer-development.md) are also implemented.
 [Numeric/named output selection](native-ashr-output-development.md) now preserves
-omitted posterior fields and prior metadata through both interfaces. Other
-advanced options and final combined checks remain open. Further development/commits stay local until
+omitted posterior fields and prior metadata through both interfaces.
+[Estimated modes](native-ashr-mode-development.md) now use native likelihood-only
+profiling and independent original search traces. Other advanced options and
+final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R
