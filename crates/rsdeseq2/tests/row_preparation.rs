@@ -210,11 +210,15 @@ fn formula_offsets_use_effective_factors_without_dividing_by_tiny_base_factors()
         .unwrap();
     let factors =
         normalization_factors_with_offsets(3, 6, Some(&[1e-310; 6]), None, &[700.; 6]).unwrap();
-    let (_, expected) = builder
+    let (matrix_fit, expected) = builder
         .normalization_factors(factors.clone())
         .fit_with_results(&counts, &formula.design.standard_design)
         .unwrap();
     assert_eq!(actual.rows, expected.rows);
     assert_eq!(fit.normalization_factors.as_ref(), Some(&factors));
-    assert_eq!(fit.size_factors, vec![1e-310; 6]);
+    // Complete formula workflows consume sample scales into the effective
+    // matrix, matching wrapped fits. Explicit matrix inputs retain their
+    // supplied sample-scale metadata even though the matrix takes precedence.
+    assert_eq!(fit.size_factors, vec![1.; 6]);
+    assert_eq!(matrix_fit.size_factors, vec![1e-310; 6]);
 }
