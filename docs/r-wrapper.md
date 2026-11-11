@@ -159,6 +159,9 @@ primitive parameters without executing their closures. Noise SD matrices and
 row-specific degrees of freedom retain complete-observation alignment. Uniform
 priors are supported; original log-F missing SDs and unsupported normal priors
 are retained. See [continuous likelihoods and limits](native-continuous-likelihood-development.md).
+Matrix weights follow the original capture rules: equal total lengths flatten
+both weights and SDs into a global mixture; otherwise component lists recycle
+against SD columns. See [capture layout and validation](native-capture-policy-development.md).
 
 Canonical `ashr::lik_pois` and `ashr::lik_binom` objects also import stored
 primitive counts and parameters without calling their functions. Identity/log
@@ -204,6 +207,12 @@ and L'Ecuyer-CMRG states with Inversion normals are supported, including states
 from parallel streams. Use `set.seed()` before a reproducible call. Missing
 state is initialized in Rust. Other RNG configurations fail explicitly; see
 [state, failure and precision checks](native-random-start-development.md).
+
+`nbinomC` and `nbinomC*` ignore optimizer, bounds and `log.link` controls.
+`nbinomCR` uses BFGS or L-BFGS-B controls only if refinement is needed; valid
+prefits ignore those controls. Empty numeric bounds are unbounded. CR with
+`log.link=FALSE` rejects all-zero rows. Other refinement optimizer families
+remain unsupported. See [compiled method policy](native-capture-policy-development.md).
 
 The package also exposes primitive matrix helpers:
 

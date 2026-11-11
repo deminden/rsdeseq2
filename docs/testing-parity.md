@@ -370,3 +370,10 @@ native/wrapped batches are exact and twenty earlier replay sets are unchanged.
 A production-R AST guard, also run by the R CI workflow, rejects numerical calls
 without mistaking quoted templates for execution. Its lexical scope does not
 replace runtime firewalls or the final authority audit.
+
+The [capture/control checkpoint](native-capture-policy-development.md) adds
+eight canonical matrix/recycling kernel, 18 complete capture and twelve compiled
+method profiles. All 38 actual native/wrapped batches agree exactly with R math
+blocked. Original-only generators record genuine refinement calls and independent
+rejections; eight public profiles retain unchanged bounds and all 21 earlier
+accepted panels are exact. The 207 existing oracle files remain unchanged.

@@ -15,7 +15,7 @@ if(!is.null(attr(output,'status')))stop(paste(output,collapse='\n'))
 writeLines(output,file.path(out,'standalone.json'));standalone<-jsonlite::fromJSON(paste(output,collapse='\n'),simplifyVector=FALSE)
 wrapped<-lapply(reference$kernel_cases,function(c){
   m<-c$builtin_likelihood
-  for(n in intersect(c('weights','df1','df2','y','scale','trials','capture_y','capture_trials'),names(m)))m[[n]]<-decode(m[[n]])
+  for(n in intersect(c('weights','df1','df2','y','scale','trials','capture_y','capture_trials'),names(m)))m[[n]]<-if(n=='weights'&&!is.null(m[[n]]$type)).formula_decode(m[[n]])else decode(m[[n]])
   if(!is.null(m$scales))m$scales<-.formula_decode(m$scales)
   r<-tryCatch(blocked(rsdeseq2:::.rsdeseq2_formula_request(list(operation='posterior_builtin_likelihood',likelihood=m,
     arguments=decode(c$arguments),lower=decode(c$lower),upper=decode(c$upper)))),error=identity)

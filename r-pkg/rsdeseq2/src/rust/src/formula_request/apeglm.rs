@@ -96,16 +96,42 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         method.as_str(),
         "general" | "nbinomR" | "betabinR" | "betabinCR" | "betabinC" | "betabinC*"
     );
-    let optimizer = choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?;
-    let log_link = field(args, "log.link")
-        .map(flag)
-        .transpose()?
-        .unwrap_or(true);
-    if !general && (optimizer != "BFGS" || !log_link) {
-        return Err(
-            "native apeglm alternate optimizers/log-link policy are not implemented yet".into(),
-        );
-    }
+    let compiled_nb = method.starts_with("nbinomC");
+    let optimizer = if compiled_nb {
+        "BFGS".to_string()
+    } else {
+        choice(field(args, "optim.method"), &["BFGS", "L-BFGS-B"])?
+    };
+    let log_link = if matches!(method.as_str(), "nbinomC" | "nbinomC*") {
+        true
+    } else {
+        field(args, "log.link")
+            .map(flag)
+            .transpose()?
+            .unwrap_or(true)
+    };
+    let refinement = if method == "nbinomCR" {
+        use rsdeseq2::shrinkage::{
+            NegativeBinomialRefinement, NegativeBinomialRefinementMethod as Method,
+        };
+        let name = field(args, "optim.method")
+            .map(text)
+            .transpose()?
+            .unwrap_or("BFGS");
+        NegativeBinomialRefinement {
+            method: match name {
+                "BFGS" => Method::Bfgs,
+                "L-BFGS-B" => Method::Lbfgsb,
+                _ => Method::Unsupported(name.to_string()),
+            },
+            bounds: match field(args, "bounds") {
+                None => Some(vec![f64::NEG_INFINITY, f64::INFINITY]),
+                Some(v) => numbers(v).ok().map(<[f64]>::to_vec),
+            },
+        }
+    } else {
+        Default::default()
+    };
     let counts = matrix(get(args, "Y")?)?;
     let design = matrix(get(args, "x")?)?;
     let p = design.n_cols();
@@ -210,6 +236,8 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             "nbinomC" | "betabinC" | "nbinomC*" | "betabinC*"
         ),
         check_opposite_start: method == "nbinomCR",
+        log_link,
+        refinement,
         ..Default::default()
     };
     let mut rng = if method.ends_with('*') {

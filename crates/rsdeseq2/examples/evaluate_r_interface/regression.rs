@@ -41,7 +41,7 @@ pub struct Case {
     pub nuisance_mean: String,
     pub method: String,
     pub optimizer: String,
-    pub bounds: [String; 2],
+    pub bounds: Vec<String>,
     pub log_link: bool,
     pub threshold: Option<String>,
     pub analysis: Option<Analysis>,
@@ -212,7 +212,11 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             "betabinC*" => RegressionMethod::BetaBinomialCStar,
             _ => return Err("invalid fixture method".into()),
         },
-        optimizer: match c.optimizer.as_str() {
+        optimizer: match if c.method.starts_with("nbinomC") {
+            "BFGS"
+        } else {
+            c.optimizer.as_str()
+        } {
             "BFGS" => RegressionOptimizer::Bfgs,
             "L-BFGS-B" => RegressionOptimizer::Lbfgsb,
             _ => return Err("invalid fixture optimizer".into()),
@@ -221,7 +225,14 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
         prior_noncentrality: number(&c.prior_mean)?,
         nuisance_mean: number(&c.nuisance_mean)?,
         log_link: c.log_link,
-        bounds: (number(&c.bounds[0])?, number(&c.bounds[1])?),
+        bounds: if !c.method.starts_with("nbinomC") && c.optimizer == "L-BFGS-B" {
+            (
+                number(c.bounds.first().ok_or("missing lower bound")?)?,
+                number(c.bounds.get(1).ok_or("missing upper bound")?)?,
+            )
+        } else {
+            (f64::NEG_INFINITY, f64::INFINITY)
+        },
     };
     if c.method != "general" && c.analysis.as_ref().is_some_and(|a| a.kind != "laplace") {
         options.posterior.analysis.grid_likelihood = c
@@ -247,6 +258,20 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             mle: input.mle,
         };
         let mut posterior = options.posterior;
+        posterior.log_link = c.log_link;
+        if c.method == "nbinomCR" {
+            use rsdeseq2::shrinkage::{
+                NegativeBinomialRefinement, NegativeBinomialRefinementMethod as Method,
+            };
+            posterior.refinement = NegativeBinomialRefinement {
+                method: match c.optimizer.as_str() {
+                    "BFGS" => Method::Bfgs,
+                    "L-BFGS-B" => Method::Lbfgsb,
+                    name => Method::Unsupported(name.to_string()),
+                },
+                bounds: super::parse_numeric_inputs(&c.bounds).ok(),
+            };
+        }
         posterior.check_opposite_start = c.method == "nbinomCR";
         posterior.map_only = c.method != "nbinomCR";
         return Ok(if let Some(state) = &c.rng_state {

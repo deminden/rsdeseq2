@@ -27,6 +27,7 @@ mod log_f;
 mod log_f_quadrature;
 mod mixture_fit;
 mod normal_mixture;
+mod normal_mixture_captures;
 mod student_t;
 mod svalue;
 mod truncated_normal_mixture;
@@ -89,3 +90,5 @@ pub use heavy_tail::{
 pub use location_mode::{LocationModeEstimate, PriorModeSearch, estimate_location_mode};
 
 pub use count_likelihood::{BinomialLink, PoissonLink};
+
+pub use heavy_tail::{NegativeBinomialRefinement, NegativeBinomialRefinementMethod};
