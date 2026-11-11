@@ -43,11 +43,13 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     disp_fit_output: *mut f64,
     base_var_output: *mut f64,
     all_zero_output: *mut i32,
+    lrt_df_output: *mut i32,
 ) -> i32 {
     let mut pending = None;
     let status = run_backend(|| {
         if replacement_output.is_null() { return Err("replacement owner output pointer is null".into()); }
         unsafe { *replacement_output = ptr::null_mut(); }
+        let lrt_df = unsafe { output_slice(lrt_df_output, 1, "LRT degrees of freedom")? };
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_matrix =
             unsafe { row_major_from_column_major(n_samples, n_coefficients, design_values)? };
@@ -98,7 +100,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             };
             builder = builder.observation_weights(weights);
         }
-        let reduced = if selected_test_type == TestType::Lrt {
+        if selected_test_type == TestType::Lrt {
             let reduced_matrix = unsafe {
                 row_major_from_column_major(n_samples, reduced_coefficients, reduced_values)?
             };
@@ -109,18 +111,11 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 None,
             )
             .map_err(|error| error.to_string())?;
-            builder = builder.reduced_design(reduced.clone());
-            Some(reduced)
-        } else {
-            None
-        };
+            builder = builder.reduced_design(reduced);
+        }
         let (fit, results, replacement) = if min_replicates_for_replace == 0 {
-            let result = if selected_test_type == TestType::Wald {
-                builder.fit_with_results(&counts, &design)
-            } else {
-                builder.fit_lrt_with_results(&counts, &design, reduced.as_ref().unwrap())
-            }
-            .map_err(|error| error.to_string())?;
+            let result = builder.fit_with_results(&counts, &design)
+                .map_err(|error| error.to_string())?;
             (result.0, result.1, None)
         } else {
             let mut replacement_options = CooksReplacementOptions::new(cooks_replacement_cutoff);
@@ -156,6 +151,9 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             }
             (merged_fit, results, Some(plan))
         };
+        lrt_df[0] = fit.lrt.as_ref().map(|lrt| i32::try_from(lrt.degrees_of_freedom)
+            .map_err(|_| "LRT degrees of freedom exceed the R integer range"))
+            .transpose()?.unwrap_or(0);
         const COLUMNS: usize = 13;
         let output = unsafe {
             output_slice(

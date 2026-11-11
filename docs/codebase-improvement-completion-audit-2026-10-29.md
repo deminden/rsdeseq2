@@ -11,6 +11,10 @@ current-source precision, speed, RSS and package checks are still required.
 The later [general/beta-binomial policy follow-up](native-regression-method-policy-development.md)
 adds 21 original profiles and closes related ignored/deferred-bound dispatch
 gaps. All 24 earlier payload sets remain exact; checkpoint status is unchanged.
+The [fit-route audit](native-fit-route-audit.md) then removes R's duplicate
+LRT degrees-of-freedom calculation and adapter test dispatch. It preserves 189
+actual interface cases and four complete fresh-workflow payloads. Broader
+authority reconciliation and final combined gates remain open.
 
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the

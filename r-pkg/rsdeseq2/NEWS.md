@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Import LRT degrees of freedom directly from the Rust fit. Forward ordinary
+  Wald/LRT calls through the shared core dispatcher and guard against duplicate
+  statistical dimension calculations in production R.
+
 * Share scalar optimizer-bound normalization across posterior methods. Defer
   unused beta-binomial controls, ignore source-unused log-link options, and
   preserve exact-name versus abbreviated optimizer dispatch. Independent

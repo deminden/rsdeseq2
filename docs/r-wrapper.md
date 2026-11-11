@@ -11,6 +11,10 @@ gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
 are composed from retained base normalization once; repeated fitting reuses that
 provenance. Older offset fits without it may require the original input.
 
+Local fitted LRT metadata imports the degrees of freedom stored by Rust rather
+than recomputing it from dimensions in R. Ordinary Wald/LRT fitting enters the
+same core dispatcher; see the [fit-route audit](native-fit-route-audit.md).
+
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 
 ```r

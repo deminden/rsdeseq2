@@ -21,7 +21,7 @@ extern int rsdeseq2_r_fit(
     uint8_t *replace, uint8_t *replaceable, uint8_t *refit_rows,
     uint8_t *new_all_zero, size_t *n_refit,
     double *factors_out, double *dispersions, double *disp_fit,
-    double *base_var, int *all_zero);
+    double *base_var, int *all_zero, int *lrt_df);
 
 /* Shape/copy require a live owner returned by fit. Output allocations must be
  * validated by C; copy also checks that the requested shape matches the owner.
