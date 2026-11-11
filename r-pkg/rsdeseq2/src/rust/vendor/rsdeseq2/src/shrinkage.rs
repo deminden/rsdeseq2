@@ -8,6 +8,7 @@ mod adaptive_result;
 mod beta_normalization;
 mod builtin_likelihood;
 mod component_summary;
+mod count_likelihood;
 mod expression_likelihood;
 mod expression_quadrature;
 mod fixed_mixture;
@@ -85,3 +86,5 @@ pub use heavy_tail::{
 };
 
 pub use location_mode::{LocationModeEstimate, PriorModeSearch, estimate_location_mode};
+
+pub use count_likelihood::{BinomialLink, PoissonLink};

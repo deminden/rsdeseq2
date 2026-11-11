@@ -11,6 +11,7 @@ use crate::{
 use std::sync::Arc;
 #[derive(Clone, Debug)]
 enum Parameters {
+    Count(super::count_likelihood::CountLikelihood),
     NormalMixture {
         weights: Vec<f64>,
         scales: Vec<f64>,
@@ -34,6 +35,73 @@ fn invalid(reason: &str) -> DeseqError {
     }
 }
 impl BuiltinLocationLikelihood {
+    pub fn poisson(
+        y: Vec<f64>,
+        scale: Vec<f64>,
+        link: super::PoissonLink,
+    ) -> Result<Self, DeseqError> {
+        Ok(Self {
+            parameters: Arc::new(Parameters::Count(
+                super::count_likelihood::CountLikelihood::poisson(y, scale, link)?,
+            )),
+            row: 0,
+        })
+    }
+    pub fn binomial(
+        y: Vec<f64>,
+        trials: Vec<f64>,
+        link: super::BinomialLink,
+    ) -> Result<Self, DeseqError> {
+        Ok(Self {
+            parameters: Arc::new(Parameters::Count(
+                super::count_likelihood::CountLikelihood::binomial(y, trials, link)?,
+            )),
+            row: 0,
+        })
+    }
+    /// Check imported stored log/logit constructor captures without executing R.
+    pub fn validate_count_captures(
+        &self,
+        y: &[f64],
+        trials: Option<&[f64]>,
+    ) -> Result<(), DeseqError> {
+        if let Parameters::Count(c) = self.parameters.as_ref() {
+            c.validate_captures(y, trials)
+        } else {
+            Err(invalid("adjusted captures require a count likelihood"))
+        }
+    }
+    pub(super) fn grid_data(&self, n: usize, se: &[f64]) -> Option<(Vec<f64>, Vec<f64>)> {
+        if let Parameters::Count(c) = self.parameters.as_ref() {
+            Some(c.grid_data(n, se))
+        } else {
+            None
+        }
+    }
+    pub(super) fn mode_bounds(
+        &self,
+        n: usize,
+        range: (f64, f64),
+        seed: Option<f64>,
+    ) -> Result<Option<(f64, f64)>, DeseqError> {
+        self.validate_observations(n)?;
+        Ok(if let Parameters::Count(c) = self.parameters.as_ref() {
+            Some(c.mode_bounds(n, range, seed))
+        } else {
+            None
+        })
+    }
+    pub(super) fn is_count(&self) -> bool {
+        matches!(self.parameters.as_ref(), Parameters::Count(_))
+    }
+    pub(super) fn support(&self) -> Option<(f64, f64)> {
+        if let Parameters::Count(c) = self.parameters.as_ref() {
+            c.support()
+        } else {
+            None
+        }
+    }
+
     pub fn normal_mixture(weights: Vec<f64>, scales: Vec<f64>) -> Result<Self, DeseqError> {
         let matrix = MatrixView::new(1, scales.len(), &scales, MatrixOrder::RowMajor)?;
         Self::normal_mixture_by_observation(weights, matrix)
@@ -96,6 +164,7 @@ impl BuiltinLocationLikelihood {
     }
     pub fn name(&self) -> &'static str {
         match self.parameters.as_ref() {
+            Parameters::Count(c) => c.name(),
             Parameters::NormalMixture { .. } => "normalmix",
             Parameters::LogF { .. } => "logF",
         }
@@ -103,6 +172,10 @@ impl BuiltinLocationLikelihood {
     pub(super) fn validate_observations(&self, n: usize) -> Result<(), DeseqError> {
         let valid = |length| length == 1 || length == n;
         let ok = match self.parameters.as_ref() {
+            Parameters::Count(c) => {
+                let (a, b) = c.lengths();
+                valid(a) && valid(b)
+            }
             Parameters::NormalMixture { rows, .. } => valid(*rows),
             Parameters::LogF { first, second } => valid(first.len()) && valid(second.len()),
         };
@@ -148,6 +221,7 @@ impl BuiltinLocationLikelihood {
     }
     pub fn log_cdf(&self, x: f64) -> f64 {
         match self.parameters.as_ref() {
+            Parameters::Count(c) => c.log_cdf(x, self.row),
             Parameters::NormalMixture { .. } => self
                 .mixture(|s| {
                     if s == 0.0 {
@@ -170,6 +244,7 @@ impl BuiltinLocationLikelihood {
     }
     pub fn log_density(&self, x: f64) -> f64 {
         match self.parameters.as_ref() {
+            Parameters::Count(c) => c.log_density(x, self.row),
             Parameters::NormalMixture { .. } => self
                 .mixture(|s| {
                     if s == 0.0 {
@@ -202,6 +277,7 @@ impl BuiltinLocationLikelihood {
             return f64::NAN;
         }
         match self.parameters.as_ref() {
+            Parameters::Count(c) => c.moment(a, b, order, self.row),
             Parameters::NormalMixture { .. } => self.mixture(|s| {
                 if order == 1 {
                     scaled_mean(a, b, 0.0, s)

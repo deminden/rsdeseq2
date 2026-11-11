@@ -21,6 +21,18 @@ pub enum FixedMixturePosterior {
     TruncatedNormal(TruncatedNormalMixturePosterior),
 }
 impl FixedMixture {
+    pub(super) fn orient_for(
+        mut self,
+        x: &[f64],
+        se: &[f64],
+        rows: impl Iterator<Item = usize> + Clone,
+    ) -> Result<Self, DeseqError> {
+        if let Self::Uniform(p) = &mut self {
+            p.orient_for(x, se, rows)?;
+        }
+        Ok(self)
+    }
+
     /// Component log convolution densities in input component order.
     pub fn log_likelihoods(
         &self,
@@ -125,11 +137,20 @@ impl FixedMixture {
                 standard_errors.len(),
             ));
         }
+        let prepared = if matches!(self,Self::Uniform(p) if p.has_count_likelihood()) {
+            Some(
+                self.clone()
+                    .orient_for(estimates, standard_errors, 0..estimates.len())?,
+            )
+        } else {
+            None
+        };
+        let prior = prepared.as_ref().unwrap_or(self);
         estimates
             .iter()
             .zip(standard_errors)
             .enumerate()
-            .map(|(row, (&x, &s))| self.posterior_at(x, s, row, estimates.len()))
+            .map(|(row, (&x, &s))| prior.posterior_at(x, s, row, estimates.len()))
             .collect()
     }
 }

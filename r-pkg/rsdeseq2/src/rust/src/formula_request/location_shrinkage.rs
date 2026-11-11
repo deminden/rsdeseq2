@@ -258,7 +258,7 @@ pub(super) fn builtin_likelihood(
         matrix::{MatrixOrder, MatrixView},
         shrinkage::BuiltinLocationLikelihood,
     };
-    match text(get(v, "type")?)? {
+    let likelihood = match text(get(v, "type")?)? {
         "normalmix" => {
             let weights = numbers(get(v, "weights")?)?.to_vec();
             let scales = get(v, "scales")?;
@@ -271,13 +271,44 @@ pub(super) fn builtin_likelihood(
             BuiltinLocationLikelihood::normal_mixture_by_observation(weights, view)
                 .map_err(|e| e.to_string())
         }
+        "pois" => BuiltinLocationLikelihood::poisson(
+            numbers(get(v, "y")?)?.to_vec(),
+            numbers(get(v, "scale")?)?.to_vec(),
+            match text(get(v, "link")?)? {
+                "identity" => rsdeseq2::shrinkage::PoissonLink::Identity,
+                "log" => rsdeseq2::shrinkage::PoissonLink::Log,
+                _ => return Err("unknown Poisson link".into()),
+            },
+        )
+        .map_err(|e| e.to_string()),
+        "binom" => BuiltinLocationLikelihood::binomial(
+            numbers(get(v, "y")?)?.to_vec(),
+            numbers(get(v, "trials")?)?.to_vec(),
+            match text(get(v, "link")?)? {
+                "identity" => rsdeseq2::shrinkage::BinomialLink::Identity,
+                "logit" => rsdeseq2::shrinkage::BinomialLink::Logit,
+                _ => return Err("unknown binomial link".into()),
+            },
+        )
+        .map_err(|e| e.to_string()),
         "logF" => BuiltinLocationLikelihood::log_f(
             numbers(get(v, "df1")?)?.to_vec(),
             numbers(get(v, "df2")?)?.to_vec(),
         )
         .map_err(|e| e.to_string()),
         _ => Err("unknown built-in likelihood type".into()),
+    }?;
+    if let Some(capture) = super::ashr::field(v, "capture_y") {
+        likelihood
+            .validate_count_captures(
+                numbers(capture)?,
+                super::ashr::field(v, "capture_trials")
+                    .map(numbers)
+                    .transpose()?,
+            )
+            .map_err(|e| e.to_string())?;
     }
+    Ok(likelihood)
 }
 pub(super) fn builtin_values(request: &Value) -> Result<Value, String> {
     let likelihood = builtin_likelihood(get(request, "likelihood")?)?;

@@ -131,3 +131,8 @@ Local canonical normal-mixture/log-F observation likelihoods now share Rust
 probabilities, moments and per-observation parameters. See
 [continuous likelihoods](../../docs/native-continuous-likelihood-development.md)
 for supported priors, original missingness policies and remaining families.
+
+Local canonical Poisson/binomial likelihoods support identity/log and
+identity/logit links, native count-specific mode/grid/FDR defaults and original
+intensity/probability summaries. See [count likelihoods](../../docs/native-count-likelihood-development.md)
+for input policy and validation.

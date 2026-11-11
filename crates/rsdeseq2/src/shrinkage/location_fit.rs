@@ -70,7 +70,28 @@ pub(super) fn fit_location(
     }
     let grid = match &options.supplied_grid {
         Some(g) => g.clone(),
-        None => prepare_mixture_grid(&x, &se, &options.grid)?,
+        None => {
+            let mut grid = options.grid.clone();
+            if let LocationLikelihood::Builtin(b) = &options.likelihood
+                && let Some((a, b)) = b.support()
+            {
+                grid.range = (grid.range.0.max(a), grid.range.1.min(b));
+            }
+            let count_data = if grid.scales.is_none() {
+                if let LocationLikelihood::Builtin(b) = &options.likelihood {
+                    b.grid_data(n, &se)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some((x, se)) = count_data {
+                prepare_mixture_grid(&x, &se, &grid)?
+            } else {
+                prepare_mixture_grid(&x, &se, &grid)?
+            }
+        }
     };
     if let MixtureComponents::TruncatedNormal { sds, .. } = &grid.components
         && sds.contains(&0.0)
@@ -92,7 +113,9 @@ pub(super) fn fit_location(
         ));
     }
     let mut warnings = grid.warnings.clone();
-    let initial_prior = grid.prior_with_likelihood(&grid.initial_weights, &options.likelihood)?;
+    let initial_prior = grid
+        .prior_with_likelihood(&grid.initial_weights, &options.likelihood)?
+        .orient_for(&x, &se, included.iter().copied())?;
     if let LocationLikelihood::Restricted(f) = &options.likelihood {
         warnings.extend(super::likelihood_diagnostics::likelihood(
             f,

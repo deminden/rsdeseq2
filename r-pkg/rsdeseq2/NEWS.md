@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Add standalone Poisson identity/log and binomial identity/logit likelihoods,
+  count-specific mode/grid/FDR defaults, and batch-wide CDF orientation. Import
+  canonical stored primitive parameters without executing R closures. Share
+  numerical reference checks across continuous and count likelihood tests.
+
 * Run canonical normal-mixture and log-F observation likelihoods entirely in
   shared Rust, including per-observation parameters, beta/gamma tails and
   integration. Import only stored primitive captures; retain source missingness,

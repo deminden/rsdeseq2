@@ -138,7 +138,16 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     } else {
         None
     };
-    let nullweight = number(args, "nullweight", 10.0)?;
+    let count_likelihood = field(args, "lik")
+        .and_then(|v| field(v, "type"))
+        .map(text)
+        .transpose()?
+        .is_some_and(|kind| matches!(kind, "pois" | "binom"));
+    let nullweight = number(
+        args,
+        "nullweight",
+        if count_likelihood { 1.0 } else { 10.0 },
+    )?;
     let penalty = if let Some(v) = field(args, "prior") {
         Some(match &v.data {
             Data::Number { values, .. } => MixturePriorPenalty::Parameters(values.clone()),
@@ -163,7 +172,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     if field(args, "mode").is_some() && field(args, "g").is_some() {
         return Err("specify either mode or g, not both".into());
     }
-    let (mode, mode_search) = match field(args, "mode").map(|v| &v.data) {
+    let (mode, mut mode_search) = match field(args, "mode").map(|v| &v.data) {
         None => (0.0, None),
         Some(Data::Number { values, .. }) => match values.as_slice() {
             [mode] => (*mode, None),
@@ -231,7 +240,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         match text(get(lik, "type")?)? {
             "normal" => LocationLikelihood::Normal,
             "t" => LocationLikelihood::StudentT(scalar(get(lik, "df")?)?),
-            "normalmix" | "logF" => {
+            "normalmix" | "logF" | "pois" | "binom" => {
                 if df.is_some() {
                     input_warnings.push("Input df is ignored for this likelihood function".into());
                 }
@@ -258,9 +267,23 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         df.map(LocationLikelihood::StudentT)
             .unwrap_or(LocationLikelihood::Normal)
     };
+    if matches!(&options.likelihood,LocationLikelihood::Builtin(b) if matches!(b.name(),"pois"|"binom"))
+    {
+        let x = numbers(get(args, "betahat")?)?;
+        let se = numbers(get(args, "sebetahat")?)?;
+        if x.iter().chain(se).any(|v| v.is_nan()) || !x.contains(&0.0) || !se.contains(&1.0) {
+            return Err(
+                "Poisson/Binomial likelihood requires zero betahat and unit sebetahat inputs"
+                    .into(),
+            );
+        }
+    }
     options.fit_options.optimizer = optimizer;
     if optimizer.is_sqp() {
         super::ashr_sqp::controls(field(args, "control"), &mut options.fit_options)?;
+    }
+    if count_likelihood && field(args, "mode").is_none() && field(args, "g").is_none() {
+        mode_search = Some(PriorModeSearch::ObservationRange);
     }
     if let Some(search) = mode_search {
         let estimate = estimate_location_mode(

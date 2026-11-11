@@ -329,6 +329,10 @@ Canonical \code{ashr::lik_normalmix} and \code{ashr::lik_logF} objects import
 stored primitive parameters without executing likelihood closures. Shared Rust
 supports noise SD matrices, row-specific degrees of freedom and uniform priors.
 Log-F posterior SDs retain the original missing second-moment policy.
+Canonical \code{ashr::lik_pois} and \code{ashr::lik_binom} objects also use
+shared Rust kernels, with identity/log and identity/logit links respectively.
+Count-specific mode/grid defaults and intensity/probability moments retain the
+original policy. Normal priors and missing count observations remain rejected.
 Native interior-point mixture fitting accepts a relative dual-gap tolerance.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.

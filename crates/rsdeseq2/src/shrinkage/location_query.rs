@@ -52,7 +52,9 @@ pub fn location_cdf_batch(
         x.push(estimate / s.powf(options.alpha));
         se.push(s.powf(1.0 - options.alpha));
     }
-    let prior = grid.prior_with_likelihood(weights, &options.likelihood)?;
+    let prior = grid
+        .prior_with_likelihood(weights, &options.likelihood)?
+        .orient_for(&x, &se, 0..n)?;
     if let MixtureComponents::TruncatedNormal { lower, upper, .. } = &grid.components
         && options
             .thresholds

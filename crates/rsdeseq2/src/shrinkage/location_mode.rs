@@ -146,8 +146,25 @@ pub fn estimate_location_mode(
             "an estimated mode requires an unfixed generated prior",
         ));
     }
+    let builtin_bounds = if let LocationLikelihood::Builtin(b) = &options.likelihood {
+        b.mode_bounds(
+            estimates.len(),
+            options.grid.range,
+            match search {
+                PriorModeSearch::ExpandedObservationRange(seed) => Some(seed),
+                _ => None,
+            },
+        )?
+    } else {
+        None
+    };
     let (lower, upper) = match search {
         PriorModeSearch::Interval(a, b) => (a, b),
+        PriorModeSearch::ObservationRange | PriorModeSearch::ExpandedObservationRange(_)
+            if builtin_bounds.is_some() =>
+        {
+            builtin_bounds.unwrap()
+        }
         PriorModeSearch::ObservationRange | PriorModeSearch::ExpandedObservationRange(_) => {
             if estimates.is_empty() || estimates.iter().any(|x| !x.is_finite()) {
                 return Err(invalid(
@@ -189,7 +206,8 @@ pub fn estimate_location_mode(
             let mut trial_warnings = fitted.warnings;
             let prior = fitted
                 .grid
-                .prior_with_likelihood(&fitted.fitted_weights, &trial_options.likelihood)?;
+                .prior_with_likelihood(&fitted.fitted_weights, &trial_options.likelihood)?
+                .orient_for(&fitted.x, &fitted.se, 0..estimates.len())?;
             if let LocationLikelihood::Restricted(f) = &trial_options.likelihood {
                 trial_warnings.extend(super::likelihood_diagnostics::likelihood(
                     f,
