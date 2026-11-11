@@ -4,6 +4,8 @@ use rsdeseq2::{cooks::CooksRefitPlan, prelude::*};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::error::Error;
+#[path = "fresh_fit/queries.rs"]
+mod queries;
 
 #[derive(Deserialize)]
 pub struct Input {
@@ -23,6 +25,8 @@ pub struct Case {
     pub threads: usize,
     pub min_replicates: usize,
     pub replacement_cutoff: String,
+    #[serde(default)]
+    pub queries: Vec<queries::Query>,
 }
 fn matrix(m: &Matrix) -> Result<RowMajorMatrix<f64>, Box<dyn Error>> {
     let values = numbers(&m.values)?;
@@ -99,7 +103,12 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
             .into_merged_fit()?;
         (f, r, Some(p))
     };
-    encode(fit, results, plan)
+    let queries = queries::evaluate(&fit, &counts, plan.as_ref(), &c.queries)?;
+    let mut output = encode(fit, results, plan)?;
+    if !c.queries.is_empty() {
+        output["queries"] = queries;
+    }
+    Ok(output)
 }
 fn encode(
     fit: DeseqFit,
@@ -143,7 +152,7 @@ fn encode(
         .collect::<Vec<_>>();
     let eligible = plan
         .as_ref()
-        .is_some_and(|p| p.replacement.replaceable_samples.iter().any(|v| *v));
+        .is_some_and(CooksRefitPlan::has_replaceable_samples);
     let n_refit = plan.as_ref().filter(|_| eligible).map_or(0, |p| p.n_refit);
     let replacement = plan.as_ref().filter(|_| n_refit > 0).map(|p| {
         p.replacement

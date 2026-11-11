@@ -102,6 +102,38 @@ fn native_glm_mu_lrt_cooks_replacement_refit_merges_refit_rows() {
             source.beta_optim_objective.as_ref().unwrap()[gene].to_bits()
         );
     }
+    let request = ResultRequest::new(
+        ResultsContrast::Numeric(vec![0.0, 1.0]),
+        WaldTestOptions::default(),
+        CooksCutoff::Disabled,
+        IndependentFilteringOptions {
+            enabled: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let later = merged
+        .results_for_request_with_replacement(&counts, &request, None, &plan)
+        .unwrap();
+    for (actual, expected) in later.rows.iter().zip(&final_results.rows) {
+        assert_eq!(actual.base_mean, expected.base_mean);
+        assert_eq!(actual.stat, expected.stat);
+        assert_eq!(actual.pvalue, expected.pvalue);
+        assert_eq!(actual.padj, expected.padj);
+    }
+    assert_eq!(
+        bits(merged.cooks.as_ref().unwrap().as_slice()),
+        bits(output.original_fit.cooks.as_ref().unwrap().as_slice())
+    );
+    for bad_rows in [vec![counts.n_genes()], vec![1, 1], vec![2, 1]] {
+        let mut invalid_plan = plan.clone();
+        invalid_plan.refit_rows = bad_rows;
+        assert!(
+            merged
+                .results_for_request_with_replacement(&counts, &request, None, &invalid_plan)
+                .is_err()
+        );
+    }
     let mut invalid = output;
     invalid.refit_plan.new_all_zero_rows.push(counts.n_genes());
     assert!(

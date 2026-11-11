@@ -16,7 +16,7 @@ compare <- function(a,b,bound) {
 }
 blocked <- function(expr) {
   functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','rank','cumsum','^','%*%','lgamma','digamma','set.seed','RNGkind','svd','La.svd'),
-    stats=c('pnorm','dnorm','dnbinom','dbinom','dt','pf','df','pgamma','dgamma','pbeta','dbeta','integrate','quantile','optim','optimHess','optimize','optimise','uniroot','qnorm','rnorm','runif'),
+    stats=c('pnorm','dnorm','dnbinom','dbinom','dt','pf','df','pgamma','dgamma','pbeta','dbeta','integrate','quantile','lowess','p.adjust','pchisq','pt','qf','optim','optimHess','optimize','optimise','uniroot','qnorm','rnorm','runif'),
     apeglm=c('apeglm','priorVar','svalue'))
   if(requireNamespace('ashr',quietly=TRUE))functions$ashr<-c('ash','ash.workhorse','mixEM','w_mixEM','mixVBEM','cxxMixSquarem','mixSQP','estimate_mixprop','cdf_post')
   if(requireNamespace('SQUAREM',quietly=TRUE))functions$SQUAREM<-'squarem'
@@ -29,3 +29,7 @@ blocked <- function(expr) {
 }
 guard <- tryCatch(blocked(stats::dnorm(0)),error=identity)
 stopifnot(inherits(guard,'error'),grepl('executed R math',conditionMessage(guard)))
+for(numerical_call in list(quote(stats::quantile(1:3)),quote(stats::lowess(1:3)),quote(stats::p.adjust(c(.1,.2))))) {
+  guard<-tryCatch(blocked(eval(numerical_call)),error=identity)
+  stopifnot(inherits(guard,'error'),grepl('executed R math',conditionMessage(guard)))
+}

@@ -5,6 +5,7 @@ use crate::errors::{DeseqError, invalid_dimensions};
 enum Flags<'a> {
     Boolean(&'a [bool]),
     Integer(&'a [i32]),
+    Indices { genes: usize, rows: &'a [usize] },
 }
 
 /// Borrowed, validated row indicators without a foreign-to-native flag copy.
@@ -24,16 +25,26 @@ impl<'a> RowFlags<'a> {
         }
         Ok(Self(Flags::Integer(values)))
     }
+    fn from_indices(genes: usize, rows: &'a [usize]) -> Result<Self, DeseqError> {
+        if rows.iter().any(|&row| row >= genes) || rows.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(DeseqError::InvalidOptions {
+                reason: "replacement row indices must be in range and strictly increasing".into(),
+            });
+        }
+        Ok(Self(Flags::Indices { genes, rows }))
+    }
     pub(crate) fn len(self) -> usize {
         match self.0 {
             Flags::Boolean(v) => v.len(),
             Flags::Integer(v) => v.len(),
+            Flags::Indices { genes, .. } => genes,
         }
     }
     pub(crate) fn at(self, gene: usize) -> bool {
         match self.0 {
             Flags::Boolean(v) => v[gene],
             Flags::Integer(v) => v[gene] == 1,
+            Flags::Indices { rows, .. } => rows.binary_search(&gene).is_ok(),
         }
     }
 }
@@ -46,6 +57,19 @@ pub struct ReplacementRows<'a> {
     new_zero: Option<RowFlags<'a>>,
 }
 impl<'a> ReplacementRows<'a> {
+    /// Borrow the sorted row indices retained by a standalone replacement plan.
+    /// No gene-length flag vectors or count matrices are copied.
+    pub fn from_plan(plan: &'a crate::cooks::CooksRefitPlan) -> Result<Self, DeseqError> {
+        let genes = plan.replacement.replaced_counts.n_genes();
+        if !plan.has_replaceable_samples() {
+            return Self::new(genes, None, None);
+        }
+        Self::new(
+            genes,
+            Some(RowFlags::from_indices(genes, &plan.refit_rows)?),
+            Some(RowFlags::from_indices(genes, &plan.new_all_zero_rows)?),
+        )
+    }
     /// Validate every optional indicator length before applying row policy.
     pub fn new(
         genes: usize,

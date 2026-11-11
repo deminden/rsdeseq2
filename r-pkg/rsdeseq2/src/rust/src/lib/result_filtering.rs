@@ -86,16 +86,10 @@ pub unsafe extern "C" fn rsdeseq2_r_independent_filtering(
         for gene in 0..genes {
             // Preserve NA/NaN payloads only as R transport formatting. Population
             // selection and adjustment have already been decided by the core.
-            let retained_missing = values[gene].is_nan()
-                && result
-                    .metadata
-                    .filter_threshold
-                    .is_none_or(|cutoff| filter[gene] >= cutoff);
-            padj[gene] = result.padj[gene].unwrap_or(if retained_missing {
-                values[gene]
-            } else {
-                missing
-            });
+            padj[gene] = rsdeseq2::independent_filtering::format_adjusted_pvalue(
+                result.padj[gene], values[gene], filter[gene],
+                result.metadata.filter_threshold, missing,
+            );
             filtered[gene] = result.filtered[gene].map_or(u8::MAX, u8::from);
         }
         theta_output.copy_from_slice(&result.metadata.theta);

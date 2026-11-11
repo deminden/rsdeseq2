@@ -19,6 +19,11 @@ Replacement fits also share the standalone row merger. The
 identity across 24 fitting requests and corrections for weighted replacement
 summaries and unnamed matrix output metadata. Later replacement-aware result
 query context remains under audit.
+Standalone callers can now retain the merged fit and plan and use
+`results_for_request_with_replacement` for later requests. The
+[query follow-up](native-replacement-query-development.md) verifies 86 numerical
+requests against actual wrapped calls, including missing-value bits and complete
+filtering metadata. Factor/formula and broader state coverage remain under audit.
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 
