@@ -8,7 +8,7 @@ use crate::contrasts::{
     ContrastSpec, FactorLevelContrast, ResultsContrast,
 };
 use crate::cooks::{
-    calculate_cooks_distance, prepare_cooks_replacement_refit, CooksOutput, CooksRefitPlan,
+    calculate_cooks_distance, prepare_cooks_replacement_refit_with_weights, CooksOutput, CooksRefitPlan,
     CooksReplacementOptions,
 };
 use crate::design::{r_like_name_candidates as design_name_candidates, DesignMatrix, FormulaModelFrame};

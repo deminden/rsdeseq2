@@ -26,27 +26,9 @@ impl DeseqBuilder {
             .disable_independent_filtering();
         let (original_fit, original_results) =
             raw_builder.fit_wald_glm_mu(counts, design, coefficient)?;
-        let original_cooks =
-            original_fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before replacement refit".to_string(),
-                })?;
-        let normalized = match original_fit.normalization_factors.as_ref() {
-            Some(normalization_factors) => {
-                normalized_counts_with_factors(counts, normalization_factors)?
-            }
-            None => normalized_counts(counts, &original_fit.size_factors)?,
-        };
-        let refit_plan = prepare_cooks_replacement_refit(
-            counts,
-            &normalized,
-            &original_fit.size_factors,
-            original_fit.normalization_factors.as_ref(),
-            original_cooks,
-            design,
-            replacement_options,
+        let refit_plan = replacement_refit_plan_from_original(
+            counts, design, &original_fit, replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -87,7 +69,7 @@ impl DeseqBuilder {
             &mut results,
             cooks_cutoff,
             counts,
-            Some(original_cooks),
+            original_fit.cooks.as_ref(),
             design,
             self.model_frame.as_ref(),
             None,
@@ -132,6 +114,7 @@ impl DeseqBuilder {
             design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -255,6 +238,7 @@ impl DeseqBuilder {
             design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -312,18 +296,11 @@ impl DeseqBuilder {
             design.n_samples(),
             design.n_coefficients(),
         )?;
-        let original_cooks =
-            original_fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before replacement refit".to_string(),
-                })?;
         apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            Some(original_cooks),
+            original_fit.cooks.as_ref(),
             design,
             self.model_frame.as_ref(),
             Some(contrast),
@@ -375,27 +352,9 @@ impl DeseqBuilder {
             .disable_independent_filtering();
         let (original_fit, original_results) =
             raw_builder.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)?;
-        let original_cooks =
-            original_fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before replacement refit".to_string(),
-                })?;
-        let normalized = match original_fit.normalization_factors.as_ref() {
-            Some(normalization_factors) => {
-                normalized_counts_with_factors(counts, normalization_factors)?
-            }
-            None => normalized_counts(counts, &original_fit.size_factors)?,
-        };
-        let refit_plan = prepare_cooks_replacement_refit(
-            counts,
-            &normalized,
-            &original_fit.size_factors,
-            original_fit.normalization_factors.as_ref(),
-            original_cooks,
-            full_design,
-            replacement_options,
+        let refit_plan = replacement_refit_plan_from_original(
+            counts, full_design, &original_fit, replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -437,7 +396,7 @@ impl DeseqBuilder {
             &mut results,
             cooks_cutoff,
             counts,
-            Some(original_cooks),
+            original_fit.cooks.as_ref(),
             full_design,
             self.model_frame.as_ref(),
             None,
@@ -478,6 +437,7 @@ impl DeseqBuilder {
             full_design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -579,6 +539,7 @@ impl DeseqBuilder {
             full_design,
             &original_fit,
             replacement_options,
+            self.observation_weights.as_ref(),
         )?;
 
         let (refit_fit, refit_results) = if refit_plan.should_refit {
@@ -637,18 +598,11 @@ impl DeseqBuilder {
             full_design.n_samples(),
             full_design.n_coefficients(),
         )?;
-        let original_cooks =
-            original_fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before replacement refit".to_string(),
-                })?;
         apply_cooks_cutoff_for_design(
             &mut results,
             cooks_cutoff,
             counts,
-            Some(original_cooks),
+            original_fit.cooks.as_ref(),
             full_design,
             self.model_frame.as_ref(),
             Some(contrast),

@@ -271,7 +271,10 @@ pub fn calculate_cooks_distance(
 
 // Replacement and refit-plan construction.
 mod replacement;
-pub use replacement::{prepare_cooks_replacement_refit, replace_outlier_counts};
+pub use replacement::{
+    prepare_cooks_replacement_refit, prepare_cooks_replacement_refit_with_weights,
+    replace_outlier_counts,
+};
 
 /// Calculate DESeq2-style post-refit `maxCooks` after outlier replacement.
 ///

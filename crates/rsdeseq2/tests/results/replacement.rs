@@ -501,6 +501,19 @@ fn fit_expanded_beta_prior_wald_cooks_replacement_carries_weights_into_refit() {
     )
     .unwrap();
     assert!(output.refit.is_some());
+    // Four samples at trim=.2 retain the ordinary mean, then truncate the
+    // replacement 41.5 to 41. Metadata uses raw assay weights, independently
+    // of the fitted likelihood and of the plan passed to the direct refit.
+    assert_eq!(
+        output.refit_plan.replacement.replaced_counts.as_slice()[2],
+        41
+    );
+    assert_relative_eq!(
+        output.refit_plan.replaced_base_mean[0],
+        12.8625,
+        epsilon = 1e-12
+    );
+    assert_relative_eq!(output.results.rows[0].base_mean, 12.8625, epsilon = 1e-12);
 
     let direct_refit = fit_expanded_beta_prior_wald_results(
         ExpandedBetaPriorWaldResultsInput {
