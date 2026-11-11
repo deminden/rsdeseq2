@@ -116,7 +116,7 @@ pub(super) fn fit_location(
     let initial_prior = grid
         .prior_with_likelihood(&grid.initial_weights, &options.likelihood)?
         .orient_for(&x, &se, included.iter().copied())?;
-    if let LocationLikelihood::Restricted(f) = &options.likelihood {
+    if let Some(f) = super::likelihood_diagnostics::WarningLikelihood::new(&options.likelihood) {
         warnings.extend(super::likelihood_diagnostics::likelihood(
             f,
             &grid.components,

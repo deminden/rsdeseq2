@@ -16,6 +16,7 @@ pub struct Case {
     output: Value,
     threshold: String,
     query_svalues: bool,
+    location: Option<super::location_shrinkage::Case>,
 }
 pub fn run(c: &Case) -> Result<SelectedAdaptiveShrinkageResult, Box<dyn Error>> {
     let output = match formula::value(&c.output).data {
@@ -34,17 +35,21 @@ pub fn run(c: &Case) -> Result<SelectedAdaptiveShrinkageResult, Box<dyn Error>> 
     Ok(adaptive_shrinkage_with_output(
         &x,
         &s,
-        &LocationShrinkageOptions {
-            supplied_grid: Some(MixtureGrid::from_supplied(
-                MixtureComponents::Normal {
-                    means: vec![0.0; 3],
-                    sds: vec![0.0, 0.5, 2.0],
-                },
-                vec![0.5, 0.3, 0.2],
-                &MixturePriorPenalty::Uniform,
-            )?),
-            fixed_prior: true,
-            ..Default::default()
+        &if let Some(location) = &c.location {
+            super::location_shrinkage::options(location)?
+        } else {
+            LocationShrinkageOptions {
+                supplied_grid: Some(MixtureGrid::from_supplied(
+                    MixtureComponents::Normal {
+                        means: vec![0.0; 3],
+                        sds: vec![0.0, 0.5, 2.0],
+                    },
+                    vec![0.5, 0.3, 0.2],
+                    &MixturePriorPenalty::Uniform,
+                )?),
+                fixed_prior: true,
+                ..Default::default()
+            }
         },
         AdaptiveShrinkageQuery {
             estimates: &x,
@@ -59,9 +64,7 @@ pub fn encode(r: SelectedAdaptiveShrinkageResult) -> Value {
     let optional = |v: Option<Vec<f64>>| v.map(|v| v.into_iter().map(bits).collect::<Vec<_>>());
     json!({"posterior_mean":optional(r.posterior_mean),"posterior_sd":optional(r.posterior_sd),
         "svalue":optional(r.svalues),"warnings":r.fit.warnings,
-        "fitted_prior":r.fitted_prior.then(|| json!({"component_class":["normalmix"],
-            "weights":r.fit.fitted_weights.into_iter().map(bits).collect::<Vec<_>>(),
-            "means":vec![bits(0.0);3],"sds":[bits(0.0),bits(0.5),bits(2.0)],"lower":null,"upper":null}))})
+        "fitted_prior":r.fitted_prior.then(||super::location_shrinkage::mixture(r.fit.fitted_grid.components,r.fit.fitted_weights))})
 }
 pub fn evaluate(input: Input) -> Value {
     json!({"cases":input.ashr_output_cases.iter().map(|c| match run(c) {

@@ -2,8 +2,8 @@
 //! The default public adapter uses this engine; advanced option gates remain.
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{
-    LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions, MixtureGrid,
-    MixtureGridOptions,
+    AdaptiveOutputSelection, LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions,
+    MixtureGrid, MixtureGridOptions,
 };
 use crate::DeseqError;
 
@@ -106,13 +106,6 @@ fn legacy_qvalues(rates: &[f64], warnings: &mut Vec<String>) -> Vec<f64> {
     result
 }
 
-/// Internal output policy for cumulative error-rate summaries and warnings.
-#[derive(Clone, Copy)]
-pub(super) struct RateOutputs {
-    pub svalues: bool,
-    pub qvalues: bool,
-}
-
 /// Prepare, fit and summarize a complete observation batch without an R runtime.
 /// Excluded observations use prior summaries; raw requested CDFs retain their
 /// separate missing/zero/infinite-SE policy. Supplied grids permit fixed priors.
@@ -121,21 +114,18 @@ pub fn shrink_location_batch(
     standard_errors: &[f64],
     options: &LocationShrinkageOptions,
 ) -> Result<LocationShrinkage, DeseqError> {
-    shrink_location_batch_with_rates(
+    shrink_location_batch_with_outputs(
         estimates,
         standard_errors,
         options,
-        RateOutputs {
-            svalues: true,
-            qvalues: true,
-        },
+        AdaptiveOutputSelection::level(2.0)?,
     )
 }
-pub(super) fn shrink_location_batch_with_rates(
+pub(super) fn shrink_location_batch_with_outputs(
     estimates: &[f64],
     standard_errors: &[f64],
     options: &LocationShrinkageOptions,
-    rates: RateOutputs,
+    outputs: AdaptiveOutputSelection,
 ) -> Result<LocationShrinkage, DeseqError> {
     let super::location_fit::FittedLocation {
         grid,
@@ -273,24 +263,33 @@ pub(super) fn shrink_location_batch_with_rates(
         .collect::<Vec<_>>();
     let mut sign_warnings = vec![];
     let mut null_warnings = vec![];
-    let svalues = if rates.svalues {
+    let svalues = if outputs.svalues {
         legacy_qvalues(&lfsr, &mut sign_warnings)
     } else {
         vec![]
     };
-    let qvalues = if rates.qvalues {
+    let qvalues = if outputs.qvalues {
         legacy_qvalues(&lfdr, &mut null_warnings)
     } else {
         vec![]
     };
-    if let LocationLikelihood::Restricted(f) = &options.likelihood {
+    if let Some(f) = super::likelihood_diagnostics::WarningLikelihood::new(&options.likelihood) {
         let raw = super::likelihood_diagnostics::Diagnostics::new(f, &grid.components, &x, &se);
-        warnings.extend_from_slice(&raw.likelihood);
-        warnings.extend_from_slice(&raw.likelihood);
-        warnings.extend_from_slice(&raw.null);
+        if outputs.flash_data {
+            warnings.extend_from_slice(&raw.likelihood);
+            warnings.extend_from_slice(&raw.mean);
+            warnings.extend_from_slice(&raw.second);
+        }
+        if outputs.log_likelihood {
+            warnings.extend_from_slice(&raw.likelihood);
+        }
+        if outputs.log_likelihood_ratio {
+            warnings.extend_from_slice(&raw.likelihood);
+            warnings.extend_from_slice(&raw.null);
+        }
         let summary =
             super::likelihood_diagnostics::Diagnostics::new(f, &summary_grid.components, &x, &se);
-        summary.append_full_summary(&mut warnings, &sign_warnings, &null_warnings);
+        summary.append_selected_summary(&mut warnings, outputs, &sign_warnings, &null_warnings);
         for &cutoff in &options.thresholds {
             warnings.extend_from_slice(&raw.likelihood);
             warnings.extend(super::likelihood_diagnostics::cdf(

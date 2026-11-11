@@ -48,7 +48,7 @@ pub struct Case {
 fn array(values: Vec<f64>) -> Value {
     json!(values.into_iter().map(bits).collect::<Vec<_>>())
 }
-fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
+pub fn mixture(components: MixtureComponents, weights: Vec<f64>) -> Value {
     let (class, means, sds, lower, upper) = match components {
         MixtureComponents::Normal { means, sds } => {
             ("normalmix", Some(means), Some(sds), None, None)

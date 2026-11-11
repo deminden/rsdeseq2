@@ -6,11 +6,25 @@ use support::*;
 #[path = "../examples/evaluate_r_interface/ashr_output.rs"]
 mod ashr_output;
 use rsdeseq2::shrinkage::*;
+#[allow(dead_code)]
+#[path = "../examples/evaluate_r_interface/em_fit.rs"]
+mod em_fit;
+#[allow(dead_code)]
+#[path = "../examples/evaluate_r_interface/location_shrinkage.rs"]
+mod location_shrinkage;
 
 #[test]
 fn selected_fields_and_missing_rates_match_original_ashr() {
-    let reference: serde_json::Value =
-        serde_json::from_str(include_str!("data/ashr_output_r462.json")).unwrap();
+    check_reference(include_str!("data/ashr_output_r462.json"));
+}
+
+#[test]
+fn recycled_likelihood_warnings_follow_selected_original_operations() {
+    check_reference(include_str!("data/likelihood_warnings_r462.json"));
+}
+
+fn check_reference(source: &str) {
+    let reference: serde_json::Value = serde_json::from_str(source).unwrap();
     let mut failures = vec![];
     for c in reference["cases"].as_array().unwrap() {
         let input: ashr_output::Case = serde_json::from_value(c.clone()).unwrap();

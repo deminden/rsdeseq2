@@ -28,6 +28,7 @@ enum Parameters {
 pub struct BuiltinLocationLikelihood {
     parameters: Arc<Parameters>,
     row: usize,
+    capture_recycling_warning: bool,
 }
 fn invalid(reason: &str) -> DeseqError {
     DeseqError::InvalidOptions {
@@ -35,6 +36,20 @@ fn invalid(reason: &str) -> DeseqError {
     }
 }
 impl BuiltinLocationLikelihood {
+    pub(super) fn with_recycling_warning(mut self) -> Self {
+        self.capture_recycling_warning = true;
+        self
+    }
+    pub(super) fn has_recycling_warning(&self) -> bool {
+        self.capture_recycling_warning
+    }
+    pub(super) fn capture_warnings(&self) -> Vec<String> {
+        if self.capture_recycling_warning {
+            vec!["longer argument not a multiple of length of shorter".into()]
+        } else {
+            vec![]
+        }
+    }
     pub fn poisson(
         y: Vec<f64>,
         scale: Vec<f64>,
@@ -45,6 +60,7 @@ impl BuiltinLocationLikelihood {
                 super::count_likelihood::CountLikelihood::poisson(y, scale, link)?,
             )),
             row: 0,
+            capture_recycling_warning: false,
         })
     }
     pub fn binomial(
@@ -57,6 +73,7 @@ impl BuiltinLocationLikelihood {
                 super::count_likelihood::CountLikelihood::binomial(y, trials, link)?,
             )),
             row: 0,
+            capture_recycling_warning: false,
         })
     }
     /// Check imported stored log/logit constructor captures without executing R.
@@ -154,6 +171,7 @@ impl BuiltinLocationLikelihood {
                 rows: scales.n_rows(),
             }),
             row: 0,
+            capture_recycling_warning: false,
         })
     }
     /// Positive degrees of freedom, shared scalars or per-observation vectors.
@@ -169,6 +187,7 @@ impl BuiltinLocationLikelihood {
         Ok(Self {
             parameters: Arc::new(Parameters::LogF { first, second }),
             row: 0,
+            capture_recycling_warning: false,
         })
     }
     pub fn name(&self) -> &'static str {
@@ -203,6 +222,7 @@ impl BuiltinLocationLikelihood {
         Ok(Self {
             parameters: Arc::clone(&self.parameters),
             row,
+            capture_recycling_warning: self.capture_recycling_warning,
         })
     }
     fn df(&self, values: &[f64]) -> f64 {

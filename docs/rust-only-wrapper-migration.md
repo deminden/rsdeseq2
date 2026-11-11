@@ -319,3 +319,9 @@ preserve R term/polynomial order, interaction coding and reduced-offset policy
 using shared Rust preparation; raw compatibility matrix helpers keep their
 explicit layout. Current-source combined acceptance and the remaining supported
 warning/option/state inventory are still required before C19/C21/C23 close.
+
+The [likelihood warning correction](native-likelihood-warning-development.md)
+retains nonmultiple capture-recycling provenance and selected-summary/mode-search
+diagnostics entirely in shared Rust. Both frontends forward the same warnings
+and preserve numerical outputs. This is a specific contract correction; the
+broader inventory and final C19/C21/C23 gates remain open.

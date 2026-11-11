@@ -427,3 +427,9 @@ actual wrapped workflows under the R numerical firewall in both R CI lanes.
 Matrix-workflow identity now includes effective normalization and full/reduced
 design arrays as well as the previous fitted/result fields. Previously absent
 fields are excluded only when comparing against the older saved schema.
+
+The [likelihood warning panel](native-likelihood-warning-development.md) adds 34
+independent selected-output cases and two mode-search traces. It requires exact
+warning message order/count alongside the existing numerical gates. Both R CI
+lanes compare actual native/wrapped bits with R math/search blocked; targeted R
+tests separately call original ashr. Twenty-seven prior replay sets remain exact.

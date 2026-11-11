@@ -89,3 +89,9 @@ reused; unchanged quantification paths are not retimed at this step. No new
 dependency or counted optimization round is introduced. Full warning
 multiplicity, remaining option/supported-state contracts, cross-route authority
 and the final combined speed/RSS/source-package checks still need completion.
+
+The [likelihood warning follow-up](native-likelihood-warning-development.md) now
+preserves the nonmultiple-recycling warning sequences omitted at this checkpoint,
+including selected-output and mode-search multiplicity. The original capture
+values and all previously accepted payloads stay unchanged. Other supported-state
+and final combined gates remain open.

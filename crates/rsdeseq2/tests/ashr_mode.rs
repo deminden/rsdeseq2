@@ -17,8 +17,17 @@ use rsdeseq2::shrinkage::*;
 fn estimated_modes_and_complete_summaries_match_original_profiles() {
     let reference: serde_json::Value =
         serde_json::from_str(include_str!("data/ashr_mode_r462.json")).unwrap();
+    check_reference(&reference["cases"]);
+}
+#[test]
+fn mode_searches_preserve_original_recycled_and_expression_warnings() {
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("data/likelihood_warnings_r462.json")).unwrap();
+    check_reference(&reference["mode_cases"]);
+}
+fn check_reference(cases: &serde_json::Value) {
     let mut failures = vec![];
-    for c in reference["cases"].as_array().unwrap() {
+    for c in cases.as_array().unwrap() {
         let input: ashr_mode::Case = serde_json::from_value(c.clone()).unwrap();
         let result = ashr_mode::run(&input);
         if c["expected_error"].is_string() || c["native_expected_error"].is_string() {

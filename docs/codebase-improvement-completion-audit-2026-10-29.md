@@ -49,6 +49,13 @@ offsets and unused size-factor metadata. Independent original-R matrices and
 actual cross-interface checks cover different requirements. This finding does
 not close the broader C19/C21 inventory or C23's combined current-source gates.
 
+The [likelihood warning follow-up](native-likelihood-warning-development.md)
+closes dropped nonmultiple-recycling warnings and full-summary warnings emitted
+for unselected outputs. Thirty-four independent output profiles and two mode
+traces preserve existing bounds and exact native/wrapped diagnostics; 27 accepted
+replay sets stay unchanged. This closes specific findings, not the remaining
+supported-contract inventory or C19/C21/C23 combined acceptance.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

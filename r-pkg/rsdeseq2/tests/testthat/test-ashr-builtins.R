@@ -48,3 +48,30 @@ testthat::test_that('equal-length matrix captures preserve their column-wise glo
   testthat::expect_equal(exp(answer$log_density),rep(expected,3),tolerance=2e-12)
   testthat::expect_equal(answer$log_cdf,rep(0,3),tolerance=2e-12)
 })
+
+testthat::test_that('recycled likelihood warnings follow the selected summaries', {
+  testthat::skip_if_not_installed('ashr')
+  x <- c(-2,-.4,0,.8,2,4)
+  se <- c(.3,.5,1,1.2,.7,.4)
+  lik <- ashr::lik_normalmix(c(.7,.3),cbind(seq(.3,1,length.out=6),
+    seq(.5,2,length.out=6),seq(.7,1.5,length.out=6)))
+  prior <- ashr::unimix(c(.2,.3,.5),c(0,-.4,-3),c(0,.4,3))
+  capture <- function(expr) {
+    messages <- character()
+    value <- withCallingHandlers(force(expr),warning=function(w) {
+      messages <<- c(messages,conditionMessage(w));invokeRestart('muffleWarning')
+    })
+    list(value=value,messages=messages)
+  }
+  for (output in list(0,1,2,4,'PosteriorMean',c('svalue','fitted_g'))) {
+    arguments <- list(betahat=x,sebetahat=se,mixcompdist='uniform',method='shrink',
+      g=prior,fixg=TRUE,lik=lik,outputlevel=output)
+    original <- capture(do.call(ashr::ash,arguments))
+    actual <- capture(.rsdeseq2_native_ash(arguments,x,se,0,TRUE))
+    testthat::expect_true(length(original$messages)>0)
+    testthat::expect_identical(actual$messages,original$messages)
+    for (field in c('PosteriorMean','PosteriorSD','svalue')) {
+      testthat::expect_equal(actual$value$result[[field]],original$value$result[[field]],tolerance=2e-6)
+    }
+  }
+})
