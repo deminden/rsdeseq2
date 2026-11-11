@@ -28,6 +28,10 @@ policy. Complete option/parameter/authority and combined checks remain open.
 precision at large counts; a lexical production-R numerical-call guard supplements
 runtime identity/firewall checks. See the [current authority audit](native-numerical-authority-audit.md)
 for remaining capture/method policies and combined gates.
+The [capture/control checkpoint](native-capture-policy-development.md) now
+implements canonical matrix flattening/recycling and deferred compiled-NB
+refinement policy in Rust. All 38 new native/wrapped batches agree exactly and
+21 accepted replay sets are unchanged; full authority/combined gates stay open.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 

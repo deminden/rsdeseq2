@@ -30,8 +30,8 @@
   values <- lapply(parameters, function(name) {
     value <- .rsdeseq2_frozen_binding(name, env, context = "built-in likelihood parameter")
     if (is.object(value) || !typeof(value) %in% c("integer", "double") ||
-        (!is.null(dim(value)) && !(kind == "normalmix" && name == "sdlik" && length(dim(value)) == 2L))) {
-      stop("built-in likelihood parameters require primitive numeric vectors or an SD matrix", call. = FALSE)
+        (!is.null(dim(value)) && !(kind == "normalmix" && length(dim(value)) == 2L))) {
+      stop("built-in likelihood parameters require primitive numeric vectors or matrices", call. = FALSE)
     }
     value
   })

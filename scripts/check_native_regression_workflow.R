@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Focused complete bridge/R-free checks and public general/nbinomR comparisons.
 args <- commandArgs(TRUE)
-if (!length(args) %in% c(4L,5L)) stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR PAIRED_FITS_RDS [REFERENCE_JSON]')
+if (!length(args) %in% c(4L,5L,6L)) stop('usage: DRIVER R_LIBRARY FRESH_OUTPUT_DIR PAIRED_FITS_RDS [REFERENCE_JSON [identity-only]]')
 driver <- normalizePath(args[[1L]])
 library(rsdeseq2, lib.loc=normalizePath(args[[2L]]))
 requireNamespace('DESeq2'); requireNamespace('apeglm')
@@ -13,7 +13,7 @@ out <- args[[3L]]
 if (dir.exists(out)) stop('Use a fresh output directory')
 dir.create(out, recursive=TRUE)
 source(file.path(root,'scripts/native_posterior_check_helpers.R'))
-reference_path <- if(length(args)==5L)args[[5L]]else file.path(root,'crates/rsdeseq2/tests/data/regression_posterior_r462.json')
+reference_path <- if(length(args)>=5L)args[[5L]]else file.path(root,'crates/rsdeseq2/tests/data/regression_posterior_r462.json')
 reference <- jsonlite::fromJSON(reference_path,simplifyVector=FALSE)
 random_mode <- !is.null(reference$rng_states)
 decode_state <- function(v)vapply(v,function(h)readBin(as.raw(strtoi(substring(h,seq(1L,7L,2L),seq(2L,8L,2L)),16L)), 'integer',n=1L,size=4L,endian='big'),integer(1L))
@@ -76,11 +76,19 @@ wrapped <- lapply(seq_along(reference$cases),function(i) {
     nuisance=as.list(as.integer(r$prior_control$no.shrink)),
     convergence=lapply(r$convergence,function(v)if(is.na(v))NULL else as.integer(v)))
   stopifnot(identical(.formula_canonical(actual),.formula_canonical(expected)))
-  if(random_mode)stopifnot(identical(actual$random_state,c$expected_random_state))
+  if(!is.null(c$expected_random_state))stopifnot(identical(actual$random_state,c$expected_random_state))
   list(name=c$name,value=actual,original_warning_messages_identical=identical(as.list(r$warnings),c$warnings),
     original_warning_events_identical=identical(sub(',.*','',r$warnings),sub(',.*','',unlist(c$warnings))))
 })
 jsonlite::write_json(wrapped,file.path(out,'wrapped.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
+if(length(args)==6L){
+  stopifnot(identical(args[[6L]],'identity-only'))
+  jsonlite::write_json(list(complete_native_standalone_batches=length(reference$cases),R_calculations_blocked=TRUE,
+    native_wrapped_bits='exact',source_warning_messages=lapply(wrapped,`[[`,'original_warning_messages_identical')),
+    file.path(out,'validation.json'),auto_unbox=TRUE,pretty=TRUE,null='null')
+  cat(length(reference$cases),'complete regression batches have exact wrapped/native bits; R calculations blocked\n')
+  quit(status=0)
+}
 # Reuse the accepted count fit. Only the newly changed posterior paths are fitted.
 fixture <- .rsdeseq2_large_transform_fixture()
 cached <- readRDS(args[[4L]])

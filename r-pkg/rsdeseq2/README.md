@@ -136,3 +136,8 @@ Local canonical Poisson/binomial likelihoods support identity/log and
 identity/logit links, native count-specific mode/grid/FDR defaults and original
 intensity/probability summaries. See [count likelihoods](../../docs/native-count-likelihood-development.md)
 for input policy and validation.
+
+Canonical normal-mixture matrix captures now follow source flattening/recycling
+rules. Compiled negative-binomial methods ignore unused controls and defer
+refinement controls until needed. See [capture and compiled-method policy](../../docs/native-capture-policy-development.md)
+for independent references, exact interface comparisons and remaining scope.

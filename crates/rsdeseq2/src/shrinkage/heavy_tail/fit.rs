@@ -9,7 +9,6 @@ use crate::{
     probability::normal_upper_tail,
     shrinkage::svalues,
 };
-use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb_with_gradient};
 
 /// MLE scale supplied for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
@@ -61,6 +60,9 @@ pub struct NegativeBinomialPosteriorOptions {
     pub multiplier: f64,
     pub map_only: bool,
     pub check_opposite_start: bool,
+    /// Compiled CR zero-row policy; MAP-only methods ignore this flag.
+    pub log_link: bool,
+    pub refinement: super::compiled_refinement::NegativeBinomialRefinement,
     pub hessian_step: f64,
     pub analysis: super::analysis::PosteriorAnalysisOptions,
 }
@@ -74,6 +76,8 @@ impl Default for NegativeBinomialPosteriorOptions {
             multiplier: 1.0,
             map_only: false,
             check_opposite_start: true,
+            log_link: true,
+            refinement: Default::default(),
             hessian_step: 1e-3,
             analysis: Default::default(),
         }
@@ -164,33 +168,14 @@ fn optimize(row: &Row<'_>, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResul
         start,
     ))
 }
-fn refine(row: &Row<'_>, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResult, DeseqError> {
-    let p = start.len();
-    let scale = row.objective_gradient(&vec![0.0; p]).0.max(1.0);
-    let mut control = OptimControl::default_for_dimension(p);
-    control.maxit = 1000;
-    control.factr = 1.0;
-    control.pgtol = 1e-10;
-    let bounds = Bounds::new(vec![f64::NEG_INFINITY; p], vec![f64::INFINITY; p])
-        .map_err(|_| invalid("invalid unbounded MAP optimization shape"))?;
-    optim_lbfgsb_with_gradient(
-        start,
-        bounds,
-        |b| row.objective_gradient(b).0 / scale,
-        |b| {
-            row.objective_gradient(b)
-                .1
-                .into_iter()
-                .map(|g| g / scale)
-                .collect()
-        },
-        control,
-    )
-    .map_err(|e| DeseqError::UnsupportedFeature {
-        feature: format!("negative-binomial MAP optimization failed: {e}"),
-    })
+fn refine(
+    row: &Row<'_>,
+    start: Vec<f64>,
+    options: &NegativeBinomialPosteriorOptions,
+) -> Result<rcompat_lbfgsb::OptimResult, DeseqError> {
+    super::compiled_refinement::optimize(row, start, &options.refinement)
 }
-/// Fit Cauchy-shrunk negative-binomial coefficients and Laplace summaries.
+
 pub fn fit_negative_binomial_posterior(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,
@@ -355,6 +340,11 @@ pub(super) fn fit_batch(
                 o.method == super::regression::RegressionMethod::NegativeBinomialR && o.log_link
             });
         if skip_zero && counts.iter().all(|&v| v == 0.0) {
+            if regression.is_none() && !options.map_only && !options.log_link {
+                return Err(invalid(
+                    "compiled refinement has no prefit for an all-zero row when log_link is false",
+                ));
+            }
             diagnostics.push(PosteriorMapDiagnostic {
                 convergence: None,
                 function_evaluations: 0,
@@ -479,8 +469,10 @@ pub(super) fn fit_batch(
         } else {
             false
         };
+        let mut refined = false;
         if regression.is_none() && !options.map_only && (result.convergence != 0 || disagreement) {
-            result = refine(&row, result.par)?;
+            result = refine(&row, result.par, options)?;
+            refined = true;
         }
         let mut laplace_valid = false;
         if let Some(sd) = &mut sd {
@@ -507,15 +499,33 @@ pub(super) fn fit_batch(
             if let Some(e) = general.as_ref().and_then(|g| g.take_error()) {
                 return Err(e);
             }
-            if regression.is_some()
-                && (!h.iter().all(|v| v.is_finite()) || h.clone().try_inverse().is_none())
+            let mut covariance = if h.iter().all(|v| v.is_finite()) {
+                h.try_inverse()
+            } else {
+                None
+            };
+            // A successful compiled prefit can still have a nonpositive variance.
+            // The reference then uses the same deferred refinement controls.
+            if regression.is_none()
+                && !refined
+                && covariance
+                    .as_ref()
+                    .is_some_and(|m| m.diagonal().iter().any(|v| *v <= 0.0))
             {
+                result = refine(&row, result.par, options)?;
+                let h = row.hessian(&result.par, options.hessian_step);
+                covariance = if h.iter().all(|v| v.is_finite()) {
+                    h.try_inverse()
+                } else {
+                    None
+                };
+            }
+            if regression.is_some() && covariance.is_none() {
                 return Err(invalid(
                     "general posterior Hessian is singular or nonfinite",
                 ));
             }
-            if h.iter().all(|v| v.is_finite())
-                && let Some(covariance) = h.try_inverse()
+            if let Some(covariance) = covariance
                 && covariance
                     .diagonal()
                     .iter()

@@ -1,5 +1,11 @@
 # Development after 0.4.0
 
+* Preserve canonical normal-mixture matrix capture flattening/recycling in Rust.
+  Match compiled negative-binomial ignored/deferred controls and source BFGS or
+  L-BFGS-B refinement policy; retain explicit unsupported-method errors when
+  refinement is actually required. New independent references preserve existing
+  numerical gates and complete native/wrapped output identity.
+
 * Correct large-count gamma/beta probabilities, moments and log-F densities with
   scaled native integrals and stable normalization. Preserve numerical gates and
   optimizer settings. Remove an unused R Cook's helper and guard production R

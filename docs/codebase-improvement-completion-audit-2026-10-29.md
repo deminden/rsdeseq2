@@ -1,5 +1,14 @@
 # Completion audit against C01–C23
 
+Current checkpoint status: approximately **20 of 23 original checkpoints are
+closed**. C19 (complete shared numerical/behavior contract), C21 (cross-route
+authority and forwarding audit) and C23 (combined validation and release
+artifacts) remain open. This count is not a percentage of effort remaining.
+The [capture/control checkpoint](native-capture-policy-development.md) closes
+two specific authority findings with 38 exact native/wrapped cases and 21
+unchanged accepted panels, without closing those broader checkpoints. Final
+current-source precision, speed, RSS and package checks are still required.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining
@@ -88,6 +97,11 @@ exactly, and twenty earlier replay sets are unchanged. A lexical guard rejects
 production R numerical calls; the [current authority audit](native-numerical-authority-audit.md)
 records concrete remaining matrix-capture and method-option policies. Full
 C19/C21/C23 contract and combined gates remain open.
+
+Those matrix-capture and compiled negative-binomial policies are now
+[implemented and independently checked](native-capture-policy-development.md).
+The current authority table distinguishes these completed findings from the
+remaining warning/option/state contracts and combined checks.
 
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.

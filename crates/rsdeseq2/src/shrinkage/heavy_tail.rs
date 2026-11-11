@@ -2,6 +2,7 @@
 mod analysis;
 mod beta_binomial;
 mod bfgs;
+mod compiled_refinement;
 mod density;
 mod fit;
 mod grid;
@@ -33,3 +34,5 @@ pub use analysis::{
     PosteriorAnalysis, PosteriorAnalysisOptions, PosteriorGridDiagnostic, PosteriorIntervalKind,
     PosteriorIntervalOptions,
 };
+
+pub use compiled_refinement::{NegativeBinomialRefinement, NegativeBinomialRefinementMethod};

@@ -34,3 +34,17 @@ testthat::test_that('modified functions and active or delayed built-in captures 
   testthat::expect_error(.rsdeseq2_native_ash_likelihood(input),'delayed|stored')
   testthat::expect_false(called)
 })
+
+testthat::test_that('equal-length matrix captures preserve their column-wise global mixture', {
+  testthat::skip_if_not_installed('ashr')
+  weights<-matrix(c(.9,.1,.2,.8),nrow=2,byrow=TRUE)
+  scales<-matrix(c(.5,1,2,3),nrow=2,byrow=TRUE)
+  payload<-.rsdeseq2_native_ash_likelihood(ashr::lik_normalmix(weights,scales))
+  testthat::expect_identical(payload$weights,weights)
+  testthat::expect_identical(payload$scales,scales)
+  answer<-.rsdeseq2_formula_request(list(operation='posterior_builtin_likelihood',likelihood=payload,
+    arguments=rep(0,3),lower=rep(-1,3),upper=rep(1,3)))
+  expected<-sum(as.numeric(weights)*stats::dnorm(0,sd=as.numeric(scales)))
+  testthat::expect_equal(exp(answer$log_density),rep(expected,3),tolerance=2e-12)
+  testthat::expect_equal(answer$log_cdf,rep(0,3),tolerance=2e-12)
+})

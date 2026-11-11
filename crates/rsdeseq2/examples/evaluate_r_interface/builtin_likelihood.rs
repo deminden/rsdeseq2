@@ -11,20 +11,40 @@ use std::error::Error;
 pub fn model(v: &Value) -> Result<BuiltinLocationLikelihood, Box<dyn Error>> {
     let likelihood = match v["type"].as_str().ok_or("missing built-in type")? {
         "normalmix" => {
-            let weights = numbers(&serde_json::from_value::<Vec<String>>(
-                v["weights"].clone(),
-            )?)?;
-            let scales = formula::value(&v["scales"]);
-            let (rows, cols) = scales
-                .dimensions
+            let weights = if v["weights"].is_array() {
+                (
+                    numbers(&serde_json::from_value::<Vec<String>>(
+                        v["weights"].clone(),
+                    )?)?,
+                    None,
+                )
+            } else {
+                let value = formula::value(&v["weights"]);
+                let Data::Number { values, .. } = value.data else {
+                    return Err("noise weights require numeric storage".into());
+                };
+                (values, value.dimensions)
+            };
+            let (r, c) = weights
+                .1
                 .map(|d| (d[0], d[1]))
-                .unwrap_or((1, weights.len()));
+                .unwrap_or((1, weights.0.len()));
+            let weights = MatrixView::new(r, c, &weights.0, MatrixOrder::RowMajor)?;
+            let scales = formula::value(&v["scales"]);
+            let (r, c) = scales.dimensions.map(|d| (d[0], d[1])).unwrap_or((
+                1,
+                match &scales.data {
+                    Data::Number { values, .. } => values.len(),
+                    _ => 0,
+                },
+            ));
             let Data::Number { values, .. } = scales.data else {
                 return Err("noise scales require numeric storage".into());
             };
-            Ok::<_, Box<dyn Error>>(BuiltinLocationLikelihood::normal_mixture_by_observation(
+            Ok::<_, Box<dyn Error>>(BuiltinLocationLikelihood::normal_mixture_from_captures(
                 weights,
-                MatrixView::new(rows, cols, &values, MatrixOrder::RowMajor)?,
+                MatrixView::new(r, c, &values, MatrixOrder::RowMajor)?,
+                scales.dimensions.is_some(),
             )?)
         }
         "pois" => Ok(BuiltinLocationLikelihood::poisson(

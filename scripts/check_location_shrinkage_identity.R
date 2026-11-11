@@ -39,7 +39,7 @@ wrapped <- lapply(seq_along(inputs),function(i){
  if(!is.null(c$custom_likelihood))request$custom_likelihood <- c(list(name=c$custom_likelihood$name),lapply(c$custom_likelihood[c('log_cdf','log_density','first','second')],function_input))
  if(!is.null(c$builtin_likelihood)){
    model<-c$builtin_likelihood
-   request$builtin_likelihood<-if(model$type=='normalmix')list(type='normalmix',weights=decode(model$weights),scales=.formula_decode(model$scales))else if(model$type=='logF')list(type='logF',df1=decode(model$df1),df2=decode(model$df2))else {v<-model;for(n in intersect(c('y','scale','trials','capture_y','capture_trials'),names(v)))v[[n]]<-decode(v[[n]]);v}
+   request$builtin_likelihood<-if(model$type=='normalmix')list(type='normalmix',weights=if(!is.null(model$weights$type)).formula_decode(model$weights)else decode(model$weights),scales=.formula_decode(model$scales))else if(model$type=='logF')list(type='logF',df1=decode(model$df1),df2=decode(model$df2))else {v<-model;for(n in intersect(c('y','scale','trials','capture_y','capture_trials'),names(v)))v[[n]]<-decode(v[[n]]);v}
  }
  result <- tryCatch(blocked(rsdeseq2:::.rsdeseq2_formula_request(request)),error=identity)
  if(!identical(inherits(result,'error'),!is.null(cases[[i]]$expected_error)))stop(c$name,': ',if(inherits(result,'error'))conditionMessage(result)else 'unexpected success')

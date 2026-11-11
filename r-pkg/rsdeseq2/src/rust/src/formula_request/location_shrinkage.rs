@@ -260,16 +260,28 @@ pub(super) fn builtin_likelihood(
     };
     let likelihood = match text(get(v, "type")?)? {
         "normalmix" => {
-            let weights = numbers(get(v, "weights")?)?.to_vec();
-            let scales = get(v, "scales")?;
-            let (rows, cols) = scales
+            let weights = get(v, "weights")?;
+            let values = numbers(weights)?;
+            let (r, c) = weights
                 .dimensions
-                .map(|x| (x[0], x[1]))
-                .unwrap_or((1, weights.len()));
-            let view = MatrixView::new(rows, cols, numbers(scales)?, MatrixOrder::RowMajor)
-                .map_err(|e| e.to_string())?;
-            BuiltinLocationLikelihood::normal_mixture_by_observation(weights, view)
-                .map_err(|e| e.to_string())
+                .map(|d| (d[0], d[1]))
+                .unwrap_or((1, values.len()));
+            let weights =
+                MatrixView::new(r, c, values, MatrixOrder::RowMajor).map_err(|e| e.to_string())?;
+            let scales = get(v, "scales")?;
+            let values = numbers(scales)?;
+            let (r, c) = scales
+                .dimensions
+                .map(|d| (d[0], d[1]))
+                .unwrap_or((1, values.len()));
+            let view =
+                MatrixView::new(r, c, values, MatrixOrder::RowMajor).map_err(|e| e.to_string())?;
+            BuiltinLocationLikelihood::normal_mixture_from_captures(
+                weights,
+                view,
+                scales.dimensions.is_some(),
+            )
+            .map_err(|e| e.to_string())
         }
         "pois" => BuiltinLocationLikelihood::poisson(
             numbers(get(v, "y")?)?.to_vec(),

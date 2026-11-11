@@ -102,6 +102,15 @@ impl BuiltinLocationLikelihood {
         }
     }
 
+    /// Import canonical primitive capture layouts. Equal total lengths flatten
+    /// the captures in column order; unequal SD matrices recycle components.
+    pub fn normal_mixture_from_captures(
+        weights: MatrixView<'_, f64>,
+        scales: MatrixView<'_, f64>,
+        scales_are_matrix: bool,
+    ) -> Result<Self, DeseqError> {
+        super::normal_mixture_captures::import(weights, scales, scales_are_matrix)
+    }
     pub fn normal_mixture(weights: Vec<f64>, scales: Vec<f64>) -> Result<Self, DeseqError> {
         let matrix = MatrixView::new(1, scales.len(), &scales, MatrixOrder::RowMajor)?;
         Self::normal_mixture_by_observation(weights, matrix)
