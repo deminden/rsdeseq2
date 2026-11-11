@@ -165,13 +165,18 @@ fn merge_beta_prior_replacement_results(
         ));
     }
 
+    if !refit_plan.has_replaceable_samples() {
+        return Ok(original_results.clone());
+    }
+
     // Keep the original result-table cardinality and patch in refit rows only;
     // this mirrors DESeq2's replacement-count refit rather than rebuilding the
     // entire result table from replacement counts.
+    let has_refit = refit_plan.n_refit > 0 && refit_plan.requires_refit();
     let mut merged = original_results.clone();
     for (gene, row) in merged.rows.iter_mut().enumerate() {
         row.base_mean = refit_plan.replaced_base_mean[gene];
-        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+        if has_refit {
             row.max_cooks = refit_plan.post_refit_max_cooks[gene];
             row.cooks_outlier = None;
             row.filtered = None;
@@ -191,7 +196,7 @@ fn merge_beta_prior_replacement_results(
     for gene in refit_plan.new_all_zero_rows.iter().copied() {
         clear_replacement_all_zero_result(&mut merged.rows[gene]);
         merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
-        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+        if has_refit {
             merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
         }
     }

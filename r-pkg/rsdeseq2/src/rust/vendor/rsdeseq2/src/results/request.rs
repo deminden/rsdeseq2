@@ -139,9 +139,8 @@ impl DeseqFit {
             }
         };
         if let Some(plan) = plan
-            && plan.has_replaceable_samples()
             && plan.n_refit > 0
-            && plan.should_refit
+            && plan.requires_refit()
         {
             if plan.post_refit_max_cooks.len() != results.rows.len() {
                 return Err(crate::errors::invalid_dimensions(

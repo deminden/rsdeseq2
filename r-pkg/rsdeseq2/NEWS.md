@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Skip unnecessary native, fixed-dispersion and expanded-prior refits when no
+  sample is eligible for replacement. Preserve candidate planner metadata and
+  all compared fitting/query outputs; verify execution with original traces.
+
 * Refresh raw count-zero metadata after replacement while retaining failed-weight
   diagnostics as missing. Cover unrelated rank-failed rows and new-zero-only
   replacement with independent original-DESeq2 fits and exact interface checks.

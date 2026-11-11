@@ -210,13 +210,18 @@ fn merge_replacement_refit_results(
         ));
     }
 
+    if !refit_plan.has_replaceable_samples() {
+        return Ok(original_results.clone());
+    }
+
     // DESeq2 replacement refits preserve the original table shape: only rows
     // selected for refit get statistical values from replacement counts, while
     // every row receives replacement-aware baseMean/maxCooks metadata.
+    let has_refit = refit_plan.n_refit > 0 && refit_plan.requires_refit();
     let mut merged = original_results.clone();
     for (gene, row) in merged.rows.iter_mut().enumerate() {
         row.base_mean = refit_plan.replaced_base_mean[gene];
-        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+        if has_refit {
             row.max_cooks = refit_plan.post_refit_max_cooks[gene];
             row.cooks_outlier = None;
             row.filtered = None;
@@ -236,7 +241,7 @@ fn merge_replacement_refit_results(
     for gene in refit_plan.new_all_zero_rows.iter().copied() {
         clear_replacement_all_zero_result(&mut merged.rows[gene]);
         merged.rows[gene].base_mean = refit_plan.replaced_base_mean[gene];
-        if refit_plan.n_refit > 0 && refit_plan.should_refit {
+        if has_refit {
             merged.rows[gene].max_cooks = refit_plan.post_refit_max_cooks[gene];
         }
     }

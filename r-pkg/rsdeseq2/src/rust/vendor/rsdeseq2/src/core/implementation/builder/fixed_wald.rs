@@ -238,7 +238,7 @@ impl DeseqBuilder {
             self.observation_weights.as_ref(),
         )?;
 
-        let (refit_fit, refit_results) = if refit_plan.should_refit {
+        let (refit_fit, refit_results) = if refit_plan.requires_refit() {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
@@ -315,7 +315,7 @@ impl DeseqBuilder {
             self.observation_weights.as_ref(),
         )?;
 
-        let (refit_fit, refit_results) = if refit_plan.should_refit {
+        let (refit_fit, refit_results) = if refit_plan.requires_refit() {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
@@ -657,7 +657,7 @@ impl DeseqBuilder {
             self.observation_weights.as_ref(),
         )?;
 
-        let (refit_fit, refit_results) = if refit_plan.should_refit {
+        let (refit_fit, refit_results) = if refit_plan.requires_refit() {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());

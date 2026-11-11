@@ -1,7 +1,7 @@
 # Compatibility
 
 Current source changes and their gates are recorded in the
-[execution report](codebase-improvement-progress-2026-10-29.md). Stored Rust
+[numerical authority audit](native-numerical-authority-audit.md). Stored Rust
 `ResultRequest` supports explicit Wald options and rejects incompatible LRT
 options. `resultsList()` now uses the standalone borrowed inference engine for
 bounded batches, with independent per-request policies and the same output as
@@ -16,6 +16,11 @@ The subsequent [Cook/refit origin correction](cooks-origin-parity-2026-10-30.md)
 fixes first-tied maxima and original formula/factor eligibility, with independent
 missingness and retained-value checks. Historical audit reports retain their
 original checkpoint scope.
+
+Cook replacement execution now requires eligible samples as well as candidate
+rows. Standalone raw-plan fields remain available; `requires_refit()` selects
+actual workflow execution. The [execution correction](replacement-execution-correction.md)
+preserves all compared result bits while removing unnecessary second fits.
 
 For a higher-level comparison against original DESeq2, see
 [`deseq2-gap-analysis.md`](deseq2-gap-analysis.md).

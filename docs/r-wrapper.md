@@ -28,6 +28,10 @@ After actual replacement, `allZero` now reflects refreshed count zeros even for
 an unrelated row skipped because of its weights. Its failed-fit diagnostics stay
 missing; disabled/no-refit replacement retains the initial skip flag. See the
 [independent state correction](weighted-replacement-state-correction.md).
+The shared engine also skips refitting unchanged counts when no sample is eligible
+for replacement. Raw standalone planner metadata still describes candidates;
+`requires_refit()` determines execution. See the
+[execution evidence](replacement-execution-correction.md).
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 

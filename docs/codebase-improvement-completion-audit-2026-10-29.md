@@ -36,6 +36,12 @@ previously failing cases corrected. All 31 actual fresh-fit requests and 113 lat
 agree across interfaces; failed-row statistics and diagnostics remain missing.
 This does not close the broader C19/C21/C23 gates.
 
+The [replacement execution correction](replacement-execution-correction.md)
+eliminates unnecessary second fits in all 16 branches when no sample is eligible.
+Original execution traces and 32 workflow cases establish the guard separately
+from output equality. All 31 complete fresh-fit payloads and 113 later queries
+remain exact; the broader C19/C21/C23 checkpoints stay open.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

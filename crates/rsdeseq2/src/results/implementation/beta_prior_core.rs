@@ -188,7 +188,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_cooks_replacement(
         input.weights,
     )?;
 
-    let refit = if refit_plan.should_refit {
+    let refit = if refit_plan.requires_refit() {
         Some(fit_expanded_beta_prior_wald_results(
             ExpandedBetaPriorWaldResultsInput {
                 counts: &refit_plan.replacement.replaced_counts,
@@ -248,7 +248,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_cooks_replacement(
         input.weights,
     )?;
 
-    let refit = if refit_plan.should_refit {
+    let refit = if refit_plan.requires_refit() {
         Some(fit_expanded_beta_prior_wald_contrast_results(
             ExpandedBetaPriorWaldResultsInput {
                 counts: &refit_plan.replacement.replaced_counts,
@@ -372,7 +372,7 @@ pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weigh
         input.weights,
     )?;
 
-    let refit = if refit_plan.should_refit {
+    let refit = if refit_plan.requires_refit() {
         Some(
             fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
                 ExpandedBetaPriorWaldNormalizedResultsInput {
@@ -443,7 +443,7 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_
         input.weights,
     )?;
 
-    let refit = if refit_plan.should_refit {
+    let refit = if refit_plan.requires_refit() {
         Some(
             fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights(
                 ExpandedBetaPriorWaldNormalizedResultsInput {
