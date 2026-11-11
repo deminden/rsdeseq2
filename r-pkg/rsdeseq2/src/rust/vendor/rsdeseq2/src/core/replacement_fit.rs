@@ -200,6 +200,15 @@ impl CooksReplacementTestOutput {
             Self::Wald(o) => (o.original_fit, o.refit_fit, o.refit_plan, o.results),
             Self::Lrt(o) => (o.original_fit, o.refit_fit, o.refit_plan, o.results),
         };
+        // Original refitWithoutOutliers recomputes base metadata for every row
+        // after actual replacement, resetting earlier weight-failure skip flags
+        // to raw count zeros. Selected refit rows may acquire skip flags again.
+        if plan.has_replaceable_samples() && plan.n_refit > 0 {
+            if plan.replaced_all_zero.len() != fit.all_zero.len() {
+                return Err(invalid("replacement all-zero dimensions do not match"));
+            }
+            fit.all_zero.copy_from_slice(&plan.replaced_all_zero);
+        }
         if let Some(refit) = &refit {
             if fit.design != refit.design || fit.reduced_design != refit.reduced_design {
                 return Err(invalid("replacement refit designs do not match"));

@@ -121,3 +121,137 @@ fn replacement_metadata_matches_original_deseq2_with_raw_weights_and_both_normal
         }
     }
 }
+
+#[test]
+fn weighted_failure_state_after_replacement_matches_original_fits_and_later_diagnostics() {
+    let reference: Value =
+        serde_json::from_str(include_str!("data/weighted_replacement_state_r462.json")).unwrap();
+    let numbers = |v: &Value| v.as_array().unwrap().iter().map(number).collect::<Vec<_>>();
+    let flags = |v: &Value| {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_bool().unwrap())
+            .collect::<Vec<_>>()
+    };
+    let genes = reference["genes"].as_u64().unwrap() as usize;
+    let samples = reference["samples"].as_u64().unwrap() as usize;
+    let failed = reference["failed_row"].as_u64().unwrap() as usize;
+    let design =
+        DesignMatrix::from_row_major(samples, 2, numbers(&reference["design"]), None).unwrap();
+    let request = ResultRequest::new(
+        ResultsContrast::Numeric(vec![0.0, 1.0]),
+        WaldTestOptions::default(),
+        CooksCutoff::Disabled,
+        IndependentFilteringOptions {
+            enabled: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut mismatches = Vec::new();
+    for c in reference["cases"].as_array().unwrap() {
+        let counts = CountMatrix::from_row_major_u32(
+            genes,
+            samples,
+            c["counts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as u32)
+                .collect(),
+        )
+        .unwrap();
+        let mut builder = DeseqBuilder::new()
+            .automatic_dispersion_means()
+            .fit_type(FitType::Mean)
+            .size_factors(numbers(&reference["size_factors"]))
+            .observation_weights(
+                RowMajorMatrix::from_row_major(genes, samples, numbers(&reference["weights"]))
+                    .unwrap(),
+            )
+            .disable_cooks_cutoff()
+            .disable_independent_filtering();
+        if c["normalization_factors"].as_bool().unwrap() {
+            builder = builder.normalization_factors(
+                RowMajorMatrix::from_row_major(genes, samples, numbers(&reference["factors"]))
+                    .unwrap(),
+            );
+        }
+        if c["test"] == "LRT" {
+            builder = builder.test(TestType::Lrt).reduced_design(
+                DesignMatrix::from_row_major(samples, 1, vec![1.0; samples], None).unwrap(),
+            );
+        }
+        let (fit, results, plan) = if c["kind"] == "disabled" {
+            let (f, r) = builder.fit_with_results(&counts, &design).unwrap();
+            (f, r, None)
+        } else {
+            let mut options = CooksReplacementOptions::new(
+                resolve_cooks_cutoff(CooksCutoff::Default, samples, 2)
+                    .unwrap()
+                    .unwrap(),
+            );
+            options.min_replicates = 3;
+            let (f, r, p) = builder
+                .fit_with_test_results_with_cooks_replacement(&counts, &design, &options)
+                .unwrap()
+                .into_merged_fit()
+                .unwrap();
+            (f, r, Some(p))
+        };
+        assert_eq!(
+            plan.as_ref().map_or(0, |p| p.n_refit),
+            c["n_refit"].as_u64().unwrap() as usize,
+            "{} replacement count",
+            c["name"]
+        );
+        if fit.all_zero != flags(&c["all_zero"]) {
+            mismatches.push(c["name"].as_str().unwrap());
+        }
+        assert_eq!(
+            fit.weights_fail.as_ref().unwrap(),
+            &flags(&c["weights_fail"])
+        );
+        for (actual, expected) in [
+            (fit.base_mean[failed], number(&c["failed_mean"])),
+            (fit.base_var[failed], number(&c["failed_variance"])),
+        ] {
+            assert!(
+                (actual - expected).abs() <= 1e-10 + 1e-12 * expected.abs(),
+                "{} failed-row base summary",
+                c["name"]
+            );
+        }
+        let later = if let Some(p) = &plan {
+            fit.results_for_request_with_replacement(&counts, &request, None, p)
+                .unwrap()
+        } else {
+            fit.results_for_request(&counts, &request, None).unwrap()
+        };
+        for rows in [&results.rows, &later.rows] {
+            assert_eq!(
+                rows[failed].stat.is_none(),
+                c["failed_stat_missing"].as_bool().unwrap(),
+                "{} statistic",
+                c["name"]
+            );
+            assert_eq!(
+                rows[failed].pvalue.is_none(),
+                c["failed_pvalue_missing"].as_bool().unwrap(),
+                "{} p-value",
+                c["name"]
+            );
+            assert_eq!(
+                rows[failed].converged.is_none(),
+                c["failed_convergence_missing"].as_bool().unwrap(),
+                "{} convergence",
+                c["name"]
+            );
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "allZero differs from original DESeq2: {mismatches:?}"
+    );
+}

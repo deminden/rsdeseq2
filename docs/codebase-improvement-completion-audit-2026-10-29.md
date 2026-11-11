@@ -30,6 +30,12 @@ queries, 24 fresh-fit requests and 189 primitive cases agree across interfaces.
 It records an independently confirmed original-DESeq2 weighted rank-failure
 state discrepancy requiring a separate correction. C19/C21/C23 remain open.
 
+The [weighted state correction](weighted-replacement-state-correction.md) now
+closes that specific discrepancy with eight independent original fits and four
+previously failing cases corrected. All 31 actual fresh-fit requests and 113 later queries
+agree across interfaces; failed-row statistics and diagnostics remain missing.
+This does not close the broader C19/C21/C23 gates.
+
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
 standalone Rust engine. Advanced shrinkage families/methods/options, the remaining

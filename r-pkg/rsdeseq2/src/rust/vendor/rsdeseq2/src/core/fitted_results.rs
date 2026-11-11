@@ -304,8 +304,22 @@ impl DeseqFit {
                 row.max_cooks = max_cook;
             }
         }
-        for (row, all_zero) in results.rows.iter_mut().zip(&self.all_zero) {
-            if *all_zero {
+        if let Some(failed) = &self.weights_fail
+            && failed.len() != results.rows.len()
+        {
+            return Err(invalid_dimensions(
+                "fitted-object weight-failure rows",
+                results.rows.len(),
+                failed.len(),
+            ));
+        }
+        for (gene, (row, all_zero)) in results.rows.iter_mut().zip(&self.all_zero).enumerate() {
+            if *all_zero
+                || self
+                    .weights_fail
+                    .as_ref()
+                    .is_some_and(|failed| failed[gene])
+            {
                 row.converged = None;
                 row.max_cooks = None;
             }

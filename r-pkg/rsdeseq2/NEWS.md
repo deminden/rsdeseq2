@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Refresh raw count-zero metadata after replacement while retaining failed-weight
+  diagnostics as missing. Cover unrelated rank-failed rows and new-zero-only
+  replacement with independent original-DESeq2 fits and exact interface checks.
+
 * Evaluate later standalone result requests with retained replacement plans.
   Share eligibility and missing-value formatting; verify 86 later queries and
   complete filtering metadata against actual R calls with R math blocked.
