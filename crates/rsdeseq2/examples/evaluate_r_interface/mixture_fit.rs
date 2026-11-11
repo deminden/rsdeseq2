@@ -51,6 +51,7 @@ pub fn evaluate(input: Input) -> Result<Value, Box<dyn Error>> {
                 active_iterations: c.options.active_iterations,
                 zero_threshold: number(&c.options.zero_threshold)?,
                 likelihood_offset: number(&c.options.likelihood_offset)?,
+                ..Default::default()
             },
         )?;
         cases.push(json!({"name":c.name,"weights":fit.weights.into_iter().map(super::bits).collect::<Vec<_>>(),

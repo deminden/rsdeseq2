@@ -15,7 +15,7 @@ compare <- function(a,b,bound) {
   error
 }
 blocked <- function(expr) {
-  functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','rank','cumsum','^','%*%','lgamma','digamma','set.seed','RNGkind'),
+  functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','rank','cumsum','^','%*%','lgamma','digamma','set.seed','RNGkind','svd','La.svd'),
     stats=c('pnorm','dnorm','dnbinom','dbinom','dt','integrate','quantile','optim','optimHess','optimize','optimise','uniroot','qnorm','rnorm','runif'),
     apeglm=c('apeglm','priorVar','svalue'))
   if(requireNamespace('ashr',quietly=TRUE))functions$ashr<-c('ash','ash.workhorse','mixEM','w_mixEM','mixVBEM','cxxMixSquarem','mixSQP','estimate_mixprop','cdf_post')

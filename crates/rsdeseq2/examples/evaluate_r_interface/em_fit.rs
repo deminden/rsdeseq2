@@ -34,6 +34,54 @@ fn control_number(c: &Value, n: &str, d: f64) -> Result<f64, Box<dyn Error>> {
         _ => Err("invalid numeric control".into()),
     }
 }
+pub(crate) fn sqp_controls(c: &Value, o: &mut MixtureFitOptions) -> Result<(), Box<dyn Error>> {
+    let Some(values) = c.as_object() else {
+        if c.is_null() || c.as_array().is_some_and(|x| x.is_empty()) {
+            return Ok(());
+        }
+        return Err("SQP control requires a named list".into());
+    };
+    for (name, value) in values {
+        let count = || -> Result<usize, Box<dyn Error>> {
+            let x = control_number(c, name, 0.0)?;
+            if !x.is_finite() || x < 0.0 || x.fract() != 0.0 || x > i32::MAX as f64 {
+                return Err("invalid SQP integer control".into());
+            }
+            Ok(x as usize)
+        };
+        match name.as_str() {
+            "verbose" | "normalize.rows" => {
+                if !value.is_boolean() {
+                    return Err("SQP flag requires logical storage".into());
+                }
+            }
+            "eps" => o.likelihood_offset = control_number(c, name, 1e-6)?,
+            "numiter.em" => o.em_iterations = count()?,
+            "maxiter.sqp" => o.max_iterations = count()?,
+            "maxiter.activeset" => {
+                if value.is_null() {
+                    o.sqp.automatic_active_iterations = true;
+                } else {
+                    o.active_iterations = count()?;
+                    o.sqp.automatic_active_iterations = false;
+                }
+            }
+            "convtol.sqp" => o.gradient_tolerance = control_number(c, name, 1e-8)?,
+            "zero.threshold.solution" => o.zero_threshold = control_number(c, name, 1e-8)?,
+            "convtol.activeset" => o.sqp.active_tolerance = control_number(c, name, 1e-10)?,
+            "zero.threshold.searchdir" => {
+                o.sqp.search_direction_threshold = Some(control_number(c, name, 1e-14)?)
+            }
+            "suffdecr.linesearch" => o.sqp.sufficient_decrease = control_number(c, name, 0.01)?,
+            "stepsizereduce" => o.sqp.step_reduction = control_number(c, name, 0.75)?,
+            "minstepsize" => o.sqp.minimum_step = control_number(c, name, 1e-8)?,
+            "identity.contrib.increase" => o.sqp.ridge_multiplier = control_number(c, name, 10.0)?,
+            "tol.svd" => o.sqp.svd_tolerance = Some(control_number(c, name, 0.0)?),
+            _ => return Err(format!("unknown SQP control '{name}'").into()),
+        }
+    }
+    Ok(())
+}
 pub(crate) fn policy(method: &str, c: &Value) -> Result<MixtureOptimizer, Box<dyn Error>> {
     let count = |n: &str, d: usize| -> Result<usize, Box<dyn Error>> {
         let v = control_number(c, n, d as f64)?;
@@ -96,15 +144,23 @@ pub fn run(c: &Case) -> Result<MixtureFit, Box<dyn Error>> {
         .transpose()?;
     let prior = numbers(&c.dirichlet)?;
     let initial = c.initial_weights.as_ref().map(|v| numbers(v)).transpose()?;
+    let mut options = if c.optimizer == "mixSQP" {
+        rsdeseq2::shrinkage::LocationShrinkageOptions::default().fit_options
+    } else {
+        MixtureFitOptions {
+            optimizer: policy(&c.optimizer, &c.control)?,
+            ..Default::default()
+        }
+    };
+    if c.optimizer == "mixSQP" {
+        sqp_controls(&c.control, &mut options)?;
+    }
     Ok(fit_mixture_proportions(
         MatrixView::new(c.observations, c.components, &ll, MatrixOrder::RowMajor)?,
         weights.as_deref(),
         &prior,
         initial.as_deref(),
-        MixtureFitOptions {
-            optimizer: policy(&c.optimizer, &c.control)?,
-            ..Default::default()
-        },
+        options,
     )?)
 }
 pub fn encode(f: MixtureFit) -> Value {

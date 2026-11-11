@@ -73,41 +73,6 @@ pub(super) fn choice(v: Option<&Value>, choices: &[&str]) -> Result<String, Stri
         Err(format!("unknown or ambiguous method option '{value}'"))
     }
 }
-fn controls(value: Option<&Value>, options: &mut LocationShrinkageOptions) -> Result<(), String> {
-    let Some(value) = value else {
-        return Ok(());
-    };
-    if matches!(&value.data,Data::List(v) if v.is_empty()) {
-        return Ok(());
-    }
-    let (names, values) = fields(value)?;
-    for (name, value) in names.iter().zip(values) {
-        let count = || -> Result<usize, String> {
-            let x = scalar(value)?;
-            if !x.is_finite() || x < 0.0 || x.fract() != 0.0 || x > i32::MAX as f64 {
-                return Err(format!("control '{name}' requires a nonnegative integer"));
-            }
-            Ok(x as usize)
-        };
-        match name.as_str() {
-            "verbose" => {
-                flag(value)?;
-            }
-            "eps" => options.fit_options.likelihood_offset = scalar(value)?,
-            "numiter.em" => options.fit_options.em_iterations = count()?,
-            "maxiter.sqp" => options.fit_options.max_iterations = count()?,
-            "maxiter.activeset" => options.fit_options.active_iterations = count()?,
-            "convtol.sqp" => options.fit_options.gradient_tolerance = scalar(value)?,
-            "zero.threshold.solution" => options.fit_options.zero_threshold = scalar(value)?,
-            _ => {
-                return Err(format!(
-                    "native ashr control '{name}' is not implemented yet"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
 pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     let args = get(request, "arguments")?;
     let (names, _) = fields(args)?;
@@ -288,7 +253,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         };
     options.fit_options.optimizer = optimizer;
     if optimizer.is_sqp() {
-        controls(field(args, "control"), &mut options)?;
+        super::ashr_sqp::controls(field(args, "control"), &mut options.fit_options)?;
     }
     if let Some(search) = mode_search {
         let estimate = estimate_location_mode(

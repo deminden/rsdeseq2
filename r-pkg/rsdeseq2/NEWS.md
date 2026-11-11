@@ -1,5 +1,9 @@
 # Development after 0.4.0
 
+* Add native SQP active-set, line-search, Hessian-regularization and optional SVD
+  controls, including automatic active-set limits. Retain independent original
+  and exact-SVD references without changing accepted default outputs.
+
 * Estimate ashr prior modes with shared Rust likelihood profiling. Reuse fitting
   preparation without posterior moments, preserve source search bounds and
   warnings, and expose explicit native intervals and search diagnostics.

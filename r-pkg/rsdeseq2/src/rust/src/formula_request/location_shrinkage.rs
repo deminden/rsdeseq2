@@ -189,7 +189,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         MixturePriorPenalty::NullBiased(scalar(nullweight)?)
     };
     let df = get(request, "df")?;
-    let options = LocationShrinkageOptions {
+    let mut options = LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: text(get(request, "family")?)?
                 .parse()
@@ -233,6 +233,12 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         observation_weights: optional(get(request, "observation_weights")?)?,
         thresholds: numbers(get(request, "thresholds")?)?.to_vec(),
     };
+    if optimizer.is_sqp() {
+        super::ashr_sqp::controls(
+            super::ashr::field(request, "control"),
+            &mut options.fit_options,
+        )?;
+    }
     shrink_location_batch(
         numbers(get(request, "estimates")?)?,
         numbers(get(request, "standard_errors")?)?,

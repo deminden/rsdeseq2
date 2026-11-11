@@ -108,15 +108,24 @@ pub(super) fn fit(request: &Value) -> Result<Value, String> {
             numbers(v).map(Some)
         }
     };
+    let optimizer = policy(text(get(request, "optimizer")?)?, field(request, "control"))?;
+    let mut options = if optimizer.is_sqp() {
+        rsdeseq2::shrinkage::LocationShrinkageOptions::default().fit_options
+    } else {
+        MixtureFitOptions {
+            optimizer,
+            ..Default::default()
+        }
+    };
+    if optimizer.is_sqp() {
+        super::ashr_sqp::controls(field(request, "control"), &mut options)?;
+    }
     let f = fit_mixture_proportions(
         matrix,
         optional("observation_weights")?,
         numbers(get(request, "dirichlet")?)?,
         optional("initial_weights")?,
-        MixtureFitOptions {
-            optimizer: policy(text(get(request, "optimizer")?)?, field(request, "control"))?,
-            ..Default::default()
-        },
+        options,
     )
     .map_err(|e| e.to_string())?;
     let opt = |v: Option<Vec<f64>>| {

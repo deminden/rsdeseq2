@@ -16,7 +16,9 @@ fitting](native-ashr-advanced-optimizer-development.md) are also implemented.
 omitted posterior fields and prior metadata through both interfaces.
 [Estimated modes](native-ashr-mode-development.md) now use native likelihood-only
 profiling and independent original search traces. Other advanced options and
-final combined checks remain open. Further development/commits stay local until
+final combined checks remain open. The [SQP numerical controls](native-sqp-control-development.md)
+now share active-set, line-search, regularization and optional spectral fitting;
+default outputs retain their accepted bits. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R

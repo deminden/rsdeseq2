@@ -134,7 +134,7 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
     } else {
         None
     };
-    Ok(LocationShrinkageOptions {
+    let mut result = LocationShrinkageOptions {
         grid: MixtureGridOptions {
             family: c.family.parse()?,
             scales: c.scales.as_ref().map(|v| numbers(v)).transpose()?,
@@ -170,7 +170,11 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
             .map(|v| numbers(v))
             .transpose()?,
         thresholds: numbers(&c.thresholds)?,
-    })
+    };
+    if optimizer.is_sqp() {
+        super::em_fit::sqp_controls(&c.control, &mut result.fit_options)?;
+    }
+    Ok(result)
 }
 pub fn run(c: &Case) -> Result<LocationShrinkage, Box<dyn Error>> {
     let options = options(c)?;

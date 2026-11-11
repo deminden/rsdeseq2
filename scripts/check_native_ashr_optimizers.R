@@ -12,6 +12,8 @@ source(file.path(root,'scripts/native_posterior_check_helpers.R'))
 out<-args[[3L]];if(dir.exists(out))stop('Use a fresh output directory');dir.create(out,recursive=TRUE)
 reference<-jsonlite::fromJSON(if(length(args)==5L)args[[5L]]else file.path(root,'crates/rsdeseq2/tests/data/ashr_optimizer_r462.json'),simplifyVector=FALSE)
 advanced<-!is.null(reference$source$original_mixIP_executed)
+sqp<-identical(reference$source$optimizer_family,'SQP')
+if(sqp){guard<-tryCatch(blocked(base::svd(matrix(1,2,2))),error=identity);stopifnot(inherits(guard,'error'),grepl('executed R math',conditionMessage(guard)))}
 input<-file.path(out,'input.json');jsonlite::write_json(list(em_fit_cases=reference$em_fit_cases),input,auto_unbox=TRUE,null='null',digits=NA)
 output<-system2(driver,shQuote(normalizePath(input)),stdout=TRUE,stderr=TRUE)
 if(!is.null(attr(output,'status')))stop(paste(output,collapse='\n'))
@@ -42,6 +44,7 @@ if(length(args)>=4L){
  settings<-list(mixEM=list(optmethod='mixEM'),w_mixEM=list(optmethod='w_mixEM',weights=rep(c(.5,1,2,1),64)),
    mixVBEM=list(optmethod='mixVBEM'),cxxMixSquarem=list(optmethod='cxxMixSquarem'))
  if(advanced)settings<-list(rre=list(optmethod='mixEM',control=list(K=2)),mpe=list(optmethod='mixEM',control=list(K=2,method='mpe')),weighted=list(optmethod='w_mixEM',weights=rep(c(.5,1,2,1),64),control=list(K=2,method='mpe',square=FALSE)),variational=list(optmethod='mixVBEM',control=list(K=2,method='mpe')),interior=list(optmethod='mixIP',control=list(rtol=1e-6)))
+ if(sqp)settings<-list(active=list(control=list(convtol.activeset=1e-12)),line=list(control=list(suffdecr.linesearch=.1,stepsizereduce=.5)),direction=list(control=list(zero.threshold.searchdir=1e-10)),ridge=list(control=list(identity.contrib.increase=2)),svd=list(control=list(tol.svd=1e-5)),automatic=list(control=list(maxiter.activeset=NULL)))
  original<-lapply(settings,function(options){
    if(identical(options$optmethod,'mixIP')){options$optmethod<-'mixSQP';options$control<-list(eps=0,convtol.sqp=1e-12,maxiter.sqp=2000,numiter.em=100,verbose=FALSE)}
    r<-suppressWarnings(do.call(ashr::ash,c(list(betahat=raw$log2FoldChange,sebetahat=raw$lfcSE,mixcompdist='normal',method='shrink'),options)))
