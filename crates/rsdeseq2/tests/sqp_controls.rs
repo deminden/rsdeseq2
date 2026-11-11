@@ -14,8 +14,16 @@ use rsdeseq2::{
 };
 #[test]
 fn sqp_control_profiles_match_original_numerical_outputs() {
-    let r: serde_json::Value =
+    let mut r: serde_json::Value =
         serde_json::from_str(include_str!("data/sqp_controls_r462.json")).unwrap();
+    let sparse: serde_json::Value =
+        serde_json::from_str(include_str!("data/sparse_sqp_r462.json")).unwrap();
+    for key in ["cases", "em_fit_cases"] {
+        r[key]
+            .as_array_mut()
+            .unwrap()
+            .extend(sparse[key].as_array().unwrap().iter().cloned());
+    }
     let mut failures = vec![];
     for c in r["cases"].as_array().unwrap() {
         let input: location_shrinkage::Case = serde_json::from_value(c.clone()).unwrap();
@@ -84,12 +92,6 @@ fn sqp_control_profiles_match_original_numerical_outputs() {
                 continue;
             }
         };
-        if input.name == "wide_prior_truncated" {
-            println!(
-                "RAW-NATIVE {:?} SUM {} RES {}",
-                f.weights, f.optimizer_weight_sum, f.dual_residual
-            );
-        }
         let target = c;
         compare(
             &f.weights,

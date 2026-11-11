@@ -43,6 +43,12 @@
     isNamespace(parent) && identical(unname(getNamespaceName(parent)), "ashr") &&
       !any(vapply(c("my_etruncnorm", "my_e2truncnorm"), exists, logical(1), envir = env, inherits = FALSE))
   }
+  # Build a syntax fingerprint without declaring a runtime etrunct import.
+  # This call object is inspected only; the likelihood is evaluated in Rust.
+  t_moment <- function(order) as.call(list(
+    call("::", as.name("etrunct"), as.name("e_trunct")),
+    as.name("a"), as.name("b"), df = as.name("df"), r = order
+  ))
   if (identical(lik[["name"]], "normal") &&
       identical(cdf, quote(stats::pnorm(x, log = TRUE))) &&
       identical(pdf, quote(stats::dnorm(x, log = TRUE))) &&
@@ -51,8 +57,8 @@
   if (identical(lik[["name"]], "t") &&
       identical(cdf, quote(stats::pt(x, df = df, log = TRUE))) &&
       identical(pdf, quote(stats::dt(x, df = df, log = TRUE))) &&
-      identical(first, quote(etrunct::e_trunct(a, b, df = df, r = 1))) &&
-      identical(second, quote(etrunct::e_trunct(a, b, df = df, r = 2))) && standard_scope()) {
+      identical(first, t_moment(1)) &&
+      identical(second, t_moment(2)) && standard_scope()) {
     df <- .rsdeseq2_frozen_binding("df", environment(lik[["lcdfFUN"]]), context = "Student-t likelihood")
     return(list(type = "t", df = df))
   }

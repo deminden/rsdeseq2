@@ -13,6 +13,10 @@ Rust workspace after correcting an outdated formula metadata assertion, but
 reproduces an unresolved default-ashr sparse SQP discrepancy in the existing
 gene-subset test. Its original-comparison bound remains unchanged. This is
 concrete C19 implementation work, not only a documentation/release gate.
+The subsequent [sparse SQP correction](native-sparse-sqp-development.md) closes
+that specific finding without changing the public comparison test or its bound.
+Full Rust tests pass; final shared-contract/authority and combined release
+acceptance still require their remaining evidence.
 The [capture/control checkpoint](native-capture-policy-development.md) closes
 two specific authority findings with 38 exact native/wrapped cases and 21
 unchanged accepted panels, without closing those broader checkpoints. Final

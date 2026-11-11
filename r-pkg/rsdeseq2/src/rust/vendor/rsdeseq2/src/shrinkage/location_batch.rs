@@ -36,6 +36,12 @@ impl Default for LocationShrinkageOptions {
                 likelihood_offset: 1e-6,
                 active_iterations: 20,
                 positive_coordinate_convergence: true,
+                sqp: super::MixtureSqpOptions {
+                    ashr_compatibility: true,
+                    automatic_active_iterations: true,
+                    search_direction_threshold: Some(1e-14),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             thresholds: vec![],

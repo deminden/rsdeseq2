@@ -5,6 +5,10 @@ This local audit starts from `6e85f68`. It adds the
 test expectation, and identifies an unresolved original-ashr comparison failure.
 It does not close C19/C21/C23 or certify a release.
 
+The later [sparse SQP correction](native-sparse-sqp-development.md) resolves the
+numerical finding below in shared Rust and passes the existing test unchanged.
+This report retains the failing checkpoint and its original evidence.
+
 ## Formula normalization assertion
 
 The complete-formula correction in `a83221d` intentionally consumes sample

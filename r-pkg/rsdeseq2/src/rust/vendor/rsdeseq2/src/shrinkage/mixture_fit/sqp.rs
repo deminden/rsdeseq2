@@ -1,4 +1,5 @@
 use super::{DMatrix, DVector, DeseqError, MixtureFitOptions, Problem, invalid};
+mod compatibility;
 
 impl Problem {
     fn expectation_step(&self, weights: &[f64]) -> Result<Vec<f64>, DeseqError> {
@@ -61,12 +62,19 @@ impl Problem {
         mut weights: Vec<f64>,
         options: MixtureFitOptions,
     ) -> Result<(Vec<f64>, bool, f64, usize, String), DeseqError> {
+        let em = |weights: &[f64]| {
+            if options.sqp.ashr_compatibility {
+                self.ashr_expectation_step(weights)
+            } else {
+                self.expectation_step(weights)
+            }
+        };
         for _ in 0..options.em_iterations {
-            weights = self.expectation_step(&weights)?;
+            weights = em(&weights)?;
         }
         let mut evaluations = 0;
         for _ in 0..options.max_iterations {
-            weights = self.expectation_step(&weights)?;
+            weights = em(&weights)?;
             for (w, &prior) in weights.iter_mut().zip(&self.prior_counts) {
                 if *w <= options.zero_threshold && (prior == 0.0 || self.offset > 0.0) {
                     *w = 0.0;
@@ -75,7 +83,8 @@ impl Problem {
             if !weights.iter().any(|w| *w > 0.0) {
                 return Err(invalid("zero threshold removed every component"));
             }
-            let (value, gradient) = self.objective_gradient(&weights);
+            let (value, gradient) =
+                self.objective_gradient_with_policy(&weights, options.sqp.ashr_compatibility);
             if !value.is_finite() || gradient.iter().any(|g| !g.is_finite()) {
                 return Err(invalid(
                     "objective or gradient exceeds the representable range",
@@ -92,7 +101,11 @@ impl Problem {
                     "SQP dual convergence reached".into(),
                 ));
             }
-            let hessian = self.hessian(&weights);
+            let hessian = if options.sqp.ashr_compatibility {
+                self.ashr_hessian(&weights)
+            } else {
+                self.hessian(&weights)
+            };
             if hessian.iter().any(|v| !v.is_finite()) {
                 return Err(invalid("Hessian exceeds the representable range"));
             }
@@ -103,8 +116,17 @@ impl Problem {
             } else {
                 options.active_iterations
             };
-            let candidate =
-                nonnegative_quadratic(&hessian, &linear, &current, active_iterations, options.sqp)?;
+            let candidate = if options.sqp.ashr_compatibility {
+                compatibility::quadratic(
+                    &hessian,
+                    &linear,
+                    &current,
+                    active_iterations,
+                    options.sqp,
+                )?
+            } else {
+                nonnegative_quadratic(&hessian, &linear, &current, active_iterations, options.sqp)?
+            };
             let direction = &candidate - &current;
             let slope = gradient
                 .iter()
@@ -151,7 +173,9 @@ impl Problem {
                 ));
             }
         }
-        let gradient = self.objective_gradient(&weights).1;
+        let gradient = self
+            .objective_gradient_with_policy(&weights, options.sqp.ashr_compatibility)
+            .1;
         let residual = dual_residual(&gradient, &weights, options);
         evaluations += 1;
         Ok((
