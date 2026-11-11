@@ -18,11 +18,47 @@ pub enum RegressionLikelihood {
     BetaBinomial,
     Restricted(Arc<RestrictedRegressionLikelihood>),
 }
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RegressionOptimizer {
     #[default]
     Bfgs,
     Lbfgsb,
+    /// Retain an unused/unsupported optimizer until a method actually needs it.
+    Unsupported,
+}
+impl RegressionOptimizer {
+    /// R's `optim` accepts unique method prefixes. Other optimizer families and
+    /// unknown/ambiguous names are retained for deferred rejection.
+    pub fn from_r_method(name: &str) -> Self {
+        let mut matches = ["Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN", "Brent"]
+            .into_iter()
+            .filter(|method| method.starts_with(name));
+        match (matches.next(), matches.next()) {
+            (Some("BFGS"), None) => Self::Bfgs,
+            (Some("L-BFGS-B"), None) => Self::Lbfgsb,
+            _ => Self::Unsupported,
+        }
+    }
+    /// Source scalar bounds: the dispatcher uses them only for the exact
+    /// `L-BFGS-B` name, even though `optim` itself accepts method prefixes.
+    /// Missing or nonfinite endpoints denote absent bounds; extra values drop.
+    pub fn r_bounds(method: &str, values: &[f64]) -> (f64, f64) {
+        if method != "L-BFGS-B" {
+            return (f64::NEG_INFINITY, f64::INFINITY);
+        }
+        (
+            values
+                .first()
+                .copied()
+                .filter(|v| v.is_finite())
+                .unwrap_or(f64::NEG_INFINITY),
+            values
+                .get(1)
+                .copied()
+                .filter(|v| v.is_finite())
+                .unwrap_or(f64::INFINITY),
+        )
+    }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RegressionMethod {
@@ -389,6 +425,11 @@ impl GeneralRow<'_> {
                 )
                 .map_err(|e| invalid(&e.to_string()))?
             }
+            RegressionOptimizer::Unsupported => {
+                return Err(invalid(
+                    "unsupported posterior optimizer; use BFGS or L-BFGS-B",
+                ));
+            }
         };
         if let Some(e) = self.error.borrow_mut().take() {
             return Err(e);
@@ -422,5 +463,8 @@ pub(super) fn optimize_nb_r(
             )
             .map_err(|e| invalid(&e.to_string()))
         }
+        RegressionOptimizer::Unsupported => Err(invalid(
+            "unsupported posterior optimizer; use BFGS or L-BFGS-B",
+        )),
     }
 }

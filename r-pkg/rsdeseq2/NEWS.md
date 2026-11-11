@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Share scalar optimizer-bound normalization across posterior methods. Defer
+  unused beta-binomial controls, ignore source-unused log-link options, and
+  preserve exact-name versus abbreviated optimizer dispatch. Independent
+  profiles retain numerical/error gates and exact native/wrapped outputs.
+
 * Preserve canonical normal-mixture matrix capture flattening/recycling in Rust.
   Match compiled negative-binomial ignored/deferred controls and source BFGS or
   L-BFGS-B refinement policy; retain explicit unsupported-method errors when

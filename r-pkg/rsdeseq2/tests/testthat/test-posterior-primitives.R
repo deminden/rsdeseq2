@@ -124,3 +124,24 @@ testthat::test_that('uniform posterior transport preserves numerical boundaries 
   for(change in list(list(lower=11),list(weights=0),list(standard_errors=c(.5,-.7)),list(estimates=0)))
     testthat::expect_error(.rsdeseq2_formula_request(utils::modifyList(request,change)))
 })
+
+testthat::test_that('posterior methods ignore controls that their source dispatch does not use', {
+  arguments<-list(Y=matrix(rep(2:5,2),nrow=1),x=cbind(1,rep(0:1,each=4)),
+    param=cbind(8,matrix(10,nrow=1,ncol=8)),coef=2,
+    prior.control=list(no.shrink=1,prior.mean=0,prior.scale=.7,prior.df=1,
+      prior.no.shrink.mean=0,prior.no.shrink.scale=15))
+  run<-function(a).rsdeseq2_formula_request(list(operation='apeglm_shrinkage',arguments=a))
+  for(method in c('betabinC','betabinCR')){
+    arguments$method<-method
+    expected<-run(arguments)
+    ignored<-utils::modifyList(arguments,list(optim.method='not_an_optimizer',
+      bounds='unused',log.link=c(TRUE,FALSE)))
+    testthat::expect_identical(run(ignored),expected)
+    testthat::expect_true(all(is.finite(expected$posterior_mode)))
+  }
+  arguments$method<-'general';arguments$param<-matrix(.2,nrow=1)
+  arguments$log.lik<-list(type='negative_binomial')
+  expected<-run(arguments)
+  testthat::expect_identical(run(utils::modifyList(arguments,list(log.link=c(TRUE,FALSE)))),expected)
+  testthat::expect_true(all(is.finite(expected$posterior_mode)))
+})

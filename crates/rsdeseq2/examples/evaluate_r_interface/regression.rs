@@ -212,24 +212,13 @@ pub fn run(c: &Case) -> Result<NegativeBinomialPosterior, Box<dyn Error>> {
             "betabinC*" => RegressionMethod::BetaBinomialCStar,
             _ => return Err("invalid fixture method".into()),
         },
-        optimizer: match if c.method.starts_with("nbinomC") {
-            "BFGS"
-        } else {
-            c.optimizer.as_str()
-        } {
-            "BFGS" => RegressionOptimizer::Bfgs,
-            "L-BFGS-B" => RegressionOptimizer::Lbfgsb,
-            _ => return Err("invalid fixture optimizer".into()),
-        },
+        optimizer: RegressionOptimizer::from_r_method(&c.optimizer),
         prior_df: number(&c.prior_df)?,
         prior_noncentrality: number(&c.prior_mean)?,
         nuisance_mean: number(&c.nuisance_mean)?,
         log_link: c.log_link,
-        bounds: if !c.method.starts_with("nbinomC") && c.optimizer == "L-BFGS-B" {
-            (
-                number(c.bounds.first().ok_or("missing lower bound")?)?,
-                number(c.bounds.get(1).ok_or("missing upper bound")?)?,
-            )
+        bounds: if !c.method.starts_with("nbinomC") {
+            RegressionOptimizer::r_bounds(&c.optimizer, &numbers(&c.bounds)?)
         } else {
             (f64::NEG_INFINITY, f64::INFINITY)
         },

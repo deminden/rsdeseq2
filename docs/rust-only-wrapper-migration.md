@@ -32,6 +32,9 @@ The [capture/control checkpoint](native-capture-policy-development.md) now
 implements canonical matrix flattening/recycling and deferred compiled-NB
 refinement policy in Rust. All 38 new native/wrapped batches agree exactly and
 21 accepted replay sets are unchanged; full authority/combined gates stay open.
+The [regression method policy follow-up](native-regression-method-policy-development.md)
+shares scalar-bound normalization and ignored/deferred controls across general,
+beta-binomial and compiled-NB paths, with 21 further exact interface cases.
 Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
@@ -117,8 +120,9 @@ files and bridge must contain no alternate statistical engine or R callback.
 Existing independent numerical bounds remain mandatory in addition to equality
 between the two interfaces.
 
-The migration is **in progress**. Removing the experimental commits does not
-mean the older R calculations listed above have already been removed.
+The migration is **in progress**. Removing experimental commits and porting
+individual numerical paths do not by themselves establish the complete
+supported behavior/shared-route contract or final combined validation.
 
 After the 0.4.0 release, the frozen-local VST port imports original saved locfit
 knots, residual coefficients and the global polynomial without refitting. Grid

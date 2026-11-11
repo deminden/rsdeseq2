@@ -35,34 +35,27 @@ pub(super) fn optimize(
     start: Vec<f64>,
     control: &NegativeBinomialRefinement,
 ) -> Result<rcompat_lbfgsb::OptimResult, DeseqError> {
-    let (optimizer, bounds) = match &control.method {
-        NegativeBinomialRefinementMethod::Bfgs => (
-            RegressionOptimizer::Bfgs,
-            (f64::NEG_INFINITY, f64::INFINITY),
-        ),
-        NegativeBinomialRefinementMethod::Lbfgsb => {
-            let b = control
+    let name = match &control.method {
+        NegativeBinomialRefinementMethod::Bfgs => "BFGS",
+        NegativeBinomialRefinementMethod::Lbfgsb => "L-BFGS-B",
+        NegativeBinomialRefinementMethod::Unsupported(name) => name,
+    };
+    let optimizer = RegressionOptimizer::from_r_method(name);
+    if optimizer == RegressionOptimizer::Unsupported {
+        return Err(invalid(&format!(
+            "unsupported refinement optimizer '{name}'"
+        )));
+    }
+    let bounds = if name == "L-BFGS-B" {
+        RegressionOptimizer::r_bounds(
+            name,
+            control
                 .bounds
-                .as_ref()
-                .ok_or_else(|| invalid("bounded refinement requires numeric bounds"))?;
-            // R's optimizer treats non-finite endpoints as absent bounds.
-            let lower = b
-                .first()
-                .copied()
-                .filter(|v| v.is_finite())
-                .unwrap_or(f64::NEG_INFINITY);
-            let upper = b
-                .get(1)
-                .copied()
-                .filter(|v| v.is_finite())
-                .unwrap_or(f64::INFINITY);
-            (RegressionOptimizer::Lbfgsb, (lower, upper))
-        }
-        NegativeBinomialRefinementMethod::Unsupported(name) => {
-            return Err(invalid(&format!(
-                "unsupported refinement optimizer '{name}'"
-            )));
-        }
+                .as_deref()
+                .ok_or_else(|| invalid("bounded refinement requires numeric bounds"))?,
+        )
+    } else {
+        (f64::NEG_INFINITY, f64::INFINITY)
     };
     super::regression::optimize_nb_r(
         row,

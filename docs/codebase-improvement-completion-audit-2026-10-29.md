@@ -8,6 +8,9 @@ The [capture/control checkpoint](native-capture-policy-development.md) closes
 two specific authority findings with 38 exact native/wrapped cases and 21
 unchanged accepted panels, without closing those broader checkpoints. Final
 current-source precision, speed, RSS and package checks are still required.
+The later [general/beta-binomial policy follow-up](native-regression-method-policy-development.md)
+adds 21 original profiles and closes related ignored/deferred-bound dispatch
+gaps. All 24 earlier payload sets remain exact; checkpoint status is unchanged.
 
 Current local development routes the default [ashr workflow](shrinkage-component-development.md)
 and [negative-binomial apeglm workflow](native-apeglm-development.md) through the
@@ -113,8 +116,9 @@ version has changed to close a gate.
 The user subsequently required [one standalone Rust numerical engine](rust-only-wrapper-migration.md)
 for both interfaces and removal of the R-backed commits. The three experimental
 commits were removed from the active history; independent audit fixes were
-replayed. Older R statistical calculations are still present and must be
-migrated. Earlier sanitizer/workflow artifacts below certify their recorded
+replayed. At that earlier checkpoint, older R statistical calculations still
+needed migration; the subsequent reports describe their replacement. Earlier
+sanitizer/workflow artifacts below certify their recorded
 historical source, rather than the not-yet-built replacement engine.
 
 ## Subsequent release and migration status

@@ -200,6 +200,12 @@ keeps the selected-coefficient result-table shape. This is separate from its
 unsupported `contrast=` coefficient-selection argument for apeglm. See
 [posterior analysis scope and explicit source corrections](native-posterior-analysis-development.md).
 
+General and beta-binomial methods ignore `log.link`. Beta-binomial prefits defer
+optimizer controls until refinement needs them. Across methods, empty/missing
+or nonfinite scalar bounds are unbounded, extra entries drop, and bounds apply
+only to the exact `optim.method="L-BFGS-B"` spelling. See
+[method argument policy and checks](native-regression-method-policy-development.md).
+
 MAP-only `apeMethod="nbinomC*"` and `apeMethod="betabinC*"` use native random
 starts. The wrapper imports stored `.Random.seed` and writes back the advanced
 state; no R random-generation function is called. The default Mersenne-Twister

@@ -377,3 +377,9 @@ method profiles. All 38 actual native/wrapped batches agree exactly with R math
 blocked. Original-only generators record genuine refinement calls and independent
 rejections; eight public profiles retain unchanged bounds and all 21 earlier
 accepted panels are exact. The 207 existing oracle files remain unchanged.
+
+The [general/beta-binomial policy follow-up](native-regression-method-policy-development.md)
+adds 21 independent method-control profiles, including four controlled errors
+and genuine source-traced refinement. All 21 actual native/wrapped outputs are
+exact; 24 earlier accepted panels and all 209 prior oracle files are unchanged.
+R frontend checks also cover malformed controls that original dispatch ignores.
