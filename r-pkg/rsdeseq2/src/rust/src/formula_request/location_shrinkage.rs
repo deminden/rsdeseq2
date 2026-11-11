@@ -213,7 +213,11 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
             ..LocationShrinkageOptions::default().fit_options
         },
         fixed_prior: flag(get(request, "fixed_prior")?)?,
-        likelihood: if request
+        likelihood: if let Some(b) = super::ashr::field(request, "builtin_likelihood")
+            .filter(|v| !matches!(v.data, Data::Null))
+        {
+            LocationLikelihood::Builtin(builtin_likelihood(b)?)
+        } else if request
             .names
             .as_ref()
             .is_some_and(|n| n.iter().any(|n| n == "custom_likelihood"))
@@ -246,6 +250,65 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
     )
     .map(encode)
     .map_err(|e| e.to_string())
+}
+pub(super) fn builtin_likelihood(
+    v: &Value,
+) -> Result<rsdeseq2::shrinkage::BuiltinLocationLikelihood, String> {
+    use rsdeseq2::{
+        matrix::{MatrixOrder, MatrixView},
+        shrinkage::BuiltinLocationLikelihood,
+    };
+    match text(get(v, "type")?)? {
+        "normalmix" => {
+            let weights = numbers(get(v, "weights")?)?.to_vec();
+            let scales = get(v, "scales")?;
+            let (rows, cols) = scales
+                .dimensions
+                .map(|x| (x[0], x[1]))
+                .unwrap_or((1, weights.len()));
+            let view = MatrixView::new(rows, cols, numbers(scales)?, MatrixOrder::RowMajor)
+                .map_err(|e| e.to_string())?;
+            BuiltinLocationLikelihood::normal_mixture_by_observation(weights, view)
+                .map_err(|e| e.to_string())
+        }
+        "logF" => BuiltinLocationLikelihood::log_f(
+            numbers(get(v, "df1")?)?.to_vec(),
+            numbers(get(v, "df2")?)?.to_vec(),
+        )
+        .map_err(|e| e.to_string()),
+        _ => Err("unknown built-in likelihood type".into()),
+    }
+}
+pub(super) fn builtin_values(request: &Value) -> Result<Value, String> {
+    let likelihood = builtin_likelihood(get(request, "likelihood")?)?;
+    let x = numbers(get(request, "arguments")?)?;
+    let a = numbers(get(request, "lower")?)?;
+    let b = numbers(get(request, "upper")?)?;
+    if a.len() != x.len() || b.len() != x.len() {
+        return Err("likelihood queries require matching argument and bound lengths".into());
+    }
+    let mut cdf = vec![];
+    let mut density = vec![];
+    let mut first = vec![];
+    let mut second = vec![];
+    for i in 0..x.len() {
+        let l = likelihood
+            .for_observation(i, x.len())
+            .map_err(|e| e.to_string())?;
+        cdf.push(l.log_cdf(x[i]));
+        density.push(l.log_density(x[i]));
+        first.push(l.truncated_moment(a[i], b[i], 1));
+        second.push(l.truncated_moment(a[i], b[i], 2));
+    }
+    Ok(named(
+        &["log_cdf", "log_density", "first", "second"],
+        vec![
+            Value::numbers(cdf),
+            Value::numbers(density),
+            Value::numbers(first),
+            Value::numbers(second),
+        ],
+    ))
 }
 
 fn restricted_function(value: &Value) -> Result<rsdeseq2::shrinkage::RestrictedFunction, String> {

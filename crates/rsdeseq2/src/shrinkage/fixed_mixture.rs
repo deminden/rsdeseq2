@@ -33,6 +33,19 @@ impl FixedMixture {
             Self::TruncatedNormal(p) => p.log_likelihoods(estimate, standard_error),
         }
     }
+    pub(super) fn log_likelihoods_at(
+        &self,
+        x: f64,
+        s: f64,
+        row: usize,
+        n: usize,
+    ) -> Result<Vec<f64>, DeseqError> {
+        if let Self::Uniform(p) = self {
+            p.log_likelihoods_at(x, s, row, n)
+        } else {
+            self.log_likelihoods(x, s)
+        }
+    }
     /// Condition on the same finite observation through every interface.
     pub fn posterior(
         &self,
@@ -58,6 +71,14 @@ impl FixedMixture {
         row: usize,
         observations: usize,
     ) -> Result<FixedMixturePosterior, DeseqError> {
+        if let Self::Uniform(p) = self {
+            return Ok(FixedMixturePosterior::Uniform(p.posterior_at(
+                estimate,
+                standard_error,
+                row,
+                observations,
+            )?));
+        }
         if let Self::TruncatedNormal(p) = self {
             Ok(FixedMixturePosterior::TruncatedNormal(p.posterior_at(
                 estimate,
@@ -78,7 +99,7 @@ impl FixedMixture {
         observations: usize,
     ) -> Result<Vec<f64>, DeseqError> {
         if let Self::Uniform(p) = self {
-            return p.cdf_values(estimate, standard_error, thresholds);
+            return p.cdf_values_at(estimate, standard_error, thresholds, row, observations);
         }
         let p = self.posterior_at(estimate, standard_error, row, observations)?;
         Ok(thresholds.iter().map(|&c| p.cdf(c)).collect())
@@ -107,7 +128,8 @@ impl FixedMixture {
         estimates
             .iter()
             .zip(standard_errors)
-            .map(|(&x, &s)| self.posterior(x, s))
+            .enumerate()
+            .map(|(row, (&x, &s))| self.posterior_at(x, s, row, estimates.len()))
             .collect()
     }
 }

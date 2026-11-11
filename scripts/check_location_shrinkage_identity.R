@@ -12,7 +12,7 @@ out <- args[[3L]];if(dir.exists(out))stop('Use a fresh output directory');dir.cr
 references <- if(length(args)==4L)list(jsonlite::fromJSON(args[[4L]],simplifyVector=FALSE))else lapply(c('location_shrinkage_r462.json','custom_likelihood_r462.json'),function(file)jsonlite::fromJSON(file.path(root,'crates/rsdeseq2/tests/data',file),simplifyVector=FALSE))
 cases <- unlist(lapply(references,`[[`,'cases'),recursive=FALSE)
 fields <- c('estimates','standard_errors','thresholds','family','point_mass','nullweight','scales','mode','range','alpha','prune_threshold','observation_weights','fixed_prior','supplied_prior','df')
-inputs <- lapply(cases,function(c){wanted<-c('name',fields,intersect(c('optimizer','control','penalty'),names(c)),if(!is.null(c$custom_likelihood))'custom_likelihood');stats::setNames(lapply(wanted,function(n)c[[n]]),wanted)})
+inputs <- lapply(cases,function(c){wanted<-c('name',fields,intersect(c('optimizer','control','penalty'),names(c)),if(!is.null(c$custom_likelihood))'custom_likelihood',if(!is.null(c$builtin_likelihood))'builtin_likelihood');stats::setNames(lapply(wanted,function(n)c[[n]]),wanted)})
 path <- file.path(out,'input.json');jsonlite::write_json(list(location_cases=inputs),path,auto_unbox=TRUE,null='null',digits=NA)
 output <- system2(driver,shQuote(normalizePath(path)),stdout=TRUE,stderr=TRUE)
 if(!is.null(attr(output,'status')))stop(paste(output,collapse='\n'))
@@ -23,7 +23,7 @@ function_input <- function(f){
  list(arguments=unlist(f$arguments,use.names=FALSE),expression=.formula_ast_decode(f$expression),constants=lapply(f$constants,.formula_decode))
 }
 blocked <- function(expression){
- functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','sum','sort','order','rank','cumsum','^','lgamma','digamma'),stats=c('pnorm','dnorm','pt','dt','integrate'))
+ functions <- list(base=c('sqrt','exp','expm1','log','log1p','log2','mean','sum','sort','order','rank','cumsum','^','lgamma','digamma'),stats=c('pnorm','dnorm','pt','dt','integrate','pf','df','pgamma','dgamma','pbeta','dbeta'))
  on.exit(for(package in names(functions))for(name in functions[[package]])suppressMessages(untrace(name,where=asNamespace(package))),add=TRUE)
  for(package in names(functions))for(name in functions[[package]])suppressWarnings(suppressMessages(trace(name,where=asNamespace(package),print=FALSE,tracer=quote(stop('location bridge executed an R calculation',call.=FALSE)))))
  force(expression)
@@ -37,6 +37,10 @@ wrapped <- lapply(seq_along(inputs),function(i){
  if(!is.null(request$control))request$control<-lapply(request$control,function(v)if(is.character(v)&&length(v)==1L&&v%in%c('Inf','-Inf','NaN'))as.numeric(v)else v)
  if(!is.null(request$supplied_prior))for(field in c('weights','means','sds','lower','upper'))if(!is.null(request$supplied_prior[[field]]))request$supplied_prior[[field]]<-decode(request$supplied_prior[[field]])
  if(!is.null(c$custom_likelihood))request$custom_likelihood <- c(list(name=c$custom_likelihood$name),lapply(c$custom_likelihood[c('log_cdf','log_density','first','second')],function_input))
+ if(!is.null(c$builtin_likelihood)){
+   model<-c$builtin_likelihood
+   request$builtin_likelihood<-if(model$type=='normalmix')list(type='normalmix',weights=decode(model$weights),scales=.formula_decode(model$scales))else list(type='logF',df1=decode(model$df1),df2=decode(model$df2))
+ }
  result <- tryCatch(blocked(rsdeseq2:::.rsdeseq2_formula_request(request)),error=identity)
  if(!identical(inherits(result,'error'),!is.null(cases[[i]]$expected_error)))stop(c$name,': ',if(inherits(result,'error'))conditionMessage(result)else 'unexpected success')
  if(inherits(result,'error'))return(list(name=c$name,ok=FALSE))

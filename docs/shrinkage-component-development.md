@@ -231,7 +231,13 @@ The [SQP-control checkpoint](native-sqp-control-development.md) adds the remaini
 numerical policies, including line search and genuine spectral truncation with
 independent original/exact-SVD comparisons.
 
-Still open: other built-in likelihood families,
+The [continuous-likelihood checkpoint](native-continuous-likelihood-development.md)
+adds canonical normal-mixture/log-F noise, observation-specific parameters and
+native integration with original missingness and tail-cancellation behavior.
+Eleven kernel and 21 full requests agree exactly; fifteen accepted replay sets
+retain their outputs.
+
+Still open: Poisson/binomial likelihood families,
 the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.

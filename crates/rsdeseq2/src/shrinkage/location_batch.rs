@@ -147,6 +147,13 @@ pub(super) fn shrink_location_batch_with_rates(
         mut warnings,
     } = super::location_fit::fit_location(estimates, standard_errors, options)?;
     let n = estimates.len();
+    if matches!(&options.likelihood,LocationLikelihood::Builtin(b) if b.name()=="logF")
+        && x.iter().chain(&se).any(|v| v.is_nan())
+    {
+        return Err(invalid(
+            "log-F summaries require nonmissing observation bounds",
+        ));
+    }
     let raw_prior = grid.prior_with_likelihood(&fitted_weights, &options.likelihood)?;
     if let MixtureComponents::TruncatedNormal { lower, upper, .. } = &grid.components
         && options.thresholds.iter().any(|&cutoff| {
@@ -221,7 +228,7 @@ pub(super) fn shrink_location_batch_with_rates(
             );
             negative[i] = zero_clip(posterior.cdf(0.0) - lfdr[i]);
             cdfs.extend(raw_prior.cdf_values_at(x[i], se[i], &options.thresholds, i, n)?);
-            let ll = raw_prior.log_likelihoods(x[i], se[i])?;
+            let ll = raw_prior.log_likelihoods_at(x[i], se[i], i, n)?;
             log_likelihood += log_marginal(&ll, &fitted_weights)
                 - options.alpha
                     * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln();

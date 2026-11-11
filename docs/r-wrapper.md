@@ -154,6 +154,12 @@ and optional `tol.svd` controls, including `maxiter.activeset=NULL`. See
 [numerical controls and validation](native-sqp-control-development.md) for default
 full-matrix preservation, spectral fallback and remaining diagnostic scope.
 
+Local canonical `ashr::lik_normalmix` and `ashr::lik_logF` objects import stored
+primitive parameters without executing their closures. Noise SD matrices and
+row-specific degrees of freedom retain complete-observation alignment. Uniform
+priors are supported; original log-F missing SDs and unsupported normal priors
+are retained. See [continuous likelihoods and limits](native-continuous-likelihood-development.md).
+
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
 `etruncFUN(a, b)` and `e2truncFUN(a, b)`. Each function must contain one supported

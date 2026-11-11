@@ -39,6 +39,7 @@ pub struct Case {
     supplied_prior: Option<Prior>,
     df: Option<String>,
     custom_likelihood: Option<Value>,
+    builtin_likelihood: Option<Value>,
     optimizer: Option<String>,
     #[serde(default)]
     control: Value,
@@ -152,7 +153,9 @@ pub fn options(c: &Case) -> Result<LocationShrinkageOptions, Box<dyn Error>> {
             ..LocationShrinkageOptions::default().fit_options
         },
         fixed_prior: c.fixed_prior,
-        likelihood: if let Some(value) = &c.custom_likelihood {
+        likelihood: if let Some(value) = &c.builtin_likelihood {
+            LocationLikelihood::Builtin(super::builtin_likelihood::model(value)?)
+        } else if let Some(value) = &c.custom_likelihood {
             LocationLikelihood::Restricted(std::sync::Arc::new(super::likelihood::restricted(
                 value,
             )?))

@@ -1,5 +1,10 @@
 # Development after 0.4.0
 
+* Run canonical normal-mixture and log-F observation likelihoods entirely in
+  shared Rust, including per-observation parameters, beta/gamma tails and
+  integration. Import only stored primitive captures; retain source missingness,
+  prior restrictions and near-one CDF cancellation behavior.
+
 * Add native SQP active-set, line-search, Hessian-regularization and optional SVD
   controls, including automatic active-set limits. Retain independent original
   and exact-SVD references without changing accepted default outputs.

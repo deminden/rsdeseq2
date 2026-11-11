@@ -22,6 +22,8 @@
 .rsdeseq2_native_ash_likelihood <- function(lik) {
   if (isS4(lik) || typeof(lik) != "list") stop("likelihood requires a primitive list", call. = FALSE)
   lik <- unclass(lik)
+  builtin <- .rsdeseq2_native_ash_builtin(lik)
+  if (!is.null(builtin)) return(builtin)
   unwrap <- function(f, arguments = "x") {
     if (typeof(f) != "closure" || !identical(names(formals(f)), arguments)) return(NULL)
     body <- body(f)

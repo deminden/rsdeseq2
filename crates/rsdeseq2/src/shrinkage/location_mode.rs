@@ -205,7 +205,10 @@ pub fn estimate_location_mode(
                 let x = fitted.x[i];
                 let se = fitted.se[i];
                 let value = if se > 0.0 && se.is_finite() && x.is_finite() {
-                    log_marginal(&prior.log_likelihoods(x, se)?, &fitted.fitted_weights)
+                    log_marginal(
+                        &prior.log_likelihoods_at(x, se, i, estimates.len())?,
+                        &fitted.fitted_weights,
+                    )
                 } else {
                     excluded(
                         &fitted.grid.components,

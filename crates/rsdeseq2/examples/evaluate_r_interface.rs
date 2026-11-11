@@ -7,6 +7,8 @@ mod ashr_mode;
 mod ashr_output;
 #[path = "evaluate_r_interface/batch.rs"]
 mod batch;
+#[path = "evaluate_r_interface/builtin_likelihood.rs"]
+mod builtin_likelihood;
 #[path = "evaluate_r_interface/cooks.rs"]
 mod cooks;
 #[path = "evaluate_r_interface/em_fit.rs"]
@@ -422,6 +424,7 @@ enum Input {
     Adaptive(adaptive::Input),
     AshrOutput(ashr_output::Input),
     AshrMode(ashr_mode::Input),
+    BuiltinLikelihood(builtin_likelihood::Input),
     Uniform(uniform::Input),
     MixtureGrid(mixture_grid::Input),
     LocationShrinkage(location_shrinkage::Input),
@@ -453,6 +456,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Input::Adaptive(input) => adaptive::evaluate(input)?,
         Input::AshrOutput(input) => ashr_output::evaluate(input),
         Input::AshrMode(input) => ashr_mode::evaluate(input),
+        Input::BuiltinLikelihood(input) => builtin_likelihood::evaluate(input),
         Input::Uniform(input) => uniform::evaluate(input)?,
         Input::MixtureGrid(input) => mixture_grid::evaluate(input)?,
         Input::LocationShrinkage(input) => location_shrinkage::evaluate(input)?,

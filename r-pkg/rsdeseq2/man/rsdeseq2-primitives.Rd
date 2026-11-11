@@ -325,6 +325,10 @@ R optimization. Two-element mode inputs retain original ashr range semantics.
 SQP numerical controls include active-set, direction, line-search and
 regularization policies, automatic active-set limits and optional spectral
 truncation. The accepted default uses the full matrix.
+Canonical \code{ashr::lik_normalmix} and \code{ashr::lik_logF} objects import
+stored primitive parameters without executing likelihood closures. Shared Rust
+supports noise SD matrices, row-specific degrees of freedom and uniform priors.
+Log-F posterior SDs retain the original missing second-moment policy.
 Native interior-point mixture fitting accepts a relative dual-gap tolerance.
 Other advanced optional methods
 remain under development and return explicit unsupported-feature errors.

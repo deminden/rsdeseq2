@@ -85,14 +85,28 @@ impl UniformMixture {
         self.likelihood = likelihood.validated()?;
         Ok(self)
     }
-    fn log_cdf(&self, q: f64) -> f64 {
-        self.likelihood.log_cdf(q)
-    }
     /// Component log convolution densities in prior input order.
     pub fn log_likelihoods(
         &self,
         estimate: f64,
         standard_error: f64,
+    ) -> Result<Vec<f64>, DeseqError> {
+        self.log_likelihoods_with(estimate, standard_error, &self.likelihood)
+    }
+    pub(super) fn log_likelihoods_at(
+        &self,
+        x: f64,
+        s: f64,
+        row: usize,
+        n: usize,
+    ) -> Result<Vec<f64>, DeseqError> {
+        self.log_likelihoods_with(x, s, self.likelihood.at(row, n)?.as_ref())
+    }
+    fn log_likelihoods_with(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        likelihood: &LocationLikelihood,
     ) -> Result<Vec<f64>, DeseqError> {
         observation(estimate, standard_error)?;
         Ok(self
@@ -102,11 +116,11 @@ impl UniformMixture {
             .map(|(&a, &b)| {
                 if a == b {
                     let q = (estimate - a) / standard_error;
-                    let density = self.likelihood.log_density(q);
+                    let density = likelihood.log_density(q);
                     return density - standard_error.ln();
                 }
-                let left = self.log_cdf((estimate - a) / standard_error);
-                let right = self.log_cdf((estimate - b) / standard_error);
+                let left = likelihood.log_cdf((estimate - a) / standard_error);
+                let right = likelihood.log_cdf((estimate - b) / standard_error);
                 // Preserve the established orientation and ordinary subtraction semantics.
                 left + (1.0 - language_exp(right - left)).ln() - (b - a).ln()
             })
@@ -116,8 +130,9 @@ impl UniformMixture {
         &self,
         estimate: f64,
         standard_error: f64,
+        likelihood: &LocationLikelihood,
     ) -> Result<Vec<f64>, DeseqError> {
-        let likelihoods = self.log_likelihoods(estimate, standard_error)?;
+        let likelihoods = self.log_likelihoods_with(estimate, standard_error, likelihood)?;
         let mut weights = likelihoods
             .iter()
             .zip(&self.log_weights)
@@ -143,14 +158,33 @@ impl UniformMixture {
         standard_error: f64,
         thresholds: &[f64],
     ) -> Result<Vec<f64>, DeseqError> {
-        let weights = self.posterior_weights(estimate, standard_error)?;
+        self.cdf_values_with(estimate, standard_error, thresholds, &self.likelihood)
+    }
+    pub(super) fn cdf_values_at(
+        &self,
+        x: f64,
+        s: f64,
+        c: &[f64],
+        row: usize,
+        n: usize,
+    ) -> Result<Vec<f64>, DeseqError> {
+        self.cdf_values_with(x, s, c, self.likelihood.at(row, n)?.as_ref())
+    }
+    fn cdf_values_with(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        thresholds: &[f64],
+        likelihood: &LocationLikelihood,
+    ) -> Result<Vec<f64>, DeseqError> {
+        let weights = self.posterior_weights(estimate, standard_error, likelihood)?;
         let view = CdfView {
             lower: &self.lower,
             upper: &self.upper,
             weights: &weights,
             estimate,
             standard_error,
-            likelihood: &self.likelihood,
+            likelihood,
         };
         Ok(thresholds.iter().map(|&c| view.cdf(c)).collect())
     }
@@ -161,7 +195,24 @@ impl UniformMixture {
         estimate: f64,
         standard_error: f64,
     ) -> Result<UniformMixturePosterior, DeseqError> {
-        let weights = self.posterior_weights(estimate, standard_error)?;
+        self.posterior_with(estimate, standard_error, &self.likelihood)
+    }
+    pub(super) fn posterior_at(
+        &self,
+        x: f64,
+        s: f64,
+        row: usize,
+        n: usize,
+    ) -> Result<UniformMixturePosterior, DeseqError> {
+        self.posterior_with(x, s, self.likelihood.at(row, n)?.as_ref())
+    }
+    fn posterior_with(
+        &self,
+        estimate: f64,
+        standard_error: f64,
+        likelihood: &LocationLikelihood,
+    ) -> Result<UniformMixturePosterior, DeseqError> {
+        let weights = self.posterior_weights(estimate, standard_error, likelihood)?;
         if weights.iter().any(|v| v.is_nan()) {
             return Ok(UniformMixturePosterior {
                 weights,
@@ -169,7 +220,7 @@ impl UniformMixture {
                 upper: self.upper.clone(),
                 estimate,
                 standard_error,
-                likelihood: self.likelihood.clone(),
+                likelihood: likelihood.clone(),
                 mean: f64::NAN,
                 standard_deviation: f64::NAN,
             });
@@ -177,31 +228,34 @@ impl UniformMixture {
         let mut mean = 0.0;
         let mut second = 0.0;
         for ((&a, &b), &weight) in self.lower.iter().zip(&self.upper).zip(&weights) {
-            let (component_mean, component_second) =
-                if a == b && !matches!(self.likelihood, LocationLikelihood::Restricted(_)) {
-                    (a, a * a)
-                } else {
-                    let alpha = (a - estimate) / standard_error;
-                    let beta = (b - estimate) / standard_error;
-                    let m = self.likelihood.moment(alpha, beta, 1);
-                    let m2 = self.likelihood.moment(alpha, beta, 2);
-                    (
-                        if matches!(self.likelihood, LocationLikelihood::Normal) {
-                            estimate + standard_error * m
-                        } else {
-                            estimate
-                                - standard_error
-                                    * self.likelihood.moment(
-                                        (estimate - b) / standard_error,
-                                        (estimate - a) / standard_error,
-                                        1,
-                                    )
-                        },
-                        estimate * estimate
-                            + 2.0 * estimate * standard_error * m
-                            + standard_error * standard_error * m2,
-                    )
-                };
+            let (component_mean, component_second) = if a == b
+                && matches!(
+                    likelihood,
+                    LocationLikelihood::Normal | LocationLikelihood::StudentT(_)
+                ) {
+                (a, a * a)
+            } else {
+                let alpha = (a - estimate) / standard_error;
+                let beta = (b - estimate) / standard_error;
+                let m = likelihood.moment(alpha, beta, 1);
+                let m2 = likelihood.moment(alpha, beta, 2);
+                (
+                    if matches!(likelihood, LocationLikelihood::Normal) {
+                        estimate + standard_error * m
+                    } else {
+                        estimate
+                            - standard_error
+                                * likelihood.moment(
+                                    (estimate - b) / standard_error,
+                                    (estimate - a) / standard_error,
+                                    1,
+                                )
+                    },
+                    estimate * estimate
+                        + 2.0 * estimate * standard_error * m
+                        + standard_error * standard_error * m2,
+                )
+            };
             mean += weight * component_mean;
             second += weight * component_second;
         }
@@ -211,7 +265,7 @@ impl UniformMixture {
             upper: self.upper.clone(),
             estimate,
             standard_error,
-            likelihood: self.likelihood.clone(),
+            likelihood: likelihood.clone(),
             mean,
             standard_deviation: {
                 let second = if second < 0.0 { 0.0 } else { second };
