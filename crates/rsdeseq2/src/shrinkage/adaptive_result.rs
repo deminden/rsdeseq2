@@ -1,7 +1,8 @@
 //! Shared result population and threshold policy for the ashr-style interface.
 use super::{
-    LocationCdfOptions, LocationShrinkage, LocationShrinkageOptions, location_cdf_batch,
-    shrink_location_batch, threshold_svalues,
+    LocationCdfOptions, LocationShrinkage, LocationShrinkageOptions,
+    location_batch::{RateOutputs, shrink_location_batch_with_rates},
+    location_cdf_batch, threshold_svalues,
 };
 use crate::DeseqError;
 /// Original result population, retained separately from forwarded fitting data.
@@ -34,10 +35,28 @@ pub fn adaptive_shrinkage(
     options: &LocationShrinkageOptions,
     query: AdaptiveShrinkageQuery<'_>,
 ) -> Result<AdaptiveShrinkageResult, DeseqError> {
+    adaptive_shrinkage_impl(
+        estimates,
+        standard_errors,
+        options,
+        query,
+        RateOutputs {
+            svalues: true,
+            qvalues: true,
+        },
+    )
+}
+pub(super) fn adaptive_shrinkage_impl(
+    estimates: &[f64],
+    standard_errors: &[f64],
+    options: &LocationShrinkageOptions,
+    query: AdaptiveShrinkageQuery<'_>,
+    rates: RateOutputs,
+) -> Result<AdaptiveShrinkageResult, DeseqError> {
     if !query.lfc_threshold.is_finite() || query.lfc_threshold < 0.0 {
         return Err(invalid("LFC threshold must be finite and nonnegative"));
     }
-    let fit = shrink_location_batch(estimates, standard_errors, options)?;
+    let fit = shrink_location_batch_with_rates(estimates, standard_errors, options, rates)?;
     let n = query.estimates.len();
     let fitted = fit.posterior_mean.len();
     if n == 0 || fitted == 0 || n < fitted || !n.is_multiple_of(fitted) {

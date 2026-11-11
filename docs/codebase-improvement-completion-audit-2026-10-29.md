@@ -46,6 +46,12 @@ certificates establish convex optima independently; the original Mosek-backed
 method was not run. Remaining likelihood/mode/control/output and final combined
 C19/C21/C23 gates stay open.
 
+The later [output-selection checkpoint](native-ashr-output-development.md) adds
+numeric levels and exact named subsets for the wrapper's posterior fields and
+fitted prior. Sixty-seven native/wrapped cases agree exactly; six public profiles
+preserve existing precision gates and omitted columns/metadata. The remaining
+likelihood/mode/control and full C19/C21/C23 gates stay open.
+
 The original [review](codebase-review-2026-10-22.md) and
 [implementation plan](codebase-improvement-plan-2026-10-22.md) remain the scope.
 This audit supplements the [batch progress report](codebase-improvement-progress-2026-10-29.md).

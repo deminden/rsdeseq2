@@ -219,8 +219,12 @@ The later [cycling/interior checkpoint](native-ashr-advanced-optimizer-developme
 adds higher-order RRE/MPE and a separate native barrier solver, with independent
 KKT certificates and explicit original-Mosek comparison limits.
 
+The [output-selection checkpoint](native-ashr-output-development.md) adds numeric
+and named subsets of the wrapper's posterior fields and fitted prior, including
+explicit threshold dependencies and native/wrapped missing-field identity.
+
 Still open: other built-in likelihood families, estimated
-modes, remaining controls/output subsets, the full warning/integration-failure
+modes, remaining controls, the full warning/integration-failure
 matrix, remaining apeglm methods, and the combined authority/performance/memory/artifact
 audit. Unsupported development options fail explicitly without an R fallback.
 Full suites and release checks remain deferred until this work is combined.

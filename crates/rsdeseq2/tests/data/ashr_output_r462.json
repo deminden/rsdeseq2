@@ -1,0 +1,3278 @@
+{
+  "source": {
+    "R": "4.6.2",
+    "ashr": "2.2.63",
+    "scope": "lfcShrink consumed output fields; unavailable threshold dependencies reject explicitly"
+  },
+  "cases": [
+    {
+      "name": "complete_negative_infinity",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "fff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_negative",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_zero",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "0000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_fractional",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3fd0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_one",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_one_and_half",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_two",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_three",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_four",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4010000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_five",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4014000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_six",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4018000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_infinity",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_missing",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "missing value where TRUE/FALSE needed",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "complete_nan",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "missing value where TRUE/FALSE needed",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "complete_mean_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_sd_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorSD"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_sign_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "svalue"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_prior_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_empty",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_unknown",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "unknown"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_duplicate",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean",
+          "PosteriorMean",
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_case_sensitive",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "posteriormean"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_all",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean",
+          "PosteriorSD",
+          "svalue",
+          "qvalue",
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "0",
+        "0.36843220086263728",
+        "0.46047995197452585",
+        "0.23773142420117135",
+        "1.9403856355130883e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "complete_missing_name",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          null,
+          "PosteriorSD"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_null",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "null",
+        "integer": false,
+        "values": null,
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_logical",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_qvalue_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "qvalue"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_likelihood_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "loglik"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_flash_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "flash_data"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_sampler_only",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "post_sampler"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "complete_numeric_empty",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "argument is of length zero",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "complete_numeric_multiple",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000",
+          "4000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "the condition has length > 1",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "missing_negative_infinity",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "fff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_negative",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "c000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_zero",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "0000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_fractional",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3fd0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_one",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_one_and_half",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_two",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_three",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4008000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_four",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4010000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_five",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4014000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_six",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4018000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_infinity",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_missing",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff00000000007a2"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "missing value where TRUE/FALSE needed",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "missing_nan",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "7ff8000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "missing value where TRUE/FALSE needed",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "missing_mean_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_sd_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorSD"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_sign_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "svalue"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_prior_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_empty",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_unknown",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "unknown"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_duplicate",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean",
+          "PosteriorMean",
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_case_sensitive",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "posteriormean"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_all",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "PosteriorMean",
+          "PosteriorSD",
+          "svalue",
+          "qvalue",
+          "fitted_g"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": [
+        "-0.92213327628652975",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": [
+        "5.0815433667694698e-05",
+        "0.12502540771683385",
+        "0.16668360514455591",
+        "0.18751270385841692",
+        "0.20001016308673353"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "missing_missing_name",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          null,
+          "PosteriorSD"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": [
+        "0.20250952660324434",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533",
+        "0.93541434669348533"
+      ],
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_null",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "null",
+        "integer": false,
+        "values": null,
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_logical",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "logical",
+        "integer": false,
+        "values": [
+          true
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_qvalue_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "qvalue"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_likelihood_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "loglik"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_flash_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "flash_data"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_sampler_only",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "text",
+        "integer": false,
+        "values": [
+          "post_sampler"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": null,
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    },
+    {
+      "name": "missing_numeric_empty",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "argument is of length zero",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "missing_numeric_multiple",
+      "estimates": [
+        "bits:bff0000000000000",
+        "bits:7ff00000000007a2",
+        "bits:7ff8000000000000",
+        "bits:3fe3333333333333",
+        "bits:4000000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fc999999999999a",
+        "bits:3fd999999999999a",
+        "bits:3fe999999999999a",
+        "bits:0000000000000000",
+        "bits:7ff0000000000000"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000",
+          "4000000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:0000000000000000",
+      "query_svalues": true,
+      "expected_error": "the condition has length > 1",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": null,
+      "warnings": []
+    },
+    {
+      "name": "threshold_level_1",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "3ff0000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:3fd0000000000000",
+      "query_svalues": false,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "-2.2204460492503131e-16",
+        "0.42354150316973077",
+        "0.52159423704278418",
+        "0.26496292576314373",
+        "2.7080891109677386e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "threshold_level_4",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4010000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:3fd0000000000000",
+      "query_svalues": false,
+      "expected_error": null,
+      "posterior_mean": [
+        "-2.9339649967182222",
+        "-0.051166053440527055",
+        "0",
+        "0.11271540356614702",
+        "3.5624820400488248"
+      ],
+      "posterior_sd": [
+        "0.29670482683047883",
+        "0.12912046441645744",
+        "0.22330670796500254",
+        "0.43912714027426314",
+        "0.66228077621859294"
+      ],
+      "svalues": [
+        "-2.2204460492503131e-16",
+        "0.42354150316973077",
+        "0.52159423704278418",
+        "0.26496292576314373",
+        "2.7080891109677386e-06"
+      ],
+      "fitted_prior": true,
+      "warnings": []
+    },
+    {
+      "name": "threshold_level_5",
+      "estimates": [
+        "bits:c008000000000000",
+        "bits:bfc999999999999a",
+        "bits:0000000000000000",
+        "bits:3fe6666666666666",
+        "bits:4010000000000000"
+      ],
+      "standard_errors": [
+        "bits:3fd3333333333333",
+        "bits:3fc999999999999a",
+        "bits:3fe0000000000000",
+        "bits:3ff0000000000000",
+        "bits:3fe6666666666666"
+      ],
+      "output": {
+        "type": "number",
+        "integer": false,
+        "values": [
+          "4014000000000000"
+        ],
+        "dimensions": null,
+        "names": null,
+        "dimnames": [
+          null,
+          null
+        ],
+        "dimname_names": [
+          null,
+          null
+        ],
+        "attributes": []
+      },
+      "threshold": "bits:3fd0000000000000",
+      "query_svalues": false,
+      "expected_error": "threshold queries require PosteriorMean and fitted_g outputs",
+      "posterior_mean": null,
+      "posterior_sd": null,
+      "svalues": null,
+      "fitted_prior": false,
+      "warnings": []
+    }
+  ]
+}

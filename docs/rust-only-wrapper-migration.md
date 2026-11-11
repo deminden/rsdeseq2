@@ -11,7 +11,10 @@ specialized logit methods. The [random-start checkpoint](native-random-start-dev
 adds portable native state for both MAP-only random-start methods. Advanced
 [ashr optimizer options](native-ashr-optimizer-development.md) now share native
 EM and variational fitting. [Higher-order cycling and native interior-point
-fitting](native-ashr-advanced-optimizer-development.md) are also implemented. Other advanced options and final combined checks remain open. Further development/commits stay local until
+fitting](native-ashr-advanced-optimizer-development.md) are also implemented.
+[Numeric/named output selection](native-ashr-output-development.md) now preserves
+omitted posterior fields and prior metadata through both interfaces. Other
+advanced options and final combined checks remain open. Further development/commits stay local until
 the user explicitly authorizes GitHub publication.
 
 The user's 2026-10-29 instruction supersedes the earlier permission to retain R

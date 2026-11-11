@@ -116,3 +116,7 @@ priors. See [optimizer validation and scope](../../docs/native-ashr-optimizer-de
 Higher-order RRE/MPE cycling and native interior-point mixture fitting are also
 available in local development. See the [advanced optimizer scope](../../docs/native-ashr-advanced-optimizer-development.md)
 for controls and reference limits.
+
+Numeric `outputlevel` and exact named subsets select local ashr posterior fields
+and fitted priors. See [output selection](../../docs/native-ashr-output-development.md)
+for omitted fields and positive-threshold requirements.
