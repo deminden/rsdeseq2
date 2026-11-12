@@ -39,3 +39,13 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Numerical checks on target and release profile
         run: python3 scripts/check_release_target.py --target ${{ matrix.target }}
+
+      - uses: r-lib/actions/setup-r@v2
+        if: failure() && matrix.name == 'windows-x86_64'
+        with:
+          r-version: '4.6.2'
+      - name: Independent original R narrow-tail diagnostics
+        if: failure() && matrix.name == 'windows-x86_64'
+        shell: bash
+        run: |
+          Rscript --vanilla -e 'x <- c((6+1e-12)/8,6/8,(6-1e-12)/8); values <- pnorm(x,log.p=TRUE); print(R.version); print(sprintf("%.17g",x)); print(sprintf("%.17g",values)); print(lapply(values,function(v)format(writeBin(v,raw(),size=8,endian="big")))); print((exp(values[2]-values[1])-1)/(exp(values[3]-values[1])-1))'

@@ -144,6 +144,20 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     );
                 }
                 for (j, &threshold) in thresholds.iter().enumerate() {
+                    let expected = number(&c.cdf[i * thresholds.len() + j]);
+                    if c.name == "ultra_narrow" && (p.cdf(threshold) - expected).abs() > 2e-8 {
+                        let points = [
+                            (estimate + 1e-12) / se,
+                            estimate / se,
+                            (estimate - 1e-12) / se,
+                        ];
+                        eprintln!(
+                            "narrow CDF diagnostic {context} cutoff {threshold}: points {:?}, logcdf {:?}, weights {:?}",
+                            points.map(f64::to_bits),
+                            points.map(|x| rsdeseq2::math::normal_log_cdf(x).to_bits()),
+                            p.weights()
+                        );
+                    }
                     close(
                         p.cdf(threshold),
                         number(&c.cdf[i * thresholds.len() + j]),
