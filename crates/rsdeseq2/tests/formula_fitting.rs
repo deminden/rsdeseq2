@@ -1,4 +1,7 @@
 //! Independent original-R matrix and offset semantics for complete workflows.
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 use rsdeseq2::{design::formula_design_for_fitting_from_model_frame, prelude::*};
 use serde_json::Value;
 
@@ -31,7 +34,7 @@ fn fitting_matrices_follow_original_term_order_and_matrix_variable_products() {
     let r: Value = serde_json::from_str(
         fresh
             .as_deref()
-            .unwrap_or(include_str!("data/formula_fitting_r462.json")),
+            .unwrap_or(formula_reference!("formula_fitting_r462")),
     )
     .unwrap();
     let frame = FormulaModelFrame {

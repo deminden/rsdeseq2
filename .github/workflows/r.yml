@@ -66,15 +66,22 @@ jobs:
       - name: Independently regenerate Linux formula references
         if: matrix.lane == 'reference'
         run: python scripts/check_linux_formula_references.py --output-dir regenerated-formula-references
-      - name: Independently generate complete formula and sparse SQP references
+      - name: Independently generate sparse SQP references
         if: matrix.lane == 'reference'
-        run: |
-          Rscript --vanilla scripts/generate_formula_fitting_reference.R formula-fitting-reference.json
-          Rscript --vanilla scripts/generate_sparse_sqp_reference.R sparse-sqp-reference.json
+        run: Rscript --vanilla scripts/generate_sparse_sqp_reference.R sparse-sqp-reference.json
+      - name: Save independently generated platform references
+        if: always() && matrix.lane == 'reference' && hashFiles('regenerated-formula-references/*.json', 'sparse-sqp-reference.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: formula-sqp-reference-${{ github.sha }}
+          path: |
+            regenerated-formula-references/*.json
+            sparse-sqp-reference.json
+          if-no-files-found: error
       - name: Check fresh platform oracles without changing saved references
         if: matrix.lane == 'reference'
         env:
-          RSDESEQ2_FORMULA_FITTING_REFERENCE: ${{ github.workspace }}/formula-fitting-reference.json
+          RSDESEQ2_FORMULA_FITTING_REFERENCE: ${{ github.workspace }}/regenerated-formula-references/formula_fitting_r462.json
           RSDESEQ2_SPARSE_SQP_REFERENCE: ${{ github.workspace }}/sparse-sqp-reference.json
         run: cargo test --locked -p rsdeseq2 --test formula_fitting --test sqp_controls
       - name: Independently record uniform posterior references
@@ -86,15 +93,6 @@ jobs:
         with:
           name: uniform-reference-${{ github.sha }}
           path: uniform-posterior-reference.json
-          if-no-files-found: error
-      - name: Save independent complete-formula and sparse-SQP references
-        if: matrix.lane == 'reference'
-        uses: actions/upload-artifact@v4
-        with:
-          name: formula-sqp-reference-${{ github.sha }}
-          path: |
-            formula-fitting-reference.json
-            sparse-sqp-reference.json
           if-no-files-found: error
       - name: Build package
         id: r-source

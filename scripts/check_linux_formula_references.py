@@ -14,6 +14,7 @@ PANELS = {
     'native_formula': 'native_formula_r462',
     'numeric_transform': 'numeric_transform_r462',
     'native_factor': 'native_factor_r462',
+    'formula_fitting': 'formula_fitting_r462',
 }
 
 
@@ -29,12 +30,13 @@ def main():
         subprocess.run([args.rscript, '--vanilla', str(ROOT / 'scripts' / ('generate_' + generator + '_reference.R')), str(output.resolve())], env=env, check=True)
         actual = json.loads(output.read_text())
         expected = json.loads((ROOT / 'crates/rsdeseq2/tests/data' / (stem + '_linux_x86_64.json')).read_text())
-        if actual['metadata']['platform'] != 'x86_64-pc-linux-gnu':
+        metadata_field = 'source' if generator == 'formula_fitting' else 'metadata'
+        if actual[metadata_field]['platform'] != 'x86_64-pc-linux-gnu':
             raise ValueError('Linux x86_64 R is required to regenerate these platform oracles')
         # Session/provenance fields differ from the original independently generated
         # snapshots. Every input, expected bit, attribute, and rejection stays exact.
-        actual.pop('metadata')
-        expected.pop('metadata')
+        actual.pop(metadata_field)
+        expected.pop(metadata_field)
         if actual != expected:
             raise ValueError('Independent R oracle differs: ' + stem)
         print(stem + ': independently regenerated inputs and expected values match exactly')
