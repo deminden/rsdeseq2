@@ -99,6 +99,8 @@ RSDESEQ2_UNIFORM_CDF_REFERENCE="$PWD/results/uniform-cdf.tsv" \
   outputs, frozen-local transformations, expressions and factors.
 - Actual SIGINT cancels an active native grid; the same R process then completes
   another native fit. The same probe checks configured grid-budget rejection.
+  Actual-fit tests also verify that a frontend polling callback is never invoked
+  from a worker thread, while a shared cancellation token reaches workers.
 - Forty-nine Python tooling tests pass with the installed R/original-ashr gate
   enabled and no skips. Rust 1.100 Clippy and Rust 1.97.1 checks pass locally.
 - Local Rust 1.100 ASan/UBSan boundary checks pass with the new fingerprint
