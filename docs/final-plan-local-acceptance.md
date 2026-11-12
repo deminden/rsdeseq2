@@ -1,10 +1,12 @@
 # Final local plan acceptance
 
-The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md) now has
-**22 checkpoints closed locally**. C19 and C21 are accepted on the requirements
-below. C23 remains open until current release artifacts and required platform
-validation are reconciled. This is a requirement count, not an estimate of
-remaining effort or complete Bioconductor compatibility.
+This report preserves the initial local acceptance of **22 checkpoints** in
+the original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md). C19/C21's
+requirements and artifact-bound measurements remain below. The later
+[final development validation](dev-validation-2026-11-12.md) closes C23 with
+current platform checks, independent Linux references and a verified local
+bundle. The earlier open dispositions below describe this report's checkpoint;
+they are not the current status or a claim of complete Bioconductor support.
 
 The initial combined pass records numerical source `48917a0`; all 635 runtime
 paths matched when it was accepted at `63ffc62`. Changes made while gathering
@@ -150,6 +152,6 @@ Strict exact workflow comparison remains the default. The explicit SQP flag
 permits only the two named ashr columns after comparison to the independent
 original package; it is not a general numerical tolerance for workflow payloads.
 
-All work remains local. Publication, tagging and pushes await a new user
-instruction. Current platform success cannot be inferred from a historical
-release or a successful local package check.
+At this report's checkpoint all work remained local. The subsequent
+[dev validation](dev-validation-2026-11-12.md) records authorized branch-only
+pushes and actual current CI results. Tagging and publication remain on hold.

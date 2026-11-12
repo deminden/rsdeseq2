@@ -1,15 +1,19 @@
-# Native numerical authority: current audit
+# Native numerical authority audit
 
-The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md) and the strict
-[one-engine requirement](rust-only-wrapper-migration.md) remain the scope. This
-is an in-progress audit, not a declaration that C19/C21/C23 are complete.
+The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md) and strict
+[one-engine requirement](rust-only-wrapper-migration.md) remain the scope.
+C19/C21 are reconciled in the [local acceptance audit](final-plan-local-acceptance.md);
+the [final development validation](dev-validation-2026-11-12.md) closes C23 with
+actual current CI and verified local artifacts. Publication remains on hold.
 
 The [current supported-contract inventory](native-supported-contract.md) maps
 all 25 R exports to numerical owners, independent references and actual
 interface checks. It also fixes the boundary between supported options and
 explicitly unsupported formula, saved-profile, optimizer and RNG families.
-The entries below preserve the scope of each recorded correction; final
-current-source route/option reconciliation and combined gates are still open.
+The entries below preserve the scope of each recorded correction, including
+then-open work subsequently closed by the acceptance reports above.
+
+## Historical correction ledger
 
 | Area | Inspected evidence | Disposition / next action |
 | --- | --- | --- |
@@ -51,4 +55,5 @@ the full quantification outputs. The present evidence prioritizes numerical
 kernels and method/argument policy. It does not rule out rare library edge cases.
 
 No current quantification speed/RSS or latest-registry claim is added by this
-audit. Work remains local; pushing/tagging/publication require a new user request.
+audit. Branch-only development checks are authorized; tags and publication
+remain on hold. The final validation report records actual later checks.

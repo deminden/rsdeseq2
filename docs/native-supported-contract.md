@@ -1,10 +1,10 @@
 # Current standalone and R wrapper contract
 
-This inventory describes local development through `48917a0` and the
-[SQP warning/platform follow-up](native-sqp-warning-platform-gates.md), following the
-published 0.4.0 source. It maps the supported public surface to its numerical
-owner and evidence. It is not a claim of complete DESeq2 compatibility or final
-release acceptance. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
+This inventory describes development on `dev` after the published 0.4.0
+source. The [final validation](dev-validation-2026-11-12.md) records accepted
+Rust/R/platform checks, the Linux arithmetic corrections and local source bundle.
+The table maps the supported public surface to its numerical owner and evidence;
+it does not claim complete DESeq2 compatibility or authorize publication. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
 and [one-engine requirement](rust-only-wrapper-migration.md) remain authoritative.
 
 ## Numerical ownership
@@ -136,10 +136,9 @@ are closed locally. Matrix and formula fits, replacement-aware later queries,
 posterior workflows and independent references establish different parts of
 that contract; primitive identity alone would not establish accuracy.
 
-C23's current local frozen GTEx/held-out precision gates, standalone/wrapped
-checks, paired speed/RSS measurements, Rust/R/Python checks, MSRV and boundary
-sanitizers pass. Package evidence is reused only after source-hash comparison.
-The latest-commit bundle and required platform gates remain release requirements;
-the new formula-fitting and sparse SQP oracles are now wired for independent
-Linux regeneration, but that Linux run has not executed. GitHub push, tagging and publication require a new user
-instruction.
+C23 is accepted by the [final development validation](dev-validation-2026-11-12.md):
+current Linux Rust/R checks, both R lanes, five target panels and the full GTEx
+replay pass. Independent references and standalone/wrapped identity remain
+separate requirements. The latest local bundle records the exact final source
+and checked R archive; historical performance measurements retain their tested
+binary/platform identities. Tags and publication remain on hold.

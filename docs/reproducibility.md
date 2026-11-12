@@ -16,9 +16,6 @@ export R_LIBS_USER="$PWD/results/r-reference-library"
 python scripts/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
 python scripts/install_r_reference.py --check-installed \
   --library "$R_LIBS_USER" --rscript "$CONDA_PREFIX/bin/Rscript"
-python scripts/benchmark_gtex_native_wald.py --repeats 1 \
-  --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --validated-results-root results/benchmarks/release_0.3.1/gtex
 ```
 
 To restore the pinned package sources into a separate library, run
@@ -31,9 +28,31 @@ invoked for a new reference snapshot; installation never rewrites the lock.
 
 Current full native Wald contrast generation, frozen parity checks, and matched
 speed and peak-memory runs are documented in the
-[0.3.1 GTEx benchmark](gtex-native-wald-benchmark.md). Its biological designs,
+[current GTEx comparison](gtex-native-wald-benchmark.md). Its biological designs,
 blocked/unblocked random splits and fixed seed are reproduced by the committed
 `scripts/generate_gtex_mode_contrasts.py` and R reference helper.
+
+For an independent reproduction, generate into a fresh directory and use
+exploration mode. This preserves historical frozen references and does not
+claim that regenerated last bits have already passed accepted-output review:
+
+```sh
+python scripts/generate_gtex_mode_contrasts.py \
+  --rscript "$CONDA_PREFIX/bin/Rscript" \
+  --output-dir results/benchmarks/reproduced_gtex_r462
+cargo build --release --locked -p rsdeseq2 --bin rsdeseq2
+python scripts/benchmark_gtex_native_wald.py --exploration --repeats 1 \
+  --rscript "$CONDA_PREFIX/bin/Rscript" \
+  --fixture-root results/benchmarks/reproduced_gtex_r462 \
+  --output-dir results/benchmarks/reproduced_gtex_comparison
+```
+
+Accepted comparison additionally requires the preserved reviewed native result
+and diagnostic exports, their SHA manifest and unchanged frozen inputs/references.
+The current benchmark documents that mode and its exact artifact identities.
+The [Linux formula reference procedure](linux_numerical_parity.md) independently
+regenerates seven original-R panels; its portable elementary boundary panel uses
+the common snapshot rather than a platform-specific filename.
 
 DESeq2 compatibility requires more than matching final p-values. Intermediate
 outputs should be generated and compared stage by stage.

@@ -1,12 +1,13 @@
 # R wrapper
 
-The current local implementation uses the standalone Rust numerical engine for
+The development implementation uses the standalone Rust numerical engine for
 fitting, inference, transforms and all supported shrinkage methods. R handles
 argument translation, identifier alignment and R/Bioconductor objects. The
 [current supported contract](native-supported-contract.md) maps every public
-export to its numerical owner and independent/interface evidence. Final
-combined validation remains open; the [0.4.0 report](release-0.4.0.md) describes
-the earlier published source, not the later development implementation.
+export to its numerical owner and independent/interface evidence. The
+[final development validation](dev-validation-2026-11-12.md) records passing
+current checks; the [0.4.0 report](release-0.4.0.md) describes the earlier
+published source. The development implementation has not been released.
 
 Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
 (disabled), or a non-negative finite cutoff, and rejects unused arguments.
@@ -446,7 +447,8 @@ DESeq2 diagnostic assay or support every DESeq2 fitting option.
 Local large-shape gamma/beta/log-F kernels use scaled native integrals, with
 [original and high-precision validation](native-large-shape-development.md).
 A production-R numerical-call guard supplements runtime interface checks;
-remaining method/capture policies are listed in the [authority audit](native-numerical-authority-audit.md).
+the [supported contract](native-supported-contract.md) records implemented
+method/capture policies and explicit limitations.
 
 Optimizer controls for ashr fixed-prior (`fixg=TRUE`) requests are unused and are
 not inspected. The optimizer name and the supplied prior remain validated.

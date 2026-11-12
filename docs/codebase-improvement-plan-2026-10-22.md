@@ -1,7 +1,9 @@
 # Detailed codebase improvement plan — 2026-10-22
 
-Status: implementation in progress; see the
-[execution report](codebase-improvement-progress-2026-10-29.md).
+Status: C01–C23 accepted for the documented development scope; see the
+[final validation](dev-validation-2026-11-12.md). The checklist below preserves
+the original implementation decisions and acceptance criteria. Publication is
+separate and remains on hold.
 Base commit: `8d4b1e43a68d5aeab0e19536404531c3e2a96333`.
 
 This expands the findings in the [codebase review](codebase-review-2026-10-22.md)
