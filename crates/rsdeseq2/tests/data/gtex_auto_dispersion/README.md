@@ -19,7 +19,7 @@ branches and cover all-zero expansion, dispersion estimates, and normalization.
 Regenerate with R 4.6.1 and DESeq2 1.52.0:
 
 ```sh
-Rscript scripts/generate_gtex_auto_dispersion_reference.R
+Rscript scripts/references/generate_gtex_auto_dispersion_reference.R
 cargo test -p rsdeseq2 --test auto_dispersion
 ```
 

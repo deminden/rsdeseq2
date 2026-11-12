@@ -6,10 +6,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GENERATOR = ROOT / "scripts" / "generate_frozen_worst_genes.py"
+GENERATOR = ROOT / "scripts/references" / "generate_frozen_worst_genes.py"
 RESULT_COLUMNS = ["baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj"]
 
 

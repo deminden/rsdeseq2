@@ -4,22 +4,22 @@
 
 New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0, apeglm
 1.34.0 and ashr 2.2-63. Historical R 4.6.1 references retain their recorded
-provenance and hashes. The [environment record](data/r-reference-environment-2026-10-29.json)
+provenance and hashes. The [environment record](../config/r-reference/r-reference-environment-2026-10-29.json)
 includes the native compiler flags and BLAS configuration. Its 82 non-base R
-packages are pinned by [source URL and SHA-256](data/r-reference-sources-2026-10-29.tsv).
+packages are pinned by [source URL and SHA-256](../config/r-reference/r-reference-sources-2026-10-29.tsv).
 
 Use the selected environment's Rscript explicitly for comparisons:
 
 ```sh
 conda activate deseq2-r462-native
 export R_LIBS_USER="$PWD/results/r-reference-library"
-python scripts/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
-python scripts/install_r_reference.py --check-installed \
+python scripts/environment/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
+python scripts/environment/install_r_reference.py --check-installed \
   --library "$R_LIBS_USER" --rscript "$CONDA_PREFIX/bin/Rscript"
 ```
 
 To restore the pinned package sources into a separate library, run
-`scripts/install_r_reference.py --library PATH --rscript PATH/TO/Rscript`
+`scripts/environment/install_r_reference.py --library PATH --rscript PATH/TO/Rscript`
 without `--check-installed`. The installer verifies source hashes and dependency
 order before installation. Its R version must match the environment record.
 Compiler/BLAS builds still need to be recorded when measuring another platform.
@@ -28,20 +28,20 @@ invoked for a new reference snapshot; installation never rewrites the lock.
 
 Current full native Wald contrast generation, frozen parity checks, and matched
 speed and peak-memory runs are documented in the
-[current GTEx comparison](gtex-native-wald-benchmark.md). Its biological designs,
+[current GTEx comparison](reports/gtex-native-wald-benchmark.md). Its biological designs,
 blocked/unblocked random splits and fixed seed are reproduced by the committed
-`scripts/generate_gtex_mode_contrasts.py` and R reference helper.
+`scripts/references/generate_gtex_mode_contrasts.py` and R reference helper.
 
 For an independent reproduction, generate into a fresh directory and use
 exploration mode. This preserves historical frozen references and does not
 claim that regenerated last bits have already passed accepted-output review:
 
 ```sh
-python scripts/generate_gtex_mode_contrasts.py \
+python scripts/references/generate_gtex_mode_contrasts.py \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
   --output-dir results/benchmarks/reproduced_gtex_r462
 cargo build --release --locked -p rsdeseq2 --bin rsdeseq2
-python scripts/benchmark_gtex_native_wald.py --exploration --repeats 1 \
+python scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats 1 \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
   --fixture-root results/benchmarks/reproduced_gtex_r462 \
   --output-dir results/benchmarks/reproduced_gtex_comparison
@@ -69,7 +69,7 @@ Regenerate the counts and DESeq2 references with Python 3, R 4.6.1, and DESeq2
 1.52.0:
 
 ```bash
-python3 scripts/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
+python3 scripts/references/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
 cargo test -p rsdeseq2 --test gtex_real_wald_parity -- --nocapture
 ```
 
@@ -82,7 +82,7 @@ for provenance and result details.
 
 ## Automatic dispersion means and maximum-error reduction
 
-See [the GTEx dispersion correction](gtex-dispersion-improvement.md) for the
+See [the GTEx dispersion correction](history/gtex-dispersion-improvement.md) for the
 branch-selection cause, the 664-fold minimum maximum-error reduction, frozen
 comparison tables, and commands for the biological and randomized contrasts.
 The compact `auto_dispersion` regression checks automatic, forced GLM, and
@@ -93,7 +93,7 @@ weighted branches against DESeq2 1.52.0 references.
 Run:
 
 ```bash
-Rscript scripts/generate_deseq2_references.R
+Rscript scripts/references/generate_deseq2_references.R
 ```
 
 The entry script retains its original default destination. Its original-DESeq2
@@ -102,14 +102,14 @@ their original order in a private context. To reproduce into fresh destinations
 without replacing the committed fixtures:
 
 ```sh
-Rscript --vanilla scripts/generate_deseq2_references.R \
+Rscript --vanilla scripts/references/generate_deseq2_references.R \
   --output-dir results/reproduced_deseq2_reference \
   --parity-output-dir results/reproduced_deseq2_parity
 ```
 
 Explicit destinations must not exist. Both absolute script paths (including
 spaces) and execution from another working directory are supported. The
-[refactor check](refactoring-focused-2026-11-12.md) compares all 119 generated
+[refactor check](history/refactoring-focused-2026-11-12.md) compares all 119 generated
 files with the original monolithic generator; frozen fixtures remain untouched.
 
 The default command writes references under:
@@ -228,7 +228,7 @@ environment:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 \
-  Rscript scripts/generate_lbfgsb_synthetic_stress_fixtures.R
+  Rscript scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R
 ```
 
 The generator refuses other R versions and serializes doubles with 17
@@ -252,7 +252,7 @@ reference, and run the accuracy check:
 
 ```bash
 cargo build --release -p rsdeseq2
-python3 scripts/real_data_parity.py \
+python3 scripts/validation/real_data_parity.py \
   --study-root /path/to/study-inputs-and-reference-outputs \
   --binary target/release/rsdeseq2 \
   --contrast VALIDATION_CONTRAST_ID \
@@ -260,7 +260,7 @@ python3 scripts/real_data_parity.py \
   --output results/benchmarks/frozen_worst100.tsv \
   --diagnostics-output results/benchmarks/frozen_worst100_diagnostics.tsv \
   --diagnostics-limit 69045
-python3 scripts/score_frozen_worst_genes.py \
+python3 scripts/validation/score_frozen_worst_genes.py \
   --fixture docs/data/wald_frozen_worst100_r461.tsv \
   --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
   --report-only
@@ -324,22 +324,22 @@ clear path to localizing drift.
 
 ## Current checkpoints and independent validation
 
-The [current GTEx comparison](gtex-native-wald-benchmark.md) records the exact
+The [current GTEx comparison](reports/gtex-native-wald-benchmark.md) records the exact
 executable, eleven studies, native R 4.6.2 session, output hashes and reproduction
 commands. Its accepted pass preserves all historical input/reference identities;
 new exploratory references must use a separate directory.
 
 The independent Pasilla panel is committed with its source archive identity,
 selection rule, counts/design and pre-optimization R references. Its generator
-and `scripts/check_pasilla_holdout.py` are included. Keep its frozen references
-unchanged when checking a candidate; see the [memory report](memory-improvements-2026-10-29.md).
-The [Rust-only wrapper migration](rust-only-wrapper-migration.md) records the
+and `scripts/validation/check_pasilla_holdout.py` are included. Keep its frozen references
+unchanged when checking a candidate; see the [memory report](history/memory-improvements-2026-10-29.md).
+The [Rust-only wrapper migration](history/rust-only-wrapper-migration.md) records the
 replacement contract and its required direct cross-interface equality checks.
 The previous R-backed request implementation and its acceptance claims were withdrawn.
-The replacement [bounded result-batch checkpoint](rust-only-result-batches-2026-10-30.md)
+The replacement [bounded result-batch checkpoint](history/rust-only-result-batches-2026-10-30.md)
 uses the standalone engine, preserves those historical artifacts, and records
 its own source package, executable hashes, exact comparisons and paired
-measurements. `scripts/check_rust_r_identity.R` compares IEEE-754 output bits
+measurements. `scripts/validation/check_rust_r_identity.R` compares IEEE-754 output bits
 against the Rust-only `evaluate_r_interface` example, including 65-request
 batches across the native chunk boundary.
 

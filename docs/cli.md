@@ -14,7 +14,7 @@ The record includes a generation ID, absolute file paths, byte lengths and
 SHA-256 hashes. From a checkout, verify a generation with:
 
 ```sh
-python scripts/check_cli_completion.py results.tsv.complete.json
+python scripts/validation/check_cli_completion.py results.tsv.complete.json
 ```
 
 A failure during staging preserves previous outputs. A failure during publication

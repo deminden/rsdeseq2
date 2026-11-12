@@ -19,9 +19,9 @@ Reproduce from the repository root with the recorded source archive and the
 `deseq2-r462-native` environment:
 
 ```sh
-python scripts/generate_pasilla_validation.py --source-archive SOURCE.tar.gz \
+python scripts/references/generate_pasilla_validation.py --source-archive SOURCE.tar.gz \
   --output-dir crates/rsdeseq2/tests/data/pasilla_holdout
-Rscript scripts/generate_pasilla_reference.R crates/rsdeseq2/tests/data/pasilla_holdout
+Rscript scripts/references/generate_pasilla_reference.R crates/rsdeseq2/tests/data/pasilla_holdout
 ```
 
 These references were frozen before memory optimization. Evaluate the panel at

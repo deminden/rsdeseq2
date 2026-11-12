@@ -7,7 +7,7 @@ use rsdeseq2::design::expression::{
 use serde_json::Value as Json;
 
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/formula.rs"]
+#[path = "../tools/validation/evaluate_r_interface/formula.rs"]
 mod formula;
 use formula::{expression, value};
 

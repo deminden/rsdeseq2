@@ -26,7 +26,7 @@ and JSON writer dependency. No reference expectation comes from rsdeseq2.
 On a Linux x86_64 reference worker supporting the selected OpenBLAS kernel:
 
 ```sh
-python scripts/check_linux_formula_references.py \
+python scripts/validation/check_linux_formula_references.py \
   --rscript Rscript --output-dir /tmp/rsdeseq2-linux-formula-reference
 ```
 

@@ -1,12 +1,12 @@
 #[macro_use]
 #[path = "support/formula_reference.rs"]
 mod reference;
-#[path = "../examples/evaluate_r_interface/factor_expansion.rs"]
+#[path = "../tools/validation/evaluate_r_interface/factor_expansion.rs"]
 mod factor_expansion;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/formula.rs"]
+#[path = "../tools/validation/evaluate_r_interface/formula.rs"]
 mod formula;
-#[path = "../examples/evaluate_r_interface/native_formula.rs"]
+#[path = "../tools/validation/evaluate_r_interface/native_formula.rs"]
 mod input;
 
 #[test]

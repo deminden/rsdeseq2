@@ -7,7 +7,8 @@ tests cover the implemented statistical pipeline.
 
 `platform-checks.yml` runs the five target/profile numerical panels on branch
 pushes, pull requests and manual checks. It has read-only repository permissions
-and does not package, upload or publish artifacts. It shares the exact test list
+and does not publish release archives or packages. Affected platforms upload
+independently generated R CDF evidence for review. It shares the exact test list
 and command runner with the tagged binary workflow and provenance records, so
 platform validation can finish before a release tag exists.
 
@@ -28,25 +29,22 @@ The GitHub release receives those records and the checked source artifacts.
 versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
-## Current development
+## Prepared 0.5.0 release
 
-The [current supported contract](native-supported-contract.md) describes the
-shared Rust implementation after the published 0.4.0 source, including native
-frozen-local VST and supported ashr/apeglm calculations. The
-[final local acceptance audit](final-plan-local-acceptance.md) closes C19/C21
-locally and records the initial combined checks and measurements. The
-[final development validation](dev-validation-2026-11-12.md) closes C23 with
-current CI and a verified local bundle. Historical release evidence below must
-not be relabeled as validation of later code.
-The [warning/platform follow-up](native-sqp-warning-platform-gates.md) records
-the corrected SQP diagnostics, fresh platform-oracle gates and separately rebuilt
-local source/package artifacts.
-The `dev` branch is authorized for CI checks. Tags, GitHub releases and package
-publication remain on hold until a new user instruction.
+[0.5.0 release notes](releases/0.5.0.md) describe the supported Rust-only engine,
+public API corrections, resource controls and layout changes. The
+[current supported contract](native-supported-contract.md),
+[correction validation](reports/review-fixes-2026-11-12.md), and
+[local preparation checks](reports/reorganisation-0.5.0.md) distinguish their
+source/artifact identities. Historical records below are not relabelled as
+validation of later code. All own package/lockfile versions must agree at 0.5.0.
+
+Preparation is local. Tags, GitHub releases and registry publication remain on
+hold until explicitly requested. Do not reuse the existing 0.4.0 tag or bundles.
 
 ## Version 0.4.0 — historical source
 
-The [0.4.0 release report](release-0.4.0.md) gathers the validated changes since
+The [0.4.0 release report](releases/0.4.0.md) gathers the validated changes since
 0.3.1. The minor version reflects formula-coding, input-validation and fitted-state
 corrections. It includes independent original-R references, direct standalone/R
 identity checks, current GTEx precision/speed/RSS evidence and a checked source
@@ -59,8 +57,8 @@ The coordinated workflow validates each release tag before publishing the checke
 source packages and five target archives. The release report records the final
 paired measurements and the visible compiled-code warning.
 
-The [earlier development report](codebase-improvement-progress-2026-10-29.md)
-and [refactor checkpoint](refactoring-followup-2026-10-29.md) retain their original
+The [earlier development report](history/codebase-improvement-progress-2026-10-29.md)
+and [refactor checkpoint](history/refactoring-followup-2026-10-29.md) retain their original
 artifact-bound evidence. Earlier release records below are historical.
 
 ## Version 0.3.1
@@ -84,7 +82,7 @@ Each accepted round exceeded 2% in total native quantification throughput in
 one paired pass across eleven complete GTEx contrasts. The product of the
 per-round ratios is 4.3407x across both batches. This cumulative estimate is
 reported separately from the direct 0.3.0/0.3.1 release measurement in the
-[current benchmark](gtex-native-wald-benchmark-0.3.1.md).
+[current benchmark](history/gtex-native-wald-benchmark-0.3.1.md).
 The optimization benchmark includes fit-diagnostic serialization; the release
 comparison times result-table serialization for each tool.
 
@@ -108,7 +106,7 @@ Validated locally on 2026-10-14 with R 4.6.1 / DESeq2 1.52.0:
   R source-package build/install passed, including package load checks.
   All 100 vendored core source files match.
 
-The [current benchmark](gtex-native-wald-benchmark-0.3.1.md) records all raw runs,
+The [current benchmark](history/gtex-native-wald-benchmark-0.3.1.md) records all raw runs,
 resource reports, hashes, settings and twenty accepted optimisation rounds.
 Broad Rust, R and Python test-suite counts in the 0.3.0 section are historical;
 those suites were not rerun during this preparation. CI retains its release
@@ -148,7 +146,7 @@ This evidence uses R 4.6.1 / DESeq2 1.52.0, parametric dispersion trends, no
 beta prior, and disabled Cook's filtering/replacement and independent
 filtering. The complete measurements, remaining error bounds,
 input/reference hashes, and reproduction commands are in the
-[GTEx dispersion correction report](gtex-dispersion-improvement.md).
+[GTEx dispersion correction report](history/gtex-dispersion-improvement.md).
 The core numerical behavior matches `9acb44b`; subsequent precision
 experiments were reverted. Earlier release benchmarks below remain historical.
 
@@ -171,7 +169,7 @@ scope and remaining limitations.
 
 ### Current parity, speed and memory evidence
 
-The [0.3.0 native Wald benchmark](gtex-native-wald-benchmark-0.3.0.md) contains
+The [0.3.0 native Wald benchmark](history/gtex-native-wald-benchmark-0.3.0.md) contains
 the original parity results, Rust/DESeq2 timings and peak resident memory.
 The main README and current benchmark report describe the latest release.
 
@@ -245,7 +243,7 @@ For 0.4.0, replay the frozen 11-contrast GTEx suite with the candidate binary:
 
 ```bash
 cargo build --release -p rsdeseq2 --locked
-python3 scripts/check_gtex_dispersion_improvement.py \
+python3 scripts/validation/check_gtex_dispersion_improvement.py \
   --workers 1 --output-dir results/benchmarks/release_0.4.0/gtex
 ```
 
@@ -263,10 +261,12 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo package -p rsdeseq2 --locked
-scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
-Rscript scripts/generate_deseq2_references.R
+scripts/benchmarks/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
+Rscript scripts/references/generate_deseq2_references.R \
+  --output-dir results/reproduced-reference \
+  --parity-output-dir results/reproduced-parity
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-python3 scripts/score_frozen_worst_genes.py \
+python3 scripts/validation/score_frozen_worst_genes.py \
   --fixture docs/data/wald_frozen_worst100_r461.tsv \
   --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
   --report-only

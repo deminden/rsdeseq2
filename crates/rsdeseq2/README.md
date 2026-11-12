@@ -14,16 +14,18 @@ It is not a drop-in replacement for the complete Bioconductor API.
 
 ## Install
 
-Add version 0.4.0 to a Rust project:
+Version 0.5.0 is prepared for release; registry commands apply after publication.
+
+Add version 0.5.0 to a Rust project:
 
 ```bash
-cargo add rsdeseq2@0.4.0
+cargo add rsdeseq2@0.5.0
 ```
 
 Install the CLI:
 
 ```bash
-cargo install rsdeseq2 --version 0.4.0 --locked
+cargo install rsdeseq2 --version 0.5.0 --locked
 ```
 
 ## Supported Scope
@@ -158,7 +160,7 @@ python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 Generate DESeq2 reference fixtures:
 
 ```bash
-Rscript scripts/generate_deseq2_references.R
+Rscript scripts/references/generate_deseq2_references.R
 cargo test -p rsdeseq2 --test dispersion_reference
 cargo test -p rsdeseq2 --test wald_reference
 cargo test -p rsdeseq2 --test lrt_reference
@@ -167,12 +169,12 @@ cargo test -p rsdeseq2 --test lrt_reference
 Run matched speed/RAM benchmarks for the supported primitives:
 
 ```bash
-scripts/benchmark_rsdeseq2.sh
+scripts/benchmarks/benchmark_rsdeseq2.sh
 ```
 
 [gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
 [benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
-[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/main/docs/gtex-dispersion-improvement.md
+[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/main/docs/history/gtex-dispersion-improvement.md
 
-[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/gtex-native-wald-benchmark.md
+[gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/reports/gtex-native-wald-benchmark.md

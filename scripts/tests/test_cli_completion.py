@@ -3,11 +3,11 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from check_cli_completion import verify
+from scripts.validation.check_cli_completion import verify
 
 
 class CompletionChecks(unittest.TestCase):

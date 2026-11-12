@@ -1,22 +1,22 @@
 //! Shared independent-posterior transports and comparison gates.
 use std::error::Error;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/builtin_likelihood.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/builtin_likelihood.rs"]
 pub(crate) mod builtin_likelihood;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/formula.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/formula.rs"]
 pub(crate) mod formula;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/heavy_tail.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/heavy_tail.rs"]
 pub(crate) mod heavy_tail;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/likelihood.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/likelihood.rs"]
 pub(crate) mod likelihood;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/random.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/random.rs"]
 pub(crate) mod random;
 #[allow(dead_code)]
-#[path = "../../examples/evaluate_r_interface/regression.rs"]
+#[path = "../../tools/validation/evaluate_r_interface/regression.rs"]
 pub(crate) mod regression;
 pub(crate) fn bits(x: f64) -> String {
     format!("{:016x}", x.to_bits())

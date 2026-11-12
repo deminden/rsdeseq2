@@ -2,7 +2,7 @@
 
 ## Current native Wald comparison
 
-The [0.4.0 candidate GTEx parity, speed and memory comparison](gtex-native-wald-benchmark.md)
+The [0.4.0 candidate GTEx parity, speed and memory comparison](reports/gtex-native-wald-benchmark.md)
 covers eleven full native Wald contrasts, including biological comparisons
 and blocked/unblocked random splits. It includes current measurements and
 committed contrast-generation and matched time/peak-memory scripts. The
@@ -35,7 +35,7 @@ parsing, output writing, R startup, and DESeq2 package loading. Use
 Synthetic moderate run:
 
 ```bash
-python3 scripts/benchmark_speed_memory.py \
+python3 scripts/benchmarks/benchmark_speed_memory.py \
   --genes 10000,50000 \
   --samples 16 \
   --repeats 2 \
@@ -46,7 +46,7 @@ python3 scripts/benchmark_speed_memory.py \
 Real count matrix run:
 
 ```bash
-scripts/benchmark_rsdeseq2.sh \
+scripts/benchmarks/benchmark_rsdeseq2.sh \
   --rscript /path/to/Rscript \
   --counts-file /path/to/raw_counts.tsv.gz \
   --repeats 3 \
@@ -147,7 +147,7 @@ DESeq2 result tables. To reproduce a check, prepare:
 Command shape:
 
 ```bash
-python3 scripts/real_data_parity.py \
+python3 scripts/validation/real_data_parity.py \
   --study-root /path/to/study-inputs-and-reference-outputs \
   --binary target/release/rsdeseq2 \
   --contrast-size-factors estimate \
@@ -198,7 +198,7 @@ serialization.
 The practical scan thresholds are maximum parameter error `5e-3`, absolute
 objective error `1e-5`, or relative objective error `1e-8`. The exact run sets
 all three endpoint/objective tolerances to zero. The fixture generator is
-`scripts/generate_lbfgsb_synthetic_stress_fixtures.R`; it refuses R versions
+`scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R`; it refuses R versions
 other than 4.6.1. These figures characterize the recorded fixture environment and do
 not imply that floating-point-sensitive callbacks are bit-exact across other
 platforms or math-library configurations. The aggregate counts are stored in
@@ -297,7 +297,7 @@ The unrounded aggregate measurements are stored in
 [`docs/data/wald_frozen_worst100_r461_summary.tsv`](data/wald_frozen_worst100_r461_summary.tsv).
 
 ```bash
-python3 scripts/score_frozen_worst_genes.py \
+python3 scripts/validation/score_frozen_worst_genes.py \
   --fixture docs/data/wald_frozen_worst100_r461.tsv \
   --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
   --report-only

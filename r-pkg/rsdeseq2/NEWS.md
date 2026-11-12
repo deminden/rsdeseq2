@@ -1,4 +1,15 @@
-# Development after 0.4.0
+# rsdeseq2 0.5.0 (prepared)
+
+* Tie posterior probability summaries to their selected coefficient and reject
+  inconsistent result shapes. The Rust posterior type now has a private identity
+  field; obtain it from a fitting API instead of a struct literal.
+* Simplify repeated formula variables and bound interaction expansion/nesting,
+  preserving additive-group and dot cross-products.
+* Add configurable posterior grid work limits, cooperative cancellation and safe
+  R interruption/reuse. Remove unconditional CLI Cook's-matrix copies.
+* Reorganise reference, validation, benchmark, environment and release tooling;
+  separate current guides/reports from historical documentation. Remove the root
+  quickstart example and exclude OS metadata from source packages.
 
 * Match original ashr's sparse SQP EM/active-set iteration policy in Rust,
   including the condition-based approximate direction solve. Correct the

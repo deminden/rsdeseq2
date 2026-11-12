@@ -4,9 +4,9 @@ use rsdeseq2::shrinkage::{
 };
 use serde::Deserialize;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/formula.rs"]
+#[path = "../tools/validation/evaluate_r_interface/formula.rs"]
 mod formula;
-#[path = "../examples/evaluate_r_interface/likelihood.rs"]
+#[path = "../tools/validation/evaluate_r_interface/likelihood.rs"]
 mod likelihood;
 #[derive(Deserialize)]
 struct Reference {

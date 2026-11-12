@@ -5,8 +5,8 @@ fitting, inference, transforms and all supported shrinkage methods. R handles
 argument translation, identifier alignment and R/Bioconductor objects. The
 [current supported contract](native-supported-contract.md) maps every public
 export to its numerical owner and independent/interface evidence. The
-[final development validation](dev-validation-2026-11-12.md) records passing
-current checks; the [0.4.0 report](release-0.4.0.md) describes the earlier
+[final development validation](history/dev-validation-2026-11-12.md) records passing
+current checks; the [0.4.0 report](releases/0.4.0.md) describes the earlier
 published source. The development implementation has not been released.
 
 Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
@@ -21,11 +21,11 @@ and replacement-fit merging. Later standalone requests can retain the merged
 fit and plan and use `results_for_request_with_replacement`. The matrix-fit
 checks cover 31 requests and 113 later queries. Complete formula-fit checks
 cover another 33 requests and 96 queries without column remapping; see the
-[formula-fit report](native-formula-fit-development.md).
+[formula-fit report](history/native-formula-fit-development.md).
 After replacement, raw count-zero metadata and weighted failure diagnostics
 remain separate. Fits skip unnecessary replacement refits when no samples are
-eligible. See the [state correction](weighted-replacement-state-correction.md)
-and [execution evidence](replacement-execution-correction.md).
+eligible. See the [state correction](history/weighted-replacement-state-correction.md)
+and [execution evidence](history/replacement-execution-correction.md).
 
 `resultsList()` evaluates several requests after one fitted-dataset validation:
 
@@ -43,10 +43,10 @@ table has the same values, classes and metadata as its individual call. Native
 inference borrows shared arrays in chunks of at most 64 requests (default 32);
 filtering and Cook's decisions remain separate for every request. Primitive
 Wald/LRT fits and supported list inputs are also accepted. See the
-[batch implementation and validation](rust-only-result-batches-2026-10-30.md).
+[batch implementation and validation](history/rust-only-result-batches-2026-10-30.md).
 Fitted Cook's/refit presentation now uses the shared borrowed Rust row policy;
 R only marshals context and attaches output columns. The
-[Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md) records its independent
+[Cook/refit checkpoint](history/rust-only-cooks-policy-2026-10-30.md) records its independent
 checks, corrected native design eligibility, exact comparisons and measured costs.
 
 `nproc` controls a reusable local worker pool for fitting, replacement refits and
@@ -57,7 +57,7 @@ different precision settings.
 The R package builds and statically links the Rust crate used by the CLI.
 Cargo is required when installing the package from source. The core crate is
 vendored under `src/rust/vendor/rsdeseq2`; regenerate that copy from the
-repository root with `scripts/sync_r_vendor.sh` before making a source release.
+repository root with `scripts/release/sync_r_vendor.sh` before making a source release.
 
 `DESeq()` and `fitRust()` run dispersion estimation, GLM fitting, Wald tests,
 and likelihood-ratio tests in Rust. They accept a count matrix plus an explicit
@@ -119,7 +119,7 @@ Use qualified built-ins when packages mask them. Custom calls, multiple
 statements, active bindings, delayed calculations and unresolved global
 constants are rejected before execution. Saved locfit imports currently require
 the standard one-dimensional quadratic Gaussian DESeq2 profile. The
-[frozen-local audit and follow-up](frozen-local-vst-audit-2026-10-31.md) describe
+[frozen-local audit and follow-up](history/frozen-local-vst-audit-2026-10-31.md) describe
 the independent references and direct interface checks. These development
 changes do not alter the published 0.4.0 artifacts.
 Design-aware rlog reuses an existing `dispFit` column when
@@ -155,23 +155,23 @@ Local ashr `optmethod` also accepts `mixEM`, `w_mixEM`, `mixVBEM` and
 variational `prior="unit"`/positive fractional priors are supported. Native `mixIP`
 uses a log-barrier solver with `control=list(rtol=...)`. Higher-order `mixEM`,
 `w_mixEM` and `mixVBEM` accept `control=list(K=2,method="mpe",square=TRUE)`.
-See the [advanced optimizer scope and reference limits](native-ashr-advanced-optimizer-development.md). See the
-[optimizer scope, controls and explicit original-package corrections](native-ashr-optimizer-development.md).
+See the [advanced optimizer scope and reference limits](history/native-ashr-advanced-optimizer-development.md). See the
+[optimizer scope, controls and explicit original-package corrections](history/native-ashr-optimizer-development.md).
 
 Numeric `outputlevel` and exact named subsets select the posterior fields and
 fitted prior returned by the local wrapper. Positive-threshold queries require
 `PosteriorMean` and `fitted_g`, including at level four. Omitted fields remain
-absent. See [output selection and validation](native-ashr-output-development.md).
+absent. See [output selection and validation](history/native-ashr-output-development.md).
 
 `mode="estimate"` profiles the fitted mixture likelihood in Rust. See
-[estimated modes and bounds](native-ashr-mode-development.md) for two-element
+[estimated modes and bounds](history/native-ashr-mode-development.md) for two-element
 mode compatibility, native explicit intervals and independent comparisons.
 
 The local SQP adapter supports active-set, direction, line-search, regularization
 and optional `tol.svd` controls, including `maxiter.activeset=NULL`. See
-[numerical controls and validation](native-sqp-control-development.md) for default
+[numerical controls and validation](history/native-sqp-control-development.md) for default
 full-matrix preservation, spectral fallback and remaining diagnostic scope.
-The subsequent [sparse SQP correction](native-sparse-sqp-development.md) uses the
+The subsequent [sparse SQP correction](history/native-sparse-sqp-development.md) uses the
 source EM/working-set policy and condition-based direction solve. It fixes the
 existing reordered-gene subset comparison without changing its precision bound.
 
@@ -179,15 +179,15 @@ Local canonical `ashr::lik_normalmix` and `ashr::lik_logF` objects import stored
 primitive parameters without executing their closures. Noise SD matrices and
 row-specific degrees of freedom retain complete-observation alignment. Uniform
 priors are supported; original log-F missing SDs and unsupported normal priors
-are retained. See [continuous likelihoods and limits](native-continuous-likelihood-development.md).
+are retained. See [continuous likelihoods and limits](history/native-continuous-likelihood-development.md).
 Matrix weights follow the original capture rules: equal total lengths flatten
 both weights and SDs into a global mixture; otherwise component lists recycle
-against SD columns. See [capture layout and validation](native-capture-policy-development.md).
+against SD columns. See [capture layout and validation](history/native-capture-policy-development.md).
 
 Canonical `ashr::lik_pois` and `ashr::lik_binom` objects also import stored
 primitive counts and parameters without calling their functions. Identity/log
 and identity/logit links, count-specific mode/grid/FDR defaults and original
-intensity/probability moments run in Rust. See [count likelihoods and limits](native-count-likelihood-development.md).
+intensity/probability moments run in Rust. See [count likelihoods and limits](history/native-count-likelihood-development.md).
 
 In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
 and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
@@ -209,7 +209,7 @@ this route supports primitive numeric one-dimensional indexing, `%*%`,
 Captured constants remain stored primitive scalars; observation, design,
 coefficient, parameter and offset vectors come from the native request. The
 canonical original `apeglm::logLikNB` is recognized without execution. BFGS and
-L-BFGS-B run in Rust. See [validation and remaining scope](native-regression-development.md).
+L-BFGS-B run in Rust. See [validation and remaining scope](history/native-regression-development.md).
 
 Optional `interval.type="HPD"` or `"credible"` uses native grid sign summaries;
 `interval.level`, `ngrid`, `nsd`, `ngrid.nuis` and `nsd.nuis` configure the grid.
@@ -219,13 +219,13 @@ requests covariance-based posterior contrasts inside the native engine. The
 primitive bridge returns extra interval/contrast matrices; public `lfcShrink()`
 keeps the selected-coefficient result-table shape. This is separate from its
 unsupported `contrast=` coefficient-selection argument for apeglm. See
-[posterior analysis scope and explicit source corrections](native-posterior-analysis-development.md).
+[posterior analysis scope and explicit source corrections](history/native-posterior-analysis-development.md).
 
 General and beta-binomial methods ignore `log.link`. Beta-binomial prefits defer
 optimizer controls until refinement needs them. Across methods, empty/missing
 or nonfinite scalar bounds are unbounded, extra entries drop, and bounds apply
 only to the exact `optim.method="L-BFGS-B"` spelling. See
-[method argument policy and checks](native-regression-method-policy-development.md).
+[method argument policy and checks](history/native-regression-method-policy-development.md).
 
 MAP-only `apeMethod="nbinomC*"` and `apeMethod="betabinC*"` use native random
 starts. The wrapper imports stored `.Random.seed` and writes back the advanced
@@ -233,13 +233,13 @@ state; no R random-generation function is called. The default Mersenne-Twister
 and L'Ecuyer-CMRG states with Inversion normals are supported, including states
 from parallel streams. Use `set.seed()` before a reproducible call. Missing
 state is initialized in Rust. Other RNG configurations fail explicitly; see
-[state, failure and precision checks](native-random-start-development.md).
+[state, failure and precision checks](history/native-random-start-development.md).
 
 `nbinomC` and `nbinomC*` ignore optimizer, bounds and `log.link` controls.
 `nbinomCR` uses BFGS or L-BFGS-B controls only if refinement is needed; valid
 prefits ignore those controls. Empty numeric bounds are unbounded. CR with
 `log.link=FALSE` rejects all-zero rows. Other refinement optimizer families
-remain unsupported. See [compiled method policy](native-capture-policy-development.md).
+remain unsupported. See [compiled method policy](history/native-capture-policy-development.md).
 
 The package also exposes primitive matrix helpers:
 
@@ -445,7 +445,7 @@ final per-gene dispersion estimates. The package does not populate every
 DESeq2 diagnostic assay or support every DESeq2 fitting option.
 
 Local large-shape gamma/beta/log-F kernels use scaled native integrals, with
-[original and high-precision validation](native-large-shape-development.md).
+[original and high-precision validation](history/native-large-shape-development.md).
 A production-R numerical-call guard supplements runtime interface checks;
 the [supported contract](native-supported-contract.md) records implemented
 method/capture policies and explicit limitations.
@@ -453,4 +453,4 @@ method/capture policies and explicit limitations.
 Optimizer controls for ashr fixed-prior (`fixg=TRUE`) requests are unused and are
 not inspected. The optimizer name and the supplied prior remain validated.
 Active fitting retains control validation. Both interfaces share the standalone
-Rust control policy; see the [control checkpoint](native-fixed-prior-controls-development.md).
+Rust control policy; see the [control checkpoint](history/native-fixed-prior-controls-development.md).

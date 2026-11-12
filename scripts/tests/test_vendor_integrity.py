@@ -1,12 +1,12 @@
 """Vendor drift must fail without fixing the checkout being checked."""
 from pathlib import Path
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import tempfile
 import unittest
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import sync_r_vendor as vendor
+import scripts.release.sync_r_vendor as vendor
 
 
 class VendorIntegrity(unittest.TestCase):

@@ -3,10 +3,10 @@
 mod support;
 use support::*;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/em_fit.rs"]
+#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
 mod em_fit;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/location_shrinkage.rs"]
+#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
 fn reference() -> serde_json::Value {
     serde_json::from_str(include_str!("data/ashr_optimizer_r462.json")).unwrap()

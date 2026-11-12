@@ -107,38 +107,38 @@ Local development also supports native apeglm grid sign summaries, scalar
 parameter uncertainty and covariance-based posterior contrasts. The primitive
 engine exposes interval/contrast matrices; `lfcShrink()` keeps its selected-
 coefficient result-table shape. See the
-[posterior analysis scope](../../docs/native-posterior-analysis-development.md)
+[posterior analysis scope](../../docs/history/native-posterior-analysis-development.md)
 for controls, validation and documented original-package grid corrections.
 
 Native ashr development also supports `mixEM`, `w_mixEM`, `mixVBEM` and
 `cxxMixSquarem`, with K=1 acceleration controls and variational unit/fractional
-priors. See [optimizer validation and scope](../../docs/native-ashr-optimizer-development.md).
+priors. See [optimizer validation and scope](../../docs/history/native-ashr-optimizer-development.md).
 
 Higher-order RRE/MPE cycling and native interior-point mixture fitting are also
-available in local development. See the [advanced optimizer scope](../../docs/native-ashr-advanced-optimizer-development.md)
+available in local development. See the [advanced optimizer scope](../../docs/history/native-ashr-advanced-optimizer-development.md)
 for controls and reference limits.
 
 Numeric `outputlevel` and exact named subsets select local ashr posterior fields
-and fitted priors. See [output selection](../../docs/native-ashr-output-development.md)
+and fitted priors. See [output selection](../../docs/history/native-ashr-output-development.md)
 for omitted fields and positive-threshold requirements.
 
-`mode="estimate"` now runs in Rust; see [mode profiling and bounds](../../docs/native-ashr-mode-development.md)
+`mode="estimate"` now runs in Rust; see [mode profiling and bounds](../../docs/history/native-ashr-mode-development.md)
 for numerical comparisons and the original two-element mode policy.
 
 Local SQP numerical controls now include active-set convergence, line search,
-regularization and optional SVD. See [controls and reference scope](../../docs/native-sqp-control-development.md).
+regularization and optional SVD. See [controls and reference scope](../../docs/history/native-sqp-control-development.md).
 
 Local canonical normal-mixture/log-F observation likelihoods now share Rust
 probabilities, moments and per-observation parameters. See
-[continuous likelihoods](../../docs/native-continuous-likelihood-development.md)
+[continuous likelihoods](../../docs/history/native-continuous-likelihood-development.md)
 for supported priors, original missingness policies and remaining families.
 
 Local canonical Poisson/binomial likelihoods support identity/log and
 identity/logit links, native count-specific mode/grid/FDR defaults and original
-intensity/probability summaries. See [count likelihoods](../../docs/native-count-likelihood-development.md)
+intensity/probability summaries. See [count likelihoods](../../docs/history/native-count-likelihood-development.md)
 for input policy and validation.
 
 Canonical normal-mixture matrix captures now follow source flattening/recycling
 rules. Compiled negative-binomial methods ignore unused controls and defer
-refinement controls until needed. See [capture and compiled-method policy](../../docs/native-capture-policy-development.md)
+refinement controls until needed. See [capture and compiled-method policy](../../docs/history/native-capture-policy-development.md)
 for independent references, exact interface comparisons and remaining scope.

@@ -1,12 +1,14 @@
 [package]
 name = "rsdeseq2"
-version = "0.4.0"
+version = "0.5.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 description = "Rust implementation of DESeq2-compatible differential expression workflows"
 readme = "README.md"
+autoexamples = false
+exclude = [".DS_Store", "**/.DS_Store"]
 
 [lib]
 name = "rsdeseq2"
@@ -48,3 +50,15 @@ thiserror.workspace = true
 [dev-dependencies]
 approx.workspace = true
 criterion.workspace = true
+
+[[example]]
+name = "compare_map_dispersion_fixture"
+path = "tools/validation/compare_map_dispersion_fixture.rs"
+
+[[example]]
+name = "compare_se_covariance_fixture"
+path = "tools/validation/compare_se_covariance_fixture.rs"
+
+[[example]]
+name = "evaluate_r_interface"
+path = "tools/validation/evaluate_r_interface.rs"

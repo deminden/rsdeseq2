@@ -1,14 +1,14 @@
 """Pinned R environments reject incomplete graphs and changed source archives."""
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import json
 import os
-import sys
 import tempfile
 import unittest
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import install_r_reference as reference
+import scripts.environment.install_r_reference as reference
 
 
 class RReferenceLock(unittest.TestCase):

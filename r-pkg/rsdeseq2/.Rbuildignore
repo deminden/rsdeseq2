@@ -1,3 +1,4 @@
 ^src/rust/target$
 ^src/Makevars$
 ^src/Makevars\.win$
+(^|/)\.DS_Store$

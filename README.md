@@ -22,32 +22,30 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
 | [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
 
-Development on `dev` after the published 0.4.0 source runs supported formula,
+The 0.5.0 source on `dev`, following the published 0.4.0 release, runs supported formula,
 transform and shrinkage calculations in the shared Rust core. The
 [supported contract](docs/native-supported-contract.md) records tested methods
-and explicit limits; the [review correction checks](docs/review-fixes-2026-11-12.md)
-and [refactor validation](docs/refactoring-focused-2026-11-12.md)
+and explicit limits; the [review correction checks](docs/reports/review-fixes-2026-11-12.md)
+and [refactor validation](docs/history/refactoring-focused-2026-11-12.md)
 record the source and numerical checks. Publication remains on hold.
 
 ## Install and Run
 
-Install the 0.4.0 CLI from crates.io:
+Install the 0.5.0 CLI from crates.io after publication:
 
 ```bash
-cargo install rsdeseq2 --version 0.4.0 --locked
+cargo install rsdeseq2 --version 0.5.0 --locked
 ```
 
-From a repository checkout, run the complete small Wald example:
+Run Wald analysis with your count and design tables:
 
 ```bash
-cargo run --release -p rsdeseq2 -- wald \
-  --counts examples/quickstart/counts.tsv \
-  --design examples/quickstart/design.tsv \
+rsdeseq2 wald \
+  --counts counts.tsv \
+  --design design.tsv \
   --fit-type mean \
   --coefficient 1 \
   --output results.tsv
-
-sed -n '1,5p' results.tsv
 ```
 
 The result table contains `baseMean`, `log2FoldChange`, `lfcSE`, `stat`,
@@ -184,7 +182,7 @@ interpreter and libraries. Groups show medians across distinct contrasts.
 Rust peaks at **214–307 MiB**, using **80.6–86.7% less peak RSS than DESeq2**.
 
 Per-contrast measurements, provenance, precision checks and reproducible scripts
-are in the [current comparison](docs/gtex-native-wald-benchmark.md).
+are in the [current comparison](docs/reports/gtex-native-wald-benchmark.md).
 Rust and R tests also cover documented normalization, Wald/LRT, transforms,
 shrinkage, fitted-object reuse and batched results. This establishes behavior for
 the tested inputs and settings; the complete Bioconductor API is outside scope.

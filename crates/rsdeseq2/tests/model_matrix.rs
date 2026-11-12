@@ -2,7 +2,7 @@
 #[path = "support/formula_reference.rs"]
 mod reference;
 // Frozen independent R matrices, including attributes/order and signed zeros.
-#[path = "../examples/evaluate_r_interface/model_matrix.rs"]
+#[path = "../tools/validation/evaluate_r_interface/model_matrix.rs"]
 mod input;
 use rsdeseq2::design::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};

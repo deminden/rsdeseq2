@@ -6,8 +6,9 @@ Python tooling/tests require Python 3.10 or newer; the validation run used Pytho
 
 - `crates/rsdeseq2`: Rust numerical core and minimal CLI.
 - `r-pkg/rsdeseq2`: R access layer and package CI.
-- `scripts`: reference-generation, parity-analysis, and benchmark scripts.
-- `docs`: algorithms, compatibility, reproducibility, and release notes.
+- `scripts/`: reference generation, validation, benchmarks, environment and release tooling.
+- `config/r-reference/`: pinned R environment and source locks.
+- `docs/`: current guides, empirical reports, historical records and versioned release notes.
 - `results/`: ignored generated parity, fixture, and benchmark outputs.
 
 The repository is Rust-first: a Rust core, CLI, R access layer,
@@ -51,7 +52,7 @@ trend model with its fitting implementation; only shared arithmetic and row
 selection cross these private module boundaries.
 
 Formula term expansion and CLI execution/adapters/readers/writers now have real
-private module boundaries; see the [review corrections](review-fixes-2026-11-12.md)
+private module boundaries; see the [review corrections](reports/review-fixes-2026-11-12.md)
 for bounded expansion, posterior summary ownership, work controls and current
 local-only validation status.
 
@@ -60,33 +61,33 @@ Most remaining design helpers, GLM IRLS/beta modules and the R Rust bridge use p
 order. Edit the focused topic files referenced by each entry file. The R
 results wrapper is split across `R/results.R` and `R/results-*.R`; these files
 contain function definitions and must remain independent of collation order.
-Regenerate the R package's vendored core with `scripts/sync_r_vendor.sh` after
+Regenerate the R package's vendored core with `scripts/release/sync_r_vendor.sh` after
 editing core Rust sources.
-Run `scripts/sync_r_vendor.sh --check` before testing or packaging. This is a
+Run `scripts/release/sync_r_vendor.sh --check` before testing or packaging. This is a
 read-only comparison against a temporary generated tree and checks the Rust/R
 versions. The vendored manifest is derived from Cargo metadata. CI checks the
 committed vendor and fails on drift instead of repairing it before testing.
 
-See the [current refactor report](refactoring-followup-2026-10-29.md) for the
+See the [current refactor report](history/refactoring-followup-2026-10-29.md) for the
 file inventory and precision/performance validation, and the
-[earlier report](refactoring-large-files.md) for the October 16 restructuring.
+[earlier report](history/refactoring-large-files.md) for the October 16 restructuring.
 
 The [test-quality report](testing-parity.md) describes required oracle checks,
 CLI routing assertions, the compact GTEx panel and full replay commands.
 
-The [shared inference report](rust-only-inference-2026-10-29.md) documents the
+The [shared inference report](history/rust-only-inference-2026-10-29.md) documents the
 standalone probability kernels and independent reference generator at that
 checkpoint. The [current supported contract](native-supported-contract.md) maps
 all R exports to the shared numerical engine and records remaining completion
 gates. New numerical changes must preserve independent bounds and direct
 standalone/wrapped equality.
 
-The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
+The [final local acceptance audit](history/final-plan-local-acceptance.md) reconciles
 the C19/C21 requirements and current combined tests, paired process measurements
-and measured wrapper boundary costs. The [final development validation](dev-validation-2026-11-12.md)
+and measured wrapper boundary costs. The [final development validation](history/dev-validation-2026-11-12.md)
 closes C23 with current CI and a verified local bundle. Development on `dev`
 is authorized; tags and publication remain on hold.
-The [warning/platform follow-up](native-sqp-warning-platform-gates.md) also
+The [warning/platform follow-up](history/native-sqp-warning-platform-gates.md) also
 requires fresh original-R complete-formula and sparse-SQP references in the
 pinned Linux lane, alongside the saved-reference tests. It documents a corrected
 warning omission found by strengthening those assertions.
@@ -102,7 +103,7 @@ cargo test --workspace
 Generate R references:
 
 ```bash
-Rscript scripts/generate_deseq2_references.R
+Rscript scripts/references/generate_deseq2_references.R
 cargo test -p rsdeseq2 --test dispersion_reference
 cargo test -p rsdeseq2 --test results_reference
 cargo test -p rsdeseq2 --test wald_reference
@@ -113,7 +114,7 @@ The optimizer stress reference specifically requires R 4.6.1:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 \
-  Rscript scripts/generate_lbfgsb_synthetic_stress_fixtures.R
+  Rscript scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R
 ```
 
 The `rcompat-lbfgsb` 0.2.1 result is 512/512 exact endpoints, objectives, and
@@ -140,7 +141,7 @@ Run benchmarks:
 
 ```bash
 cargo bench -p rsdeseq2
-scripts/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
+scripts/benchmarks/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
 ```
 
 After producing the top-1,000 benchmark diagnostics described in
@@ -148,7 +149,7 @@ After producing the top-1,000 benchmark diagnostics described in
 reproduce the reported measurements and run the scorer tests:
 
 ```bash
-python3 scripts/score_frozen_worst_genes.py \
+python3 scripts/validation/score_frozen_worst_genes.py \
   --fixture docs/data/wald_frozen_worst100_r461.tsv \
   --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
   --report-only
@@ -179,11 +180,11 @@ practical:
 
 ## Current improvement cycle
 
-The [execution report](codebase-improvement-progress-2026-10-29.md) records the
+The [execution report](history/codebase-improvement-progress-2026-10-29.md) records the
 correctness, memory, result-query and output-publication changes. The primary
 native quantification gate is one paired eleven-contrast pass; count a speed
 round only at 2% higher summed throughput. Independent memory acceptance and R
-query improvements are reported separately. Keep `OPTIMISATION_LOG.md` untracked.
+query improvements are reported separately. Keep the optimisation journal in ignored `results/local/OPTIMISATION_LOG.md`.
 
 Run source-package checks in `deseq2-r462-native`; use that Rscript explicitly and
 include the restored reference/test-tool library in `R_LIBS_USER`. The source
@@ -196,6 +197,6 @@ borrows coefficient/SE/covariance matrices and prepares count-zero context once;
 consume each owned result before the next request when bounded scratch matters.
 The R single and batch calls share this kernel and C request descriptor. No R
 callback or numerical backend is permitted. See the
-[batch checkpoint](rust-only-result-batches-2026-10-30.md) for validation and
-paired measurements, and the [completion audit](codebase-improvement-completion-audit-2026-10-29.md)
+[batch checkpoint](history/rust-only-result-batches-2026-10-30.md) for validation and
+paired measurements, and the [completion audit](history/codebase-improvement-completion-audit-2026-10-29.md)
 for the current accepted scope and any future release coordination.

@@ -6,10 +6,10 @@ use support::*;
 #[path = "common/builtin_checks.rs"]
 mod checks;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/em_fit.rs"]
+#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
 mod em_fit;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/location_shrinkage.rs"]
+#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
 fn reference() -> serde_json::Value {
     serde_json::from_str(include_str!("data/large_shape_likelihood_r462.json")).unwrap()

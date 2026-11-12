@@ -70,7 +70,7 @@ jobs:
           path: validated
       - name: Verify successful source validation
         shell: bash
-        run: python3 scripts/release_artifact_manifest.py verify validated
+        run: python3 scripts/release/release_artifact_manifest.py verify validated
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -93,7 +93,7 @@ jobs:
         run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
 
       - name: Numerical checks on shipped target and release profile
-        run: python3 scripts/check_release_target.py --target ${{ matrix.target }}
+        run: python3 scripts/validation/check_release_target.py --target ${{ matrix.target }}
 
       - name: Stage files
         shell: bash
@@ -125,7 +125,7 @@ jobs:
         run: |
           version="${RELEASE_TAG#v}"
           package_dir="rsdeseq2-${version}-${{ matrix.asset_suffix }}"
-          python3 scripts/record_binary_build.py \
+          python3 scripts/release/record_binary_build.py \
             --binary "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" \
             --archive "dist/${package_dir}.${{ matrix.archive_ext }}" \
             --target "${{ matrix.target }}" \
@@ -215,7 +215,7 @@ jobs:
           SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
           env GITHUB_SHA="$SOURCE_COMMIT" GITHUB_REF_NAME="$RELEASE_TAG" \
-            python3 scripts/release_artifact_manifest.py verify validated
+            python3 scripts/release/release_artifact_manifest.py verify validated
           python3 - <<'PYCODE'
           import hashlib, json, os
           from pathlib import Path
@@ -251,7 +251,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            notes="docs/release-${RELEASE_TAG#v}.md"
+            notes="docs/releases/${RELEASE_TAG#v}.md"
+            if [ ! -f "$notes" ]; then notes="docs/release-${RELEASE_TAG#v}.md"; fi
             if [ -f "$notes" ]; then
               gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --notes-file "$notes"
             else

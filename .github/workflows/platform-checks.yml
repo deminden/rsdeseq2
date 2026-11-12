@@ -45,10 +45,10 @@ jobs:
         if: matrix.name == 'windows-x86_64' || matrix.name == 'macos-x86_64'
         shell: bash
         run: |
-          Rscript --vanilla scripts/generate_uniform_cdf_reference.R uniform-cdf.tsv > uniform-cdf-provenance.txt
+          Rscript --vanilla scripts/references/generate_uniform_cdf_reference.R uniform-cdf.tsv > uniform-cdf-provenance.txt
           echo "RSDESEQ2_UNIFORM_CDF_REFERENCE=${{ github.workspace }}/uniform-cdf.tsv" >> "$GITHUB_ENV"
       - name: Numerical checks on target and release profile
-        run: python3 scripts/check_release_target.py --target ${{ matrix.target }}
+        run: python3 scripts/validation/check_release_target.py --target ${{ matrix.target }}
 
       - name: Retain independent uniform CDF provenance
         if: always() && (matrix.name == 'windows-x86_64' || matrix.name == 'macos-x86_64')

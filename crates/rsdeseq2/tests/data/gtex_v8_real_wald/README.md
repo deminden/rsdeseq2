@@ -45,7 +45,7 @@ cargo test -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald \
 This explicit slow test fits every original gene and estimates normalization.
 The manual Parity workflow runs it. Full data are also retained for the eleven
 biological/random contrast benchmarks; their generation is documented in
-`docs/gtex-native-wald-benchmark.md`. The compact fixed-dispersion test does not
+`docs/reports/gtex-native-wald-benchmark.md`. The compact fixed-dispersion test does not
 replace native dispersion, optimizer, weighted, local-fit or full-contrast gates.
 
 ## Reproduce the panel and optimizer oracles
@@ -53,8 +53,8 @@ replace native dispersion, optimizer, weighted, local-fit or full-contrast gates
 From the repository root, using the pinned reference environment:
 
 ```bash
-python3 scripts/generate_gtex_compact_fixture.py --rscript /path/to/Rscript
-/path/to/Rscript --vanilla scripts/generate_gtex_optim_reference.R "$PWD"
+python3 scripts/references/generate_gtex_compact_fixture.py --rscript /path/to/Rscript
+/path/to/Rscript --vanilla scripts/references/generate_gtex_optim_reference.R "$PWD"
 ```
 
 The optimizer generator freezes six independent `stats::optim` cases: three
@@ -66,7 +66,7 @@ bounds, controls and R answers are checked in under
 To redownload upstream data and recreate the full references:
 
 ```bash
-python3 scripts/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
+python3 scripts/references/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
 ```
 
 This caches the 875 MiB compressed upstream matrix under `target/`. Reference

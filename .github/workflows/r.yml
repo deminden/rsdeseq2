@@ -36,9 +36,9 @@ jobs:
           python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
       - name: Check committed Rust vendor and package versions
-        run: scripts/sync_r_vendor.sh --check
+        run: scripts/release/sync_r_vendor.sh --check
       - name: Reject production R numerical calculations
-        run: Rscript --vanilla scripts/audit_r_numerical_boundary.R r-pkg/rsdeseq2/R
+        run: Rscript --vanilla scripts/validation/audit_r_numerical_boundary.R r-pkg/rsdeseq2/R
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran clang
       - run: mkdir -p "$R_LIBS_USER"
@@ -48,16 +48,16 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
       - name: Restore verified numerical reference environment
         if: matrix.lane == 'reference'
-        run: python scripts/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
+        run: python scripts/environment/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
       - name: Cache verified reference dependencies
         if: matrix.lane == 'reference' && steps.reference-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('docs/data/r-reference-sources-2026-10-29.tsv', 'docs/data/r-reference-environment-2026-10-29.json', 'scripts/install_locked_r_packages.R', 'scripts/install_r_reference.py') }}
+          key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
       - name: Install current compatibility dependencies
         if: matrix.lane == 'current'
         run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("testthat", "ashr", "BiocManager")); BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)'
@@ -65,10 +65,10 @@ jobs:
         run: Rscript -e 'print(sessionInfo())' > R-reference-session.txt
       - name: Independently regenerate Linux formula references
         if: matrix.lane == 'reference'
-        run: python scripts/check_linux_formula_references.py --output-dir regenerated-formula-references
+        run: python scripts/validation/check_linux_formula_references.py --output-dir regenerated-formula-references
       - name: Independently generate sparse SQP references
         if: matrix.lane == 'reference'
-        run: Rscript --vanilla scripts/generate_sparse_sqp_reference.R sparse-sqp-reference.json
+        run: Rscript --vanilla scripts/references/generate_sparse_sqp_reference.R sparse-sqp-reference.json
       - name: Save independently generated platform references
         if: always() && matrix.lane == 'reference' && hashFiles('regenerated-formula-references/*.json', 'sparse-sqp-reference.json') != ''
         uses: actions/upload-artifact@v4
@@ -86,7 +86,7 @@ jobs:
         run: cargo test --locked -p rsdeseq2 --test formula_fitting --test sqp_controls
       - name: Independently record uniform posterior references
         if: matrix.lane == 'reference'
-        run: Rscript --vanilla scripts/generate_uniform_posterior_reference.R uniform-posterior-reference.json
+        run: Rscript --vanilla scripts/references/generate_uniform_posterior_reference.R uniform-posterior-reference.json
       - name: Save independent posterior reference
         if: matrix.lane == 'reference'
         uses: actions/upload-artifact@v4
@@ -105,10 +105,10 @@ jobs:
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
       - name: Check actual posterior interruption and interpreter reuse
         if: matrix.lane == 'reference'
-        run: python scripts/check_posterior_interruption.py --rscript "$(command -v Rscript)" --r-library rsdeseq2.Rcheck
+        run: python scripts/validation/check_posterior_interruption.py --rscript "$(command -v Rscript)" --r-library rsdeseq2.Rcheck
       - name: Instrument Linux native boundary and forced unwind cleanup
         if: matrix.lane == 'reference'
-        run: python scripts/check_native_boundary_sanitizers.py --rscript "$(command -v Rscript)" --r-library "$R_LIBS_USER" --output-dir native-boundary-sanitizers
+        run: python scripts/validation/check_native_boundary_sanitizers.py --rscript "$(command -v Rscript)" --r-library "$R_LIBS_USER" --output-dir native-boundary-sanitizers
       - name: Save native boundary instrumentation evidence
         if: always() && matrix.lane == 'reference'
         uses: actions/upload-artifact@v4
@@ -121,26 +121,26 @@ jobs:
       - name: Require standalone and wrapped primitives to be bit-identical
         run: |
           cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
-          Rscript --vanilla scripts/check_rust_r_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-primitives
-          Rscript --vanilla scripts/check_fresh_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fresh-fits
-          Rscript --vanilla scripts/check_formula_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-formula-fits
-          Rscript --vanilla scripts/check_formula_expression_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-expressions
-          Rscript --vanilla scripts/check_native_formula_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-formulas
-          Rscript --vanilla scripts/check_native_factor_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-factors
-          Rscript --vanilla scripts/check_frozen_local_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-frozen-local
-          Rscript --vanilla scripts/check_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-posterior
-          Rscript --vanilla scripts/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp crates/rsdeseq2/tests/data/sparse_sqp_r462.json
-          Rscript --vanilla scripts/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics - crates/rsdeseq2/tests/data/sparse_sqp_r462.json
-          Rscript --vanilla scripts/check_mixture_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-prior-fitting
-          Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-likelihood-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
-          Rscript --vanilla scripts/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fixed-controls - crates/rsdeseq2/tests/data/fixed_prior_controls_r462.json
-          Rscript --vanilla scripts/check_native_ashr_mode.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-mode-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
-          Rscript --vanilla scripts/check_normal_log_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-log-tails
-          Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform
+          Rscript --vanilla scripts/validation/check_rust_r_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-primitives
+          Rscript --vanilla scripts/validation/check_fresh_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fresh-fits
+          Rscript --vanilla scripts/validation/check_formula_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-formula-fits
+          Rscript --vanilla scripts/validation/check_formula_expression_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-expressions
+          Rscript --vanilla scripts/validation/check_native_formula_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-formulas
+          Rscript --vanilla scripts/validation/check_native_factor_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-native-factors
+          Rscript --vanilla scripts/validation/check_frozen_local_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-frozen-local
+          Rscript --vanilla scripts/validation/check_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-posterior
+          Rscript --vanilla scripts/validation/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp crates/rsdeseq2/tests/data/sparse_sqp_r462.json
+          Rscript --vanilla scripts/validation/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics - crates/rsdeseq2/tests/data/sparse_sqp_r462.json
+          Rscript --vanilla scripts/validation/check_mixture_fit_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-prior-fitting
+          Rscript --vanilla scripts/validation/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-likelihood-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
+          Rscript --vanilla scripts/validation/check_native_ashr_output.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-fixed-controls - crates/rsdeseq2/tests/data/fixed_prior_controls_r462.json
+          Rscript --vanilla scripts/validation/check_native_ashr_mode.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-mode-warnings - crates/rsdeseq2/tests/data/likelihood_warnings_r462.json
+          Rscript --vanilla scripts/validation/check_normal_log_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-log-tails
+          Rscript --vanilla scripts/validation/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform
           if [ "${{ matrix.lane }}" = reference ]; then
-            Rscript --vanilla scripts/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform-live uniform-posterior-reference.json
-            Rscript --vanilla scripts/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-live sparse-sqp-reference.json
-            Rscript --vanilla scripts/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics-live - sparse-sqp-reference.json
+            Rscript --vanilla scripts/validation/check_uniform_posterior_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-uniform-live uniform-posterior-reference.json
+            Rscript --vanilla scripts/validation/check_location_shrinkage_identity.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-live sparse-sqp-reference.json
+            Rscript --vanilla scripts/validation/check_native_ashr_optimizers.R target/release/examples/evaluate_r_interface rsdeseq2.Rcheck cross-interface-sparse-sqp-diagnostics-live - sparse-sqp-reference.json
           fi
       - name: Check strict workflow and original-ashr comparison gates
         if: matrix.lane == 'reference'
