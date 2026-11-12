@@ -96,7 +96,23 @@ Run:
 Rscript scripts/generate_deseq2_references.R
 ```
 
-The script writes references under:
+The entry script retains its original default destination. Its original-DESeq2
+panels are grouped under `scripts/reference_generation/deseq2/` and execute in
+their original order in a private context. To reproduce into fresh destinations
+without replacing the committed fixtures:
+
+```sh
+Rscript --vanilla scripts/generate_deseq2_references.R \
+  --output-dir results/reproduced_deseq2_reference \
+  --parity-output-dir results/reproduced_deseq2_parity
+```
+
+Explicit destinations must not exist. Both absolute script paths (including
+spaces) and execution from another working directory are supported. The
+[refactor check](refactoring-focused-2026-11-12.md) compares all 119 generated
+files with the original monolithic generator; frozen fixtures remain untouched.
+
+The default command writes references under:
 
 ```text
 crates/rsdeseq2/tests/data/deseq2_reference/

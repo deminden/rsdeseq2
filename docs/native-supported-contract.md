@@ -3,7 +3,9 @@
 This inventory describes development on `dev` after the published 0.4.0
 source. The [final validation](dev-validation-2026-11-12.md) records accepted
 Rust/R/platform checks, the Linux arithmetic corrections and local source bundle.
-The table maps the supported public surface to its numerical owner and evidence;
+The [focused refactor report](refactoring-focused-2026-11-12.md) records the
+subsequent module/test/generator restructuring and its unchanged numerical
+contract. The table maps the supported public surface to its numerical owner and evidence;
 it does not claim complete DESeq2 compatibility or authorize publication. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
 and [one-engine requirement](rust-only-wrapper-migration.md) remain authoritative.
 
@@ -27,7 +29,7 @@ the numerical-owner column are relative to `crates/rsdeseq2/src/`.
 | `applyCooksCutoffRust` | `results/cooks_policy.rs` and shared BH adjustment | Original policy fixtures and `test-result-policy.R`; caller-supplied low-count context is validated, not inferred from a primitive table. |
 | `resultsTableRust`, `applyIndependentFilteringRust` | `independent_filtering.rs`, `independent_filtering/lowess.rs`, shared result formatting | Original quantile/lowess/BH fixtures; `test-results-filtering.R` and primitive interface checks. R assembles already-computed columns and metadata. |
 | `deseq2McolsDiagnosticsRust`, `rsdeseq2DiagnosticSchemaRust` | Shared diagnostics/schema and supplied primitive fit fields | Schema and primitive-route tests. These helpers expose available diagnostics; they do not reconstruct absent fits or implement every Bioconductor metadata convention. |
-| `vst`, `varianceStabilizingTransformation`, `rlog` | `core/implementation/builder/dispersion_transforms.rs`, `transform/` | Original transform fixtures and integration tests; [frozen local fits and expressions](frozen-local-vst-audit-2026-10-31.md) include eight exact standalone/wrapped cases with R numerical calls blocked. |
+| `vst`, `varianceStabilizingTransformation`, `rlog` | `core/implementation/builder/stages/`, `transform/` | Original transform fixtures and integration tests; [frozen local fits and expressions](frozen-local-vst-audit-2026-10-31.md) include eight exact standalone/wrapped cases with R numerical calls blocked. |
 | `lfcShrink` | `glm/beta/`, `shrinkage/`, shared formula/model-matrix construction | Original normal, ashr and apeglm references plus actual workflow/interface checks listed below. No production call to the original shrinkage packages computes the result. |
 
 The R Rust modules under `src/rust/src/lib/` and `formula_request/` are
