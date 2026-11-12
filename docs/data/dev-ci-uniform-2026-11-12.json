@@ -1,0 +1,27 @@
+{
+  "reference_run_id": 43210948289,
+  "reference_commit": "5229b76d717622adbfb5c37826227b6e7e708a44",
+  "origin": "Original R 4.6.2 and ashr 2.2.63 on Linux x86_64, before candidate comparison",
+  "raw_reference_sha256": "38be6e007bced363bcc72a76f18c757072bec168af10c5a13547bc4a09fbb046",
+  "committed_reference_sha256": "f72cb565ebf6cfad9d0c152ea7f18ee15bc54a3c91f30f3a147f2a4e9a680fe3",
+  "numerical_reference_fields_unchanged": true,
+  "cases": 10,
+  "original_linux_log_density_probe": [
+    "-30423.141160755429"
+  ],
+  "original_mac_log_density_probe": [
+    "-30423.141160755433"
+  ],
+  "failure_before": {
+    "profile": "halfuniform",
+    "estimate": -40,
+    "standard_error": 0.15,
+    "posterior_sd": 0.0006100314077021022,
+    "original_linux_sd": 0.0006059354437324744,
+    "absolute_difference": 4.095963969627829e-06
+  },
+  "unchanged_absolute_sd_bound": 2e-06,
+  "policy": "Linux x86_64 uses the original Linux non-fused density expression; other targets retain their existing fused expression. All arithmetic remains in Rust.",
+  "local_prototype": "Non-fused expression passes all bounded posterior profiles, including the independent Linux uniform reference and unchanged truncated-normal and Student-t references.",
+  "ci_confirmation": "Pending dev branch checks"
+}
