@@ -177,5 +177,6 @@
         }
       ]
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

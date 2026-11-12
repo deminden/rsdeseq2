@@ -240,5 +240,6 @@
         "rsdeseq2/help/paths.rds": "a6e11d2b8a512100835eb812d08e3445b1ec2f8a69dc0dc41413b86b84f2e693"
       }
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }
