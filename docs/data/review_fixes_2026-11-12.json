@@ -119,7 +119,8 @@
       "maximum_error_vs_frozen_arm_ashr": 1.1102230246251565e-16,
       "bound_unchanged": 2e-08
     },
-    "actual_SIGINT_and_budget_and_R_reuse": "passed"
+    "actual_SIGINT_and_budget_and_R_reuse": "passed",
+    "callback_thread_affinity_and_cross_thread_cancellation": "passed through actual posterior fits"
   },
   "local_sanitizers": {
     "status": "passed",

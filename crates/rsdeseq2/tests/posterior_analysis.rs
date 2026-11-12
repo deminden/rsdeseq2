@@ -362,6 +362,41 @@ fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
             .to_string()
             .contains("cancelled")
     );
+    // A frontend callback (such as R's interrupt poll) must remain confined to
+    // its originating thread, while explicit cancellation reaches workers.
+    static AFFINITY_POLLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    fn observe_owner() -> bool {
+        AFFINITY_POLLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        false
+    }
+    options.analysis.work =
+        rsdeseq2::shrinkage::PosteriorWorkControl::default().with_interrupt_check(observe_owner);
+    std::thread::scope(|scope| {
+        let worker = scope.spawn(|| fit_negative_binomial_posterior(input, &options));
+        assert!(worker.join().unwrap().is_ok());
+    });
+    assert_eq!(AFFINITY_POLLS.load(std::sync::atomic::Ordering::Relaxed), 0);
+    assert!(fit_negative_binomial_posterior(input, &options).is_ok());
+    let owner_polls = AFFINITY_POLLS.load(std::sync::atomic::Ordering::Relaxed);
+    assert!(owner_polls > 0);
+    let shared = options.analysis.work.cancellation.clone();
+    std::thread::scope(|scope| {
+        scope.spawn(|| shared.cancel()).join().unwrap();
+        let worker = scope.spawn(|| fit_negative_binomial_posterior(input, &options));
+        assert!(
+            worker
+                .join()
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("cancelled")
+        );
+    });
+    assert_eq!(
+        AFFINITY_POLLS.load(std::sync::atomic::Ordering::Relaxed),
+        owner_polls
+    );
+
     // Poll cancellation during an active grid, beyond entry and row preflight.
     static POLLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     fn interrupt() -> bool {
