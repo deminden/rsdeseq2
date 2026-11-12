@@ -10,6 +10,7 @@ rebuilt with instrumentation. Leak detection is disabled for this R process.
 import argparse
 import json
 import os
+import platform
 from pathlib import Path
 import shlex
 import shutil
@@ -49,7 +50,8 @@ def main():
         report.update(status='unavailable', reason='Selected R compiler does not expose Clang sanitizer resources')
         record()
         raise
-    pattern = 'libclang_rt.asan-*.so' if linux else 'libclang_rt.asan*_dynamic.dylib'
+    machine = {'AMD64': 'x86_64', 'arm64': 'aarch64'}.get(platform.machine(), platform.machine())
+    pattern = f'libclang_rt.asan-{machine}.so' if linux else 'libclang_rt.asan*_dynamic.dylib'
     runtimes = sorted(resources.rglob(pattern))
     if not runtimes:
         report.update(status='unavailable', reason='Selected Clang has no supported dynamic ASan runtime')

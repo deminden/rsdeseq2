@@ -53,8 +53,12 @@ fn expanded_formula_design_supports_dot_main_effects() {
     assert_eq!(star_dot, star_explicit);
 
     let interaction_dot = expanded_formula_design("~ condition:.", &factors, &numeric).unwrap();
-    let interaction_explicit =
-        expanded_formula_design("~ condition:batch + condition:dose", &factors, &numeric).unwrap();
+    let interaction_explicit = expanded_formula_design(
+        "~ condition + condition:batch + condition:dose",
+        &factors,
+        &numeric,
+    )
+    .unwrap();
     assert_eq!(interaction_dot, interaction_explicit);
 
     let nested_dot = expanded_formula_design("~ condition / .", &factors, &numeric).unwrap();
@@ -609,6 +613,15 @@ fn formula_interactions_are_idempotent_before_expansion() {
         .iter()
         .map(|name| ExpandedNumericSpec { name, values: &x })
         .collect::<Vec<_>>();
+    for formula in ["~ .^20", "~ . - .^20", "~ .:.:.:."] {
+        assert!(
+            expanded_formula_design(formula, &[], &covariates)
+                .unwrap_err()
+                .to_string()
+                .contains("formula expansion exceeds"),
+            "{formula}"
+        );
+    }
     let explosive = format!("~ {}", names.join("*"));
     assert!(
         expanded_formula_design(&explosive, &[], &covariates)
@@ -616,4 +629,29 @@ fn formula_interactions_are_idempotent_before_expansion() {
             .to_string()
             .contains("formula expansion exceeds")
     );
+}
+
+#[test]
+fn repeated_additive_groups_and_dot_keep_cross_variable_interactions() {
+    // Original R model.matrix gives the same four columns for these formulas.
+    let x = [1., 2., 3., 4.];
+    let y = [2., 1., 4., 3.];
+    let numeric = [
+        ExpandedNumericSpec {
+            name: "x",
+            values: &x,
+        },
+        ExpandedNumericSpec {
+            name: "y",
+            values: &y,
+        },
+    ];
+    let expected = expanded_formula_design("~ x+y+x:y", &[], &numeric).unwrap();
+    for formula in ["~ (x+y)*(x+y)", "~ .*.", "~ .:."] {
+        assert_eq!(
+            expanded_formula_design(formula, &[], &numeric).unwrap(),
+            expected,
+            "{formula}"
+        );
+    }
 }

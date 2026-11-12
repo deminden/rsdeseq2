@@ -63,6 +63,7 @@ pub(super) fn evaluate(request: &Value) -> Result<Value, String> {
         "prior.control",
         "multiplier",
         "ngrid",
+        "max.grid.evaluations",
         "nsd",
         "ngrid.nuis",
         "nsd.nuis",

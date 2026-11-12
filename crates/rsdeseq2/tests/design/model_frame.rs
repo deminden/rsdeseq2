@@ -472,7 +472,7 @@ fn expanded_formula_design_from_model_frame_supports_dot_main_effects() {
     let interaction_dot =
         expanded_formula_design_from_model_frame("~ condition:.", &model_frame).unwrap();
     let interaction_explicit = expanded_formula_design_from_model_frame(
-        "~ condition:`cell type` + condition:`dose value`",
+        "~ condition + condition:`cell type` + condition:`dose value`",
         &model_frame,
     )
     .unwrap();
@@ -490,18 +490,16 @@ fn expanded_formula_design_from_model_frame_supports_dot_main_effects() {
     let star_dot_removed =
         expanded_formula_design_from_model_frame("~ condition * . - condition:.", &model_frame)
             .unwrap();
-    let star_dot_removed_explicit = expanded_formula_design_from_model_frame(
-        "~ condition + `cell type` + `dose value`",
-        &model_frame,
-    )
-    .unwrap();
+    let star_dot_removed_explicit =
+        expanded_formula_design_from_model_frame("~ `cell type` + `dose value`", &model_frame)
+            .unwrap();
     assert_eq!(star_dot_removed, star_dot_removed_explicit);
 
     let nested_dot_removed =
         expanded_formula_design_from_model_frame("~ condition / . - condition:.", &model_frame)
             .unwrap();
     let nested_dot_removed_explicit =
-        expanded_formula_design_from_model_frame("~ condition", &model_frame).unwrap();
+        expanded_formula_design_from_model_frame("~ 1", &model_frame).unwrap();
     assert_eq!(nested_dot_removed, nested_dot_removed_explicit);
 
     let all_dot_removed =

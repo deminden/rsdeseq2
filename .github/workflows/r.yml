@@ -103,6 +103,9 @@ jobs:
         env:
           RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
+      - name: Check actual posterior interruption and interpreter reuse
+        if: matrix.lane == 'reference'
+        run: python scripts/check_posterior_interruption.py --rscript "$(command -v Rscript)" --r-library rsdeseq2.Rcheck
       - name: Instrument Linux native boundary and forced unwind cleanup
         if: matrix.lane == 'reference'
         run: python scripts/check_native_boundary_sanitizers.py --rscript "$(command -v Rscript)" --r-library "$R_LIBS_USER" --output-dir native-boundary-sanitizers
