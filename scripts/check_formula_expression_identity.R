@@ -18,7 +18,12 @@ canonical<-function(x){
 total<-0L
 for(file in c("formula_expression_r462.json","formula_expression_extended_r462.json","formula_elementary_boundaries_r462.json")) {
  panelOut<-file.path(out,sub(".json$","",file));dir.create(panelOut)
-reference<-jsonlite::fromJSON(.formula_reference_path(file.path(root,"crates/rsdeseq2/tests/data"),file),simplifyVector=FALSE)
+# The elementary boundary panel is portable and has one shared snapshot, as in
+# the Rust reference test. The other panels require their platform-specific data.
+dataDirectory<-file.path(root,"crates/rsdeseq2/tests/data")
+referencePath<-if(file=="formula_elementary_boundaries_r462.json")file.path(dataDirectory,file)else .formula_reference_path(dataDirectory,file)
+if(!file.exists(referencePath))stop("Missing required formula reference: ",referencePath)
+reference<-jsonlite::fromJSON(referencePath,simplifyVector=FALSE)
 input<-list(formula_cases=reference$cases,variables=reference$variables,collation=reference$metadata$collation)
 path<-file.path(panelOut,"input.json");jsonlite::write_json(input,path,auto_unbox=TRUE,null="null",digits=NA)
 output<-system2(driver,shQuote(normalizePath(path)),stdout=TRUE,stderr=TRUE)
