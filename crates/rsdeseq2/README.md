@@ -14,7 +14,8 @@ It is not a drop-in replacement for the complete Bioconductor API.
 
 ## Install
 
-For the current 0.5.0 source, install from a repository checkout:
+Source installation requires Rust 1.97.1 or newer with Cargo. For the
+current 0.5.0 source, install from a repository checkout:
 
 ```bash
 cargo install --path crates/rsdeseq2 --locked
@@ -53,24 +54,15 @@ See [compatibility and limits][compatibility] and the [supported contract][contr
 
 ## Validation and Performance
 
-The recorded comparison takes 43.33 seconds versus DESeq2's 242.12 seconds across
-eleven GTEx contrasts: an observed 5.59× summed process-time ratio. Rust peak
-RSS is 214–307 MiB, 80.6–86.7% below the matched DESeq2 process.
-Comparisons use native R 4.6.2 / DESeq2 1.52.0 on Apple M5, with one fitting/BLAS
-worker. These are single-pass observations with no discarded outliers. Other
-user and system workloads were active; small development speed changes cannot
-be inferred from these measurements.
+The [repository comparison][comparison] is the summary of measured precision,
+speed and peak memory against DESeq2. The [benchmark report][gtex-benchmark]
+records the exact executable, environment, per-contrast measurements and
+reproduction commands. These measurements cover eleven full GTEx v8 Kidney
+Cortex Wald contrasts, including biological comparisons and random splits.
 
-Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
-Cortex, including biological comparisons and reproducible blocked/unblocked
-random splits. The [current parity, speed and memory comparison][gtex-benchmark]
-records measurements, settings, hardware, automatic mean-fitting settings,
-remaining error bounds and reproduction commands.
-
-The test suite also covers documented normalization, GLM, Wald/LRT,
-transformation, shrinkage, and R-wrapper paths. These measurements establish
-behavior for the tested inputs and settings, rather than complete DESeq2
-workflow parity.
+Tests additionally cover normalization, GLM, Wald/LRT, transformations,
+shrinkage and R-wrapper paths. Tested behavior and full Bioconductor API
+compatibility are distinct; see the [supported contract][contract].
 
 ## Rust Usage
 
@@ -180,5 +172,5 @@ scripts/benchmarks/benchmark_rsdeseq2.sh
 
 [contract]: https://github.com/deminden/rsdeseq2/blob/main/docs/native-supported-contract.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
-[benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
 [gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/reports/gtex-native-wald-benchmark.md
+[comparison]: https://github.com/deminden/rsdeseq2/blob/main/README.md#validation-and-performance
