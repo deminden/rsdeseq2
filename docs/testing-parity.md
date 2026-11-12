@@ -7,12 +7,14 @@ scope; old outstanding-method descriptions are not the current method inventory.
 The [final local acceptance audit](final-plan-local-acceptance.md) now records
 1,154 passing Rust tests, 2,867 R assertions and 49 Python tests, current
 GTEx/held-out checks, actual interface identity, MSRV, sanitizers and paired
-speed/RSS measurements. C19/C21 are closed locally; current platform and
-release-artifact gates remain open.
+speed/RSS measurements. The later [development validation](dev-validation-2026-11-12.md)
+closes C23 with actual current CI and a verified local source bundle. Historical
+counts and measurements retain their recorded source/platform scope.
 The [warning/platform follow-up](native-sqp-warning-platform-gates.md) adds fresh
 platform reference inputs to the existing formula/SQP tests and asserts the
 original warning sequence. The pinned Linux lane must generate and test those
-references; that run is still pending.
+references; the pinned Linux lane now passes those checks, alongside the fresh
+bounded-posterior reference. See the [Linux arithmetic notes](linux_numerical_parity.md).
 
 ## Historical migration checkpoints
 
@@ -45,14 +47,19 @@ checks, including error handling and integer-NA state-word bits.
 ## Accepted benchmark runs
 
 `benchmark_gtex_native_wald.py` defaults to one sequential pass. An accepted run
-requires `--validated-results-root` and verifies that directory against the
-reviewed `--validated-output-hashes` manifest (default: the v0.3.1 native-output
-manifest). It also verifies the frozen 44 input/reference hashes. For example:
+requires `--validated-results-root` and verifies that directory against an
+reviewed `--validated-output-hashes` manifest (default: the accepted 0.4.0
+output baseline). Use the manifest associated with the preserved candidate
+exports when validating another source. It also verifies
+the frozen 44 input/reference hashes. With the preserved current accepted
+exports and matching native R environment:
 
 ```sh
 python3 scripts/benchmark_gtex_native_wald.py --repeats 1 \
-  --validated-results-root results/benchmarks/release_0.3.1/gtex \
-  --output-dir results/benchmarks/current-accepted
+  --rscript "$R_SCRIPT" \
+  --validated-results-root "$REVIEWED_EXPORTS" \
+  --validated-output-hashes "$REVIEWED_HASH_MANIFEST" \
+  --output-dir "$FRESH_COMPARISON_DIR"
 ```
 
 Use the documented pinned R environment. A finite but inaccurate candidate

@@ -76,10 +76,11 @@ RSDESEQ2_SPARSE_SQP_REFERENCE="$FRESH_SQP_JSON" \
   "$STANDALONE_DRIVER" "$R_LIBRARY" "$FRESH_OPTIMIZER_DIR" - "$FRESH_SQP_JSON"
 ```
 
-These commands are locally tested on macOS. The Linux run and other current
-platform gates remain open; wiring a required CI step is not evidence that it
-has run successfully. All development and rebuilt artifacts stay local until a
-new publication instruction.
+These commands were first tested locally on macOS. The later
+[dev validation](dev-validation-2026-11-12.md) records successful current Linux
+and five-target execution. The [Linux notes](linux_numerical_parity.md) document
+two additional failures found by that execution and their independent fixes.
+Tags and publication remain on hold.
 
 ## Check platforms without publishing
 
@@ -100,6 +101,6 @@ python scripts/check_release_target.py --target aarch64-apple-darwin
 
 This ARM Mac cannot execute Intel binaries in its current configuration, lacks a
 Linux C cross-compiler and has no local Linux/Windows runtime. The remaining
-platform gates require suitable runners. Branch-only CI needs a new user
-authorization because the current development commits are still local; tags and
-publication remain separate actions.
+platform gates required suitable runners. The user subsequently authorized
+`dev` branch checks; all five panels now pass as recorded in the final validation.
+Tags and publication remain separate actions and are still on hold.

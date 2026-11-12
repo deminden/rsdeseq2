@@ -1,19 +1,14 @@
 # Completion audit against C01–C23
 
-Current local checkpoint status: **22 of 23 original checkpoints are closed**.
-The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
-C19's shared numerical/behavior contract and C21's execution/forwarding contract
-against the current source and complete-workflow evidence. C23 remains open for
-current release artifacts and required platform validation. This count is not
-a percentage of effort remaining, or a claim of cross-platform release readiness.
+All **23 original checkpoints are accepted for the documented development
+scope**. The [final development validation](dev-validation-2026-11-12.md) binds
+current Rust/R/platform CI, independent Linux references, retained performance
+evidence and the verified local source bundle. The supported scope is explicit;
+this count does not claim the complete DESeq2/Bioconductor API.
 
-The combined local pass at `48917a0` retains all original precision bounds,
-exact native/wrapped checks and the recorded background load in its speed/RSS
-observations. The later [warning/platform follow-up](native-sqp-warning-platform-gates.md)
-strengthens the fresh Linux oracle gates and corrects an independently detected
-SQP warning omission. Its source/package identities and checks are recorded
-separately; earlier measurements keep their tested artifact identities. Nothing
-from this development checkpoint has been pushed, tagged or published.
+Development is pushed only to `dev`. Tags, releases, registry publication and
+merging to the main branch remain on hold. Historical reports below preserve
+their original artifact identities, counts and then-open findings.
 
 ## Historical checkpoint notes
 

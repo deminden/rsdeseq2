@@ -23,5 +23,20 @@
   "unchanged_absolute_sd_bound": 2e-06,
   "policy": "Linux x86_64 uses the original Linux non-fused density expression; other targets retain their existing fused expression. All arithmetic remains in Rust.",
   "local_prototype": "Non-fused expression passes all bounded posterior profiles, including the independent Linux uniform reference and unchanged truncated-normal and Student-t references.",
-  "ci_confirmation": "Pending dev branch checks"
+  "ci_confirmation": {
+    "commit": "d1ffc9813565352044bbd214fcc436efcd3b05b6",
+    "R_reference_run": 43215474305,
+    "R_reference_job": 131173491054,
+    "fresh_original_bounds": "passed",
+    "native_wrapped_bits": "exact with R numerical calls blocked",
+    "Rust_run": 43215474416,
+    "bounded_posterior_suite": "passed on actual Linux x86_64"
+  },
+  "prototype_after": {
+    "previously_failing_sd": 0.0006059354437324744,
+    "absolute_difference": 0.0,
+    "maximum_sd_error_all_650_rows": 4.76837158203125e-07,
+    "maximum_error_profile": "point_zero",
+    "sd_bound": 2e-06
+  }
 }

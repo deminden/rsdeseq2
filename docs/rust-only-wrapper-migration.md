@@ -3,7 +3,13 @@
 The [current supported contract](native-supported-contract.md) is the consolidated
 entry-point/method inventory. The reports below record individual implementation
 checkpoints; their old open-item descriptions retain that historical scope.
-Final C19/C21 reconciliation and C23 combined acceptance remain required.
+C19/C21 are reconciled in the [local acceptance audit](final-plan-local-acceptance.md);
+[final dev validation](dev-validation-2026-11-12.md) closes C23. Tags and
+publication remain on hold.
+
+## Historical migration checkpoints
+
+The following notes preserve their then-current scope and outstanding findings.
 
 Current local development adds [bounded posterior components and all six
 normal-likelihood mixture grids](shrinkage-component-development.md), plus

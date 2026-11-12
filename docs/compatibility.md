@@ -1,17 +1,19 @@
 # Compatibility
 
-Current source changes and their gates are recorded in the
-[numerical authority audit](native-numerical-authority-audit.md). Stored Rust
+The [supported contract](native-supported-contract.md) maps every public R
+entry point, implemented method/option family and support boundary to its Rust
+owner and independent/interface evidence. Stored Rust
 `ResultRequest` supports explicit Wald options and rejects incompatible LRT
 options. `resultsList()` now uses the standalone borrowed inference engine for
 bounded batches, with independent per-request policies and the same output as
 individual calls. Filtering/BH, probabilities, contrast projection and
 contrast-zero and Cook/refit row rules are shared Rust implementations. Native
 low-count eligibility requires a matching two-column design; stored requests
-infer it from formula factors unless explicitly overridden. Local default ashr
-and negative-binomial apeglm workflows now share the native numerical engine.
-Remaining argument/warning/state contracts and the final combined audit remain open; see the
-[Rust-only implementation contract](rust-only-wrapper-migration.md).
+infer it from formula factors unless explicitly overridden. Supported normal,
+ashr and apeglm methods, saved local transforms and restricted likelihood/
+dispersion expressions all use the native numerical engine. C19/C21's shared
+contract and execution audits are accepted; current platform checks and source
+artifacts are recorded in the [final validation](dev-validation-2026-11-12.md).
 The subsequent [Cook/refit origin correction](cooks-origin-parity-2026-10-30.md)
 fixes first-tied maxima and original formula/factor eligibility, with independent
 missingness and retained-value checks. Historical audit reports retain their
@@ -35,10 +37,10 @@ For a higher-level comparison against original DESeq2, see
 
 ## Numerical Parity Snapshot
 
-The strongest matches are stage-level primitives with generated
-DESeq2 fixtures or direct formula checks. They support matched validation and
-benchmarking, but they are not a claim of full
-`DESeq()` workflow parity.
+Evidence includes independent stage-level DESeq2 fixtures, complete GTEx and
+held-out Wald/LRT workflows, direct formula checks and actual standalone/wrapped
+identity. It establishes the documented inputs and settings, not the complete
+DESeq2/Bioconductor object API.
 
 | area | numerical status | evidence |
 | --- | --- | --- |

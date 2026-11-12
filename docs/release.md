@@ -28,21 +28,21 @@ The GitHub release receives those records and the checked source artifacts.
 versions and the tag must agree. Local workflow lint and dependency simulations
 are useful preparation; successful target jobs remain required for publication.
 
-
-## Current local development
+## Current development
 
 The [current supported contract](native-supported-contract.md) describes the
 shared Rust implementation after the published 0.4.0 source, including native
 frozen-local VST and supported ashr/apeglm calculations. The
 [final local acceptance audit](final-plan-local-acceptance.md) closes C19/C21
-locally and records the current combined checks, measurements and remaining
-C23 artifact/platform gates. Historical release evidence below must not be
-relabeled as validation of later code.
+locally and records the initial combined checks and measurements. The
+[final development validation](dev-validation-2026-11-12.md) closes C23 with
+current CI and a verified local bundle. Historical release evidence below must
+not be relabeled as validation of later code.
 The [warning/platform follow-up](native-sqp-warning-platform-gates.md) records
 the corrected SQP diagnostics, fresh platform-oracle gates and separately rebuilt
 local source/package artifacts.
-Development stays local; push, tagging and publication wait for a new user
-instruction.
+The `dev` branch is authorized for CI checks. Tags, GitHub releases and package
+publication remain on hold until a new user instruction.
 
 ## Version 0.4.0 — historical source
 

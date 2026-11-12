@@ -73,8 +73,9 @@ standalone/wrapped equality.
 
 The [final local acceptance audit](final-plan-local-acceptance.md) reconciles
 the C19/C21 requirements and current combined tests, paired process measurements
-and measured wrapper boundary costs. C23's current platform/artifact gates
-remain explicit; local acceptance does not authorize publication.
+and measured wrapper boundary costs. The [final development validation](dev-validation-2026-11-12.md)
+closes C23 with current CI and a verified local bundle. Development on `dev`
+is authorized; tags and publication remain on hold.
 The [warning/platform follow-up](native-sqp-warning-platform-gates.md) also
 requires fresh original-R complete-formula and sparse-SQP references in the
 pinned Linux lane, alongside the saved-reference tests. It documents a corrected
@@ -187,4 +188,4 @@ The R single and batch calls share this kernel and C request descriptor. No R
 callback or numerical backend is permitted. See the
 [batch checkpoint](rust-only-result-batches-2026-10-30.md) for validation and
 paired measurements, and the [completion audit](codebase-improvement-completion-audit-2026-10-29.md)
-for remaining work.
+for the current accepted scope and any future release coordination.
