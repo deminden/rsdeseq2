@@ -14,7 +14,14 @@ It is not a drop-in replacement for the complete Bioconductor API.
 
 ## Install
 
-Version 0.5.0 is prepared for release; registry commands apply after publication.
+For the current 0.5.0 source, install from a repository checkout:
+
+```bash
+cargo install --path crates/rsdeseq2 --locked
+```
+
+Use a path dependency when embedding that checkout. The following registry
+commands apply after 0.5.0 publication.
 
 Add version 0.5.0 to a Rust project:
 
@@ -42,13 +49,11 @@ Unsupported interfaces include complete Bioconductor `DESeqDataSet` mutation
 and metadata support, full glmGamPoi behavior, plotting, and other convenience
 APIs.
 
-Detailed status lives in
-[docs/deseq2-gap-analysis.md][gap-analysis] and
-[docs/compatibility.md][compatibility].
+See [compatibility and limits][compatibility] and the [supported contract][contract].
 
 ## Validation and Performance
 
-Current development takes 43.33 seconds versus DESeq2's 242.12 seconds across
+The recorded comparison takes 43.33 seconds versus DESeq2's 242.12 seconds across
 eleven GTEx contrasts: an observed 5.59× summed process-time ratio. Rust peak
 RSS is 214–307 MiB, 80.6–86.7% below the matched DESeq2 process.
 Comparisons use native R 4.6.2 / DESeq2 1.52.0 on Apple M5, with one fitting/BLAS
@@ -59,9 +64,8 @@ be inferred from these measurements.
 Current validation covers 11 full native Wald contrasts from GTEx v8 Kidney
 Cortex, including biological comparisons and reproducible blocked/unblocked
 random splits. The [current parity, speed and memory comparison][gtex-benchmark]
-records measurements, settings, hardware, and reproduction commands. The
-[dispersion correction report][gtex-parity] documents the automatic mean-fitting
-correction and remaining error bounds.
+records measurements, settings, hardware, automatic mean-fitting settings,
+remaining error bounds and reproduction commands.
 
 The test suite also covers documented normalization, GLM, Wald/LRT,
 transformation, shrinkage, and R-wrapper paths. These measurements establish
@@ -160,7 +164,9 @@ python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 Generate DESeq2 reference fixtures:
 
 ```bash
-Rscript scripts/references/generate_deseq2_references.R
+Rscript scripts/references/generate_deseq2_references.R \
+  --output-dir results/reproduced-reference \
+  --parity-output-dir results/reproduced-parity
 cargo test -p rsdeseq2 --test dispersion_reference
 cargo test -p rsdeseq2 --test wald_reference
 cargo test -p rsdeseq2 --test lrt_reference
@@ -172,9 +178,7 @@ Run matched speed/RAM benchmarks for the supported primitives:
 scripts/benchmarks/benchmark_rsdeseq2.sh
 ```
 
-[gap-analysis]: https://github.com/deminden/rsdeseq2/blob/main/docs/deseq2-gap-analysis.md
+[contract]: https://github.com/deminden/rsdeseq2/blob/main/docs/native-supported-contract.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
 [benchmarks]: https://github.com/deminden/rsdeseq2/blob/main/docs/benchmarks.md
-[gtex-parity]: https://github.com/deminden/rsdeseq2/blob/main/docs/history/gtex-dispersion-improvement.md
-
 [gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/reports/gtex-native-wald-benchmark.md

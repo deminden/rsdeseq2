@@ -1,201 +1,21 @@
 # rsdeseq2 0.5.0 (prepared)
 
-* Tie posterior probability summaries to their selected coefficient and reject
-  inconsistent result shapes. The Rust posterior type now has a private identity
-  field; obtain it from a fitting API instead of a struct literal.
-* Simplify repeated formula variables and bound interaction expansion/nesting,
-  preserving additive-group and dot cross-products.
-* Add configurable posterior grid work limits, cooperative cancellation and safe
-  R interruption/reuse. Remove unconditional CLI Cook's-matrix copies.
-* Reorganise reference, validation, benchmark, environment and release tooling;
-  separate current guides/reports from historical documentation. Remove the root
-  quickstart example and exclude OS metadata from source packages.
+* Run supported fitting, formulas, result queries, transforms and normal/ashr/
+  apeglm calculations in shared standalone Rust; R translates and constructs objects.
+* Support restricted likelihood and saved-dispersion expressions without R execution.
+  Reject custom formula functions and unsupported captured values before execution.
+* Preserve formula term/factor order, polynomial grouping and offsets. Bound
+  interaction expansion and nesting while simplifying repeated variables.
+* Share replacement merging, later queries, warning sequences, optimizer controls,
+  selected posterior outputs and portable random-state handling across interfaces.
+* Retain coefficient identity for posterior summaries and validate result shapes.
+  Construct Rust posterior objects through fitting APIs; their identity is private.
+* Add configurable grid budgets, cooperative cancellation and safe R interruption/reuse.
+* Borrow retained CLI Cook's matrices for diagnostic export.
+* Group tooling by purpose, keep current documentation and reproducibility evidence,
+  and exclude OS metadata from Rust/R source packages.
+* Pass both R lanes, Rust/Python, five platforms, full GTEx and Linux sanitizer checks.
+  R package checks retain the known Rust compiled-symbol warning.
 
-* Match original ashr's sparse SQP EM/active-set iteration policy in Rust,
-  including the condition-based approximate direction solve. Correct the
-  existing reordered-gene subset comparison without relaxing its precision
-  bound; preserve the general convex fitter's full-KKT policy.
-
-* Share SQP/EM/interior optimizer control parsing in standalone Rust. Ignore
-  unused controls for fixed-prior ashr requests while retaining active-control,
-  optimizer-name and missing-prior validation. Preserve numerical outputs and
-  add original-package acceptance and exact interface checks.
-
-* Preserve normal-mixture capture recycling warnings and output-dependent
-  warning order/multiplicity in shared Rust, including mode searches. Check
-  actual native/wrapped diagnostic identity and original-package warning
-  sequences without changing numerical kernels or accepted outputs.
-
-* Preserve R term order, polynomial matrix-variable grouping and interaction
-  coding in complete native formula fits. Accept matching reduced LRT offsets,
-  canonicalize unused sample factors with matrix normalization, and validate
-  expression aliases after formula subtraction. Add complete formula-fit and
-  later factor-query identity checks to both R CI lanes.
-
-* Skip unnecessary native, fixed-dispersion and expanded-prior refits when no
-  sample is eligible for replacement. Preserve candidate planner metadata and
-  all compared fitting/query outputs; verify execution with original traces.
-
-* Refresh raw count-zero metadata after replacement while retaining failed-weight
-  diagnostics as missing. Cover unrelated rank-failed rows and new-zero-only
-  replacement with independent original-DESeq2 fits and exact interface checks.
-
-* Evaluate later standalone result requests with retained replacement plans.
-  Share eligibility and missing-value formatting; verify 86 later queries and
-  complete filtering metadata against actual R calls with R math blocked.
-
-* Share replacement-fit row merging with the standalone Rust engine, including
-  full/reduced and optimizer diagnostics. Preserve raw observation weights in
-  replacement base summaries. Retain unnamed covariance dimensions and valid
-  automatic result-table row names. Compare complete fresh-fit numerical bits
-  across both interfaces in CI.
-
-* Import LRT degrees of freedom directly from the Rust fit. Forward ordinary
-  Wald/LRT calls through the shared core dispatcher and guard against duplicate
-  statistical dimension calculations in production R.
-
-* Share scalar optimizer-bound normalization across posterior methods. Defer
-  unused beta-binomial controls, ignore source-unused log-link options, and
-  preserve exact-name versus abbreviated optimizer dispatch. Independent
-  profiles retain numerical/error gates and exact native/wrapped outputs.
-
-* Preserve canonical normal-mixture matrix capture flattening/recycling in Rust.
-  Match compiled negative-binomial ignored/deferred controls and source BFGS or
-  L-BFGS-B refinement policy; retain explicit unsupported-method errors when
-  refinement is actually required. New independent references preserve existing
-  numerical gates and complete native/wrapped output identity.
-
-* Correct large-count gamma/beta probabilities, moments and log-F densities with
-  scaled native integrals and stable normalization. Preserve numerical gates and
-  optimizer settings. Remove an unused R Cook's helper and guard production R
-  sources against direct statistical calls in CI.
-
-* Add standalone Poisson identity/log and binomial identity/logit likelihoods,
-  count-specific mode/grid/FDR defaults, and batch-wide CDF orientation. Import
-  canonical stored primitive parameters without executing R closures. Share
-  numerical reference checks across continuous and count likelihood tests.
-
-* Run canonical normal-mixture and log-F observation likelihoods entirely in
-  shared Rust, including per-observation parameters, beta/gamma tails and
-  integration. Import only stored primitive captures; retain source missingness,
-  prior restrictions and near-one CDF cancellation behavior.
-
-* Add native SQP active-set, line-search, Hessian-regularization and optional SVD
-  controls, including automatic active-set limits. Retain independent original
-  and exact-SVD references without changing accepted default outputs.
-
-* Estimate ashr prior modes with shared Rust likelihood profiling. Reuse fitting
-  preparation without posterior moments, preserve source search bounds and
-  warnings, and expose explicit native intervals and search diagnostics.
-
-* Select ashr posterior fields and fitted priors with numeric output levels or
-  exact named subsets in Rust. Preserve omitted columns and require posterior
-  means/prior for thresholded s-values; retain original numerical references.
-
-* Add native cycling RRE/MPE and squared polynomial acceleration, plus a separate
-  interior-point mixture solver. Retain independent original cycling and
-  high-precision KKT references; direct Mosek comparison is not claimed.
-
-* Add native ordinary, weighted, variational and compiled-style EM mixture
-  fitting with K=1 acceleration controls and unit/fractional variational priors.
-  Correct compiled second-probe convergence and diagnostics; retain independent
-  original-package references and unchanged numerical gates.
-
-* Add shared Rust Laplace/grid intervals, scalar parameter uncertainty and
-  covariance-based posterior contrasts. Restricted grid likelihood expressions
-  support primitive numeric subscripts without executing R functions. Preserve
-  default/random-start output bits and document three original apeglm grid bugs.
-
-* Run default ashr and negative-binomial apeglm shrinkage in shared Rust,
-  including prior adaptation, posterior summaries, scale conversion and s-values.
-  Restricted ashr likelihood expressions are imported without R execution.
-  Advanced optional methods remain under development and fail explicitly.
-* Retain original apeglm iteration/stopping behavior with a standalone
-  MIT-licensed LBFGSpp algorithm adaptation. Ship its attribution with Rust source
-  and installed R packages; the read-only vendor gate checks notice integrity.
-* Add shared Rust general apeglm and analytic `nbinomR` fitting, with BFGS and
-  bounded L-BFGS-B. Translate restricted five-argument likelihood expressions,
-  matrix products and supported density calls without invoking R callbacks.
-  Custom formula functions remain unsupported.
-* Add native beta-binomial logit shrinkage: `betabinR`, `betabinCR` and MAP-only
-  `betabinC`, with analytic scores, zero-success rows and concentration/trial
-  validation. Preserve native optimizer warnings through the R interface.
-* Correct shared BFGS metric resets, convergence probes and iteration counting;
-  retain all previous posterior reference values and precision bounds.
-* Add MAP-only `nbinomC*` and `betabinC*` with native random starts, portable
-  MT19937/L'Ecuyer-CMRG Inversion state import/export and post-error state updates.
-  Preserve all integer state-word bits. R random-generation functions are not used.
-
-* Import standard saved DESeq2 local-dispersion coefficients without refitting.
-  Construct frozen VST grids and evaluate/interpolate the curves in shared Rust.
-* Translate restricted custom dispersion expressions into Rust. Reject custom
-  calls, active bindings and delayed expressions before execution.
-* Borrow count/normalization matrices when preparing the 999-point frozen grid,
-  avoiding a full normalized matrix transfer through the primitive transport.
-
-# rsdeseq2 0.4.0
-
-* Match Linux original-R extended reductions, polynomial BLAS rounding and
-  per-argument sum precision in Rust. Independently regenerate six exact Linux
-  formula reference panels under a fixed Haswell reference kernel.
-* Preserve quantification precision and paired workflow payloads. Reference and
-  compatibility R CI, full GTEx replay and all five release targets pass.
-* Retain the visible R CMD check warning for Rust runtime termination symbols.
-
-* Share formula arithmetic, model-frame preparation, offsets and model-matrix
-  calculations between the standalone Rust core and the R interface. Reject
-  custom formula functions before execution; supported built-ins use Rust.
-* Correct ordered-factor polynomial coding, factor conversion and unused-level
-  handling, higher-order interaction coding and multiplication order. Reject
-  treatment-style level selectors for ordered factors; use polynomial coefficient
-  names or numeric contrasts. Move expanded-factor recoding into Rust.
-* Evaluate Wald hypotheses, LRT probabilities, Cook's cutoffs, independent
-  filtering and multiple-testing adjustments in the shared Rust engine. Preserve
-  unmasked/refitted state, validate cached inputs, and apply masking before BH.
-* Harden input, rank, reduced-model, normalization-offset and worker validation.
-  Reduce fit copies, bound temporary results and defer replacement-count output
-  allocation until a refit actually produces it.
-* Refactor large implementation and test modules, consolidate repetitive tests,
-  and add independent original-R fixtures plus direct cross-interface bit checks.
-  Upgrade locfit, L-BFGS-B and other dependencies to the audited stable versions.
-* This release does not complete the Rust-only R-wrapper migration. Frozen local
-  VST reuse and optional ashr/apeglm posterior calculations still involve R.
-  See the repository migration plan for the remaining work and supported scope.
-
-# rsdeseq2 0.3.1
-
-* Speed up native Wald quantification with shared Cox-Reid design products,
-  matrix-order specialization, reused IRLS vectors and design decompositions,
-  cached likelihood terms, and deferred error allocations.
-* Preserve the validated 0.3.0 numerical behavior and automatic dispersion
-  mean-fitting correction from `9acb44b`. The twenty accepted optimisation
-  rounds retain byte-identical results and diagnostics on all eleven frozen
-  GTEx contrasts.
-* Synchronize the R backend with the optimized Rust core and align package,
-  crate, backend, and vendored-core versions at 0.3.1.
-* Extend the reproducible GTEx process benchmark with an optional previous
-  Rust release, alternating tool order and direct time/peak-RSS ratios.
-
-# rsdeseq2 0.3.0
-
-* Native dispersion workflows select DESeq2's automatic mean-fitting branch.
-  Unweighted designs with as many distinct sample rows as coefficients use
-  linear means; other designs and supplied observation weights use GLM means.
-* The validated correction from `9acb44b` reduces all nine relevant global
-  maximum errors by at least 596.7-fold across 11 frozen GTEx Kidney Cortex
-  contrasts, with preserved gene coverage and finite/NA patterns.
-* Fitted `DESeqDataSet` objects receive Rust `mu` and `cooks` assays, fitted
-  row metadata, and per-coefficient MLE and standard-error columns.
-* Cook's outlier replacement and refitting run for eligible replicate samples.
-  `minReplicatesForReplace` defaults to seven; use an integer of at least three
-  or `Inf` to disable replacement. Original counts and Cook's distances are
-  retained, with replacement assays and flags attached when applicable.
-* Dataset result tables carry Bioconductor column descriptions and result
-  metadata, including independent-filtering and replacement/refit information.
-* Seeded integration tests cover automatic dispersion means, fitted means,
-  Cook's distances, outlier replacement/refitting, and result metadata.
-
-# rsdeseq2 0.2.6
-
-* Added dataset VST/rlog transformations, frozen trend/intercept reuse, and
-  selected normal, `ashr`, and `apeglm` shrinkage workflows.
+See the supported contract and current R guide for method/option limits.
+No 0.5.0 release has been published.

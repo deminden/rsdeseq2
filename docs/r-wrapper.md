@@ -1,33 +1,64 @@
 # R wrapper
 
-The development implementation uses the standalone Rust numerical engine for
-fitting, inference, transforms and all supported shrinkage methods. R handles
-argument translation, identifier alignment and R/Bioconductor objects. The
-[current supported contract](native-supported-contract.md) maps every public
-export to its numerical owner and independent/interface evidence. The
-[final development validation](history/dev-validation-2026-11-12.md) records passing
-current checks; the [0.4.0 report](releases/0.4.0.md) describes the earlier
-published source. The development implementation has not been released.
+Version 0.5.0 runs supported fitting, inference, transformations and shrinkage in
+the standalone Rust core. R translates arguments, aligns identifiers and builds
+R/Bioconductor objects; C marshals buffers. The [contract](native-supported-contract.md)
+maps every export to its numerical owner. [CI](testing-parity.md#ci-status)
+checks original-package accuracy and exact standalone/wrapped equality.
 
-Fitted-object `results()` accepts `cooksCutoff=TRUE` (automatic), `FALSE`/`NULL`
-(disabled), or a non-negative finite cutoff, and rejects unused arguments.
-Dataset result/shrinkage access validates retained fit inputs and maps unique
-gene subsets. Changes to fitted sample inputs require refitting. Formula offsets
-are composed from retained base normalization once; repeated fitting reuses that
-provenance. Older offset fits without it may require the original input.
+## Fitting and stored objects
 
-Wald/LRT fits share the core dispatcher, including stored LRT degrees of freedom
-and replacement-fit merging. Later standalone requests can retain the merged
-fit and plan and use `results_for_request_with_replacement`. The matrix-fit
-checks cover 31 requests and 113 later queries. Complete formula-fit checks
-cover another 33 requests and 96 queries without column remapping; see the
-[formula-fit report](history/native-formula-fit-development.md).
-After replacement, raw count-zero metadata and weighted failure diagnostics
-remain separate. Fits skip unnecessary replacement refits when no samples are
-eligible. See the [state correction](history/weighted-replacement-state-correction.md)
-and [execution evidence](history/replacement-execution-correction.md).
+`DESeq()` and `fitRust()` accept counts with an explicit numeric design, a list
+containing `counts`/`design`, or a supported `DESeqDataSet`. They run native
+dispersion estimation and Wald or full/reduced LRT fitting. Formula metadata is
+translated in R; expressions and design values are computed in Rust.
+`estimateDispersionsRust()` returns final dispersions from the same pipeline.
 
-`resultsList()` evaluates several requests after one fitted-dataset validation:
+Matrix/list inputs return `rsdeseq2RustFit`, retaining counts, design, coefficients,
+covariance, normalization, test and result state. Dataset fits return the dataset
+with the Rust fit in metadata, `mu`/original `cooks` assays, and implemented row
+metadata: base mean/variance, all-zero flags, trend/final dispersion, convergence,
+maximum Cook's distance and coefficient MLE/SE columns.
+
+Use `rsdeseq2::results()` and `rsdeseq2::resultsNames()` for the stored fit. The
+package does not register a replacement method for `DESeq2::results()`. Missing
+model/count/covariance/provenance cannot be reconstructed from an arbitrary
+result table. Changed fitted sample inputs require refitting; supported gene
+subsets and reordering map to original fitted rows.
+
+Normalization-factor matrices take precedence over size factors. Supplied weights,
+normalization and formula offsets are forwarded to Rust. Offsets compose once
+from retained base normalization, including repeated fits. Older objects without
+required provenance need the original input or a refit. Formula fits canonicalize
+unused sample-factor metadata to ones; explicit matrix fits retain supplied metadata.
+
+## Results and replacement
+
+`results()` supports named coefficients and documented numeric, list and
+factor-level contrasts. `contrast` takes precedence over `name`. Wald threshold
+alternatives and supplied t degrees of freedom use shared Rust probabilities.
+LRT coefficient/contrast selection changes the reported LFC/SE while retaining
+the model-comparison statistic/p-value; nondefault Wald-only options fail.
+
+`cooksCutoff=TRUE` selects the automatic cutoff, `FALSE`/`NULL` disables masking,
+and a nonnegative finite value supplies the cutoff. Unknown/unused arguments
+fail. Independent filtering and BH adjustment are recomputed for each request,
+including gene subsets. Raw and weighted all-zero/failure flags remain distinct.
+
+Replacement requires candidate rows and eligible samples. The default threshold
+is seven replicates per design cell; `minReplicatesForReplace` accepts an integer
+at least three or `Inf` to disable replacement. Original counts/Cook's assays
+are preserved. Replaced datasets get `replaceCounts`, `replaceCooks` and a
+replacement flag; results retain eligible-sample/refit metadata. No eligible
+samples means no unnecessary second fit. The low-count Cook's rule requires
+matching formula/factor and design context and uses original first-tied maxima.
+
+Standalone later queries can retain the fit and replacement plan and use
+`results_for_request_with_replacement`. Primitive fits reject requests needing
+context they do not contain.
+
+`resultsList()` validates shared fitted input once and evaluates independent
+queries in chunks of at most 64 requests (default 32):
 
 ```r
 tables <- rsdeseq2::resultsList(dds, list(
@@ -37,75 +68,38 @@ tables <- rsdeseq2::resultsList(dds, list(
 ), batchSize = 32L)
 ```
 
-Each entry accepts `results()` arguments and overrides common arguments passed
-in `...`, including an explicit `NULL`. Names and order are preserved, and each
-table has the same values, classes and metadata as its individual call. Native
-inference borrows shared arrays in chunks of at most 64 requests (default 32);
-filtering and Cook's decisions remain separate for every request. Primitive
-Wald/LRT fits and supported list inputs are also accepted. See the
-[batch implementation and validation](history/rust-only-result-batches-2026-10-30.md).
-Fitted Cook's/refit presentation now uses the shared borrowed Rust row policy;
-R only marshals context and attaches output columns. The
-[Cook/refit checkpoint](history/rust-only-cooks-policy-2026-10-30.md) records its independent
-checks, corrected native design eligibility, exact comparisons and measured costs.
+Entries override common arguments, including explicit `NULL`. Names/order,
+classes, values and metadata match individual calls; each query keeps its own
+Cook's/filtering decisions. Supported primitive Wald/LRT and list inputs are accepted.
 
-`nproc` controls a reusable local worker pool for fitting, replacement refits and
-transforms, including frozen rlog. The `strict`, `fast` and `diagnostic` mode
-names currently share the strict numerical algorithm; they do not select
-different precision settings.
+## Formulas
 
-The R package builds and statically links the Rust crate used by the CLI.
-Cargo is required when installing the package from source. The core crate is
-vendored under `src/rust/vendor/rsdeseq2`; regenerate that copy from the
-repository root with `scripts/release/sync_r_vendor.sh` before making a source release.
+Supported native formulas include declared factor/numeric columns, interactions,
+subtraction, additive groups, dot expansion, offsets and built-in transforms
+such as `log`, `scale`, `poly`, `I`, factor conversion and `relevel`.
+Complete fits preserve original R term order, factor coding and polynomial
+matrix groups. Repeated variables simplify before bounded expansion. Limits are
+1 MiB input, 128 parenthesis levels and 16,384 generated interaction terms.
 
-`DESeq()` and `fitRust()` run dispersion estimation, GLM fitting, Wald tests,
-and likelihood-ratio tests in Rust. They accept a count matrix plus an explicit
-numeric design matrix, a list containing `counts` and `design`, or a
-Bioconductor `DESeqDataSet` when `SummarizedExperiment` is installed. R parses
-formula metadata; supported expressions, model frames, offsets and matrix
-values are evaluated by the shared Rust core. Custom formula functions are
-rejected before execution. The fit
-retains coefficient estimates and covariance, so `results()` supports named
-coefficients and DESeq2-style contrasts as well as the default result table.
-Matrix and list inputs return an `rsdeseq2RustFit` list. A `DESeqDataSet` input
-returns the fitted dataset with the Rust fit stored in its metadata, and the
-package's `results()` and `resultsNames()` functions dispatch through that fit.
-Existing size factors, normalization factors, observation-weight assays, and
-formula offsets are passed through the fitting bridge; explicit matrices can
-also be provided for matrix or list inputs. Fitted datasets receive Rust
-`mu` and `cooks` assays, plus row metadata for `baseMean`, `baseVar`, `allZero`,
-`dispFit`, final `dispersion`, `betaConv`, `maxCooks`, and per-coefficient MLE
-and SE columns. These fitted means and Cook's distances are checked against
-DESeq2 on a seeded integration fixture.
+Custom formula functions and splines are unsupported and rejected without
+execution. Arbitrary R classes and the full R formula grammar are outside scope.
+Matching reduced-LRT offsets are accepted; conflicting offsets fail. Standalone
+callers use `formula_design_for_fitting_from_model_frame()` for the complete-fit
+layout; expanded-design compatibility helpers expose their own explicit layout.
 
-For rows with Cook's outliers, `DESeq()` replaces counts only in eligible
-replicate samples and refits those rows. The default eligibility threshold is
-seven replicates per design cell; `minReplicatesForReplace` can lower it to at
-least three or be set to `Inf` to disable replacement. The returned dataset
-retains original `counts` and original `cooks`; when rows are replaced, it adds
-`replaceCounts` and `replaceCooks` assays and a `replace` row-metadata flag.
-`results()` metadata records the threshold, eligible samples, and refit rows.
-The adapter still does not populate every DESeq2 diagnostic or implement every
-DESeq2 fitting and result option. Use `rsdeseq2::results()` and
-`rsdeseq2::resultsNames()` to read the stored Rust fit; this does not register a
-replacement method for `DESeq2::results()`.
+## Transformations
 
-For dataset transformations, `vst()`, `varianceStabilizingTransformation()`,
-and `rlog()` return Bioconductor `DESeqTransform` objects. Their main trend,
-VST and rlog computations run in Rust. They support blind and design-aware
-dispersion fitting, normalization factors, observation weights, and formula
-offsets. Fast `vst()` selects its subset by ordinary normalized-count means,
-including for weighted datasets, and errors when fewer than `nsub` genes
-qualify. Rlog can also reuse supplied frozen intercepts and a shared sample
-prior variance. Full-data VST reuses existing frozen parametric/mean
-dispersion-function parameters in Rust. The development tree after 0.4.0 also
-imports saved one-dimensional DESeq2 locfit coefficients without refitting;
-Rust constructs the 999-point grid, predicts dispersions and computes the VST.
-Restricted custom dispersion expressions are translated into the shared Rust
-expression engine. They must have one mean argument and one expression, using
-supported built-ins and primitive constants captured in a local environment.
-For example:
+Dataset `vst()`, `varianceStabilizingTransformation()` and `rlog()` return
+`DESeqTransform`. They support blind/design-aware fitting, normalization factors,
+weights and offsets. Fast VST selects its subset using ordinary normalized-count
+means even with weights, propagates weights into fitting and errors if fewer
+than `nsub` genes qualify. Design-aware rlog can reuse stored `dispFit`; frozen
+gene intercepts and a shared sample prior variance are supported.
+
+Full VST reuses saved parametric/mean coefficients or the standard
+one-dimensional quadratic Gaussian DESeq2 locfit profile. Rust constructs the
+999-point grid, predicts dispersions and performs integration/interpolation.
+Restricted custom dispersion functions are translated without executing R:
 
 ```r
 trend <- local({
@@ -115,342 +109,145 @@ trend <- local({
 attr(trend, "fitType") <- "local"
 ```
 
-Use qualified built-ins when packages mask them. Custom calls, multiple
-statements, active bindings, delayed calculations and unresolved global
-constants are rejected before execution. Saved locfit imports currently require
-the standard one-dimensional quadratic Gaussian DESeq2 profile. The
-[frozen-local audit and follow-up](history/frozen-local-vst-audit-2026-10-31.md) describe
-the independent references and direct interface checks. These development
-changes do not alter the published 0.4.0 artifacts.
-Design-aware rlog reuses an existing `dispFit` column when
-`blind=FALSE`. The supported saved-fit profiles and strict fast-subset behavior
-have independent fixtures; broader unrepresented profiles are not certified by
-those checks.
+A function must have one mean argument and one supported expression with stored
+primitive constants. Qualified built-ins avoid masking. Custom calls, multiple
+statements, active bindings, delayed values and unresolved globals fail before
+execution. Saved profiles outside the documented representation are unsupported.
 
-`lfcShrink()` currently accepts a dataset fitted by `rsdeseq2::DESeq()` and
-either a coefficient name/index or an expanded-design factor-level, numeric, or
-list contrast. Coefficient lookup accepts exact names and unambiguous
-DESeq2-cleaned aliases, including for transformed-factor formulas. The
-`type="normal"` contrast route prepares expanded-design metadata in R and uses
-Rust for factor recoding, matrix values, prior estimation, refitting and the
-posterior contrast. Numeric contrasts require a supplied result table; list
-contrasts average selected coefficients and need supplied results when their
-names are absent from the unshrunk design. The local development
-`type="ashr"` route uses shared Rust fitting, posterior means/SDs and s-values,
-including restricted custom likelihood expressions, estimated modes and SQP
-numerical controls. Normal/t, canonical normal-mixture/log-F and Poisson/binomial
-likelihoods are supported as detailed below. Released 0.4.0 uses the original
-ashr package. Local `type="apeglm"` supports all nine declared method names:
-`general`, `nbinomR`, `nbinomCR`, `nbinomC`, `nbinomC*`, `betabinR`, `betabinCR`,
-`betabinC` and `betabinC*`. Their [method and analysis limits](native-supported-contract.md)
-remain explicit. It handles named/indexed Wald coefficients, including
-posterior SDs and s-values, but not the public `contrast=` selection argument.
-Formula interactions are rejected for normal shrinkage. Factor-level contrast syntax for transformed
-factors remains unsupported when DESeq2 cannot resolve its coefficient names.
-Ordered factors use polynomial coefficients; choose a named coefficient or a
-numeric contrast instead of a treatment-style factor-level contrast.
+## Shrinkage
 
-Local ashr `optmethod` also accepts `mixEM`, `w_mixEM`, `mixVBEM` and
-`cxxMixSquarem`, using the shared native engine. Their K=1 EM controls and
-variational `prior="unit"`/positive fractional priors are supported. Native `mixIP`
-uses a log-barrier solver with `control=list(rtol=...)`. Higher-order `mixEM`,
-`w_mixEM` and `mixVBEM` accept `control=list(K=2,method="mpe",square=TRUE)`.
-See the [advanced optimizer scope and reference limits](history/native-ashr-advanced-optimizer-development.md). See the
-[optimizer scope, controls and explicit original-package corrections](history/native-ashr-optimizer-development.md).
+`lfcShrink()` consumes a dataset fitted by `rsdeseq2::DESeq()` and returns
+`DESeqResults` with method-specific prior metadata. Exact coefficient names and
+unambiguous DESeq2-cleaned aliases are supported. `type="normal"` accepts named/
+indexed coefficients and supported expanded-design factor, numeric/list contrasts.
+Numeric contrasts require supplied results. List contrasts average selected
+coefficients and need supplied results when those names are absent from the
+unshrunk design. Normal shrinkage rejects formula interactions. Ordered factors
+use polynomial coordinates; choose named coefficients or numeric contrasts rather
+than treatment-style factor selectors. Transformed-factor selectors remain
+unsupported when original DESeq2 cannot resolve them.
 
-Numeric `outputlevel` and exact named subsets select the posterior fields and
-fitted prior returned by the local wrapper. Positive-threshold queries require
-`PosteriorMean` and `fitted_g`, including at level four. Omitted fields remain
-absent. See [output selection and validation](history/native-ashr-output-development.md).
+Positive normal `lfcThreshold` recomputes posterior Wald tests and filtering/BH.
+Thresholded ashr/apeglm summaries use false-sign-or-small s-values.
 
-`mode="estimate"` profiles the fitted mixture likelihood in Rust. See
-[estimated modes and bounds](history/native-ashr-mode-development.md) for two-element
-mode compatibility, native explicit intervals and independent comparisons.
+### ashr
 
-The local SQP adapter supports active-set, direction, line-search, regularization
-and optional `tol.svd` controls, including `maxiter.activeset=NULL`. See
-[numerical controls and validation](history/native-sqp-control-development.md) for default
-full-matrix preservation, spectral fallback and remaining diagnostic scope.
-The subsequent [sparse SQP correction](history/native-sparse-sqp-development.md) uses the
-source EM/working-set policy and condition-based direction solve. It fixes the
-existing reordered-gene subset comparison without changing its precision bound.
+All supported mixture fitting, likelihood evaluation, posterior moments/SDs,
+s-values and selected outputs run in Rust. The declared normal-likelihood prior
+grids, normal/t observations, canonical normal-mixture/log-F and Poisson/binomial
+likelihoods and restricted likelihood expressions are supported within their
+explicit prior/likelihood combinations.
 
-Local canonical `ashr::lik_normalmix` and `ashr::lik_logF` objects import stored
-primitive parameters without executing their closures. Noise SD matrices and
-row-specific degrees of freedom retain complete-observation alignment. Uniform
-priors are supported; original log-F missing SDs and unsupported normal priors
-are retained. See [continuous likelihoods and limits](history/native-continuous-likelihood-development.md).
-Matrix weights follow the original capture rules: equal total lengths flatten
-both weights and SDs into a global mixture; otherwise component lists recycle
-against SD columns. See [capture layout and validation](history/native-capture-policy-development.md).
+`optmethod` accepts `mixSQP`, `mixEM`, `w_mixEM`, `mixVBEM`, `cxxMixSquarem` and
+native `mixIP`. EM supports K=1 and higher-order RRE/MPE cycling, including
+`control=list(K=2, method="mpe", square=TRUE)` where applicable. Variational
+unit/positive fractional priors are supported. Native `mixIP` uses a KKT-checked
+log-barrier solver with `rtol`; it does not claim original Mosek execution parity.
+SQP exposes active-set, direction, line-search, regularization and optional
+`tol.svd` controls, including `maxiter.activeset=NULL`.
 
-Canonical `ashr::lik_pois` and `ashr::lik_binom` objects also import stored
-primitive counts and parameters without calling their functions. Identity/log
-and identity/logit links, count-specific mode/grid/FDR defaults and original
-intensity/probability moments run in Rust. See [count likelihoods and limits](history/native-count-likelihood-development.md).
+Fixed-prior (`fixg=TRUE`) fitting skips unused numerical controls but validates
+the optimizer name and prior. Active fitting validates active controls. Numeric
+`outputlevel` and exact named subsets select returned fields; omitted fields stay
+absent. Positive-threshold requests require `PosteriorMean` and `fitted_g`, even
+at level four. `mode="estimate"` profiles the fitted mixture in Rust, preserving
+the supported original two-element mode behavior and explicit native intervals.
 
-In local development, a custom ashr `lik` list can supply `name`, `lcdfFUN(x)`
-and `lpdfFUN(x)`, with optional standardized truncated-moment expressions
-`etruncFUN(a, b)` and `e2truncFUN(a, b)`. Each function must contain one supported
-expression: arithmetic, comparisons, elementary math, `ifelse`, `pmin` or `pmax`.
-Captured constants must be stored primitive numeric/logical scalars. The wrapper
-imports syntax and values; it never invokes these functions. Without an explicit
-first moment Rust integrates the density; without a second moment posterior SDs
-remain missing, as in the original helper. Arbitrary calls, reductions, arrays,
-active bindings and unevaluated promises are rejected. This likelihood-expression
-support is separate from formulas, which still reject custom functions.
+Canonical likelihood objects import stored primitive parameters without calling
+closures. Noise-SD matrices and row-specific degrees of freedom keep observation
+alignment. Equal total normal-mixture weight/SD lengths flatten into a global
+mixture; otherwise component lists recycle against SD columns, preserving warnings.
+Normal-mixture/log-F likelihoods retain their supported uniform-prior combinations
+and original missingness policy. Poisson identity/log and binomial identity/logit
+links use native mode/grid/FDR defaults and intensity/probability moments.
 
-General apeglm fitting accepts `log.lik=function(y,x,beta,param,offset)` through
-`lfcShrink(..., type="apeglm", apeMethod="general", log.lik=...)`. Functions
-must contain one supported expression. Alongside the elementary subset above,
-this route supports primitive numeric one-dimensional indexing, `%*%`,
-`as.numeric`, `as.double`, `lgamma`, `dnorm`,
-`dnbinom`, `dbinom` and `dt`. Density calls may be qualified with `stats::`.
-Captured constants remain stored primitive scalars; observation, design,
-coefficient, parameter and offset vectors come from the native request. The
-canonical original `apeglm::logLikNB` is recognized without execution. BFGS and
-L-BFGS-B run in Rust. See [validation and remaining scope](history/native-regression-development.md).
+Custom `lik` lists can supply `name`, `lcdfFUN(x)`, `lpdfFUN(x)` and optional
+`etruncFUN(a,b)`/`e2truncFUN(a,b)`. Each function is one supported arithmetic,
+comparison, elementary-math, `ifelse`, `pmin` or `pmax` expression with primitive
+scalar captures. Rust integrates the density when a first moment is absent;
+without a second moment posterior SD stays missing. Reductions, arrays, arbitrary
+calls, active bindings and unevaluated promises are rejected. This expression
+contract does not enable custom functions in formulas.
 
-Optional `interval.type="HPD"` or `"credible"` uses native grid sign summaries;
-`interval.level`, `ngrid`, `nsd`, `ngrid.nuis` and `nsd.nuis` configure the grid.
-`param.sd` supports scalar parameter uncertainty and requires a grid interval
-without a threshold; its sign summaries remain missing. The `contrasts` option
-requests covariance-based posterior contrasts inside the native engine. The
-primitive bridge returns extra interval/contrast matrices; public `lfcShrink()`
-keeps the selected-coefficient result-table shape. This is separate from its
-unsupported `contrast=` coefficient-selection argument for apeglm. See
-[posterior analysis scope and explicit source corrections](history/native-posterior-analysis-development.md).
+### apeglm
 
-General and beta-binomial methods ignore `log.link`. Beta-binomial prefits defer
-optimizer controls until refinement needs them. Across methods, empty/missing
-or nonfinite scalar bounds are unbounded, extra entries drop, and bounds apply
-only to the exact `optim.method="L-BFGS-B"` spelling. See
-[method argument policy and checks](history/native-regression-method-policy-development.md).
+Supported methods are `general`, `nbinomR`, `nbinomCR`, `nbinomC`, `nbinomC*`,
+`betabinR`, `betabinCR`, `betabinC` and `betabinC*`. Public `lfcShrink` accepts a
+named/indexed coefficient; its `contrast=` coefficient selector is unsupported.
+Posterior covariance contrasts inside the engine are a separate option.
 
-MAP-only `apeMethod="nbinomC*"` and `apeMethod="betabinC*"` use native random
-starts. The wrapper imports stored `.Random.seed` and writes back the advanced
-state; no R random-generation function is called. The default Mersenne-Twister
-and L'Ecuyer-CMRG states with Inversion normals are supported, including states
-from parallel streams. Use `set.seed()` before a reproducible call. Missing
-state is initialized in Rust. Other RNG configurations fail explicitly; see
-[state, failure and precision checks](history/native-random-start-development.md).
+General `log.lik=function(y,x,beta,param,offset)` is translated from one restricted
+expression. It supports the elementary subset, primitive one-dimensional indexing,
+`%*%`, `as.numeric`, `as.double`, `lgamma`, `dnorm`, `dnbinom`, `dbinom` and `dt`.
+Densities may be qualified with `stats::`; stored captures must be primitive
+scalars. Canonical `apeglm::logLikNB` is recognized without execution.
 
-`nbinomC` and `nbinomC*` ignore optimizer, bounds and `log.link` controls.
-`nbinomCR` uses BFGS or L-BFGS-B controls only if refinement is needed; valid
-prefits ignore those controls. Empty numeric bounds are unbounded. CR with
-`log.link=FALSE` rejects all-zero rows. Other refinement optimizer families
-remain unsupported. See [compiled method policy](history/native-capture-policy-development.md).
+BFGS/L-BFGS-B run in Rust when refinement requires them. MAP-only C methods ignore
+optimizer, bounds and `log.link`; CR prefits defer controls until refinement is
+needed. General/beta-binomial methods ignore `log.link`. Empty/missing/nonfinite
+scalar bounds are unbounded, extra entries drop, and bounds apply only to exact
+`optim.method="L-BFGS-B"`. CR with `log.link=FALSE` rejects all-zero rows.
+Other refinement families are unsupported.
 
-The package also exposes primitive matrix helpers:
+`interval.type="HPD"`/`"credible"`, `interval.level`, `ngrid`, `nsd`, `ngrid.nuis`
+and `nsd.nuis` configure native grid analysis. Scalar `param.sd` requires a grid
+interval without a threshold and leaves sign summaries missing. The `contrasts`
+option requests native posterior covariance contrasts. Primitive analysis returns
+interval/contrast matrices; public `lfcShrink()` retains its selected-coefficient
+table shape. Probability summaries retain coefficient ownership and reject
+mismatched coefficient/shape queries.
 
-- `estimateSizeFactorsRust(counts, method = c("ratio", "poscounts"), geoMeans = NULL, controlGenes = NULL, native = TRUE)`
-- `normalizedCountsRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = TRUE)`
-- `baseMeanRust(counts, sizeFactors = NULL, normalizationFactors = NULL, native = TRUE)`
-- `baseMetadataRust(counts, sizeFactors = NULL, normalizationFactors = NULL, weights = NULL, native = TRUE)`
-- `applyCooksCutoffRust(pvalue, maxCooks, cooksCutoff, counts = NULL, cooks = NULL, lowCountHeuristic = FALSE, native = TRUE)`
-- `resultsTableRust(baseMean, log2FoldChange = NULL, lfcSE = NULL, stat = NULL, pvalue = NULL, padj = NULL, dispersion = NULL, converged = NULL, rowNames = NULL)`
-- `applyIndependentFilteringRust(results, alpha = 0.1, theta = NULL, enabled = TRUE)`
-- `rsdeseq2DiagnosticSchemaRust(native = FALSE)`
-- `deseq2McolsDiagnosticsRust(nGenes, test = c("none", "Wald", "LRT"), ...)`
+Grid work defaults to ten million likelihood evaluations per batch.
+`max.grid.evaluations` changes the limit; explicit `NULL` removes it. Work limits
+are checked before fitting and do not reduce precision.
 
-These helpers validate ordinary R matrices with genes in rows and samples in
-columns and call the Rust core through registered `.Call` bridges.
-When `normalizationFactors` are supplied to `normalizedCountsRust()`,
-`baseMeanRust()`, or `baseMetadataRust()`, they preempt `sizeFactors`, matching
-DESeq2's normalized-count behavior.
+### Random starts and interruption
 
-The retained `native` arguments on the primitive helpers are for source
-compatibility. Calls always use the Rust backend and report an error if the
-native library is unavailable.
+MAP-only `nbinomC*`/`betabinC*` import `.Random.seed` and write back the advanced
+state using native Mersenne-Twister or L'Ecuyer-CMRG with Inversion normals.
+Missing state is initialized in Rust; other RNG configurations fail explicitly.
+Use `set.seed()` for reproducible calls. R random-generation functions are not
+called by the production engine.
 
-`baseMetadataRust()` returns primitive row metadata columns `baseMean`,
-`baseVar`, and `allZero`. When `weights` are supplied, they must be a finite
-non-negative matrix with the same dimensions as `counts`; the helper multiplies
-normalized counts by those raw observation weights before calculating row means
-and sample variances. This mirrors the early DESeq2 weighted metadata shape but
-does not modify DESeqDataSet `mcols()`.
+Cancellation returns an error, not partial results. Native grid polling supports
+shared cancellation; frontend callbacks run only on their originating thread.
+R interruption is contained with `R_ToplevelExec`, so no R jump crosses an active
+Rust frame. Interpreter reuse after cancellation is tested.
 
-`applyCooksCutoffRust()` is a primitive result-table helper. It masks p-values
-where `maxCooks > cooksCutoff`, recomputes BH-adjusted p-values, and can apply
-the DESeq2 two-group low-count Cook's heuristic when the caller supplies raw
-`counts`, per-sample `cooks`, and has already established the one-factor
-two-level formula condition. It does not inspect DESeqDataSet objects or infer
-formula semantics. Masking, the low-count heuristic and BH adjustment use the
-Rust backend; R assembles the output table.
-When p-values carry gene names, named
-`maxCooks`, count rows, and Cook's rows are aligned to that order before
-masking; named Cook's columns are aligned to named count columns before the
-low-count heuristic is evaluated.
+## Primitive results and alignment
 
-`resultsTableRust()` assembles already-computed primitive vectors into a
-DESeq2-shaped result data frame with `baseMean`, `log2FoldChange`, `lfcSE`,
-`stat`, `pvalue`, and `padj`, plus optional `dispersion` and `converged`
-diagnostic columns. It computes BH-adjusted p-values from `pvalue` when `padj`
-is omitted. When output row names are known from `rowNames` or named
-`baseMean`, named result vectors are aligned to that row order before the table
-is assembled. It does not run Wald/LRT fitting, Cook's masking, outlier
-replacement, or independent filtering.
+Primitive helpers include size factors, normalized counts/base metadata,
+Cook's masking, result-table assembly, independent filtering and diagnostic schemas.
+Legacy `native` arguments remain accepted; they do not select R calculations.
+Metadata/schema helpers assemble objects without reconstructing absent fits.
 
-Rust result-table metadata retains the resolved numeric contrast vector for
-implemented contrast and replacement/refit routes. Wrapper code can use this
-structured provenance instead of recovering the contrast from display labels;
-primitive `resultsTableRust()` callers can also pass finite numeric
-coefficient-shaped `contrast` metadata directly.
+`waldFitRust()`/`lrtFitRust()` and `nbinomWaldTestRust()`/`nbinomLRTRust()` package
+already-computed fields. They do not fit an unfitted dataset. Wald requests use
+supplied beta/SE/covariance and required contrast context. LRT requests retain
+supplied statistics/probabilities or obtain chi-square tails from Rust with `lrtDf`.
+`resultsTableRust()` assembles supplied vectors and computes BH if `padj` is absent;
+it does not fit models, replace counts or independently apply Cook's/filtering policy.
+`applyIndependentFilteringRust()` returns filtered BH, theta/rejection counts,
+selected threshold and lowess metadata from Rust.
 
-`waldFitRust()` packages already-computed primitive Wald beta matrices,
-coefficient covariance arrays, optional coefficient SEs, and optional contrast
-diagnostics such as counts, sample levels, factor levels, and model matrices.
-`results()` can consume this primitive fit object for default/name-selected
-coefficients and DESeq2-style `contrast = ...` forms, including
-`lfcThreshold`/`altHypothesis` Wald p-values with Normal or supplied t tails.
-For convenience, `results()` can also consume the same list-like primitive Wald
-fields directly and internally package them through `nbinomWaldTestRust()`.
-Already-fitted DESeq2-shaped list or S4-like objects are also recognized when
-they expose row metadata in `mcols` with coefficient columns and matching `SE_`
-columns, plus optional nested `assays$counts` or `assays[["counts"]]`,
-`sampleLevels`, and `modelMatrix` diagnostics. Extracted row metadata can be a
-base `data.frame` or a DataFrame-like object that can be safely coerced with
-`as.data.frame()`, which covers common `mcols`/`rowData`-style containers.
-When explicit `factorReferences` metadata is available, character triplet
-contrasts use it as the treatment/base reference unless `reference` is supplied
-explicitly. Otherwise, when `factorLevels` or factor-valued `colData` is
-available, character triplet contrasts use the first factor level. When
-counts are available and `sampleLevels` is not supplied, character contrast
-all-zero handling can use the matching factor column from `colData` as the
-per-sample level vector; if count columns and `colData` rows are both named,
-`colData` is aligned to the count column order before that per-sample metadata
-is used. Extracted `colData` can be a base `data.frame` or a DataFrame-like
-object that can be safely coerced with `as.data.frame()`. Named `sampleLevels`
-vectors are aligned to named count columns with the same unique-name and
-missing-name validation. `factorLevels` and `colData` factor lookup is exact
-first, then an
-unambiguous R-cleaned alias, so non-syntactic metadata names can be addressed
-like cleaned coefficient names. `factorLevels` names must themselves have
-unique R-cleaned aliases; explicit metadata and levels inferred from `colData`
-are rejected at fit packaging time when two factor fields would clean to the
-same name. Character contrast levels used for all-zero
-handling follow the same exact-first, unambiguous R-cleaned alias rule against
-observed sample levels, so cleaned level requests can select raw
-non-syntactic factor values without guessing through collisions. Explicit
-`reference` values for character contrasts are canonicalized through the same
-level-alias rule before coefficient contrast resolution. `mcols` beta
-and `SE_` coefficient columns use the same exact-first, unambiguous R-cleaned
-alias lookup when explicit
-`resultsNames` are available, which lets ordinary cleaned data-frame column
-names back non-syntactic result names without silently picking ambiguous
-columns. Object-style design matrices can be exposed as fields, slots, or
-attributes named `modelMatrix`, `model.matrix`, `designMatrix`, or
-`fullModelMatrix`; after extraction they are aligned to named count samples
-when possible. Named model-matrix columns must be unique and are also aligned
-to result-name order with the same exact-first, unambiguous R-cleaned alias
-lookup before numeric contrast all-zero handling uses them. Coefficient
-matrices and names can also use common object aliases such as `coef`,
-`coefficients`, `coefNames`,
-`coefficientNames`, or `resultNames`, while covariance arrays can use
-`betaCov`, `coefCovariance`, or `coefficientCovariance`. Factor-level metadata can be exposed as
-`factorLevels`, `factorLevelNames`, `factorLevelsList`, or `levelNames`.
-Explicit factor-reference metadata can be exposed as `factorReferences`,
-`factorReference`, `factorReferenceLevels`, or `referenceLevels`; references
-are exact-first, then unambiguous R-cleaned aliases against `factorLevels` when
-those levels are available, and against observed sample levels when declared
-factor levels are absent. Primitive fit constructors infer factor levels from
-factor-valued or character `colData` before canonicalizing supplied factor
-references, so cleaned reference metadata can be stored under the canonical raw
-factor and level names. The canonical raw reference level is stored in the fit
-object after resolution. The
-same alias names are checked on object attributes after accessors and direct
-fields, which matches DESeq2-shaped fitted objects that retain supplied model
-matrices outside ordinary row metadata. When explicit `resultsNames` and named
-coefficient-matrix columns are supplied together, the coefficient matrix is
-aligned to result-name order through exact-first, unambiguous R-cleaned alias
-lookup before canonical names are restored. For primitive fit constructors, named
-row-shaped inputs are aligned to named beta rows with duplicate and missing
-gene-name validation. This covers `baseMean`, coefficient SE matrices,
-coefficient covariance arrays, count matrices, and LRT statistic / p-value /
-degrees-of-freedom vectors, so row metadata follows gene names when both sides
-expose them. Named coefficient SE columns and named coefficient axes of
-covariance arrays are also aligned to result-name order with the exact-first,
-unambiguous R-cleaned alias resolver before canonical `resultsNames` are
-restored. When scalar row diagnostics are extracted from `mcols`, explicit
-`mcols` row names are preserved on extracted vectors and matrix-like payloads
-so the same alignment rules apply to object-shaped metadata.
-`resolveResultsContrastRust()` resolves character triplet, list/listValues, and
-numeric contrast forms against `resultsNames`, preserving whether character or
-numeric all-zero handling applies. This remains an already-fitted route; it does
-not run GLM fitting from DESeqDataSet objects. Default and `name = ...`
-coefficient results do not apply contrast all-zero handling. Coefficient names
-created from supported formula numeric transforms, such as
-`cell type_as.double`, use the same exact-first, unambiguous R-cleaned alias
-lookup for `name = ...` and coefficient-list contrasts. Exact duplicate
-`resultsNames` are rejected at packaging time, while raw names that merely
-share a cleaned alias remain valid so exact lookup can win before alias lookup.
+Named vectors/matrices align to unique gene/sample/coefficient names. Duplicate,
+missing or ambiguous names fail. Lookup uses exact names first, then unambiguous
+R-cleaned aliases. Stored `factorReferences`, declared `factorLevels` and compatible
+`colData` establish character-contrast references; declared factor order precedes
+observed sample order. Named count/design/weight/normalization and covariance
+axes preserve their required alignment. See installed R help for supported object
+field aliases and complete argument signatures.
 
-`resultsNames()` returns coefficient/result names from primitive Wald/LRT fit
-objects, list-like primitive objects, DESeq2-shaped fitted list/S4 metadata,
-beta matrices, or already-supplied character vectors. It is the R-wrapper helper
-for feeding `resolveResultsContrastRust()` without manually duplicating
-coefficient names. List-like objects use the same coefficient/name aliases as
-`results()`, including `coef`, `coefficients`, `coefNames`,
-`coefficientNames`, and `resultNames`, so formula-derived non-syntactic names
-are preserved through helper calls. When alias-provided coefficient names and a
-coefficient matrix are both present, their dimensions are validated together;
-`resultsNamesRust()` provides the same primitive helper under the Rust-suffixed
-name.
+`baseMetadataRust()` multiplies normalized counts by raw nonnegative observation
+weights before ordinary row means/sample variances; it does not modify `mcols()`.
+`applyCooksCutoffRust()` can use caller-supplied low-count context but does not
+infer formula semantics from a primitive table. Diagnostics helpers expose
+implemented fields rather than every Bioconductor convention.
 
-`nbinomWaldTestRust()` accepts the same already-computed primitive
-Wald inputs, a list-like primitive object containing those fields, or an
-already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
-and returns an `rsdeseq2PrimitiveWaldFit` object. This primitive constructor
-does not fit an unfitted dataset; use `DESeq()` or `fitRust()` for the supported
-high-level R fitting path.
+## Execution and installation
 
-`lrtFitRust()` packages already-computed primitive full-model beta matrices,
-coefficient covariance arrays, optional coefficient SEs, and LRT statistic /
-p-value diagnostics. If `lrtPvalue` is omitted, callers can supply `lrtDf` and
-the wrapper computes chi-square tail p-values. `results()` consumes
-`rsdeseq2PrimitiveLrtFit` objects with the same `name` and `contrast = ...`
-selection rules as primitive Wald fits: the selected coefficient or contrast
-defines the reported LFC and SE, while `stat` and `pvalue` remain the supplied
-LRT model-comparison statistic and p-value. `nbinomLRTRust()` accepts those
-primitive fields, a list-like primitive object containing them, or an
-already-fitted DESeq2-shaped list/S4-like object with compatible `mcols` fields,
-and returns an `rsdeseq2PrimitiveLrtFit` object. This primitive constructor
-does not fit an unfitted dataset; use `DESeq()` or `fitRust()` for the supported
-high-level R fitting path. `results()` can
-also consume list-like primitive or fitted-object
-LRT fields directly and internally package them through `nbinomLRTRust()`.
-
-`applyIndependentFilteringRust()` applies baseMean-driven filtered BH
-adjustment to a primitive result data frame. The Rust core computes the default
-theta grid, R-compatible type-7 quantiles, BH adjustments and lowess fit used
-for threshold selection. The returned data frame gets a `filtered` column and an
-`independentFiltering` attribute with theta, rejection counts, selected
-threshold, lowess fit, and alpha. This helper does not inspect DESeqDataSet
-objects.
-
-`deseq2McolsDiagnosticsRust()` is a pure-R schema for the Rust fit-state
-diagnostic aliases. It validates primitive vectors and returns a data frame
-with DESeq2-style row metadata names such as `betaConv`, `fullBetaConv`,
-`reducedBetaConv`, `betaIter`, `reducedBetaIter`, `deviance`, and `maxCooks`.
-`rsdeseq2DiagnosticSchemaRust()` returns the same schema and can call the
-registered native C stub when the shared library is loaded. These helpers do
-not inspect or modify DESeqDataSet objects.
-
-For matrix and list inputs, the returned `rsdeseq2RustFit` list contains the
-Rust result table, counts, design matrices, test, coefficient estimates, and
-covariance. For `DESeqDataSet` inputs, the fitted dataset is returned with the
-Rust fit stored in its metadata and updated size or normalization factors.
-`estimateDispersionsRust()` runs the same Rust fit pipeline and returns its
-final per-gene dispersion estimates. The package does not populate every
-DESeq2 diagnostic assay or support every DESeq2 fitting option.
-
-Local large-shape gamma/beta/log-F kernels use scaled native integrals, with
-[original and high-precision validation](history/native-large-shape-development.md).
-A production-R numerical-call guard supplements runtime interface checks;
-the [supported contract](native-supported-contract.md) records implemented
-method/capture policies and explicit limitations.
-
-Optimizer controls for ashr fixed-prior (`fixg=TRUE`) requests are unused and are
-not inspected. The optimizer name and the supplied prior remain validated.
-Active fitting retains control validation. Both interfaces share the standalone
-Rust control policy; see the [control checkpoint](history/native-fixed-prior-controls-development.md).
+`nproc` controls reusable local worker pools for fitting, replacement and transforms.
+`strict`, `fast` and `diagnostic` currently select the same numerical algorithm.
+The R package statically links its vendored core and requires Cargo for source
+installation. Before packaging core changes, run `scripts/release/sync_r_vendor.sh`
+and its read-only `--check` mode from the repository root.

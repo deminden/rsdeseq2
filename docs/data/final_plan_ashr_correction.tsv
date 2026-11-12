@@ -1,3 +1,0 @@
-path	migration	bound	candidate_original_error	baseline_original_error	candidate_baseline_difference
-payload/output/log2FoldChange	original_ashr_SQP_checked	2e-06	8.88178419700125e-16	2.88657986402541e-15	2.1094237467878e-15
-payload/output/lfcSE	original_ashr_SQP_checked	2e-06	1.60982338570648e-15	1.55431223447522e-15	1.60982338570648e-15

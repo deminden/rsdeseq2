@@ -24,7 +24,7 @@ conversion explicitly.
 
 ## Size Factors
 
-The initial implementation supports two size-factor methods.
+Size-factor estimation supports two methods.
 
 `ratio` computes a geometric mean for each gene across all samples. Genes with
 any zero count receive a zero geometric mean and are skipped. For each sample,
@@ -214,9 +214,10 @@ validation.
 For large counts all three transforms converge toward `log2(q)`. At the R
 dataset layer, full-data VST reuses an existing parametric or mean
 `dispersionFunction` by passing its fitted coefficients into Rust. DESeq2 stores
-local dispersion functions as R closures with interpolation state, so the
-wrapper evaluates that function on DESeq2's 999-point grid and Rust performs
-the local VST integration from those values. Fast `vst()` continues to fit its
+local dispersion functions as R closures with interpolation state. The wrapper
+imports standard saved locfit coefficients or translates a restricted dispersion
+expression without executing the closure. Rust constructs the 999-point grid,
+predicts dispersions and performs local VST integration. Fast `vst()` fits its
 deterministic subset, as DESeq2 does. Design-aware `rlog()` reuses an existing
 `mcols(object)$dispFit`; blind `rlog()` refits the trend. A lower-level
 `vst_with_dispersion_trend` and its factor-aware variants mirror DESeq2's
@@ -327,8 +328,7 @@ and returns a `DESeqTransform`, including optional frozen-intercept reuse.
 Dataset-based `vst()` and `varianceStabilizingTransformation()` use the same
 Rust fitting path and preserve the Bioconductor dataset metadata needed for a
 transform result. A seeded 1,200-gene, 12-sample fixture covers full and fast
-VST plus rlog across mean, parametric, and local trends; broader dataset
-coverage and every fast-VST subset edge case remain open. The R wrapper's
+VST plus rlog across mean, parametric, and local trends. The R wrapper's
 `lfcShrink()` supports normal beta-prior
 shrinkage for named/indexed Wald coefficients and expanded-design factor-level,
 numeric, and list contrasts. The contrast route uses an expanded model and
@@ -343,7 +343,7 @@ rejected for normal shrinkage.
 
 ## Gene-Wise Dispersion Objective
 
-The gene-wise dispersion foundation follows DESeq2's fixed-mean
+The gene-wise dispersion objective follows DESeq2's fixed-mean
 dispersion optimizer shape. For one gene, the alpha-dependent likelihood kernel
 used for scoring is:
 
@@ -416,7 +416,7 @@ those stage helpers when desired.
 
 ## Parametric Dispersion Trend
 
-The implemented trend foundation follows DESeq2's
+Trend fitting follows DESeq2's
 `parametricDispersionFit` form:
 
 ```text
@@ -477,14 +477,10 @@ local trends use the same backend's direct local prediction path. A small
 offline DESeq2 local-trend fixture checks the fitted shape, with a second
 fixture covering mixed rows above and below the `10 * minDisp` fit threshold
 and another fixture checking predictions at means outside the original fit
-rows. A 64,344-value real-data fixture has median relative error `3.74e-13`,
-p99 `5.85e-12`, and maximum `1.47e-11` against DESeq2 1.46.0. The small
-fitted-shape and mixed-threshold fixtures have maximum absolute errors of
-`9.62e-05` and `1.98e-03`. The out-of-fit prediction fixture has maximum
-absolute error `2.56e-04`, within its `2e-3` reference tolerance but above the
-v0.2.4 baseline of `5.76e-05`; it is disclosed as a localized regression rather
-than counted as an improvement. The GLM-mu local MAP/Wald/LRT fixtures remain
-at machine precision.
+rows. Independent real-data and small-fixture tests cover local predictions,
+fit-threshold selection, minimum-dispersion floors and out-of-fit evaluation,
+with explicit per-fixture bounds. GLM-mu local MAP/Wald/LRT checks test downstream
+results separately.
 Manually constructed local trends reuse the
 builder shape checks for span and polynomial degree, then validate finite log
 dispersions, positive finite local weights, and a consistent empty state for the
@@ -538,7 +534,7 @@ options. `glmGamPoi` remains explicitly unsupported.
 
 ## MAP Dispersions
 
-The initial MAP stage follows DESeq2's `type="DESeq2"` flow after gene-wise
+The MAP stage follows DESeq2's `type="DESeq2"` flow after gene-wise
 estimates, trend fitting, and prior variance are available. Low-level MAP
 fitting accepts optional normalized observation weights; the high-level
 linear-mu pipeline remains no-weight because DESeq2 disables `linearMu` when
@@ -599,7 +595,7 @@ by observation weights, matching the DESeq2 shortcut.
 
 ## Fixed-Dispersion IRLS
 
-The initial general GLM path implements DESeq2's standard-design-matrix
+The general GLM path implements DESeq2's standard-design-matrix
 `fitBeta` branch. Fitting is done on natural-log scale:
 
 ```text
@@ -834,25 +830,11 @@ standard errors, coefficient covariance, and row log likelihoods, and sets
 `beta_converged` from the selected optimizer convergence flag. `force_optim`
 sends every row through the bounded refit after IRLS.
 
-rsdeseq2 0.2.5 uses `rcompat-lbfgsb` 0.2.1. A 512-case replay of bounded
-negative-binomial objectives generated by R 4.6.1 matched all 512 optimizer
-endpoints, objective values, and function/gradient counts exactly. Under the
-same replay, 0.1.6 matched 493/512 endpoints plus objectives and 507/512
-objectives at the practical
-`5e-3` parameter and `1e-5` absolute or `1e-8` relative objective thresholds,
-0/512 at zero tolerance, and 311/512 evaluation counts. These figures apply to
-the recorded x86_64 Linux/OpenBLAS 0.3.32 one-thread fixture environment; callback
-arithmetic or platform changes can alter floating-point-sensitive paths.
-
-On the fixed 100-row v0.2.4 high-error set, the measured v0.2.5 median absolute
-error is `6.064e-10`, mean absolute error is `1.261e-4`, and maximum absolute
-error is `1.526e-3`. The corresponding v0.2.4 measurements are `1.464e-4`,
-`3.794e-4`, and `3.094e-3`: the v0.2.5 values are 241,402x lower at the median,
-3.009x lower at the mean, and 50.68% lower at the maximum. Compensated
-size-factor accumulation removes the dispersion-trend amplification that
-dominated the median; callback-compatible final/refit optimization and its
-stability check remain important for the remaining tail. See
-[benchmarks.md](benchmarks.md) for the measured values and procedure.
+The bounded optimizer has independent fixed-input R stress fixtures. End-to-end
+accuracy additionally depends on normalization, dispersion and callback arithmetic;
+optimizer replay alone does not establish whole-workflow parity. The
+[reproducibility guide](reproducibility.md) describes the frozen stress and hard-row
+checks, and [benchmarks](benchmarks.md) separates precision from timing scope.
 
 Returned beta estimates and standard errors are converted to log2 scale with
 `log2(e)`.
@@ -986,11 +968,12 @@ The helper operates on an `NbinomGlmFit` and a selected coefficient index. The
 builder pipelines wrap it with result-table assembly, Cook's filtering, and
 independent filtering. Primitive numeric and DESeq2-style results contrasts
 have result-row builders and supplied/native Wald pipeline routes. Full
-Bioconductor result-object metadata remains interface work.
+The R wrapper adds the implemented `DESeqResults` column descriptions and query
+metadata; complete Bioconductor object semantics remain outside scope.
 
 ## Result Rows
 
-The initial result assembly mirrors the simple non-contrast DESeq2 `results()`
+Result assembly mirrors the simple non-contrast DESeq2 `results()`
 path, with Cook's p-value masking and base-mean independent filtering available
 in the builder pipelines:
 
@@ -1068,9 +1051,9 @@ stage-by-stage parity checks, especially when result-table differences need to
 be traced back to `dispGeneEst`, `dispFit`, `dispMAP`, final dispersion
 estimates, beta estimates, beta optimizer starts, beta standard errors,
 iteration/convergence fields, deviance, or Cook's summaries.
-Full Bioconductor result objects and complete high-level object mutation are
-not implemented. The R package can attach a Rust fit to a `DESeqDataSet` and
-dispatch supported result requests through its own helpers. Lightweight Rust
+The R package returns `DESeqResults` for supported dataset results/shrinkage and
+attaches a Rust fit to `DESeqDataSet` inputs. Complete Bioconductor metadata and
+high-level mutation semantics remain outside scope. Lightweight Rust
 fit/result metadata and primitive R routes preserve implemented formula-aware
 contrast labels, sample-level metadata, factor levels, and explicit factor
 references for supported already-fitted routes.
@@ -1156,9 +1139,11 @@ helpers expose this limited replacement-refit path for the default Wald/LRT
 coefficient and
 primitive numeric, named/list, and caller-supplied factor-level Wald contrasts.
 
-Automatic R formula/colData dispatch for the two-group low-count heuristic,
-remaining contrast edge cases, beta-prior behavior, and Bioconductor
-assay/metadata preservation are not implemented yet.
+Supported formula/colData fits dispatch the two-group low-count rule using the
+shared Rust policy and retained design origin. Replacement fits merge implemented
+assays and metadata while preserving raw-count and weighted-failure semantics.
+Complete Bioconductor metadata and undocumented contrast/beta-prior routes remain
+outside the [supported contract](native-supported-contract.md).
 
 ## Independent Filtering
 
@@ -1337,11 +1322,10 @@ The R reference generator validates this supported scope with
 native dispersion validation, optim fallback, and richer
 result metadata.
 
-## Gene-Wise Dispersion Foundation
+## Dispersion Workflow and Diagnostics
 
 The dispersion stage implements reusable pieces of DESeq2's
-`estimateDispersionsGeneEst` path for both the `linearMu` branch and an
-initial GLM-mu branch.
+`estimateDispersionsGeneEst` path for both the `linearMu` and GLM-mu branches.
 
 The rough starting estimate follows `roughDispEstimate`:
 
@@ -1589,5 +1573,5 @@ arrays, applies Cook's masking, then recomputes independent filtering/BH for tha
 request. LRT requests retain their stored model-level statistics and reject
 nondefault Wald options. Ordinary stored-fit requests and replacement-output
 merge policies retain their separate required context; no absent replacement
-state is synthesized. The R layer keeps its validated probability functions
-until a shared bridge meets the same precision limits.
+state is synthesized. The R wrapper forwards probability calculations to these
+same Rust kernels; no production R numerical fallback is selected.

@@ -1,0 +1,34 @@
+{
+  "record_type": "Recorded complete R workflow measurements; current CI is ci_0.5.0.json",
+  "source_record_sha256": "92c714aa83692d53d7fb32ba54aa4e45e478fa9efb2e38e4e905d74bf54836bd",
+  "source_record_url": "https://github.com/deminden/rsdeseq2/blob/62825c0dc5d5c54122e0fdc74b3b1b1914840361/docs/data/review_fixes_2026-11-12.json",
+  "numerical_source_commit": "f05cbd13fe08e85fbb10d3e3a6abfb76a49dac41",
+  "measurements": {
+    "baseline": {
+      "total_s": 180.45989725075196,
+      "maximum_peak_rss_mib": 1136.703125
+    },
+    "candidate": {
+      "total_s": 180.7793113741791,
+      "maximum_peak_rss_mib": 1159.0
+    },
+    "cases": 20,
+    "paired_passes": 1,
+    "strict_payload_identity": true,
+    "elapsed_change_percent": 0.17700005834719867,
+    "max_rss_budget_mib": 2048
+  },
+  "external_state": {
+    "Rust CI": "passed",
+    "pinned R 4.6.2": "passed",
+    "current R": "passed",
+    "Linux x86_64": "passed",
+    "Linux aarch64": "passed",
+    "macOS x86_64": "passed",
+    "macOS aarch64": "passed",
+    "Windows x86_64": "passed",
+    "full GTEx": "passed",
+    "Linux ASan/UBSan": "passed",
+    "independent x86 R CDF references": "passed"
+  }
+}

@@ -1,7 +1,0 @@
-area	before_lines	entry_path	entry_lines	topic_files	largest_topic_lines
-Native LRT tests	3354	crates/rsdeseq2/tests/native_lrt_pipeline.rs	204	7	772
-Wald tests	3081	crates/rsdeseq2/tests/wald_pipeline.rs	117	9	545
-R result tests	1789	r-pkg/rsdeseq2/tests/testthat/test-results.R	240	5	521
-Builder workflows	1559	crates/rsdeseq2/src/core/implementation/builder/workflows/mod.rs	7	5	680
-Contrast handling	1388	crates/rsdeseq2/src/contrasts.rs	18	5	358
-Dispersion trends	1660	crates/rsdeseq2/src/dispersion/trend.rs	32	7	568

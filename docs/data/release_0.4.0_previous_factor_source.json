@@ -1,5 +1,0 @@
-{
-  "production_revision": "fada553556dc25532c47fb06c8f74f31e2493747",
-  "source_archive_sha256": "6f68709bfc7553140603c2084b3403916f4ae54811a3137d8be72a13e532db9b",
-  "modifications": "Renamed unchanged old test-only JSON example to factor_previous_probe; production sources unchanged"
-}

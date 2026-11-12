@@ -1,202 +1,84 @@
 # Development
 
-Python tooling/tests require Python 3.10 or newer; the validation run used Python 3.14.7.
+Use Rust 1.97.1 or newer (Rust 2024 edition), Python 3.10 or newer, and
+`deseq2-r462-native` for independent R comparisons. See
+[reproducibility](reproducibility.md) for pinned package restoration.
 
-## Repository Structure
+## Repository responsibilities
 
-- `crates/rsdeseq2`: Rust numerical core and minimal CLI.
-- `r-pkg/rsdeseq2`: R access layer and package CI.
-- `scripts/`: reference generation, validation, benchmarks, environment and release tooling.
-- `config/r-reference/`: pinned R environment and source locks.
-- `docs/`: current guides, empirical reports, historical records and versioned release notes.
-- `results/`: ignored generated parity, fixture, and benchmark outputs.
+| Directory | Responsibility |
+| --- | --- |
+| `crates/rsdeseq2/` | Canonical Rust core, CLI, integration tests and benchmarks |
+| `crates/rsdeseq2/tools/validation/` | Standalone protocol and fixture tools; explicit Cargo example targets |
+| `r-pkg/rsdeseq2/` | R access package, native bridge and generated vendored core |
+| `scripts/` | [Reference, validation, benchmark, environment and release tooling](../scripts/README.md) |
+| `config/r-reference/` | Source hashes and environment locks for independent R references |
+| `docs/` | Current guides, release notes and supporting evidence |
+| `results/` | Ignored datasets, measurements, check outputs and local optimisation journal |
 
-The repository is Rust-first: a Rust core, CLI, R access layer,
-scripts for parity fixtures, docs, CI, and validation outputs. R/DESeq2 is used
-as an external reference generator for tests.
+Keep caches, generated archives, OS metadata and machine-specific paths out of
+tracked source. `.DS_Store` is excluded from Rust and R packages.
 
-The minimum supported toolchain is Rust 1.97.1, declared by `rust-version` in
-`Cargo.toml`; the workspace uses the Rust 2024 edition. Development and CI use
-that toolchain or newer. R package CI requires the pinned R 4.6.2 reference lane and also runs an advisory
-current-R lane, while numerical reference
-fixtures retain their recorded R versions.
-Public slice-like APIs prefer `RangeBounds` where range inputs are accepted, so
-callers can use legacy range syntax and the `core::range` types.
+## Code boundaries
 
-## Source Organization
+Statistical computation belongs to Rust. R handles argument translation,
+identifier alignment and object assembly; C validates and marshals buffers.
+Reference generators and tests may use original R calculations. Production
+interfaces must share the same numerical engine and return identical values.
 
-The large integration suites keep one entry file and executable per suite;
-child modules under `tests/native_wald_pipeline/`, `tests/native_lrt_pipeline/`,
-`tests/wald_pipeline/`, `tests/design/` and `tests/results/` group cases by workflow. Shared fixtures stay in the entry
-file rather than being copied into individual cases.
+Builder workflows and stages have private modules under
+`core/implementation/builder/`. Formula parsing/evaluation, contrasts,
+dispersion trends and CLI execution have focused private modules. Some
+bridge/GLM helpers use `include!` files to preserve scope and operation order.
+The R results adapter uses `R/results.R` and `R/results-*.R`; function definitions
+must remain independent of collation order.
 
-CLI numerical routing cases live under `tests/cli/`, with shared assertions
-and separate normalization/contrast case tables. Use fixtures where ignoring a
-flag changes numerical results, and keep invalid-input/ambiguity cases distinct.
+Large integration suites retain one entry executable with topic modules. Shared
+fixture setup belongs with its suite. Prefer independent numerical oracles and
+cases where ignoring an option changes the answer. Missing fixtures must fail.
 
-The R result tests are grouped into `test-results.R` and five
-`test-results-*.R` files for selectors, filtering, alignment, object inputs and
-all-zero contrasts. Run `testthat::test_dir(..., filter = "^results")` to select
-the complete result-contract group.
+After changing the canonical core, regenerate and check its R vendor:
 
-Builder entry points use private modules under
-`core/implementation/builder/workflows/`. Normalization, gene-wise dispersion,
-trend/MAP attachment, VST and rlog stage methods have separate private modules
-under `core/implementation/builder/stages/`. Formula beta-prior adapters live in
-`results/implementation/beta_prior_formula/`: primitive/model-frame parsing
-forwards into shared size-factor or matrix-factor execution helpers. Public
-signatures and numerical operation order are preserved. Contrast handling uses
-modules under `contrasts/`, and dispersion trends use modules under `dispersion/trend/`. The
-original public module paths re-export the same types and functions. Keep each
-trend model with its fitting implementation; only shared arithmetic and row
-selection cross these private module boundaries.
-
-Formula term expansion and CLI execution/adapters/readers/writers now have real
-private module boundaries; see the [review corrections](reports/review-fixes-2026-11-12.md)
-for bounded expansion, posterior summary ownership, work controls and current
-local-only validation status.
-
-Most remaining design helpers, GLM IRLS/beta modules and the R Rust bridge use private
-`include!` files to keep existing public paths, helper scope and operation
-order. Edit the focused topic files referenced by each entry file. The R
-results wrapper is split across `R/results.R` and `R/results-*.R`; these files
-contain function definitions and must remain independent of collation order.
-Regenerate the R package's vendored core with `scripts/release/sync_r_vendor.sh` after
-editing core Rust sources.
-Run `scripts/release/sync_r_vendor.sh --check` before testing or packaging. This is a
-read-only comparison against a temporary generated tree and checks the Rust/R
-versions. The vendored manifest is derived from Cargo metadata. CI checks the
-committed vendor and fails on drift instead of repairing it before testing.
-
-See the [current refactor report](history/refactoring-followup-2026-10-29.md) for the
-file inventory and precision/performance validation, and the
-[earlier report](history/refactoring-large-files.md) for the October 16 restructuring.
-
-The [test-quality report](testing-parity.md) describes required oracle checks,
-CLI routing assertions, the compact GTEx panel and full replay commands.
-
-The [shared inference report](history/rust-only-inference-2026-10-29.md) documents the
-standalone probability kernels and independent reference generator at that
-checkpoint. The [current supported contract](native-supported-contract.md) maps
-all R exports to the shared numerical engine and records remaining completion
-gates. New numerical changes must preserve independent bounds and direct
-standalone/wrapped equality.
-
-The [final local acceptance audit](history/final-plan-local-acceptance.md) reconciles
-the C19/C21 requirements and current combined tests, paired process measurements
-and measured wrapper boundary costs. The [final development validation](history/dev-validation-2026-11-12.md)
-closes C23 with current CI and a verified local bundle. Development on `dev`
-is authorized; tags and publication remain on hold.
-The [warning/platform follow-up](history/native-sqp-warning-platform-gates.md) also
-requires fresh original-R complete-formula and sparse-SQP references in the
-pinned Linux lane, alongside the saved-reference tests. It documents a corrected
-warning omission found by strengthening those assertions.
-
-## Commands
-
-```bash
-cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+```sh
+scripts/release/sync_r_vendor.sh
+scripts/release/sync_r_vendor.sh --check
 ```
 
-Generate R references:
+Check mode is read-only and verifies notices, generated manifests and package
+versions. CI rejects drift rather than repairing source before testing.
 
-```bash
-Rscript scripts/references/generate_deseq2_references.R
-cargo test -p rsdeseq2 --test dispersion_reference
-cargo test -p rsdeseq2 --test results_reference
-cargo test -p rsdeseq2 --test wald_reference
-cargo test -p rsdeseq2 --test lrt_reference
-```
+## Validation
 
-The optimizer stress reference specifically requires R 4.6.1:
-
-```bash
-OPENBLAS_NUM_THREADS=1 \
-  Rscript scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R
-```
-
-The `rcompat-lbfgsb` 0.2.1 result is 512/512 exact endpoints, objectives, and
-evaluation counts. The 0.1.6 baseline matched endpoint plus objective in
-493/512 cases and the objective alone in 507/512 cases at practical tolerances,
-0/512 exactly, and 311/512 for exact evaluation counts.
-
-The committed references under
-`crates/rsdeseq2/tests/data/deseq2_reference/` are required. Missing, empty or
-malformed fixtures fail the tests; they never turn a numerical replay into a
-silent pass. These files compare implemented Rust stages with generated DESeq2 outputs. Wald/LRT
-golden checks use supplied dispersions and `DESeq2:::fitNbinomGLMs` to match the
-fixed-dispersion scope. The generated reference set includes
-DESeq2-backed beta-prior variance, refit, and estimated-prior refit references,
-weighted fixed-dispersion Wald/LRT, unweighted GLM-mu mean-trend MAP/Wald/LRT references
-with and without Cox-Reid, weighted GLM-mu Cox-Reid gene-wise references, and the
-weighted GLM-mu mean and local-trend MAP/Wald/LRT references, including
-result-row BH-adjusted p-value and compact result-table checks for those
-matched Wald/LRT branches, plus the unweighted GLM-mu local-trend
-MAP/Wald/LRT result-table fixture and the unweighted/weighted GLM-mu Cox-Reid
-local-trend MAP/Wald/LRT references.
-
-Run benchmarks:
-
-```bash
-cargo bench -p rsdeseq2
-scripts/benchmarks/benchmark_rsdeseq2.sh --genes 1000 --samples 8 --repeats 1
-```
-
-After producing the top-1,000 benchmark diagnostics described in
-[reproducibility.md](reproducibility.md#versioned-high-error-benchmark),
-reproduce the reported measurements and run the scorer tests:
-
-```bash
-python3 scripts/validation/score_frozen_worst_genes.py \
-  --fixture docs/data/wald_frozen_worst100_r461.tsv \
-  --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
-  --report-only
+```sh
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 ```
 
-## Coding Conventions
+Run affected panels during implementation, then the appropriate combined gate.
+Documentation-only edits need link/path checks and confirmation that code and
+retained reference bytes did not change. See [testing and CI](testing-parity.md)
+for R, full GTEx and sanitizer commands.
 
-- Keep statistical computation in Rust; see the implementation plan for
-  wrapper constraints.
-- Prefer explicit structs and enums over string options.
-- Return `DeseqError::UnsupportedFeature` for unimplemented stages.
-- Avoid panics in library code.
-- Add hand-computable tests before reference tests.
-- Keep compatibility behavior documented when inferred from DESeq2 docs or
-  source.
+## Numerical and performance changes
 
-## Adding a New Statistical Stage
+Keep explicit per-field bounds, operation order and independent provenance.
+Use typed options and unsupported-feature errors. Avoid panics in public APIs.
+Add hand-computable cases when they provide independent information, plus
+reference/stress cases appropriate to the changed behavior.
 
-Each stage should expose intermediate output in `DeseqFit` or a stage-specific
-struct. When a field maps directly to DESeq2 row metadata, also update the
-diagnostic alias view in `diagnostics.rs`. Add tests in three layers where
-practical:
+`PreparedContrastView` borrows shared inference matrices across requests.
+Consume each owned result before the next request when scratch-memory bounds
+matter. Local worker pools are reusable. Frontend polling callbacks stay on
+their originating thread; cancellation returns an error, not partial results.
 
-1. Hand-computable toy test.
-2. DESeq2 golden-reference comparison.
-3. Stress/property test for edge cases.
+For quantification optimisations, use one paired pass across the eleven full
+GTEx contrasts. Count a round only at 2% higher summed throughput, with unchanged
+precision/output gates and an independent memory check. Combine partial gains;
+record attempts in ignored `results/local/OPTIMISATION_LOG.md`. Keep every
+observation and distinguish result-only timing from diagnostic exports.
+See [benchmarks](benchmarks.md).
 
-## Current improvement cycle
-
-The [execution report](history/codebase-improvement-progress-2026-10-29.md) records the
-correctness, memory, result-query and output-publication changes. The primary
-native quantification gate is one paired eleven-contrast pass; count a speed
-round only at 2% higher summed throughput. Independent memory acceptance and R
-query improvements are reported separately. Keep the optimisation journal in ignored `results/local/OPTIMISATION_LOG.md`.
-
-Run source-package checks in `deseq2-r462-native`; use that Rscript explicitly and
-include the restored reference/test-tool library in `R_LIBS_USER`. The source
-installer's `--check-installed --library PATH` checks that path in addition to
-normal R libraries. Main README figures compare with DESeq2; previous-Rust deltas
-and per-stage figures belong in the detailed reports.
-
-Use `PreparedContrastView` when evaluating several primitive contrasts. It
-borrows coefficient/SE/covariance matrices and prepares count-zero context once;
-consume each owned result before the next request when bounded scratch matters.
-The R single and batch calls share this kernel and C request descriptor. No R
-callback or numerical backend is permitted. See the
-[batch checkpoint](history/rust-only-result-batches-2026-10-30.md) for validation and
-paired measurements, and the [completion audit](history/codebase-improvement-completion-audit-2026-10-29.md)
-for the current accepted scope and any future release coordination.
+Align the crate, R package, backend, vendor and lockfiles before packaging.
+Publishing is a separate explicit action; see [release procedure](release.md).

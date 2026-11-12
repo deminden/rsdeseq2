@@ -1,18 +1,19 @@
-# Documentation map
+# Documentation
 
-The files in this directory are maintained user and contributor guides.
+These guides describe the current 0.5.0 source and its supported behavior.
 
-- [CLI](cli.md), [R wrapper](r-wrapper.md), [supported contract](native-supported-contract.md)
-- [Compatibility](compatibility.md), [gap analysis](deseq2-gap-analysis.md), [algorithms](algorithms.md)
-- [Testing and parity](testing-parity.md), [reproducibility](reproducibility.md), [benchmarks](benchmarks.md)
-- [Development](development.md), [release procedure](release.md)
+| Task | Guide |
+| --- | --- |
+| Run file-based analysis | [CLI](cli.md) |
+| Use R fits, results, transforms and shrinkage | [R wrapper](r-wrapper.md) |
+| Check supported methods and limits | [Compatibility](compatibility.md), [numerical ownership contract](native-supported-contract.md) |
+| Understand statistical implementation | [Algorithms](algorithms.md), [platform arithmetic](linux_numerical_parity.md) |
+| Review precision, speed and memory | [GTEx comparison](reports/gtex-native-wald-benchmark.md), [benchmark procedure](benchmarks.md) |
+| Reproduce data and independent references | [Reproducibility](reproducibility.md) |
+| Run tests or inspect passing CI | [Testing and parity](testing-parity.md) |
+| Change or package the code | [Development](development.md), [release procedure](release.md), [0.5.0 notes](releases/0.5.0.md) |
 
-`reports/` holds the current empirical comparison and latest correction evidence.
-`history/` preserves superseded development plans, implementation checkpoints and
-older benchmark reports. Their source revisions, counts and measurements retain
-their original scope. `releases/` contains versioned release notes. `data/` holds
-supporting measurement and reference evidence; operational environment locks live
-separately in [`config/r-reference/`](../config/r-reference/).
-
-Historical JSON/TSV provenance records retain original command paths and hashes.
-Current executable commands and documentation links use the reorganised paths.
+`data/` contains the raw evidence used by these guides and active validation
+tools. Operational R environment locks live in [`config/r-reference/`](../config/r-reference/).
+Reference metadata and measurement source hashes identify the exact environments
+and binaries that produced their values.

@@ -24,5 +24,5 @@ python scripts/references/generate_pasilla_validation.py --source-archive SOURCE
 Rscript scripts/references/generate_pasilla_reference.R crates/rsdeseq2/tests/data/pasilla_holdout
 ```
 
-These references were frozen before memory optimization. Evaluate the panel at
-milestone acceptance; do not tune individual optimization candidates against it.
+Keep the independent references unchanged when evaluating a candidate. Use the
+holdout at acceptance; do not tune individual optimisation candidates against it.

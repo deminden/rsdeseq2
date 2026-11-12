@@ -15,7 +15,7 @@ Reference files should record:
   `base_metadata_nf.tsv`, `native_nf_dispersion_reference.tsv`, and
   `native_nf_mu.tsv` for normalization-factor metadata and native
   normalization-factor dispersion intermediates.
-- `results_wald_ratio.tsv` for future full-pipeline parity.
+- `results_wald_ratio.tsv` for full-pipeline parity.
 - `fixed_dispersions.tsv`, `fixed_wald_reference.tsv`,
   `fixed_wald_t_reference.tsv`, `fixed_wald_weighted_reference.tsv`,
   `fixed_lrt_reference.tsv`, `fixed_mu_full.tsv`, `fixed_hat_full.tsv`,
