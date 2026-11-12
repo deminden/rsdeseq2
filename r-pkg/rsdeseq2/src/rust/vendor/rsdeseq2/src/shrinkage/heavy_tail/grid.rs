@@ -440,9 +440,9 @@ mod tests {
                     ));
                 }
             }
-            for i in 0..2 {
+            for (i, &interval) in result.interval.iter().enumerate() {
                 assert!(
-                    (result.interval[i] - expected("interval", i)).abs()
+                    (interval - expected("interval", i)).abs()
                         <= 2.0 * options.grid_standard_deviations * 0.7 / 50.0 + 1e-10,
                     "{} interval",
                     c["name"]
