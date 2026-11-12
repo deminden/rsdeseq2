@@ -18,8 +18,10 @@ include!("implementation/beta_prior_factor.rs");
 // Additive expanded beta-prior result workflows.
 include!("implementation/beta_prior_additive.rs");
 
-// Formula-driven expanded beta-prior result workflows.
-include!("implementation/beta_prior_formula.rs");
+// Formula parsing adapters and shared beta-prior execution policies.
+#[path = "implementation/beta_prior_formula/mod.rs"]
+mod beta_prior_formula;
+pub use beta_prior_formula::*;
 
 // Cook's replacement merge helpers for beta-prior result workflows.
 include!("implementation/cooks_replacement.rs");
