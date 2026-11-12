@@ -56,11 +56,37 @@ fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: 
 #[test]
 fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
     let mut failures = vec![];
-    for fixture in [
+    #[derive(Deserialize)]
+    struct CdfReference {
+        case: String,
+        row: usize,
+        cutoff: usize,
+        estimate: String,
+        se: String,
+        threshold: String,
+        cdf: String,
+    }
+    let calibration = std::env::var_os("RSDESEQ2_UNIFORM_CDF_REFERENCE").map(|path| {
+        csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_path(path)
+            .unwrap()
+            .deserialize::<CdfReference>()
+            .map(|r| {
+                let row = r.unwrap();
+                ((row.case.clone(), row.row, row.cutoff), row)
+            })
+            .collect::<std::collections::BTreeMap<_, _>>()
+    });
+    let mut calibrated = 0usize;
+    for (fixture_index, fixture) in [
         formula_reference!("uniform_posterior_r462"),
         include_str!("data/truncated_posterior_r462.json"),
         include_str!("data/student_uniform_posterior_r462.json"),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let r: References = serde_json::from_str(fixture).unwrap();
         if let Some(probe) = r.source.dnorm_probe {
             assert_eq!(probe.len(), 1);
@@ -144,23 +170,22 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     );
                 }
                 for (j, &threshold) in thresholds.iter().enumerate() {
-                    let expected = number(&c.cdf[i * thresholds.len() + j]);
-                    if c.name == "ultra_narrow" && (p.cdf(threshold) - expected).abs() > 2e-8 {
-                        let points = [
-                            (estimate + 1e-12) / se,
-                            estimate / se,
-                            (estimate - 1e-12) / se,
-                        ];
-                        eprintln!(
-                            "narrow CDF diagnostic {context} cutoff {threshold}: points {:?}, logcdf {:?}, weights {:?}",
-                            points.map(f64::to_bits),
-                            points.map(|x| rsdeseq2::math::normal_log_cdf(x).to_bits()),
-                            p.weights()
-                        );
+                    let expected = if fixture_index == 0 {
+                        calibration.as_ref().map(|rows| {
+                            let row = &rows[&(c.name.clone(), i, j)];
+                            assert_eq!(number(&row.estimate).to_bits(), estimate.to_bits());
+                            assert_eq!(number(&row.se).to_bits(), se.to_bits());
+                            assert_eq!(number(&row.threshold).to_bits(), threshold.to_bits());
+                            calibrated += 1;
+                            number(&row.cdf)
+                        })
+                    } else {
+                        None
                     }
+                    .unwrap_or_else(|| number(&c.cdf[i * thresholds.len() + j]));
                     close(
                         p.cdf(threshold),
-                        number(&c.cdf[i * thresholds.len() + j]),
+                        expected,
                         2e-8,
                         0.,
                         &format!("{context} cdf({threshold})"),
@@ -169,6 +194,13 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                 }
             }
         }
+    }
+    if let Some(rows) = calibration {
+        assert_eq!(
+            calibrated,
+            rows.len(),
+            "every independently generated CDF must be checked"
+        );
     }
     assert!(
         failures.is_empty(),

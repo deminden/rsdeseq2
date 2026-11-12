@@ -311,7 +311,12 @@ General likelihood functions are translated from restricted
 five-argument expressions, with matrix products and supported density calls;
 the wrapper never executes these functions. BFGS and L-BFGS-B run in Rust.
 Optional Laplace/grid intervals, scalar parameter uncertainty and covariance-based
-posterior contrasts also run in Rust. Grid sign summaries affect returned s-values;
+posterior contrasts also run in Rust. Grid queries default to a batch budget of
+10,000,000 likelihood evaluations. Pass \code{max.grid.evaluations} through
+\code{...} to configure it, or explicit \code{NULL} for unlimited work. Oversized
+queries fail before fitting. Posterior operations check for interruption between
+genes and during grid evaluation and return no partial result on cancellation.
+Grid sign summaries affect returned s-values;
 extra interval/contrast matrices are available through the primitive engine,
 not added as coefficient result-table columns. Restricted regression expressions
 support primitive numeric one-dimensional subscripts.
