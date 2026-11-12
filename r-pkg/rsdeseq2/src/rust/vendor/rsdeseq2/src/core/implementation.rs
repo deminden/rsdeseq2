@@ -21,8 +21,19 @@ include!("implementation/outputs.rs");
 // Builder configuration setters and accessors.
 include!("implementation/builder/config.rs");
 
-// Builder normalization, dispersion, VST, and rlog stages.
-include!("implementation/builder/dispersion_transforms.rs");
+// Builder stage boundaries retain the existing public forwarding methods.
+#[path = "implementation/builder/stages/gene_wise.rs"]
+mod builder_gene_wise;
+#[path = "implementation/builder/stages/map.rs"]
+mod builder_map;
+#[path = "implementation/builder/stages/normalization.rs"]
+mod builder_normalization;
+#[path = "implementation/builder/stages/rlog.rs"]
+mod builder_rlog;
+#[path = "implementation/builder/stages/trends.rs"]
+mod builder_trends;
+#[path = "implementation/builder/stages/vst.rs"]
+mod builder_vst;
 
 // Builder Wald and LRT orchestration before replacement refits.
 include!("implementation/builder/wald_lrt.rs");

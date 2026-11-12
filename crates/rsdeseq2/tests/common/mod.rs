@@ -196,6 +196,20 @@ pub fn assert_float_close(actual: f64, expected: f64, atol: f64, rtol: f64, labe
     );
 }
 
+/// Compare a scalar to a required reference value or its explicit missing row.
+pub fn assert_reference_value(
+    actual: f64,
+    expected: Option<f64>,
+    atol: f64,
+    rtol: f64,
+    label: &str,
+) {
+    match expected {
+        Some(expected) => assert_float_close(actual, expected, atol, rtol, label),
+        None => assert!(actual.is_nan(), "{label}: expected missing, got {actual}"),
+    }
+}
+
 pub fn assert_option_close(
     actual: Option<f64>,
     expected: Option<f64>,
