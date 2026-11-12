@@ -1,8 +1,16 @@
+#[macro_use]
+#[path = "support/formula_reference.rs"]
+mod reference;
 use rsdeseq2::shrinkage::{FixedMixture, TruncatedNormalMixture, UniformMixture};
 use serde::Deserialize;
 #[derive(Deserialize)]
 struct References {
+    source: Source,
     cases: Vec<Case>,
+}
+#[derive(Deserialize)]
+struct Source {
+    dnorm_probe: Option<Vec<String>>,
 }
 #[derive(Deserialize)]
 struct Case {
@@ -49,11 +57,21 @@ fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: 
 fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
     let mut failures = vec![];
     for fixture in [
-        include_str!("data/uniform_posterior_r462.json"),
+        formula_reference!("uniform_posterior_r462"),
         include_str!("data/truncated_posterior_r462.json"),
         include_str!("data/student_uniform_posterior_r462.json"),
     ] {
         let r: References = serde_json::from_str(fixture).unwrap();
+        if let Some(probe) = r.source.dnorm_probe {
+            assert_eq!(probe.len(), 1);
+            let point = UniformMixture::new(vec![1.0], vec![0.0], vec![0.0]).unwrap();
+            let density = point.log_likelihoods(37.0 / 0.15, 1.0).unwrap()[0];
+            assert_eq!(
+                density.to_bits(),
+                number(&probe[0]).to_bits(),
+                "original dnorm probe"
+            );
+        }
         for c in r.cases {
             let prior = if let Some(means) = &c.means {
                 FixedMixture::TruncatedNormal(

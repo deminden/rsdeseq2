@@ -59,3 +59,23 @@ Rust tests and the actual-interface checker. It must not acquire a Linux suffix:
 that previously selected a nonexistent file and prevented the remaining R
 interface checks from running. Required platform-specific panels still fail
 when their snapshot is missing; there is no fallback or wider numerical bound.
+
+## Far-tail bounded posterior density
+
+The original Linux R 4.6.2 density evaluation rounds its square and addition
+separately; the existing macOS reference uses a fused operation. A one-ulp
+log-density difference can grow when a posterior variance subtracts close
+moments. In the independently generated half-uniform profile at estimate
+`-40` and standard error `0.15`, the macOS expression missed the original Linux
+posterior SD by `4.10e-6`, exceeding the existing `2e-6` bound.
+
+The Rust density helper now uses the original Linux expression on Linux x86_64
+and retains the existing expression on other targets. The standalone and
+wrapped interfaces share this helper. The Linux fixture comes from
+[original R and ashr in CI](https://github.com/deminden/rsdeseq2/actions/runs/43210948289);
+all numerical reference fields are preserved. Tests check the density probe's
+exact bits as well as every existing posterior accuracy bound. The macOS
+reference and all tolerances remain unchanged. The
+[diagnostic proof](data/dev-ci-uniform-2026-11-12.json) records the source hashes
+and failing case. This correction affects bounded and location-prior helpers;
+the default quantification and normal-mixture fitting paths are unchanged.
