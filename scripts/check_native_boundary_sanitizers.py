@@ -89,7 +89,13 @@ def main():
             subprocess.run([str(r), 'CMD', 'INSTALL', '--preclean', '--no-test-load',
                             '--library='+str(library), str(source)], env=env, check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=600)
-        fingerprints = list((source/f'src/rust/target/{target}/release/.fingerprint').rglob('lib-rsdeseq2_r.json'))
+        fingerprints = list((source/f'src/rust/target/{target}/release').rglob('lib-rsdeseq2_r.json'))
+        # Cargo 1.100 stores these below build/CRATE/HASH/fingerprint;
+        # earlier Cargo uses .fingerprint/CRATE-HASH. The disposable source
+        # is fresh, so both layouts must describe this instrumented build.
+        report['rust_fingerprint_evidence'] = [
+            dict(path=str(p.relative_to(source)), rustflags=json.loads(p.read_text()).get('rustflags', []))
+            for p in fingerprints]
         report['rust_address_instrumentation_verified'] = any(
             '-Zsanitizer=address' in json.loads(p.read_text()).get('rustflags', []) for p in fingerprints)
         dll = library/'rsdeseq2/libs/rsdeseq2.so'

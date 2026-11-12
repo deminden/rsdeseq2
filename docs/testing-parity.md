@@ -481,3 +481,12 @@ The [fixed-prior control panel](native-fixed-prior-controls-development.md) adds
 corrects twelve old standalone acceptance decisions without changing any old
 oracle or bound. Both R CI lanes verify actual interface bits with R math blocked;
 six cached public profiles and targeted R tests cover the public adapter.
+
+
+## Platform-sensitive uniform CDF references
+
+The [review corrections](review-fixes-2026-11-12.md) document independent base-R
+CDF calibration for Windows and Intel macOS, where near-coincident normal log
+probabilities round differently from the ARM reference. The release-target panel
+retains the original bounds and other frozen posterior fields. It checks every
+fresh CDF and its input values; expected values never come from the Rust engine.

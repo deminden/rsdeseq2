@@ -50,7 +50,12 @@ original public module paths re-export the same types and functions. Keep each
 trend model with its fitting implementation; only shared arithmetic and row
 selection cross these private module boundaries.
 
-The design implementation, GLM IRLS/beta modules and R Rust bridge use private
+Formula term expansion and CLI execution/adapters/readers/writers now have real
+private module boundaries; see the [review corrections](review-fixes-2026-11-12.md)
+for bounded expansion, posterior summary ownership, work controls and current
+local-only validation status.
+
+Most remaining design helpers, GLM IRLS/beta modules and the R Rust bridge use private
 `include!` files to keep existing public paths, helper scope and operation
 order. Edit the focused topic files referenced by each entry file. The R
 results wrapper is split across `R/results.R` and `R/results-*.R`; these files

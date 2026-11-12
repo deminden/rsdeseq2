@@ -119,9 +119,22 @@ testthat::test_that("apeglm lfcShrink matches DESeq2 coefficient posteriors and 
   rust_fit <- rsdeseq2::DESeq(rust_dds, fitType = "mean")
   reference_fit <- DESeq2::DESeq(reference_dds, fitType = "mean", quiet = TRUE)
   reference_coef <- utils::tail(DESeq2::resultsNames(reference_fit), 1L)
+  native_request <- getFromNamespace(".rsdeseq2_formula_request", "rsdeseq2")
+  transported <- NULL
+  testthat::local_mocked_bindings(.rsdeseq2_formula_request = function(request) {
+    if (identical(request$operation, "apeglm_shrinkage")) transported <<- request$arguments
+    native_request(request)
+  }, .package = "rsdeseq2")
   rust_shrunk <- rsdeseq2::lfcShrink(
-    rust_fit, coef = "conditionB", type = "apeglm", quiet = TRUE
+    rust_fit, coef = "conditionB", type = "apeglm", quiet = TRUE,
+    max.grid.evaluations = NULL
   )
+  testthat::expect_true("max.grid.evaluations" %in% names(transported))
+  testthat::expect_null(transported$max.grid.evaluations)
+  testthat::expect_error(rsdeseq2::lfcShrink(
+    rust_fit, coef = "conditionB", type = "apeglm", quiet = TRUE,
+    interval.type = "credible", max.grid.evaluations = 1
+  ), "configured budget")
   reference_shrunk <- DESeq2::lfcShrink(
     reference_fit, coef = reference_coef, type = "apeglm", quiet = TRUE
   )

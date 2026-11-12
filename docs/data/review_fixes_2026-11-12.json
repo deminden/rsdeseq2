@@ -1,0 +1,161 @@
+{
+  "baseline_commit": "f6099e8",
+  "numerical_source_commit": "f05cbd13fe08e85fbb10d3e3a6abfb76a49dac41",
+  "local_followup_requires_authorized_platform_rerun": true,
+  "no_further_push_authorized": true,
+  "frozen_files_unchanged": 219,
+  "numerical_and_wrapper_sources_unchanged_since_numerical_commit": true,
+  "binaries": {
+    "baseline-rsdeseq2": "9de234843c219e61ee8a114393a37a7d69a178ab55e8739ef767cc051eebc8a5",
+    "candidate-rsdeseq2": "ce5f1a432648f07264dc875c86ff23a2d6fb533318860cd5dfa8d07c68990992"
+  },
+  "native": {
+    "baseline": {
+      "total_s": 73.11485358211212,
+      "maximum_peak_rss_mib": 306.609375
+    },
+    "candidate": {
+      "total_s": 71.4917907078052,
+      "maximum_peak_rss_mib": 305.890625
+    },
+    "elapsed_change_percent": -2.2198811797990325,
+    "status": "passed",
+    "paired_passes": 1,
+    "contrasts": 11,
+    "exact_exports_per_tool": 22,
+    "frozen_inputs_verified": 44,
+    "binary_sha256": {
+      "baseline": "9de234843c219e61ee8a114393a37a7d69a178ab55e8739ef767cc051eebc8a5",
+      "candidate": "ce5f1a432648f07264dc875c86ff23a2d6fb533318860cd5dfa8d07c68990992"
+    },
+    "timing_scope": "CLI startup, counts/design loading, full default native Wald, result and diagnostic serialization",
+    "existing_original_bounds": "Native exports match the accepted 0.4.0 hash manifest exactly; original reference metrics retained",
+    "time_command": "/usr/bin/time -l",
+    "memory_metric": "Whole-process maximum RSS, MiB",
+    "own_fits_and_builds_concurrent": false,
+    "no_new_optimization_round": true
+  },
+  "R": {
+    "baseline": {
+      "total_s": 180.45989725075196,
+      "maximum_peak_rss_mib": 1136.703125
+    },
+    "candidate": {
+      "total_s": 180.7793113741791,
+      "maximum_peak_rss_mib": 1159.0
+    },
+    "cases": 20,
+    "paired_passes": 1,
+    "strict_payload_identity": true,
+    "elapsed_change_percent": 0.17700005834719867,
+    "max_rss_budget_mib": 2048
+  },
+  "interface_checks": [
+    {
+      "check": "rust_r_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "fresh_fit_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "formula_fit_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "formula_expression_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "native_formula_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "native_factor_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "frozen_local_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "posterior_identity",
+      "exit_code": 0
+    },
+    {
+      "check": "uniform_posterior_identity",
+      "exit_code": 0
+    }
+  ],
+  "checks": {
+    "full_rust_checkpoint": {
+      "pass": 1157,
+      "ignored": 1
+    },
+    "resolved_formula": {
+      "pass": 69
+    },
+    "full_R_checkpoint": {
+      "pass": 2867,
+      "fail": 0,
+      "warnings": 0,
+      "skip": 0
+    },
+    "final_R_shrinkage": {
+      "pass": 71,
+      "fail": 0,
+      "warnings": 0,
+      "skip": 0
+    },
+    "python_real_R": {
+      "pass": 49,
+      "skip": 0
+    },
+    "local_clippy": "Rust 1.100 passed",
+    "minimum_compiler": "Rust 1.97.1 passed",
+    "uniform_cdf": {
+      "independent_R_values": 6500,
+      "maximum_error_vs_frozen_arm_ashr": 1.1102230246251565e-16,
+      "bound_unchanged": 2e-08
+    },
+    "actual_SIGINT_and_budget_and_R_reuse": "passed"
+  },
+  "local_sanitizers": {
+    "status": "passed",
+    "c": "address,undefined",
+    "rust": "address",
+    "rust_stdlib_instrumented": false,
+    "r_interpreter_instrumented": false,
+    "preinstalled_r_dependencies_instrumented": false,
+    "leak_detection": false,
+    "replacement_unwind_hooks": true,
+    "formula_unwind_hooks": true,
+    "target": "aarch64-apple-darwin",
+    "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+    "rust_fingerprint_evidence": [
+      {
+        "path": "src/rust/target/aarch64-apple-darwin/release/build/rsdeseq2-r/2270f099642eee32/fingerprint/lib-rsdeseq2_r.json",
+        "rustflags": [
+          "-Zsanitizer=address",
+          "-Cforce-frame-pointers=yes"
+        ]
+      }
+    ],
+    "rust_address_instrumentation_verified": true,
+    "asan_symbols_verified": true,
+    "ubsan_symbols_verified": true,
+    "replacement_unwind_error_cases_passed": 4,
+    "formula_unwind_error_cases_passed": 4
+  },
+  "external_state": {
+    "source": "8707cc9 and f05cbd1",
+    "rust": "passed",
+    "full_gtex": "passed",
+    "linux_x86_64": "passed",
+    "linux_aarch64": "passed",
+    "macos_aarch64": "passed",
+    "windows_and_macos_x86_64": "old ARM CDF oracle mismatch; independent platform calibration prepared locally",
+    "linux_sanitizer": "old Cargo metadata lookup failed; corrected lookup passes locally under Cargo 1.100; Linux execution pending"
+  }
+}
