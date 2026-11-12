@@ -4,7 +4,7 @@
 [![R CI](https://github.com/deminden/rsdeseq2/actions/workflows/r.yml/badge.svg)](https://github.com/deminden/rsdeseq2/actions/workflows/r.yml)
 [![crates.io](https://img.shields.io/crates/v/rsdeseq2.svg)](https://crates.io/crates/rsdeseq2)
 [![API documentation](https://img.shields.io/docsrs/rsdeseq2)](https://docs.rs/rsdeseq2)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT + BSD notices](https://img.shields.io/badge/license-MIT%20%2B%20BSD-blue.svg)](THIRD_PARTY_NOTICES.md)
 
 `rsdeseq2` independently implements DESeq2-compatible count-data
 workflows in Rust: normalization, dispersion estimation, negative-binomial
@@ -26,105 +26,6 @@ Version 0.5.0 on `dev` runs supported formula, transform and shrinkage
 calculations in the shared Rust core. The [supported contract](docs/native-supported-contract.md)
 records methods and limits; [CI validation](docs/testing-parity.md#ci-status)
 records passing Rust, R, platform, full-GTEx and sanitizer checks. Publication is on hold.
-
-## Install and Run
-
-Install the current 0.5.0 CLI from a repository checkout:
-
-```bash
-cargo install --path crates/rsdeseq2 --locked
-```
-
-Run Wald analysis with your count and design tables:
-
-```bash
-rsdeseq2 wald \
-  --counts counts.tsv \
-  --design design.tsv \
-  --fit-type mean \
-  --coefficient 1 \
-  --output results.tsv
-```
-
-The result table contains `baseMean`, `log2FoldChange`, `lfcSE`, `stat`,
-`pvalue`, `padj`, fitted dispersion, convergence, and filtering fields.
-
-The CLI expects unnormalized non-negative integer counts. `counts.tsv` has a
-leading `gene` column and one column per sample; `design.tsv` has a leading
-`sample` column followed by numeric design-matrix columns. Design rows are
-aligned to count columns by sample label. See the [CLI reference](docs/cli.md)
-for complete schemas, contrasts, normalization inputs, and output sidecars.
-
-### Rust library
-
-Add the current library from your checkout to a Rust project:
-
-```bash
-cargo add rsdeseq2 --path /path/to/rsdeseq2/crates/rsdeseq2
-```
-
-A normalization primitive:
-
-```rust
-use rsdeseq2::prelude::*;
-
-fn main() -> Result<(), DeseqError> {
-    let counts = CountMatrix::from_row_major_u32(
-        3,
-        4,
-        vec![
-            10, 12, 20, 24,
-            0, 0, 5, 7,
-            100, 80, 90, 120,
-        ],
-    )?;
-
-    let fit = DeseqBuilder::new()
-        .size_factor_method(SizeFactorMethod::Ratio)
-        .execution_mode(ExecutionMode::Strict)
-        .fit_size_factors_and_base_means(&counts)?;
-
-    println!("{:?}", fit.size_factors);
-    Ok(())
-}
-```
-
-### R access layer
-
-Install the source package from a repository checkout:
-
-```bash
-R CMD INSTALL r-pkg/rsdeseq2
-```
-
-Then call a supported primitive:
-
-```r
-library(rsdeseq2)
-
-counts <- matrix(
-  c(10L, 12L, 20L, 24L,
-    5L,  7L,  6L,  8L,
-    100L, 80L, 90L, 120L),
-  nrow = 3L,
-  byrow = TRUE
-)
-estimateSizeFactorsRust(counts, native = TRUE)
-```
-
-## Supported Workflows
-
-| need | status | notes |
-| --- | --- | --- |
-| Ratio and `poscounts` normalization | Supported | Includes supplied geometric means, control genes, normalized counts, base metadata, and normalization-factor offsets |
-| Wald and LRT result workflows | Supported for documented paths | Supplied-dispersion GLMs and implemented native-dispersion branches; coefficient, list, and numeric contrasts; Normal and t tails |
-| Diagnostics and result assembly | Supported for documented paths | Cook's diagnostics and replacement/refitting, independent filtering, adjusted p-values, and result metadata |
-| Transformations and priors | Supported for documented paths | Mean, parametric, and local VST; rlog; normal, `ashr`, and `apeglm` shrinkage; selected formula/model-frame workflows. Normal shrinkage with formula interactions and some transformed-factor contrast forms are unsupported |
-| R package | Partial | Matrix, list, and limited `DESeqDataSet` Wald/LRT fits with fitted assays, row/result metadata, and eligible Cook's replacement/refits; dataset transforms return Bioconductor transform objects and selected `lfcShrink` methods return `DESeqResults`. Additional Bioconductor semantics remain unsupported |
-| Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, plotting, arbitrary R expressions, or complete object-mutation and metadata semantics |
-
-The public Rust API is pre-1.0 and can change between minor releases. See the
-[compatibility guide](docs/compatibility.md) for feature-level detail.
 
 ## Validation and Performance
 
@@ -184,6 +85,60 @@ Rust and R tests also cover documented normalization, Wald/LRT, transforms,
 shrinkage, fitted-object reuse and batched results. This establishes behavior for
 the tested inputs and settings; the complete Bioconductor API is outside scope.
 
+## Installation
+
+The current **0.5.0 source is unreleased**. The registry and API badges above
+refer to published versions. Check out `dev` to use the source described here:
+
+```bash
+git clone --branch dev https://github.com/deminden/rsdeseq2.git
+cd rsdeseq2
+```
+
+Source installation requires **Rust 1.97.1 or newer, with Cargo**. Installing
+the R package also compiles Rust and requires R and its native build tools.
+R 4.6.2 is the pinned comparison environment; see the
+[R guide](docs/r-wrapper.md) for supported interfaces and optional dependencies.
+
+| Interface | Install from the checkout root | Usage |
+| --- | --- | --- |
+| CLI | `cargo install --path crates/rsdeseq2 --locked` | [Commands and input schemas](docs/cli.md) |
+| Rust library | `cargo add rsdeseq2 --path /absolute/path/to/rsdeseq2/crates/rsdeseq2` from your application | [Library usage](crates/rsdeseq2/README.md#rust-usage) |
+| R package | `R CMD INSTALL r-pkg/rsdeseq2` | [Fitting and results](docs/r-wrapper.md) |
+
+For a Wald analysis with your own count and numeric design tables:
+
+```bash
+rsdeseq2 wald \
+  --counts counts.tsv \
+  --design design.tsv \
+  --fit-type mean \
+  --coefficient 1 \
+  --output results.tsv
+```
+
+Here `--fit-type mean` explicitly selects a constant mean dispersion trend;
+it is a modeling choice. Select the trend appropriate to your analysis.
+Counts must be unnormalized non-negative integers. The leading columns are
+`gene` in the count table and `sample` in the design table; sample labels align
+the two tables. Coefficient indices are zero-based. The [CLI guide](docs/cli.md)
+describes complete schemas, contrasts and outputs.
+
+## Supported Workflows
+
+| Area | Implemented scope |
+| --- | --- |
+| Normalization and fitting | Ratio/`poscounts`, normalization factors, dispersion estimation, Wald and LRT |
+| Results and diagnostics | Contrasts, Cook's replacement/refitting, independent filtering and adjusted p-values |
+| Transformations and shrinkage | VST, rlog, and supported normal, `ashr` and `apeglm` methods |
+| R integration | Matrix/list and supported formula/`DESeqDataSet` workflows; selected Bioconductor result objects |
+
+Full Bioconductor object semantics, `glmGamPoi`, plotting and custom formula
+functions are outside scope. Method-specific restrictions are maintained in
+[compatibility and limits](docs/compatibility.md) and the
+[supported contract](docs/native-supported-contract.md).
+The public Rust API is pre-1.0 and can change between minor releases.
+
 ## Documentation
 
 - **Run analyses:** [CLI inputs and commands](docs/cli.md)
@@ -194,21 +149,6 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 - **Use the R layer:** [R wrapper status](docs/r-wrapper.md)
 - **Contribute or release:** [development](docs/development.md) and
   [release checklist](docs/release.md)
-
-## Development
-
-Python tooling/tests require Python 3.10 or newer.
-
-The workspace requires Rust 1.97.1 or newer and uses the Rust 2024 edition, as
-declared by `rust-version` and `edition` in `Cargo.toml`. The R package is tested
-with native R 4.6.2. Each saved fixture records its generating environment.
-
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-```
 
 ## Support and Citation
 
@@ -224,6 +164,11 @@ release used for software provenance.
 
 ## License
 
-MIT. The R-compatible arithmetic is independently implemented from published
+Project code is MIT-licensed; adapted numerical components also carry
+BSD-3-Clause and BSD-2-Clause-Views terms. See [LICENSE](LICENSE) and
+[third-party notices](THIRD_PARTY_NOTICES.md), consistent with the Cargo
+license expression `MIT AND BSD-3-Clause AND BSD-2-Clause-Views`.
+
+The R-compatible arithmetic is independently implemented from published
 probability identities and validated against saved black-box R outputs. No R
 or DESeq2 implementation is copied, linked, or distributed.

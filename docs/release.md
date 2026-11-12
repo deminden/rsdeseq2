@@ -16,6 +16,7 @@ cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 cargo +1.97.1 check --locked --workspace --all-targets
+python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 cargo package --locked -p rsdeseq2
 ```
@@ -55,13 +56,35 @@ manifest and tag/version agreement. Crate publication stages version-pinned
 README links and requires repackaging to reproduce the checked archive bytes.
 Binary provenance records compiler, commit and executable/archive hashes.
 
+Binary archives use `scripts/release/prepare_release_docs.py` to generate a
+platform-specific README with executable instructions, local license notices,
+and documentation links pinned to the release tag. The same helper renders
+GitHub release notes with absolute tag-pinned links; missing notes fail packaging
+instead of silently generating a different release description. Repository CI
+checks these generated documents without building binaries or contacting GitHub.
+
+To inspect the documentation locally, use a fresh ignored staging directory:
+
+```sh
+mkdir -p results/release-docs
+cp LICENSE THIRD_PARTY_NOTICES.md results/release-docs/
+python3 scripts/release/prepare_release_docs.py --tag v0.5.0 binary \
+  --directory results/release-docs --target x86_64-unknown-linux-gnu
+python3 scripts/release/prepare_release_docs.py --tag v0.5.0 notes \
+  --output results/release-docs/release-notes.md
+```
+
+These commands only prepare local files; they do not create a tag or release.
+
 ## Publication procedure
 
 Only perform these steps after an explicit publication request:
 
 1. Select committed source, confirm an unused version/tag and align all own
    package versions. Complete the source and numerical gates above.
-2. Verify branch CI, current notes, package contents and artifact identities.
+2. Update the README installation/publication status for the intended release,
+   then verify CI for that final commit, current notes, package contents and
+   artifact identities.
 3. Push the matching `vX.Y.Z` tag. The coordinated workflow validates source
    before crate publication and binary packaging/upload.
 4. Confirm checked source artifacts, five target archives, checksums and
