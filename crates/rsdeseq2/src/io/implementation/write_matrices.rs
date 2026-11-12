@@ -330,10 +330,10 @@ pub fn write_cooks_sample_metadata_tsv(
 
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     writer.write_record(["sample", "samplesForCooks"])?;
-    for sample in 0..cooks.cooks.n_cols() {
+    for (sample, &samples_for_cooks) in cooks.samples_for_cooks.iter().enumerate() {
         writer.write_record([
             matrix_sample_name(sample_names, sample, "sample"),
-            format_r_logical(cooks.samples_for_cooks[sample]),
+            format_r_logical(samples_for_cooks),
         ])?;
     }
     writer.flush()?;
