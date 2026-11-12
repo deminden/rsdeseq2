@@ -1,9 +1,10 @@
 # Review corrections after the focused refactor
 
-Development source after `f6099e8` addresses the seven-item review. Subsequent
-changes stay local at the user's request. This validation record distinguishes
-completed local checks from target-specific checks awaiting a future authorized
-CI run; no publication or further push is authorized.
+Development source after `f6099e8` addresses the seven-item review. All current
+Rust, R, five-platform and full-GTEx CI checks pass at `8de67af1fd3a136c5b205c2927b13fa52e5ac9dd`.
+Independent affected-platform R CDF checks and Linux instrumented boundary tests
+also pass. Changes are on `dev`; no tag, release or registry publication is part
+of this work.
 
 ## Posterior query contract
 
@@ -128,15 +129,26 @@ not replace the README's original-DESeq2 result-only comparisons. Development
 memory deltas remain in this report. The single pass does not establish exact
 speed preservation or explain the observed memory variation.
 
-## Remaining external checks
+## Final development checks
 
-Before the user stopped further pushes, Linux x86_64/aarch64 and ARM macOS
-expanded panels, Rust CI and full 56,200-gene GTEx parity passed on the recorded
-development source. Windows/Intel macOS exposed the rounding-reference issue;
-Linux instrumentation exposed the Cargo metadata-location issue. Both follow-ups
-are implemented and checked locally as described above. Their updated affected
-platform jobs have not been run: further pushes/CI dispatches await the user's
-instruction. Do not describe the current local source as having all CI green.
+| Workflow | Result |
+| --- | --- |
+| [Parity](https://github.com/deminden/rsdeseq2/actions/runs/43311556521) | All 56,200 GTEx genes and six Wald fields passed. The duplicate ordinary-oracle job is intentionally skipped; Rust CI runs those tests. |
+| [Rust](https://github.com/deminden/rsdeseq2/actions/runs/43311494102) | Passed formatting, Clippy, 1,159 Rust tests and Python integrity checks. The existing opt-in full GTEx case runs separately. |
+| [Platform checks](https://github.com/deminden/rsdeseq2/actions/runs/43311494595) | All five target/profile panels passed, including independent R 4.6.2 uniform CDF references on Windows and Intel macOS. |
+| [R](https://github.com/deminden/rsdeseq2/actions/runs/43311494448) | Both pinned R 4.6.2 and current R passed package and native/wrapped identity checks. The pinned lane also passed actual interruption, independent Linux references, ASan/UBSan and the strict original-ashr gates. |
+
+The Linux sanitizer artifact verifies Rust address instrumentation using the
+Cargo 1.100 fingerprint layout, C address/undefined-behavior symbols, and all
+eight forced-owner cleanup controls. The independent x86 CDF artifacts retain
+their platform, R version, every input/CDF value and SHA-256 digest. Production
+numerical and wrapper sources remain identical to the paired-measurement source
+`f05cbd1`; the subsequent changes affect tests, reference generation, checks and
+documentation. No frozen oracle or precision bound was changed.
+
+Linux package checks retain the known compiled-symbol warning from the Rust
+static library. Tags and publication remain on hold. The final documentation commit changes only README/docs after the
+CI-tested source; earlier artifact identities remain unchanged.
 
 Machine-readable [evidence](data/review_fixes_2026-11-12.json),
 [native observations](data/review_fixes_2026-11-12_native.tsv) and

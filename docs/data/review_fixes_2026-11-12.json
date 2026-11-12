@@ -1,8 +1,6 @@
 {
   "baseline_commit": "f6099e8",
   "numerical_source_commit": "f05cbd13fe08e85fbb10d3e3a6abfb76a49dac41",
-  "local_followup_requires_authorized_platform_rerun": true,
-  "no_further_push_authorized": true,
   "frozen_files_unchanged": 219,
   "numerical_and_wrapper_sources_unchanged_since_numerical_commit": true,
   "binaries": {
@@ -150,13 +148,722 @@
     "formula_unwind_error_cases_passed": 4
   },
   "external_state": {
-    "source": "8707cc9 and f05cbd1",
-    "rust": "passed",
-    "full_gtex": "passed",
-    "linux_x86_64": "passed",
-    "linux_aarch64": "passed",
-    "macos_aarch64": "passed",
-    "windows_and_macos_x86_64": "old ARM CDF oracle mismatch; independent platform calibration prepared locally",
-    "linux_sanitizer": "old Cargo metadata lookup failed; corrected lookup passes locally under Cargo 1.100; Linux execution pending"
+    "Rust CI": "passed",
+    "pinned R 4.6.2": "passed",
+    "current R": "passed",
+    "Linux x86_64": "passed",
+    "Linux aarch64": "passed",
+    "macOS x86_64": "passed",
+    "macOS aarch64": "passed",
+    "Windows x86_64": "passed",
+    "full GTEx": "passed",
+    "Linux ASan/UBSan": "passed",
+    "independent x86 R CDF references": "passed"
+  },
+  "development_validation_complete": true,
+  "publication_performed": false,
+  "ci": {
+    "source_commit": "8de67af1fd3a136c5b205c2927b13fa52e5ac9dd",
+    "workflows": [
+      {
+        "name": "Parity",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311556521",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "full-gtex-replay",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311556521/job/131508663245",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "All 56,200 genes and all six Wald result columns",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "frozen-oracles",
+            "status": "completed",
+            "conclusion": "skipped",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311556521/job/131508665519",
+            "steps": []
+          }
+        ]
+      },
+      {
+        "name": "Rust",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494102",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "rust",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494102/job/131508440903",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check committed Rust vendor and package versions",
+                "conclusion": "success"
+              },
+              {
+                "name": "Format",
+                "conclusion": "success"
+              },
+              {
+                "name": "Clippy",
+                "conclusion": "success"
+              },
+              {
+                "name": "Test",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Parity and benchmark integrity checks",
+                "conclusion": "success"
+              },
+              {
+                "name": "README quick start",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Platform checks",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "Check macos-x86_64",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595/job/131508440908",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "success"
+              },
+              {
+                "name": "Generate independent platform uniform CDFs",
+                "conclusion": "success"
+              },
+              {
+                "name": "Numerical checks on target and release profile",
+                "conclusion": "success"
+              },
+              {
+                "name": "Retain independent uniform CDF provenance",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "Check windows-x86_64",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595/job/131508441316",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "success"
+              },
+              {
+                "name": "Generate independent platform uniform CDFs",
+                "conclusion": "success"
+              },
+              {
+                "name": "Numerical checks on target and release profile",
+                "conclusion": "success"
+              },
+              {
+                "name": "Retain independent uniform CDF provenance",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "Check linux-x86_64",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595/job/131508441369",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Generate independent platform uniform CDFs",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Numerical checks on target and release profile",
+                "conclusion": "success"
+              },
+              {
+                "name": "Retain independent uniform CDF provenance",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "Check linux-aarch64",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595/job/131508441539",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Generate independent platform uniform CDFs",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Numerical checks on target and release profile",
+                "conclusion": "success"
+              },
+              {
+                "name": "Retain independent uniform CDF provenance",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "Check macos-aarch64",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494595/job/131508441605",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Generate independent platform uniform CDFs",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Numerical checks on target and release profile",
+                "conclusion": "success"
+              },
+              {
+                "name": "Retain independent uniform CDF provenance",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "R",
+        "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494448",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "r (reference, 4.6.2)",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494448/job/131508441095",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check committed Rust vendor and package versions",
+                "conclusion": "success"
+              },
+              {
+                "name": "Reject production R numerical calculations",
+                "conclusion": "success"
+              },
+              {
+                "name": "Install system dependencies",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run mkdir -p \"$R_LIBS_USER\"",
+                "conclusion": "success"
+              },
+              {
+                "name": "Cache exact reference packages",
+                "conclusion": "success"
+              },
+              {
+                "name": "Restore verified numerical reference environment",
+                "conclusion": "success"
+              },
+              {
+                "name": "Cache verified reference dependencies",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Install current compatibility dependencies",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Record environment",
+                "conclusion": "success"
+              },
+              {
+                "name": "Independently regenerate Linux formula references",
+                "conclusion": "success"
+              },
+              {
+                "name": "Independently generate sparse SQP references",
+                "conclusion": "success"
+              },
+              {
+                "name": "Save independently generated platform references",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check fresh platform oracles without changing saved references",
+                "conclusion": "success"
+              },
+              {
+                "name": "Independently record uniform posterior references",
+                "conclusion": "success"
+              },
+              {
+                "name": "Save independent posterior reference",
+                "conclusion": "success"
+              },
+              {
+                "name": "Build package",
+                "conclusion": "success"
+              },
+              {
+                "name": "Package check",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check actual posterior interruption and interpreter reuse",
+                "conclusion": "success"
+              },
+              {
+                "name": "Instrument Linux native boundary and forced unwind cleanup",
+                "conclusion": "success"
+              },
+              {
+                "name": "Save native boundary instrumentation evidence",
+                "conclusion": "success"
+              },
+              {
+                "name": "Require standalone and wrapped primitives to be bit-identical",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check strict workflow and original-ashr comparison gates",
+                "conclusion": "success"
+              },
+              {
+                "name": "Save checked source package",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          },
+          {
+            "name": "r (current, release)",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/deminden/rsdeseq2/actions/runs/43311494448/job/131508442019",
+            "steps": [
+              {
+                "name": "Set up job",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run r-lib/actions/setup-r@v2",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run dtolnay/rust-toolchain@stable",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check committed Rust vendor and package versions",
+                "conclusion": "success"
+              },
+              {
+                "name": "Reject production R numerical calculations",
+                "conclusion": "success"
+              },
+              {
+                "name": "Install system dependencies",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run mkdir -p \"$R_LIBS_USER\"",
+                "conclusion": "success"
+              },
+              {
+                "name": "Cache exact reference packages",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Restore verified numerical reference environment",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Cache verified reference dependencies",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Install current compatibility dependencies",
+                "conclusion": "success"
+              },
+              {
+                "name": "Record environment",
+                "conclusion": "success"
+              },
+              {
+                "name": "Independently regenerate Linux formula references",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Independently generate sparse SQP references",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Save independently generated platform references",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Check fresh platform oracles without changing saved references",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Independently record uniform posterior references",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Save independent posterior reference",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Build package",
+                "conclusion": "success"
+              },
+              {
+                "name": "Package check",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check actual posterior interruption and interpreter reuse",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Instrument Linux native boundary and forced unwind cleanup",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Save native boundary instrumentation evidence",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Require standalone and wrapped primitives to be bit-identical",
+                "conclusion": "success"
+              },
+              {
+                "name": "Check strict workflow and original-ashr comparison gates",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Save checked source package",
+                "conclusion": "skipped"
+              },
+              {
+                "name": "Post Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Post Run actions/checkout@v4",
+                "conclusion": "success"
+              },
+              {
+                "name": "Complete job",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "job": "full-gtex-replay",
+        "sha256": "045d24fe4ba3993a4826a4e65deaf3fe58aa4e82cb94c5f956a783f501e2f202"
+      },
+      {
+        "job": "rust",
+        "sha256": "ada59cedf6d3e100a252a1e99305d9736dcd83d1037020391a127b7e43fd1c75"
+      },
+      {
+        "job": "Check macos-x86_64",
+        "sha256": "f3e5092e6abfabd51d67794539c900f71ac4a197a82d962db8e3a649e66da5bd"
+      },
+      {
+        "job": "Check windows-x86_64",
+        "sha256": "4cdc3d7869186ebf8af9260d65e8a474092360ce3b60437afe093284bb1b52d4"
+      },
+      {
+        "job": "Check linux-x86_64",
+        "sha256": "743025a5c3fd906e0a1c98585893fcfebd79d97add1ab2f3f6ce9e1b9e9f0720"
+      },
+      {
+        "job": "Check linux-aarch64",
+        "sha256": "2064cb31bba09ecba9c3e7e37288e8ec76df2fe198b60090afccdf41cd3bb6f1"
+      },
+      {
+        "job": "Check macos-aarch64",
+        "sha256": "8278f64cf16da52d41d220b46e284758495a7bd790edaa82068b1b163ccfa334"
+      },
+      {
+        "job": "r (reference, 4.6.2)",
+        "sha256": "37574c94c470d3d2ae6e859422daa41355e197102a94b9c20c3400d06d2ae3eb"
+      },
+      {
+        "job": "r (current, release)",
+        "sha256": "1b72a70ef64dbe0c759ba52591952657016065df660be993ff5916885181990e"
+      }
+    ],
+    "platform_references": [
+      {
+        "artifact": "uniform-cdf-macos-x86_64-8de67af1fd3a136c5b205c2927b13fa52e5ac9dd",
+        "provenance": "Independent uniform CDFs: x86_64-apple-darwin20 4.6.2",
+        "rows": 6500,
+        "sha256": "6aac87ee444d052096ff4a5d8f5cfb737bd754d4557ddad811b3dd14d39372e3",
+        "maximum_difference_from_ARM": 0.0009499385022168627,
+        "cells_exceeding_cross_host_bound": 1
+      },
+      {
+        "artifact": "uniform-cdf-windows-x86_64-8de67af1fd3a136c5b205c2927b13fa52e5ac9dd",
+        "provenance": "Independent uniform CDFs: x86_64-w64-mingw32 4.6.2",
+        "rows": 6500,
+        "sha256": "c147dbb777c02352a92d8a834d048c8d2aa7fca4604dc22ee7721c9308e7cc3a",
+        "maximum_difference_from_ARM": 0.0009499385022168627,
+        "cells_exceeding_cross_host_bound": 1
+      }
+    ],
+    "linux_sanitizers": {
+      "status": "passed",
+      "c": "address,undefined",
+      "rust": "address",
+      "rust_stdlib_instrumented": false,
+      "r_interpreter_instrumented": false,
+      "preinstalled_r_dependencies_instrumented": false,
+      "leak_detection": false,
+      "replacement_unwind_hooks": true,
+      "formula_unwind_hooks": true,
+      "target": "x86_64-unknown-linux-gnu",
+      "rustflags": "-Zsanitizer=address -Cforce-frame-pointers=yes",
+      "rust_fingerprint_evidence": [
+        {
+          "path": "src/rust/target/x86_64-unknown-linux-gnu/release/build/rsdeseq2-r/d3a76f5af0aa7ab4/fingerprint/lib-rsdeseq2_r.json",
+          "rustflags": [
+            "-Zsanitizer=address",
+            "-Cforce-frame-pointers=yes"
+          ]
+        }
+      ],
+      "rust_address_instrumentation_verified": true,
+      "asan_symbols_verified": true,
+      "ubsan_symbols_verified": true,
+      "replacement_unwind_error_cases_passed": 4,
+      "formula_unwind_error_cases_passed": 4
+    },
+    "linux_full_rust": {
+      "passed": 1159,
+      "failed": 0,
+      "ignored": 1
+    }
   }
 }
