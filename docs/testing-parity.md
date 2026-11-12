@@ -16,6 +16,16 @@ original warning sequence. The pinned Linux lane must generate and test those
 references; the pinned Linux lane now passes those checks, alongside the fresh
 bounded-posterior reference. See the [Linux arithmetic notes](linux_numerical_parity.md).
 
+## Focused suite organization
+
+The [November 12 refactor](refactoring-focused-2026-11-12.md) keeps one Cargo
+integration executable per reference/CLI suite, with child modules grouped by
+workflow. All 73 moved Rust test bodies and 20 R integration bodies retain their
+original assertions and tolerances. Reference scalar/missing-value comparison is
+shared; the Wald/LRT wrappers keep their explicit `1e-5` bounds. The three R
+integration files retain the original object/transform/shrinkage case order.
+Use `testthat::test_dir(..., filter = "^fit-integration")` for the full group.
+
 ## Historical migration checkpoints
 
 The preceding [combined-suite audit](native-plan-audit-development.md) passes

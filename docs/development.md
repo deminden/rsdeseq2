@@ -39,8 +39,13 @@ all-zero contrasts. Run `testthat::test_dir(..., filter = "^results")` to select
 the complete result-contract group.
 
 Builder entry points use private modules under
-`core/implementation/builder/workflows/`. Contrast handling uses modules under
-`contrasts/`, and dispersion trends use modules under `dispersion/trend/`. The
+`core/implementation/builder/workflows/`. Normalization, gene-wise dispersion,
+trend/MAP attachment, VST and rlog stage methods have separate private modules
+under `core/implementation/builder/stages/`. Formula beta-prior adapters live in
+`results/implementation/beta_prior_formula/`: primitive/model-frame parsing
+forwards into shared size-factor or matrix-factor execution helpers. Public
+signatures and numerical operation order are preserved. Contrast handling uses
+modules under `contrasts/`, and dispersion trends use modules under `dispersion/trend/`. The
 original public module paths re-export the same types and functions. Keep each
 trend model with its fitting implementation; only shared arithmetic and row
 selection cross these private module boundaries.

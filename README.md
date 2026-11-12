@@ -25,8 +25,8 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 Development on `dev` after the published 0.4.0 source runs supported formula,
 transform and shrinkage calculations in the shared Rust core. The
 [supported contract](docs/native-supported-contract.md) records tested methods
-and explicit limits; the [validation report](docs/dev-validation-2026-11-12.md)
-records passing checks and the local bundle. Publication remains on hold.
+and explicit limits; the [refactor validation](docs/refactoring-focused-2026-11-12.md)
+records the latest source checks. Publication remains on hold.
 
 ## Install and Run
 
