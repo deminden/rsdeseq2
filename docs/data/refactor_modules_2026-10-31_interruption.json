@@ -1,8 +1,0 @@
-{
-  "status": "interrupted",
-  "reason": "Extreme external CPU contention invalidated performance comparison; avoid adding load to the shared machine.",
-  "utc": "2026-10-31T14:38:12.084891+00:00",
-  "child_processes_signalled": 0,
-  "timing_pass_complete": false,
-  "r_workflow_pass_started": false
-}

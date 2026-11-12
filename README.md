@@ -22,19 +22,17 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
 | [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
 
-The 0.5.0 source on `dev`, following the published 0.4.0 release, runs supported formula,
-transform and shrinkage calculations in the shared Rust core. The
-[supported contract](docs/native-supported-contract.md) records tested methods
-and explicit limits; the [review correction checks](docs/reports/review-fixes-2026-11-12.md)
-and [refactor validation](docs/history/refactoring-focused-2026-11-12.md)
-record the source and numerical checks. Publication remains on hold.
+Version 0.5.0 on `dev` runs supported formula, transform and shrinkage
+calculations in the shared Rust core. The [supported contract](docs/native-supported-contract.md)
+records methods and limits; [CI validation](docs/testing-parity.md#ci-status)
+records passing Rust, R, platform, full-GTEx and sanitizer checks. Publication is on hold.
 
 ## Install and Run
 
-Install the 0.5.0 CLI from crates.io after publication:
+Install the current 0.5.0 CLI from a repository checkout:
 
 ```bash
-cargo install rsdeseq2 --version 0.5.0 --locked
+cargo install --path crates/rsdeseq2 --locked
 ```
 
 Run Wald analysis with your count and design tables:
@@ -59,10 +57,10 @@ for complete schemas, contrasts, normalization inputs, and output sidecars.
 
 ### Rust library
 
-Add the library to a Rust project:
+Add the current library from your checkout to a Rust project:
 
 ```bash
-cargo add rsdeseq2
+cargo add rsdeseq2 --path /path/to/rsdeseq2/crates/rsdeseq2
 ```
 
 A normalization primitive:
@@ -126,12 +124,11 @@ estimateSizeFactorsRust(counts, native = TRUE)
 | Complete DESeq2/Bioconductor surface | Not supported | No `glmGamPoi`, plotting, arbitrary R expressions, or complete object-mutation and metadata semantics |
 
 The public Rust API is pre-1.0 and can change between minor releases. See the
-[compatibility matrix](docs/compatibility.md) and
-[DESeq2 gap analysis](docs/deseq2-gap-analysis.md) for feature-level detail.
+[compatibility guide](docs/compatibility.md) for feature-level detail.
 
 ## Validation and Performance
 
-Current development is compared with native R 4.6.2 / DESeq2 1.52.0 on eleven
+The recorded process comparison uses native R 4.6.2 / DESeq2 1.52.0 on eleven
 GTEx v8 Kidney Cortex contrasts: biological comparisons and reproducible
 blocked/unblocked random splits. Every contrast uses all 56,200 genes.
 
@@ -190,8 +187,7 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 ## Documentation
 
 - **Run analyses:** [CLI inputs and commands](docs/cli.md)
-- **Check feature support:** [compatibility matrix](docs/compatibility.md) and
-  [DESeq2 gap analysis](docs/deseq2-gap-analysis.md)
+- **Check feature support:** [compatibility and limits](docs/compatibility.md)
 - **Understand numerical behavior:** [algorithms](docs/algorithms.md)
 - **Inspect evidence:** [benchmarks](docs/benchmarks.md) and
   [reproducibility](docs/reproducibility.md)
@@ -201,7 +197,7 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 
 ## Development
 
-Python tooling/tests require Python 3.10 or newer; the validation run used Python 3.14.7.
+Python tooling/tests require Python 3.10 or newer.
 
 The workspace requires Rust 1.97.1 or newer and uses the Rust 2024 edition, as
 declared by `rust-version` and `edition` in `Cargo.toml`. The R package is tested

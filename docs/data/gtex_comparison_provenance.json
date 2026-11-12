@@ -1,0 +1,57 @@
+{
+  "record_type": "Measured GTEx process comparison; current implementation CI is recorded separately in ci_0.5.0.json",
+  "source_record_sha256": "e027ac721ef158b8514b7a034a73ab4e945d268d12230a58283eadc34355f895",
+  "source_record_url": "https://github.com/deminden/rsdeseq2/blob/62825c0dc5d5c54122e0fdc74b3b1b1914840361/docs/data/native-sqp-warning-local.json",
+  "raw_process_provenance_sha256": "24c5fa178e3b61b8be0d8dafd17a868f1af1df2d6e8f647afa0eddac8c886981",
+  "process_provenance": {
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.7",
+    "rust_threads": 1,
+    "blas_threads": 1,
+    "repeats": 1,
+    "binary_sha256": "447ff5b2df1d2f55b94d4940c2c6507cb5063c859e4d6e3c667bae3c8982a780",
+    "baseline_binary_sha256": "0387fdccecf88c7a6bbd4375aa95f9ad8e54b877a17bce28c682d7c4cd692f11",
+    "baseline_label": "before SQP warning correction 48917a0",
+    "tool_order": "alternates by contrast/repetition; rotates all three tools when a baseline is supplied",
+    "timing_scope": "process startup, input parsing, full native Wald fit and result TSV output",
+    "diagnostic_validation_scope": "separate untimed native fits; exact result and diagnostic hashes required",
+    "memory_metric": "per-process maximum resident set size, normalized to MiB (2^20 bytes)",
+    "memory_scope": "entire fitting process, including interpreter/libraries, input data and native allocations",
+    "time_command": [
+      "/usr/bin/time",
+      "-l"
+    ],
+    "cpu_model": "Apple M5",
+    "rscript_name": "Rscript"
+  },
+  "R": "4.6.2",
+  "DESeq2": "1.52.0",
+  "measurements": {
+    "current_max_rss_mib": 307.46875,
+    "current_s": 43.32784441602416,
+    "deseq2_max_rss_mib": 1768.921875,
+    "deseq2_s": 242.12058075179812,
+    "deseq2_time_ratio": 5.588105847754877,
+    "memory_reduction_percent_range": [
+      80.6123768136119,
+      86.65410597836699
+    ]
+  },
+  "measurement_limits": {
+    "all_observations_retained": true,
+    "external_user_virtualization_and_system_workloads_present": true,
+    "no_causal_speed_gain_claim": true,
+    "no_optimization_round_counted": true,
+    "own_task_panels_sequential_without_concurrent_fits_or_builds": true,
+    "paired_passes_for_corrected_build": 1
+  },
+  "artifact_sha256": {
+    "results/native-sqp-warning/gtex-export-identity.json": "2bc153fe7759e86347949174d5b55991e82c6e7ab1737706bcaf2ba1341e95ad",
+    "results/native-sqp-warning/native-speed/R-session.txt": "5ab7b5b0ab832ddc96869ea54e37b5686a43855823d642304004716543447306",
+    "results/native-sqp-warning/native-speed/acceptance.json": "29a6462621916399a3e3649607ff4c965c12181c8efb218781c8bf14ff78bd32",
+    "results/native-sqp-warning/native-speed/provenance.json": "24c5fa178e3b61b8be0d8dafd17a868f1af1df2d6e8f647afa0eddac8c886981",
+    "results/native-sqp-warning/numerical-preservation.json": "8ab5614b94a5525a19760362f242804315bd71e2edc03d295a0942244ecd9dea",
+    "results/native-sqp-warning/pasilla/acceptance.json": "1d855d64307059ebe870a4003aeadf05b5d8009d5723b1f4a1d6dd86c2440d6d"
+  }
+}

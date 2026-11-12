@@ -1,11 +1,12 @@
-# GTEx native Wald comparison — current local development
+# GTEx native Wald comparison
 
-Measurements after the [SQP warning correction](../history/native-sqp-warning-platform-gates.md)
-use native R 4.6.2 / DESeq2 1.52.0 in
+The recorded comparison uses native R 4.6.2 / DESeq2 1.52.0 in
 `deseq2-r462-native`, Apple M5/macOS 27.2, one Rust/BLAS worker and one paired
-pass over eleven full contrasts. All 56,200 genes are retained in each contrast.
-The tested CLI SHA-256 is
+pass over eleven full contrasts. Each contrast retains all 56,200 genes.
+The measured CLI SHA-256 is
 `447ff5b2df1d2f55b94d4940c2c6507cb5063c859e4d6e3c667bae3c8982a780`.
+These are measurements of that binary, not a newly timed 0.5.0 build.
+The current implementation separately passes [0.5.0 CI](../testing-parity.md#ci-status).
 The directory named `sex_female_vs_male` tests male versus female.
 
 ## Precision
@@ -25,8 +26,8 @@ including matching finite/NA patterns and gene coverage.
 | Unblocked random splits | 3 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `2.87e-05` |
 
 All 121 per-contrast and nine global frozen-reference gates pass; all 22 native
-result and diagnostic exports match the unchanged accepted 0.4.0 manifest. Earlier frozen
-reference files, tolerances and release manifests remain unchanged. The
+result and diagnostic exports match the reviewed acceptance manifest. Frozen
+reference files, tolerances and export hashes remain unchanged. The
 independent Pasilla Wald/LRT checks also pass with all eight exports exact.
 
 ## Observed process time and memory
@@ -54,86 +55,31 @@ interpreter/libraries; no outlier was removed and no unchanged case was retimed
 within the final paired pass. These are process observations, not estimates of
 run-to-run variability.
 
-The current candidate takes 43.328 s versus the pre-warning-correction
-`48917a0` candidate's 46.476 s (−6.774% elapsed), with 307.469 versus 308.000 MiB
-maximum RSS. This is a local development baseline, not a published release.
-Twenty paired R workflows take 89.638 versus 89.423 s (+0.240% elapsed), with
-1,133.391 versus 1,133.859 MiB maximum RSS, all below the predeclared 2 GiB budget.
-All twenty complete payloads are byte-identical under strict comparison; no
-numerical migration exception is enabled. The main README compares memory
-against original DESeq2 only.
-
 Other user calculations, virtualization and system indexing were active during
-the run. Load snapshots are retained with the raw logs. The measurement task
-ran its panels sequentially without concurrent fits/builds; no observation was
-discarded or retimed. Small development speed differences are not established
-by this loaded single pass, and no optimization round is counted.
+the measurement. Fits/builds within the panel ran sequentially, and no run was
+discarded or retimed. Small timing changes are not established gains under this
+uncontrolled external load.
 
 ## Evidence
 
-- [Current per-contrast summary](../data/native_sqp_warning_native_summary.tsv),
+- [Per-contrast summary](../data/native_sqp_warning_native_summary.tsv),
   [individual runs](../data/native_sqp_warning_native_timings.tsv),
   [group aggregation](../data/native_sqp_warning_native_groups.tsv), and
-  [source/acceptance/provenance hashes](../data/native-sqp-warning-local.json).
-- [Current timed original-R precision](../data/native_sqp_warning_native_precision.tsv),
-  [R workflow runs and payload hashes](../data/native_sqp_warning_r_workflows.tsv),
-  [stage times](../data/native_sqp_warning_r_stages.tsv) and
-  [measured wrapper boundary costs](../data/final_plan_r_boundary.tsv).
+  [source, acceptance and provenance hashes](../data/gtex_comparison_provenance.json).
+- [Timed original-DESeq2 precision](../data/native_sqp_warning_native_precision.tsv).
 - [Frozen precision gates](../data/release_0.4.0_gtex_precision.tsv),
   [global gates](../data/release_0.4.0_gtex_global_precision.tsv), and
-  [22 export identities](../data/release_0.4.0_gtex_output_sha256.tsv).
-- [Final local acceptance and limitations](../history/final-plan-local-acceptance.md).
-  The new formula/SQP independent Linux references and current platform jobs
-  remain open. [Earlier Linux reference evidence](../linux_numerical_parity.md)
-  and [0.4.0 release scope](../releases/0.4.0.md) retain their historical scope.
-- The [initial combined audit](../data/final_plan_local_acceptance.json) retains
-  its previous executable/package identities and measurements.
-- The preceding release comparison remains in the
-  [release report](../releases/0.4.0.md) and its original
-  [summary](../data/release_0.4.0_final_native_summary.tsv),
-  [runs](../data/release_0.4.0_final_native_timings.tsv) and
-  [provenance](../data/release_0.4.0_final_native_provenance.json).
-- [Earlier candidate observation](../history/gtex-native-wald-benchmark-0.4.0-checkpoint.md)
-  retains its original measurements and artifact identities.
+  [reviewed native export hashes](../data/release_0.4.0_gtex_output_sha256.tsv).
+
+The detailed R workflow procedure also checks complete payloads, elapsed time and
+RSS; its [raw observations](../data/review_fixes_2026-11-12_R.tsv) and
+[source/acceptance record](../data/r_workflow_provenance.json) retain their
+own timing scope. They are not part of the Rust-versus-DESeq2 result-only ratio.
 
 ## Reproduction
 
-The [Python contrast generator](../../scripts/references/generate_gtex_mode_contrasts.py),
-[offline reference generator](../../scripts/references/generate_gtex_mode_contrast_references.R)
-and [process benchmark](../../scripts/benchmarks/benchmark_gtex_native_wald.py) are committed.
-With Python 3.10 or newer, restore the pinned R environment and generate a separate
-exploratory panel; do not overwrite historical frozen references:
-
-```sh
-export R_LIBS_USER="$PWD/results/r-reference-library"
-python scripts/environment/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
-python scripts/references/generate_gtex_mode_contrasts.py \
-  --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --output-dir results/benchmarks/reproduced_gtex_r462
-cargo build --release --locked -p rsdeseq2
-python scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats 1 \
-  --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --fixture-root results/benchmarks/reproduced_gtex_r462 \
-  --output-dir results/benchmarks/reproduced_gtex_comparison
-```
-
-Use native R 4.6.2; `CONDA_PREFIX` above points to its environment. Newly generated
-references may differ in last bits and remain exploration evidence until reviewed.
-Accepted optimization evidence instead requires the preserved reviewed native
-result and diagnostic directory, its committed SHA manifest and unchanged frozen
-references. Accepted runs verify result/diagnostic exports in separate untimed
-native fits before recording the result-only timing scope. A missing or changed
-diagnostic export fails acceptance; these verification fits are excluded from
-the reported fit process time and RSS:
-
-```sh
-python scripts/benchmarks/benchmark_gtex_native_wald.py --repeats 1 \
-  --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --validated-results-root results/benchmarks/release_0.4.0/gtex \
-  --validated-output-hashes docs/data/release_0.4.0_gtex_output_sha256.tsv \
-  --output-dir results/benchmarks/current-accepted
-```
-
-For historical records, see [2026-10-29](../history/gtex-native-wald-benchmark-2026-10-29.md),
-[0.3.1](../history/gtex-native-wald-benchmark-0.3.1.md) and
-[0.3.0](../history/gtex-native-wald-benchmark-0.3.0.md).
+The contrast generator, independent original-R fitting helper and process
+benchmark runner are committed. [Reproducibility](../reproducibility.md) describes
+biological/random designs, the fixed seed, fresh-reference exploration and the
+frozen acceptance gate. [Benchmarks](../benchmarks.md) defines time/RSS scope,
+ratios and required provenance.

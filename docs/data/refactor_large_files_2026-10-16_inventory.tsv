@@ -1,9 +1,0 @@
-path	before_lines	after_lines	topic_files	largest_topic_file_lines	integration_tests
-crates/rsdeseq2/tests/native_wald_pipeline.rs	6131	274	12	727	97
-crates/rsdeseq2/tests/design.rs	5843	38	11	907	66
-crates/rsdeseq2/tests/results.rs	4259	71	11	538	53
-r-pkg/rsdeseq2/R/results.R	2389	259	8	491	NA
-crates/rsdeseq2/src/design/implementation/formula_entry.rs	2308	139	9	497	NA
-crates/rsdeseq2/src/glm/irls.rs	2374	410	9	516	NA
-crates/rsdeseq2/src/glm/beta.rs	1879	170	8	398	NA
-r-pkg/rsdeseq2/src/rust/src/lib.rs	1555	193	7	318	NA

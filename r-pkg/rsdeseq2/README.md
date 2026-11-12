@@ -67,8 +67,7 @@ a dataset fitted with `rsdeseq2::DESeq()`; the contrast route uses the Rust
 expanded-model refit. Numeric contrasts require a supplied result table; list
 contrasts average selected expanded coefficients and need supplied results
 when their names are absent from the unshrunk design. The returned
-`DESeqResults` records the estimated beta-prior variances. Local development
-`type="ashr"` returns native posterior means/SDs and s-values, while
+`DESeqResults` records the estimated beta-prior variances. `type="ashr"` returns native posterior means/SDs and s-values, while
 `type="apeglm"` uses native negative-binomial fitting for
 named/indexed coefficients and returns posterior SDs and s-values. Formula
 interactions are rejected for normal shrinkage. Cleaned coefficient aliases
@@ -81,7 +80,7 @@ General likelihood functions are translated from
 restricted expressions without R execution. MAP-only `nbinomC*` and `betabinC*`
 use native random starts with portable R state import/export. The
 [current supported contract](../../docs/native-supported-contract.md) records
-method/analysis options, explicit unsupported cases and remaining parity gates.
+method/analysis options and explicit unsupported cases.
 Ordered factors use
 polynomial coordinates; select their named coefficients or supply numeric
 contrasts rather than treatment-style factor-level contrasts.
@@ -103,42 +102,7 @@ The Rust core validation summary and benchmark scope are documented in the
 [repository README](../../README.md#validation-and-performance) and
 [benchmark report](../../docs/benchmarks.md).
 
-Local development also supports native apeglm grid sign summaries, scalar
-parameter uncertainty and covariance-based posterior contrasts. The primitive
-engine exposes interval/contrast matrices; `lfcShrink()` keeps its selected-
-coefficient result-table shape. See the
-[posterior analysis scope](../../docs/history/native-posterior-analysis-development.md)
-for controls, validation and documented original-package grid corrections.
-
-Native ashr development also supports `mixEM`, `w_mixEM`, `mixVBEM` and
-`cxxMixSquarem`, with K=1 acceleration controls and variational unit/fractional
-priors. See [optimizer validation and scope](../../docs/history/native-ashr-optimizer-development.md).
-
-Higher-order RRE/MPE cycling and native interior-point mixture fitting are also
-available in local development. See the [advanced optimizer scope](../../docs/history/native-ashr-advanced-optimizer-development.md)
-for controls and reference limits.
-
-Numeric `outputlevel` and exact named subsets select local ashr posterior fields
-and fitted priors. See [output selection](../../docs/history/native-ashr-output-development.md)
-for omitted fields and positive-threshold requirements.
-
-`mode="estimate"` now runs in Rust; see [mode profiling and bounds](../../docs/history/native-ashr-mode-development.md)
-for numerical comparisons and the original two-element mode policy.
-
-Local SQP numerical controls now include active-set convergence, line search,
-regularization and optional SVD. See [controls and reference scope](../../docs/history/native-sqp-control-development.md).
-
-Local canonical normal-mixture/log-F observation likelihoods now share Rust
-probabilities, moments and per-observation parameters. See
-[continuous likelihoods](../../docs/history/native-continuous-likelihood-development.md)
-for supported priors, original missingness policies and remaining families.
-
-Local canonical Poisson/binomial likelihoods support identity/log and
-identity/logit links, native count-specific mode/grid/FDR defaults and original
-intensity/probability summaries. See [count likelihoods](../../docs/history/native-count-likelihood-development.md)
-for input policy and validation.
-
-Canonical normal-mixture matrix captures now follow source flattening/recycling
-rules. Compiled negative-binomial methods ignore unused controls and defer
-refinement controls until needed. See [capture and compiled-method policy](../../docs/history/native-capture-policy-development.md)
-for independent references, exact interface comparisons and remaining scope.
+Native ashr likelihoods/optimizers, apeglm grid and uncertainty analysis,
+restricted expressions, random states and work controls are described in the
+[current R guide](../../docs/r-wrapper.md). All supported statistics use the
+standalone Rust engine; R handles translation and objects.

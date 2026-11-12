@@ -1,350 +1,158 @@
 # Reproducibility
 
-## Current comparison environment
+## Reference environment
 
-New comparisons use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0, apeglm
-1.34.0 and ashr 2.2-63. Historical R 4.6.1 references retain their recorded
-provenance and hashes. The [environment record](../config/r-reference/r-reference-environment-2026-10-29.json)
-includes the native compiler flags and BLAS configuration. Its 82 non-base R
-packages are pinned by [source URL and SHA-256](../config/r-reference/r-reference-sources-2026-10-29.tsv).
-
-Use the selected environment's Rscript explicitly for comparisons:
+Use `deseq2-r462-native`: R 4.6.2, DESeq2 1.52.0, apeglm 1.34.0 and ashr
+2.2-63. The [environment lock](../config/r-reference/r-reference-environment-2026-10-29.json)
+records compiler/BLAS settings; the [source lock](../config/r-reference/r-reference-sources-2026-10-29.tsv)
+pins all 82 non-base R packages by version, URL and SHA-256.
 
 ```sh
 conda activate deseq2-r462-native
 export R_LIBS_USER="$PWD/results/r-reference-library"
-python scripts/environment/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
-python scripts/environment/install_r_reference.py --check-installed \
+python3 scripts/environment/install_r_reference.py --rscript "$CONDA_PREFIX/bin/Rscript"
+python3 scripts/environment/install_r_reference.py --check-installed \
   --library "$R_LIBS_USER" --rscript "$CONDA_PREFIX/bin/Rscript"
 ```
 
-To restore the pinned package sources into a separate library, run
-`scripts/environment/install_r_reference.py --library PATH --rscript PATH/TO/Rscript`
-without `--check-installed`. The installer verifies source hashes and dependency
-order before installation. Its R version must match the environment record.
-Compiler/BLAS builds still need to be recorded when measuring another platform.
-`freeze_r_reference_sources.py` regenerates source metadata only when explicitly
-invoked for a new reference snapshot; installation never rewrites the lock.
+Use the selected environment's Rscript explicitly. Installation verifies source
+hashes and dependency order without changing the locks. Record compiler, BLAS,
+platform and thread settings for measurements on another machine. Fixtures with
+an R 4.6.1 generation requirement retain that requirement; do not regenerate
+those expectations under another R version and call them equivalent.
 
-Current full native Wald contrast generation, frozen parity checks, and matched
-speed and peak-memory runs are documented in the
-[current GTEx comparison](reports/gtex-native-wald-benchmark.md). Its biological designs,
-blocked/unblocked random splits and fixed seed are reproduced by the committed
-`scripts/references/generate_gtex_mode_contrasts.py` and R reference helper.
+## Generate biological and random GTEx contrasts
 
-For an independent reproduction, generate into a fresh directory and use
-exploration mode. This preserves historical frozen references and does not
-claim that regenerated last bits have already passed accepted-output review:
+The committed [Python generator](../scripts/references/generate_gtex_mode_contrasts.py)
+uses the full GTEx v8 Kidney Cortex fixture: 56,200 genes and 61 samples.
+It produces eleven designs:
+
+- The original blocked condition contrast.
+- Male versus female and male age-bin 4 versus 3. The directory
+  `sex_female_vs_male` encodes male versus female despite its name.
+- Five random splits preserving condition-group sizes within the existing blocks.
+- Three unblocked random splits preserving the overall condition-group sizes.
+
+The random seed is `20261014`. Design rows and count columns retain the same
+sample order. Full-cohort designs reuse all gene rows; the age comparison selects
+male samples. The [R helper](../scripts/references/generate_gtex_mode_contrast_references.R)
+independently fits original DESeq2; it never imports candidate results.
+
+Generate into a fresh output directory:
 
 ```sh
-python scripts/references/generate_gtex_mode_contrasts.py \
+python3 scripts/references/generate_gtex_mode_contrasts.py \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --output-dir results/benchmarks/reproduced_gtex_r462
+  --output-dir results/benchmarks/reproduced-gtex
 cargo build --release --locked -p rsdeseq2 --bin rsdeseq2
-python scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats 1 \
+python3 scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats 1 \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
-  --fixture-root results/benchmarks/reproduced_gtex_r462 \
-  --output-dir results/benchmarks/reproduced_gtex_comparison
+  --fixture-root results/benchmarks/reproduced-gtex \
+  --output-dir results/benchmarks/reproduced-comparison
 ```
 
-Accepted comparison additionally requires the preserved reviewed native result
-and diagnostic exports, their SHA manifest and unchanged frozen inputs/references.
-The current benchmark documents that mode and its exact artifact identities.
-The [Linux formula reference procedure](linux_numerical_parity.md) independently
-regenerates seven original-R panels; its portable elementary boundary panel uses
-the common snapshot rather than a platform-specific filename.
+`--counts-only` on the Python generator reproduces inputs/designs without fitting
+new R references. Fresh references can differ in their final bits across recorded
+environments. Exploration mode reports those differences; it does not silently
+replace the accepted frozen reference set. See the [measured comparison](reports/gtex-native-wald-benchmark.md).
 
-DESeq2 compatibility requires more than matching final p-values. Intermediate
-outputs should be generated and compared stage by stage.
+## Eleven-contrast acceptance
 
-## Full-gene real-data Wald parity
+Restore the reviewed full contrast/reference bundle under
+`results/benchmarks/gtex_mode_contrasts/`, or pass its location with `--fixture-root`.
+The checker requires all eleven designs, result and diagnostic references, and
+exact hashes from [the reference manifest](data/gtex_dispersion_reference_sha256.tsv).
+A missing or changed reference fails rather than triggering regeneration.
 
-The checked-in GTEx v8 fixture contains all 56,200 genes for 61 Kidney Cortex
-samples and saved DESeq2 1.52.0 references. The Rust integration test compares
-size factors and fixed-dispersion Wald fields across the complete gene set.
-The fixture directory documents the data source, comparison settings, and
-reproduction procedure.
-
-Regenerate the counts and DESeq2 references with Python 3, R 4.6.1, and DESeq2
-1.52.0:
-
-```bash
-python3 scripts/references/generate_gtex_real_wald_fixture.py --rscript /path/to/Rscript
-cargo test -p rsdeseq2 --test gtex_real_wald_parity -- --nocapture
+```sh
+cargo build --release --locked -p rsdeseq2
+python3 scripts/validation/check_gtex_dispersion_improvement.py \
+  --workers 1 --output-dir results/checks/gtex
 ```
 
-The generator downloads the official GTEx v8 gene-read matrix and sample
-annotations, then extracts the fixture's complete gene rows for its saved
-sample IDs. The compressed matrix is cached under `target/` and is not part of
-the repository. See
-[`tests/data/gtex_v8_real_wald/README.md`](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md)
-for provenance and result details.
+This runs 121 per-contrast and nine global precision gates, including finite/NA
+patterns and gene coverage. The committed gate baseline is
+[data/gtex_dispersion_improvement.tsv](data/gtex_dispersion_improvement.tsv).
+Keep its values unchanged during candidate validation.
 
-## Automatic dispersion means and maximum-error reduction
+Accepted timing additionally requires the reviewed native result/diagnostic
+exports. Pass their directory explicitly:
 
-See [the GTEx dispersion correction](history/gtex-dispersion-improvement.md) for the
-branch-selection cause, the 664-fold minimum maximum-error reduction, frozen
-comparison tables, and commands for the biological and randomized contrasts.
-The compact `auto_dispersion` regression checks automatic, forced GLM, and
-weighted branches against DESeq2 1.52.0 references.
-
-## Reference Generation
-
-Run:
-
-```bash
-Rscript scripts/references/generate_deseq2_references.R
+```sh
+python3 scripts/benchmarks/benchmark_gtex_native_wald.py --repeats 1 \
+  --rscript "$CONDA_PREFIX/bin/Rscript" \
+  --validated-results-root /path/to/reviewed-native-results \
+  --validated-output-hashes docs/data/release_0.4.0_gtex_output_sha256.tsv \
+  --output-dir results/benchmarks/accepted-comparison
 ```
 
-The entry script retains its original default destination. Its original-DESeq2
-panels are grouped under `scripts/reference_generation/deseq2/` and execute in
-their original order in a private context. To reproduce into fresh destinations
-without replacing the committed fixtures:
+That manifest's filename identifies the reviewed acceptance set; validation
+preserves its hashes. The runner verifies native result and diagnostic exports
+with untimed fits before recording result-only timing. See [benchmark scope](benchmarks.md).
+
+## Compact and full-gene replay
+
+All-gene counts, sample metadata, fixed dispersions and original DESeq2 outputs
+are checked in under
+[`tests/data/gtex_v8_real_wald/`](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md).
+Routine tests use a 512-gene selection plus full normalization; the opt-in replay
+fits all genes. Replaying requires no R installation or data download.
+
+```sh
+cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity
+cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald \
+  -- --ignored --nocapture
+```
+
+The fixture README records the source data, independent R generation version,
+selection policy and regeneration commands. The independent Pasilla holdout also
+has committed counts/design and Wald/LRT references; reproduce its checks with
+`scripts/validation/check_pasilla_holdout.py` and its [fixture guide](../crates/rsdeseq2/tests/data/pasilla_holdout/README.md).
+
+## Independent stage references
+
+The DESeq2 entry script and its modules live together under
+`scripts/references/` and `scripts/references/deseq2/`. Use fresh explicit output
+paths to avoid replacing committed expectations:
 
 ```sh
 Rscript --vanilla scripts/references/generate_deseq2_references.R \
-  --output-dir results/reproduced_deseq2_reference \
-  --parity-output-dir results/reproduced_deseq2_parity
+  --output-dir results/reproduced-deseq2-reference \
+  --parity-output-dir results/reproduced-deseq2-parity
 ```
 
-Explicit destinations must not exist. Both absolute script paths (including
-spaces) and execution from another working directory are supported. The
-[refactor check](history/refactoring-focused-2026-11-12.md) compares all 119 generated
-files with the original monolithic generator; frozen fixtures remain untouched.
+The panels cover normalization/base metadata, supplied-dispersion weighted and
+unweighted GLMs, beta priors, dispersion means/trends/MAP, Wald/LRT results,
+fitted means/hats and Cook's replacement. Supplied-dispersion references isolate
+GLM behavior; they do not establish accuracy for dispersion estimation by themselves.
 
-The default command writes references under:
+Committed references are required: absent, empty or malformed files fail tests.
+Reference generation is a reviewed maintenance task. Preserve original R/package
+versions and platform metadata; never derive expected values from the candidate.
+Additional formula, likelihood, posterior, mathematical truth and optimizer
+reference generators are grouped in `scripts/references/`.
 
-```text
-crates/rsdeseq2/tests/data/deseq2_reference/
-```
+The bounded optimizer stress generator requires its recorded R 4.6.1 environment:
 
-Generated files should include:
-
-- `metadata.tsv`
-- `sessionInfo.txt`
-- `counts.tsv`
-- `col_data.tsv`
-- `design_full.tsv`
-- `design_reduced.tsv`
-- `fixed_dispersions.tsv`
-- `size_factors_ratio.tsv`
-- `size_factors_poscounts.tsv`
-- `normalized_counts_ratio.tsv`
-- `base_mean_ratio.tsv`
-- `base_metadata_ratio.tsv`
-- `normalization_factors.tsv`
-- `normalized_counts_nf.tsv`
-- `base_metadata_nf.tsv`
-- `native_nf_dispersion_reference.tsv`, when DESeq2 internals are available
-- `native_nf_mu.tsv`, when DESeq2 internals are available
-- `parametric_trend_reference.tsv`
-- `dispersion_prior_variance_reference.tsv`
-- `map_dispersion_reference.tsv`
-- `results_wald_ratio.tsv`, when full DESeq2 succeeds on the fixture
-- `fixed_wald_reference.tsv`, when DESeq2 internals are available
-- `fixed_wald_t_reference.tsv`, when DESeq2 internals are available
-- `fixed_lrt_reference.tsv`, when DESeq2 internals are available
-- `fixed_mu_full.tsv`
-- `fixed_hat_full.tsv`
-- `fixed_mu_reduced.tsv`
-- `fixed_hat_reduced.tsv`
-- `fixed_cooks_full.tsv`
-- `fixed_weighted_mu_reduced.tsv`
-- `fixed_weighted_hat_reduced.tsv`
-- `native_glm_mu_cr_reference.tsv`, when DESeq2 internals are available
-- `native_glm_mu_cr_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_reference.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_lrt_reference.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_wald_mu.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_wald_hat.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_cr_map_reference.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_cr_lrt_reference.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_cr_map_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_cr_wald_mu.tsv`, when DESeq2 internals are available
-- `native_glm_mu_mean_cr_wald_hat.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_reference.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_lrt_reference.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_cr_reference.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_cr_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_mean_cr_map_reference.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_mean_cr_lrt_reference.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_mean_cr_map_dispersion_mu.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_mean_cr_wald_mu.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_mean_cr_wald_hat.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_wald_mu.tsv`, when DESeq2 internals are available
-- `native_weighted_glm_mu_wald_hat.tsv`, when DESeq2 internals are available
-- `cooks_replacement_counts.tsv`
-- `cooks_replacement_design.tsv`
-- `cooks_replacement_cooks.tsv`
-- `cooks_replacement_size_factors.tsv`
-- `cooks_replacement_options.tsv`
-- `cooks_replacement_candidate_counts.tsv`
-- `cooks_replacement_replaced_counts.tsv`
-- `cooks_replacement_rows.tsv`
-
-The fixed-dispersion files use `DESeq2:::fitNbinomGLMs` with supplied
-dispersions, default `1e-6` beta ridge, `useQR=FALSE`, and `useOptim=FALSE`.
-They validate the implemented Rust fixed-dispersion GLM path. They are
-not a substitute for full DESeq2 dispersion-estimation parity. The default
-reference set includes the unweighted fixed Wald/LRT, fitted `mu`, hat
-diagonal, Cook's distance files, and weighted fixed Wald/LRT files including
-reduced-model fitted means and hat diagonals because these are numerically
-reproduced. The same supplied-dispersion MLE beta matrix
-also drives `beta_prior_variance_reference.tsv`, which records DESeq2
-`estimateBetaPriorVar` weighted and quantile beta-prior variance outputs for
-the primitive Rust beta-prior estimator, plus `beta_prior_refit_reference.tsv`,
-`beta_prior_refit_mu.tsv`, and `beta_prior_refit_hat.tsv` for the corresponding
-supplied-dispersion ridge refit. The forced-optim fallback reference includes
-both fitted means and hat diagonals. The GLM-mu native files include the default
-unweighted and weighted Cox-Reid gene-wise branches,
-`estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=TRUE)`, the default
-unweighted Cox-Reid mean-trend MAP/Wald/LRT branch, plus the supported
-mean-trend MAP/Wald/LRT path:
-`estimateDispersionsGeneEst(linearMu=FALSE,niter=2,useCR=FALSE)`, mean trend
-or local trend fitting, `estimateDispersionsMAP(useCR=FALSE)`, and final
-full/reduced `fitNbinomGLMs(useQR=FALSE,useOptim=FALSE)`. The matched GLM-mu Wald/LRT
-reference rows include compact DESeq2-shaped result tables with BH-adjusted
-p-values for result-table parity. The unweighted GLM-mu local-trend fixture
-also records MAP, Wald, LRT, and result rows for the tiny-data case where one
-row is usable for the local fit; the weighted GLM-mu local fixture covers the
-same MAP/Wald/LRT results with `weightsFail` expansion. A separate
-GLM-mu Cox-Reid local-trend fixture family records unweighted and weighted MAP
-dispersion intermediates, stored dispersion means, Wald fitted means and hat
-diagonals, LRT full/reduced likelihoods, and compact Wald/LRT result rows for
-that combination.
-
-Rust golden tests skip automatically when these files are absent. After running
-the R script, those same tests compare size factors, normalized counts,
-normalization-factor normalized counts, baseMean/baseVar/allZero,
-fixed-dispersion Wald/LRT fields, fitted means, hat diagonals, Cook's
-distances, matched GLM-mu result-row p-values and adjusted p-values, and
-compact matched GLM-mu Wald/LRT result rows, and Cook's replacement/refit
-bookkeeping against the generated references.
-
-The separate L-BFGS-B stress reference is generated with the recorded R 4.6.1
-environment:
-
-```bash
+```sh
 OPENBLAS_NUM_THREADS=1 \
   Rscript scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R
 ```
 
-The generator refuses other R versions and serializes doubles with 17
-significant digits. The 2026-07-22 fixture contains 512 cases and records x86_64
-Linux, OpenBLAS 0.3.32, one thread. Replaying it with `rcompat-lbfgsb` 0.2.1
-produces 512/512 exact endpoints, objective values, and evaluation counts. The
-0.1.6 baseline produced 493/512 practical endpoint-plus-objective matches,
-507/512 practical objective matches, 0/512 exact endpoint-plus-objective
-matches, and 311/512 exact count matches.
+A fixed hard-row scorer is also available at
+`scripts/validation/score_frozen_worst_genes.py`. Its required
+[gene/column set](data/wald_frozen_worst100_r461.tsv) prevents selection changes
+from hiding error tails. Supply diagnostics for the complete study: missing
+fixed genes fail; the scorer does not infer them from a truncated output.
 
-## Versioned High-Error Benchmark
+## Platform references and records
 
-Optimizer isolation does not prove end-to-end parity, so the repository also
-stores the 100 rows with the largest v0.2.4 errors from a versioned 69,045-gene
-validation contrast. Each row records the result column with the largest
-baseline error. The fixture is
-[`data/wald_frozen_worst100_r461.tsv`](data/wald_frozen_worst100_r461.tsv).
+[Platform arithmetic](linux_numerical_parity.md) specifies Linux extended
+reductions, the pinned BLAS kernel and independent Windows/Intel-macOS CDFs.
+The [testing guide](testing-parity.md) lists actual interface and safety checks.
 
-Build in release mode, generate all 69,045 diagnostics from the saved real-data
-reference, and run the accuracy check:
-
-```bash
-cargo build --release -p rsdeseq2
-python3 scripts/validation/real_data_parity.py \
-  --study-root /path/to/study-inputs-and-reference-outputs \
-  --binary target/release/rsdeseq2 \
-  --contrast VALIDATION_CONTRAST_ID \
-  --contrast-size-factors estimate \
-  --output results/benchmarks/frozen_worst100.tsv \
-  --diagnostics-output results/benchmarks/frozen_worst100_diagnostics.tsv \
-  --diagnostics-limit 69045
-python3 scripts/validation/score_frozen_worst_genes.py \
-  --fixture docs/data/wald_frozen_worst100_r461.tsv \
-  --diagnostics results/benchmarks/frozen_worst100_diagnostics.tsv \
-  --report-only
-```
-
-`VALIDATION_CONTRAST_ID` is the contrast identifier used by the selected study
-input and saved-reference bundle.
-
-The full diagnostics table lets the scorer evaluate every fixed gene from its
-measured row. The v0.2.5 release-mode run measured median, mean, and maximum
-absolute errors of `6.063612945084174e-10`, `1.260818774570247e-4`, and
-`1.5259081158007781e-3`. The frozen v0.2.4 baseline measured
-`1.4637657972313423e-4`, `3.793917566690452e-4`, and
-`3.0938714191082184e-3`, respectively. The v0.2.5 median and mean are
-241401.589x and 3.00909032x lower; the maximum is 50.6796531% lower, with a
-v0.2.5-to-v0.2.4 ratio of `0.493203469`. Of the 100 rows, 89 improved and 78
-improved by at least 10x.
-
-The ratio size-factor path uses compensated accumulation of log counts when
-computing per-gene geometric means. This reduces floating-point loss in
-normalization before the dispersion and fitting stages.
-
-The native Wald pipeline is covered by Rust self-consistency tests:
-it preserves dispersion intermediates, expands all-zero rows, and produces the
-same GLM/result fields as the supplied-dispersion Wald path when fed its own
-final MAP dispersions. The reference generator emits normalization-factor
-native dispersion references for `roughDispEstimate`, `momentsDispEstimate`,
-bounded starts, and post-`minmu` fitted means from
-`estimateDispersionsGeneEst`, plus weighted GLM-mu references for the supported
-mean-trend MAP/Wald/LRT branch. Generated reference coverage excludes broader
-DESeq2 stage-by-stage comparisons for unimplemented dispersion branches.
-Thresholded selected-coefficient Wald alternatives are covered by
-hand/R-formula tests; generated `results(lfcThreshold=...)` tables are absent.
-
-Rust dispersion unit tests use hand-computable cases. A complete generated
-stage-reference set would include separate columns for `roughDispEstimate`, `momentsDispEstimate`,
-linear fitted means, Cox-Reid objective values, log-dispersion prior objective
-values, GLM-refit mean matrices from the non-`linearMu` branch, `fitidx`
-decisions across `niter`, parametric trend coefficients, mean trend constants,
-`dispFit`, fallback grid estimates, line-search estimates, weighted objective
-values, and MAP dispersions. Line-search references should include final
-score, first derivative, and second derivative so drift can be localized before
-full result-table comparison.
-
-## Version Recording
-
-Every reference output set should record:
-
-- DESeq2 version
-- Bioconductor version
-- R version
-- platform
-- package versions that affect fitting
-
-## Why Intermediates Matter
-
-Final p-values can agree accidentally or disagree for reasons that are hard to
-diagnose. Comparing `sizeFactors`, normalized counts, dispersion estimates,
-coefficients, standard errors, Cook's distances, and filtering decisions gives a
-clear path to localizing drift.
-
-## Current checkpoints and independent validation
-
-The [current GTEx comparison](reports/gtex-native-wald-benchmark.md) records the exact
-executable, eleven studies, native R 4.6.2 session, output hashes and reproduction
-commands. Its accepted pass preserves all historical input/reference identities;
-new exploratory references must use a separate directory.
-
-The independent Pasilla panel is committed with its source archive identity,
-selection rule, counts/design and pre-optimization R references. Its generator
-and `scripts/validation/check_pasilla_holdout.py` are included. Keep its frozen references
-unchanged when checking a candidate; see the [memory report](history/memory-improvements-2026-10-29.md).
-The [Rust-only wrapper migration](history/rust-only-wrapper-migration.md) records the
-replacement contract and its required direct cross-interface equality checks.
-The previous R-backed request implementation and its acceptance claims were withdrawn.
-The replacement [bounded result-batch checkpoint](history/rust-only-result-batches-2026-10-30.md)
-uses the standalone engine, preserves those historical artifacts, and records
-its own source package, executable hashes, exact comparisons and paired
-measurements. `scripts/validation/check_rust_r_identity.R` compares IEEE-754 output bits
-against the Rust-only `evaluate_r_interface` example, including 65-request
-batches across the native chunk boundary.
-
-## Linux formula references
-
-The Linux x86_64 formula panels retain exact independent R bits under a fixed
-reference BLAS kernel. See [Linux numerical parity](linux_numerical_parity.md)
-for the environment, generator command, and extended-precision reductions.
+For every new observation, record source commit, executable/package hashes,
+R/DESeq2/ashr/apeglm/compiler versions, platform/BLAS, thread counts, input hashes,
+settings, raw timings/RSS and result hashes. Keep normalization, gene/trend/MAP
+dispersions, coefficients/SEs, Cook's and filtering intermediates so drift can be
+localized before examining final p-values.
