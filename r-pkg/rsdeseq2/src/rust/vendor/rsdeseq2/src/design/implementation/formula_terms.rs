@@ -215,7 +215,7 @@ fn expand_parenthesized_star(alternatives: &[Vec<String>]) -> Result<Vec<String>
     // enumerating subsets, preserving the first occurrence and its coding order.
     let mut distinct = Vec::new();
     for group in alternatives {
-        if !distinct.contains(group) {
+        if group.len() != 1 || group[0] == "." || !distinct.contains(group) {
             distinct.push(group.clone());
         }
     }
@@ -251,6 +251,7 @@ fn expand_parenthesized_formula_power(
     }
     let order = parse_formula_interaction_power(term, &pieces[1])?;
     let max_order = order.min(terms.len());
+    check_power_expansion(terms.len(), max_order)?;
     let mut expanded = Vec::new();
     for interaction_order in 1..=max_order {
         for combination in formula_term_combinations(&terms, interaction_order)? {
@@ -744,7 +745,7 @@ fn push_unique_formula_term(terms: &mut Vec<String>, term: String) -> Result<(),
 
 const MAX_EXPANDED_TERMS: usize = 16_384;
 
-fn check_expansion_size(size: usize) -> Result<(), DeseqError> {
+pub(super) fn check_expansion_size(size: usize) -> Result<(), DeseqError> {
     if size > MAX_EXPANDED_TERMS {
         return Err(DeseqError::InvalidOptions {
             reason: format!("formula expansion exceeds {MAX_EXPANDED_TERMS} terms"),
@@ -753,7 +754,7 @@ fn check_expansion_size(size: usize) -> Result<(), DeseqError> {
     Ok(())
 }
 
-fn check_combination_count(n: usize, order: usize) -> Result<(), DeseqError> {
+pub(super) fn check_combination_count(n: usize, order: usize) -> Result<(), DeseqError> {
     if order > n {
         return Ok(());
     }
@@ -775,13 +776,15 @@ fn canonical_interaction(term: &str) -> Result<String, DeseqError> {
             .strip_prefix('`')
             .and_then(|v| v.strip_suffix('`'))
             .unwrap_or(&variable);
-        if !variables.iter().any(|existing: &String| {
-            existing
-                .strip_prefix('`')
-                .and_then(|v| v.strip_suffix('`'))
-                .unwrap_or(existing)
-                == identity
-        }) {
+        if variable == "."
+            || !variables.iter().any(|existing: &String| {
+                existing
+                    .strip_prefix('`')
+                    .and_then(|v| v.strip_suffix('`'))
+                    .unwrap_or(existing)
+                    == identity
+            })
+        {
             variables.push(variable);
         }
     }
@@ -819,6 +822,20 @@ pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), DeseqError> {
             }
         } else if c == ')' {
             depth = depth.saturating_sub(1);
+        }
+    }
+    Ok(())
+}
+
+/// Bound the sum of all interaction orders before enumerating resolved dot columns.
+pub(super) fn check_power_expansion(n: usize, order: usize) -> Result<(), DeseqError> {
+    let mut combination = 1u128;
+    let mut total = 0u128;
+    for k in 1..=order.min(n) {
+        combination = combination.saturating_mul((n - k + 1) as u128) / k as u128;
+        total = total.saturating_add(combination);
+        if total > MAX_EXPANDED_TERMS as u128 {
+            return check_expansion_size(usize::MAX);
         }
     }
     Ok(())

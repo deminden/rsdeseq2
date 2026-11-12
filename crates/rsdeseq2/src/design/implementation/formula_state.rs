@@ -85,8 +85,8 @@ fn add_star_formula_term<'a>(
         }
     }
     for order in 3..=alternatives.len() {
-        for subset in formula_alternative_combinations(&alternatives, order) {
-            for product in formula_variable_alternative_products(&subset) {
+        for subset in formula_alternative_combinations(&alternatives, order)? {
+            for product in formula_variable_alternative_products(&subset)? {
                 if formula_variables_are_unique(&product) {
                     add_higher_order_formula_interaction(
                         &product,
@@ -121,7 +121,7 @@ fn add_nested_formula_term<'a>(
         )?;
     }
     for prefix_len in 2..=alternatives.len() {
-        for product in formula_variable_alternative_products(&alternatives[..prefix_len]) {
+        for product in formula_variable_alternative_products(&alternatives[..prefix_len])? {
             if !formula_variables_are_unique(&product) {
                 continue;
             }
@@ -181,8 +181,8 @@ fn remove_star_formula_term<'a>(
         }
     }
     for order in 3..=alternatives.len() {
-        for subset in formula_alternative_combinations(&alternatives, order) {
-            for product in formula_variable_alternative_products(&subset) {
+        for subset in formula_alternative_combinations(&alternatives, order)? {
+            for product in formula_variable_alternative_products(&subset)? {
                 if formula_variables_are_unique(&product) {
                     remove_higher_order_formula_interaction(
                         &product,
@@ -210,7 +210,7 @@ fn remove_nested_formula_term<'a>(
         remove_main_formula_term(variable, factors, numeric_covariates, state)?;
     }
     for prefix_len in 2..=alternatives.len() {
-        for product in formula_variable_alternative_products(&alternatives[..prefix_len]) {
+        for product in formula_variable_alternative_products(&alternatives[..prefix_len])? {
             if !formula_variables_are_unique(&product) {
                 continue;
             }
@@ -270,8 +270,9 @@ fn apply_power_formula_term<'a>(
     let variables = formula_piece_variables(base, factors, numeric_covariates)?;
     let order = parse_formula_state_interaction_power(term, &pieces[1])?;
     let max_order = order.min(variables.len());
+    check_power_expansion(variables.len(), max_order)?;
     for interaction_order in 1..=max_order {
-        for product in formula_variable_combinations(&variables, interaction_order) {
+        for product in formula_variable_combinations(&variables, interaction_order)? {
             if product.len() == 1 {
                 if add {
                     add_main_formula_term(
@@ -487,7 +488,8 @@ fn formula_piece_variables<'a>(
 fn formula_alternative_combinations<'a>(
     alternatives: &'a [Vec<&'a str>],
     order: usize,
-) -> Vec<Vec<Vec<&'a str>>> {
+) -> Result<Vec<Vec<Vec<&'a str>>>, DeseqError> {
+    check_combination_count(alternatives.len(), order)?;
     fn push_combinations<'a>(
         alternatives: &'a [Vec<&'a str>],
         order: usize,
@@ -508,14 +510,19 @@ fn formula_alternative_combinations<'a>(
     }
 
     if order == 0 || order > alternatives.len() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mut output = Vec::new();
     push_combinations(alternatives, order, 0, &mut Vec::new(), &mut output);
-    output
+    Ok(output)
 }
 
-fn formula_variable_alternative_products<'a>(alternatives: &[Vec<&'a str>]) -> Vec<Vec<&'a str>> {
+fn formula_variable_alternative_products<'a>(alternatives: &[Vec<&'a str>]) -> Result<Vec<Vec<&'a str>>, DeseqError> {
+    alternatives.iter().try_fold(1usize, |count, group| {
+        let size = count.saturating_mul(group.len());
+        check_expansion_size(size)?;
+        Ok::<_, DeseqError>(size)
+    })?;
     let mut products: Vec<Vec<&'a str>> = vec![Vec::new()];
     for alternative in alternatives {
         let mut next = Vec::new();
@@ -528,10 +535,11 @@ fn formula_variable_alternative_products<'a>(alternatives: &[Vec<&'a str>]) -> V
         }
         products = next;
     }
-    products
+    Ok(products)
 }
 
-fn formula_variable_combinations<'a>(variables: &[&'a str], order: usize) -> Vec<Vec<&'a str>> {
+fn formula_variable_combinations<'a>(variables: &[&'a str], order: usize) -> Result<Vec<Vec<&'a str>>, DeseqError> {
+    check_combination_count(variables.len(), order)?;
     fn push_combinations<'a>(
         variables: &[&'a str],
         order: usize,
@@ -551,11 +559,11 @@ fn formula_variable_combinations<'a>(variables: &[&'a str], order: usize) -> Vec
         }
     }
     if order == 0 || order > variables.len() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mut output = Vec::new();
     push_combinations(variables, order, 0, &mut Vec::new(), &mut output);
-    output
+    Ok(output)
 }
 
 fn formula_variables_are_unique(variables: &[&str]) -> bool {
@@ -576,11 +584,14 @@ fn add_interaction_formula_term<'a>(
         formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     let has_dot = pieces.iter().any(|piece| piece == ".");
     let mut added_any = false;
-    for product in formula_variable_alternative_products(&alternatives) {
-        if !formula_variables_are_unique(&product) {
-            continue;
-        }
-        if product.len() == 2 {
+    for product in formula_variable_alternative_products(&alternatives)? {
+        let mut unique = Vec::new();
+        for variable in product { if !unique.contains(&variable) { unique.push(variable); } }
+        let product = unique;
+        if product.len() == 1 {
+            add_main_formula_term(product[0], factors, numeric_covariates,
+                &mut state.selected_factors, &mut state.selected_numeric_covariates)?;
+        } else if product.len() == 2 {
             add_pairwise_formula_interaction(
                 product[0],
                 product[1],
@@ -708,11 +719,13 @@ fn remove_interaction_formula_term<'a>(
         formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     let has_dot = pieces.iter().any(|piece| piece == ".");
     let mut removed_any = false;
-    for product in formula_variable_alternative_products(&alternatives) {
-        if !formula_variables_are_unique(&product) {
-            continue;
-        }
-        if product.len() == 2 {
+    for product in formula_variable_alternative_products(&alternatives)? {
+        let mut unique = Vec::new();
+        for variable in product { if !unique.contains(&variable) { unique.push(variable); } }
+        let product = unique;
+        if product.len() == 1 {
+            remove_main_formula_term(product[0], factors, numeric_covariates, state)?;
+        } else if product.len() == 2 {
             remove_pairwise_formula_interaction(
                 product[0],
                 product[1],

@@ -19,10 +19,13 @@ This is an intentional source-compatibility transition for development after
 Formula interactions remove repeated variable identities while preserving their
 first occurrence. `x*x`, `x:x`, `x/x`, and equivalent grouped formulas simplify
 as in independent base R 4.6.2 checks. Repeated star operands are removed before
-subset enumeration. Expansion is limited to 16,384 terms, input to 1 MiB and
+subset enumeration. Additive groups and dot placeholders keep their cross-variable
+interactions: `(x+y)*(x+y)` and `.:.` include the main effects and `x:y`.
+Resolved dot powers and Cartesian products use the same preflight bounds.
+Expansion is limited to 16,384 terms, input to 1 MiB and
 parenthesis nesting to 128 levels; excessive requests return an error before
-unbounded expansion. Formula parsing now has a real private module with seven
-explicit parent-facing functions. CLI execution, adapters, readers and writers
+unbounded expansion. Formula parsing now has a real private module with explicit
+parent-facing functions. CLI execution, adapters, readers and writers
 also have compiler-visible private modules. Public entry points remain stable.
 
 The CLI borrows Cook's distances from the retained original fit. Workflows

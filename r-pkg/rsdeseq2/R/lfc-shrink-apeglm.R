@@ -109,6 +109,10 @@
     ),
     dots
   )
+  # Preserve explicit unlimited resource policy through argument transport.
+  if ("max.grid.evaluations" %in% names(dots) && is.null(dots$max.grid.evaluations)) {
+    apeArguments["max.grid.evaluations"] <- list(NULL)
+  }
   nativeMethod <- match.arg(apeArguments$method, c("general", "nbinomR", "nbinomCR", "nbinomC", "nbinomC*", "betabinR", "betabinCR", "betabinC", "betabinC*"))
   gridInterval <- !is.null(apeArguments$interval.type) &&
     !identical(match.arg(apeArguments$interval.type, c("laplace", "HPD", "credible")), "laplace")
