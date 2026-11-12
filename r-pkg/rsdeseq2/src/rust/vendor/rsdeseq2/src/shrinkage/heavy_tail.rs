@@ -36,3 +36,6 @@ pub use analysis::{
 };
 
 pub use compiled_refinement::{NegativeBinomialRefinement, NegativeBinomialRefinementMethod};
+
+mod work;
+pub use work::{PosteriorCancellation, PosteriorWorkControl};

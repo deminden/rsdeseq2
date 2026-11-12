@@ -49,7 +49,9 @@ include!("implementation/formula_factors.rs");
 include!("implementation/formula_factor_evaluation.rs");
 
 // Formula term splitting and parenthesized-term expansion.
-include!("implementation/formula_terms.rs");
+#[path = "implementation/formula_terms.rs"]
+mod formula_terms;
+use formula_terms::*;
 
 // Formula state mutation for add/remove term handling.
 include!("implementation/formula_state.rs");

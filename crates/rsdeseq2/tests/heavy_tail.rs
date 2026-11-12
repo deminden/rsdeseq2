@@ -221,3 +221,78 @@ fn invalid_rows_and_degenerate_scales_error_while_zero_rows_remain_missing() {
     assert_eq!(zero.false_sign_rate, Some(vec![None]));
     assert!(zero.diagnostics[0].convergence.is_none());
 }
+
+#[test]
+fn posterior_summaries_keep_coefficient_identity_and_reject_inconsistent_state() {
+    use rsdeseq2::matrix::{MatrixOrder, MatrixView, RowMajorMatrix};
+    use rsdeseq2::shrinkage::{
+        CoefficientScale, NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions,
+        PosteriorOffsets, fit_negative_binomial_posterior,
+    };
+    let counts = [
+        100., 105., 98., 110., 108., 102., 10., 12., 9., 80., 85., 78.,
+    ];
+    let design = [1., 0., 1., 0., 1., 0., 1., 1., 1., 1., 1., 1.];
+    let input = NegativeBinomialPosteriorInput {
+        counts: MatrixView::new(2, 6, &counts, MatrixOrder::RowMajor).unwrap(),
+        design: MatrixView::new(6, 2, &design, MatrixOrder::RowMajor).unwrap(),
+        dispersions: &[0.1, 0.1],
+        offsets: PosteriorOffsets::None,
+        weights: None,
+        mle: None,
+    };
+    let options = NegativeBinomialPosteriorOptions {
+        coefficient: Some(1),
+        ..Default::default()
+    };
+    let fit = fit_negative_binomial_posterior(input, &options).unwrap();
+    assert_eq!(fit.summary_coefficient(), Some(1));
+    let summary = fit
+        .coefficient_summary(1, CoefficientScale::Natural)
+        .unwrap();
+    assert_eq!(summary.sign_svalues, fit.sign_svalues);
+    assert!(
+        fit.coefficient_summary(0, CoefficientScale::Natural)
+            .unwrap_err()
+            .to_string()
+            .contains("probability summary coefficient")
+    );
+    // The data distinguish the two scientific summaries; a wrong-column test
+    // would be ineffective if both coefficients happened to have equal s-values.
+    let other = fit_negative_binomial_posterior(
+        input,
+        &NegativeBinomialPosteriorOptions {
+            coefficient: Some(0),
+            ..options
+        },
+    )
+    .unwrap();
+    assert_eq!(fit.mode, other.mode);
+    assert_ne!(fit.sign_svalues, other.sign_svalues);
+    for damage in 0..7 {
+        let mut broken = fit.clone();
+        match damage {
+            0 => {
+                broken.standard_deviation =
+                    Some(RowMajorMatrix::from_row_major(1, 1, vec![1.]).unwrap())
+            }
+            1 => broken.sign_svalues = Some(vec![]),
+            2 => broken.threshold_svalues = Some(vec![]),
+            3 => broken.false_sign_rate = Some(vec![]),
+            4 => broken.false_sign_or_small_rate = Some(vec![]),
+            5 => broken.diagnostics.clear(),
+            _ => {
+                broken.analysis.intervals =
+                    Some(RowMajorMatrix::from_row_major(2, 1, vec![1.; 2]).unwrap())
+            }
+        }
+        assert!(
+            broken
+                .coefficient_summary(1, CoefficientScale::Natural)
+                .unwrap_err()
+                .to_string()
+                .contains("inconsistent shapes"),
+            "damage {damage}"
+        );
+    }
+}

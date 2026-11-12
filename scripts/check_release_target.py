@@ -8,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 RELEASE_TESTS = (
     'model_validity', 'wald_reference', 'lrt_reference', 'dispersion_reference',
     'gtex_real_wald_parity', 'thread_invariance', 'cli', 'frozen_local_vst',
+    # Small independent panels exercise target-sensitive posterior arithmetic,
+    # sparse optimizer state, uncertainty propagation and formula column order.
+    'bounded_posterior', 'sqp_controls', 'heavy_tail', 'posterior_analysis',
+    'formula_fitting',
 )
 
 

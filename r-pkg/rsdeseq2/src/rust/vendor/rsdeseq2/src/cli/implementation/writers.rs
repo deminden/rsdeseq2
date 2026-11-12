@@ -1,11 +1,13 @@
-fn write_cli_cooks_outputs(
+use super::*;
+
+pub(super) fn write_cli_cooks_outputs(
     paths: &CliCooksOutputPaths,
     gene_names: Option<&[String]>,
     sample_names: Option<&[String]>,
     analysis: &CliAnalysisOutput,
 ) -> Result<(), DeseqError> {
     if paths.cooks_distance.is_some() {
-        let cooks = analysis.cooks.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
+        let cooks = analysis.cooks.as_ref().or_else(|| analysis.fit.as_ref().and_then(|fit| fit.cooks.as_ref())).ok_or_else(|| DeseqError::InvalidOptions {
             reason: "Cook's diagnostic sidecar output requires a workflow that computes Cook's distances"
                 .to_string(),
         })?;
@@ -48,7 +50,7 @@ fn write_cli_cooks_outputs(
     Ok(())
 }
 
-fn write_cli_result_sidecars(
+pub(super) fn write_cli_result_sidecars(
     paths: &CliResultSidecarPaths,
     gene_names: Option<&[String]>,
     analysis: &CliAnalysisOutput,

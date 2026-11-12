@@ -82,7 +82,17 @@ pub(super) fn options(args: &Value) -> Result<PosteriorAnalysisOptions, String> 
     } else {
         None
     };
+    let mut work = rsdeseq2::shrinkage::PosteriorWorkControl::default()
+        .with_interrupt_check(super::poll_interrupt);
+    if let Some(value) = field(args, "max.grid.evaluations") {
+        work.max_grid_evaluations = if matches!(value.data, Data::Null) {
+            None
+        } else {
+            Some(count(args, "max.grid.evaluations", 10_000_000)?)
+        };
+    }
     Ok(PosteriorAnalysisOptions {
+        work,
         interval,
         contrasts,
         parameter_standard_errors,

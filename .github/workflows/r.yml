@@ -40,7 +40,7 @@ jobs:
       - name: Reject production R numerical calculations
         run: Rscript --vanilla scripts/audit_r_numerical_boundary.R r-pkg/rsdeseq2/R
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libxml2-dev libssl-dev libblas-dev liblapack-dev gfortran clang
       - run: mkdir -p "$R_LIBS_USER"
       - name: Cache exact reference packages
         id: reference-cache
@@ -103,6 +103,18 @@ jobs:
         env:
           RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
+      - name: Instrument Linux native boundary and forced unwind cleanup
+        if: matrix.lane == 'reference'
+        run: python scripts/check_native_boundary_sanitizers.py --rscript "$(command -v Rscript)" --r-library "$R_LIBS_USER" --output-dir native-boundary-sanitizers
+      - name: Save native boundary instrumentation evidence
+        if: always() && matrix.lane == 'reference'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-boundary-sanitizers-${{ github.sha }}
+          path: |
+            native-boundary-sanitizers/sanitizers.json
+            native-boundary-sanitizers/*.log
+          if-no-files-found: error
       - name: Require standalone and wrapped primitives to be bit-identical
         run: |
           cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface

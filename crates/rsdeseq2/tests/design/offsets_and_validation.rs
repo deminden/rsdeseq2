@@ -329,8 +329,10 @@ fn expanded_formula_design_validates_unsupported_terms() {
     assert!(expanded_formula_design("condition + dose", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~", &factors, &numeric).is_err());
     assert!(expanded_formula_design("~ condition + missing", &factors, &numeric).is_err());
-    assert!(
-        expanded_formula_design("~ condition + condition:condition", &factors, &numeric).is_err()
+    // R formula interactions are idempotent, including factors.
+    assert_eq!(
+        expanded_formula_design("~ condition + condition:condition", &factors, &numeric).unwrap(),
+        expanded_formula_design("~ condition", &factors, &numeric).unwrap()
     );
     assert!(
         expanded_formula_design(

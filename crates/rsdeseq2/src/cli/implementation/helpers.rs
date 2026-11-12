@@ -1,4 +1,6 @@
-fn require_cli_fit<'a>(
+use super::*;
+
+pub(super) fn require_cli_fit<'a>(
     analysis: &'a CliAnalysisOutput,
     context: &str,
 ) -> Result<&'a DeseqFit, DeseqError> {
@@ -10,7 +12,7 @@ fn require_cli_fit<'a>(
         })
 }
 
-fn require_cli_refit<'a>(
+pub(super) fn require_cli_refit<'a>(
     analysis: &'a CliAnalysisOutput,
     context: &str,
 ) -> Result<&'a DeseqFit, DeseqError> {
@@ -22,13 +24,13 @@ fn require_cli_refit<'a>(
         })
 }
 
-fn fit_coefficient_names(fit: &DeseqFit) -> Option<&[String]> {
+pub(super) fn fit_coefficient_names(fit: &DeseqFit) -> Option<&[String]> {
     fit.design
         .as_ref()
         .and_then(|design| design.coefficient_names())
 }
 
-fn apply_cli_normalization_inputs(
+pub(super) fn apply_cli_normalization_inputs(
     builder: DeseqBuilder,
     counts: &crate::core::CountMatrix,
     normalization_factors: Option<PathBuf>,
@@ -46,7 +48,7 @@ fn apply_cli_normalization_inputs(
     }
 }
 
-fn apply_cli_size_factor_controls(
+pub(super) fn apply_cli_size_factor_controls(
     mut builder: DeseqBuilder,
     counts: &crate::core::CountMatrix,
     geometric_means: Option<PathBuf>,
@@ -61,7 +63,7 @@ fn apply_cli_size_factor_controls(
     Ok(builder)
 }
 
-fn read_cli_geometric_means(
+pub(super) fn read_cli_geometric_means(
     path: Option<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<Option<Vec<f64>>, DeseqError> {
@@ -79,7 +81,7 @@ fn read_cli_geometric_means(
     .transpose()
 }
 
-fn read_cli_frozen_intercept(
+pub(super) fn read_cli_frozen_intercept(
     path: Option<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<Option<Vec<f64>>, DeseqError> {
@@ -98,7 +100,7 @@ fn read_cli_frozen_intercept(
     .transpose()
 }
 
-fn read_cli_gene_numeric(
+pub(super) fn read_cli_gene_numeric(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,
     context: &str,
@@ -114,7 +116,7 @@ fn read_cli_gene_numeric(
     )
 }
 
-fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64, DeseqError> {
+pub(super) fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64, DeseqError> {
     let value = value.ok_or_else(|| DeseqError::InvalidOptions {
         reason: "--rlog-prior-variance is required with --frozen-intercept".to_string(),
     })?;
@@ -127,13 +129,13 @@ fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64, DeseqErro
     }
 }
 
-fn cli_rlog_prior_without_frozen_intercept() -> DeseqError {
+pub(super) fn cli_rlog_prior_without_frozen_intercept() -> DeseqError {
     DeseqError::InvalidOptions {
         reason: "--rlog-prior-variance requires --frozen-intercept".to_string(),
     }
 }
 
-fn read_cli_size_factors(
+pub(super) fn read_cli_size_factors(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<Vec<f64>, DeseqError> {
@@ -148,7 +150,7 @@ fn read_cli_size_factors(
     )
 }
 
-fn read_cli_normalization_factors(
+pub(super) fn read_cli_normalization_factors(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<crate::matrix::RowMajorMatrix<f64>, DeseqError> {
@@ -159,7 +161,7 @@ fn read_cli_normalization_factors(
     )
 }
 
-fn read_cli_observation_weights(
+pub(super) fn read_cli_observation_weights(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<crate::matrix::RowMajorMatrix<f64>, DeseqError> {
@@ -170,7 +172,7 @@ fn read_cli_observation_weights(
     )
 }
 
-fn apply_cli_result_options(
+pub(super) fn apply_cli_result_options(
     mut builder: DeseqBuilder,
     disable_cooks_cutoff: bool,
     cooks_cutoff: Option<f64>,
@@ -204,7 +206,7 @@ fn apply_cli_result_options(
     Ok(builder)
 }
 
-fn apply_cli_wald_t_options(
+pub(super) fn apply_cli_wald_t_options(
     builder: DeseqBuilder,
     counts: &crate::core::CountMatrix,
     use_t: bool,
@@ -244,7 +246,7 @@ fn apply_cli_wald_t_options(
     }
 }
 
-fn read_cli_design_matrix(
+pub(super) fn read_cli_design_matrix(
     path: impl Into<PathBuf>,
     counts: &crate::core::CountMatrix,
 ) -> Result<crate::design::DesignMatrix, DeseqError> {
@@ -258,7 +260,7 @@ fn read_cli_design_matrix(
     )
 }
 
-fn cli_conflicting_normalization_inputs() -> DeseqError {
+pub(super) fn cli_conflicting_normalization_inputs() -> DeseqError {
     DeseqError::InvalidDimensions {
         context: "normalization inputs".to_string(),
         expected: 1,
@@ -266,7 +268,9 @@ fn cli_conflicting_normalization_inputs() -> DeseqError {
     }
 }
 
-fn default_cli_coefficient(design: &crate::design::DesignMatrix) -> Result<usize, DeseqError> {
+pub(super) fn default_cli_coefficient(
+    design: &crate::design::DesignMatrix,
+) -> Result<usize, DeseqError> {
     design
         .n_coefficients()
         .checked_sub(1)

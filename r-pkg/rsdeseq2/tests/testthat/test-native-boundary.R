@@ -263,11 +263,13 @@ test_that("registered native calls reject malformed buffers in a child process",
   direct <- Sys.getenv("RSDESEQ2_NATIVE_BOUNDARY_R_EXEC")
   runtime <- Sys.getenv("RSDESEQ2_SANITIZER_RUNTIME")
   libraries <- Sys.getenv("RSDESEQ2_SANITIZER_LIBRARY_PATH")
+  preloadVar <- Sys.getenv("RSDESEQ2_SANITIZER_PRELOAD_VAR", "DYLD_INSERT_LIBRARIES")
+  libraryVar <- Sys.getenv("RSDESEQ2_SANITIZER_LIBRARY_VAR", "DYLD_FALLBACK_LIBRARY_PATH")
   executable <- if (nzchar(direct)) direct else file.path(R.home("bin"), "Rscript")
   arguments <- if (nzchar(direct)) c("--vanilla", "--slave", "-f") else "--vanilla"
   output <- system2(executable, c(arguments, shQuote(script)),
-                    env = c(if (nzchar(runtime)) paste0("DYLD_INSERT_LIBRARIES=", shQuote(runtime)),
-                            if (nzchar(libraries)) paste0("DYLD_FALLBACK_LIBRARY_PATH=", shQuote(libraries))),
+                    env = c(if (nzchar(runtime)) paste0(preloadVar, "=", shQuote(runtime)),
+                            if (nzchar(libraries)) paste0(libraryVar, "=", shQuote(libraries))),
                     stdout = TRUE, stderr = TRUE, timeout = 60)
   if(Sys.getenv("RSDESEQ2_REQUIRE_REPLACEMENT_HOOKS")=="1") cat(paste(output,collapse="\n"),"\n")
   expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
