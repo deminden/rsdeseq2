@@ -16,11 +16,11 @@
   },
   "binaries": {
     "baseline": {
-      "path": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/parser-shared-candidate-v1/rsdeseq2",
+      "path": "results/codebase_improvements/parser-shared-candidate-v1/rsdeseq2",
       "sha256": "75c5e6884624970995e52a4bdca2fd4462f474b80e89d9717d5fbaef5e02fdce"
     },
     "candidate": {
-      "path": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/release-0.4.0-candidate-v1/rsdeseq2",
+      "path": "results/codebase_improvements/release-0.4.0-candidate-v1/rsdeseq2",
       "sha256": "c41f9357e61ef612ec53bc6f45ae930f05e4782afb30d4710e3b2f2294376dfa"
     }
   },
@@ -177,5 +177,6 @@
         }
       ]
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

@@ -181,8 +181,8 @@
   "r_workflow_provenance": {
     "rscript": "/Users/dendem/miniforge3/envs/deseq2-r462-native/bin/Rscript",
     "libraries": {
-      "baseline": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/r462-library",
-      "candidate": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/formula-bridge-source-v9/rsdeseq2.Rcheck"
+      "baseline": "results/codebase_improvements/r462-library",
+      "candidate": "results/codebase_improvements/formula-bridge-source-v9/rsdeseq2.Rcheck"
     },
     "repeats": 1,
     "max_rss_mib": 2048,
@@ -244,5 +244,6 @@
         "rsdeseq2/help/paths.rds": "97f795f461c60d7c6eca4cfa1292cda531855d021b49367a428918e0df9efeb6"
       }
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

@@ -177,8 +177,8 @@
   "r_workflow_provenance": {
     "rscript": "/Users/dendem/miniforge3/envs/deseq2-r462-native/bin/Rscript",
     "libraries": {
-      "baseline": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/r462-library",
-      "candidate": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/parser-shared-source-v1/rsdeseq2.Rcheck"
+      "baseline": "results/codebase_improvements/r462-library",
+      "candidate": "results/codebase_improvements/parser-shared-source-v1/rsdeseq2.Rcheck"
     },
     "repeats": 1,
     "max_rss_mib": 2048,
@@ -240,5 +240,6 @@
         "rsdeseq2/help/paths.rds": "a6e11d2b8a512100835eb812d08e3445b1ec2f8a69dc0dc41413b86b84f2e693"
       }
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

@@ -180,8 +180,8 @@
   "r_workflow_provenance": {
     "rscript": "/Users/dendem/miniforge3/envs/deseq2-r462-native/bin/Rscript",
     "libraries": {
-      "baseline": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/r462-library",
-      "candidate": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/release-0.4.0-source-v2/rsdeseq2.Rcheck"
+      "baseline": "results/codebase_improvements/r462-library",
+      "candidate": "results/codebase_improvements/release-0.4.0-source-v2/rsdeseq2.Rcheck"
     },
     "repeats": 1,
     "max_rss_mib": 2048,
@@ -262,5 +262,6 @@
   "publication_readiness": "Local source/precision candidate ready; combined performance audit and remote platform gates pending",
   "development_library_updated_after_both_panels": true,
   "tracked_text_normalization": "LF line endings and trailing whitespace removed; raw measurement/session records retained unchanged in local results",
-  "installed_checked_archive_factor_identity_cases": 60
+  "installed_checked_archive_factor_identity_cases": 60,
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

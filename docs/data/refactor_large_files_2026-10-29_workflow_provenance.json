@@ -1,8 +1,8 @@
 {
   "rscript": "/Users/dendem/miniforge3/envs/deseq2-r462-native/bin/Rscript",
   "libraries": {
-    "baseline": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/rust-only-primitives-rcheck-v2/rsdeseq2.Rcheck",
-    "candidate": "/Users/dendem/Documents/Codex/Mac setup/rsdeseq2/results/codebase_improvements/refactor-source/rsdeseq2.Rcheck"
+    "baseline": "results/codebase_improvements/rust-only-primitives-rcheck-v2/rsdeseq2.Rcheck",
+    "candidate": "results/codebase_improvements/refactor-source/rsdeseq2.Rcheck"
   },
   "repeats": 1,
   "max_rss_mib": 2048,
@@ -62,5 +62,6 @@
       "rsdeseq2/help/aliases.rds": "af52327b5734b4b57e01e85524a810833fa88d801e7d26c18d6c905a1ad08c92",
       "rsdeseq2/help/paths.rds": "0e0ef321ad03eb6c0f8d57036697724b4f690810d1b818c4abfb1b292b03287d"
     }
-  }
+  },
+  "path_display": "Repository-relative paths; numerical values, hashes and original source scope are unchanged."
 }

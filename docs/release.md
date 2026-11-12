@@ -116,8 +116,8 @@ validation before publication.
 
 ### Publication preparation
 
-The local release branch is `codex/release-0.3.1`. Versions, documentation,
-vendored Rust code and evidence are prepared together. Local artifacts include
+For 0.3.1, versions, documentation, vendored Rust code and evidence were
+prepared together. Local artifacts included
 the macOS ARM64 CLI, Rust crate, R source package, repository source archive,
 release notes and SHA-256 checksums. The existing tag-triggered workflow builds
 all five platform CLI archives when the release is published.
