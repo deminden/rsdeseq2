@@ -574,3 +574,46 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
     };
     assert!(expanded_formula_design_from_model_frame("~ condition", &bad_reference).is_err());
 }
+
+#[test]
+fn formula_interactions_are_idempotent_before_expansion() {
+    // Independently checked with base R 4.6.2 model.matrix: all these formulas
+    // have the same intercept/x columns, assignments and order as ~ x.
+    let x = [1., 2., 3., 4.];
+    let numeric = [ExpandedNumericSpec {
+        name: "x",
+        values: &x,
+    }];
+    let expected = expanded_formula_design("~ x", &[], &numeric).unwrap();
+    for formula in [
+        "~ x*x",
+        "~ x:x",
+        "~ (x+x)*x",
+        "~ x/x",
+        "~ (x+x)^2",
+        "~ x:`x`",
+    ] {
+        assert_eq!(
+            expanded_formula_design(formula, &[], &numeric).unwrap(),
+            expected,
+            "{formula}"
+        );
+    }
+    let repeated = format!("~ {}", vec!["x"; 100].join("*"));
+    assert_eq!(
+        expanded_formula_design(&repeated, &[], &numeric).unwrap(),
+        expected
+    );
+    let names = (0..20).map(|i| format!("v{i}")).collect::<Vec<_>>();
+    let covariates = names
+        .iter()
+        .map(|name| ExpandedNumericSpec { name, values: &x })
+        .collect::<Vec<_>>();
+    let explosive = format!("~ {}", names.join("*"));
+    assert!(
+        expanded_formula_design(&explosive, &[], &covariates)
+            .unwrap_err()
+            .to_string()
+            .contains("formula expansion exceeds")
+    );
+}

@@ -31,6 +31,8 @@ impl Default for PosteriorIntervalOptions {
 }
 #[derive(Clone, Debug, Default)]
 pub struct PosteriorAnalysisOptions {
+    /// Batch-wide resource controls; numerical grid policy is unchanged.
+    pub work: super::work::PosteriorWorkControl,
     pub interval: Option<PosteriorIntervalOptions>,
     /// Coefficients by contrasts, in natural coefficient units.
     pub contrasts: Option<RowMajorMatrix<f64>>,
@@ -55,6 +57,43 @@ pub struct PosteriorAnalysis {
     pub grid_diagnostics: Vec<Option<PosteriorGridDiagnostic>>,
 }
 impl PosteriorAnalysisOptions {
+    /// Preflight work for an active grid query, including optional parameter integration.
+    /// Laplace/MAP-only or unselected queries perform no grid evaluations.
+    pub fn estimated_grid_evaluations(
+        &self,
+        genes: usize,
+        coefficients: usize,
+        coefficient: Option<usize>,
+        map_only: bool,
+    ) -> Result<usize, DeseqError> {
+        let Some(o) = self.interval.as_ref().filter(|o| {
+            o.kind != PosteriorIntervalKind::Laplace && !map_only && coefficient.is_some()
+        }) else {
+            return Ok(0);
+        };
+        if coefficients == 0 || coefficient.is_some_and(|c| c >= coefficients) {
+            return Err(invalid("posterior coefficient is outside the model"));
+        }
+        let power = u32::try_from(coefficients - 1)
+            .map_err(|_| invalid("posterior dimensions overflow"))?;
+        o.grid_intervals
+            .checked_add(1)
+            .and_then(|points| {
+                o.nuisance_points
+                    .checked_pow(power)
+                    .and_then(|n| points.checked_mul(n))
+            })
+            .and_then(|n| {
+                n.checked_mul(if self.parameter_standard_errors.is_some() {
+                    o.nuisance_points
+                } else {
+                    1
+                })
+            })
+            .and_then(|n| n.checked_mul(genes))
+            .ok_or_else(|| invalid("posterior grid evaluation count overflows"))
+    }
+
     pub(super) fn validate(
         &self,
         genes: usize,
@@ -137,6 +176,13 @@ impl PosteriorAnalysisOptions {
                     .ok_or_else(|| invalid("posterior grid evaluation count overflows"))?;
             }
         }
+        self.work
+            .validate_estimate(self.estimated_grid_evaluations(
+                genes,
+                p,
+                coefficient,
+                map_only,
+            )?)?;
         Ok(())
     }
 }

@@ -63,6 +63,7 @@ pub struct Analysis {
 impl Analysis {
     fn options(&self) -> Result<PosteriorAnalysisOptions, Box<dyn Error>> {
         Ok(PosteriorAnalysisOptions {
+            work: Default::default(),
             interval: Some(PosteriorIntervalOptions {
                 kind: match self.kind.as_str() {
                     "laplace" => PosteriorIntervalKind::Laplace,

@@ -1,10 +1,13 @@
 #include <R.h>
 #include <Rinternals.h>
+#include <R_ext/Utils.h>
 #include <stdint.h>
 #include "validation.h"
 #include "formula_transport.h"
 typedef struct FormulaOutput FormulaOutput;
-extern int rsdeseq2_r_formula_request(const uint8_t *,size_t,FormulaOutput **);
+extern int rsdeseq2_r_formula_request_interruptible(const uint8_t *,size_t,FormulaOutput **,int (*)(void));
+static void poll_interrupt(void *data){(void)data;R_CheckUserInterrupt();}
+static int interrupted(void){return R_ToplevelExec(poll_interrupt,NULL)==FALSE;}
 extern int rsdeseq2_r_formula_bytes(const FormulaOutput *,const uint8_t **,size_t *);
 extern void rsdeseq2_r_formula_drop(FormulaOutput **);
 extern const char *rsdeseq2_r_last_error(void);
@@ -35,7 +38,7 @@ SEXP rsdeseq2_formula_request(SEXP request){
      * leaves Rust. The continuation also exists before publishing any owner. */
     size_t size=rsdeseq2_formula_measure(request);uint8_t *bytes=(uint8_t *)R_alloc(size,1);rsdeseq2_formula_write(request,bytes,size);
     SEXP continuation=PROTECT(R_MakeUnwindCont());Output output={NULL};
-    checked(rsdeseq2_r_formula_request(bytes,size,&output.owner));
+    checked(rsdeseq2_r_formula_request_interruptible(bytes,size,&output.owner,interrupted));
 #ifdef RSDESEQ2_TEST_FORMULA_UNWIND
     ++seen;
 #endif

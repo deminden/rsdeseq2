@@ -95,3 +95,5 @@ pub use location_mode::{LocationModeEstimate, PriorModeSearch, estimate_location
 pub use count_likelihood::{BinomialLink, PoissonLink};
 
 pub use heavy_tail::{NegativeBinomialRefinement, NegativeBinomialRefinementMethod};
+
+pub use heavy_tail::{PosteriorCancellation, PosteriorWorkControl};

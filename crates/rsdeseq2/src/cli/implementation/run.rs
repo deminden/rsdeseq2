@@ -1,16 +1,19 @@
+use super::*;
+
 /// Parse process arguments and run the CLI.
 pub fn run_cli() -> Result<(), DeseqError> {
     run(Cli::parse())
 }
 
-fn run(mut cli: Cli) -> Result<(), DeseqError> {
+pub(super) fn run(mut cli: Cli) -> Result<(), DeseqError> {
     let (inputs, mut outputs) = cli.command.paths_mut();
-    let transaction = super::output_transaction::OutputTransaction::prepare(&inputs, &mut outputs)?;
+    let transaction =
+        crate::cli::output_transaction::OutputTransaction::prepare(&inputs, &mut outputs)?;
     run_staged(cli)?;
     transaction.publish()
 }
 
-fn run_staged(cli: Cli) -> Result<(), DeseqError> {
+pub(super) fn run_staged(cli: Cli) -> Result<(), DeseqError> {
     match cli.command {
         Commands::SizeFactors {
             counts,
@@ -96,7 +99,8 @@ fn run_staged(cli: Cli) -> Result<(), DeseqError> {
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
-            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
+            let mut builder = DeseqBuilder::new()
+                .automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into());
             builder = apply_cli_normalization_inputs(
@@ -144,7 +148,8 @@ fn run_staged(cli: Cli) -> Result<(), DeseqError> {
             output,
         } => {
             let counts = read_count_matrix_tsv(counts)?;
-            let mut builder = DeseqBuilder::new().automatic_dispersion_means()
+            let mut builder = DeseqBuilder::new()
+                .automatic_dispersion_means()
                 .size_factor_method(method.into())
                 .fit_type(fit_type.into());
             builder = apply_cli_normalization_inputs(

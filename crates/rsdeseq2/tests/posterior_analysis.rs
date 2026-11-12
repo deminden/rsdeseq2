@@ -285,3 +285,94 @@ fn one_coefficient_grid_has_a_valid_zero_dimensional_nuisance_integral() {
         );
     }
 }
+
+#[test]
+fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
+    use rsdeseq2::shrinkage::{
+        PosteriorAnalysisOptions, PosteriorIntervalKind, PosteriorIntervalOptions,
+    };
+    let mut analysis = PosteriorAnalysisOptions {
+        interval: Some(PosteriorIntervalOptions {
+            kind: PosteriorIntervalKind::EqualTail,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_eq!(
+        analysis
+            .estimated_grid_evaluations(2, 10, Some(1), false)
+            .unwrap(),
+        199_218_750
+    );
+    assert_eq!(
+        analysis
+            .estimated_grid_evaluations(2, 10, Some(1), true)
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        analysis
+            .estimated_grid_evaluations(2, 10, None, false)
+            .unwrap(),
+        0
+    );
+    analysis.parameter_standard_errors = Some(vec![0.1; 2]);
+    assert_eq!(
+        analysis
+            .estimated_grid_evaluations(2, 10, Some(1), false)
+            .unwrap(),
+        996_093_750
+    );
+    // Exercise policy through the actual fit, rather than only a count helper.
+    use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+    use rsdeseq2::shrinkage::{
+        NegativeBinomialPosteriorInput, NegativeBinomialPosteriorOptions, PosteriorOffsets,
+        fit_negative_binomial_posterior,
+    };
+    let counts = [10., 12., 20., 22.];
+    let design = [1., 0., 1., 0., 1., 1., 1., 1.];
+    let input = NegativeBinomialPosteriorInput {
+        counts: MatrixView::new(1, 4, &counts, MatrixOrder::RowMajor).unwrap(),
+        design: MatrixView::new(4, 2, &design, MatrixOrder::RowMajor).unwrap(),
+        dispersions: &[0.1],
+        offsets: PosteriorOffsets::None,
+        weights: None,
+        mle: None,
+    };
+    analysis.parameter_standard_errors = None;
+    analysis.work.max_grid_evaluations = Some(254); // 51 * 5 = 255
+    let mut options = NegativeBinomialPosteriorOptions {
+        coefficient: Some(1),
+        analysis,
+        ..Default::default()
+    };
+    assert!(
+        fit_negative_binomial_posterior(input, &options)
+            .unwrap_err()
+            .to_string()
+            .contains("255 evaluations")
+    );
+    options.analysis.work.max_grid_evaluations = None;
+    let accepted = fit_negative_binomial_posterior(input, &options).unwrap();
+    assert!(accepted.diagnostics[0].laplace_valid);
+    options.analysis.work.cancellation.cancel();
+    assert!(
+        fit_negative_binomial_posterior(input, &options)
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled")
+    );
+    // Poll cancellation during an active grid, beyond entry and row preflight.
+    static POLLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    fn interrupt() -> bool {
+        POLLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 2
+    }
+    options.analysis.work =
+        rsdeseq2::shrinkage::PosteriorWorkControl::default().with_interrupt_check(interrupt);
+    assert!(
+        fit_negative_binomial_posterior(input, &options)
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled")
+    );
+}

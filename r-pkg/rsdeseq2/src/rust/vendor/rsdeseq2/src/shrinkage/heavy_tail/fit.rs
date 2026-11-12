@@ -93,6 +93,8 @@ pub struct PosteriorMapDiagnostic {
 }
 #[derive(Clone, Debug)]
 pub struct NegativeBinomialPosterior {
+    /// Coefficient owning probability summaries; only the fitter sets this identity.
+    summary_coefficient: Option<usize>,
     /// Row-major modes and SDs in natural log coefficient units.
     pub mode: RowMajorMatrix<f64>,
     pub standard_deviation: Option<RowMajorMatrix<f64>>,
@@ -117,6 +119,55 @@ pub struct PosteriorCoefficientSummary {
     pub threshold_svalues: Option<Vec<Option<f64>>>,
 }
 impl NegativeBinomialPosterior {
+    /// Coefficient for which the stored sign/threshold probabilities were fitted.
+    pub fn summary_coefficient(&self) -> Option<usize> {
+        self.summary_coefficient
+    }
+
+    fn validate_summary_shapes(&self) -> Result<(), DeseqError> {
+        let genes = self.mode.n_rows();
+        let columns = self.mode.n_cols();
+        if self
+            .standard_deviation
+            .as_ref()
+            .is_some_and(|m| m.n_rows() != genes || m.n_cols() != columns)
+            || self.diagnostics.len() != genes
+            || [
+                &self.false_sign_rate,
+                &self.sign_svalues,
+                &self.false_sign_or_small_rate,
+                &self.threshold_svalues,
+            ]
+            .iter()
+            .any(|v| v.as_ref().is_some_and(|v| v.len() != genes))
+            || self
+                .analysis
+                .intervals
+                .as_ref()
+                .is_some_and(|m| m.n_rows() != genes || m.n_cols() != 2)
+            || [
+                &self.analysis.contrast_mode,
+                &self.analysis.contrast_standard_deviation,
+            ]
+            .iter()
+            .any(|m| m.as_ref().is_some_and(|m| m.n_rows() != genes))
+            || (!self.analysis.grid_diagnostics.is_empty()
+                && self.analysis.grid_diagnostics.len() != genes)
+        {
+            return Err(invalid("posterior summary arrays have inconsistent shapes"));
+        }
+        if let (Some(mode), Some(sd)) = (
+            &self.analysis.contrast_mode,
+            &self.analysis.contrast_standard_deviation,
+        ) && mode.n_cols() != sd.n_cols()
+        {
+            return Err(invalid(
+                "posterior contrast arrays have inconsistent shapes",
+            ));
+        }
+        Ok(())
+    }
+
     pub fn coefficient_summary(
         &self,
         coefficient: usize,
@@ -124,6 +175,14 @@ impl NegativeBinomialPosterior {
     ) -> Result<PosteriorCoefficientSummary, DeseqError> {
         if coefficient >= self.mode.n_cols() {
             return Err(invalid("coefficient is outside posterior matrix"));
+        }
+        self.validate_summary_shapes()?;
+        if (self.sign_svalues.is_some() || self.threshold_svalues.is_some())
+            && self.summary_coefficient != Some(coefficient)
+        {
+            return Err(invalid(
+                "requested coefficient differs from the fitted probability summary coefficient",
+            ));
         }
         let factor = match scale {
             CoefficientScale::Natural => 1.0,
@@ -329,6 +388,7 @@ pub(super) fn fit_batch(
     let mut second_warnings = vec![];
     let shared_initial = random.as_deref_mut().map(|rng| rng.start_vector(p));
     for gene in 0..g {
+        options.analysis.work.check()?;
         let counts = (0..n)
             .map(|i| *input.counts.at(gene, i))
             .collect::<Vec<_>>();
@@ -562,6 +622,7 @@ pub(super) fn fit_batch(
                         dispersion,
                         &options.analysis,
                     );
+                    let mut grid_evaluations = 0usize;
                     if let Some(summary) = analysis.row(
                         super::analysis::AnalysisRow {
                             gene,
@@ -573,7 +634,13 @@ pub(super) fn fit_batch(
                             threshold: options.threshold,
                             flip_sign: options.flip_sign,
                         },
-                        |beta, shift| density.value(beta, shift),
+                        |beta, shift| {
+                            if grid_evaluations.is_multiple_of(256) {
+                                options.analysis.work.check()?;
+                            }
+                            grid_evaluations += 1;
+                            density.value(beta, shift)
+                        },
                     )? {
                         fsr.as_mut().unwrap()[gene] = summary.false_sign_rate;
                         if let Some(rates) = &mut fsos {
@@ -597,6 +664,7 @@ pub(super) fn fit_batch(
     let threshold_svalues = fsos.as_ref().map(|v| svalues(v)).transpose()?;
     warnings.extend(second_warnings);
     Ok(NegativeBinomialPosterior {
+        summary_coefficient: options.coefficient,
         mode: RowMajorMatrix::from_row_major(g, p, modes)?,
         standard_deviation: sd
             .map(|v| RowMajorMatrix::from_row_major(g, p, v))

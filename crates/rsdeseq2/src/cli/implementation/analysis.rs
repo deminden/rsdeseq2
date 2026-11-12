@@ -1,4 +1,6 @@
-fn cli_normalized_counts(
+use super::*;
+
+pub(super) fn cli_normalized_counts(
     counts: &crate::core::CountMatrix,
     normalization_factors: Option<PathBuf>,
     size_factors: Option<PathBuf>,
@@ -27,40 +29,39 @@ fn cli_normalized_counts(
     }
 }
 
-fn cli_fit_output((fit, results): (DeseqFit, DeseqResults)) -> CliAnalysisOutput {
-    let cooks = fit.cooks.clone();
+pub(super) fn cli_fit_output((fit, results): (DeseqFit, DeseqResults)) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results,
         fit: Some(fit),
         refit: None,
-        cooks,
+        cooks: None,
         refit_plan: None,
     }
 }
 
-fn cli_wald_replacement_output(output: CooksReplacementWaldOutput) -> CliAnalysisOutput {
-    let cooks = output.original_fit.cooks.clone();
+pub(super) fn cli_wald_replacement_output(output: CooksReplacementWaldOutput) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
         fit: Some(output.original_fit),
         refit: output.refit_fit,
-        cooks,
+        cooks: None,
         refit_plan: Some(output.refit_plan),
     }
 }
 
-fn cli_lrt_replacement_output(output: CooksReplacementLrtOutput) -> CliAnalysisOutput {
-    let cooks = output.original_fit.cooks.clone();
+pub(super) fn cli_lrt_replacement_output(output: CooksReplacementLrtOutput) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
         fit: Some(output.original_fit),
         refit: output.refit_fit,
-        cooks,
+        cooks: None,
         refit_plan: Some(output.refit_plan),
     }
 }
 
-fn cli_expanded_beta_prior_output(output: ExpandedBetaPriorWaldResults) -> CliAnalysisOutput {
+pub(super) fn cli_expanded_beta_prior_output(
+    output: ExpandedBetaPriorWaldResults,
+) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
         fit: None,
@@ -70,7 +71,7 @@ fn cli_expanded_beta_prior_output(output: ExpandedBetaPriorWaldResults) -> CliAn
     }
 }
 
-fn cli_expanded_beta_prior_replacement_output(
+pub(super) fn cli_expanded_beta_prior_replacement_output(
     output: ExpandedBetaPriorWaldReplacementResults,
 ) -> CliAnalysisOutput {
     CliAnalysisOutput {
@@ -82,7 +83,9 @@ fn cli_expanded_beta_prior_replacement_output(
     }
 }
 
-fn cli_factor_beta_prior_output(output: ExpandedFactorBetaPriorWaldResults) -> CliAnalysisOutput {
+pub(super) fn cli_factor_beta_prior_output(
+    output: ExpandedFactorBetaPriorWaldResults,
+) -> CliAnalysisOutput {
     CliAnalysisOutput {
         results: output.results,
         fit: None,
@@ -92,13 +95,13 @@ fn cli_factor_beta_prior_output(output: ExpandedFactorBetaPriorWaldResults) -> C
     }
 }
 
-fn cli_factor_beta_prior_replacement_output(
+pub(super) fn cli_factor_beta_prior_replacement_output(
     output: ExpandedFactorBetaPriorWaldReplacementResults,
 ) -> CliAnalysisOutput {
     cli_expanded_beta_prior_replacement_output(output.replacement)
 }
 
-fn cli_additive_beta_prior_output(
+pub(super) fn cli_additive_beta_prior_output(
     output: ExpandedAdditiveBetaPriorWaldResults,
 ) -> CliAnalysisOutput {
     CliAnalysisOutput {
@@ -110,14 +113,14 @@ fn cli_additive_beta_prior_output(
     }
 }
 
-fn cli_additive_beta_prior_replacement_output(
+pub(super) fn cli_additive_beta_prior_replacement_output(
     output: ExpandedAdditiveBetaPriorWaldReplacementResults,
 ) -> CliAnalysisOutput {
     cli_expanded_beta_prior_replacement_output(output.replacement)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cli_expanded_beta_prior_wald_analysis(
+pub(super) fn cli_expanded_beta_prior_wald_analysis(
     counts: &crate::core::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     expanded_design: PathBuf,
@@ -282,7 +285,7 @@ fn cli_expanded_beta_prior_wald_analysis(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cli_factor_beta_prior_wald_analysis(
+pub(super) fn cli_factor_beta_prior_wald_analysis(
     counts: &crate::core::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     factor: String,
@@ -460,7 +463,7 @@ fn cli_factor_beta_prior_wald_analysis(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cli_additive_beta_prior_wald_analysis(
+pub(super) fn cli_additive_beta_prior_wald_analysis(
     counts: &crate::core::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     factor_names: Vec<String>,
@@ -692,7 +695,7 @@ fn cli_additive_beta_prior_wald_analysis(
     }
 }
 
-fn cli_beta_prior_numeric_contrast(
+pub(super) fn cli_beta_prior_numeric_contrast(
     design: &crate::design::DesignMatrix,
     contrast: Option<Vec<f64>>,
     contrast_name: Option<String>,
@@ -719,7 +722,7 @@ fn cli_beta_prior_numeric_contrast(
     Ok(None)
 }
 
-fn parse_cli_coefficient_groups(
+pub(super) fn parse_cli_coefficient_groups(
     raw: &str,
     n_coefficients: usize,
     n_expanded_coefficients: usize,

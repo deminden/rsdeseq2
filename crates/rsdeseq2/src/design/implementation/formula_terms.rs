@@ -1,8 +1,12 @@
-fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, DeseqError> {
+use crate::errors::DeseqError;
+
+pub(super) fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, DeseqError> {
     let signed_terms = split_formula_signed_terms(rhs)?;
+    validate_expansion_input(rhs)?;
     let mut expanded = Vec::new();
     for (sign, term) in signed_terms {
         for expanded_term in expand_parenthesized_formula_term(&term)? {
+            check_expansion_size(expanded.len().saturating_add(1))?;
             expanded.push(apply_formula_term_sign(sign, expanded_term));
         }
     }
@@ -17,7 +21,7 @@ fn apply_formula_term_sign(sign: i8, term: String) -> String {
         .map_or_else(|| format!("- {term}"), ToOwned::to_owned)
 }
 
-fn join_formula_terms(terms: &[String]) -> String {
+pub(super) fn join_formula_terms(terms: &[String]) -> String {
     let mut joined = String::new();
     for term in terms {
         if joined.is_empty() {
@@ -33,7 +37,7 @@ fn join_formula_terms(terms: &[String]) -> String {
     joined
 }
 
-fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError> {
+pub(super) fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>, DeseqError> {
     let mut terms = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
@@ -173,10 +177,10 @@ fn expand_parenthesized_formula_in_operator(
     let inner = split_formula_additive_group(&pieces[0])?;
     let outer = split_formula_additive_group(&pieces[1])?;
     let alternatives = [outer, inner];
-    Ok(formula_alternative_products(&alternatives)
+    formula_alternative_products(&alternatives)?
         .into_iter()
-        .map(|product| product.join(":"))
-        .collect())
+        .map(|product| canonical_interaction(&product.join(":")))
+        .collect::<Result<_, _>>()
 }
 
 fn expand_parenthesized_formula_operator(
@@ -189,15 +193,15 @@ fn expand_parenthesized_formula_operator(
     }
     match delimiter {
         '*' => expand_parenthesized_star(&alternatives),
-        ':' => Ok(formula_alternative_products(&alternatives)
+        ':' => Ok(formula_alternative_products(&alternatives)?
             .into_iter()
-            .map(|product| product.join(":"))
-            .collect()),
+            .map(|product| canonical_interaction(&product.join(":")))
+            .collect::<Result<_, _>>()?),
         '/' => {
             let mut terms = Vec::new();
-            for product in formula_alternative_products(&alternatives) {
+            for product in formula_alternative_products(&alternatives)? {
                 for prefix_len in 1..=product.len() {
-                    push_unique_formula_term(&mut terms, product[..prefix_len].join(":"));
+                    push_unique_formula_term(&mut terms, product[..prefix_len].join(":"))?;
                 }
             }
             Ok(terms)
@@ -207,16 +211,25 @@ fn expand_parenthesized_formula_operator(
 }
 
 fn expand_parenthesized_star(alternatives: &[Vec<String>]) -> Result<Vec<String>, DeseqError> {
+    // Repeated operands are idempotent in R formula algebra. Remove them before
+    // enumerating subsets, preserving the first occurrence and its coding order.
+    let mut distinct = Vec::new();
+    for group in alternatives {
+        if !distinct.contains(group) {
+            distinct.push(group.clone());
+        }
+    }
+    let alternatives = distinct.as_slice();
     let mut terms = Vec::new();
     for group in alternatives {
         for term in group {
-            push_unique_formula_term(&mut terms, term.clone());
+            push_unique_formula_term(&mut terms, term.clone())?;
         }
     }
     for order in 2..=alternatives.len() {
-        for group_subset in formula_group_combinations(alternatives, order) {
-            for product in formula_alternative_products(&group_subset) {
-                push_unique_formula_term(&mut terms, product.join(":"));
+        for group_subset in formula_group_combinations(alternatives, order)? {
+            for product in formula_alternative_products(&group_subset)? {
+                push_unique_formula_term(&mut terms, product.join(":"))?;
             }
         }
     }
@@ -240,8 +253,8 @@ fn expand_parenthesized_formula_power(
     let max_order = order.min(terms.len());
     let mut expanded = Vec::new();
     for interaction_order in 1..=max_order {
-        for combination in formula_term_combinations(&terms, interaction_order) {
-            push_unique_formula_term(&mut expanded, combination.join(":"));
+        for combination in formula_term_combinations(&terms, interaction_order)? {
+            push_unique_formula_term(&mut expanded, combination.join(":"))?;
         }
     }
     Ok(expanded)
@@ -265,15 +278,11 @@ fn parse_formula_interaction_power(term: &str, exponent: &str) -> Result<usize, 
     let order = exponent
         .parse::<usize>()
         .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!(
-                "formula power term '{term}' requires a positive integer exponent"
-            ),
+            reason: format!("formula power term '{term}' requires a positive integer exponent"),
         })?;
     if order == 0 {
         return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula power term '{term}' requires a positive integer exponent"
-            ),
+            reason: format!("formula power term '{term}' requires a positive integer exponent"),
         });
     }
     Ok(order)
@@ -295,12 +304,12 @@ fn split_formula_additive_group(term: &str) -> Result<Vec<String>, DeseqError> {
     for piece in pieces {
         if formula_contains_unquoted_char(&piece, '-') {
             for expanded in simplify_signed_additive_formula_group(&piece)? {
-                push_unique_formula_term(&mut terms, expanded);
+                push_unique_formula_term(&mut terms, expanded)?;
             }
             continue;
         }
         for expanded in expand_parenthesized_formula_term(&piece)? {
-            push_unique_formula_term(&mut terms, expanded);
+            push_unique_formula_term(&mut terms, expanded)?;
         }
     }
     Ok(terms)
@@ -320,7 +329,7 @@ fn simplify_signed_additive_formula_group(term: &str) -> Result<Vec<String>, Des
             continue;
         }
         for expanded in expand_parenthesized_formula_term(&signed_term)? {
-            push_unique_formula_term(&mut terms, expanded);
+            push_unique_formula_term(&mut terms, expanded)?;
         }
     }
     Ok(terms)
@@ -341,13 +350,13 @@ fn expand_signed_additive_formula_group(term: &str) -> Result<Vec<String>, Deseq
     let mut terms = Vec::new();
     for (sign, signed_term) in signed_terms {
         for expanded in expand_parenthesized_formula_term(&signed_term)? {
-            push_unique_formula_term(&mut terms, apply_formula_term_sign(sign, expanded));
+            push_unique_formula_term(&mut terms, apply_formula_term_sign(sign, expanded))?;
         }
     }
     Ok(terms)
 }
 
-fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
+pub(super) fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
     let mut stripped = term.trim();
     loop {
         if !(stripped.starts_with('(') && stripped.ends_with(')')) {
@@ -406,7 +415,10 @@ fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqError> {
     }
 }
 
-fn split_formula_top_level(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
+pub(super) fn split_formula_top_level(
+    term: &str,
+    delimiter: char,
+) -> Result<Vec<String>, DeseqError> {
     let mut pieces = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
@@ -543,14 +555,11 @@ fn formula_contains_unquoted_char(term: &str, needle: char) -> bool {
     false
 }
 
-fn formula_contains_top_level(term: &str, delimiter: char) -> Result<bool, DeseqError> {
+pub(super) fn formula_contains_top_level(term: &str, delimiter: char) -> Result<bool, DeseqError> {
     Ok(split_formula_top_level(term, delimiter)?.len() > 1)
 }
 
-fn split_formula_top_level_operator(
-    term: &str,
-    operator: &str,
-) -> Result<Vec<String>, DeseqError> {
+fn split_formula_top_level_operator(term: &str, operator: &str) -> Result<Vec<String>, DeseqError> {
     let mut pieces = Vec::new();
     let mut depth = 0_i32;
     let mut in_backticks = false;
@@ -638,7 +647,15 @@ fn split_formula_top_level_operator(
     Ok(pieces)
 }
 
-fn formula_alternative_products(alternatives: &[Vec<String>]) -> Vec<Vec<String>> {
+fn formula_alternative_products(
+    alternatives: &[Vec<String>],
+) -> Result<Vec<Vec<String>>, DeseqError> {
+    let size = alternatives.iter().try_fold(1usize, |n, group| {
+        let size = n.saturating_mul(group.len());
+        check_expansion_size(size)?;
+        Ok::<_, DeseqError>(size)
+    })?;
+    check_expansion_size(size)?;
     let mut products: Vec<Vec<String>> = vec![Vec::new()];
     for group in alternatives {
         let mut next = Vec::new();
@@ -651,10 +668,14 @@ fn formula_alternative_products(alternatives: &[Vec<String>]) -> Vec<Vec<String>
         }
         products = next;
     }
-    products
+    Ok(products)
 }
 
-fn formula_group_combinations(groups: &[Vec<String>], order: usize) -> Vec<Vec<Vec<String>>> {
+fn formula_group_combinations(
+    groups: &[Vec<String>],
+    order: usize,
+) -> Result<Vec<Vec<Vec<String>>>, DeseqError> {
+    check_combination_count(groups.len(), order)?;
     fn push_group_combinations(
         groups: &[Vec<String>],
         order: usize,
@@ -674,14 +695,18 @@ fn formula_group_combinations(groups: &[Vec<String>], order: usize) -> Vec<Vec<V
         }
     }
     if order == 0 || order > groups.len() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mut output = Vec::new();
     push_group_combinations(groups, order, 0, &mut Vec::new(), &mut output);
-    output
+    Ok(output)
 }
 
-fn formula_term_combinations(terms: &[String], order: usize) -> Vec<Vec<String>> {
+fn formula_term_combinations(
+    terms: &[String],
+    order: usize,
+) -> Result<Vec<Vec<String>>, DeseqError> {
+    check_combination_count(terms.len(), order)?;
     fn push_term_combinations(
         terms: &[String],
         order: usize,
@@ -701,15 +726,100 @@ fn formula_term_combinations(terms: &[String], order: usize) -> Vec<Vec<String>>
         }
     }
     if order == 0 || order > terms.len() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mut output = Vec::new();
     push_term_combinations(terms, order, 0, &mut Vec::new(), &mut output);
-    output
+    Ok(output)
 }
 
-fn push_unique_formula_term(terms: &mut Vec<String>, term: String) {
+fn push_unique_formula_term(terms: &mut Vec<String>, term: String) -> Result<(), DeseqError> {
+    let term = canonical_interaction(&term)?;
     if !terms.iter().any(|candidate| candidate == &term) {
+        check_expansion_size(terms.len().saturating_add(1))?;
         terms.push(term);
     }
+    Ok(())
+}
+
+const MAX_EXPANDED_TERMS: usize = 16_384;
+
+fn check_expansion_size(size: usize) -> Result<(), DeseqError> {
+    if size > MAX_EXPANDED_TERMS {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("formula expansion exceeds {MAX_EXPANDED_TERMS} terms"),
+        });
+    }
+    Ok(())
+}
+
+fn check_combination_count(n: usize, order: usize) -> Result<(), DeseqError> {
+    if order > n {
+        return Ok(());
+    }
+    let k = order.min(n - order);
+    let mut size = 1u128;
+    for i in 0..k {
+        size = size.saturating_mul((n - i) as u128) / (i + 1) as u128;
+        if size > MAX_EXPANDED_TERMS as u128 {
+            return check_expansion_size(usize::MAX);
+        }
+    }
+    Ok(())
+}
+
+fn canonical_interaction(term: &str) -> Result<String, DeseqError> {
+    let mut variables = Vec::new();
+    for variable in split_formula_top_level(term, ':')? {
+        let identity = variable
+            .strip_prefix('`')
+            .and_then(|v| v.strip_suffix('`'))
+            .unwrap_or(&variable);
+        if !variables.iter().any(|existing: &String| {
+            existing
+                .strip_prefix('`')
+                .and_then(|v| v.strip_suffix('`'))
+                .unwrap_or(existing)
+                == identity
+        }) {
+            variables.push(variable);
+        }
+    }
+    Ok(variables.join(":"))
+}
+
+pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), DeseqError> {
+    if rhs.len() > 1_048_576 {
+        return Err(DeseqError::InvalidOptions {
+            reason: "formula exceeds 1 MiB".into(),
+        });
+    }
+    // Syntax validation remains in the parser; this preflight bounds recursive
+    // group expansion while ignoring parentheses in strings and quoted names.
+    let mut depth = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    for c in rhs.chars() {
+        if let Some(q) = quote {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == q {
+                quote = None;
+            }
+        } else if matches!(c, '\'' | '"' | '`') {
+            quote = Some(c);
+        } else if c == '(' {
+            depth += 1;
+            if depth > 128 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: "formula nesting exceeds 128 levels".into(),
+                });
+            }
+        } else if c == ')' {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    Ok(())
 }

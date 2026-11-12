@@ -59,6 +59,7 @@ fn formula_design_with_column_order<'a>(
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     fitting_order: bool,
 ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
+    validate_expansion_input(formula)?;
     let rhs = formula_rhs(formula)?;
     let (rhs, offsets) = extract_formula_offsets(rhs, factors, numeric_covariates)?;
     let (rhs, derived_factor_covariates) = expand_formula_factor_transform_terms(&rhs, factors)?;

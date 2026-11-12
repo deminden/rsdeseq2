@@ -339,3 +339,45 @@ mod tests {
         }
     }
 }
+
+// Only the synchronous originating R thread owns this callback. The C callback
+// catches R's nonlocal jump with R_ToplevelExec before returning to Rust.
+type InterruptCallback = extern "C" fn() -> i32;
+thread_local! {
+    static INTERRUPT: std::cell::Cell<Option<InterruptCallback>> = const { std::cell::Cell::new(None) };
+    static LAST_POLL: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
+}
+fn poll_interrupt() -> bool {
+    let due = LAST_POLL.with(|last| {
+        if last
+            .get()
+            .is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(50))
+        {
+            return false;
+        }
+        last.set(Some(std::time::Instant::now()));
+        true
+    });
+    due && INTERRUPT.with(|slot| slot.get().is_some_and(|check| check() != 0))
+}
+/// # Safety
+/// Same buffer/owner contract as formula_request. The callback must return
+/// normally and remain valid until this synchronous call returns.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rsdeseq2_r_formula_request_interruptible(
+    input: *const u8,
+    size: usize,
+    output: *mut *mut FormulaOutput,
+    callback: Option<InterruptCallback>,
+) -> i32 {
+    struct Reset(Option<InterruptCallback>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            INTERRUPT.with(|s| s.set(self.0));
+            LAST_POLL.with(|s| s.set(None));
+        }
+    }
+    let _reset = Reset(INTERRUPT.with(|s| s.replace(callback)));
+    LAST_POLL.with(|s| s.set(None));
+    unsafe { rsdeseq2_r_formula_request(input, size, output) }
+}
