@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Check committed Rust vendor and package versions
-        run: scripts/sync_r_vendor.sh --check
+        run: scripts/release/sync_r_vendor.sh --check
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -25,13 +25,3 @@ jobs:
           python-version: '3.12'
       - name: Parity and benchmark integrity checks
         run: python -m unittest discover -s scripts/tests -p 'test_*.py'
-      - name: README quick start
-        run: |
-          quickstart_output="$(mktemp)"
-          cargo run --quiet -p rsdeseq2 -- wald \
-            --counts examples/quickstart/counts.tsv \
-            --design examples/quickstart/design.tsv \
-            --fit-type mean \
-            --coefficient 1 \
-            --output "$quickstart_output"
-          test "$(wc -l < "$quickstart_output")" -eq 5

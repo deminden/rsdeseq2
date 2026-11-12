@@ -3,12 +3,12 @@ import json
 import os
 from pathlib import Path
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import tempfile
 import unittest
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import release_artifact_manifest as release
+import scripts.release.release_artifact_manifest as release
 
 
 class ReleaseArtifacts(unittest.TestCase):

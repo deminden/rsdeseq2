@@ -15,7 +15,7 @@ pub fn reference_file(name: &str) -> PathBuf {
     let path = reference_dir().join(name);
     assert!(
         path.is_file(),
-        "required DESeq2 reference missing: {}; regenerate with scripts/generate_deseq2_references.R",
+        "required DESeq2 reference missing: {}; regenerate with scripts/references/generate_deseq2_references.R",
         path.display()
     );
     path

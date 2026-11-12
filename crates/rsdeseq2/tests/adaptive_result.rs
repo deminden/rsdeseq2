@@ -1,6 +1,6 @@
 use std::error::Error;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/adaptive.rs"]
+#[path = "../tools/validation/evaluate_r_interface/adaptive.rs"]
 mod adaptive;
 fn bits(value: f64) -> String {
     format!("{:016x}", value.to_bits())

@@ -3,14 +3,14 @@
 mod support;
 use support::*;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/ashr_output.rs"]
+#[path = "../tools/validation/evaluate_r_interface/ashr_output.rs"]
 mod ashr_output;
 use rsdeseq2::shrinkage::*;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/em_fit.rs"]
+#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
 mod em_fit;
 #[allow(dead_code)]
-#[path = "../examples/evaluate_r_interface/location_shrinkage.rs"]
+#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
 
 #[test]

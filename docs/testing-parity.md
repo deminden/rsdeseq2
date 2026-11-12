@@ -4,13 +4,13 @@ The [current supported contract](native-supported-contract.md) maps the complete
 public wrapper surface to numerical owners, independent accuracy references and
 actual standalone/wrapped checks. Reports below retain their original checkpoint
 scope; old outstanding-method descriptions are not the current method inventory.
-The [final local acceptance audit](final-plan-local-acceptance.md) now records
+The [final local acceptance audit](history/final-plan-local-acceptance.md) now records
 1,154 passing Rust tests, 2,867 R assertions and 49 Python tests, current
 GTEx/held-out checks, actual interface identity, MSRV, sanitizers and paired
-speed/RSS measurements. The later [development validation](dev-validation-2026-11-12.md)
+speed/RSS measurements. The later [development validation](history/dev-validation-2026-11-12.md)
 closes C23 with actual current CI and a verified local source bundle. Historical
 counts and measurements retain their recorded source/platform scope.
-The [warning/platform follow-up](native-sqp-warning-platform-gates.md) adds fresh
+The [warning/platform follow-up](history/native-sqp-warning-platform-gates.md) adds fresh
 platform reference inputs to the existing formula/SQP tests and asserts the
 original warning sequence. The pinned Linux lane must generate and test those
 references; the pinned Linux lane now passes those checks, alongside the fresh
@@ -18,7 +18,7 @@ bounded-posterior reference. See the [Linux arithmetic notes](linux_numerical_pa
 
 ## Focused suite organization
 
-The [November 12 refactor](refactoring-focused-2026-11-12.md) keeps one Cargo
+The [November 12 refactor](history/refactoring-focused-2026-11-12.md) keeps one Cargo
 integration executable per reference/CLI suite, with child modules grouped by
 workflow. All 73 moved Rust test bodies and 20 R integration bodies retain their
 original assertions and tolerances. Reference scalar/missing-value comparison is
@@ -28,29 +28,29 @@ Use `testthat::test_dir(..., filter = "^fit-integration")` for the full group.
 
 ## Historical migration checkpoints
 
-The preceding [combined-suite audit](native-plan-audit-development.md) passes
+The preceding [combined-suite audit](history/native-plan-audit-development.md) passes
 1,153 Rust tests and the supported Python suite. It also reproduces a default
 ashr numerical failure in the existing 18-gene subset test. That test and its
 bound remain intact; the full R suite was not certified green at that checkpoint.
 That describes the preceding checkpoint. The later
-[sparse SQP correction](native-sparse-sqp-development.md) passes the same test
+[sparse SQP correction](history/native-sparse-sqp-development.md) passes the same test
 and adds nine original complete/primitive profiles with direct interface gates.
 Its source-package check and current evidence are recorded separately.
 
 Local default ashr and negative-binomial apeglm migration checks are recorded
-separately in [ashr development](shrinkage-component-development.md) and
-[apeglm development](native-apeglm-development.md). They combine independent
+separately in [ashr development](history/shrinkage-component-development.md) and
+[apeglm development](history/native-apeglm-development.md). They combine independent
 original-package numerical references with direct native/R-free output-bit
 comparisons and blocked R statistical calls. Advanced optional methods and the
 final combined suite/performance/memory/artifact gates remain open.
-The later [general-regression checkpoint](native-regression-development.md)
+The later [general-regression checkpoint](history/native-regression-development.md)
 covers translated likelihoods and analytic `nbinomR`, with independent
 high-precision density checks where original R loses tail precision.
-The [beta-binomial checkpoint](native-beta-binomial-development.md) adds three
+The [beta-binomial checkpoint](history/native-beta-binomial-development.md) adds three
 logit methods, saturated-row optimizer checks and explicit native warning
 comparisons. Source warning counts and failure-reason wording can differ near
 floating-point plateaus; these differences remain visible in the report.
-The [random-start checkpoint](native-random-start-development.md) adds frozen
+The [random-start checkpoint](history/native-random-start-development.md) adds frozen
 uniform/normal/state tables, 164 posterior profiles and public-session state
 checks, including error handling and integer-NA state-word bits.
 
@@ -65,7 +65,7 @@ the frozen 44 input/reference hashes. With the preserved current accepted
 exports and matching native R environment:
 
 ```sh
-python3 scripts/benchmark_gtex_native_wald.py --repeats 1 \
+python3 scripts/benchmarks/benchmark_gtex_native_wald.py --repeats 1 \
   --rscript "$R_SCRIPT" \
   --validated-results-root "$REVIEWED_EXPORTS" \
   --validated-output-hashes "$REVIEWED_HASH_MANIFEST" \
@@ -280,7 +280,7 @@ Rust case in routine runs; missing fixtures are never reported as passed cases.
 
 Before accepting numerical or performance changes, also replay all eleven
 biological/random full-data contrasts using the commands in the
-[GTEx benchmark documentation](gtex-native-wald-benchmark.md). The compact panel
+[GTEx benchmark documentation](reports/gtex-native-wald-benchmark.md). The compact panel
 complements that release gate; it does not establish parity for every gene,
 contrast or estimator by itself.
 
@@ -300,7 +300,7 @@ no numerical runtime code or R wrapper functions changed.
 
 ## Standalone batch checkpoint — 2026-10-30
 
-The [batch checkpoint](rust-only-result-batches-2026-10-30.md) supersedes the
+The [batch checkpoint](history/rust-only-result-batches-2026-10-30.md) supersedes the
 removed R-backed implementation's acceptance claims. Native R 4.6.2 validates
 1,488 assertions with no failures, warnings or skips and source-package Status
 OK. Rust passes 1,045 tests, with the existing opt-in full-GTEx case excluded
@@ -320,13 +320,13 @@ instrumentation exclusions are recorded in the checkpoint.
 
 BH/filtering, inference probabilities, contrast projection and contrast-zero
 rules now use the standalone Rust engine. Remaining R calculations are listed in
-the [migration inventory](rust-only-wrapper-migration.md); no reference or
+the [migration inventory](history/rust-only-wrapper-migration.md); no reference or
 precision bound has been relaxed to close a gate. Earlier checkpoint numbers and
 measurements remain in their linked historical reports.
 
 ## Shared Cook/refit checkpoint — 2026-10-30
 
-The [Cook/refit checkpoint](rust-only-cooks-policy-2026-10-30.md) passes 1,049
+The [Cook/refit checkpoint](history/rust-only-cooks-policy-2026-10-30.md) passes 1,049
 Rust tests, one backend test and 45 Python checks. The final R source package
 has Status OK, 1,510 assertions, no failures/warnings/skips and 262 source files
 matching the working tree. Direct standalone/wrapped comparisons cover 101
@@ -354,44 +354,44 @@ wrapper tie rule for this migration; they do not establish full DESeq2 Cook's
 parity for those edges. The checkpoint and completion audit keep the required
 independent correction open.
 
-The local [posterior analysis checkpoint](native-posterior-analysis-development.md)
+The local [posterior analysis checkpoint](history/native-posterior-analysis-development.md)
 adds forty original-apeglm profiles and sixteen fixed-mode grid queries. Native
 and wrapped full analysis outputs agree exactly with R statistical calculations
 blocked. Original mesh interval allowances and three deliberate source-bug
 corrections are documented separately from unchanged MAP/SD/sign precision gates.
 
-The local [ashr optimizer checkpoint](native-ashr-optimizer-development.md) adds
+The local [ashr optimizer checkpoint](history/native-ashr-optimizer-development.md) adds
 96 complete batches and 97 captured primitive problems, with exact native/wrapped
 output, original iteration/convergence checks, unchanged numerical bounds and
 independent categorical/Dirichlet solutions. Original compiled convergence and
 diagnostic bugs retain their unmodified observations beside explicit corrections.
 
-The local [advanced optimizer checkpoint](native-ashr-advanced-optimizer-development.md)
+The local [advanced optimizer checkpoint](history/native-ashr-advanced-optimizer-development.md)
 adds 54 full/primitive requests, independent affine fixed points and 90-decimal
 convex KKT certificates. Native/wrapped outputs and controlled rejection decisions
 are exact. Original Mosek-backed mixIP is not executed; unregularized original SQP
 and the independent certificates provide separately identified convex references.
 
-The local [output-selection checkpoint](native-ashr-output-development.md) adds
+The local [output-selection checkpoint](history/native-ashr-output-development.md) adds
 67 original-package selection/missingness cases with exact native/wrapped output
 bits and six public 128-gene profiles. Conjugate normal checks also run in the R
 posterior test file. Numeric levels and exact subsets preserve absent fields and
 unchanged numerical bounds; positive thresholds require means and fitted priors.
 
-The local [estimated-mode checkpoint](native-ashr-mode-development.md) adds 26
+The local [estimated-mode checkpoint](history/native-ashr-mode-development.md) adds 26
 original search profiles, exact native/wrapped requests and six public workflows.
 Bounds/counts, posterior/likelihood precision, analytical normal optima and unused
 invalid moment expressions are checked. R scalar optimizers are explicitly
 blocked; twelve earlier complete replay sets retain exact outputs.
 
-The local [SQP-control checkpoint](native-sqp-control-development.md) adds 33
+The local [SQP-control checkpoint](history/native-sqp-control-development.md) adds 33
 complete and primitive profiles, including genuine rank-six/seven truncation,
 independent exact-SVD references and analytical direction-cutoff checks. Both
 original and independent spectral outputs retain `2e-6` bounds. Complete R/native
 output bits agree, six public profiles pass, and thirteen accepted replay sets
 remain exact. Original verbose/advisory formatting remains in the authority audit.
 
-The local [continuous-likelihood checkpoint](native-continuous-likelihood-development.md)
+The local [continuous-likelihood checkpoint](history/native-continuous-likelihood-development.md)
 adds eleven kernel profiles and 21 complete batches with independent original-ashr
 references. Actual native/wrapped outputs agree exactly with R math blocked.
 Seven public profiles retain unchanged bounds, one invalid profile rejects in
@@ -399,39 +399,39 @@ both engines, and fifteen accepted replay sets remain exact. Tail-cancellation
 cases guard ordinary CDF arithmetic; analytical logistic and quadrature checks
 provide independent solutions alongside source parity.
 
-The local [count-likelihood checkpoint](native-count-likelihood-development.md)
+The local [count-likelihood checkpoint](history/native-count-likelihood-development.md)
 adds twelve kernel, 24 complete and twelve estimated-mode profiles. Native/wrapped
 output bits agree with R calculations blocked. Sixteen public count profiles
 cover fixed/default modes, automatic grids and default FDR across four links.
 Seventeen earlier accepted replay sets remain exact. Analytical gamma/beta
 identities and mixed-row batch-orientation cases supplement original references.
 
-The [large-shape correction](native-large-shape-development.md) adds 41 original
+The [large-shape correction](history/native-large-shape-development.md) adds 41 original
 kernel profiles and independent 100-decimal density truths. All 41 actual
 native/wrapped batches are exact and twenty earlier replay sets are unchanged.
 A production-R AST guard, also run by the R CI workflow, rejects numerical calls
 without mistaking quoted templates for execution. Its lexical scope does not
 replace runtime firewalls or the final authority audit.
 
-The [capture/control checkpoint](native-capture-policy-development.md) adds
+The [capture/control checkpoint](history/native-capture-policy-development.md) adds
 eight canonical matrix/recycling kernel, 18 complete capture and twelve compiled
 method profiles. All 38 actual native/wrapped batches agree exactly with R math
 blocked. Original-only generators record genuine refinement calls and independent
 rejections; eight public profiles retain unchanged bounds and all 21 earlier
 accepted panels are exact. The 207 existing oracle files remain unchanged.
 
-The [general/beta-binomial policy follow-up](native-regression-method-policy-development.md)
+The [general/beta-binomial policy follow-up](history/native-regression-method-policy-development.md)
 adds 21 independent method-control profiles, including four controlled errors
 and genuine source-traced refinement. All 21 actual native/wrapped outputs are
 exact; 24 earlier accepted panels and all 209 prior oracle files are unchanged.
 R frontend checks also cover malformed controls that original dispatch ignores.
 
-The [fit-route audit](native-fit-route-audit.md) removes duplicate R LRT degrees
+The [fit-route audit](history/native-fit-route-audit.md) removes duplicate R LRT degrees
 of freedom and adapter test dispatch. All 189 actual result-interface cases and
 four complete paired fitted-workflow payloads remain exact. One/two-df LRT and
 Wald NULL/type assertions supplement the existing fit and malformed-boundary tests.
 
-The [fresh-fit checker](native-fresh-fit-development.md) compares actual public
+The [fresh-fit checker](history/native-fresh-fit-development.md) compares actual public
 R fits with R-free fits for 24 requests, with R math blocked and raw floating-point
 bits preserved. It includes required successful parametric/local/mean fits,
 weighted replacement and normalization, serial/four-worker identity, unnamed
@@ -439,7 +439,7 @@ matrix metadata and controlled rejections. It runs in both R CI lanes. The new
 original-only weighted fixture isolates replacement summaries from optimizer
 variation; an expanded-prior test also retains a hand-calculated weighted mean.
 
-The [later-query follow-up](native-replacement-query-development.md) reuses those
+The [later-query follow-up](history/native-replacement-query-development.md) reuses those
 fits for 86 numerical requests. All seven query columns, missing-value bits and
 complete filtering numerical metadata agree. It covers reversed/fractional
 contrasts, no eligible replacement samples, zero/disabled/automatic Cook cutoffs,
@@ -448,21 +448,21 @@ explicit caller missing marker; runtime negative controls also block R lowess,
 quantile and adjustment execution. Original-DESeq2 state parity remains a
 separate requirement from agreement between the two interfaces.
 
-The [weighted state panel](weighted-replacement-state-correction.md) adds eight
+The [weighted state panel](history/weighted-replacement-state-correction.md) adds eight
 actual original-DESeq2 fits with validated public missingness/convergence fields.
 It exposes four old flag failures without changing earlier reference files or
 bounds. The fresh-fit checker now covers 31 fitting requests and 113 later
 queries, including failed-weight rows with no refits, ordinary replacement and
 new-zero-only replacement in both tests.
 
-The [execution panel](replacement-execution-correction.md) traces original
+The [execution panel](history/replacement-execution-correction.md) traces original
 DESeq2 to distinguish skipped refits from output-equivalent unnecessary work.
 Its eight profiles and two positive controls back one 32-case native/fixed
 regression matrix; an existing expanded-prior fixture covers four more routes.
 All 31 complete fresh-fit payloads and 113 later queries retain their previous
 bits. No timing threshold substitutes for the structural execution check.
 
-The [formula-fit panel](native-formula-fit-development.md) adds 32 independent
+The [formula-fit panel](history/native-formula-fit-development.md) adds 32 independent
 original-R matrices/offsets without column mapping. Complete public native
 formula fits and later numeric/character requests are separately checked against
 actual wrapped workflows under the R numerical firewall in both R CI lanes.
@@ -470,13 +470,13 @@ Matrix-workflow identity now includes effective normalization and full/reduced
 design arrays as well as the previous fitted/result fields. Previously absent
 fields are excluded only when comparing against the older saved schema.
 
-The [likelihood warning panel](native-likelihood-warning-development.md) adds 34
+The [likelihood warning panel](history/native-likelihood-warning-development.md) adds 34
 independent selected-output cases and two mode-search traces. It requires exact
 warning message order/count alongside the existing numerical gates. Both R CI
 lanes compare actual native/wrapped bits with R math/search blocked; targeted R
 tests separately call original ashr. Twenty-seven prior replay sets remain exact.
 
-The [fixed-prior control panel](native-fixed-prior-controls-development.md) adds
+The [fixed-prior control panel](history/native-fixed-prior-controls-development.md) adds
 18 required successes and eight required rejections from original ashr. It
 corrects twelve old standalone acceptance decisions without changing any old
 oracle or bound. Both R CI lanes verify actual interface bits with R math blocked;
@@ -485,7 +485,7 @@ six cached public profiles and targeted R tests cover the public adapter.
 
 ## Platform-sensitive uniform CDF references
 
-The [review corrections](review-fixes-2026-11-12.md) document independent base-R
+The [review corrections](reports/review-fixes-2026-11-12.md) document independent base-R
 CDF calibration for Windows and Intel macOS, where near-coincident normal log
 probabilities round differently from the ARM reference. The release-target panel
 retains the original bounds and other frozen posterior fields. It checks every

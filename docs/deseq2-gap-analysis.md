@@ -96,7 +96,7 @@ The default dispersion mean selection now follows DESeq2's saturated-group
 rule. On the versioned GTEx unblocked contrast comparison, this removes the
 previous systematic gene-wise/trend/MAP gap and reduces each targeted maximum
 by at least 664-fold. Six blocked controls retain their existing error limits.
-See [the correction and measurements](gtex-dispersion-improvement.md).
+See [the correction and measurements](history/gtex-dispersion-improvement.md).
 
 ### Full GLM Fitting
 
@@ -201,7 +201,7 @@ Important generated references live under:
 
 The generator is:
 
-- `scripts/generate_deseq2_references.R`
+- `scripts/references/generate_deseq2_references.R`
 
 ## Benchmark Interpretation
 

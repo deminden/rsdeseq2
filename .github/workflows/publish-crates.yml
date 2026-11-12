@@ -29,7 +29,7 @@ jobs:
           path: validated
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify successful source validation
-        run: python3 scripts/release_artifact_manifest.py verify validated
+        run: python3 scripts/release/release_artifact_manifest.py verify validated
 
       - name: Check tag matches crate version
         run: |
@@ -46,7 +46,7 @@ jobs:
       - name: Stage the checked crate source
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python3 scripts/stage_release_crate.py
+        run: python3 scripts/release/stage_release_crate.py
 
       - name: Package
         run: cargo package -p rsdeseq2 --locked --allow-dirty

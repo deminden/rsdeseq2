@@ -4,16 +4,16 @@ import json
 import math
 from pathlib import Path
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import tempfile
 import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT/'scripts'))
-import check_gtex_dispersion_improvement as parity
-import benchmark_gtex_native_wald as benchmark
-import generate_gtex_mode_contrasts as contrasts
-import generate_gtex_compact_fixture as compact
+import scripts.validation.check_gtex_dispersion_improvement as parity
+import scripts.benchmarks.benchmark_gtex_native_wald as benchmark
+import scripts.references.generate_gtex_mode_contrasts as contrasts
+import scripts.references.generate_gtex_compact_fixture as compact
 
 
 def write(path, rows, columns=('gene','value')):

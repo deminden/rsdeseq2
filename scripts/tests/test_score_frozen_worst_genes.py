@@ -6,10 +6,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCORER = ROOT / "scripts" / "score_frozen_worst_genes.py"
+SCORER = ROOT / "scripts/validation" / "score_frozen_worst_genes.py"
 
 
 class FrozenWorstGeneScorerTests(unittest.TestCase):

@@ -1,6 +1,8 @@
 """Precision gates for the explicitly opted-in fitted provenance migration."""
 import os
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import shutil
 import subprocess
 import tempfile
@@ -52,7 +54,7 @@ for(name in names(variants))saveRDS(variants[[name]](b),file.path(directory,past
                     report = directory/'report.tsv'
                     report.unlink(missing_ok=True)
                     result = subprocess.run([RSCRIPT, '--vanilla',
-                        str(ROOT/'scripts/compare_r_workflow_payloads.R'),
+                        str(ROOT/'scripts/validation/compare_r_workflow_payloads.R'),
                         str(directory/'a.rds'), str(directory/f'{name}.rds'),
                         'two_group_results', mode, str(report)], capture_output=True, text=True)
                     self.assertEqual(result.returncode == 0, succeeds, result.stdout+result.stderr)
@@ -106,7 +108,7 @@ for(name in names(variants))saveRDS(variants[[name]](b),file.path(directory,past
                     report = directory/'report.tsv'
                     report.unlink(missing_ok=True)
                     result = subprocess.run([RSCRIPT, '--vanilla',
-                        str(ROOT/'scripts/compare_r_workflow_payloads.R'),
+                        str(ROOT/'scripts/validation/compare_r_workflow_payloads.R'),
                         str(directory/'a.rds'), str(directory/f'{name}.rds'), workflow,
                         mode, str(report), R_LIBRARY], capture_output=True, text=True)
                     self.assertEqual(result.returncode == 0, succeeds, result.stdout+result.stderr)

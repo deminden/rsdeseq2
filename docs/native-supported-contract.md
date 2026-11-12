@@ -1,13 +1,13 @@
 # Current standalone and R wrapper contract
 
 This inventory describes development on `dev` after the published 0.4.0
-source. The [final validation](dev-validation-2026-11-12.md) records accepted
+source. The [final validation](history/dev-validation-2026-11-12.md) records accepted
 Rust/R/platform checks, the Linux arithmetic corrections and local source bundle.
-The [focused refactor report](refactoring-focused-2026-11-12.md) records the
+The [focused refactor report](history/refactoring-focused-2026-11-12.md) records the
 subsequent module/test/generator restructuring and its unchanged numerical
 contract. The table maps the supported public surface to its numerical owner and evidence;
-it does not claim complete DESeq2 compatibility or authorize publication. The original [C01–C23 plan](codebase-improvement-plan-2026-10-22.md)
-and [one-engine requirement](rust-only-wrapper-migration.md) remain authoritative.
+it does not claim complete DESeq2 compatibility or authorize publication. The original [C01–C23 plan](history/codebase-improvement-plan-2026-10-22.md)
+and [one-engine requirement](history/rust-only-wrapper-migration.md) remain authoritative.
 
 ## Numerical ownership
 
@@ -22,14 +22,14 @@ the numerical-owner column are relative to `crates/rsdeseq2/src/`.
 
 | Public R entry points | Numerical owner | Independent accuracy and interface evidence |
 | --- | --- | --- |
-| `DESeq`, `fitRust`, `estimateDispersionsRust` | `core/implementation/builder/`, `normalization.rs`, `dispersion/`, `glm/`; `core/replacement_fit.rs` merges replacement fits | Original DESeq2 dispersion/Wald/LRT fixtures; [fresh fits](native-fresh-fit-development.md), [weighted state](weighted-replacement-state-correction.md), and [replacement execution](replacement-execution-correction.md). Actual interface checks cover 31 matrix requests and 113 later queries. |
-| `results`, `resultsList`, `resultsNames`, `resultsNamesRust`, `resolveResultsContrastRust` | `contrasts/`, `core/fitted_results.rs`, `results/request.rs`, `glm/inference.rs`, `glm/inference_primitives.rs`, `results/cooks_policy.rs`, `results/replacement_policy.rs`, `independent_filtering.rs` | Original contrast/tail/filter references; [borrowed batches](rust-only-result-batches-2026-10-30.md), [Cook/refit policy](rust-only-cooks-policy-2026-10-30.md), and [later queries](native-replacement-query-development.md). Names and selector translation are adapter metadata; statistics use the shared kernels. |
+| `DESeq`, `fitRust`, `estimateDispersionsRust` | `core/implementation/builder/`, `normalization.rs`, `dispersion/`, `glm/`; `core/replacement_fit.rs` merges replacement fits | Original DESeq2 dispersion/Wald/LRT fixtures; [fresh fits](history/native-fresh-fit-development.md), [weighted state](history/weighted-replacement-state-correction.md), and [replacement execution](history/replacement-execution-correction.md). Actual interface checks cover 31 matrix requests and 113 later queries. |
+| `results`, `resultsList`, `resultsNames`, `resultsNamesRust`, `resolveResultsContrastRust` | `contrasts/`, `core/fitted_results.rs`, `results/request.rs`, `glm/inference.rs`, `glm/inference_primitives.rs`, `results/cooks_policy.rs`, `results/replacement_policy.rs`, `independent_filtering.rs` | Original contrast/tail/filter references; [borrowed batches](history/rust-only-result-batches-2026-10-30.md), [Cook/refit policy](history/rust-only-cooks-policy-2026-10-30.md), and [later queries](history/native-replacement-query-development.md). Names and selector translation are adapter metadata; statistics use the shared kernels. |
 | `waldFitRust`, `lrtFitRust`, `nbinomWaldTestRust`, `nbinomLRTRust` | Primitive fit packaging forwards inference to the same `glm/`, `contrasts/` and `results/` kernels | `test-primitive-routes.R`, `test-results-object-inputs.R`, and `check_rust_r_identity.R` exercise packaging, overrides, stored Wald/LRT dispatch and missing context. These constructors do not perform a new count fit. |
 | `estimateSizeFactorsRust`, `normalizedCountsRust`, `baseMeanRust`, `baseMetadataRust` | `normalization.rs`, `normalization/offsets.rs`, `matrix/` | Original normalization/weighted metadata fixtures, `row_preparation.rs`, `results_reference.rs`, and primitive interface checks. Matrix normalization factors take precedence over sample factors. |
 | `applyCooksCutoffRust` | `results/cooks_policy.rs` and shared BH adjustment | Original policy fixtures and `test-result-policy.R`; caller-supplied low-count context is validated, not inferred from a primitive table. |
 | `resultsTableRust`, `applyIndependentFilteringRust` | `independent_filtering.rs`, `independent_filtering/lowess.rs`, shared result formatting | Original quantile/lowess/BH fixtures; `test-results-filtering.R` and primitive interface checks. R assembles already-computed columns and metadata. |
 | `deseq2McolsDiagnosticsRust`, `rsdeseq2DiagnosticSchemaRust` | Shared diagnostics/schema and supplied primitive fit fields | Schema and primitive-route tests. These helpers expose available diagnostics; they do not reconstruct absent fits or implement every Bioconductor metadata convention. |
-| `vst`, `varianceStabilizingTransformation`, `rlog` | `core/implementation/builder/stages/`, `transform/` | Original transform fixtures and integration tests; [frozen local fits and expressions](frozen-local-vst-audit-2026-10-31.md) include eight exact standalone/wrapped cases with R numerical calls blocked. |
+| `vst`, `varianceStabilizingTransformation`, `rlog` | `core/implementation/builder/stages/`, `transform/` | Original transform fixtures and integration tests; [frozen local fits and expressions](history/frozen-local-vst-audit-2026-10-31.md) include eight exact standalone/wrapped cases with R numerical calls blocked. |
 | `lfcShrink` | `glm/beta/`, `shrinkage/`, shared formula/model-matrix construction | Original normal, ashr and apeglm references plus actual workflow/interface checks listed below. No production call to the original shrinkage packages computes the result. |
 
 The R Rust modules under `src/rust/src/lib/` and `formula_request/` are
@@ -61,7 +61,7 @@ reintroducing R calls; it does not replace numerical or complete-workflow tests.
   when preparing the complete-fit layout. Matching reduced offsets are accepted;
   conflicting offsets fail. Effective matrix normalization canonicalizes unused
   sample factors to ones for formula workflows. Explicit matrix workflows retain
-  their supplied sample-factor metadata. See [formula-fit scope](native-formula-fit-development.md).
+  their supplied sample-factor metadata. See [formula-fit scope](history/native-formula-fit-development.md).
 - **Formula limits:** arbitrary custom functions and the full R formula grammar,
   including splines, are not supported. The standalone primitive frame has
   separate factor/numeric columns; ordered inputs use explicit `ordered()`.
@@ -83,14 +83,14 @@ reintroducing R calls; it does not replace numerical or complete-workflow tests.
   likelihood expressions. Shared Rust handles mixture fitting, selected outputs,
   estimated modes, posterior moments and s-values. Numeric/named output selection
   and source warning sequences have independent references. See
-  [continuous likelihoods](native-continuous-likelihood-development.md),
-  [count likelihoods](native-count-likelihood-development.md),
-  [mode](native-ashr-mode-development.md), and
-  [warnings](native-likelihood-warning-development.md). Unsupported prior/likelihood
+  [continuous likelihoods](history/native-continuous-likelihood-development.md),
+  [count likelihoods](history/native-count-likelihood-development.md),
+  [mode](history/native-ashr-mode-development.md), and
+  [warnings](history/native-likelihood-warning-development.md). Unsupported prior/likelihood
   combinations retain explicit errors, including combinations rejected by the
   original package deeper in its dispatch.
 - **ashr controls:** SQP, `mixEM`, `w_mixEM`, `mixVBEM`, `cxxMixSquarem` and native
-  `mixIP` use the [shared core control parser](native-fixed-prior-controls-development.md).
+  `mixIP` use the [shared core control parser](history/native-fixed-prior-controls-development.md).
   Active controls have the documented typed contract. A supplied fixed prior
   skips unused controls but still validates the optimizer name and required
   prior. Higher-order EM cycling and SQP spectral controls are supported as
@@ -101,15 +101,15 @@ reintroducing R calls; it does not replace numerical or complete-workflow tests.
 - **apeglm:** `general`, `nbinomR`, `nbinomCR`, `nbinomC`, `nbinomC*`, `betabinR`,
   `betabinCR`, `betabinC`, and `betabinC*`. Restricted general likelihoods,
   posterior grids/intervals, scalar parameter uncertainty and internal posterior
-  contrasts follow the [analysis contract](native-posterior-analysis-development.md).
+  contrasts follow the [analysis contract](history/native-posterior-analysis-development.md).
   Public `lfcShrink` keeps its selected-coefficient table shape; its `contrast=`
   selection argument remains unsupported for apeglm. BFGS/L-BFGS-B are supported
   when refinement requires an optimizer. Other refinement families are rejected;
   unused controls follow the independently checked
-  [method-dispatch policy](native-regression-method-policy-development.md).
+  [method-dispatch policy](history/native-regression-method-policy-development.md).
 - **Random starts:** native Mersenne-Twister and L'Ecuyer-CMRG with Inversion
   normals import/write back state. Other R RNG configurations are rejected;
-  there is no R random-generation fallback. See [state and failure behavior](native-random-start-development.md).
+  there is no R random-generation fallback. See [state and failure behavior](history/native-random-start-development.md).
 - **Execution:** reusable local worker pools serve fitting, refits and transforms.
   `strict`, `fast` and `diagnostic` currently select the same numerical algorithm.
   Public forwarding methods remain available. CLI publication uses staged
@@ -124,21 +124,21 @@ previously supported method. Source-bound reports retain their original scope.
 
 ## Current completion evidence
 
-The [combined-suite audit](native-plan-audit-development.md) identified a default
+The [combined-suite audit](history/native-plan-audit-development.md) identified a default
 ashr sparse SQP discrepancy in the existing 18-gene subset test. The subsequent
-[shared Rust correction](native-sparse-sqp-development.md) closes that finding
+[shared Rust correction](history/native-sparse-sqp-development.md) closes that finding
 and passes the unchanged original-comparison bound. Supported here describes
 the intended API contract, not proof that every implementation route has
 already passed final combined acceptance.
 
-The [final local acceptance audit](final-plan-local-acceptance.md) now reconciles
+The [final local acceptance audit](history/final-plan-local-acceptance.md) now reconciles
 these entry routes, supported options, warnings, state changes and forwarding
 adapters against current tests and complete actual interface outputs. C19/C21
 are closed locally. Matrix and formula fits, replacement-aware later queries,
 posterior workflows and independent references establish different parts of
 that contract; primitive identity alone would not establish accuracy.
 
-C23 is accepted by the [final development validation](dev-validation-2026-11-12.md):
+C23 is accepted by the [final development validation](history/dev-validation-2026-11-12.md):
 current Linux Rust/R checks, both R lanes, five target panels and the full GTEx
 replay pass. Independent references and standalone/wrapped identity remain
 separate requirements. The latest local bundle records the exact final source
