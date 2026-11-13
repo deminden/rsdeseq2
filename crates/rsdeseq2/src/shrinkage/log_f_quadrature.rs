@@ -1,6 +1,6 @@
 //! Fifteen-point Gauss-Kronrod integration of infinite log-F moment intervals.
 //! Nodes/weights are mathematical quadrature constants; the QUADPACK reference
-//! is https://www.netlib.org/quadpack/dqk15i.f . No R routine is called or linked.
+//! is <https://www.netlib.org/quadpack/dqk15i.f> . No R routine is called or linked.
 const NODES: [f64; 8] = [
     0.9914553711208126,
     0.9491079123427585,
