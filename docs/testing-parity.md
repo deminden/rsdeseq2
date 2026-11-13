@@ -26,7 +26,7 @@ weakened and no reference bounds were widened.
 
 Both R package checks retain one known compiled-symbol warning for Rust runtime
 termination entry points. Their tests pass; this is not a warning-free package
-or CRAN-acceptance claim. No 0.5.0 release has been published.
+or CRAN-acceptance claim.
 
 ## Numerical coverage
 

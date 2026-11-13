@@ -1,9 +1,11 @@
 # Release preparation
 
-The current source version is **0.5.0**. Its implementation is prepared for `main` and has
-passed [source CI](testing-parity.md#ci-status). No 0.5.0 tag, GitHub release or
-registry publication has been created. [Release notes](releases/0.5.0.md)
-describe the prepared distribution.
+The current source version is **0.5.0**. [Release notes](releases/0.5.0.md)
+describe its behavior and [source CI](testing-parity.md#ci-status) records the
+independent validation. The tag-triggered workflow validates the release source
+and binds published artifacts to its commit. Check [crates.io](https://crates.io/crates/rsdeseq2/0.5.0)
+and [GitHub assets](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0)
+for publication availability.
 
 ## Local source checks
 

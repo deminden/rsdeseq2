@@ -202,6 +202,6 @@
       ]
     }
   ],
-  "publication": "No 0.5.0 tag, release or registry publication",
+  "publication_at_observation": "No 0.5.0 tag, release or registry publication",
   "documentation_scope": "This observation validates the linked commit. Final release preparation changes documentation and package discovery metadata; numerical sources and retained reference values are unchanged. The release workflow revalidates the tagged source."
 }
