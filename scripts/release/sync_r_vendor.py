@@ -66,11 +66,11 @@ def check_tree(expected, actual):
 
 
 def sync_notice(source, destination, check=False):
-    """Ship the same notices with the installed R binary; check is read-only."""
+    """Ship identical license/notice files in packages; check is read-only."""
     wanted = source.read_bytes()
     if check:
         if not destination.is_file() or destination.read_bytes() != wanted:
-            raise ValueError('R third-party notices differ; run scripts/release/sync_r_vendor.sh')
+            raise ValueError(f'Package third-party notices differ: {destination.name}; run scripts/release/sync_r_vendor.sh')
     else:
         destination.write_bytes(wanted)
 
@@ -107,6 +107,8 @@ def main():
             for name in ('Cargo.toml', 'README.md'):
                 shutil.copyfile(expected/name, VENDOR/name)
             print(f'Synchronized Rust core into {VENDOR}')
+        for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
+            sync_notice(ROOT/name, ROOT/'crates/rsdeseq2'/name, args.check)
         sync_notice(ROOT/'THIRD_PARTY_NOTICES.md', ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
         if args.check:
             print('R vendor, notices, manifest and package versions match.')

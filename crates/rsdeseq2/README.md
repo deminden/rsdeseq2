@@ -113,8 +113,8 @@ for numerical differences. [Development instructions][development] describe
 local checks and independent reference generation.
 
 Project code is MIT-licensed; adapted numerical components additionally carry
-BSD-3-Clause and BSD-2-Clause-Views terms. See [license][license] and
-[third-party notices][notices].
+BSD-3-Clause and BSD-2-Clause-Views terms. The crate includes `LICENSE` and
+`THIRD_PARTY_NOTICES.md`; see [license][license] and [third-party notices][notices].
 
 [contract]: https://github.com/deminden/rsdeseq2/blob/main/docs/native-supported-contract.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
