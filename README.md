@@ -87,9 +87,12 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 
 ## Installation
 
-Install the 0.5.0 source described here from `main`. Registry installation and
-binary downloads become available when the version is published; see
-[release status](docs/release.md). The registry and API badges show published versions.
+The library and CLI are distributed through [crates.io](https://crates.io/crates/rsdeseq2/0.5.0).
+Install the published CLI with `cargo install rsdeseq2 --version 0.5.0 --locked`,
+or add the library with `cargo add rsdeseq2@0.5.0`. Prebuilt CLI archives are
+attached to the [versioned GitHub release](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0).
+
+For source installation, check out `main`:
 
 ```bash
 git clone --branch main https://github.com/deminden/rsdeseq2.git

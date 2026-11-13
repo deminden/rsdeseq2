@@ -10,7 +10,7 @@ individual analysis stages. An optional R package wraps the same numerical core.
 
 ## Install
 
-Requires **Rust 1.97.1 or newer**. For a published 0.5.0 release:
+Requires **Rust 1.97.1 or newer**.
 
 ```sh
 # Embed the library.
@@ -26,8 +26,8 @@ For source installation from a repository checkout:
 cargo install --path crates/rsdeseq2 --locked
 ```
 
-[Release status][release] records publication availability. The registry and
-version-pinned documentation links become available when the release is published.
+[Release procedure][release] describes checked artifacts, version tags and
+publication verification.
 
 ## Workflows
 
