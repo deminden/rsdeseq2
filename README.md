@@ -22,10 +22,10 @@ a drop-in replacement for `DESeqDataSet` or the complete Bioconductor API.
 | [Rust crate](crates/rsdeseq2/README.md) | Embedding analysis stages in Rust applications | Broadest implemented API |
 | [R package](r-pkg/rsdeseq2/README.md) | Rust-backed matrix, list, formula, and limited `DESeqDataSet` workflows; VST/rlog and selected shrinkage | Does not implement the complete Bioconductor object API |
 
-Version 0.5.0 on `dev` runs supported formula, transform and shrinkage
+Version 0.5.0 runs supported formula, transform and shrinkage
 calculations in the shared Rust core. The [supported contract](docs/native-supported-contract.md)
 records methods and limits; [CI validation](docs/testing-parity.md#ci-status)
-records passing Rust, R, platform, full-GTEx and sanitizer checks. Publication is on hold.
+records passing Rust, R, platform, full-GTEx and sanitizer checks.
 
 ## Validation and Performance
 
@@ -87,11 +87,12 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 
 ## Installation
 
-The current **0.5.0 source is unreleased**. The registry and API badges above
-refer to published versions. Check out `dev` to use the source described here:
+Install the 0.5.0 source described here from `main`. Registry installation and
+binary downloads become available when the version is published; see
+[release status](docs/release.md). The registry and API badges show published versions.
 
 ```bash
-git clone --branch dev https://github.com/deminden/rsdeseq2.git
+git clone --branch main https://github.com/deminden/rsdeseq2.git
 cd rsdeseq2
 ```
 

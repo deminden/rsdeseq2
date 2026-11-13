@@ -1,17 +1,16 @@
-//! Rust core for `rsdeseq2`.
+//! DESeq2-compatible RNA-seq differential expression in Rust.
 //!
-//! This crate currently implements early DESeq2-compatible stages:
-//! count/design matrix validation, size-factor estimation, normalized counts,
-//! gene/sample normalization factors for implemented fixed-dispersion paths,
-//! base means, optionally weighted fixed-dispersion IRLS with scalar or
-//! per-coefficient ridge values, normal-equation or QR updates, and bounded
-//! optim fallback refits for routed rows,
-//! observation-weight preprocessing, primitive Wald linear contrasts, Wald/LRT
-//! statistics, Cook's diagnostics and low-count heuristic helper, primitive
-//! outlier count replacement, limited GLM-mu native Wald/LRT replacement refit
-//! metadata, BH adjusted p-values, independent filtering, and an inspectable
-//! fit-state skeleton, plus implemented normTransform, VST helpers, and a
-//! fit-state and builder-level rlog sample-effect ridge-GLM path.
+//! The library provides normalization, dispersion estimation, negative-binomial
+//! GLMs, Wald and likelihood-ratio tests, contrasts, Cook's diagnostics and
+//! replacement/refitting, independent filtering, transformations and supported
+//! normal, ashr and apeglm shrinkage. The CLI and optional R interface share
+//! this numerical core; standalone Rust execution requires no R runtime.
+//!
+//! Start with [`prelude`] and [`core::DeseqBuilder`]. Individual statistical
+//! stages are available through their public modules. Compatibility is bounded
+//! by the documented workflow contracts; the complete Bioconductor object API
+//! is outside scope. See the repository's compatibility and testing guides for
+//! supported settings and independent reference validation.
 
 pub(crate) mod all_zero;
 pub mod bindings;

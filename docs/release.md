@@ -1,7 +1,7 @@
 # Release preparation
 
-The current source version is **0.5.0**. Its implementation is on `dev` and has
-passed [branch CI](testing-parity.md#ci-status). No 0.5.0 tag, GitHub release or
+The current source version is **0.5.0**. Its implementation is prepared for `main` and has
+passed [source CI](testing-parity.md#ci-status). No 0.5.0 tag, GitHub release or
 registry publication has been created. [Release notes](releases/0.5.0.md)
 describe the prepared distribution.
 
