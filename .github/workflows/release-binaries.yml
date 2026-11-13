@@ -12,6 +12,11 @@ on:
         description: Original Release run with successful validation and five binary builds
         required: true
         type: string
+      rebuild_binaries:
+        description: Rebuild all five targets from the immutable tag using the original checked source artifacts
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -26,7 +31,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' || inputs.rebuild_binaries
     name: Build ${{ matrix.asset_suffix }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -64,13 +69,23 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
 
+      - name: Resolve immutable source commit
+        id: source
+        shell: bash
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
-          name: validated-source-${{ github.sha }}
+          name: validated-source-${{ steps.source.outputs.commit }}
           path: validated
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id || github.run_id }}
       - name: Verify successful source validation
         shell: bash
-        run: python3 scripts/release/release_artifact_manifest.py verify validated
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          env GITHUB_SHA="$SOURCE_COMMIT" GITHUB_REF_NAME="$RELEASE_TAG" \
+            python3 scripts/release/release_artifact_manifest.py verify validated
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -92,8 +107,28 @@ jobs:
       - name: Build
         run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
 
+      - uses: r-lib/actions/setup-r@v2
+        if: matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64'
+        with:
+          r-version: '4.6.2'
+      - name: Generate independent platform uniform CDFs
+        if: matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64'
+        shell: bash
+        run: |
+          Rscript --vanilla scripts/references/generate_uniform_cdf_reference.R uniform-cdf.tsv > uniform-cdf-provenance.txt
+          echo "RSDESEQ2_UNIFORM_CDF_REFERENCE=${{ github.workspace }}/uniform-cdf.tsv" >> "$GITHUB_ENV"
       - name: Numerical checks on shipped target and release profile
         run: python3 scripts/validation/check_release_target.py --target ${{ matrix.target }}
+
+      - name: Retain independent uniform CDF provenance
+        if: always() && (matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64')
+        uses: actions/upload-artifact@v4
+        with:
+          name: uniform-cdf-${{ matrix.asset_suffix }}-${{ github.run_id }}
+          path: |
+            uniform-cdf.tsv
+            uniform-cdf-provenance.txt
+          if-no-files-found: error
 
       - name: Stage files
         shell: bash
@@ -145,7 +180,7 @@ jobs:
   release:
     name: Upload GitHub release assets
     needs: build
-    if: ${{ always() && (needs.build.result == 'success' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ always() && (needs.build.result == 'success' || (github.event_name == 'workflow_dispatch' && !inputs.rebuild_binaries)) }}
     runs-on: ubuntu-latest
     steps:
       # Checkout cleans the workspace, so it must precede every artifact download.
@@ -157,6 +192,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          REBUILD_BINARIES: ${{ inputs.rebuild_binaries }}
         run: |
           python3 - <<'PYCODE'
           import json, os, subprocess, urllib.request
@@ -180,18 +216,23 @@ jobs:
               jobs = api('actions/runs/' + run_id + '/jobs?per_page=100')
               if jobs['total_count'] > len(jobs['jobs']):
                   raise SystemExit('Source run job list is incomplete')
+              rebuild = os.environ.get('REBUILD_BINARIES') == 'true'
               required = {
                   'validate / rust / rust', 'validate / msrv',
                   'validate / r / r (reference, 4.6.2)', 'validate / r / r (current, release)',
-                  'validate / parity / full-gtex-replay', 'validate / artifacts',
-                  *('binaries / Build ' + target for target in (
-                      'linux-x86_64', 'linux-aarch64', 'macos-x86_64', 'macos-aarch64', 'windows-x86_64'))}
+                  'validate / parity / full-gtex-replay', 'validate / artifacts'}
+              if rebuild:
+                  required.add('crate / Publish rsdeseq2 to crates.io')
+              else:
+                  required.update('binaries / Build ' + target for target in (
+                      'linux-x86_64', 'linux-aarch64', 'macos-x86_64', 'macos-aarch64', 'windows-x86_64'))
               passed = {job['name'] for job in jobs['jobs'] if job['conclusion'] == 'success'}
               if required - passed:
                   raise SystemExit('Original validation or binary checks did not all pass: ' + str(sorted(required - passed)))
               for job in jobs['jobs']:
                   if (job['conclusion'] not in ('success', 'skipped')
-                          and job['name'] != 'binaries / Upload GitHub release assets'):
+                          and job['name'] != 'binaries / Upload GitHub release assets'
+                          and not (rebuild and job['name'].startswith('binaries / Build '))):
                       raise SystemExit('Original run has another unsuccessful job: ' + job['name'])
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('commit=' + commit + '\n')
@@ -203,7 +244,7 @@ jobs:
           pattern: rsdeseq2-${{ env.RELEASE_TAG }}-*
           merge-multiple: true
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.source_run_id || github.run_id }}
+          run-id: ${{ inputs.rebuild_binaries && github.run_id || inputs.source_run_id || github.run_id }}
 
       - name: Download checked source artifacts
         uses: actions/download-artifact@v4

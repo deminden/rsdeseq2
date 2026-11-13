@@ -101,3 +101,14 @@ pass, run **Release binaries** manually from the default branch with the existin
 `release_tag` and original coordinated `source_run_id`. Recovery verifies the
 tag, original checks and hashes and uploads already checked archives. It does
 not move the tag or republish the crate.
+
+If an asset build fails because its release harness needs correction, keep the
+published crate and immutable tag intact. Correct the workflow on the default
+branch, then dispatch **Release binaries** with the original `release_tag`,
+`source_run_id`, and `rebuild_binaries=true`. This mode checks out the tag, verifies
+the original checked-source manifest, reruns all five target panels and requires
+all rebuilt jobs to pass before upload. Original source validation and crate
+publication must already have succeeded. Windows and Intel macOS regenerate
+the same independent R 4.6.2 CDF references used by normal platform CI, at the
+existing bounds. Only the asset workflow is repaired; tagged numerical source
+and registry packages remain immutable.
