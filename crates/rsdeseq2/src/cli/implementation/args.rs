@@ -74,10 +74,10 @@ use crate::results::{
     ExpandedFactorBetaPriorWaldResultsInput,
 };
 
-/// Command-line arguments for the minimal `rsdeseq2` CLI.
+/// Command-line arguments for the `rsdeseq2` analysis CLI.
 #[derive(Debug, Parser)]
-#[command(name = "rsdeseq2")]
-#[command(about = "Early DESeq2-compatible Rust workflow stages")]
+#[command(name = "rsdeseq2", version)]
+#[command(about = "DESeq2-compatible RNA-seq differential expression in Rust")]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
