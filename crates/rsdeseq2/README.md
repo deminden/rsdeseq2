@@ -1,70 +1,67 @@
 # rsdeseq2
 
-`rsdeseq2` is a Rust implementation of DESeq2-compatible differential
-expression workflows. It focuses on deterministic, inspectable execution for
-normalization, dispersion estimation, GLM tests, transformations, and
-result-table assembly.
+DESeq2-compatible RNA-seq differential expression in Rust, available as a
+library and standalone command-line tool. Normalization, dispersion estimation,
+negative-binomial fitting, statistical tests, transformations and supported
+shrinkage all run in Rust. **R and DESeq2 are not runtime dependencies.**
 
-`rsdeseq2` does not contain or reuse DESeq2 implementation code. It implements
-the same documented and observed behavior independently, with parity checked
-against reference outputs.
-
-The crate includes both a Rust library and the `rsdeseq2` command-line tool.
-It is not a drop-in replacement for the complete Bioconductor API.
+Use the CLI with count/design tables, or embed the library to inspect and reuse
+individual analysis stages. An optional R package wraps the same numerical core.
 
 ## Install
 
-Source installation requires Rust 1.97.1 or newer with Cargo. For the
-current 0.5.0 source, install from a repository checkout:
+Requires **Rust 1.97.1 or newer**. For a published 0.5.0 release:
 
-```bash
-cargo install --path crates/rsdeseq2 --locked
-```
-
-Use a path dependency when embedding that checkout. The following registry
-commands apply after 0.5.0 publication.
-
-Add version 0.5.0 to a Rust project:
-
-```bash
+```sh
+# Embed the library.
 cargo add rsdeseq2@0.5.0
-```
 
-Install the CLI:
-
-```bash
+# Install the CLI.
 cargo install rsdeseq2 --version 0.5.0 --locked
 ```
 
-## Supported Scope
+For source installation from a repository checkout:
 
-Implemented areas include size-factor estimation, normalized counts and base
-row metadata, fixed-dispersion and selected native-dispersion NB GLM Wald/LRT
-workflows, DESeq2-style result contrasts, Cook's and independent-filtering
-helpers, beta-prior refit workflows, `normTransform`/VST/rlog transformations,
-and native CLI VST/rlog commands. The R package also provides dataset-based
-VST/rlog objects and selected `lfcShrink()` methods; see its package README for
-the supported Bioconductor integrations.
+```sh
+cargo install --path crates/rsdeseq2 --locked
+```
 
-Unsupported interfaces include complete Bioconductor `DESeqDataSet` mutation
-and metadata support, full glmGamPoi behavior, plotting, and other convenience
-APIs.
+[Release status][release] records publication availability. The registry and
+version-pinned documentation links become available when the release is published.
 
-See [compatibility and limits][compatibility] and the [supported contract][contract].
+## Workflows
+
+- **Normalize counts:** ratio/`poscounts` size factors, normalization factors,
+  normalized counts and weighted base metadata.
+- **Fit and test:** gene-wise/trend/MAP dispersions; negative-binomial Wald and
+  likelihood-ratio tests; supported observation weights, offsets and contrasts.
+- **Assemble results:** Cook's diagnostics and replacement/refitting,
+  independent filtering, adjusted p-values and fitted-state reuse.
+- **Transform and shrink:** VST, rlog, and supported normal, `ashr` and `apeglm`
+  methods, with shared Rust execution through the R interface.
+
+The implementation is independently validated against original R/DESeq2 outputs.
+It does not implement the complete Bioconductor object API. `glmGamPoi`, plotting,
+custom formula functions and method-specific unsupported options remain outside
+scope. Read [compatibility and limits][compatibility] and the
+[supported contract][contract] before selecting a workflow. The public Rust API
+is pre-1.0 and may change between minor releases.
 
 ## Validation and Performance
 
-The [repository comparison][comparison] is the summary of measured precision,
-speed and peak memory against DESeq2. The [benchmark report][gtex-benchmark]
-records the exact executable, environment, per-contrast measurements and
-reproduction commands. These measurements cover eleven full GTEx v8 Kidney
-Cortex Wald contrasts, including biological comparisons and random splits.
+The [main comparison][comparison] reports precision, elapsed-time ratios and
+peak memory against DESeq2 for eleven full GTEx v8 Kidney Cortex contrasts.
+The [measurement report][gtex-benchmark] provides per-contrast values, executable
+and environment identities, and reproduction instructions. These are measured
+results for the documented workload, not a guarantee for every design.
 
-Tests additionally cover normalization, GLM, Wald/LRT, transformations,
-shrinkage and R-wrapper paths. Tested behavior and full Bioconductor API
-compatibility are distinct; see the [supported contract][contract].
+Independent reference tests cover numerical stages and complete workflows;
+separate tests require identical standalone and R-wrapped results. See
+[testing and parity][testing] for platform, R, sanitizer and full-GTEx checks.
 
 ## Rust Usage
+
+A minimal normalization example:
 
 ```rust
 use rsdeseq2::prelude::*;
@@ -93,84 +90,39 @@ fn main() -> Result<(), DeseqError> {
 
 ## CLI
 
-```bash
-cargo run -p rsdeseq2 -- size-factors \
-  --counts counts.tsv \
-  --method ratio \
-  --output size_factors.tsv
+Run a Wald analysis with your count and numeric design tables:
 
-cargo run -p rsdeseq2 -- base-mean \
-  --counts counts.tsv \
-  --size-factors size_factors.tsv \
-  --output base_mean.tsv
-
-cargo run -p rsdeseq2 -- normalized-counts \
-  --counts counts.tsv \
-  --size-factors size_factors.tsv \
-  --output normalized_counts.tsv
-
-cargo run -p rsdeseq2 -- vst \
+```sh
+rsdeseq2 wald \
   --counts counts.tsv \
   --design design.tsv \
-  --blind=false \
   --fit-type mean \
-  --output vst.tsv
-
-cargo run -p rsdeseq2 -- rlog \
-  --counts counts.tsv \
-  --design design.tsv \
-  --blind=false \
-  --fit-type mean \
-  --output rlog.tsv
-
-cargo run -p rsdeseq2 -- wald \
-  --counts counts.tsv \
-  --design design.tsv \
-  --normalization-factors normalization_factors.tsv \
-  --observation-weights observation_weights.tsv \
-  --fit-type parametric \
   --coefficient 1 \
   --output results.tsv
-
-cargo run -p rsdeseq2 -- lrt \
-  --counts counts.tsv \
-  --design design.tsv \
-  --reduced-design reduced_design.tsv \
-  --fit-type parametric \
-  --coefficient 1 \
-  --output lrt_results.tsv
 ```
 
-## Development
+`--fit-type mean` explicitly selects a constant mean dispersion trend.
+Coefficient indices are zero-based. See the [CLI guide][cli] for input schemas,
+trend choices, named coefficients, contrasts, LRT and transformation commands.
 
-Requires Rust 1.97.1 or newer and uses the Rust 2024 edition, as declared by
-`rust-version` and `edition` in the workspace `Cargo.toml`.
+## Support and License
 
-```bash
-cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-```
+Report reproducible problems through [GitHub Issues](https://github.com/deminden/rsdeseq2/issues).
+Include the version, inputs or a minimal reproducer, and reference-tool versions
+for numerical differences. [Development instructions][development] describe
+local checks and independent reference generation.
 
-Generate DESeq2 reference fixtures:
-
-```bash
-Rscript scripts/references/generate_deseq2_references.R \
-  --output-dir results/reproduced-reference \
-  --parity-output-dir results/reproduced-parity
-cargo test -p rsdeseq2 --test dispersion_reference
-cargo test -p rsdeseq2 --test wald_reference
-cargo test -p rsdeseq2 --test lrt_reference
-```
-
-Run matched speed/RAM benchmarks for the supported primitives:
-
-```bash
-scripts/benchmarks/benchmark_rsdeseq2.sh
-```
+Project code is MIT-licensed; adapted numerical components additionally carry
+BSD-3-Clause and BSD-2-Clause-Views terms. See [license][license] and
+[third-party notices][notices].
 
 [contract]: https://github.com/deminden/rsdeseq2/blob/main/docs/native-supported-contract.md
 [compatibility]: https://github.com/deminden/rsdeseq2/blob/main/docs/compatibility.md
 [gtex-benchmark]: https://github.com/deminden/rsdeseq2/blob/main/docs/reports/gtex-native-wald-benchmark.md
 [comparison]: https://github.com/deminden/rsdeseq2/blob/main/README.md#validation-and-performance
+[release]: https://github.com/deminden/rsdeseq2/blob/main/docs/release.md
+[testing]: https://github.com/deminden/rsdeseq2/blob/main/docs/testing-parity.md
+[cli]: https://github.com/deminden/rsdeseq2/blob/main/docs/cli.md
+[development]: https://github.com/deminden/rsdeseq2/blob/main/docs/development.md
+[license]: https://github.com/deminden/rsdeseq2/blob/main/LICENSE
+[notices]: https://github.com/deminden/rsdeseq2/blob/main/THIRD_PARTY_NOTICES.md

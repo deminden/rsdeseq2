@@ -1,17 +1,18 @@
 {
-  "commit": "62825c0dc5d5c54122e0fdc74b3b1b1914840361",
-  "observed_utc": "2026-11-12T22:53:18.792723+00:00",
+  "version": "0.5.0",
+  "commit": "2d86916c089f55bcddb33aee1af9b079f2b9384e",
+  "observed_utc": "2026-11-12T23:58:04.081156+00:00",
   "runs": [
     {
-      "id": 43320539793,
+      "id": 43331570676,
       "name": "Parity",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43320539793",
+      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43331570676",
       "attempt": 1,
       "jobs": [
         {
-          "id": 131539736693,
+          "id": 131577292236,
           "name": "full-gtex-replay",
           "status": "completed",
           "conclusion": "success",
@@ -19,7 +20,7 @@
           "failed_steps": []
         },
         {
-          "id": 131539738691,
+          "id": 131577294057,
           "name": "frozen-oracles",
           "status": "completed",
           "conclusion": "skipped",
@@ -29,15 +30,15 @@
       ]
     },
     {
-      "id": 43320505082,
+      "id": 43331557396,
       "name": "Rust",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43320505082",
+      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557396",
       "attempt": 1,
       "jobs": [
         {
-          "id": 131539614326,
+          "id": 131577239162,
           "name": "rust",
           "status": "completed",
           "conclusion": "success",
@@ -47,23 +48,15 @@
       ]
     },
     {
-      "id": 43320504806,
+      "id": 43331557382,
       "name": "Platform checks",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
+      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
       "attempt": 1,
       "jobs": [
         {
-          "id": 131539614471,
-          "name": "Check macos-x86_64",
-          "status": "completed",
-          "conclusion": "success",
-          "step": null,
-          "failed_steps": []
-        },
-        {
-          "id": 131539614695,
+          "id": 131577238918,
           "name": "Check linux-x86_64",
           "status": "completed",
           "conclusion": "success",
@@ -71,15 +64,23 @@
           "failed_steps": []
         },
         {
-          "id": 131539614702,
-          "name": "Check macos-aarch64",
+          "id": 131577239299,
+          "name": "Check windows-x86_64",
           "status": "completed",
           "conclusion": "success",
           "step": null,
           "failed_steps": []
         },
         {
-          "id": 131539614721,
+          "id": 131577239330,
+          "name": "Check macos-x86_64",
+          "status": "completed",
+          "conclusion": "success",
+          "step": null,
+          "failed_steps": []
+        },
+        {
+          "id": 131577239391,
           "name": "Check linux-aarch64",
           "status": "completed",
           "conclusion": "success",
@@ -87,8 +88,8 @@
           "failed_steps": []
         },
         {
-          "id": 131539615061,
-          "name": "Check windows-x86_64",
+          "id": 131577239408,
+          "name": "Check macos-aarch64",
           "status": "completed",
           "conclusion": "success",
           "step": null,
@@ -97,15 +98,15 @@
       ]
     },
     {
-      "id": 43320504838,
+      "id": 43331557387,
       "name": "R",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504838",
+      "url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557387",
       "attempt": 1,
       "jobs": [
         {
-          "id": 131539613778,
+          "id": 131577238688,
           "name": "r (reference, 4.6.2)",
           "status": "completed",
           "conclusion": "success",
@@ -113,7 +114,7 @@
           "failed_steps": []
         },
         {
-          "id": 131539614143,
+          "id": 131577239125,
           "name": "r (current, release)",
           "status": "completed",
           "conclusion": "success",
@@ -123,125 +124,84 @@
       ]
     }
   ],
-  "passed_jobs": [
+  "evidence": [
     {
-      "run": "Parity",
       "job": "full-gtex-replay",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320539793",
-      "job_id": 131539736693,
-      "log_sha256": "6a28d7ff1be340e578be6b01dbf07cc67b53a9f63f54b3ead630780db0a0cd53",
-      "Rust_passed": 1,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
+      "id": 131577292236,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331570676",
+      "log_sha256": "51cae4cf211381756619b8ed1ed1f1d18e6acd4059ce3b1bcb67f0cbd0b2f69a",
+      "rust_tests_passed": 1,
+      "warnings": []
     },
     {
-      "run": "Rust",
       "job": "rust",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320505082",
-      "job_id": 131539614326,
-      "log_sha256": "333a07a0537d4e1f0a3c9bf7b0bddc5e744344369cc8de5eae5b4d75ec90e478",
-      "Rust_passed": 1159,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": [
-        "49"
-      ]
+      "id": 131577239162,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557396",
+      "log_sha256": "c6919ebc659c0ca29fdc433e2ca11a735b4e245edc27ab6e0bc1a5b61a49ea73",
+      "rust_tests_passed": 1159,
+      "warnings": []
     },
     {
-      "run": "Platform checks",
-      "job": "Check macos-x86_64",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
-      "job_id": 131539614471,
-      "log_sha256": "9dbc4538394cc01abcda9cec9f662d08335f6d7d1334a53488c7d79ebde74d88",
-      "Rust_passed": 115,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
-    },
-    {
-      "run": "Platform checks",
       "job": "Check linux-x86_64",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
-      "job_id": 131539614695,
-      "log_sha256": "778e909701175c9692f9672c81359b2a980ac9c49d5f254a2877c471e290a985",
-      "Rust_passed": 115,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
+      "id": 131577238918,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
+      "log_sha256": "03a1713c4bac9676d2c87bcf360a8492a797866da6d98c912041edb0a99eb68a",
+      "rust_tests_passed": 115,
+      "warnings": []
     },
     {
-      "run": "Platform checks",
-      "job": "Check macos-aarch64",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
-      "job_id": 131539614702,
-      "log_sha256": "75077d00c28697cc3131c300eaacb2b5b65ceb1b69c99c5bd751289ffc41b556",
-      "Rust_passed": 115,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
-    },
-    {
-      "run": "Platform checks",
-      "job": "Check linux-aarch64",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
-      "job_id": 131539614721,
-      "log_sha256": "be365234ceb688c952afb88e739f784e335bf10f2398fd1eba69e245a6a49957",
-      "Rust_passed": 115,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
-    },
-    {
-      "run": "Platform checks",
       "job": "Check windows-x86_64",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504806",
-      "job_id": 131539615061,
-      "log_sha256": "2745e1dc67906765d68f4ae1ca6f173fa4d9b777c65870e36839332adcee2fcb",
-      "Rust_passed": 115,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [],
-      "Python_test_counts": []
+      "id": 131577239299,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
+      "log_sha256": "cdf17dd2e322ab36a6219fcf0b384424146d797d1065d1e2d9b91ec89ea62ff5",
+      "rust_tests_passed": 115,
+      "warnings": []
     },
     {
-      "run": "R",
+      "job": "Check macos-x86_64",
+      "id": 131577239330,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
+      "log_sha256": "c477d240d2543b50b20425235ae13847535042ce6da3ad7dc02f01dadc27ab7e",
+      "rust_tests_passed": 115,
+      "warnings": []
+    },
+    {
+      "job": "Check linux-aarch64",
+      "id": 131577239391,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
+      "log_sha256": "7d98442b4fe39944a4612dd12d43b315f6a0279d91dc611a57c71665e0317bb5",
+      "rust_tests_passed": 115,
+      "warnings": []
+    },
+    {
+      "job": "Check macos-aarch64",
+      "id": 131577239408,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557382",
+      "log_sha256": "ed8d9dcfe1c1c43c942a6d28be476c384d85cefa6d793a758c5ca86f86d06222",
+      "rust_tests_passed": 115,
+      "warnings": []
+    },
+    {
       "job": "r (reference, 4.6.2)",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504838",
-      "job_id": 131539613778,
-      "log_sha256": "d6f95326afeb52863307e29d78cd059925ef3dd41b322592dc7ad22b5f196dec",
-      "Rust_passed": 4,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [
-        "1 WARNING"
-      ],
-      "Python_test_counts": [
-        "2"
+      "id": 131577238688,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557387",
+      "log_sha256": "1ce00a5c42bb0f5db5cb3d59470bfa084eecb0df1fe3e920f966519ef83e074b",
+      "rust_tests_passed": 4,
+      "warnings": [
+        "2026-11-12T23:50:14.1690783Z Status: 1 WARNING"
       ]
     },
     {
-      "run": "R",
       "job": "r (current, release)",
-      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43320504838",
-      "job_id": 131539614143,
-      "log_sha256": "9b34e1366ec699d94b1e49f4e0455ae50469eed5aa3c26d48643f76cf8dc9ce3",
-      "Rust_passed": 0,
-      "Rust_failed": 0,
-      "R_assertion_summaries": [],
-      "R_package_status": [
-        "1 WARNING"
-      ],
-      "Python_test_counts": []
+      "id": 131577239125,
+      "run_url": "https://github.com/deminden/rsdeseq2/actions/runs/43331557387",
+      "log_sha256": "f2224e9d2b38784797eeaf2537e1833961f3af715f33ff01b129876de1ab28f0",
+      "rust_tests_passed": 0,
+      "warnings": [
+        "2026-11-12T23:54:38.0169683Z Status: 1 WARNING"
+      ]
     }
   ],
-  "publication": "Dev branch only; no tag, release or registry publication",
-  "version": "0.5.0",
-  "documentation_scope": "CI validates this implementation commit. Documentation-only cleanup preserves runtime, tests, workflows and retained reference bytes."
+  "publication": "No 0.5.0 tag, release or registry publication",
+  "documentation_scope": "This observation validates the linked commit. Final release preparation changes documentation and package discovery metadata; numerical sources and retained reference values are unchanged. The release workflow revalidates the tagged source."
 }

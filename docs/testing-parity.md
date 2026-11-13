@@ -6,17 +6,18 @@ matching the same Rust engine twice does not prove agreement with DESeq2.
 
 ## CI status
 
-All nine executed jobs passed on implementation commit
-[`62825c0`](https://github.com/deminden/rsdeseq2/commit/62825c0dc5d5c54122e0fdc74b3b1b1914840361)
-on 2026-11-12. The documentation cleanup does not change runtime code, tests,
-workflows or retained numerical reference values.
+All nine executed jobs passed on source commit
+[`2d86916`](https://github.com/deminden/rsdeseq2/commit/2d86916c089f55bcddb33aee1af9b079f2b9384e)
+on 2026-11-12 UTC. Final release preparation updates documentation and package
+discovery metadata; numerical code, tests and retained reference values are
+unchanged. The tag-triggered release workflow validates the final source again.
 
 | Workflow | Passing checks |
 | --- | --- |
-| [Rust](https://github.com/deminden/rsdeseq2/actions/runs/43320505082) | Vendor/version integrity, formatting, Clippy, full workspace and Python tooling tests |
-| [R](https://github.com/deminden/rsdeseq2/actions/runs/43320504838) | Both pinned R 4.6.2 and current R: package checks and exact standalone/wrapped comparisons. Pinned R also checks fresh formula/SQP/uniform references, interruption/reuse, sanitizers and actual R payload gates |
-| [Five platforms](https://github.com/deminden/rsdeseq2/actions/runs/43320504806) | Linux x86_64/aarch64, macOS x86_64/aarch64 and Windows x86_64 numerical/CLI panels in release profile |
-| [Full GTEx](https://github.com/deminden/rsdeseq2/actions/runs/43320539793) | All 56,200 genes, 61 samples and six Wald result fields |
+| [Rust](https://github.com/deminden/rsdeseq2/actions/runs/43331557396) | Vendor/version integrity, formatting, Clippy, full workspace and Python tooling tests |
+| [R](https://github.com/deminden/rsdeseq2/actions/runs/43331557387) | Both pinned R 4.6.2 and current R: package checks and exact standalone/wrapped comparisons. Pinned R also checks fresh formula/SQP/uniform references, interruption/reuse, sanitizers and actual R payload gates |
+| [Five platforms](https://github.com/deminden/rsdeseq2/actions/runs/43331557382) | Linux x86_64/aarch64, macOS x86_64/aarch64 and Windows x86_64 numerical/CLI panels in release profile |
+| [Full GTEx](https://github.com/deminden/rsdeseq2/actions/runs/43331570676) | All 56,200 genes, 61 samples and six Wald result fields |
 
 [Machine-readable evidence](data/ci_0.5.0.json) binds run/job IDs and downloaded
 log hashes to that commit. The full-only Parity dispatch intentionally skips its
