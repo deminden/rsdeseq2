@@ -1,6 +1,6 @@
 //! Positive Gamma normalization from Fullerton's public-domain SLATEC series.
-//! Tables: https://netlib.org/slatec/fnlib/dgamma.f . The SLATEC guide states
-//! public-domain distribution: https://netlib.org/slatec/guide (section 4).
+//! Tables: <https://netlib.org/slatec/fnlib/dgamma.f> . The SLATEC guide states
+//! public-domain distribution: <https://netlib.org/slatec/guide> (section 4).
 //! This standalone Rust implementation is used only by posterior components;
 //! it neither calls R nor changes the existing GLM probability kernels.
 #![allow(clippy::excessive_precision)]
