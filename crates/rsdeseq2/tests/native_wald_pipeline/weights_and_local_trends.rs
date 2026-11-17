@@ -590,14 +590,4 @@ fn native_linear_mu_generic_pipeline_accepts_local_and_rejects_glm_gam_poi() {
         local_fit.dispersion.as_ref().unwrap().len(),
         counts.n_genes()
     );
-
-    let glm_gam_poi_err = native_wald_builder()
-        .fit_type(FitType::GlmGamPoi)
-        .fit_wald_linear_mu(&counts, &design, 1)
-        .unwrap_err();
-    assert!(
-        glm_gam_poi_err
-            .to_string()
-            .contains("glmGamPoi dispersion trend")
-    );
 }

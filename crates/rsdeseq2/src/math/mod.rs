@@ -6,6 +6,12 @@ pub mod median;
 pub mod normal;
 pub mod optim;
 pub mod rank;
+
+/// Former name of [`rank`], which computes ranks and has no QR factorization.
+#[deprecated(note = "renamed to `rsdeseq2::math::rank`")]
+pub mod qr {
+    pub use super::rank::*;
+}
 pub mod special;
 
 pub use distributions::{

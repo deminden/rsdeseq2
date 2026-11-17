@@ -181,9 +181,7 @@ impl DeseqBuilder {
 
     /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
     ///
-    /// `Parametric`, `Local`, and `Mean` are currently implemented.
-    /// `GlmGamPoi` returns `UnsupportedFeature` until a parity implementation
-    /// is added.
+    /// Dispatches to the parametric, local or mean trend.
     pub fn fit_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -197,17 +195,12 @@ impl DeseqBuilder {
             FitType::Parametric => self.fit_parametric_dispersion_trend_linear_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_linear_mu(counts, design),
             FitType::Local => self.fit_local_dispersion_trend_linear_mu(counts, design),
-            FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
-                feature: "linear-mu glmGamPoi dispersion trend fitting".to_string(),
-            }),
         }
     }
 
     /// Run the implemented GLM-mu dispersion trend path selected by `fit_type`.
     ///
-    /// `Parametric`, `Local`, and `Mean` are currently implemented.
-    /// `GlmGamPoi` returns `UnsupportedFeature` until a parity implementation
-    /// is added.
+    /// Dispatches to the parametric, local or mean trend.
     pub fn fit_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -221,9 +214,6 @@ impl DeseqBuilder {
             FitType::Parametric => self.fit_parametric_dispersion_trend_glm_mu(counts, design),
             FitType::Mean => self.fit_mean_dispersion_trend_glm_mu(counts, design),
             FitType::Local => self.fit_local_dispersion_trend_glm_mu(counts, design),
-            FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
-                feature: "GLM-mu glmGamPoi dispersion trend fitting".to_string(),
-            }),
         }
     }
 }

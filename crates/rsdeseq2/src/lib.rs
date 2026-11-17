@@ -13,7 +13,6 @@
 //! supported settings and independent reference validation.
 
 pub(crate) mod all_zero;
-pub mod bindings;
 pub mod cli;
 pub mod contrasts;
 pub mod cooks;

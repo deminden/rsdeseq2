@@ -86,7 +86,6 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
 /// row-normalized observation weights are supplied, they are used in the
 /// fixed-dispersion IRLS mean fit and the fixed-mean likelihood objective;
 /// Cox-Reid terms use DESeq2's thresholded weighted sample subset.
-/// glmGamPoi fitting remains a future high-level branch.
 pub fn estimate_gene_wise_dispersions_glm_mu(
     input: GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,

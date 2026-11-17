@@ -359,14 +359,6 @@ fn fit_dispersion_trend_dispatches_default_fit_types() {
 }
 
 #[test]
-fn fit_dispersion_trend_rejects_glm_gam_poi_until_supported() {
-    let (means, disps) = trend_data();
-    let err = fit_dispersion_trend(&means, &disps, FitType::GlmGamPoi).unwrap_err();
-
-    assert!(matches!(err, DeseqError::UnsupportedFeature { .. }));
-}
-
-#[test]
 fn mean_trend_evaluates_constant_for_positive_means() {
     let trend = MeanDispersionTrend { mean_disp: 0.2 };
 
