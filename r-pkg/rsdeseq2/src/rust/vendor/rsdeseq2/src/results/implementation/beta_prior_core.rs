@@ -1,3 +1,4 @@
+use super::*;
 /// Return the core DESeq2 `results()` column names currently emitted by Rust.
 pub fn deseq2_result_core_column_names() -> &'static [&'static str] {
     &DESEQ2_RESULT_CORE_COLUMNS

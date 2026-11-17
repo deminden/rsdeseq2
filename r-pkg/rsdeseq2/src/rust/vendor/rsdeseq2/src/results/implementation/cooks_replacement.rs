@@ -1,4 +1,5 @@
-fn formula_size_factor_offsets(
+use super::*;
+pub(super) fn formula_size_factor_offsets(
     counts: &CountMatrix,
     size_factors: &[f64],
     offsets: &[f64],
@@ -36,7 +37,7 @@ fn formula_size_factor_offsets(
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
 }
 
-fn formula_normalization_factor_offsets(
+pub(super) fn formula_normalization_factor_offsets(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     offsets: &[f64],
@@ -78,11 +79,11 @@ fn formula_normalization_factor_offsets(
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
 }
 
-fn formula_offsets_are_active(offsets: &[f64]) -> bool {
+pub(super) fn formula_offsets_are_active(offsets: &[f64]) -> bool {
     offsets.iter().any(|value| *value != 0.0)
 }
 
-fn beta_prior_cooks_output(
+pub(super) fn beta_prior_cooks_output(
     counts: &CountMatrix,
     size_factors: &[f64],
     fit: &ExpandedModelBetaPriorGlmFit,
@@ -97,7 +98,7 @@ fn beta_prior_cooks_output(
     )
 }
 
-fn beta_prior_normalized_cooks_output(
+pub(super) fn beta_prior_normalized_cooks_output(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     fit: &ExpandedModelBetaPriorGlmFit,
@@ -112,7 +113,7 @@ fn beta_prior_normalized_cooks_output(
     )
 }
 
-fn attach_cooks_to_results(
+pub(super) fn attach_cooks_to_results(
     results: &mut DeseqResults,
     max_cooks: &[Option<f64>],
 ) -> Result<(), DeseqError> {
@@ -130,7 +131,7 @@ fn attach_cooks_to_results(
     Ok(())
 }
 
-fn merge_beta_prior_replacement_results(
+pub(super) fn merge_beta_prior_replacement_results(
     original_results: &DeseqResults,
     refit_results: Option<&DeseqResults>,
     refit_plan: &CooksRefitPlan,
@@ -143,13 +144,14 @@ fn merge_beta_prior_replacement_results(
         ));
     }
     if let Some(refit_results) = refit_results
-        && refit_results.rows.len() != original_results.rows.len() {
-            return Err(invalid_dimensions(
-                "beta-prior replacement refit result rows",
-                original_results.rows.len(),
-                refit_results.rows.len(),
-            ));
-        }
+        && refit_results.rows.len() != original_results.rows.len()
+    {
+        return Err(invalid_dimensions(
+            "beta-prior replacement refit result rows",
+            original_results.rows.len(),
+            refit_results.rows.len(),
+        ));
+    }
     if refit_plan.replaced_base_mean.len() != original_results.rows.len() {
         return Err(invalid_dimensions(
             "beta-prior replacement baseMean rows",
@@ -205,7 +207,7 @@ fn merge_beta_prior_replacement_results(
     Ok(merged)
 }
 
-fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
+pub(super) fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.log2_fold_change = None;
     row.lfc_se = None;
     row.stat = None;
@@ -217,7 +219,10 @@ fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.filtered = None;
 }
 
-fn formula_offset_scales(offsets: &[f64], n_samples: usize) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn formula_offset_scales(
+    offsets: &[f64],
+    n_samples: usize,
+) -> Result<Vec<f64>, DeseqError> {
     if offsets.len() != n_samples {
         return Err(invalid_dimensions(
             "formula offsets",

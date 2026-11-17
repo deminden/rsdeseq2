@@ -4,19 +4,29 @@
 //! while preserving existing paths through re-exports.
 
 // Result row, table, metadata, and beta-prior workflow types.
-include!("implementation/types.rs");
+#[path = "implementation/types.rs"]
+mod types;
+pub use types::*;
 
 // Shared adjusted/public and deferred/private row construction.
-include!("implementation/row_builders.rs");
+#[path = "implementation/row_builders.rs"]
+mod row_builders;
+pub use row_builders::*;
 
 // Core Wald builders and caller-supplied expanded beta-prior workflows.
-include!("implementation/beta_prior_core.rs");
+#[path = "implementation/beta_prior_core.rs"]
+mod beta_prior_core;
+pub use beta_prior_core::*;
 
 // One-factor expanded beta-prior result workflows.
-include!("implementation/beta_prior_factor.rs");
+#[path = "implementation/beta_prior_factor.rs"]
+mod beta_prior_factor;
+pub use beta_prior_factor::*;
 
 // Additive expanded beta-prior result workflows.
-include!("implementation/beta_prior_additive.rs");
+#[path = "implementation/beta_prior_additive.rs"]
+mod beta_prior_additive;
+pub use beta_prior_additive::*;
 
 // Formula parsing adapters and shared beta-prior execution policies.
 #[path = "implementation/beta_prior_formula/mod.rs"]
@@ -24,10 +34,16 @@ mod beta_prior_formula;
 pub use beta_prior_formula::*;
 
 // Cook's replacement merge helpers for beta-prior result workflows.
-include!("implementation/cooks_replacement.rs");
+#[path = "implementation/cooks_replacement.rs"]
+mod cooks_replacement;
+use cooks_replacement::*;
 
 // Cook filtering and explicit adjustment updates.
-include!("implementation/wald_lrt.rs");
+#[path = "implementation/wald_lrt.rs"]
+mod wald_lrt;
+pub use wald_lrt::*;
 
 // Validation, column assembly, and result metadata descriptions.
-include!("implementation/metadata_validation.rs");
+#[path = "implementation/metadata_validation.rs"]
+mod metadata_validation;
+use metadata_validation::*;

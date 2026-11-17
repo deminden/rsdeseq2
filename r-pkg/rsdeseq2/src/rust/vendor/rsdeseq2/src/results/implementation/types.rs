@@ -1,31 +1,31 @@
-use crate::glm::inference::GlmInferenceView;
-use crate::cooks::{
-    calculate_cooks_distance, prepare_cooks_replacement_refit_with_weights, CooksOutput, CooksRefitPlan,
-    CooksReplacementOptions,
+use super::*;
+pub(super) use crate::cooks::{
+    CooksOutput, CooksRefitPlan, CooksReplacementOptions, calculate_cooks_distance,
+    prepare_cooks_replacement_refit_with_weights,
 };
-use crate::matrix::CountMatrix;
-use crate::design::{
-    expanded_factor_design, expanded_formula_design_with_offsets,
-    expanded_formula_design_with_offsets_from_model_frame, DesignMatrix,
-    ExpandedAdditiveFactorDesign, ExpandedFactorDesign, ExpandedFactorInteractionSpec,
-    ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec, ExpandedFormulaDesignWithOffsets,
-    ExpandedNumericInteractionSpec, ExpandedNumericSpec, FormulaModelFrame,
+pub(super) use crate::design::{
+    DesignMatrix, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,
+    ExpandedFactorInteractionSpec, ExpandedFactorNumericInteractionSpec, ExpandedFactorSpec,
+    ExpandedFormulaDesignWithOffsets, ExpandedNumericInteractionSpec, ExpandedNumericSpec,
+    FormulaModelFrame, expanded_factor_design, expanded_formula_design_with_offsets,
+    expanded_formula_design_with_offsets_from_model_frame,
 };
-use crate::errors::{invalid_dimensions, DeseqError};
-use crate::glm::{
-    collapse_expanded_model_fit,
+pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+pub(super) use crate::glm::inference::GlmInferenceView;
+pub(super) use crate::glm::{
+    BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
+    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, LrtOutput, NbinomGlmFit,
+    WaldAlternative, WaldContrastOutput, WaldOutput, WaldTestOptions, collapse_expanded_model_fit,
     fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
     fit_expanded_glms_with_estimated_beta_prior_variance_and_weights, wald_test_coefficient,
-    wald_test_contrast, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
-    BetaPriorSizeFactorWeightInput, ExpandedModelBetaPriorDesignInput,
-    ExpandedModelBetaPriorGlmFit, LrtOutput, NbinomGlmFit, WaldAlternative, WaldContrastOutput,
-    WaldOutput, WaldTestOptions,
+    wald_test_contrast,
 };
-use crate::independent_filtering::IndependentFilteringOutput;
-use crate::matrix::RowMajorMatrix;
-use crate::multiple_testing::bh_adjust;
-use crate::normalization::{normalized_counts, normalized_counts_with_factors};
-use crate::options::{CooksCutoff, TestType};
+pub(super) use crate::independent_filtering::IndependentFilteringOutput;
+pub(super) use crate::matrix::CountMatrix;
+pub(super) use crate::matrix::RowMajorMatrix;
+pub(super) use crate::multiple_testing::bh_adjust;
+pub(super) use crate::normalization::{normalized_counts, normalized_counts_with_factors};
+pub(super) use crate::options::{CooksCutoff, TestType};
 
 /// Core DESeq2 `results()` column names emitted by the current Rust result rows.
 pub const DESEQ2_RESULT_CORE_COLUMNS: [&str; 6] = [
