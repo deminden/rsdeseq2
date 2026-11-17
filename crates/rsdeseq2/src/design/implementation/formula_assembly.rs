@@ -1,4 +1,5 @@
-fn expanded_formula_design_from_state<'a>(
+use super::*;
+pub(super) fn expanded_formula_design_from_state<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -229,7 +230,7 @@ fn expanded_formula_design_from_state<'a>(
     ))
 }
 
-fn formula_design_output(
+pub(super) fn formula_design_output(
     state: &ExpandedFormulaDesignState<'_>,
     expanded_design: DesignMatrix,
     standard_design: DesignMatrix,
@@ -276,7 +277,7 @@ fn formula_design_output(
     }
 }
 
-fn formula_used_factors<'a>(
+pub(super) fn formula_used_factors<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
 ) -> Result<Vec<ExpandedFactorSpec<'a>>, DeseqError> {
@@ -307,7 +308,7 @@ fn formula_used_factors<'a>(
     Ok(used)
 }
 
-fn formula_used_numeric_covariates<'a>(
+pub(super) fn formula_used_numeric_covariates<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<Vec<ExpandedNumericSpec<'a>>, DeseqError> {
@@ -344,7 +345,7 @@ fn formula_used_numeric_covariates<'a>(
     Ok(used)
 }
 
-fn push_unique_factor_spec<'a>(
+pub(super) fn push_unique_factor_spec<'a>(
     used: &mut Vec<ExpandedFactorSpec<'a>>,
     factor: ExpandedFactorSpec<'a>,
 ) -> Result<(), DeseqError> {
@@ -358,7 +359,7 @@ fn push_unique_factor_spec<'a>(
     Ok(())
 }
 
-fn push_unique_numeric_spec<'a>(
+pub(super) fn push_unique_numeric_spec<'a>(
     used: &mut Vec<ExpandedNumericSpec<'a>>,
     covariate: ExpandedNumericSpec<'a>,
 ) -> Result<(), DeseqError> {
@@ -372,7 +373,7 @@ fn push_unique_numeric_spec<'a>(
     Ok(())
 }
 
-fn formula_design_sample_count(
+pub(super) fn formula_design_sample_count(
     state: &ExpandedFormulaDesignState<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     used_numeric_covariates: &[ExpandedNumericSpec<'_>],
@@ -417,7 +418,7 @@ fn formula_design_sample_count(
     })
 }
 
-fn validate_formula_used_factor_specs(
+pub(super) fn validate_formula_used_factor_specs(
     factors: &[ExpandedFactorSpec<'_>],
     n_samples: usize,
 ) -> Result<(), DeseqError> {
@@ -447,7 +448,7 @@ fn validate_formula_used_factor_specs(
     Ok(())
 }
 
-fn formula_factor_spec<'a>(
+pub(super) fn formula_factor_spec<'a>(
     factor: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
 ) -> Result<ExpandedFactorSpec<'a>, DeseqError> {
@@ -460,7 +461,7 @@ fn formula_factor_spec<'a>(
         })
 }
 
-fn formula_numeric_spec<'a>(
+pub(super) fn formula_numeric_spec<'a>(
     numeric: &str,
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<ExpandedNumericSpec<'a>, DeseqError> {
@@ -475,7 +476,7 @@ fn formula_numeric_spec<'a>(
         })
 }
 
-fn formula_factor_levels<'a>(
+pub(super) fn formula_factor_levels<'a>(
     factor: &str,
     factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &'a [Vec<String>],
@@ -489,21 +490,27 @@ fn formula_factor_levels<'a>(
     Ok(&factor_levels[idx])
 }
 
-fn formula_has_factor_main_effect(state: &ExpandedFormulaDesignState<'_>, factor: &str) -> bool {
+pub(super) fn formula_has_factor_main_effect(
+    state: &ExpandedFormulaDesignState<'_>,
+    factor: &str,
+) -> bool {
     state
         .selected_factors
         .iter()
         .any(|candidate| candidate.factor == factor)
 }
 
-fn formula_has_numeric_main_effect(state: &ExpandedFormulaDesignState<'_>, numeric: &str) -> bool {
+pub(super) fn formula_has_numeric_main_effect(
+    state: &ExpandedFormulaDesignState<'_>,
+    numeric: &str,
+) -> bool {
     state
         .selected_numeric_covariates
         .iter()
         .any(|candidate| candidate.name == numeric)
 }
 
-fn push_formula_factor_interaction_standard_names(
+pub(super) fn push_formula_factor_interaction_standard_names(
     interaction: &ExpandedFactorInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -553,7 +560,7 @@ fn push_formula_factor_interaction_standard_names(
     Ok(())
 }
 
-fn push_formula_factor_numeric_standard_names(
+pub(super) fn push_formula_factor_numeric_standard_names(
     interaction: &ExpandedFactorNumericInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -592,7 +599,7 @@ fn push_formula_factor_numeric_standard_names(
     Ok(())
 }
 
-fn formula_higher_order_expanded_names(
+pub(super) fn formula_higher_order_expanded_names(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -600,7 +607,7 @@ fn formula_higher_order_expanded_names(
     formula_higher_order_names(interaction, used_factors, factor_levels, &|_| false)
 }
 
-fn push_formula_higher_order_standard_names(
+pub(super) fn push_formula_higher_order_standard_names(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -631,7 +638,7 @@ fn push_formula_higher_order_standard_names(
     Ok(())
 }
 
-fn formula_higher_order_names<F>(
+pub(super) fn formula_higher_order_names<F>(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -649,7 +656,7 @@ where
     )
 }
 
-fn formula_higher_order_names_with_choice_filter<F, G>(
+pub(super) fn formula_higher_order_names_with_choice_filter<F, G>(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &[Vec<String>],
@@ -696,7 +703,7 @@ where
     Ok(names)
 }
 
-fn formula_higher_order_level_grid<'a>(
+pub(super) fn formula_higher_order_level_grid<'a>(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &'a [Vec<String>],
@@ -709,7 +716,7 @@ fn formula_higher_order_level_grid<'a>(
     )
 }
 
-fn formula_higher_order_level_grid_with_treatment<'a, F>(
+pub(super) fn formula_higher_order_level_grid_with_treatment<'a, F>(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
     used_factors: &[ExpandedFactorSpec<'_>],
     factor_levels: &'a [Vec<String>],
@@ -746,7 +753,7 @@ where
     Ok(grids)
 }
 
-fn formula_higher_order_interaction_name(
+pub(super) fn formula_higher_order_interaction_name(
     interaction: &FormulaHigherOrderInteractionSpec<'_>,
 ) -> String {
     interaction
@@ -757,14 +764,14 @@ fn formula_higher_order_interaction_name(
         .join(":")
 }
 
-struct FormulaFactorInteractionPiece<'a> {
+pub(super) struct FormulaFactorInteractionPiece<'a> {
     factor: &'a str,
     level: &'a str,
     reference: &'a str,
     use_treatment_name: bool,
 }
 
-fn formula_factor_interaction_standard_name(
+pub(super) fn formula_factor_interaction_standard_name(
     left: FormulaFactorInteractionPiece<'_>,
     right: FormulaFactorInteractionPiece<'_>,
 ) -> String {
@@ -781,7 +788,7 @@ fn formula_factor_interaction_standard_name(
     format!("{left}:{right}")
 }
 
-fn add_factor_numeric_formula_interaction<'a>(
+pub(super) fn add_factor_numeric_formula_interaction<'a>(
     factor: &'a str,
     numeric: &'a str,
     factor_numeric_interactions: &mut Vec<ExpandedFactorNumericInteractionSpec<'a>>,
@@ -797,7 +804,7 @@ fn add_factor_numeric_formula_interaction<'a>(
     Ok(())
 }
 
-fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
+pub(super) fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
     let pieces = split_formula_top_level(term, delimiter)?;
     if pieces.len() < 2 || pieces.iter().any(|piece| piece.is_empty()) {
         return Err(DeseqError::InvalidOptions {

@@ -1,3 +1,4 @@
+use super::*;
 // Public formula design entry points.
 
 /// Build an expanded additive design from a primitive DESeq2-style formula subset.
@@ -53,7 +54,7 @@ pub fn expanded_formula_design_with_offsets<'a>(
     formula_design_with_column_order(formula, factors, numeric_covariates, false)
 }
 
-fn formula_design_with_column_order<'a>(
+pub(super) fn formula_design_with_column_order<'a>(
     formula: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -99,7 +100,7 @@ fn formula_design_with_column_order<'a>(
     };
 
     let rhs = expand_parenthesized_formula_terms(&rhs)?;
-    state.frame_order = super::formula_origin::formula_variables(&format!("~{rhs}"))?;
+    state.frame_order = super::super::formula_origin::formula_variables(&format!("~{rhs}"))?;
     for (sign, raw_term) in split_formula_signed_terms(&rhs)? {
         (|| -> Result<(), DeseqError> {
             let term = raw_term.trim();
@@ -177,7 +178,7 @@ fn formula_design_with_column_order<'a>(
             &derived_factor_covariates,
         )?
     };
-    let origin = DesignOrigin::formula(super::formula_origin::formula_variables(formula)?)?
+    let origin = DesignOrigin::formula(super::super::formula_origin::formula_variables(formula)?)?
         .with_ordered_factors(
             derived_factor_covariates
                 .iter()

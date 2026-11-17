@@ -1,13 +1,14 @@
+use super::*;
 // Ordered factors use the same polynomial coding and product plan as the R
 // primitive interface. Unordered expanded columns retain full indicators.
-fn formula_ordered_design(
+pub(super) fn formula_ordered_design(
     state: &ExpandedFormulaDesignState<'_>,
     factors: &[ExpandedFactorSpec<'_>],
     numeric: &[ExpandedNumericSpec<'_>],
     derived: &[FormulaDerivedFactorCovariate],
     samples: usize,
 ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
-    use super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
+    use super::super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
     use crate::matrix::{MatrixOrder, MatrixView};
     let ordered = factors
         .iter()

@@ -1,6 +1,7 @@
+use super::*;
 // Polynomial transform argument handling.
 
-fn formula_numeric_poly_term(
+pub(super) fn formula_numeric_poly_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<FormulaNumericTransformExpansion, DeseqError> {
@@ -53,7 +54,11 @@ fn formula_numeric_poly_term(
         if let Some((key, value)) = split_formula_named_argument(trimmed) {
             match key.as_str() {
                 "x" => {
-                    reject_duplicate_formula_poly_argument(numeric_text.is_some(), "x", expression)?;
+                    reject_duplicate_formula_poly_argument(
+                        numeric_text.is_some(),
+                        "x",
+                        expression,
+                    )?;
                     numeric_text = Some(value.to_string());
                     continue;
                 }
@@ -136,7 +141,12 @@ fn formula_numeric_poly_term(
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;
     if raw {
-        return formula_numeric_raw_poly_columns(expression, numeric_name, covariate.values, degree);
+        return formula_numeric_raw_poly_columns(
+            expression,
+            numeric_name,
+            covariate.values,
+            degree,
+        );
     }
     formula_numeric_orthogonal_poly_columns(expression, numeric_name, covariate.values, degree)
 }

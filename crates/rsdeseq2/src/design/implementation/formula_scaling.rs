@@ -1,6 +1,7 @@
+use super::*;
 // Numeric scaling transforms and their options.
 
-fn formula_numeric_scale_term(
+pub(super) fn formula_numeric_scale_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
@@ -112,12 +113,16 @@ fn formula_numeric_scale_term(
     let numeric_name = covariate.name;
     let option_value = |option| match option {
         FormulaScaleOption::Auto => {
-            super::expression::Value::new(super::expression::Data::Logical(vec![Some(true)]))
+            super::super::expression::Value::new(super::super::expression::Data::Logical(vec![
+                Some(true),
+            ]))
         }
         FormulaScaleOption::Disabled => {
-            super::expression::Value::new(super::expression::Data::Logical(vec![Some(false)]))
+            super::super::expression::Value::new(super::super::expression::Data::Logical(vec![
+                Some(false),
+            ]))
         }
-        FormulaScaleOption::Explicit(value) => super::expression::Value::scalar(value),
+        FormulaScaleOption::Explicit(value) => super::super::expression::Value::scalar(value),
     };
     let values = formula_call_values(
         "scale",
@@ -140,7 +145,7 @@ fn formula_numeric_scale_term(
     Ok((format!("{numeric_name}_{label}"), values))
 }
 
-fn parse_formula_scale_option(
+pub(super) fn parse_formula_scale_option(
     value: &str,
     argument: &str,
     expression: &str,

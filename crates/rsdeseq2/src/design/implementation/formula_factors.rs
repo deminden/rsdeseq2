@@ -1,4 +1,5 @@
-fn expand_formula_factor_transform_terms(
+use super::*;
+pub(super) fn expand_formula_factor_transform_terms(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<(String, Vec<FormulaDerivedFactorCovariate>), DeseqError> {
@@ -26,12 +27,12 @@ fn expand_formula_factor_transform_terms(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FormulaFactorTransform {
+pub(super) struct FormulaFactorTransform {
     name: &'static str,
     label: &'static str,
 }
 
-const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 6] = [
+pub(super) const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 6] = [
     FormulaFactorTransform {
         name: "as.factor",
         label: "as.factor",
@@ -58,16 +59,15 @@ const FORMULA_FACTOR_TRANSFORMS: [FormulaFactorTransform; 6] = [
     },
 ];
 
-fn next_formula_factor_transform(rhs: &str) -> Option<(usize, usize, FormulaFactorTransform)> {
+pub(super) fn next_formula_factor_transform(
+    rhs: &str,
+) -> Option<(usize, usize, FormulaFactorTransform)> {
     let mut in_backticks = false;
     let mut quote = None;
     let mut escaped_quote = false;
     let mut idx = 0_usize;
     while idx < rhs.len() {
-        let character = rhs[idx..]
-            .chars()
-            .next()
-            ?;
+        let character = rhs[idx..].chars().next()?;
         if let Some(active_quote) = quote {
             if escaped_quote {
                 escaped_quote = false;
@@ -101,7 +101,7 @@ fn next_formula_factor_transform(rhs: &str) -> Option<(usize, usize, FormulaFact
     None
 }
 
-fn formula_factor_transform_term(
+pub(super) fn formula_factor_transform_term(
     transform: FormulaFactorTransform,
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -112,15 +112,17 @@ fn formula_factor_transform_term(
         "factor" | "as.factor" | "ordered" | "as.ordered" => {
             formula_factor_identity_transform_term(transform, expression, factors)
         }
-        _ => Err(crate::errors::invariant("validated formula factor transform")),
+        _ => Err(crate::errors::invariant(
+            "validated formula factor transform",
+        )),
     }
 }
 
-fn formula_factor_transform_accepts_levels(transform: FormulaFactorTransform) -> bool {
+pub(super) fn formula_factor_transform_accepts_levels(transform: FormulaFactorTransform) -> bool {
     matches!(transform.label, "factor" | "ordered")
 }
 
-fn formula_factor_identity_transform_term(
+pub(super) fn formula_factor_identity_transform_term(
     transform: FormulaFactorTransform,
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -266,7 +268,7 @@ fn formula_factor_identity_transform_term(
     )
 }
 
-fn formula_relevel_transform_term(
+pub(super) fn formula_relevel_transform_term(
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
@@ -367,7 +369,7 @@ fn formula_relevel_transform_term(
     )
 }
 
-fn resolve_formula_factor_reference_alias(
+pub(super) fn resolve_formula_factor_reference_alias(
     factor: &FormulaDerivedFactorCovariate,
     requested: &str,
 ) -> Result<String, DeseqError> {
@@ -377,7 +379,9 @@ fn resolve_formula_factor_reference_alias(
         .map(str::to_string)
 }
 
-fn formula_factor_level_candidates(factor: &FormulaDerivedFactorCovariate) -> Vec<String> {
+pub(super) fn formula_factor_level_candidates(
+    factor: &FormulaDerivedFactorCovariate,
+) -> Vec<String> {
     let mut levels = Vec::new();
     if let Some(declared) = &factor.levels {
         for level in declared {
@@ -394,7 +398,7 @@ fn formula_factor_level_candidates(factor: &FormulaDerivedFactorCovariate) -> Ve
     levels
 }
 
-fn formula_factor_argument_covariate(
+pub(super) fn formula_factor_argument_covariate(
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
@@ -424,7 +428,7 @@ fn formula_factor_argument_covariate(
     })
 }
 
-fn formula_transform_inner_expression(
+pub(super) fn formula_transform_inner_expression(
     expression: &str,
     transform: FormulaFactorTransform,
 ) -> Option<&str> {
@@ -433,7 +437,7 @@ fn formula_transform_inner_expression(
     trimmed[after_open..].strip_suffix(')')
 }
 
-fn find_formula_factor<'a>(
+pub(super) fn find_formula_factor<'a>(
     factor_name: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
 ) -> Result<&'a ExpandedFactorSpec<'a>, DeseqError> {

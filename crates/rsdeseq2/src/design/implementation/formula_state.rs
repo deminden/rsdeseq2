@@ -1,4 +1,5 @@
-fn remove_formula_term<'a>(
+use super::*;
+pub(super) fn remove_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -45,15 +46,14 @@ fn remove_formula_term<'a>(
     remove_main_formula_term(term, factors, numeric_covariates, state)
 }
 
-fn add_star_formula_term<'a>(
+pub(super) fn add_star_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '*')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     for alternative in &alternatives {
         for variable in alternative {
             add_main_formula_term(
@@ -102,15 +102,14 @@ fn add_star_formula_term<'a>(
     Ok(())
 }
 
-fn add_nested_formula_term<'a>(
+pub(super) fn add_nested_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '/')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     for variable in &alternatives[0] {
         add_main_formula_term(
             variable,
@@ -148,15 +147,14 @@ fn add_nested_formula_term<'a>(
     Ok(())
 }
 
-fn remove_star_formula_term<'a>(
+pub(super) fn remove_star_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '*')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     for alternative in &alternatives {
         for variable in alternative {
             remove_main_formula_term(variable, factors, numeric_covariates, state)?;
@@ -197,15 +195,14 @@ fn remove_star_formula_term<'a>(
     Ok(())
 }
 
-fn remove_nested_formula_term<'a>(
+pub(super) fn remove_nested_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '/')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     for variable in &alternatives[0] {
         remove_main_formula_term(variable, factors, numeric_covariates, state)?;
     }
@@ -235,7 +232,7 @@ fn remove_nested_formula_term<'a>(
     Ok(())
 }
 
-fn add_power_formula_term<'a>(
+pub(super) fn add_power_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -244,7 +241,7 @@ fn add_power_formula_term<'a>(
     apply_power_formula_term(term, factors, numeric_covariates, state, true)
 }
 
-fn remove_power_formula_term<'a>(
+pub(super) fn remove_power_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -253,7 +250,7 @@ fn remove_power_formula_term<'a>(
     apply_power_formula_term(term, factors, numeric_covariates, state, false)
 }
 
-fn apply_power_formula_term<'a>(
+pub(super) fn apply_power_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -313,14 +310,22 @@ fn apply_power_formula_term<'a>(
                     state,
                 )?;
             } else {
-                remove_higher_order_formula_interaction(&product, factors, numeric_covariates, state)?;
+                remove_higher_order_formula_interaction(
+                    &product,
+                    factors,
+                    numeric_covariates,
+                    state,
+                )?;
             }
         }
     }
     Ok(())
 }
 
-fn parse_formula_state_interaction_power(term: &str, exponent: &str) -> Result<usize, DeseqError> {
+pub(super) fn parse_formula_state_interaction_power(
+    term: &str,
+    exponent: &str,
+) -> Result<usize, DeseqError> {
     let exponent = exponent.trim();
     if exponent.is_empty() {
         return Err(DeseqError::InvalidOptions {
@@ -330,21 +335,17 @@ fn parse_formula_state_interaction_power(term: &str, exponent: &str) -> Result<u
     let order = exponent
         .parse::<usize>()
         .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!(
-                "formula power term '{term}' requires a positive integer exponent"
-            ),
+            reason: format!("formula power term '{term}' requires a positive integer exponent"),
         })?;
     if order == 0 {
         return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula power term '{term}' requires a positive integer exponent"
-            ),
+            reason: format!("formula power term '{term}' requires a positive integer exponent"),
         });
     }
     Ok(order)
 }
 
-fn add_main_formula_term<'a>(
+pub(super) fn add_main_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -392,7 +393,7 @@ fn add_main_formula_term<'a>(
     })
 }
 
-fn remove_main_formula_term<'a>(
+pub(super) fn remove_main_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -424,7 +425,7 @@ fn remove_main_formula_term<'a>(
     })
 }
 
-fn add_formula_dot_main_terms<'a>(
+pub(super) fn add_formula_dot_main_terms<'a>(
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     selected_factors: &mut Vec<ExpandedFactorSpec<'a>>,
@@ -448,7 +449,7 @@ fn add_formula_dot_main_terms<'a>(
     }
 }
 
-fn formula_piece_variable_alternatives<'a>(
+pub(super) fn formula_piece_variable_alternatives<'a>(
     pieces: &[String],
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -459,7 +460,7 @@ fn formula_piece_variable_alternatives<'a>(
         .collect()
 }
 
-fn formula_piece_variables<'a>(
+pub(super) fn formula_piece_variables<'a>(
     piece: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -485,7 +486,7 @@ fn formula_piece_variables<'a>(
     }
 }
 
-fn formula_alternative_combinations<'a>(
+pub(super) fn formula_alternative_combinations<'a>(
     alternatives: &'a [Vec<&'a str>],
     order: usize,
 ) -> Result<Vec<Vec<Vec<&'a str>>>, DeseqError> {
@@ -517,7 +518,9 @@ fn formula_alternative_combinations<'a>(
     Ok(output)
 }
 
-fn formula_variable_alternative_products<'a>(alternatives: &[Vec<&'a str>]) -> Result<Vec<Vec<&'a str>>, DeseqError> {
+pub(super) fn formula_variable_alternative_products<'a>(
+    alternatives: &[Vec<&'a str>],
+) -> Result<Vec<Vec<&'a str>>, DeseqError> {
     alternatives.iter().try_fold(1usize, |count, group| {
         let size = count.saturating_mul(group.len());
         check_expansion_size(size)?;
@@ -538,7 +541,10 @@ fn formula_variable_alternative_products<'a>(alternatives: &[Vec<&'a str>]) -> R
     Ok(products)
 }
 
-fn formula_variable_combinations<'a>(variables: &[&'a str], order: usize) -> Result<Vec<Vec<&'a str>>, DeseqError> {
+pub(super) fn formula_variable_combinations<'a>(
+    variables: &[&'a str],
+    order: usize,
+) -> Result<Vec<Vec<&'a str>>, DeseqError> {
     check_combination_count(variables.len(), order)?;
     fn push_combinations<'a>(
         variables: &[&'a str],
@@ -566,31 +572,39 @@ fn formula_variable_combinations<'a>(variables: &[&'a str], order: usize) -> Res
     Ok(output)
 }
 
-fn formula_variables_are_unique(variables: &[&str]) -> bool {
+pub(super) fn formula_variables_are_unique(variables: &[&str]) -> bool {
     variables
         .iter()
         .enumerate()
         .all(|(idx, variable)| !variables[..idx].contains(variable))
 }
 
-fn add_interaction_formula_term<'a>(
+pub(super) fn add_interaction_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, ':')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     let has_dot = pieces.iter().any(|piece| piece == ".");
     let mut added_any = false;
     for product in formula_variable_alternative_products(&alternatives)? {
         let mut unique = Vec::new();
-        for variable in product { if !unique.contains(&variable) { unique.push(variable); } }
+        for variable in product {
+            if !unique.contains(&variable) {
+                unique.push(variable);
+            }
+        }
         let product = unique;
         if product.len() == 1 {
-            add_main_formula_term(product[0], factors, numeric_covariates,
-                &mut state.selected_factors, &mut state.selected_numeric_covariates)?;
+            add_main_formula_term(
+                product[0],
+                factors,
+                numeric_covariates,
+                &mut state.selected_factors,
+                &mut state.selected_numeric_covariates,
+            )?;
         } else if product.len() == 2 {
             add_pairwise_formula_interaction(
                 product[0],
@@ -619,7 +633,7 @@ fn add_interaction_formula_term<'a>(
     Ok(())
 }
 
-fn add_pairwise_formula_interaction<'a>(
+pub(super) fn add_pairwise_formula_interaction<'a>(
     left: &str,
     right: &str,
     display_term: &str,
@@ -708,20 +722,23 @@ fn add_pairwise_formula_interaction<'a>(
     Ok(())
 }
 
-fn remove_interaction_formula_term<'a>(
+pub(super) fn remove_interaction_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, ':')?;
-    let alternatives =
-        formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
+    let alternatives = formula_piece_variable_alternatives(&pieces, factors, numeric_covariates)?;
     let has_dot = pieces.iter().any(|piece| piece == ".");
     let mut removed_any = false;
     for product in formula_variable_alternative_products(&alternatives)? {
         let mut unique = Vec::new();
-        for variable in product { if !unique.contains(&variable) { unique.push(variable); } }
+        for variable in product {
+            if !unique.contains(&variable) {
+                unique.push(variable);
+            }
+        }
         let product = unique;
         if product.len() == 1 {
             remove_main_formula_term(product[0], factors, numeric_covariates, state)?;
@@ -734,12 +751,7 @@ fn remove_interaction_formula_term<'a>(
                 state,
             )?;
         } else {
-            remove_higher_order_formula_interaction(
-                &product,
-                factors,
-                numeric_covariates,
-                state,
-            )?;
+            remove_higher_order_formula_interaction(&product, factors, numeric_covariates, state)?;
         }
         removed_any = true;
     }
@@ -751,7 +763,7 @@ fn remove_interaction_formula_term<'a>(
     Ok(())
 }
 
-fn remove_pairwise_formula_interaction<'a>(
+pub(super) fn remove_pairwise_formula_interaction<'a>(
     left: &str,
     right: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -766,7 +778,8 @@ fn remove_pairwise_formula_interaction<'a>(
         });
     }
     let left_variable = resolve_formula_variable(left_variable_name, factors, numeric_covariates)?;
-    let right_variable = resolve_formula_variable(right_variable_name, factors, numeric_covariates)?;
+    let right_variable =
+        resolve_formula_variable(right_variable_name, factors, numeric_covariates)?;
     match (&left_variable, &right_variable) {
         (FormulaVariableRef::Factor(left_factor), FormulaVariableRef::Factor(right_factor)) => {
             state.factor_interactions.retain(|interaction| {
@@ -794,7 +807,7 @@ fn remove_pairwise_formula_interaction<'a>(
     Ok(())
 }
 
-fn add_higher_order_formula_interaction<'a>(
+pub(super) fn add_higher_order_formula_interaction<'a>(
     pieces: &[&str],
     display_term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -821,7 +834,11 @@ fn add_higher_order_formula_interaction<'a>(
                 ),
             });
         }
-        variables.push(resolve_formula_variable(variable_name, factors, numeric_covariates)?);
+        variables.push(resolve_formula_variable(
+            variable_name,
+            factors,
+            numeric_covariates,
+        )?);
     }
     if state
         .higher_order_interactions
@@ -836,7 +853,7 @@ fn add_higher_order_formula_interaction<'a>(
     Ok(())
 }
 
-fn remove_higher_order_formula_interaction<'a>(
+pub(super) fn remove_higher_order_formula_interaction<'a>(
     pieces: &[&str],
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -861,7 +878,11 @@ fn remove_higher_order_formula_interaction<'a>(
                 ),
             });
         }
-        variables.push(resolve_formula_variable(variable_name, factors, numeric_covariates)?);
+        variables.push(resolve_formula_variable(
+            variable_name,
+            factors,
+            numeric_covariates,
+        )?);
     }
     state
         .higher_order_interactions
@@ -869,7 +890,7 @@ fn remove_higher_order_formula_interaction<'a>(
     Ok(())
 }
 
-fn resolve_formula_variable<'a>(
+pub(super) fn resolve_formula_variable<'a>(
     variable: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -930,7 +951,9 @@ fn resolve_formula_variable<'a>(
         .collect::<Vec<_>>();
     if factor_aliases.len() + numeric_aliases.len() > 1 {
         return Err(DeseqError::InvalidOptions {
-            reason: format!("formula variable '{variable}' resolves ambiguously after R-style cleanup"),
+            reason: format!(
+                "formula variable '{variable}' resolves ambiguously after R-style cleanup"
+            ),
         });
     }
     if let [factor] = factor_aliases.as_slice() {
@@ -944,7 +967,7 @@ fn resolve_formula_variable<'a>(
     })
 }
 
-fn resolved_formula_variable_name<'a>(
+pub(super) fn resolved_formula_variable_name<'a>(
     variable: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
@@ -956,7 +979,7 @@ fn resolved_formula_variable_name<'a>(
     }
 }
 
-fn same_formula_variable_set(
+pub(super) fn same_formula_variable_set(
     left: &[FormulaVariableRef<'_>],
     right: &[FormulaVariableRef<'_>],
 ) -> bool {

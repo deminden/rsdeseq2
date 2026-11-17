@@ -1,15 +1,16 @@
+use super::*;
 // R terms deduplicates language expressions before model.offset sums them.
 // Compare lexical primitives, not evaluated vectors: different variables can
 // contain identical values and must still contribute independently.
 #[derive(PartialEq)]
-enum FormulaOffsetToken {
+pub(super) enum FormulaOffsetToken {
     Symbol(String),
     Number(u64, bool),
     Text(String),
     Punctuation(char),
 }
 
-fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetToken>, DeseqError> {
+pub(super) fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetToken>, DeseqError> {
     let mut tokens = Vec::new();
     let mut at = 0;
     while at < expression.len() {

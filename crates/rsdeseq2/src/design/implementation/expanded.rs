@@ -1,3 +1,4 @@
+use super::*;
 /// Build a primitive expanded one-factor design and matching standard design.
 ///
 /// The expanded matrix has columns `Intercept`, then one indicator per factor

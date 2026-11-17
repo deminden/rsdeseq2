@@ -1,6 +1,9 @@
+use super::*;
 // A factor in an interaction is contrasted only when the complementary term
 // is present. This metadata rule is shared by both compatibility layouts.
-fn formula_term_variables<'a>(state: &'a ExpandedFormulaDesignState<'_>) -> Vec<Vec<&'a str>> {
+pub(super) fn formula_term_variables<'a>(
+    state: &'a ExpandedFormulaDesignState<'_>,
+) -> Vec<Vec<&'a str>> {
     let mut terms = Vec::new();
     terms.extend(state.selected_factors.iter().map(|f| vec![f.factor]));
     terms.extend(
@@ -36,7 +39,7 @@ fn formula_term_variables<'a>(state: &'a ExpandedFormulaDesignState<'_>) -> Vec<
     terms
 }
 
-fn formula_factor_has_complement(
+pub(super) fn formula_factor_has_complement(
     state: &ExpandedFormulaDesignState<'_>,
     factor: &str,
     variables: &[&str],

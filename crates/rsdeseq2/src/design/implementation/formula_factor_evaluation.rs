@@ -1,14 +1,15 @@
+use super::*;
 // Factor operations and recoding execute in the shared expression engine.
 // This adapter translates labels and the compatibility API's reference metadata.
-fn formula_text_value(values: &[String]) -> super::expression::Value {
-    super::expression::Value::new(super::expression::Data::Text(
+pub(super) fn formula_text_value(values: &[String]) -> super::super::expression::Value {
+    super::super::expression::Value::new(super::super::expression::Data::Text(
         values.iter().cloned().map(Some).collect(),
     ))
 }
 
-fn formula_factor_result(
+pub(super) fn formula_factor_result(
     name: String,
-    primitive: super::expression::Value,
+    primitive: super::super::expression::Value,
     preferred_reference: Option<&str>,
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     let levels = primitive

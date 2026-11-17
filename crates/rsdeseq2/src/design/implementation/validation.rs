@@ -1,4 +1,7 @@
-fn validate_additive_factor_specs(factors: &[ExpandedFactorSpec<'_>]) -> Result<(), DeseqError> {
+use super::*;
+pub(super) fn validate_additive_factor_specs(
+    factors: &[ExpandedFactorSpec<'_>],
+) -> Result<(), DeseqError> {
     if factors.is_empty() {
         return Err(DeseqError::InvalidOptions {
             reason: "at least one factor is required".to_string(),
@@ -31,7 +34,7 @@ fn validate_additive_factor_specs(factors: &[ExpandedFactorSpec<'_>]) -> Result<
     Ok(())
 }
 
-fn additive_design_sample_count(
+pub(super) fn additive_design_sample_count(
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<usize, DeseqError> {
@@ -51,7 +54,7 @@ fn additive_design_sample_count(
     Ok(covariate.values.len())
 }
 
-fn validate_numeric_covariate_specs(
+pub(super) fn validate_numeric_covariate_specs(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
     n_samples: usize,
 ) -> Result<(), DeseqError> {
@@ -91,7 +94,7 @@ fn validate_numeric_covariate_specs(
     Ok(())
 }
 
-fn resolve_interaction_indices(
+pub(super) fn resolve_interaction_indices(
     factors: &[ExpandedFactorSpec<'_>],
     interactions: &[ExpandedFactorInteractionSpec<'_>],
 ) -> Result<Vec<(usize, usize)>, DeseqError> {
@@ -130,7 +133,7 @@ fn resolve_interaction_indices(
     Ok(indices)
 }
 
-fn resolve_factor_numeric_interaction_indices(
+pub(super) fn resolve_factor_numeric_interaction_indices(
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
     interactions: &[ExpandedFactorNumericInteractionSpec<'_>],
@@ -158,7 +161,7 @@ fn resolve_factor_numeric_interaction_indices(
     Ok(indices)
 }
 
-fn resolve_numeric_interaction_indices(
+pub(super) fn resolve_numeric_interaction_indices(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
     interactions: &[ExpandedNumericInteractionSpec<'_>],
 ) -> Result<Vec<(usize, usize)>, DeseqError> {
@@ -197,7 +200,10 @@ fn resolve_numeric_interaction_indices(
     Ok(indices)
 }
 
-fn factor_index(factors: &[ExpandedFactorSpec<'_>], factor: &str) -> Result<usize, DeseqError> {
+pub(super) fn factor_index(
+    factors: &[ExpandedFactorSpec<'_>],
+    factor: &str,
+) -> Result<usize, DeseqError> {
     factors
         .iter()
         .position(|candidate| candidate.factor == factor)
@@ -206,7 +212,7 @@ fn factor_index(factors: &[ExpandedFactorSpec<'_>], factor: &str) -> Result<usiz
         })
 }
 
-fn numeric_index(
+pub(super) fn numeric_index(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
     numeric: &str,
 ) -> Result<usize, DeseqError> {
@@ -220,7 +226,10 @@ fn numeric_index(
         })
 }
 
-fn validate_unique_coefficient_names(names: &[String], context: &str) -> Result<(), DeseqError> {
+pub(super) fn validate_unique_coefficient_names(
+    names: &[String],
+    context: &str,
+) -> Result<(), DeseqError> {
     for (idx, name) in names.iter().enumerate() {
         if names[..idx].iter().any(|previous| previous == name) {
             return Err(DeseqError::InvalidOptions {
@@ -231,7 +240,7 @@ fn validate_unique_coefficient_names(names: &[String], context: &str) -> Result<
     Ok(())
 }
 
-fn validate_factor_design_inputs<S: AsRef<str>>(
+pub(super) fn validate_factor_design_inputs<S: AsRef<str>>(
     factor: &str,
     sample_levels: &[S],
     reference: &str,
@@ -264,7 +273,7 @@ fn validate_factor_design_inputs<S: AsRef<str>>(
     Ok(())
 }
 
-fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
+pub(super) fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
     factor: &str,
     sample_levels: &[S],
     reference: &str,
@@ -306,8 +315,7 @@ fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
             r_like_make_name(previous) == cleaned_level
                 && previous.as_str() != cleaned_level
                 && level.as_str() != cleaned_level
-        })
-        {
+        }) {
             return Err(DeseqError::InvalidOptions {
                 reason: format!(
                     "factor '{factor}' declared level '{level}' resolves ambiguously after R-style cleanup"
@@ -336,7 +344,7 @@ fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
     Ok(())
 }
 
-fn ordered_levels<S: AsRef<str>>(sample_levels: &[S], reference: &str) -> Vec<String> {
+pub(super) fn ordered_levels<S: AsRef<str>>(sample_levels: &[S], reference: &str) -> Vec<String> {
     let mut levels = vec![reference.to_string()];
     for level in sample_levels {
         let level = level.as_ref();
@@ -347,7 +355,7 @@ fn ordered_levels<S: AsRef<str>>(sample_levels: &[S], reference: &str) -> Vec<St
     levels
 }
 
-fn ordered_levels_with_declared<S: AsRef<str>>(
+pub(super) fn ordered_levels_with_declared<S: AsRef<str>>(
     sample_levels: &[S],
     reference: &str,
     levels: Option<&[String]>,
@@ -364,15 +372,19 @@ fn ordered_levels_with_declared<S: AsRef<str>>(
     ordered
 }
 
-fn expanded_factor_coefficient_name(factor: &str, level: &str) -> String {
+pub(super) fn expanded_factor_coefficient_name(factor: &str, level: &str) -> String {
     format!("{factor}{level}")
 }
 
-fn standard_factor_coefficient_name(factor: &str, level: &str, reference: &str) -> String {
+pub(super) fn standard_factor_coefficient_name(
+    factor: &str,
+    level: &str,
+    reference: &str,
+) -> String {
     format!("{factor}_{level}_vs_{reference}")
 }
 
-fn interaction_coefficient_name(
+pub(super) fn interaction_coefficient_name(
     left_factor: &str,
     left_level: &str,
     right_factor: &str,
@@ -381,7 +393,7 @@ fn interaction_coefficient_name(
     format!("{left_factor}{left_level}:{right_factor}{right_level}")
 }
 
-fn standard_interaction_coefficient_name(
+pub(super) fn standard_interaction_coefficient_name(
     left_factor: &str,
     left_level: &str,
     left_reference: &str,
@@ -394,11 +406,15 @@ fn standard_interaction_coefficient_name(
     )
 }
 
-fn factor_numeric_interaction_coefficient_name(factor: &str, level: &str, numeric: &str) -> String {
+pub(super) fn factor_numeric_interaction_coefficient_name(
+    factor: &str,
+    level: &str,
+    numeric: &str,
+) -> String {
     format!("{factor}{level}:{numeric}")
 }
 
-fn standard_factor_numeric_interaction_coefficient_name(
+pub(super) fn standard_factor_numeric_interaction_coefficient_name(
     factor: &str,
     level: &str,
     reference: &str,
@@ -407,7 +423,10 @@ fn standard_factor_numeric_interaction_coefficient_name(
     format!("{factor}_{level}_vs_{reference}:{numeric}")
 }
 
-fn numeric_interaction_coefficient_name(left_numeric: &str, right_numeric: &str) -> String {
+pub(super) fn numeric_interaction_coefficient_name(
+    left_numeric: &str,
+    right_numeric: &str,
+) -> String {
     format!("{left_numeric}:{right_numeric}")
 }
 
@@ -446,7 +465,7 @@ pub(crate) fn r_like_make_name(raw: &str) -> String {
     out
 }
 
-fn is_r_reserved_word(name: &str) -> bool {
+pub(super) fn is_r_reserved_word(name: &str) -> bool {
     matches!(
         name,
         "if" | "else"

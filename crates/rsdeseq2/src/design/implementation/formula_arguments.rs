@@ -1,6 +1,7 @@
+use super::*;
 // Shared transform arguments, options and string parsing.
 
-fn reject_duplicate_formula_poly_argument(
+pub(super) fn reject_duplicate_formula_poly_argument(
     seen: bool,
     argument: &str,
     expression: &str,
@@ -8,7 +9,7 @@ fn reject_duplicate_formula_poly_argument(
     reject_duplicate_formula_transform_argument(seen, "poly", argument, expression)
 }
 
-fn reject_duplicate_formula_transform_argument(
+pub(super) fn reject_duplicate_formula_transform_argument(
     seen: bool,
     transform: &str,
     argument: &str,
@@ -24,7 +25,7 @@ fn reject_duplicate_formula_transform_argument(
     Ok(())
 }
 
-fn split_formula_named_argument(argument: &str) -> Option<(String, &str)> {
+pub(super) fn split_formula_named_argument(argument: &str) -> Option<(String, &str)> {
     let equals = formula_top_level_equals_index(argument)?;
     let (key, value_with_equals) = argument.split_at(equals);
     let value = &value_with_equals[1..];
@@ -35,7 +36,7 @@ fn split_formula_named_argument(argument: &str) -> Option<(String, &str)> {
     Some((key, value.trim()))
 }
 
-fn formula_top_level_equals_index(argument: &str) -> Option<usize> {
+pub(super) fn formula_top_level_equals_index(argument: &str) -> Option<usize> {
     let mut depth = 0_i32;
     let mut in_backticks = false;
     let mut quote = None;
@@ -72,7 +73,7 @@ fn formula_top_level_equals_index(argument: &str) -> Option<usize> {
     None
 }
 
-fn parse_formula_bool_option(
+pub(super) fn parse_formula_bool_option(
     value: &str,
     argument: &str,
     expression: &str,
@@ -93,7 +94,7 @@ fn parse_formula_bool_option(
     }
 }
 
-fn parse_formula_string_argument(
+pub(super) fn parse_formula_string_argument(
     value: &str,
     transform: &str,
     argument: &str,
@@ -115,7 +116,7 @@ fn parse_formula_string_argument(
     Ok(parsed)
 }
 
-fn parse_formula_quoted_string(
+pub(super) fn parse_formula_quoted_string(
     value: &str,
     transform: &str,
     argument: &str,
@@ -159,7 +160,7 @@ fn parse_formula_quoted_string(
     Ok(parsed)
 }
 
-fn parse_formula_string_vector_argument(
+pub(super) fn parse_formula_string_vector_argument(
     value: &str,
     transform: &str,
     argument: &str,
@@ -203,7 +204,7 @@ fn parse_formula_string_vector_argument(
     Ok(levels)
 }
 
-fn formula_string_vector_label(values: &[String]) -> String {
+pub(super) fn formula_string_vector_label(values: &[String]) -> String {
     let quoted = values
         .iter()
         .map(|value| format!("\"{}\"", formula_quote_string(value)))
@@ -211,7 +212,7 @@ fn formula_string_vector_label(values: &[String]) -> String {
     format!("c({})", quoted.join(", "))
 }
 
-fn formula_quote_string(value: &str) -> String {
+pub(super) fn formula_quote_string(value: &str) -> String {
     let mut quoted = String::with_capacity(value.len());
     for character in value.chars() {
         match character {

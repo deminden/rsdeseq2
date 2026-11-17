@@ -1,56 +1,57 @@
+use super::*;
 // Private state and derived-covariate types shared by the formula implementation.
 
-struct ExpandedFormulaDesignState<'a> {
-    frame_order: Vec<String>,
-    term_order: Option<Vec<Vec<String>>>,
-    has_intercept: bool,
-    selected_factors: Vec<ExpandedFactorSpec<'a>>,
-    selected_numeric_covariates: Vec<ExpandedNumericSpec<'a>>,
-    factor_interactions: Vec<ExpandedFactorInteractionSpec<'a>>,
-    factor_numeric_interactions: Vec<ExpandedFactorNumericInteractionSpec<'a>>,
-    numeric_interactions: Vec<ExpandedNumericInteractionSpec<'a>>,
-    higher_order_interactions: Vec<FormulaHigherOrderInteractionSpec<'a>>,
+pub(super) struct ExpandedFormulaDesignState<'a> {
+    pub(super) frame_order: Vec<String>,
+    pub(super) term_order: Option<Vec<Vec<String>>>,
+    pub(super) has_intercept: bool,
+    pub(super) selected_factors: Vec<ExpandedFactorSpec<'a>>,
+    pub(super) selected_numeric_covariates: Vec<ExpandedNumericSpec<'a>>,
+    pub(super) factor_interactions: Vec<ExpandedFactorInteractionSpec<'a>>,
+    pub(super) factor_numeric_interactions: Vec<ExpandedFactorNumericInteractionSpec<'a>>,
+    pub(super) numeric_interactions: Vec<ExpandedNumericInteractionSpec<'a>>,
+    pub(super) higher_order_interactions: Vec<FormulaHigherOrderInteractionSpec<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct FormulaHigherOrderInteractionSpec<'a> {
-    variables: Vec<FormulaVariableRef<'a>>,
+pub(super) struct FormulaHigherOrderInteractionSpec<'a> {
+    pub(super) variables: Vec<FormulaVariableRef<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct FormulaDerivedNumericCovariate {
-    name: String,
-    values: Vec<f64>,
-    group: Option<usize>,
+pub(super) struct FormulaDerivedNumericCovariate {
+    pub(super) name: String,
+    pub(super) values: Vec<f64>,
+    pub(super) group: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct FormulaDerivedFactorCovariate {
-    name: String,
-    sample_levels: Vec<String>,
-    reference: String,
-    levels: Option<Vec<String>>,
-    primitive: super::expression::Value,
+pub(super) struct FormulaDerivedFactorCovariate {
+    pub(super) name: String,
+    pub(super) sample_levels: Vec<String>,
+    pub(super) reference: String,
+    pub(super) levels: Option<Vec<String>>,
+    pub(super) primitive: super::super::expression::Value,
 }
 
-type FormulaDerivedNumericTerm = (String, Vec<f64>);
-type FormulaNumericTransformExpansion = (String, Vec<FormulaDerivedNumericTerm>);
+pub(super) type FormulaDerivedNumericTerm = (String, Vec<f64>);
+pub(super) type FormulaNumericTransformExpansion = (String, Vec<FormulaDerivedNumericTerm>);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum FormulaScaleOption {
+pub(super) enum FormulaScaleOption {
     Auto,
     Disabled,
     Explicit(f64),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum FormulaVariableRef<'a> {
+pub(super) enum FormulaVariableRef<'a> {
     Factor(&'a str),
     Numeric(&'a str),
 }
 
 impl FormulaVariableRef<'_> {
-    fn name(&self) -> &str {
+    pub(super) fn name(&self) -> &str {
         match self {
             Self::Factor(name) | Self::Numeric(name) => name,
         }
