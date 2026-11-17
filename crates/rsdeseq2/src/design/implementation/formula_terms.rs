@@ -159,9 +159,10 @@ fn expand_parenthesized_formula_term(term: &str) -> Result<Vec<String>, DeseqErr
     if formula_contains_unquoted_char(term, '-') {
         return expand_signed_additive_formula_group(term);
     }
-    if formula_contains_unquoted_parentheses(term) {
-        return split_formula_additive_group(term);
-    }
+    // What remains has no outer parentheses and no top-level operator, so any
+    // parentheses belong to a call such as `f(x)`: one term, checked when it is
+    // evaluated. Handing it back to `split_formula_additive_group` recursed
+    // without end.
     Ok(vec![term.to_string()])
 }
 

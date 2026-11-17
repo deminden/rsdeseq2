@@ -70,6 +70,8 @@ mod edge_cases;
 mod formula_expression;
 #[path = "formula_fitting.rs"]
 mod formula_fitting;
+#[path = "formula_term_expansion.rs"]
+mod formula_term_expansion;
 #[path = "frozen_local_vst.rs"]
 mod frozen_local_vst;
 #[path = "glm_intercept.rs"]

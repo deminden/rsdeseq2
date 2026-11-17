@@ -70,6 +70,13 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 - `DeseqError` is `#[non_exhaustive]`; exhaustive matches need a wildcard arm.
 
+### Fixed
+
+- A formula containing a call to an unknown function, such as `~ q(age)` or
+  `~ f() + condition`, recursed until the stack overflowed and aborted the
+  process (CLI or R session). It now returns the usual "formula variable ...
+  is not present" error. Found by the formula fuzz target.
+
 ### Deprecated
 
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes
