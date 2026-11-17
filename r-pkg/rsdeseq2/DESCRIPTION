@@ -2,15 +2,15 @@ Package: rsdeseq2
 Title: Rust Backend for DESeq2-Compatible Workflows
 Version: 0.5.0
 Authors@R:
-    person(given = "rsdeseq2", family = "contributors",
+    person(given = "Denis", family = "Demin",
            role = c("aut", "cre"), email = "denisdeminbio@gmail.com")
-Author: rsdeseq2 contributors
-Maintainer: rsdeseq2 contributors <denisdeminbio@gmail.com>
+Author: Denis Demin [aut, cre]
+Maintainer: Denis Demin <denisdeminbio@gmail.com>
 Description: R access layer for a Rust implementation of DESeq2-compatible
     differential expression workflow stages and result-table semantics.
 License: MIT + file LICENSE
 Encoding: UTF-8
-SystemRequirements: Cargo (Rust 1.97.1 or newer)
+SystemRequirements: Cargo and rustc (Rust >= 1.97.1, the crate rust-version)
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.0
 Imports:
