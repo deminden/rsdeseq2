@@ -1,3 +1,4 @@
+use super::*;
 /// Build DESeq2-shaped Wald result rows from precomputed Wald statistics.
 pub fn build_wald_results_from_wald(
     base_mean: &[f64],
@@ -33,7 +34,7 @@ pub(crate) fn build_wald_results_from_wald_unadjusted(
     )
 }
 
-fn assemble_wald_coefficient(
+pub(super) fn assemble_wald_coefficient(
     base_mean: &[f64],
     fit: &NbinomGlmFit,
     coefficient: usize,
@@ -135,7 +136,7 @@ pub(crate) fn build_wald_contrast_results_unadjusted(
     )
 }
 
-fn assemble_wald_contrast(
+pub(super) fn assemble_wald_contrast(
     base_mean: &[f64],
     fit: &GlmInferenceView<'_>,
     contrast: &WaldContrastOutput,

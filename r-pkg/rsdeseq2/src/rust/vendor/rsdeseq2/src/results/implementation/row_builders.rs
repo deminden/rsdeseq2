@@ -25,5 +25,9 @@ impl<'a> RowAssembly<'a> {
 }
 
 // Wald and LRT rows retain stable public constructor contracts.
-include!("row_builders/wald.rs");
-include!("row_builders/lrt.rs");
+#[path = "row_builders/wald.rs"]
+mod wald;
+pub use wald::*;
+#[path = "row_builders/lrt.rs"]
+mod lrt;
+pub use lrt::*;
