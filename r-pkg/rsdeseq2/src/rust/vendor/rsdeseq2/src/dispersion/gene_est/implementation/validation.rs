@@ -1,4 +1,5 @@
-fn best_log_alpha(
+use super::*;
+pub(super) fn best_log_alpha(
     objective: DispersionObjectiveInput<'_>,
     grid: &[f64],
 ) -> Result<(f64, f64), DeseqError> {
@@ -14,7 +15,7 @@ fn best_log_alpha(
     Ok((best_log, best_score))
 }
 
-fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     if len == 0 {
         return Err(DeseqError::InvalidDimensions {
             context: "dispersion grid points".to_string(),
@@ -43,13 +44,14 @@ fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     }
     (0..len)
         .map(|idx| {
-            let offset = checked::try_mul(step, idx as f64).nonfinite_at("dispersion grid offset", Some(idx))?;
+            let offset = checked::try_mul(step, idx as f64)
+                .nonfinite_at("dispersion grid offset", Some(idx))?;
             checked::try_add(start, offset).nonfinite_at("dispersion grid value", Some(idx))
         })
         .collect()
 }
 
-fn compact_counts_rows(
+pub(super) fn compact_counts_rows(
     counts: &CountMatrix,
     row_indices: &[usize],
 ) -> Result<CountMatrix, DeseqError> {
@@ -73,7 +75,7 @@ fn compact_counts_rows(
     )
 }
 
-fn compact_matrix_rows(
+pub(super) fn compact_matrix_rows(
     matrix: &RowMajorMatrix<f64>,
     row_indices: &[usize],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
@@ -84,7 +86,10 @@ fn compact_matrix_rows(
     RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
 }
 
-fn compact_gene_values(values: &[f64], row_indices: &[usize]) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn compact_gene_values(
+    values: &[f64],
+    row_indices: &[usize],
+) -> Result<Vec<f64>, DeseqError> {
     let mut compact = Vec::with_capacity(row_indices.len());
     for row in row_indices {
         let Some(value) = values.get(*row).copied() else {
@@ -99,7 +104,7 @@ fn compact_gene_values(values: &[f64], row_indices: &[usize]) -> Result<Vec<f64>
     Ok(compact)
 }
 
-fn validate_gene_est_inputs(
+pub(super) fn validate_gene_est_inputs(
     input: &GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
 ) -> Result<(), DeseqError> {
@@ -184,7 +189,9 @@ fn validate_gene_est_inputs(
     Ok(())
 }
 
-fn validate_gene_est_options(options: GeneWiseDispersionOptions) -> Result<(), DeseqError> {
+pub(super) fn validate_gene_est_options(
+    options: GeneWiseDispersionOptions,
+) -> Result<(), DeseqError> {
     if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "min_disp must be finite and positive".to_string(),
@@ -237,7 +244,7 @@ fn validate_gene_est_options(options: GeneWiseDispersionOptions) -> Result<(), D
     Ok(())
 }
 
-fn validate_weight_threshold(value: f64, context: &str) -> Result<(), DeseqError> {
+pub(super) fn validate_weight_threshold(value: f64, context: &str) -> Result<(), DeseqError> {
     if !value.is_finite() || value < 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: format!("{context} must be finite and non-negative"),
@@ -246,7 +253,7 @@ fn validate_weight_threshold(value: f64, context: &str) -> Result<(), DeseqError
     Ok(())
 }
 
-fn validate_dispersion_prior(prior: Option<DispersionPrior>) -> Result<(), DeseqError> {
+pub(super) fn validate_dispersion_prior(prior: Option<DispersionPrior>) -> Result<(), DeseqError> {
     if let Some(prior) = prior {
         if !prior.log_mean.is_finite() {
             return Err(DeseqError::InvalidDispersion {
@@ -262,11 +269,8 @@ fn validate_dispersion_prior(prior: Option<DispersionPrior>) -> Result<(), Deseq
     Ok(())
 }
 
-
-
-
 #[inline(always)]
-fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
+pub(super) fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
     if !mu.is_finite() || mu <= 0.0 {
         return Err(DeseqError::NonFiniteValue {
             context: "dispersion mean".to_string(),
@@ -278,7 +282,7 @@ fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
 }
 
 #[inline(always)]
-fn checked_matrix_add_assign(
+pub(super) fn checked_matrix_add_assign(
     sum: &mut f64,
     term: f64,
     index: usize,
@@ -297,7 +301,7 @@ fn checked_matrix_add_assign(
     }
 }
 
-fn checked_sum_indexed(
+pub(super) fn checked_sum_indexed(
     values: impl IntoIterator<Item = f64>,
     context: &str,
 ) -> Result<f64, DeseqError> {
@@ -309,15 +313,15 @@ fn checked_sum_indexed(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct MuAlphaTerms {
-    log1p: f64,
-    ratio: f64,
-    alpha_over_one_plus: f64,
-    mu_squared_alpha_over_one_plus_squared: f64,
-    inv_one_plus_squared: f64,
+pub(super) struct MuAlphaTerms {
+    pub(super) log1p: f64,
+    pub(super) ratio: f64,
+    pub(super) alpha_over_one_plus: f64,
+    pub(super) mu_squared_alpha_over_one_plus_squared: f64,
+    pub(super) inv_one_plus_squared: f64,
 }
 
-fn mu_alpha_terms(
+pub(super) fn mu_alpha_terms(
     mu: f64,
     alpha: f64,
     index: usize,
@@ -327,7 +331,7 @@ fn mu_alpha_terms(
 }
 
 #[inline(always)]
-fn mu_alpha_terms_impl<const NEED_LOG: bool>(
+pub(super) fn mu_alpha_terms_impl<const NEED_LOG: bool>(
     mu: f64,
     alpha: f64,
     index: usize,
@@ -393,7 +397,7 @@ fn mu_alpha_terms_impl<const NEED_LOG: bool>(
 }
 
 #[inline(always)]
-fn checked_mu_alpha_product(
+pub(super) fn checked_mu_alpha_product(
     left: f64,
     right: f64,
     index: usize,
@@ -413,14 +417,14 @@ fn checked_mu_alpha_product(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct CoxReidWeightTerms {
-    weight: f64,
-    d_weight: f64,
-    d2_weight: f64,
+pub(super) struct CoxReidWeightTerms {
+    pub(super) weight: f64,
+    pub(super) d_weight: f64,
+    pub(super) d2_weight: f64,
 }
 
 #[inline(always)]
-fn cox_reid_weight_terms(
+pub(super) fn cox_reid_weight_terms(
     mu: f64,
     alpha: f64,
     index: usize,
@@ -432,10 +436,17 @@ fn cox_reid_weight_terms(
     } else {
         mu_alpha_terms(mu, alpha, index, "Cox-Reid working weight")?
     };
-    let weight = checked::try_mul(mu_alpha.ratio, alpha.recip()).nonfinite_at("Cox-Reid working weight", Some(index))?;
-    let weight_square = checked::try_mul(weight, weight).nonfinite_at("Cox-Reid working weight square", Some(index))?;
+    let weight = checked::try_mul(mu_alpha.ratio, alpha.recip())
+        .nonfinite_at("Cox-Reid working weight", Some(index))?;
+    let weight_square = checked::try_mul(weight, weight)
+        .nonfinite_at("Cox-Reid working weight square", Some(index))?;
     let d_weight = -weight_square;
-    let d2_weight = checked::try_mul(2.0, checked::try_mul(weight_square, weight).nonfinite_at("Cox-Reid working weight cube", Some(index))?).nonfinite_at("Cox-Reid working second derivative weight", Some(index))?;
+    let d2_weight = checked::try_mul(
+        2.0,
+        checked::try_mul(weight_square, weight)
+            .nonfinite_at("Cox-Reid working weight cube", Some(index))?,
+    )
+    .nonfinite_at("Cox-Reid working second derivative weight", Some(index))?;
     Ok(CoxReidWeightTerms {
         weight,
         d_weight,
@@ -443,7 +454,7 @@ fn cox_reid_weight_terms(
     })
 }
 
-fn checked_log_alpha_first_derivative(
+pub(super) fn checked_log_alpha_first_derivative(
     inv_alpha: f64,
     derivative_alpha: f64,
     context: &str,
@@ -451,7 +462,7 @@ fn checked_log_alpha_first_derivative(
     checked::try_mul(inv_alpha, derivative_alpha).nonfinite_at(context, Some(0))
 }
 
-fn checked_log_alpha_second_derivative(
+pub(super) fn checked_log_alpha_second_derivative(
     second_alpha_sum: f64,
     inv_alpha: f64,
     first_alpha_sum: f64,
@@ -459,21 +470,26 @@ fn checked_log_alpha_second_derivative(
     context: &str,
 ) -> Result<f64, DeseqError> {
     let alpha_first_scale = checked::try_mul(2.0, inv_alpha).nonfinite_at(context, Some(0))?;
-    let alpha_first_term = -checked::try_mul(alpha_first_scale, first_alpha_sum).nonfinite_at(context, Some(0))?;
-    checked::try_scaled_sum(&[second_alpha_sum, alpha_first_term, first_log_alpha]).nonfinite_at(context, None)
+    let alpha_first_term =
+        -checked::try_mul(alpha_first_scale, first_alpha_sum).nonfinite_at(context, Some(0))?;
+    checked::try_scaled_sum(&[second_alpha_sum, alpha_first_term, first_log_alpha])
+        .nonfinite_at(context, None)
 }
 
-fn checked_cox_reid_log_alpha_second_derivative(
+pub(super) fn checked_cox_reid_log_alpha_second_derivative(
     second_alpha: f64,
     alpha: f64,
     first_log_alpha: f64,
 ) -> Result<f64, DeseqError> {
-    let alpha_squared = checked::try_mul(alpha, alpha).nonfinite_at("Cox-Reid log-alpha second derivative alpha square", Some(0))?;
-    let alpha_term = checked::try_mul(second_alpha, alpha_squared).nonfinite_at("Cox-Reid log-alpha second derivative alpha term", Some(0))?;
-    checked::try_scaled_sum(&[alpha_term, first_log_alpha]).nonfinite_at("Cox-Reid log-alpha second derivative", None)
+    let alpha_squared = checked::try_mul(alpha, alpha)
+        .nonfinite_at("Cox-Reid log-alpha second derivative alpha square", Some(0))?;
+    let alpha_term = checked::try_mul(second_alpha, alpha_squared)
+        .nonfinite_at("Cox-Reid log-alpha second derivative alpha term", Some(0))?;
+    checked::try_scaled_sum(&[alpha_term, first_log_alpha])
+        .nonfinite_at("Cox-Reid log-alpha second derivative", None)
 }
 
-fn validate_observation_weight_slice(
+pub(super) fn validate_observation_weight_slice(
     weights: Option<&[f64]>,
     expected_len: usize,
     context: &str,
@@ -496,7 +512,7 @@ fn validate_observation_weight_slice(
     Ok(())
 }
 
-fn validate_dispersion_bounds(min_disp: f64, max_disp: f64) -> Result<(), DeseqError> {
+pub(super) fn validate_dispersion_bounds(min_disp: f64, max_disp: f64) -> Result<(), DeseqError> {
     if !max_disp.is_finite() || max_disp <= min_disp {
         return Err(DeseqError::InvalidDispersion {
             reason: "max dispersion must be finite and greater than min dispersion".to_string(),
@@ -505,7 +521,7 @@ fn validate_dispersion_bounds(min_disp: f64, max_disp: f64) -> Result<(), DeseqE
     Ok(())
 }
 
-fn max_dispersion(options: GeneWiseDispersionOptions, n_samples: usize) -> f64 {
+pub(super) fn max_dispersion(options: GeneWiseDispersionOptions, n_samples: usize) -> f64 {
     options
         .max_disp
         .unwrap_or_else(|| 10.0_f64.max(n_samples as f64))

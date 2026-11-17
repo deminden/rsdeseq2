@@ -1,3 +1,4 @@
+use super::*;
 /// Combine rough and moments estimates using DESeq2's bounded start shape.
 pub fn initial_dispersion_estimates(
     rough_disp: &[f64],
@@ -27,7 +28,7 @@ pub fn initial_dispersion_estimates(
         .collect())
 }
 
-fn fit_dispersion_for_gene(
+pub(super) fn fit_dispersion_for_gene(
     counts: &[u32],
     mu: &[f64],
     design: &DesignMatrix,
@@ -50,7 +51,7 @@ fn fit_dispersion_for_gene(
     ))
 }
 
-fn fit_dispersion_for_gene_detailed(
+pub(super) fn fit_dispersion_for_gene_detailed(
     counts: &[u32],
     mu: &[f64],
     design: &DesignMatrix,
@@ -69,7 +70,7 @@ fn fit_dispersion_for_gene_detailed(
     )
 }
 
-fn fit_dispersion_for_gene_detailed_with_weights(
+pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
     counts: &[u32],
     mu: &[f64],
     design: &DesignMatrix,
@@ -270,30 +271,30 @@ pub fn fit_dispersion_line_search_no_cr_with_prior_and_weights(
 }
 
 #[derive(Clone, Copy)]
-struct DispersionOptimizerInput<'a> {
-    counts: &'a [u32],
-    mu: &'a [f64],
-    design: Option<&'a DesignMatrix>,
-    initial_dispersion: f64,
-    options: GeneWiseDispersionOptions,
-    n_samples: usize,
-    prior: Option<DispersionPrior>,
-    weights: Option<&'a [f64]>,
+pub(super) struct DispersionOptimizerInput<'a> {
+    pub(super) counts: &'a [u32],
+    pub(super) mu: &'a [f64],
+    pub(super) design: Option<&'a DesignMatrix>,
+    pub(super) initial_dispersion: f64,
+    pub(super) options: GeneWiseDispersionOptions,
+    pub(super) n_samples: usize,
+    pub(super) prior: Option<DispersionPrior>,
+    pub(super) weights: Option<&'a [f64]>,
 }
 
 #[derive(Clone, Copy)]
-struct DispersionObjectiveInput<'a> {
-    counts: &'a [u32],
-    mu: &'a [f64],
-    design: Option<&'a DesignMatrix>,
-    use_cox_reid: bool,
-    prior: Option<DispersionPrior>,
-    weights: Option<&'a [f64]>,
-    weight_threshold: f64,
-    prepared_cox: Option<&'a PreparedCoxReidDesign>,
+pub(super) struct DispersionObjectiveInput<'a> {
+    pub(super) counts: &'a [u32],
+    pub(super) mu: &'a [f64],
+    pub(super) design: Option<&'a DesignMatrix>,
+    pub(super) use_cox_reid: bool,
+    pub(super) prior: Option<DispersionPrior>,
+    pub(super) weights: Option<&'a [f64]>,
+    pub(super) weight_threshold: f64,
+    pub(super) prepared_cox: Option<&'a PreparedCoxReidDesign>,
 }
 
-fn fit_dispersion_line_search_inner(
+pub(super) fn fit_dispersion_line_search_inner(
     input: DispersionOptimizerInput<'_>,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
     let counts = input.counts;
@@ -390,7 +391,8 @@ fn fit_dispersion_line_search_inner(
             // The Armijo test already evaluated this exact point. Reuse its
             // value without changing the accepted-step arithmetic.
             let lp_new = -theta_kappa;
-            last_change = checked::try_sub(lp_new, lp).nonfinite_at("dispersion line-search accepted objective change", Some(0))?;
+            last_change = checked::try_sub(lp_new, lp)
+                .nonfinite_at("dispersion line-search accepted objective change", Some(0))?;
             lp = lp_new;
             if last_change < options.disp_tol {
                 break;
@@ -427,7 +429,7 @@ fn fit_dispersion_line_search_inner(
 }
 
 #[cfg(test)]
-fn bounded_log_alpha_proposal(
+pub(super) fn bounded_log_alpha_proposal(
     log_alpha: f64,
     direction: f64,
     step: f64,
@@ -445,21 +447,29 @@ fn bounded_log_alpha_proposal(
     {
         return None;
     }
-    let unclamped = checked::try_mul(step, direction).nonfinite_at("dispersion line-search proposal step", Some(0))
+    let unclamped = checked::try_mul(step, direction)
+        .nonfinite_at("dispersion line-search proposal step", Some(0))
         .ok()
         .and_then(|movement| {
-            checked::try_add(log_alpha, movement).nonfinite_at("dispersion line-search proposal", Some(0)).ok()
+            checked::try_add(log_alpha, movement)
+                .nonfinite_at("dispersion line-search proposal", Some(0))
+                .ok()
         })?;
     let clamped = unclamped.clamp(lower, upper);
     if clamped == unclamped {
         return Some((unclamped, step));
     }
-    let effective_step = checked::try_sub(clamped, log_alpha).nonfinite_at("dispersion line-search effective proposal movement", Some(0))
-    .ok()
-    .and_then(|movement| {
-        checked::try_div(movement, direction).nonfinite_at("dispersion line-search effective proposal step", Some(0))
+    let effective_step = checked::try_sub(clamped, log_alpha)
+        .nonfinite_at(
+            "dispersion line-search effective proposal movement",
+            Some(0),
+        )
         .ok()
-    })?;
+        .and_then(|movement| {
+            checked::try_div(movement, direction)
+                .nonfinite_at("dispersion line-search effective proposal step", Some(0))
+                .ok()
+        })?;
     if effective_step > 0.0 {
         Some((clamped, effective_step))
     } else {
@@ -468,15 +478,20 @@ fn bounded_log_alpha_proposal(
 }
 
 #[cfg(test)]
-fn checked_line_search_armijo_bound(
+pub(super) fn checked_line_search_armijo_bound(
     lp: f64,
     effective_kappa: f64,
     epsilon: f64,
     dlp: f64,
 ) -> Result<f64, DeseqError> {
-    let scaled_direction = checked::try_mul(effective_kappa, epsilon).nonfinite_at("dispersion line-search Armijo scale", Some(0))?;
-    let scaled_slope = checked::try_mul(scaled_direction, dlp).nonfinite_at("dispersion line-search Armijo scale", Some(0))
-    .and_then(|scale| checked::try_mul(scale, dlp).nonfinite_at("dispersion line-search Armijo scale", Some(0)))?;
+    let scaled_direction = checked::try_mul(effective_kappa, epsilon)
+        .nonfinite_at("dispersion line-search Armijo scale", Some(0))?;
+    let scaled_slope = checked::try_mul(scaled_direction, dlp)
+        .nonfinite_at("dispersion line-search Armijo scale", Some(0))
+        .and_then(|scale| {
+            checked::try_mul(scale, dlp)
+                .nonfinite_at("dispersion line-search Armijo scale", Some(0))
+        })?;
     checked::try_sub(-lp, scaled_slope).nonfinite_at("dispersion line-search Armijo bound", Some(0))
 }
 
@@ -602,7 +617,7 @@ pub fn fit_dispersion_grid_no_cr_with_prior_and_weights(
     })
 }
 
-fn fit_dispersion_grid_inner(
+pub(super) fn fit_dispersion_grid_inner(
     input: DispersionOptimizerInput<'_>,
 ) -> Result<(f64, usize), DeseqError> {
     let counts = input.counts;
@@ -646,9 +661,12 @@ fn fit_dispersion_grid_inner(
     let max_log = max_disp.ln();
     let coarse = linspace(min_log, max_log, options.grid_points)?;
     let (best_log, _) = best_log_alpha(objective, &coarse)?;
-    let delta = checked::try_sub(coarse[1], coarse[0]).nonfinite_at("dispersion grid step", Some(1))?;
-    let fine_lower = checked::try_sub(best_log, delta).nonfinite_at("dispersion fine grid lower bound", Some(0))?;
-    let fine_upper = checked::try_add(best_log, delta).nonfinite_at("dispersion fine grid upper bound", Some(0))?;
+    let delta =
+        checked::try_sub(coarse[1], coarse[0]).nonfinite_at("dispersion grid step", Some(1))?;
+    let fine_lower = checked::try_sub(best_log, delta)
+        .nonfinite_at("dispersion fine grid lower bound", Some(0))?;
+    let fine_upper = checked::try_add(best_log, delta)
+        .nonfinite_at("dispersion fine grid upper bound", Some(0))?;
     let fine = linspace(fine_lower, fine_upper, options.grid_points)?;
     let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((
