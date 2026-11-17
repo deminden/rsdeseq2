@@ -161,6 +161,8 @@ impl PosteriorRng {
     }
     /// Initialize an unseeded request entirely in Rust. Reproducible callers
     /// should supply a seed/state; an unseeded R session receives the result.
+    // Invariant: from_seed accepts every i32 except i32::MIN, which is mapped to 0.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
     pub fn from_entropy() -> Self {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let time = SystemTime::now()

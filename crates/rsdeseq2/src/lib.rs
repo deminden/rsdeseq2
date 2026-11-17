@@ -12,6 +12,9 @@
 //! is outside scope. See the repository's compatibility and testing guides for
 //! supported settings and independent reference validation.
 
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+#![deny(unsafe_code, clippy::undocumented_unsafe_blocks)]
+
 pub(crate) mod all_zero;
 #[cfg(feature = "cli")]
 pub mod cli;

@@ -16,6 +16,8 @@ pub fn formula_design_for_fitting_from_model_frame(
     )
 }
 
+// Invariant: term order is always enabled before terms are refreshed.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 fn refresh_formula_term_order(state: &mut ExpandedFormulaDesignState<'_>) {
     if state.term_order.is_none() {
         return;

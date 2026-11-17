@@ -114,6 +114,7 @@ struct LrtPipelineOutput {
 
 /// Output from the limited native Wald replacement-refit path.
 #[derive(Clone, Debug, PartialEq)]
+#[must_use]
 pub struct CooksReplacementWaldOutput {
     /// Original fit on the caller-supplied counts, before replacement.
     pub original_fit: DeseqFit,
@@ -131,6 +132,7 @@ pub struct CooksReplacementWaldOutput {
 
 /// Output from the limited native LRT replacement-refit path.
 #[derive(Clone, Debug, PartialEq)]
+#[must_use]
 pub struct CooksReplacementLrtOutput {
     /// Original fit on the caller-supplied counts, before replacement.
     pub original_fit: DeseqFit,

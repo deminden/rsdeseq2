@@ -1,5 +1,6 @@
 /// Inspectable fit state for all implemented and future DESeq2 stages.
 #[derive(Clone, Debug, PartialEq)]
+#[must_use]
 pub struct DeseqFit {
     /// Count matrix summary.
     pub counts_summary: CountsSummary,
@@ -126,6 +127,7 @@ pub struct DeseqFit {
 
 /// Builder for implemented and future DESeq2 workflow stages.
 #[derive(Clone, Debug)]
+#[must_use]
 pub struct DeseqBuilder {
     fit_type: FitType,
     test: TestType,

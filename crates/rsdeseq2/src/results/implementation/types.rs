@@ -601,6 +601,7 @@ pub struct DeseqResultRow {
 
 /// Collection of result rows.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[must_use]
 pub struct DeseqResults {
     /// Rows in output order.
     pub rows: Vec<DeseqResultRow>,

@@ -44,6 +44,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   are bit-identical; the CLI binary is about 16% smaller. The R package build
   keeps its own profile and unwinding panics.
 
+- `DeseqBuilder`, `DeseqFit`, `DeseqResults`, `NbinomGlmFit`, `RlogOutput` and
+  the Cook's replacement outputs are `#[must_use]`, so discarding a fit or
+  result now warns. Impossible internal states return `InvalidOptions`
+  ("internal invariant violated: ...") instead of panicking.
+
 ### Deprecated
 
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes

@@ -15,19 +15,11 @@ rust-version = "1.97.1"
 codegen-units = 1
 lto = "thin"
 
-# Hardening targets (docs/reports/hardening-progress.md). They warn while the
-# existing sites are removed; the gating Clippy command allows them explicitly
-# until Phase 2.4 turns them into errors.
+# Library lint policy lives in crates/rsdeseq2/src/lib.rs: unwrap/expect are
+# denied outside tests and unsafe code is denied except for the documented x87
+# kernels. missing_docs warns until the public API is fully documented.
 [workspace.lints.rust]
 missing_docs = "warn"
-unsafe_code = "warn"
-
-[workspace.lints.clippy]
-expect_used = "warn"
-panic = "warn"
-undocumented_unsafe_blocks = "warn"
-unreachable = "warn"
-unwrap_used = "warn"
 
 [workspace.dependencies]
 approx = "0.5.1"

@@ -17,24 +17,23 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
-        # The hardening target lints in the workspace [lints] table only warn
-        # for now; they are reported by the next step and allowed here.
+        # missing_docs warns until the public API is documented (see the
+        # report step); every other warning fails the build.
         run: >-
           cargo clippy --locked --workspace --all-targets -- -D warnings
-          -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
+          -A missing_docs
       - name: Library feature combinations
         run: |
           for features in "" "formula" "shrinkage" "formula,shrinkage"; do
             cargo clippy --locked -p rsdeseq2 --lib --no-default-features --features "$features" -- \
-              -D warnings -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic \
-              -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
+              -D warnings -A missing_docs
           done
       - name: Hardening lint report (not gating)
         continue-on-error: true
         run: |
           cargo clippy --locked --workspace --all-targets --message-format=short 2>&1 \
             | grep -E ': warning: ' | sort -u > hardening-lints.txt || true
-          echo "hardening lint warnings: $(wc -l < hardening-lints.txt)" >> "$GITHUB_STEP_SUMMARY"
+          echo "missing_docs warnings: $(wc -l < hardening-lints.txt)" >> "$GITHUB_STEP_SUMMARY"
       - name: API documentation
         env:
           # missing_docs is a warn-level hardening target (Phase 2.4).

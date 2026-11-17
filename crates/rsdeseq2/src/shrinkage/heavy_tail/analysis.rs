@@ -267,6 +267,8 @@ impl PosteriorAnalysis {
             },
         })
     }
+    // Invariant: grid columns come from the posterior coefficient matrix shape.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
     pub(super) fn row(
         &mut self,
         row: AnalysisRow<'_>,

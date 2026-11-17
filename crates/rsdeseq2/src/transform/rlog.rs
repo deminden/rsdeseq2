@@ -19,6 +19,7 @@ pub const RLOG_PRIOR_UPPER_QUANTILE: f64 = 0.05;
 
 /// Result of an rlog fit that estimates the sample-effect prior variance.
 #[derive(Clone, Debug, PartialEq)]
+#[must_use]
 pub struct RlogOutput {
     /// Genes x samples rlog values on the log2 normalized-expression scale.
     pub transformed: RowMajorMatrix<f64>,
