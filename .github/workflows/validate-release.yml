@@ -18,8 +18,8 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: '1.97.1'
       - run: cargo check --locked --workspace --all-targets
@@ -27,9 +27,9 @@ jobs:
     needs: [rust, r, parity, msrv]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: r-source-${{ github.sha }}
           path: validated
@@ -41,7 +41,7 @@ jobs:
           cargo package -p rsdeseq2 --locked --allow-dirty
           cp target/package/rsdeseq2-*.crate validated/
           python3 scripts/release/release_artifact_manifest.py write validated
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: validated-source-${{ github.sha }}
           path: validated/*

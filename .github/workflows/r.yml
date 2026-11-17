@@ -27,14 +27,14 @@ jobs:
       LC_ALL: C.UTF-8
       OMP_NUM_THREADS: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: r-lib/actions/setup-r@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
           r-version: ${{ matrix.r-version }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
       - name: Check committed Rust vendor and package versions
         run: scripts/release/sync_r_vendor.sh --check
       - name: Reject production R numerical calculations
@@ -45,7 +45,7 @@ jobs:
       - name: Cache exact reference packages
         id: reference-cache
         if: matrix.lane == 'reference'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.R_LIBS_USER }}
           key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
@@ -54,7 +54,7 @@ jobs:
         run: python scripts/environment/install_r_reference.py --library "$R_LIBS_USER" ${{ steps.reference-cache.outputs.cache-hit == 'true' && '--check-installed' || '' }}
       - name: Cache verified reference dependencies
         if: matrix.lane == 'reference' && steps.reference-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.R_LIBS_USER }}
           key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
@@ -71,7 +71,7 @@ jobs:
         run: Rscript --vanilla scripts/references/generate_sparse_sqp_reference.R sparse-sqp-reference.json
       - name: Save independently generated platform references
         if: always() && matrix.lane == 'reference' && hashFiles('regenerated-formula-references/*.json', 'sparse-sqp-reference.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: formula-sqp-reference-${{ github.sha }}
           path: |
@@ -89,7 +89,7 @@ jobs:
         run: Rscript --vanilla scripts/references/generate_uniform_posterior_reference.R uniform-posterior-reference.json
       - name: Save independent posterior reference
         if: matrix.lane == 'reference'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: uniform-reference-${{ github.sha }}
           path: uniform-posterior-reference.json
@@ -111,7 +111,7 @@ jobs:
         run: python scripts/validation/check_native_boundary_sanitizers.py --rscript "$(command -v Rscript)" --r-library "$R_LIBS_USER" --output-dir native-boundary-sanitizers
       - name: Save native boundary instrumentation evidence
         if: always() && matrix.lane == 'reference'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-boundary-sanitizers-${{ github.sha }}
           path: |
@@ -150,7 +150,7 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p test_profile_r_workflows.py
       - name: Save checked source package
         if: matrix.lane == 'reference'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: r-source-${{ github.sha }}
           path: |

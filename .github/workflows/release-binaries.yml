@@ -65,7 +65,7 @@ jobs:
             archive_ext: zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.RELEASE_TAG }}
 
@@ -73,7 +73,7 @@ jobs:
         id: source
         shell: bash
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: validated-source-${{ steps.source.outputs.commit }}
           path: validated
@@ -87,7 +87,7 @@ jobs:
           env GITHUB_SHA="$SOURCE_COMMIT" GITHUB_REF_NAME="$RELEASE_TAG" \
             python3 scripts/release/release_artifact_manifest.py verify validated
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: ${{ matrix.target }}
 
@@ -107,7 +107,7 @@ jobs:
       - name: Build
         run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
 
-      - uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         if: matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64'
         with:
           r-version: '4.6.2'
@@ -122,7 +122,7 @@ jobs:
 
       - name: Retain independent uniform CDF provenance
         if: always() && (matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: uniform-cdf-${{ matrix.asset_suffix }}-${{ github.run_id }}
           path: |
@@ -169,7 +169,7 @@ jobs:
             --output "dist/${package_dir}.build.json"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rsdeseq2-${{ env.RELEASE_TAG }}-${{ matrix.asset_suffix }}
           path: |
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checkout cleans the workspace, so it must precede every artifact download.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.RELEASE_TAG }}
       - name: Verify source and original successful checks
@@ -238,7 +238,7 @@ jobs:
               output.write('commit=' + commit + '\n')
           PYCODE
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           pattern: rsdeseq2-${{ env.RELEASE_TAG }}-*
@@ -247,7 +247,7 @@ jobs:
           run-id: ${{ inputs.rebuild_binaries && github.run_id || inputs.source_run_id || github.run_id }}
 
       - name: Download checked source artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: validated-source-${{ steps.source.outputs.commit }}
           path: validated

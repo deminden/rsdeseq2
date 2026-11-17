@@ -1,0 +1,32 @@
+# cargo-deny policy, checked in CI (`cargo deny check`).
+
+[graph]
+all-features = true
+
+[licenses]
+# Permissive licences used by the dependency tree, plus the crate's own
+# MIT AND BSD-3-Clause AND BSD-2-Clause-Views expression.
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause-Views",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[advisories]
+# Default policy: known vulnerabilities and yanked crates fail the check.
+yanked = "deny"
+
+[bans]
+# Duplicate versions are reported but do not fail yet; wildcards do.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

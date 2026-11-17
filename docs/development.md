@@ -58,7 +58,11 @@ cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validation/check_module_cycles.py
+cargo deny --all-features check   # licences, advisories, bans, sources
 ```
+
+[Contributing](../CONTRIBUTING.md) summarises the IDENTICAL/NUMERIC rules and
+the pull-request template.
 
 The library denies `unwrap`/`expect` outside tests, `unsafe` code outside the
 documented x87 kernels and unsafe blocks without `SAFETY:` comments; impossible
