@@ -27,3 +27,5 @@ build/
 *.egg-info/
 
 .DS_Store
+mutants.out/
+mutants.out.old/

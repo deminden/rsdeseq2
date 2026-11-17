@@ -1,0 +1,70 @@
+name: coverage and mutation
+
+# Weekly and on demand: line coverage for the core crate, and cargo-mutants on
+# the modules whose arithmetic every result depends on. Neither gates pull
+# requests; surviving mutants are reviewed and either killed with a test or
+# recorded as equivalent in docs/reports/hardening-progress.md.
+
+on:
+  schedule:
+    - cron: '41 4 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Line coverage (lib and integration tests)
+        run: |
+          cargo llvm-cov --locked -p rsdeseq2 --lib --test integration --summary-only \
+            | tee coverage-summary.txt
+          cargo llvm-cov report --lcov --output-path lcov.info
+          tail -n 1 coverage-summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: |
+            coverage-summary.txt
+            lcov.info
+
+  mutants:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        files:
+          - crates/rsdeseq2/src/numeric/*.rs
+          - crates/rsdeseq2/src/multiple_testing.rs
+          - crates/rsdeseq2/src/normalization.rs
+          - crates/rsdeseq2/src/independent_filtering.rs
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
+        with:
+          tool: cargo-mutants
+      - name: Mutants in ${{ matrix.files }}
+        run: >-
+          cargo mutants -d crates/rsdeseq2 -o . -f '${{ matrix.files }}' --timeout 600
+          --cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration
+          || true
+      - name: Summary
+        run: |
+          for kind in caught missed timeout unviable; do
+            echo "$kind: $(wc -l < mutants.out/$kind.txt)" >> "$GITHUB_STEP_SUMMARY"
+          done
+          sed 's/^/- /' mutants.out/missed.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mutants-${{ strategy.job-index }}-${{ github.sha }}
+          path: mutants.out
