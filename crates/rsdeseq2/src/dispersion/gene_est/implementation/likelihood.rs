@@ -48,12 +48,7 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu * alpha;
-        let mu_plus_inv_alpha = checked_add(
-            mu,
-            inv_alpha,
-            sample,
-            "dispersion objective mean plus inverse alpha",
-        )?;
+        let mu_plus_inv_alpha = checked::try_add(mu, inv_alpha).nonfinite_at("dispersion objective mean plus inverse alpha", Some(sample))?;
         let log_gamma_y = if count == 0 {
             log_gamma_inv_alpha
         } else {
@@ -70,18 +65,8 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
                 value: term,
             });
         }
-        let weighted_term = checked_mul(
-            observation_weight,
-            term,
-            sample,
-            "dispersion objective weighted likelihood term",
-        )?;
-        total = checked_add(
-            total,
-            weighted_term,
-            sample,
-            "dispersion objective likelihood sum",
-        )?;
+        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at("dispersion objective weighted likelihood term", Some(sample))?;
+        total = checked::try_add(total, weighted_term).nonfinite_at("dispersion objective likelihood sum", Some(sample))?;
     }
     Ok(total)
 }
@@ -273,18 +258,8 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
                 value: term,
             });
         }
-        let weighted_term = checked_mul(
-            observation_weight,
-            term,
-            sample,
-            "dispersion objective weighted derivative term",
-        )?;
-        derivative_alpha = checked_add(
-            derivative_alpha,
-            weighted_term,
-            sample,
-            "dispersion objective derivative sum",
-        )?;
+        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at("dispersion objective weighted derivative term", Some(sample))?;
+        derivative_alpha = checked::try_add(derivative_alpha, weighted_term).nonfinite_at("dispersion objective derivative sum", Some(sample))?;
     }
     checked_log_alpha_first_derivative(
         inv_alpha,
@@ -376,23 +351,13 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         }
         checked_matrix_add_assign(
             &mut first_alpha_sum,
-            checked_mul(
-                observation_weight,
-                first_term,
-                sample,
-                "dispersion objective weighted first derivative term",
-            )?,
+            checked::try_mul(observation_weight, first_term).nonfinite_at("dispersion objective weighted first derivative term", Some(sample))?,
             sample,
             "dispersion objective first derivative sum",
         )?;
         checked_matrix_add_assign(
             &mut second_alpha_sum,
-            checked_mul(
-                observation_weight,
-                second_term,
-                sample,
-                "dispersion objective weighted second derivative term",
-            )?,
+            checked::try_mul(observation_weight, second_term).nonfinite_at("dispersion objective weighted second derivative term", Some(sample))?,
             sample,
             "dispersion objective second derivative sum",
         )?;

@@ -390,12 +390,7 @@ fn fit_dispersion_line_search_inner(
             // The Armijo test already evaluated this exact point. Reuse its
             // value without changing the accepted-step arithmetic.
             let lp_new = -theta_kappa;
-            last_change = checked_sub(
-                lp_new,
-                lp,
-                0,
-                "dispersion line-search accepted objective change",
-            )?;
+            last_change = checked::try_sub(lp_new, lp).nonfinite_at("dispersion line-search accepted objective change", Some(0))?;
             lp = lp_new;
             if last_change < options.disp_tol {
                 break;
@@ -450,29 +445,19 @@ fn bounded_log_alpha_proposal(
     {
         return None;
     }
-    let unclamped = checked_mul(step, direction, 0, "dispersion line-search proposal step")
+    let unclamped = checked::try_mul(step, direction).nonfinite_at("dispersion line-search proposal step", Some(0))
         .ok()
         .and_then(|movement| {
-            checked_add(log_alpha, movement, 0, "dispersion line-search proposal").ok()
+            checked::try_add(log_alpha, movement).nonfinite_at("dispersion line-search proposal", Some(0)).ok()
         })?;
     let clamped = unclamped.clamp(lower, upper);
     if clamped == unclamped {
         return Some((unclamped, step));
     }
-    let effective_step = checked_sub(
-        clamped,
-        log_alpha,
-        0,
-        "dispersion line-search effective proposal movement",
-    )
+    let effective_step = checked::try_sub(clamped, log_alpha).nonfinite_at("dispersion line-search effective proposal movement", Some(0))
     .ok()
     .and_then(|movement| {
-        checked_div(
-            movement,
-            direction,
-            0,
-            "dispersion line-search effective proposal step",
-        )
+        checked::try_div(movement, direction).nonfinite_at("dispersion line-search effective proposal step", Some(0))
         .ok()
     })?;
     if effective_step > 0.0 {
@@ -489,20 +474,10 @@ fn checked_line_search_armijo_bound(
     epsilon: f64,
     dlp: f64,
 ) -> Result<f64, DeseqError> {
-    let scaled_direction = checked_mul(
-        effective_kappa,
-        epsilon,
-        0,
-        "dispersion line-search Armijo scale",
-    )?;
-    let scaled_slope = checked_mul(
-        scaled_direction,
-        dlp,
-        0,
-        "dispersion line-search Armijo scale",
-    )
-    .and_then(|scale| checked_mul(scale, dlp, 0, "dispersion line-search Armijo scale"))?;
-    checked_sub(-lp, scaled_slope, 0, "dispersion line-search Armijo bound")
+    let scaled_direction = checked::try_mul(effective_kappa, epsilon).nonfinite_at("dispersion line-search Armijo scale", Some(0))?;
+    let scaled_slope = checked::try_mul(scaled_direction, dlp).nonfinite_at("dispersion line-search Armijo scale", Some(0))
+    .and_then(|scale| checked::try_mul(scale, dlp).nonfinite_at("dispersion line-search Armijo scale", Some(0)))?;
+    checked::try_sub(-lp, scaled_slope).nonfinite_at("dispersion line-search Armijo bound", Some(0))
 }
 
 /// Fit a dispersion for one gene by DESeq2-style two-pass log-alpha grid search.
@@ -671,9 +646,9 @@ fn fit_dispersion_grid_inner(
     let max_log = max_disp.ln();
     let coarse = linspace(min_log, max_log, options.grid_points)?;
     let (best_log, _) = best_log_alpha(objective, &coarse)?;
-    let delta = checked_sub(coarse[1], coarse[0], 1, "dispersion grid step")?;
-    let fine_lower = checked_sub(best_log, delta, 0, "dispersion fine grid lower bound")?;
-    let fine_upper = checked_add(best_log, delta, 0, "dispersion fine grid upper bound")?;
+    let delta = checked::try_sub(coarse[1], coarse[0]).nonfinite_at("dispersion grid step", Some(1))?;
+    let fine_lower = checked::try_sub(best_log, delta).nonfinite_at("dispersion fine grid lower bound", Some(0))?;
+    let fine_upper = checked::try_add(best_log, delta).nonfinite_at("dispersion fine grid upper bound", Some(0))?;
     let fine = linspace(fine_lower, fine_upper, options.grid_points)?;
     let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((

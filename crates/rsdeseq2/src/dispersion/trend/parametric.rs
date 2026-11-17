@@ -1,12 +1,12 @@
 //! Parametric trend model and Gamma identity-link fitting.
 
 use super::numerics::{
-    checked_add_assign, checked_div2, checked_product_difference, checked_product2,
-    checked_product3, checked_sub2, checked_sum2, validate_positive_dispersion,
+    checked_add_assign, checked_product_difference, checked_product3, validate_positive_dispersion,
     validate_positive_mean,
 };
 use super::selection::{parametric_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::numeric::checked::{self, CheckedExt};
 
 const PARAMETRIC_WLS_SUM_CONTEXT: &str = "parametric dispersion weighted least-squares sums";
 
@@ -221,7 +221,8 @@ pub(super) fn robust_parametric_trend_rows(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean)?;
-        let residual = checked_div2(disp, fitted, "parametric dispersion residual filter")?;
+        let residual = checked::div(disp, fitted)
+            .invalid_dispersion("parametric dispersion residual filter")?;
         good.push(
             residual.is_finite()
                 && residual > options.min_residual
@@ -249,22 +250,14 @@ fn gamma_identity_irls(
         let candidate = weighted_gamma_identity_least_squares(means, disps, good, trend)?;
         let candidate = positive_step_halving(means, good, trend, candidate)?;
         let deviance = gamma_deviance(means, disps, good, candidate)?;
-        let deviance_change = checked_sub2(
-            deviance,
-            old_deviance,
-            "parametric dispersion gamma IRLS convergence",
-        )?
-        .abs();
-        let deviance_scale = checked_sum2(
-            deviance.abs(),
-            0.1,
-            "parametric dispersion gamma IRLS convergence",
-        )?;
-        let converged = checked_div2(
-            deviance_change,
-            deviance_scale,
-            "parametric dispersion gamma IRLS convergence",
-        )? < options.glm_tol;
+        let deviance_change = checked::sub(deviance, old_deviance)
+            .invalid_dispersion("parametric dispersion gamma IRLS convergence")?
+            .abs();
+        let deviance_scale = checked::add(deviance.abs(), 0.1)
+            .invalid_dispersion("parametric dispersion gamma IRLS convergence")?;
+        let converged = checked::div(deviance_change, deviance_scale)
+            .invalid_dispersion("parametric dispersion gamma IRLS convergence")?
+            < options.glm_tol;
         trend = candidate;
         if converged {
             return Ok(GammaIdentityFit {
@@ -308,17 +301,15 @@ pub(super) fn weighted_gamma_identity_least_squares(
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
         let fitted = trend.evaluate_validated(mean)?;
-        let inv_fitted = checked_div2(1.0, fitted, PARAMETRIC_WLS_SUM_CONTEXT)?;
-        let weight = checked_product2(
-            inv_fitted,
-            inv_fitted,
-            "parametric dispersion weighted least-squares weights",
-        )?;
+        let inv_fitted =
+            checked::div(1.0, fitted).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?;
+        let weight = checked::mul(inv_fitted, inv_fitted)
+            .invalid_dispersion("parametric dispersion weighted least-squares weights")?;
         let x = mean.recip();
         checked_add_assign(&mut s00, weight, PARAMETRIC_WLS_SUM_CONTEXT)?;
         checked_add_assign(
             &mut s01,
-            checked_product2(weight, x, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked::mul(weight, x).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
         )?;
         checked_add_assign(
@@ -328,7 +319,7 @@ pub(super) fn weighted_gamma_identity_least_squares(
         )?;
         checked_add_assign(
             &mut t0,
-            checked_product2(weight, disp, PARAMETRIC_WLS_SUM_CONTEXT)?,
+            checked::mul(weight, disp).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?,
             PARAMETRIC_WLS_SUM_CONTEXT,
         )?;
         checked_add_assign(
@@ -351,16 +342,10 @@ pub(super) fn weighted_gamma_identity_least_squares(
     let extra_pois_numerator =
         checked_product_difference(s00, t1, s01, t0, PARAMETRIC_WLS_NUMERATOR_CONTEXT)?;
     let target = ParametricDispersionTrend {
-        asympt_disp: checked_div2(
-            asympt_numerator,
-            determinant,
-            "parametric dispersion weighted least-squares coefficients",
-        )?,
-        extra_pois: checked_div2(
-            extra_pois_numerator,
-            determinant,
-            "parametric dispersion weighted least-squares coefficients",
-        )?,
+        asympt_disp: checked::div(asympt_numerator, determinant)
+            .invalid_dispersion("parametric dispersion weighted least-squares coefficients")?,
+        extra_pois: checked::div(extra_pois_numerator, determinant)
+            .invalid_dispersion("parametric dispersion weighted least-squares coefficients")?,
     };
     if !target.asympt_disp.is_finite() || !target.extra_pois.is_finite() {
         return Err(DeseqError::InvalidDispersion {
@@ -500,13 +485,17 @@ pub(super) fn parametric_coefficient_change(
     old.validate_fit()?;
     new.validate_fit()?;
     let context = "parametric dispersion coefficient change";
-    let asympt_change = checked_div2(new.asympt_disp, old.asympt_disp, context)?.ln();
-    let extra_pois_change = checked_div2(new.extra_pois, old.extra_pois, context)?.ln();
-    checked_sum2(
-        checked_product2(asympt_change, asympt_change, context)?,
-        checked_product2(extra_pois_change, extra_pois_change, context)?,
-        context,
+    let asympt_change = checked::div(new.asympt_disp, old.asympt_disp)
+        .invalid_dispersion(context)?
+        .ln();
+    let extra_pois_change = checked::div(new.extra_pois, old.extra_pois)
+        .invalid_dispersion(context)?
+        .ln();
+    checked::add(
+        checked::mul(asympt_change, asympt_change).invalid_dispersion(context)?,
+        checked::mul(extra_pois_change, extra_pois_change).invalid_dispersion(context)?,
     )
+    .invalid_dispersion(context)
 }
 
 fn validate_parametric_trend_inputs(

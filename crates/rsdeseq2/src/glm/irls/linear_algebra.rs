@@ -31,9 +31,9 @@ fn solve_weighted_least_squares_qr(
         if !sqrt_weight.is_finite() {
             return None;
         }
-        augmented_z[row] = checked_product2(z[row], sqrt_weight)?;
+        augmented_z[row] = checked::mul(z[row], sqrt_weight)?;
         for col in 0..p {
-            augmented_x[(row, col)] = checked_product2(x[(row, col)], sqrt_weight)?;
+            augmented_x[(row, col)] = checked::mul(x[(row, col)], sqrt_weight)?;
         }
     }
     for col in 0..p {
@@ -59,7 +59,7 @@ fn covariance_and_hat_diagonal(
     let mut xtwx_ridge = xtwx.clone();
     for diagonal in 0..x.ncols() {
         xtwx_ridge[(diagonal, diagonal)] =
-            checked_sum2(xtwx_ridge[(diagonal, diagonal)], ridge_lambda[diagonal])?;
+            checked::add(xtwx_ridge[(diagonal, diagonal)], ridge_lambda[diagonal])?;
     }
     let inverse = xtwx_ridge.try_inverse()?;
     let sigma = &inverse * xtwx * &inverse;
@@ -83,10 +83,7 @@ fn covariance_and_hat_diagonal(
         fill_active_design_columns(x, sample, &mut active);
         for (left, left_value) in active.iter().copied() {
             for (right, right_value) in active.iter().copied() {
-                value = checked_sum2(
-                    value,
-                    checked_product4(left_value, weight, right_value, inverse[(right, left)])?,
-                )?;
+                value = checked::add(value, checked_product4(left_value, weight, right_value, inverse[(right, left)])?)?;
             }
         }
         hat.push(value);
@@ -106,14 +103,11 @@ fn xtwx_and_xtwz(
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
         fill_active_design_columns(x, sample, &mut active);
         for (col, col_value) in active.iter().copied() {
-            xtwz[col] = checked_sum2(xtwz[col], checked_product3(col_value, weight, z[sample])?)?;
+            xtwz[col] = checked::add(xtwz[col], checked_product3(col_value, weight, z[sample])?)?;
         }
         for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
             for (col, col_value) in active.iter().copied().skip(left_pos) {
-                xtwx[(row, col)] = checked_sum2(
-                    xtwx[(row, col)],
-                    checked_product3(row_value, weight, col_value)?,
-                )?;
+                xtwx[(row, col)] = checked::add(xtwx[(row, col)], checked_product3(row_value, weight, col_value)?)?;
                 if row != col {
                     xtwx[(col, row)] = xtwx[(row, col)];
                 }
@@ -122,7 +116,7 @@ fn xtwx_and_xtwz(
     }
     for diagonal in 0..x.ncols() {
         xtwx[(diagonal, diagonal)] =
-            checked_sum2(xtwx[(diagonal, diagonal)], ridge_lambda[diagonal])?;
+            checked::add(xtwx[(diagonal, diagonal)], ridge_lambda[diagonal])?;
     }
     Some((xtwx, xtwz))
 }
@@ -134,10 +128,7 @@ fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
         fill_active_design_columns(x, sample, &mut active);
         for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
             for (col, col_value) in active.iter().copied().skip(left_pos) {
-                xtwx[(row, col)] = checked_sum2(
-                    xtwx[(row, col)],
-                    checked_product3(row_value, weight, col_value)?,
-                )?;
+                xtwx[(row, col)] = checked::add(xtwx[(row, col)], checked_product3(row_value, weight, col_value)?)?;
                 if row != col {
                     xtwx[(col, row)] = xtwx[(row, col)];
                 }

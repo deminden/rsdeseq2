@@ -2,6 +2,7 @@ use crate::core::CountMatrix;
 use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDispersionTrend};
 use crate::errors::DeseqError;
 use crate::matrix::RowMajorMatrix;
+use crate::numeric::checked::{self, CheckedExt};
 
 // Fast-VST row selection and aligned subsets.
 mod frozen;
@@ -143,23 +144,27 @@ fn vst_local_with_integral(
             reason: "local VST integral must increase across scaling quantiles".to_string(),
         });
     }
-    let log_delta = checked_sub(h2.log2(), h1.log2(), 0, "local VST scaling log delta")?;
-    let integral_delta = checked_sub(int_h2, int_h1, 0, "local VST scaling integral delta")?;
-    let eta = checked_div(log_delta, integral_delta, 0, "local VST scaling eta")?;
-    let eta_integral = checked_mul(eta, int_h1, 0, "local VST scaling eta integral")?;
-    let xi = checked_sub(h1.log2(), eta_integral, 0, "local VST scaling xi")?;
+    let log_delta = checked::try_sub(h2.log2(), h1.log2())
+        .nonfinite_at("local VST scaling log delta", Some(0))?;
+    let integral_delta = checked::try_sub(int_h2, int_h1)
+        .nonfinite_at("local VST scaling integral delta", Some(0))?;
+    let eta = checked::try_div_finite_result(log_delta, integral_delta)
+        .nonfinite_at("local VST scaling eta", Some(0))?;
+    let eta_integral =
+        checked::try_mul(eta, int_h1).nonfinite_at("local VST scaling eta integral", Some(0))?;
+    let xi =
+        checked::try_sub(h1.log2(), eta_integral).nonfinite_at("local VST scaling xi", Some(0))?;
     let values = normalized_counts
         .as_slice()
         .iter()
         .copied()
         .map(|count| {
             integral.evaluate(count.asinh()).and_then(|value| {
-                checked_add(
-                    checked_mul(eta, value, 0, "local VST scaled value")?,
+                checked::try_add(
+                    checked::try_mul(eta, value).nonfinite_at("local VST scaled value", Some(0))?,
                     xi,
-                    0,
-                    "local VST scaled value",
                 )
+                .nonfinite_at("local VST scaled value", Some(0))
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -191,7 +196,7 @@ pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, D
         }
         inverse_size_factors.push(size_factor.recip());
     }
-    checked_mean(&inverse_size_factors, "local VST inverse size-factor mean")
+    checked::try_mean(&inverse_size_factors).nonfinite("local VST inverse size-factor mean")
 }
 
 /// Compute the local-VST size-factor summary from normalization factors.
@@ -223,11 +228,10 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
     }
     let mut inverse_column_means = Vec::with_capacity(normalization_factors.n_cols());
     for (sample, sum) in log_col_sums.into_iter().enumerate() {
-        let log_mean = checked_div(
-            sum,
-            normalization_factors.n_rows() as f64,
-            sample,
+        let log_mean = checked::try_div_finite_result(sum, normalization_factors.n_rows() as f64)
+            .nonfinite_at(
             "local VST normalization-factor log column mean",
+            Some(sample),
         )?;
         let column_geometric_mean = log_mean.exp();
         if !column_geometric_mean.is_finite() || column_geometric_mean <= 0.0 {
@@ -239,10 +243,8 @@ pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
         }
         inverse_column_means.push(column_geometric_mean.recip());
     }
-    checked_mean(
-        &inverse_column_means,
-        "local VST inverse normalization-factor mean",
-    )
+    checked::try_mean(&inverse_column_means)
+        .nonfinite("local VST inverse normalization-factor mean")
 }
 
 /// Apply VST using an already-fitted dispersion trend.
@@ -336,42 +338,26 @@ pub fn vst_mean_value(
             value: normalized_count,
         });
     }
-    let dispersion_count = match checked_mul(
-        mean_dispersion,
-        normalized_count,
-        index,
-        "mean VST dispersion count",
-    ) {
+    let dispersion_count = match checked::try_mul(mean_dispersion, normalized_count)
+        .nonfinite_at("mean VST dispersion count", Some(index))
+    {
         Ok(value) => value,
         Err(_) => return Ok(normalized_count.log2()),
     };
     if dispersion_count.is_infinite() {
         return Ok(normalized_count.log2());
     }
-    let transformed_numerator = checked_sub(
-        checked_mul(
-            2.0,
-            dispersion_count.sqrt().asinh(),
-            index,
-            "mean VST numerator",
-        )?,
+    let transformed_numerator = checked::try_sub(
+        checked::try_mul(2.0, dispersion_count.sqrt().asinh())
+            .nonfinite_at("mean VST numerator", Some(index))?,
         mean_dispersion.ln(),
-        index,
-        "mean VST numerator",
-    )?;
-    let transformed_numerator = checked_sub(
-        transformed_numerator,
-        4.0_f64.ln(),
-        index,
-        "mean VST numerator",
-    )?;
+    )
+    .nonfinite_at("mean VST numerator", Some(index))?;
+    let transformed_numerator = checked::try_sub(transformed_numerator, 4.0_f64.ln())
+        .nonfinite_at("mean VST numerator", Some(index))?;
     finite_value(
-        checked_div(
-            transformed_numerator,
-            std::f64::consts::LN_2,
-            index,
-            "mean VST value",
-        )?,
+        checked::try_div_finite_result(transformed_numerator, std::f64::consts::LN_2)
+            .nonfinite_at("mean VST value", Some(index))?,
         Some(index),
         "mean VST value",
     )
@@ -387,35 +373,34 @@ pub fn vst_parametric_value(
     validate_normalized_count(normalized_count, index)?;
     let alpha = trend.asympt_disp;
     let extra = trend.extra_pois;
-    let alpha_count =
-        match checked_mul(alpha, normalized_count, index, "parametric VST alpha count") {
-            Ok(value) => value,
-            Err(_) => return Ok(normalized_count.log2()),
-        };
+    let alpha_count = match checked::try_mul(alpha, normalized_count)
+        .nonfinite_at("parametric VST alpha count", Some(index))
+    {
+        Ok(value) => value,
+        Err(_) => return Ok(normalized_count.log2()),
+    };
     if alpha_count.is_infinite() {
         return Ok(normalized_count.log2());
     }
-    let root_term = checked_add(1.0, extra, index, "parametric VST root term")
-        .and_then(|value| checked_add(value, alpha_count, index, "parametric VST root term"))?;
-    let numerator_root = checked_add(
-        alpha_count.sqrt(),
-        root_term.sqrt(),
-        index,
-        "parametric VST numerator root",
-    )?;
-    let numerator = checked_sub(
-        checked_mul(2.0, numerator_root.ln(), index, "parametric VST numerator")?,
-        checked_mul(4.0, alpha, index, "parametric VST denominator")?.ln(),
-        index,
-        "parametric VST numerator",
-    )?;
+    let root_term = checked::try_add(1.0, extra)
+        .nonfinite_at("parametric VST root term", Some(index))
+        .and_then(|value| {
+            checked::try_add(value, alpha_count)
+                .nonfinite_at("parametric VST root term", Some(index))
+        })?;
+    let numerator_root = checked::try_add(alpha_count.sqrt(), root_term.sqrt())
+        .nonfinite_at("parametric VST numerator root", Some(index))?;
+    let numerator = checked::try_sub(
+        checked::try_mul(2.0, numerator_root.ln())
+            .nonfinite_at("parametric VST numerator", Some(index))?,
+        checked::try_mul(4.0, alpha)
+            .nonfinite_at("parametric VST denominator", Some(index))?
+            .ln(),
+    )
+    .nonfinite_at("parametric VST numerator", Some(index))?;
     finite_value(
-        checked_div(
-            numerator,
-            std::f64::consts::LN_2,
-            index,
-            "parametric VST value",
-        )?,
+        checked::try_div_finite_result(numerator, std::f64::consts::LN_2)
+            .nonfinite_at("parametric VST value", Some(index))?,
         Some(index),
         "parametric VST value",
     )
@@ -502,7 +487,7 @@ fn normalized_count_row_means(
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for row in 0..normalized_counts.n_rows() {
         let values = normalized_counts.row(row)?;
-        means.push(checked_mean(values, "local VST row mean")?);
+        means.push(checked::try_mean(values).nonfinite("local VST row mean")?);
     }
     Ok(means)
 }
@@ -537,24 +522,10 @@ fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
     checked_interpolate(
         sorted[lower_idx],
         fraction,
-        checked_sub(
-            sorted[lower_idx + 1],
-            sorted[lower_idx],
-            lower_idx,
-            "local VST quantile interpolation delta",
-        )?,
+        checked::try_sub(sorted[lower_idx + 1], sorted[lower_idx])
+            .nonfinite_at("local VST quantile interpolation delta", Some(lower_idx))?,
         "local VST quantile interpolation",
     )
-}
-
-fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left + right;
-    finite_value(value, Some(index), context)
-}
-
-fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left - right;
-    finite_value(value, Some(index), context)
 }
 
 fn checked_add_assign(
@@ -563,18 +534,8 @@ fn checked_add_assign(
     index: usize,
     context: &str,
 ) -> Result<(), DeseqError> {
-    *sum = checked_add(*sum, term, index, context)?;
+    *sum = checked::try_add(*sum, term).nonfinite_at(context, Some(index))?;
     Ok(())
-}
-
-fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    finite_value(value, Some(index), context)
-}
-
-fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left / right;
-    finite_value(value, Some(index), context)
 }
 
 fn checked_interpolate(
@@ -583,44 +544,11 @@ fn checked_interpolate(
     delta: f64,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    checked_add(origin, checked_mul(scale, delta, 0, context)?, 0, context)
-}
-
-fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
-    let mut sum = 0.0;
-    for (idx, value) in values.into_iter().enumerate() {
-        sum = checked_add(sum, value, idx, context)?;
-    }
-    Ok(sum)
-}
-
-fn checked_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
-    let mut scale = 0.0_f64;
-    for (idx, value) in values.iter().copied().enumerate() {
-        if !value.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: Some(idx),
-                value,
-            });
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Ok(0.0);
-    }
-    let normalized_sum = checked_sum(
-        values
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, value)| checked_div(value, scale, idx, context))
-            .collect::<Result<Vec<_>, _>>()?,
-        context,
-    )?;
-    let normalized_mean = checked_div(normalized_sum, values.len() as f64, 0, context)?;
-    let mean = checked_mul(normalized_mean, scale, 0, context)?;
-    finite_value(mean, None, context)
+    checked::try_add(
+        origin,
+        checked::try_mul(scale, delta).nonfinite_at(context, Some(0))?,
+    )
+    .nonfinite_at(context, Some(0))
 }
 
 fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
@@ -652,14 +580,18 @@ mod tests {
 
     #[test]
     fn checked_local_vst_arithmetic_rejects_nonfinite_subtraction_and_division() {
-        let sub_err = checked_sub(f64::MAX, -f64::MAX, 0, "test subtraction").unwrap_err();
+        let sub_err = checked::try_sub(f64::MAX, -f64::MAX)
+            .nonfinite_at("test subtraction", Some(0))
+            .unwrap_err();
         assert!(matches!(
             sub_err,
             DeseqError::NonFiniteValue { context, index, .. }
                 if context == "test subtraction" && index == Some(0)
         ));
 
-        let div_err = checked_div(1.0, 0.0, 1, "test division").unwrap_err();
+        let div_err = checked::try_div_finite_result(1.0, 0.0)
+            .nonfinite_at("test division", Some(1))
+            .unwrap_err();
         assert!(matches!(
             div_err,
             DeseqError::NonFiniteValue { context, index, .. }

@@ -252,20 +252,10 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
             cox_reid_weight_terms_for_order::<DERIVATIVE, SECOND_DERIVATIVE>(mu, alpha, sample)?;
         for (left_pos, (left_idx, left_value)) in active_columns.iter().copied().enumerate() {
             for (right_idx, right_value) in active_columns.iter().copied().skip(left_pos) {
-                let x_product = checked_mul(
-                    left_value,
-                    right_value,
-                    sample,
-                    "Cox-Reid weighted design product",
-                )?;
+                let x_product = checked::try_mul(left_value, right_value).nonfinite_at("Cox-Reid weighted design product", Some(sample))?;
                 checked_matrix_add_assign(
                     &mut xtwx[(left_idx, right_idx)],
-                    checked_mul(
-                        x_product,
-                        weight_terms.weight,
-                        sample,
-                        "Cox-Reid weighted design xtwx",
-                    )?,
+                    checked::try_mul(x_product, weight_terms.weight).nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design xtwx",
                 )?;
@@ -273,12 +263,7 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
                 if let Some(d_xtwx) = &mut d_xtwx {
                     checked_matrix_add_assign(
                         &mut d_xtwx[(left_idx, right_idx)],
-                        checked_mul(
-                            x_product,
-                            weight_terms.d_weight,
-                            sample,
-                            "Cox-Reid weighted design derivative",
-                        )?,
+                        checked::try_mul(x_product, weight_terms.d_weight).nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
                         sample,
                         "Cox-Reid weighted design derivative",
                     )?;
@@ -286,12 +271,7 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
                 if let Some(d2_xtwx) = &mut d2_xtwx {
                     checked_matrix_add_assign(
                         &mut d2_xtwx[(left_idx, right_idx)],
-                        checked_mul(
-                            x_product,
-                            weight_terms.d2_weight,
-                            sample,
-                            "Cox-Reid weighted design second derivative",
-                        )?,
+                        checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at("Cox-Reid weighted design second derivative", Some(sample))?,
                         sample,
                         "Cox-Reid weighted design second derivative",
                     )?;
@@ -354,12 +334,7 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             }
             checked_matrix_add_assign(
                 &mut xtwx[(left_idx, right_idx)],
-                checked_mul(
-                    x_product,
-                    weight_terms.weight,
-                    sample,
-                    "Cox-Reid weighted design xtwx",
-                )?,
+                checked::try_mul(x_product, weight_terms.weight).nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
                 sample,
                 "Cox-Reid weighted design xtwx",
             )?;
@@ -367,12 +342,7 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             if let Some(d_xtwx) = &mut d_xtwx {
                 checked_matrix_add_assign(
                     &mut d_xtwx[(left_idx, right_idx)],
-                    checked_mul(
-                        x_product,
-                        weight_terms.d_weight,
-                        sample,
-                        "Cox-Reid weighted design derivative",
-                    )?,
+                    checked::try_mul(x_product, weight_terms.d_weight).nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design derivative",
                 )?;
@@ -380,12 +350,7 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             if let Some(d2_xtwx) = &mut d2_xtwx {
                 checked_matrix_add_assign(
                     &mut d2_xtwx[(left_idx, right_idx)],
-                    checked_mul(
-                        x_product,
-                        weight_terms.d2_weight,
-                        sample,
-                        "Cox-Reid weighted design second derivative",
-                    )?,
+                    checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at("Cox-Reid weighted design second derivative", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design second derivative",
                 )?;
@@ -653,19 +618,14 @@ fn cox_reid_weight_terms_for_order<const DERIVATIVE: bool, const SECOND_DERIVATI
     } else {
         1.0
     };
-    let weight = checked_mul(ratio, alpha.recip(), index, "Cox-Reid working weight")?;
+    let weight = checked::try_mul(ratio, alpha.recip()).nonfinite_at("Cox-Reid working weight", Some(index))?;
     let square = if DERIVATIVE || SECOND_DERIVATIVE {
-        checked_mul(weight, weight, index, "Cox-Reid working weight square")?
+        checked::try_mul(weight, weight).nonfinite_at("Cox-Reid working weight square", Some(index))?
     } else {
         0.0
     };
     let d2_weight = if SECOND_DERIVATIVE {
-        checked_mul(
-            2.0,
-            checked_mul(square, weight, index, "Cox-Reid working weight cube")?,
-            index,
-            "Cox-Reid working second derivative weight",
-        )?
+        checked::try_mul(2.0, checked::try_mul(square, weight).nonfinite_at("Cox-Reid working weight cube", Some(index))?).nonfinite_at("Cox-Reid working second derivative weight", Some(index))?
     } else {
         0.0
     };

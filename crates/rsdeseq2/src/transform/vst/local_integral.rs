@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::checked::{self, CheckedExt};
 
 #[derive(Clone, Debug)]
 pub(super) struct LocalVstIntegral {
@@ -57,11 +58,14 @@ impl LocalVstIntegral {
             .copied()
             .zip(dispersions.iter().copied())
             .map(|(q, dispersion)| {
-                let dispersion_q = checked_mul(dispersion, q, 0, "local VST dispersion q")?;
-                let dispersion_q2 = checked_mul(dispersion_q, q, 0, "local VST dispersion q2")?;
-                let poisson_q = checked_mul(inverse_size_factor_mean, q, 0, "local VST Poisson q")?;
-                let variance =
-                    checked_add(dispersion_q2, poisson_q, 0, "local VST variance curve")?;
+                let dispersion_q = checked::try_mul(dispersion, q)
+                    .nonfinite_at("local VST dispersion q", Some(0))?;
+                let dispersion_q2 = checked::try_mul(dispersion_q, q)
+                    .nonfinite_at("local VST dispersion q2", Some(0))?;
+                let poisson_q = checked::try_mul(inverse_size_factor_mean, q)
+                    .nonfinite_at("local VST Poisson q", Some(0))?;
+                let variance = checked::try_add(dispersion_q2, poisson_q)
+                    .nonfinite_at("local VST variance curve", Some(0))?;
                 if !variance.is_finite() || variance <= 0.0 {
                     return Err(DeseqError::InvalidDispersion {
                         reason: "local VST variance curve must be finite and positive".to_string(),
@@ -74,27 +78,22 @@ impl LocalVstIntegral {
         let mut y = Vec::with_capacity(grid.len() - 1);
         let mut cumulative = 0.0;
         for idx in 1..grid.len() {
-            let width = checked_sub(grid[idx], grid[idx - 1], idx, "local VST integration width")?;
-            let height_sum = checked_add(
-                integrand[idx],
-                integrand[idx - 1],
-                idx,
-                "local VST integration height sum",
-            )?;
-            let area = checked_div(
-                checked_mul(width, height_sum, idx, "local VST integration area")?,
+            let width = checked::try_sub(grid[idx], grid[idx - 1])
+                .nonfinite_at("local VST integration width", Some(idx))?;
+            let height_sum = checked::try_add(integrand[idx], integrand[idx - 1])
+                .nonfinite_at("local VST integration height sum", Some(idx))?;
+            let area = checked::try_div_finite_result(
+                checked::try_mul(width, height_sum)
+                    .nonfinite_at("local VST integration area", Some(idx))?,
                 2.0,
-                idx,
-                "local VST integration area",
-            )?;
-            cumulative = checked_add(cumulative, area, idx, "local VST integration cumulative")?;
-            let midpoint_sum = checked_add(
-                grid[idx],
-                grid[idx - 1],
-                idx,
-                "local VST integration midpoint sum",
-            )?;
-            let midpoint = checked_div(midpoint_sum, 2.0, idx, "local VST integration midpoint")?;
+            )
+            .nonfinite_at("local VST integration area", Some(idx))?;
+            cumulative = checked::try_add(cumulative, area)
+                .nonfinite_at("local VST integration cumulative", Some(idx))?;
+            let midpoint_sum = checked::try_add(grid[idx], grid[idx - 1])
+                .nonfinite_at("local VST integration midpoint sum", Some(idx))?;
+            let midpoint = checked::try_div_finite_result(midpoint_sum, 2.0)
+                .nonfinite_at("local VST integration midpoint", Some(idx))?;
             x.push(midpoint.asinh());
             y.push(cumulative);
         }
@@ -130,126 +129,79 @@ impl LocalVstIntegral {
             self.x.partition_point(|value| *value < target) - 1
         };
         let upper = lower + 1;
-        let width = checked_sub(
-            self.x[upper],
-            self.x[lower],
-            upper,
-            "local VST spline width",
-        )?;
-        let left = checked_sub(
-            self.x[upper],
-            target,
-            lower,
-            "local VST spline left distance",
-        )?;
-        let right = checked_sub(
-            target,
-            self.x[lower],
-            lower,
-            "local VST spline right distance",
-        )?;
-        let left_cube = checked_mul(
-            checked_mul(left, left, lower, "local VST spline left cube")?,
+        let width = checked::try_sub(self.x[upper], self.x[lower])
+            .nonfinite_at("local VST spline width", Some(upper))?;
+        let left = checked::try_sub(self.x[upper], target)
+            .nonfinite_at("local VST spline left distance", Some(lower))?;
+        let right = checked::try_sub(target, self.x[lower])
+            .nonfinite_at("local VST spline right distance", Some(lower))?;
+        let left_cube = checked::try_mul(
+            checked::try_mul(left, left).nonfinite_at("local VST spline left cube", Some(lower))?,
             left,
-            lower,
-            "local VST spline left cube",
-        )?;
-        let right_cube = checked_mul(
-            checked_mul(right, right, lower, "local VST spline right cube")?,
+        )
+        .nonfinite_at("local VST spline left cube", Some(lower))?;
+        let right_cube = checked::try_mul(
+            checked::try_mul(right, right)
+                .nonfinite_at("local VST spline right cube", Some(lower))?,
             right,
-            lower,
-            "local VST spline right cube",
-        )?;
-        let width_six = checked_mul(6.0, width, lower, "local VST spline denominator")?;
-        let curvature_left = checked_div(
-            checked_mul(
-                self.second_derivatives[lower],
-                left_cube,
-                lower,
-                "local VST spline curvature",
-            )?,
+        )
+        .nonfinite_at("local VST spline right cube", Some(lower))?;
+        let width_six = checked::try_mul(6.0, width)
+            .nonfinite_at("local VST spline denominator", Some(lower))?;
+        let curvature_left = checked::try_div_finite_result(
+            checked::try_mul(self.second_derivatives[lower], left_cube)
+                .nonfinite_at("local VST spline curvature", Some(lower))?,
             width_six,
-            lower,
-            "local VST spline curvature",
-        )?;
-        let curvature_right = checked_div(
-            checked_mul(
-                self.second_derivatives[upper],
-                right_cube,
-                upper,
-                "local VST spline curvature",
-            )?,
+        )
+        .nonfinite_at("local VST spline curvature", Some(lower))?;
+        let curvature_right = checked::try_div_finite_result(
+            checked::try_mul(self.second_derivatives[upper], right_cube)
+                .nonfinite_at("local VST spline curvature", Some(upper))?,
             width_six,
-            upper,
-            "local VST spline curvature",
-        )?;
-        let width_squared = checked_mul(width, width, lower, "local VST spline width squared")?;
-        let correction_left = checked_div(
-            checked_mul(
-                self.second_derivatives[lower],
-                width_squared,
-                lower,
-                "local VST spline correction",
-            )?,
+        )
+        .nonfinite_at("local VST spline curvature", Some(upper))?;
+        let width_squared = checked::try_mul(width, width)
+            .nonfinite_at("local VST spline width squared", Some(lower))?;
+        let correction_left = checked::try_div_finite_result(
+            checked::try_mul(self.second_derivatives[lower], width_squared)
+                .nonfinite_at("local VST spline correction", Some(lower))?,
             6.0,
-            lower,
-            "local VST spline correction",
-        )?;
-        let correction_right = checked_div(
-            checked_mul(
-                self.second_derivatives[upper],
-                width_squared,
-                upper,
-                "local VST spline correction",
-            )?,
+        )
+        .nonfinite_at("local VST spline correction", Some(lower))?;
+        let correction_right = checked::try_div_finite_result(
+            checked::try_mul(self.second_derivatives[upper], width_squared)
+                .nonfinite_at("local VST spline correction", Some(upper))?,
             6.0,
-            upper,
-            "local VST spline correction",
-        )?;
-        let linear_left = checked_div(
-            checked_mul(
-                checked_sub(
-                    self.y[lower],
-                    correction_left,
-                    lower,
-                    "local VST spline linear term",
-                )?,
+        )
+        .nonfinite_at("local VST spline correction", Some(upper))?;
+        let linear_left = checked::try_div_finite_result(
+            checked::try_mul(
+                checked::try_sub(self.y[lower], correction_left)
+                    .nonfinite_at("local VST spline linear term", Some(lower))?,
                 left,
-                lower,
-                "local VST spline linear term",
-            )?,
+            )
+            .nonfinite_at("local VST spline linear term", Some(lower))?,
             width,
-            lower,
-            "local VST spline linear term",
-        )?;
-        let linear_right = checked_div(
-            checked_mul(
-                checked_sub(
-                    self.y[upper],
-                    correction_right,
-                    upper,
-                    "local VST spline linear term",
-                )?,
+        )
+        .nonfinite_at("local VST spline linear term", Some(lower))?;
+        let linear_right = checked::try_div_finite_result(
+            checked::try_mul(
+                checked::try_sub(self.y[upper], correction_right)
+                    .nonfinite_at("local VST spline linear term", Some(upper))?,
                 right,
-                upper,
-                "local VST spline linear term",
-            )?,
+            )
+            .nonfinite_at("local VST spline linear term", Some(upper))?,
             width,
-            upper,
-            "local VST spline linear term",
-        )?;
+        )
+        .nonfinite_at("local VST spline linear term", Some(upper))?;
         finite_value(
-            checked_add(
-                checked_add(
-                    curvature_left,
-                    curvature_right,
-                    lower,
-                    "local VST spline value",
-                )?,
-                checked_add(linear_left, linear_right, lower, "local VST spline value")?,
-                lower,
-                "local VST spline value",
-            )?,
+            checked::try_add(
+                checked::try_add(curvature_left, curvature_right)
+                    .nonfinite_at("local VST spline value", Some(lower))?,
+                checked::try_add(linear_left, linear_right)
+                    .nonfinite_at("local VST spline value", Some(lower))?,
+            )
+            .nonfinite_at("local VST spline value", Some(lower))?,
             None,
             "local VST spline value",
         )
@@ -271,19 +223,22 @@ fn fmm_spline_second_derivatives(x: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
     let mut h = Vec::with_capacity(n - 1);
     let mut slopes = Vec::with_capacity(n - 1);
     for idx in 0..n - 1 {
-        let width = checked_sub(x[idx + 1], x[idx], idx, "local VST spline knot width")?;
+        let width = checked::try_sub(x[idx + 1], x[idx])
+            .nonfinite_at("local VST spline knot width", Some(idx))?;
         if width <= 0.0 {
             return Err(DeseqError::InvalidOptions {
                 reason: "local VST spline knots must be strictly increasing".to_string(),
             });
         }
         h.push(width);
-        slopes.push(checked_div(
-            checked_sub(y[idx + 1], y[idx], idx, "local VST spline secant")?,
-            width,
-            idx,
-            "local VST spline secant",
-        )?);
+        slopes.push(
+            checked::try_div_finite_result(
+                checked::try_sub(y[idx + 1], y[idx])
+                    .nonfinite_at("local VST spline secant", Some(idx))?,
+                width,
+            )
+            .nonfinite_at("local VST spline secant", Some(idx))?,
+        );
     }
     // R solves for sigma = second_derivative / 6. The endpoint right-hand
     // sides are divided-difference estimates of the cubic third derivatives.

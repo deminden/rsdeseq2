@@ -1,4 +1,4 @@
-use crate::math::sum::checked_scaled_sum;
+use crate::numeric::checked;
 use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
 use statrs::distribution::{Continuous, Normal};
 
@@ -262,7 +262,7 @@ pub fn wald_stat_and_pvalue_with_options(
             let stat = beta.signum() * shifted.max(0.0);
             let pvalue = tail
                 .upper(shifted)
-                .and_then(|pvalue| checked_product2(2.0, pvalue).and_then(clamp_probability));
+                .and_then(|pvalue| checked::mul(2.0, pvalue).and_then(clamp_probability));
             (stat, pvalue)
         }
         WaldAlternative::LessAbs => {
@@ -359,16 +359,16 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
     let distribution = Normal::new(0.0, 1.0).ok()?;
     let a = checked_shifted_stat(abs_beta, threshold, beta_se)?;
     let b = checked_shifted_stat(abs_beta, -threshold, beta_se)?;
-    let denominator = checked_sub(b, a)?;
-    let scale = checked_div(2.0, denominator)?;
+    let denominator = checked::sub(b, a)?;
+    let scale = checked::div(2.0, denominator)?;
     let left_tail_a = normal_upper_tail(a);
     let left_tail_b = normal_upper_tail(b);
-    let value = checked_product2(
+    let value = checked::mul(
         scale,
-        checked_scaled_sum(&[
-            checked_product2(-a, left_tail_a)?,
+        checked::scaled_sum(&[
+            checked::mul(-a, left_tail_a)?,
             distribution.pdf(a),
-            checked_product2(b, left_tail_b)?,
+            checked::mul(b, left_tail_b)?,
             -distribution.pdf(b),
         ])?,
     )?;
@@ -379,28 +379,8 @@ fn clamp_probability(value: f64) -> Option<f64> {
     value.is_finite().then_some(value.clamp(0.0, 1.0))
 }
 
-fn checked_sub(left: f64, right: f64) -> Option<f64> {
-    let value = left - right;
-    value.is_finite().then_some(value)
-}
-
-fn checked_add(left: f64, right: f64) -> Option<f64> {
-    let value = left + right;
-    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
-}
-
-fn checked_div(left: f64, right: f64) -> Option<f64> {
-    let value = left / right;
-    (left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite()).then_some(value)
-}
-
 fn checked_shifted_stat(left: f64, right: f64, beta_se: f64) -> Option<f64> {
-    checked_div(checked_add(left, right)?, beta_se)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let value = left * right;
-    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
+    checked::div(checked::add(left, right)?, beta_se)
 }
 
 pub(super) fn checked_product3_ordered_by_magnitude(
@@ -410,7 +390,7 @@ pub(super) fn checked_product3_ordered_by_magnitude(
 ) -> Option<f64> {
     let mut factors = [left, middle, right];
     factors.sort_by(|a, b| a.abs().total_cmp(&b.abs()));
-    checked_product2(checked_product2(factors[0], factors[1])?, factors[2])
+    checked::mul(checked::mul(factors[0], factors[1])?, factors[2])
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn checked_div_rejects_nonfinite_dispersion_summaries() {
-        let zero_err = checked_div(1.0, 0.0, 7, "test dispersion division").unwrap_err();
+        let zero_err = checked::try_div(1.0, 0.0).nonfinite_at("test dispersion division", Some(7)).unwrap_err();
         assert!(matches!(
             zero_err,
             DeseqError::NonFiniteValue { context, index, .. }
@@ -84,7 +84,7 @@ mod tests {
         ));
 
         let overflow_err =
-            checked_div(f64::MAX, f64::MIN_POSITIVE, 3, "test dispersion division").unwrap_err();
+            checked::try_div(f64::MAX, f64::MIN_POSITIVE).nonfinite_at("test dispersion division", Some(3)).unwrap_err();
         assert!(matches!(
             overflow_err,
             DeseqError::NonFiniteValue { context, index, .. }

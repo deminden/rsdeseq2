@@ -2,11 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        checked_div2, checked_mean_dispersion_working_weight, checked_scaled_sum,
-        intercept_working_weights, stable_interpolate, weighted_mean,
-    };
+    use super::{checked_mean_dispersion_working_weight, intercept_working_weights, stable_interpolate, weighted_mean};
     use crate::errors::DeseqError;
+    use crate::numeric::checked;
 
     #[test]
     fn stable_interpolate_preserves_equal_extreme_endpoints() {
@@ -35,14 +33,14 @@ mod tests {
 
     #[test]
     fn checked_scaled_sum_rejects_overflowed_rescale() {
-        assert_eq!(checked_scaled_sum([f64::MAX, f64::MAX]), None);
+        assert_eq!(checked::scaled_sum(&[f64::MAX, f64::MAX]), None);
     }
 
     #[test]
     fn checked_div2_rejects_zero_and_nonfinite_inputs() {
-        assert_eq!(checked_div2(1.0, 0.0), None);
-        assert_eq!(checked_div2(f64::NAN, 1.0), None);
-        assert_eq!(checked_div2(4.0, 2.0), Some(2.0));
+        assert_eq!(checked::div(1.0, 0.0), None);
+        assert_eq!(checked::div(f64::NAN, 1.0), None);
+        assert_eq!(checked::div(4.0, 2.0), Some(2.0));
     }
 
     #[test]

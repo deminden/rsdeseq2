@@ -1,4 +1,5 @@
 use crate::errors::DeseqError;
+use crate::numeric::checked;
 
 /// Options for a small deterministic bounded optimizer.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -256,25 +257,25 @@ fn l2_norm(values: &[f64]) -> Option<f64> {
     }
     let mut sum = 0.0;
     for value in values.iter().copied() {
-        let scaled = checked_div2(value, scale)?;
-        let term = checked_product2(scaled, scaled)?;
-        sum = checked_sum2(sum, term)?;
+        let scaled = checked::div(value, scale)?;
+        let term = checked::mul(scaled, scaled)?;
+        sum = checked::add(sum, term)?;
     }
-    checked_product2(scale, sum.sqrt())
+    checked::mul(scale, sum.sqrt())
 }
 
 fn dot(left: &[f64], right: &[f64]) -> Option<f64> {
     let mut terms = Vec::with_capacity(left.len().min(right.len()));
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        terms.push(checked_product2(left, right)?);
+        terms.push(checked::mul(left, right)?);
     }
-    scaled_sum(&terms)
+    checked::scaled_sum(&terms)
 }
 
 fn max_abs_difference(left: &[f64], right: &[f64]) -> Option<f64> {
     let mut max_difference = 0.0;
     for (left, right) in left.iter().copied().zip(right.iter().copied()) {
-        let difference = checked_sum2(left, -right)?.abs();
+        let difference = checked::add(left, -right)?.abs();
         max_difference = f64::max(max_difference, difference);
     }
     Some(max_difference)
@@ -291,10 +292,10 @@ fn actual_directional_derivative(
         .copied()
         .zip(candidate.iter().copied().zip(parameters.iter().copied()))
     {
-        let direction = checked_sum2(candidate, -parameter)?;
-        terms.push(checked_product2(gradient, direction)?);
+        let direction = checked::add(candidate, -parameter)?;
+        terms.push(checked::mul(gradient, direction)?);
     }
-    scaled_sum(&terms)
+    checked::scaled_sum(&terms)
 }
 
 fn checked_candidate(
@@ -327,47 +328,13 @@ fn checked_candidate_coordinate(
     {
         return None;
     }
-    let displacement = checked_product2(step, delta)?;
-    let candidate = checked_sum2(value, displacement)?;
+    let displacement = checked::mul(step, delta)?;
+    let candidate = checked::add(value, displacement)?;
     Some(candidate.clamp(lower, upper))
 }
 
-fn scaled_sum(values: &[f64]) -> Option<f64> {
-    let scale = values
-        .iter()
-        .copied()
-        .map(f64::abs)
-        .try_fold(0.0_f64, |scale, value| {
-            value.is_finite().then_some(scale.max(value))
-        })?;
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let mut sum = 0.0;
-    for value in values.iter().copied() {
-        sum = checked_sum2(sum, checked_div2(value, scale)?)?;
-    }
-    checked_product2(sum, scale)
-}
-
 fn checked_armijo_bound(value: f64, armijo: f64, derivative: f64) -> Option<f64> {
-    checked_sum2(value, checked_product2(armijo, derivative)?)
-}
-
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_div2(left: f64, right: f64) -> Option<f64> {
-    let quotient = left / right;
-    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
-        .then_some(quotient)
+    checked::add(value, checked::mul(armijo, derivative)?)
 }
 
 #[cfg(test)]
@@ -460,7 +427,7 @@ mod tests {
         );
         assert_eq!(checked_armijo_bound(f64::MAX, 1.0, f64::MAX), None);
         assert_eq!(checked_armijo_bound(1.0, f64::NAN, 1.0), None);
-        assert_eq!(checked_div2(1.0, 0.0), None);
+        assert_eq!(checked::div(1.0, 0.0), None);
     }
 
     #[test]

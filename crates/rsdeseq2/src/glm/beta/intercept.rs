@@ -62,7 +62,7 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
                         ),
                     });
                 }
-                checked_mean(normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
+                checked::mean(normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
                     reason: format!("gene {gene} has non-finite normalized intercept mean"),
                 })?
             }
@@ -89,7 +89,7 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
         let mu_start = gene * counts.n_samples();
         let mu_row = &mu_values[mu_start..mu_start + counts.n_samples()];
         let working_weights = intercept_working_weights(mu_row, dispersion, weight_row)?;
-        let xtwx = checked_sum(working_weights.iter().copied()).ok_or_else(|| {
+        let xtwx = checked::sum(working_weights.iter().copied()).ok_or_else(|| {
             DeseqError::InvalidDispersion {
                 reason: format!("gene {gene} has non-finite intercept information"),
             }
@@ -108,7 +108,7 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
         beta_se_values.push(checked_intercept_beta_se(sigma, gene)?);
         beta_covariance_values.push(checked_intercept_beta_covariance(sigma, gene)?);
         for (sample, value) in working_weights.into_iter().enumerate() {
-            let Some(hat) = checked_product2(value, sigma) else {
+            let Some(hat) = checked::mul(value, sigma) else {
                 return Err(DeseqError::InvalidDispersion {
                     reason: format!(
                         "gene {gene} sample {sample} has non-finite intercept hat diagonal"
@@ -204,19 +204,19 @@ fn weighted_mean(values: &[f64], weights: &[f64], gene: usize) -> Result<f64, De
         .enumerate()
     {
         validate_nonnegative_finite(weight, "weight", sample)?;
-        let Some(value_term) = checked_product2(weight, value) else {
+        let Some(value_term) = checked::mul(weight, value) else {
             return Err(DeseqError::InvalidCounts {
                 reason: format!("gene {gene} has non-finite weighted normalized mean"),
             });
         };
         weighted_values.push(value_term);
     }
-    let Some(numerator_mean) = checked_scaled_mean(&weighted_values) else {
+    let Some(numerator_mean) = checked::mean(&weighted_values) else {
         return Err(DeseqError::InvalidCounts {
             reason: format!("gene {gene} has non-finite weighted normalized mean"),
         });
     };
-    let Some(denominator) = checked_scaled_sum(weights.iter().copied()) else {
+    let Some(denominator) = checked::scaled_sum(weights) else {
         return Err(DeseqError::InvalidCounts {
             reason: format!("gene {gene} has non-finite total weight"),
         });
@@ -231,12 +231,12 @@ fn weighted_mean(values: &[f64], weights: &[f64], gene: usize) -> Result<f64, De
             reason: format!("gene {gene} has zero total weight"),
         });
     }
-    let mean_scale = checked_div2(weighted_values.len() as f64, denominator).ok_or_else(|| {
+    let mean_scale = checked::div(weighted_values.len() as f64, denominator).ok_or_else(|| {
         DeseqError::InvalidCounts {
             reason: format!("gene {gene} has non-finite weighted normalized mean"),
         }
     })?;
-    checked_product2(numerator_mean, mean_scale).ok_or_else(|| DeseqError::InvalidCounts {
+    checked::mul(numerator_mean, mean_scale).ok_or_else(|| DeseqError::InvalidCounts {
         reason: format!("gene {gene} has non-finite weighted normalized mean"),
     })
 }
@@ -260,7 +260,7 @@ fn intercept_working_weights(
             Some(weights) => {
                 let weight = weights[sample];
                 validate_nonnegative_finite(weight, "weight", sample)?;
-                checked_product2(weight, working_weight).ok_or_else(|| {
+                checked::mul(weight, working_weight).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "intercept working weight".to_string(),
                         index: Some(sample),

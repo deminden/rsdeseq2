@@ -717,16 +717,7 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
 }
 
 fn full_deviance_from_log_like(log_like: f64) -> f64 {
-    checked_product2(-2.0, log_like).unwrap_or(f64::NAN)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let deviance = left * right;
-    if left.is_finite() && right.is_finite() && deviance.is_finite() {
-        Some(deviance)
-    } else {
-        None
-    }
+    checked::mul(-2.0, log_like).unwrap_or(f64::NAN)
 }
 
 fn validate_pipeline_wald_coefficient(

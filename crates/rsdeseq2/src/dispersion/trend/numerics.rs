@@ -1,6 +1,7 @@
 //! Checked arithmetic and shared trend input validation.
 
 use crate::errors::DeseqError;
+use crate::numeric::checked::{self, CheckedExt};
 
 pub(super) fn checked_add_assign(
     total: &mut f64,
@@ -17,53 +18,17 @@ pub(super) fn checked_add_assign(
     Ok(())
 }
 
-pub(super) fn checked_product2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let product = left * right;
-    if !left.is_finite() || !right.is_finite() || !product.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} must remain finite"),
-        });
-    }
-    Ok(product)
-}
-
 pub(super) fn checked_product3(
     left: f64,
     middle: f64,
     right: f64,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    checked_product2(checked_product2(left, middle, context)?, right, context)
-}
-
-pub(super) fn checked_sum2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let sum = left + right;
-    if !left.is_finite() || !right.is_finite() || !sum.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} must remain finite"),
-        });
-    }
-    Ok(sum)
-}
-
-pub(super) fn checked_sub2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let difference = left - right;
-    if !left.is_finite() || !right.is_finite() || !difference.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} must remain finite"),
-        });
-    }
-    Ok(difference)
-}
-
-pub(super) fn checked_div2(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let quotient = left / right;
-    if !left.is_finite() || !right.is_finite() || right == 0.0 || !quotient.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} must remain finite"),
-        });
-    }
-    Ok(quotient)
+    checked::mul(
+        checked::mul(left, middle).invalid_dispersion(context)?,
+        right,
+    )
+    .invalid_dispersion(context)
 }
 
 pub(super) fn checked_product_difference(

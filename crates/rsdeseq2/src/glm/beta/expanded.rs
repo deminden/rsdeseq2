@@ -22,7 +22,7 @@ pub fn average_expanded_model_coefficients(
         let row = expanded_beta.row(gene)?;
         for group in coefficient_groups {
             let grouped = group.iter().map(|&column| row[column]).collect::<Vec<_>>();
-            values.push(checked_scaled_mean(&grouped).ok_or_else(|| {
+            values.push(checked::mean(&grouped).ok_or_else(|| {
                 DeseqError::NonFiniteValue {
                     context: "expanded beta coefficient average".to_string(),
                     index: Some(gene),
@@ -152,13 +152,13 @@ pub fn expanded_model_group_contrast(
         }
     }
 
-    let numerator_weight = checked_div2(1.0, numerator_columns.len() as f64).ok_or_else(|| {
+    let numerator_weight = checked::div(1.0, numerator_columns.len() as f64).ok_or_else(|| {
         DeseqError::InvalidOptions {
             reason: "expanded contrast numerator weight is non-finite".to_string(),
         }
     })?;
     let denominator_weight =
-        checked_div2(-1.0, denominator_columns.len() as f64).ok_or_else(|| {
+        checked::div(-1.0, denominator_columns.len() as f64).ok_or_else(|| {
             DeseqError::InvalidOptions {
                 reason: "expanded contrast denominator weight is non-finite".to_string(),
             }

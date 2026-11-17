@@ -1,5 +1,6 @@
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::{median_finite, trigamma};
+use crate::numeric::checked::{self, CheckedExt};
 use statrs::distribution::{ChiSquared, ContinuousCDF, Normal};
 
 const LOW_DF_HIST_MIN: f64 = -10.0;
@@ -287,19 +288,13 @@ fn histogram_density(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
             reason: "all low-df dispersion histogram values were outside bounds".to_string(),
         });
     }
-    let density_denominator = checked_mul(
-        total as f64,
-        LOW_DF_HIST_WIDTH,
-        "low-df dispersion histogram density denominator",
-    )?;
+    let density_denominator = checked::try_mul(total as f64, LOW_DF_HIST_WIDTH)
+        .nonfinite_at("low-df dispersion histogram density denominator", None)?;
     counts
         .into_iter()
         .map(|count| {
-            checked_div(
-                count as f64,
-                density_denominator,
-                "low-df dispersion histogram density",
-            )
+            checked::try_div(count as f64, density_denominator)
+                .nonfinite_at("low-df dispersion histogram density", None)
         })
         .collect()
 }
@@ -325,9 +320,12 @@ fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError>
     }
     let mut divergence = 0.0;
     for (obs, sim) in observed.iter().copied().zip(simulated.iter().copied()) {
-        let obs_adjusted = checked_add(obs, small, "low-df dispersion KL observed bin")?;
-        let sim_adjusted = checked_add(sim, small, "low-df dispersion KL simulated bin")?;
-        let ratio = checked_div(obs_adjusted, sim_adjusted, "low-df dispersion KL bin ratio")?;
+        let obs_adjusted =
+            checked::try_add(obs, small).nonfinite_at("low-df dispersion KL observed bin", None)?;
+        let sim_adjusted = checked::try_add(sim, small)
+            .nonfinite_at("low-df dispersion KL simulated bin", None)?;
+        let ratio = checked::try_div(obs_adjusted, sim_adjusted)
+            .nonfinite_at("low-df dispersion KL bin ratio", None)?;
         let log_ratio = ratio.ln();
         if !log_ratio.is_finite() {
             return Err(DeseqError::NonFiniteValue {
@@ -336,8 +334,10 @@ fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError>
                 value: log_ratio,
             });
         }
-        let term = checked_mul(obs, log_ratio, "low-df dispersion KL term")?;
-        divergence = checked_add(divergence, term, "low-df dispersion KL sum")?;
+        let term =
+            checked::try_mul(obs, log_ratio).nonfinite_at("low-df dispersion KL term", None)?;
+        divergence =
+            checked::try_add(divergence, term).nonfinite_at("low-df dispersion KL sum", None)?;
     }
     Ok(divergence)
 }
@@ -399,18 +399,21 @@ fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     if len == 1 {
         return Ok(vec![start]);
     }
-    let span = checked_sub(end, start, "low-df prior variance grid span")?;
-    let step = checked_div(span, len as f64 - 1.0, "low-df prior variance grid step")?;
+    let span =
+        checked::try_sub(end, start).nonfinite_at("low-df prior variance grid span", None)?;
+    let step = checked::try_div(span, len as f64 - 1.0)
+        .nonfinite_at("low-df prior variance grid step", None)?;
     (0..len)
         .map(|idx| {
-            let offset = checked_mul(step, idx as f64, "low-df prior variance grid offset")?;
-            checked_add(start, offset, "low-df prior variance grid value").map_err(|_| {
-                DeseqError::NonFiniteValue {
+            let offset = checked::try_mul(step, idx as f64)
+                .nonfinite_at("low-df prior variance grid offset", None)?;
+            checked::try_add(start, offset)
+                .nonfinite_at("low-df prior variance grid value", None)
+                .map_err(|_| DeseqError::NonFiniteValue {
                     context: "low-df prior variance grid value".to_string(),
                     index: Some(idx),
                     value: start + offset,
-                }
-            })
+                })
         })
         .collect()
 }
@@ -444,73 +447,80 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
         let mut sxx = 0.0;
         let mut sxy = 0.0;
         for (_, idx) in distances.iter().copied().take(span_points) {
-            let distance =
-                checked_sub(x[idx], target, "low-df prior variance smoother distance")?.abs();
-            let scaled = checked_div(
-                distance,
-                max_distance,
-                "low-df prior variance smoother scaled distance",
-            )?
-            .min(1.0);
+            let distance = checked::try_sub(x[idx], target)
+                .nonfinite_at("low-df prior variance smoother distance", None)?
+                .abs();
+            let scaled = checked::try_div(distance, max_distance)
+                .nonfinite_at("low-df prior variance smoother scaled distance", None)?
+                .min(1.0);
             let weight = tricube_weight(scaled)?;
-            sw = checked_add(sw, weight, "low-df prior variance smoother weights")?;
-            sx = checked_add(
+            sw = checked::try_add(sw, weight)
+                .nonfinite_at("low-df prior variance smoother weights", None)?;
+            sx = checked::try_add(
                 sx,
-                checked_mul(weight, x[idx], "low-df prior variance smoother x")?,
-                "low-df prior variance smoother x",
-            )?;
-            sy = checked_add(
+                checked::try_mul(weight, x[idx])
+                    .nonfinite_at("low-df prior variance smoother x", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother x", None)?;
+            sy = checked::try_add(
                 sy,
-                checked_mul(weight, y[idx], "low-df prior variance smoother y")?,
-                "low-df prior variance smoother y",
-            )?;
-            let weighted_x = checked_mul(weight, x[idx], "low-df prior variance smoother xx")?;
-            sxx = checked_add(
+                checked::try_mul(weight, y[idx])
+                    .nonfinite_at("low-df prior variance smoother y", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother y", None)?;
+            let weighted_x = checked::try_mul(weight, x[idx])
+                .nonfinite_at("low-df prior variance smoother xx", None)?;
+            sxx = checked::try_add(
                 sxx,
-                checked_mul(weighted_x, x[idx], "low-df prior variance smoother xx")?,
-                "low-df prior variance smoother xx",
-            )?;
-            sxy = checked_add(
+                checked::try_mul(weighted_x, x[idx])
+                    .nonfinite_at("low-df prior variance smoother xx", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother xx", None)?;
+            sxy = checked::try_add(
                 sxy,
-                checked_mul(weighted_x, y[idx], "low-df prior variance smoother xy")?,
-                "low-df prior variance smoother xy",
-            )?;
+                checked::try_mul(weighted_x, y[idx])
+                    .nonfinite_at("low-df prior variance smoother xy", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother xy", None)?;
         }
         if sw <= 0.0 {
             continue;
         }
-        let denominator = checked_sub(
-            checked_mul(sw, sxx, "low-df prior variance smoother denominator")?,
-            checked_mul(sx, sx, "low-df prior variance smoother denominator")?,
-            "low-df prior variance smoother denominator",
-        )?;
+        let denominator = checked::try_sub(
+            checked::try_mul(sw, sxx)
+                .nonfinite_at("low-df prior variance smoother denominator", None)?,
+            checked::try_mul(sx, sx)
+                .nonfinite_at("low-df prior variance smoother denominator", None)?,
+        )
+        .nonfinite_at("low-df prior variance smoother denominator", None)?;
         let predicted = if denominator.abs() > f64::EPSILON {
-            let numerator = checked_sub(
-                checked_mul(sw, sxy, "low-df prior variance smoother slope")?,
-                checked_mul(sx, sy, "low-df prior variance smoother slope")?,
-                "low-df prior variance smoother slope",
-            )?;
-            let slope = checked_div(
-                numerator,
-                denominator,
-                "low-df prior variance smoother slope",
-            )?;
-            let intercept = checked_div(
-                checked_sub(
+            let numerator = checked::try_sub(
+                checked::try_mul(sw, sxy)
+                    .nonfinite_at("low-df prior variance smoother slope", None)?,
+                checked::try_mul(sx, sy)
+                    .nonfinite_at("low-df prior variance smoother slope", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother slope", None)?;
+            let slope = checked::try_div(numerator, denominator)
+                .nonfinite_at("low-df prior variance smoother slope", None)?;
+            let intercept = checked::try_div(
+                checked::try_sub(
                     sy,
-                    checked_mul(slope, sx, "low-df prior variance smoother intercept")?,
-                    "low-df prior variance smoother intercept",
-                )?,
+                    checked::try_mul(slope, sx)
+                        .nonfinite_at("low-df prior variance smoother intercept", None)?,
+                )
+                .nonfinite_at("low-df prior variance smoother intercept", None)?,
                 sw,
-                "low-df prior variance smoother intercept",
-            )?;
-            checked_add(
+            )
+            .nonfinite_at("low-df prior variance smoother intercept", None)?;
+            checked::try_add(
                 intercept,
-                checked_mul(slope, target, "low-df prior variance smoother prediction")?,
-                "low-df prior variance smoother prediction",
-            )?
+                checked::try_mul(slope, target)
+                    .nonfinite_at("low-df prior variance smoother prediction", None)?,
+            )
+            .nonfinite_at("low-df prior variance smoother prediction", None)?
         } else {
-            checked_div(sy, sw, "low-df prior variance smoother mean")?
+            checked::try_div(sy, sw).nonfinite_at("low-df prior variance smoother mean", None)?
         };
         if predicted < best_y {
             best_y = predicted;
@@ -526,91 +536,25 @@ fn local_linear_smoothed_argmin(x: &[f64], y: &[f64], fine_x: &[f64]) -> Result<
 }
 
 fn low_df_simulated_residual(base: f64, variance: f64, normal: f64) -> Result<f64, DeseqError> {
-    checked_add(
+    checked::try_add(
         base,
-        checked_mul(variance.sqrt(), normal, "low-df simulated residual scale")?,
-        "low-df simulated residual",
+        checked::try_mul(variance.sqrt(), normal)
+            .nonfinite_at("low-df simulated residual scale", None)?,
     )
+    .nonfinite_at("low-df simulated residual", None)
 }
 
 fn tricube_weight(scaled: f64) -> Result<f64, DeseqError> {
-    let scaled_square = checked_mul(
-        scaled,
-        scaled,
-        "low-df prior variance smoother scaled square",
-    )?;
-    let scaled_cubed = checked_mul(
-        scaled_square,
-        scaled,
-        "low-df prior variance smoother scaled cube",
-    )?;
-    let one_minus_scaled_cubed = checked_sub(
-        1.0,
-        scaled_cubed,
-        "low-df prior variance smoother tricube complement",
-    )?;
-    let weight_square = checked_mul(
-        one_minus_scaled_cubed,
-        one_minus_scaled_cubed,
-        "low-df prior variance smoother tricube weight",
-    )?;
-    checked_mul(
-        weight_square,
-        one_minus_scaled_cubed,
-        "low-df prior variance smoother tricube weight",
-    )
-}
-
-fn checked_add(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left + right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
-}
-
-fn checked_sub(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left - right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
-}
-
-fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
-}
-
-fn checked_div(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left / right;
-    if left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
+    let scaled_square = checked::try_mul(scaled, scaled)
+        .nonfinite_at("low-df prior variance smoother scaled square", None)?;
+    let scaled_cubed = checked::try_mul(scaled_square, scaled)
+        .nonfinite_at("low-df prior variance smoother scaled cube", None)?;
+    let one_minus_scaled_cubed = checked::try_sub(1.0, scaled_cubed)
+        .nonfinite_at("low-df prior variance smoother tricube complement", None)?;
+    let weight_square = checked::try_mul(one_minus_scaled_cubed, one_minus_scaled_cubed)
+        .nonfinite_at("low-df prior variance smoother tricube weight", None)?;
+    checked::try_mul(weight_square, one_minus_scaled_cubed)
+        .nonfinite_at("low-df prior variance smoother tricube weight", None)
 }
 
 #[cfg(test)]
@@ -675,13 +619,17 @@ mod tests {
 
     #[test]
     fn checked_div_rejects_zero_and_nonfinite_prior_arithmetic() {
-        let zero_err = checked_div(1.0, 0.0, "test low-df division").unwrap_err();
+        let zero_err = checked::try_div(1.0, 0.0)
+            .nonfinite_at("test low-df division", None)
+            .unwrap_err();
         assert!(matches!(
             zero_err,
             DeseqError::NonFiniteValue { context, .. } if context == "test low-df division"
         ));
 
-        let nonfinite_err = checked_div(f64::NAN, 1.0, "test low-df division").unwrap_err();
+        let nonfinite_err = checked::try_div(f64::NAN, 1.0)
+            .nonfinite_at("test low-df division", None)
+            .unwrap_err();
         assert!(matches!(
             nonfinite_err,
             DeseqError::NonFiniteValue { context, .. } if context == "test low-df division"

@@ -69,81 +69,25 @@ fn checked_mean_dispersion_working_weight(
     index: usize,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    let Some(inv_mean) = checked_div2(1.0, mean) else {
+    let Some(inv_mean) = checked::div(1.0, mean) else {
         return Err(DeseqError::NonFiniteValue {
             context: context.to_string(),
             index: Some(index),
             value: f64::NAN,
         });
     };
-    let Some(denominator) = checked_sum2(inv_mean, dispersion) else {
+    let Some(denominator) = checked::add(inv_mean, dispersion) else {
         return Err(DeseqError::NonFiniteValue {
             context: context.to_string(),
             index: Some(index),
             value: f64::NAN,
         });
     };
-    checked_div2(1.0, denominator).ok_or_else(|| DeseqError::NonFiniteValue {
+    checked::div(1.0, denominator).ok_or_else(|| DeseqError::NonFiniteValue {
         context: context.to_string(),
         index: Some(index),
         value: f64::NAN,
     })
-}
-
-fn checked_mean(values: &[f64]) -> Option<f64> {
-    checked_scaled_mean(values)
-}
-
-fn checked_scaled_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
-    let values = values.into_iter().collect::<Vec<_>>();
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return None;
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let normalized_sum = checked_sum(
-        values
-            .iter()
-            .copied()
-            .map(|value| checked_div2(value, scale))
-            .collect::<Option<Vec<_>>>()?,
-    )?;
-    checked_product2(normalized_sum, scale)
-}
-
-fn checked_scaled_mean(values: &[f64]) -> Option<f64> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return None;
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let normalized_sum = checked_sum(
-        values
-            .iter()
-            .copied()
-            .map(|value| checked_div2(value, scale))
-            .collect::<Option<Vec<_>>>()?,
-    )?;
-    checked_product2(checked_div2(normalized_sum, values.len() as f64)?, scale)
-}
-
-fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
-    values.into_iter().try_fold(0.0, checked_sum2)
-}
-
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
 fn checked_square(value: f64) -> Option<f64> {
@@ -151,20 +95,9 @@ fn checked_square(value: f64) -> Option<f64> {
     (value.is_finite() && square.is_finite()).then_some(square)
 }
 
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_div2(left: f64, right: f64) -> Option<f64> {
-    let quotient = left / right;
-    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
-        .then_some(quotient)
-}
-
 fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
     let se = sigma.sqrt();
-    let Some(value) = checked_product2(std::f64::consts::LOG2_E, se) else {
+    let Some(value) = checked::mul(std::f64::consts::LOG2_E, se) else {
         return Err(DeseqError::InvalidDispersion {
             reason: format!("gene {gene} has non-finite intercept beta standard error"),
         });
@@ -174,12 +107,12 @@ fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError>
 
 fn checked_intercept_beta_covariance(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
     let log2_e = std::f64::consts::LOG2_E;
-    let Some(log2_e_squared) = checked_product2(log2_e, log2_e) else {
+    let Some(log2_e_squared) = checked::mul(log2_e, log2_e) else {
         return Err(DeseqError::InvalidDispersion {
             reason: "non-finite log2 covariance scaling factor".to_string(),
         });
     };
-    let Some(value) = checked_product2(log2_e_squared, sigma) else {
+    let Some(value) = checked::mul(log2_e_squared, sigma) else {
         return Err(DeseqError::InvalidDispersion {
             reason: format!("gene {gene} has non-finite intercept beta covariance"),
         });
@@ -275,7 +208,7 @@ fn weighted_abs_quantile(
     }
     pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    let Some(weight_sum) = checked_sum(pairs.iter().map(|(_, weight)| *weight)) else {
+    let Some(weight_sum) = checked::sum(pairs.iter().map(|(_, weight)| *weight)) else {
         return Err(DeseqError::InvalidOptions {
             reason: "weighted beta prior variance quantile needs finite total weight".to_string(),
         });
@@ -287,7 +220,7 @@ fn weighted_abs_quantile(
         });
     }
 
-    let Some(norm_scale) = checked_div2(pairs.len() as f64, weight_sum) else {
+    let Some(norm_scale) = checked::div(pairs.len() as f64, weight_sum) else {
         return Err(DeseqError::InvalidOptions {
             reason: "weighted beta prior variance quantile produced non-finite normalization scale"
                 .to_string(),
@@ -295,7 +228,7 @@ fn weighted_abs_quantile(
     };
     let mut unique = Vec::<(f64, f64)>::with_capacity(pairs.len());
     for (value, weight) in pairs {
-        let Some(normalized_weight) = checked_product2(weight, norm_scale) else {
+        let Some(normalized_weight) = checked::mul(weight, norm_scale) else {
             return Err(DeseqError::InvalidOptions {
                 reason:
                     "weighted beta prior variance quantile produced non-finite normalized weight"
@@ -311,7 +244,7 @@ fn weighted_abs_quantile(
         if let Some((last_value, last_weight)) = unique.last_mut()
             && *last_value == value
         {
-            let Some(next_weight) = checked_sum2(*last_weight, normalized_weight) else {
+            let Some(next_weight) = checked::add(*last_weight, normalized_weight) else {
                 return Err(DeseqError::InvalidOptions {
                     reason:
                         "weighted beta prior variance quantile produced non-finite merged weight"
@@ -328,7 +261,7 @@ fn weighted_abs_quantile(
         return Ok(unique[0].0);
     }
 
-    let Some(n) = checked_sum(unique.iter().map(|(_, weight)| *weight)) else {
+    let Some(n) = checked::sum(unique.iter().map(|(_, weight)| *weight)) else {
         return Err(DeseqError::InvalidOptions {
             reason:
                 "weighted beta prior variance quantile produced non-finite total normalized weight"
@@ -348,7 +281,7 @@ fn weighted_abs_quantile(
     let mut cumulative_weights = Vec::with_capacity(unique.len());
     let mut cumulative = 0.0;
     for (_, weight) in &unique {
-        let Some(next_cumulative) = checked_sum2(cumulative, *weight) else {
+        let Some(next_cumulative) = checked::add(cumulative, *weight) else {
             return Err(DeseqError::InvalidOptions {
                 reason:
                     "weighted beta prior variance quantile produced non-finite cumulative weight"
@@ -375,13 +308,13 @@ fn stable_interpolate(left: f64, right: f64, fraction: f64) -> f64 {
     if left == right {
         return left;
     }
-    let Some(delta) = checked_sum2(right, -left) else {
+    let Some(delta) = checked::add(right, -left) else {
         return f64::NAN;
     };
-    let Some(offset) = checked_product2(fraction, delta) else {
+    let Some(offset) = checked::mul(fraction, delta) else {
         return f64::NAN;
     };
-    checked_sum2(left, offset).unwrap_or(f64::NAN)
+    checked::add(left, offset).unwrap_or(f64::NAN)
 }
 
 fn weighted_order_statistic(

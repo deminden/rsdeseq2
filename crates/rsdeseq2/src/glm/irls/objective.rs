@@ -67,17 +67,17 @@ fn beta_log2_objective_gradient_hessian(
                 Some(value) => value,
                 None => return Ok(beta_optim_penalty(p)),
             };
-        let Some(weighted_objective_term) = checked_product2(weight, objective_term) else {
+        let Some(weighted_objective_term) = checked::mul(weight, objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(next_objective) = checked_sum2(objective, weighted_objective_term) else {
+        let Some(next_objective) = checked::add(objective, weighted_objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
         objective = next_objective;
-        let Some(disp_mu) = checked_product2(input.dispersion, mu) else {
+        let Some(disp_mu) = checked::mul(input.dispersion, mu) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(one_plus_disp_mu) = checked_sum2(1.0, disp_mu) else {
+        let Some(one_plus_disp_mu) = checked::add(1.0, disp_mu) else {
             return Ok(beta_optim_penalty(p));
         };
         if !one_plus_disp_mu.is_finite() || one_plus_disp_mu <= 0.0 {
@@ -94,19 +94,19 @@ fn beta_log2_objective_gradient_hessian(
             return Ok(beta_optim_penalty(p));
         };
         for (col, gradient_value) in gradient.iter_mut().enumerate().take(p) {
-            let Some(term) = checked_product2(-input.x[(sample, col)], sample_score) else {
+            let Some(term) = checked::mul(-input.x[(sample, col)], sample_score) else {
                 return Ok(beta_optim_penalty(p));
             };
-            let Some(next_gradient) = checked_sum2(*gradient_value, term) else {
+            let Some(next_gradient) = checked::add(*gradient_value, term) else {
                 return Ok(beta_optim_penalty(p));
             };
             *gradient_value = next_gradient;
         }
-        let Some(disp_count) = checked_product2(input.dispersion, f64::from(input.counts[sample]))
+        let Some(disp_count) = checked::mul(input.dispersion, f64::from(input.counts[sample]))
         else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(one_plus_disp_count) = checked_sum2(1.0, disp_count) else {
+        let Some(one_plus_disp_count) = checked::add(1.0, disp_count) else {
             return Ok(beta_optim_penalty(p));
         };
         let Some(sample_hessian_weight) = checked_product6(
@@ -128,7 +128,7 @@ fn beta_log2_objective_gradient_hessian(
                 ) else {
                     return Ok(beta_optim_penalty(p));
                 };
-                let Some(next_hessian) = checked_sum2(hessian[(row, col)], term) else {
+                let Some(next_hessian) = checked::add(hessian[(row, col)], term) else {
                     return Ok(beta_optim_penalty(p));
                 };
                 hessian[(row, col)] = next_hessian;
@@ -141,22 +141,22 @@ fn beta_log2_objective_gradient_hessian(
     }
     for col in 0..p {
         validate_nonnegative_finite(input.ridge_lambda[col], "ridge lambda", col)?;
-        let Some(ridge_log2) = checked_product2(input.ridge_lambda[col], ln2_squared) else {
+        let Some(ridge_log2) = checked::mul(input.ridge_lambda[col], ln2_squared) else {
             return Ok(beta_optim_penalty(p));
         };
         let Some(objective_term) = checked_product4(0.5, ridge_log2, beta[col], beta[col]) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(gradient_term) = checked_product2(ridge_log2, beta[col]) else {
+        let Some(gradient_term) = checked::mul(ridge_log2, beta[col]) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(next_objective) = checked_sum2(objective, objective_term) else {
+        let Some(next_objective) = checked::add(objective, objective_term) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(next_gradient) = checked_sum2(gradient[col], gradient_term) else {
+        let Some(next_gradient) = checked::add(gradient[col], gradient_term) else {
             return Ok(beta_optim_penalty(p));
         };
-        let Some(next_hessian) = checked_sum2(hessian[(col, col)], ridge_log2) else {
+        let Some(next_hessian) = checked::add(hessian[(col, col)], ridge_log2) else {
             return Ok(beta_optim_penalty(p));
         };
         objective = next_objective;
@@ -174,12 +174,12 @@ fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f
     if !size.is_finite() || size <= 0.0 {
         return None;
     }
-    let size_plus_mu = checked_sum2(size, mu)?;
-    let count_plus_size = checked_sum2(count, size)?;
-    let first = checked_product2(count_plus_size, size_plus_mu.ln())?;
-    let second = checked_product2(size, size.ln())?;
-    let third = checked_product2(count, mu.ln())?;
-    checked_sum2(checked_sum2(first, -second)?, -third)
+    let size_plus_mu = checked::add(size, mu)?;
+    let count_plus_size = checked::add(count, size)?;
+    let first = checked::mul(count_plus_size, size_plus_mu.ln())?;
+    let second = checked::mul(size, size.ln())?;
+    let third = checked::mul(count, mu.ln())?;
+    checked::add(checked::add(first, -second)?, -third)
 }
 
 fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
@@ -242,10 +242,10 @@ fn beta_log2_numeric_gradient(
         backward_beta[col] = backward;
         let forward_value = beta_log2_objective(input, &forward_beta)?;
         let backward_value = beta_log2_objective(input, &backward_beta)?;
-        let Some(difference) = checked_sum2(forward_value, -backward_value) else {
+        let Some(difference) = checked::add(forward_value, -backward_value) else {
             return Ok(vec![0.0; beta.len()]);
         };
-        let Some(value) = checked_div2(difference, denominator) else {
+        let Some(value) = checked::div(difference, denominator) else {
             return Ok(vec![0.0; beta.len()]);
         };
         gradient.push(value);

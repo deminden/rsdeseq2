@@ -31,8 +31,8 @@ fn projected_gradient_norm(
             } else {
                 gradient
             };
-        let scaled = checked_div2(value, scale)?;
-        let term = checked_product2(scaled, scaled)?;
+        let scaled = checked::div(value, scale)?;
+        let term = checked::mul(scaled, scaled)?;
         let next = sum + term;
         if !term.is_finite() || !next.is_finite() {
             return None;
@@ -43,31 +43,12 @@ fn projected_gradient_norm(
     norm.is_finite().then_some(norm)
 }
 
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_div2(left: f64, right: f64) -> Option<f64> {
-    let quotient = left / right;
-    (left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite())
-        .then_some(quotient)
-}
-
 fn checked_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
-    checked_product2(checked_product2(left, middle)?, right)
+    checked::mul(checked::mul(left, middle)?, right)
 }
 
 fn checked_product4(first: f64, second: f64, third: f64, fourth: f64) -> Option<f64> {
-    checked_product2(
-        checked_product2(first, second)?,
-        checked_product2(third, fourth)?,
-    )
+    checked::mul(checked::mul(first, second)?, checked::mul(third, fourth)?)
 }
 
 fn checked_product6(
@@ -78,14 +59,11 @@ fn checked_product6(
     fifth: f64,
     sixth: f64,
 ) -> Option<f64> {
-    checked_product2(
-        checked_product3(first, second, third)?,
-        checked_product3(fourth, fifth, sixth)?,
-    )
+    checked::mul(checked_product3(first, second, third)?, checked_product3(fourth, fifth, sixth)?)
 }
 
 fn irls_deviance_convergence_stat(dev: f64, dev_old: f64) -> Option<f64> {
-    let delta = checked_sum2(dev, -dev_old)?.abs();
-    let scale = checked_sum2(dev.abs(), 0.1)?;
-    checked_div2(delta, scale)
+    let delta = checked::add(dev, -dev_old)?.abs();
+    let scale = checked::add(dev.abs(), 0.1)?;
+    checked::div(delta, scale)
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::checked::{self, CheckedExt};
 
 pub(super) fn trimmed_cell_variance(
     normalized_counts: &RowMajorMatrix<f64>,
@@ -31,24 +32,21 @@ pub(super) fn trimmed_cell_variance(
                 .enumerate()
                 .map(|(sample, value)| {
                     let residual = value - mean;
-                    checked_mul(
-                        residual,
-                        residual,
-                        sample,
-                        "Cook's trimmed cell residual square",
-                    )
+                    checked::try_mul(residual, residual)
+                        .nonfinite_at("Cook's trimmed cell residual square", Some(sample))
                 })
                 .collect::<Result<Vec<_>, DeseqError>>()?;
-            group_variances.push(checked_mul(
-                trim_scale(bin),
-                trimmed_mean(
-                    sq_errors,
-                    trim_ratio(bin),
-                    "Cook's trimmed cell variance mean",
-                )?,
-                gene,
-                "Cook's trimmed cell variance",
-            )?);
+            group_variances.push(
+                checked::try_mul(
+                    trim_scale(bin),
+                    trimmed_mean(
+                        sq_errors,
+                        trim_ratio(bin),
+                        "Cook's trimmed cell variance mean",
+                    )?,
+                )
+                .nonfinite_at("Cook's trimmed cell variance", Some(gene))?,
+            );
         }
         variances.push(row_max(&group_variances));
     }
@@ -68,15 +66,17 @@ pub(super) fn trimmed_variance(
             .enumerate()
             .map(|(sample, value)| {
                 let residual = value - mean;
-                checked_mul(residual, residual, sample, "Cook's trimmed residual square")
+                checked::try_mul(residual, residual)
+                    .nonfinite_at("Cook's trimmed residual square", Some(sample))
             })
             .collect::<Result<Vec<_>, DeseqError>>()?;
-        variances.push(checked_mul(
-            1.51,
-            trimmed_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
-            gene,
-            "Cook's trimmed variance",
-        )?);
+        variances.push(
+            checked::try_mul(
+                1.51,
+                trimmed_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
+            )
+            .nonfinite_at("Cook's trimmed variance", Some(gene))?,
+        );
     }
     Ok(variances)
 }

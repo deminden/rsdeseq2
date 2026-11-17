@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::checked::{self, CheckedExt};
 
 /// Replace Cook's outlier counts with trimmed-mean predictions.
 ///
@@ -42,11 +43,9 @@ pub fn replace_outlier_counts(
             None => size_factors,
         };
         for (sample, scale) in scale_row.iter().copied().enumerate() {
-            let scaled_mean = checked_product2(
-                trim_mean,
-                scale,
-                Some(gene * counts.n_samples() + sample),
+            let scaled_mean = checked::try_mul(trim_mean, scale).nonfinite_at(
                 "replacement scaled mean",
+                Some(gene * counts.n_samples() + sample),
             )?;
             candidate_values.push(replacement_count_from_scaled_mean(scaled_mean)?);
         }

@@ -6,6 +6,7 @@ use crate::normalization::{
     base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,
     validate_size_factors,
 };
+use crate::numeric::checked::{self, CheckedExt};
 
 const MIN_COOKS_DISPERSION: f64 = 0.04;
 
@@ -232,36 +233,36 @@ pub fn calculate_cooks_distance(
                 values.push(f64::NAN);
                 continue;
             }
-            let Ok(dispersion_mean) =
-                checked_mul(dispersion, mean, sample, "Cook's dispersion mean")
+            let Ok(dispersion_mean) = checked::try_mul(dispersion, mean)
+                .nonfinite_at("Cook's dispersion mean", Some(sample))
             else {
                 values.push(f64::NAN);
                 continue;
             };
-            let Ok(variance_factor) =
-                checked_add(1.0, dispersion_mean, sample, "Cook's variance factor")
+            let Ok(variance_factor) = checked::try_add(1.0, dispersion_mean)
+                .nonfinite_at("Cook's variance factor", Some(sample))
             else {
                 values.push(f64::NAN);
                 continue;
             };
-            let Ok(variance) = checked_mul(mean, variance_factor, sample, "Cook's variance") else {
+            let Ok(variance) = checked::try_mul(mean, variance_factor)
+                .nonfinite_at("Cook's variance", Some(sample))
+            else {
                 values.push(f64::NAN);
                 continue;
             };
             let residual = f64::from(count_row[sample]) - mean;
             let one_minus_h = 1.0 - h;
-            let Ok(residual_sq) = checked_mul(residual, residual, sample, "Cook's residual square")
+            let Ok(residual_sq) = checked::try_mul(residual, residual)
+                .nonfinite_at("Cook's residual square", Some(sample))
             else {
                 values.push(f64::NAN);
                 continue;
             };
             let pearson_sq = residual_sq / variance;
-            let Ok(denominator) = checked_mul(
-                one_minus_h,
-                one_minus_h,
-                sample,
-                "Cook's leverage denominator",
-            ) else {
+            let Ok(denominator) = checked::try_mul(one_minus_h, one_minus_h)
+                .nonfinite_at("Cook's leverage denominator", Some(sample))
+            else {
                 values.push(f64::NAN);
                 continue;
             };
@@ -359,7 +360,7 @@ pub fn robust_method_of_moments_dispersion(
     let mut dispersions = Vec::with_capacity(normalized_counts.n_rows());
     for (gene, variance) in variance.iter().copied().enumerate() {
         let row = normalized_counts.row(gene)?;
-        let mean = checked_mean(row, "Cook's robust dispersion mean")?;
+        let mean = checked::try_mean(row).nonfinite_at("Cook's robust dispersion mean", None)?;
         let alpha = if mean > 0.0 {
             let inv_mean = mean.recip();
             let centered = variance - mean;
@@ -370,17 +371,12 @@ pub fn robust_method_of_moments_dispersion(
                     value: centered,
                 });
             }
-            checked_mul(
+            checked::try_mul(
                 centered,
-                checked_mul(
-                    inv_mean,
-                    inv_mean,
-                    gene,
-                    "Cook's robust dispersion inverse mean square",
-                )?,
-                gene,
-                "Cook's robust dispersion",
-            )?
+                checked::try_mul(inv_mean, inv_mean)
+                    .nonfinite_at("Cook's robust dispersion inverse mean square", Some(gene))?,
+            )
+            .nonfinite_at("Cook's robust dispersion", Some(gene))?
         } else {
             f64::NAN
         };
@@ -608,7 +604,7 @@ fn trimmed_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, D
         return Ok(f64::NAN);
     }
     let kept = &values[trim_count..end];
-    checked_mean(kept, context)
+    checked::try_mean(kept).nonfinite_at(context, None)
 }
 
 fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
@@ -629,92 +625,10 @@ fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
     if trim_count >= end {
         return f64::NAN;
     }
-    checked_sum(
-        values[trim_count..end].iter().copied(),
-        "replacement trimmed mean",
-    )
-    .map(|sum| sum / (end - trim_count) as f64)
-    .unwrap_or(f64::NAN)
-}
-
-fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left + right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
-    let mut sum = 0.0;
-    for (idx, value) in values.into_iter().enumerate() {
-        sum = checked_add(sum, value, idx, context)?;
-    }
-    Ok(sum)
-}
-
-fn checked_product2(
-    left: f64,
-    right: f64,
-    index: Option<usize>,
-    context: &str,
-) -> Result<f64, DeseqError> {
-    let product = left * right;
-    if left.is_finite() && right.is_finite() && product.is_finite() {
-        Ok(product)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index,
-            value: product,
-        })
-    }
-}
-
-fn checked_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: None,
-                value,
-            });
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Ok(0.0);
-    }
-    let normalized_sum = checked_sum(values.iter().copied().map(|value| value / scale), context)?;
-    let mean = normalized_sum / values.len() as f64 * scale;
-    if mean.is_finite() {
-        Ok(mean)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value: mean,
-        })
-    }
+    checked::try_sum(values[trim_count..end].iter().copied())
+        .nonfinite("replacement trimmed mean")
+        .map(|sum| sum / (end - trim_count) as f64)
+        .unwrap_or(f64::NAN)
 }
 
 fn replacement_count_from_scaled_mean(value: f64) -> Result<u32, DeseqError> {

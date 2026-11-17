@@ -32,7 +32,7 @@ fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     if len == 1 {
         return Ok(vec![start]);
     }
-    let span = checked_sub(end, start, 0, "dispersion grid span")?;
+    let span = checked::try_sub(end, start).nonfinite_at("dispersion grid span", Some(0))?;
     let step = span / (len as f64 - 1.0);
     if !step.is_finite() {
         return Err(DeseqError::NonFiniteValue {
@@ -43,8 +43,8 @@ fn linspace(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     }
     (0..len)
         .map(|idx| {
-            let offset = checked_mul(step, idx as f64, idx, "dispersion grid offset")?;
-            checked_add(start, offset, idx, "dispersion grid value")
+            let offset = checked::try_mul(step, idx as f64).nonfinite_at("dispersion grid offset", Some(idx))?;
+            checked::try_add(start, offset).nonfinite_at("dispersion grid value", Some(idx))
         })
         .collect()
 }
@@ -312,62 +312,6 @@ fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {
 }
 
 #[inline(always)]
-fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-#[inline(always)]
-fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left + right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-#[inline(always)]
-fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left - right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-#[inline(always)]
-fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left / right;
-    if left.is_finite() && right.is_finite() && right != 0.0 && value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        })
-    }
-}
-
-#[inline(always)]
 fn checked_matrix_add_assign(
     sum: &mut f64,
     term: f64,
@@ -522,20 +466,10 @@ fn cox_reid_weight_terms(
     } else {
         mu_alpha_terms(mu, alpha, index, "Cox-Reid working weight")?
     };
-    let weight = checked_mul(
-        mu_alpha.ratio,
-        alpha.recip(),
-        index,
-        "Cox-Reid working weight",
-    )?;
-    let weight_square = checked_mul(weight, weight, index, "Cox-Reid working weight square")?;
+    let weight = checked::try_mul(mu_alpha.ratio, alpha.recip()).nonfinite_at("Cox-Reid working weight", Some(index))?;
+    let weight_square = checked::try_mul(weight, weight).nonfinite_at("Cox-Reid working weight square", Some(index))?;
     let d_weight = -weight_square;
-    let d2_weight = checked_mul(
-        2.0,
-        checked_mul(weight_square, weight, index, "Cox-Reid working weight cube")?,
-        index,
-        "Cox-Reid working second derivative weight",
-    )?;
+    let d2_weight = checked::try_mul(2.0, checked::try_mul(weight_square, weight).nonfinite_at("Cox-Reid working weight cube", Some(index))?).nonfinite_at("Cox-Reid working second derivative weight", Some(index))?;
     Ok(CoxReidWeightTerms {
         weight,
         d_weight,
@@ -543,52 +477,12 @@ fn cox_reid_weight_terms(
     })
 }
 
-fn checked_scaled_sum(values: &[f64], context: &str) -> Result<f64, DeseqError> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: None,
-                value,
-            });
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Ok(0.0);
-    }
-    let mut normalized_sum = 0.0;
-    for value in values.iter().copied() {
-        let term = value / scale;
-        let next = normalized_sum + term;
-        if !term.is_finite() || !next.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: None,
-                value: next,
-            });
-        }
-        normalized_sum = next;
-    }
-    let sum = normalized_sum * scale;
-    if sum.is_finite() {
-        Ok(sum)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value: sum,
-        })
-    }
-}
-
 fn checked_log_alpha_first_derivative(
     inv_alpha: f64,
     derivative_alpha: f64,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    checked_mul(inv_alpha, derivative_alpha, 0, context)
+    checked::try_mul(inv_alpha, derivative_alpha).nonfinite_at(context, Some(0))
 }
 
 fn checked_log_alpha_second_derivative(
@@ -598,12 +492,9 @@ fn checked_log_alpha_second_derivative(
     first_log_alpha: f64,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    let alpha_first_scale = checked_mul(2.0, inv_alpha, 0, context)?;
-    let alpha_first_term = -checked_mul(alpha_first_scale, first_alpha_sum, 0, context)?;
-    checked_scaled_sum(
-        &[second_alpha_sum, alpha_first_term, first_log_alpha],
-        context,
-    )
+    let alpha_first_scale = checked::try_mul(2.0, inv_alpha).nonfinite_at(context, Some(0))?;
+    let alpha_first_term = -checked::try_mul(alpha_first_scale, first_alpha_sum).nonfinite_at(context, Some(0))?;
+    checked::try_scaled_sum(&[second_alpha_sum, alpha_first_term, first_log_alpha]).nonfinite_at(context, None)
 }
 
 fn checked_cox_reid_log_alpha_second_derivative(
@@ -611,22 +502,9 @@ fn checked_cox_reid_log_alpha_second_derivative(
     alpha: f64,
     first_log_alpha: f64,
 ) -> Result<f64, DeseqError> {
-    let alpha_squared = checked_mul(
-        alpha,
-        alpha,
-        0,
-        "Cox-Reid log-alpha second derivative alpha square",
-    )?;
-    let alpha_term = checked_mul(
-        second_alpha,
-        alpha_squared,
-        0,
-        "Cox-Reid log-alpha second derivative alpha term",
-    )?;
-    checked_scaled_sum(
-        &[alpha_term, first_log_alpha],
-        "Cox-Reid log-alpha second derivative",
-    )
+    let alpha_squared = checked::try_mul(alpha, alpha).nonfinite_at("Cox-Reid log-alpha second derivative alpha square", Some(0))?;
+    let alpha_term = checked::try_mul(second_alpha, alpha_squared).nonfinite_at("Cox-Reid log-alpha second derivative alpha term", Some(0))?;
+    checked::try_scaled_sum(&[alpha_term, first_log_alpha]).nonfinite_at("Cox-Reid log-alpha second derivative", None)
 }
 
 fn validate_observation_weight_slice(

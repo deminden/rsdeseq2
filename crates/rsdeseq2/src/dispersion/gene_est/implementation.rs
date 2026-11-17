@@ -3,6 +3,7 @@
 //! The source is split by workflow so the public module can stay small
 //! while preserving existing paths through re-exports.
 
+use crate::numeric::checked::{self, CheckedExt};
 use rayon::prelude::*;
 
 // Public options, inputs, outputs, and private diagnostics types.
