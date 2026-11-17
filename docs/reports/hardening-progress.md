@@ -8,6 +8,7 @@ otherwise; structural counts come from
 | Phase | Commit | Production unwrap + expect + unreachable! | Repeated-block share | `pub fn` | `include!` | Test binaries | Release build s | Test run s | Eleven-contrast s | Peak RSS MiB |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Baseline 0.5.0 | `ede9157` | 119 | 10.8% | 882 | 80 | 76 | 90.2 | 35.5 | 105.7 | 253.6 |
+| Phase 1 | `hardening/1.6-features` | 119 | 10.3% | 881 | 80 | 76 | 115.3 | 33.5 | 103.0 (paired: 0.5.0 109.2) | 253.6 |
 
 ## Targets
 
@@ -35,3 +36,18 @@ otherwise; structural counts come from
 - Hardening lint warnings at baseline (workspace `[lints]`, warn only): 461 in
   the library and CLI, 997 across all targets. See the
   [lint baseline](baseline-0.5.0.md#lint-baseline).
+
+## Phase 1 notes
+
+- Every task was IDENTICAL; the golden manifest is unchanged since Phase 0 and
+  passes at 1 and 4 threads after each task.
+- Eleven-contrast outputs are byte-identical to 0.5.0. One paired pass (2
+  repetitions, 1 thread) gave a 1.061 throughput ratio over 0.5.0. Unpaired
+  sums drift by about 6% between sessions on this VM, so only the paired ratio
+  is meaningful.
+- The release build is slower (115 s against 90 s) because of thin LTO with one
+  codegen unit (task 1.5); the binary is 16% smaller.
+- Panic-site counts are unchanged by design: Phase 1 is deduplication. Phase 2
+  removes them.
+- The R bridge now builds without the CLI dependencies (task 1.6).
+
