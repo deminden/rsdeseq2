@@ -1,3 +1,4 @@
+use super::*;
 impl Default for DeseqBuilder {
     fn default() -> Self {
         Self::new()
@@ -39,7 +40,7 @@ impl DeseqBuilder {
         self
     }
 
-    fn with_automatic_dispersion_means(&self) -> std::borrow::Cow<'_, Self> {
+    pub(super) fn with_automatic_dispersion_means(&self) -> std::borrow::Cow<'_, Self> {
         if self.automatic_dispersion_means {
             std::borrow::Cow::Borrowed(self)
         } else {
@@ -187,12 +188,13 @@ impl DeseqBuilder {
             return pool.install(|| self.expanded_formula_design(formula));
         }
 
-        let model_frame = self.model_frame.as_ref().ok_or_else(|| {
-            DeseqError::InvalidOptions {
+        let model_frame = self
+            .model_frame
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
                 reason: "formula design construction requires builder model-frame metadata"
                     .to_string(),
-            }
-        })?;
+            })?;
         expanded_formula_design_from_model_frame(formula, model_frame)
     }
 
@@ -205,12 +207,13 @@ impl DeseqBuilder {
             return pool.install(|| self.expanded_formula_design_with_offsets(formula));
         }
 
-        let model_frame = self.model_frame.as_ref().ok_or_else(|| {
-            DeseqError::InvalidOptions {
+        let model_frame = self
+            .model_frame
+            .as_ref()
+            .ok_or_else(|| DeseqError::InvalidOptions {
                 reason: "formula design construction requires builder model-frame metadata"
                     .to_string(),
-            }
-        })?;
+            })?;
         expanded_formula_design_with_offsets_from_model_frame(formula, model_frame)
     }
 
@@ -316,7 +319,6 @@ impl DeseqBuilder {
         self.test
     }
 
-
     /// Requested thread count.
     pub fn requested_threads(&self) -> Option<usize> {
         self.threads
@@ -377,7 +379,7 @@ impl DeseqBuilder {
         self.observation_weight_options
     }
 
-    fn model_frame_factor_level_contrast<'a>(
+    pub(super) fn model_frame_factor_level_contrast<'a>(
         &'a self,
         contrast: &'a ResultsContrast,
     ) -> Result<Option<FactorLevelContrast<'a>>, DeseqError> {
@@ -387,7 +389,7 @@ impl DeseqBuilder {
         }
     }
 
-    fn formula_design_for_fitting(
+    pub(super) fn formula_design_for_fitting(
         &self,
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
@@ -400,7 +402,7 @@ impl DeseqBuilder {
         crate::design::formula_design_for_fitting_from_model_frame(formula, frame)
     }
 
-    fn reduced_formula_design(
+    pub(super) fn reduced_formula_design(
         &self,
         full: &ExpandedFormulaDesignWithOffsets,
         reduced: &str,
@@ -415,7 +417,7 @@ impl DeseqBuilder {
         Ok(reduced.design.standard_design)
     }
 
-    fn with_formula_offsets(
+    pub(super) fn with_formula_offsets(
         &self,
         counts: &CountMatrix,
         formula_design: &ExpandedFormulaDesignWithOffsets,
@@ -467,7 +469,7 @@ impl DeseqBuilder {
     }
 }
 
-fn factor_level_contrast_from_sample_levels<'a>(
+pub(super) fn factor_level_contrast_from_sample_levels<'a>(
     factor: &'a str,
     numerator: &str,
     denominator: &str,
@@ -509,7 +511,7 @@ fn factor_level_contrast_from_sample_levels<'a>(
     })
 }
 
-fn resolve_sample_level_alias_for_builder<'a>(
+pub(super) fn resolve_sample_level_alias_for_builder<'a>(
     factor: &str,
     requested: &str,
     role: &str,
@@ -555,34 +557,84 @@ fn resolve_sample_level_alias_for_builder<'a>(
 }
 
 #[cfg(test)]
-mod execution_control_tests {
+pub(super) mod execution_control_tests {
     use super::*;
     use std::sync::{Arc, Barrier, Mutex};
 
     #[test]
     fn public_worker_request_applies_inside_fitting_and_reuses_cloned_context() {
-        let counts = CountMatrix::from_row_major_u32(3, 8, vec![
-            10,12,9,11,20,22,19,21, 30,27,32,31,18,20,17,21, 8,9,7,10,12,11,14,13,
-        ]).unwrap();
-        let design = DesignMatrix::from_row_major(8, 2,
-            (0..8).flat_map(|i| [1.0, (i/4) as f64]).collect(), None).unwrap();
-        for workers in [1,4] {
+        let counts = CountMatrix::from_row_major_u32(
+            3,
+            8,
+            vec![
+                10, 12, 9, 11, 20, 22, 19, 21, 30, 27, 32, 31, 18, 20, 17, 21, 8, 9, 7, 10, 12, 11,
+                14, 13,
+            ],
+        )
+        .unwrap();
+        let design = DesignMatrix::from_row_major(
+            8,
+            2,
+            (0..8).flat_map(|i| [1.0, (i / 4) as f64]).collect(),
+            None,
+        )
+        .unwrap();
+        for workers in [1, 4] {
             let observed = Arc::new(Mutex::new(Vec::new()));
-            let mut builder = DeseqBuilder::new().threads(workers).size_factors(vec![1.0;8]);
+            let mut builder = DeseqBuilder::new()
+                .threads(workers)
+                .size_factors(vec![1.0; 8]);
             builder.execution_observer = Some(Arc::clone(&observed));
-            let ambient = rayon::ThreadPoolBuilder::new().num_threads(if workers == 1 {4} else {1}).build().unwrap();
-            let _ = ambient.install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1;3], 1)).unwrap();
+            let ambient = rayon::ThreadPoolBuilder::new()
+                .num_threads(if workers == 1 { 4 } else { 1 })
+                .build()
+                .unwrap();
+            let _ = ambient
+                .install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1; 3], 1))
+                .unwrap();
             assert_eq!(*observed.lock().unwrap(), [workers]);
             let cloned = builder.clone();
-            assert_eq!(cloned.with_execution_context(rayon::current_num_threads).unwrap(), workers);
+            assert_eq!(
+                cloned
+                    .with_execution_context(rayon::current_num_threads)
+                    .unwrap(),
+                workers
+            );
             assert!(Arc::ptr_eq(
-                &builder.execution_context.pool_for_entry(Some(workers)).unwrap().unwrap(),
-                &cloned.execution_context.pool_for_entry(Some(workers)).unwrap().unwrap()));
+                &builder
+                    .execution_context
+                    .pool_for_entry(Some(workers))
+                    .unwrap()
+                    .unwrap(),
+                &cloned
+                    .execution_context
+                    .pool_for_entry(Some(workers))
+                    .unwrap()
+                    .unwrap()
+            ));
         }
-        assert!(DeseqBuilder::new().threads(0).with_execution_context(|| ()).is_err());
-        assert!(DeseqBuilder::new().threads(usize::MAX).with_execution_context(|| ()).is_err());
-        let ambient = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
-        assert_eq!(ambient.install(|| DeseqBuilder::new().with_execution_context(rayon::current_num_threads)).unwrap(), 2);
+        assert!(
+            DeseqBuilder::new()
+                .threads(0)
+                .with_execution_context(|| ())
+                .is_err()
+        );
+        assert!(
+            DeseqBuilder::new()
+                .threads(usize::MAX)
+                .with_execution_context(|| ())
+                .is_err()
+        );
+        let ambient = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .unwrap();
+        assert_eq!(
+            ambient
+                .install(|| DeseqBuilder::new().with_execution_context(rayon::current_num_threads))
+                .unwrap(),
+            2
+        );
     }
 
     #[test]
@@ -592,18 +644,27 @@ mod execution_control_tests {
             for workers in [1, 4] {
                 let barrier = Arc::clone(&barrier);
                 scope.spawn(move || {
-                    let builder = DeseqBuilder::new().threads(workers).size_factors(vec![1.0; 8]);
-                    let pool = builder.execution_context.pool_for_entry(Some(workers)).unwrap().unwrap();
+                    let builder = DeseqBuilder::new()
+                        .threads(workers)
+                        .size_factors(vec![1.0; 8]);
+                    let pool = builder
+                        .execution_context
+                        .pool_for_entry(Some(workers))
+                        .unwrap()
+                        .unwrap();
                     let weak = Arc::downgrade(&pool);
                     drop(pool);
-                    builder.with_execution_context(|| {
-                        barrier.wait();
-                        assert_eq!(rayon::current_num_threads(), workers);
-                        // A normal analysis error must not poison or strand the pool.
-                        let invalid = CountMatrix::from_row_major_u32(1, 2, vec![1, 2]).unwrap();
-                        assert!(builder.fit_size_factors_and_base_means(&invalid).is_err());
-                        assert_eq!(rayon::current_num_threads(), workers);
-                    }).unwrap();
+                    builder
+                        .with_execution_context(|| {
+                            barrier.wait();
+                            assert_eq!(rayon::current_num_threads(), workers);
+                            // A normal analysis error must not poison or strand the pool.
+                            let invalid =
+                                CountMatrix::from_row_major_u32(1, 2, vec![1, 2]).unwrap();
+                            assert!(builder.fit_size_factors_and_base_means(&invalid).is_err());
+                            assert_eq!(rayon::current_num_threads(), workers);
+                        })
+                        .unwrap();
                     let counts = CountMatrix::from_row_major_u32(1, 8, vec![10; 8]).unwrap();
                     assert!(builder.fit_size_factors_and_base_means(&counts).is_ok());
                     drop(builder);
@@ -615,26 +676,58 @@ mod execution_control_tests {
 
     #[test]
     fn replacement_refits_and_transforms_keep_the_requested_context_and_exact_outputs() {
-        let counts = CountMatrix::from_row_major_u32(3, 8, vec![
-            1000,12,9,11,20,22,19,21, 30,27,32,31,18,20,17,21, 8,9,7,10,12,11,14,13,
-        ]).unwrap();
-        let design = DesignMatrix::from_row_major(8, 2,
-            (0..8).flat_map(|i| [1.0, (i/4) as f64]).collect(), None).unwrap();
+        let counts = CountMatrix::from_row_major_u32(
+            3,
+            8,
+            vec![
+                1000, 12, 9, 11, 20, 22, 19, 21, 30, 27, 32, 31, 18, 20, 17, 21, 8, 9, 7, 10, 12,
+                11, 14, 13,
+            ],
+        )
+        .unwrap();
+        let design = DesignMatrix::from_row_major(
+            8,
+            2,
+            (0..8).flat_map(|i| [1.0, (i / 4) as f64]).collect(),
+            None,
+        )
+        .unwrap();
         let run = |workers| {
             let observed = Arc::new(Mutex::new(Vec::new()));
-            let mut builder = DeseqBuilder::new().threads(workers).size_factors(vec![1.0; 8])
-                .fit_type(FitType::Mean).disable_cooks_cutoff().disable_independent_filtering();
+            let mut builder = DeseqBuilder::new()
+                .threads(workers)
+                .size_factors(vec![1.0; 8])
+                .fit_type(FitType::Mean)
+                .disable_cooks_cutoff()
+                .disable_independent_filtering();
             builder.execution_observer = Some(Arc::clone(&observed));
-            let ambient = rayon::ThreadPoolBuilder::new().num_threads(if workers == 1 {4} else {1}).build().unwrap();
+            let ambient = rayon::ThreadPoolBuilder::new()
+                .num_threads(if workers == 1 { 4 } else { 1 })
+                .build()
+                .unwrap();
             ambient.install(|| {
-                let replacement = builder.fit_fixed_dispersion_wald_with_cooks_replacement(
-                    &counts, &design, &[0.1; 3], 1, &CooksReplacementOptions {
-                        trim: 0.2, cooks_cutoff: 0.0, min_replicates: 3,
-                        which_samples: Some(vec![true, false, false, false, false, false, false, false]),
-                    }).unwrap();
+                let replacement = builder
+                    .fit_fixed_dispersion_wald_with_cooks_replacement(
+                        &counts,
+                        &design,
+                        &[0.1; 3],
+                        1,
+                        &CooksReplacementOptions {
+                            trim: 0.2,
+                            cooks_cutoff: 0.0,
+                            min_replicates: 3,
+                            which_samples: Some(vec![
+                                true, false, false, false, false, false, false, false,
+                            ]),
+                        },
+                    )
+                    .unwrap();
                 assert!(replacement.refit_plan.should_refit);
                 let stages = std::mem::take(&mut *observed.lock().unwrap());
-                assert!(stages.len() >= 2, "original and replacement refit must both execute");
+                assert!(
+                    stages.len() >= 2,
+                    "original and replacement refit must both execute"
+                );
                 assert!(stages.iter().all(|n| *n == workers));
                 let vst = builder.vst_glm_mu_auto(&counts, &design, 1000).unwrap();
                 let rlog = builder.rlog_glm_mu(&counts, &design).unwrap();

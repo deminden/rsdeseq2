@@ -1,17 +1,18 @@
-struct NormalizationStages {
-    size_factors: Vec<f64>,
-    base_mean: Vec<f64>,
-    base_var: Vec<f64>,
-    all_zero: Vec<bool>,
-    normalized: RowMajorMatrix<f64>,
-    normalization_factors: Option<RowMajorMatrix<f64>>,
-    observation_weights: Option<RowMajorMatrix<f64>>,
-    weights_fail: Option<Vec<bool>>,
-    weights_design_rank: Option<usize>,
+use super::*;
+pub(super) struct NormalizationStages {
+    pub(super) size_factors: Vec<f64>,
+    pub(super) base_mean: Vec<f64>,
+    pub(super) base_var: Vec<f64>,
+    pub(super) all_zero: Vec<bool>,
+    pub(super) normalized: RowMajorMatrix<f64>,
+    pub(super) normalization_factors: Option<RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<RowMajorMatrix<f64>>,
+    pub(super) weights_fail: Option<Vec<bool>>,
+    pub(super) weights_design_rank: Option<usize>,
 }
 
 impl NormalizationStages {
-    fn into_base_fit_input(self) -> BaseFitInput {
+    pub(super) fn into_base_fit_input(self) -> BaseFitInput {
         BaseFitInput {
             size_factors: self.size_factors,
             normalization_factors: self.normalization_factors,
@@ -25,91 +26,91 @@ impl NormalizationStages {
     }
 }
 
-struct BaseFitInput {
-    size_factors: Vec<f64>,
-    normalization_factors: Option<RowMajorMatrix<f64>>,
-    observation_weights: Option<RowMajorMatrix<f64>>,
-    weights_fail: Option<Vec<bool>>,
-    weights_design_rank: Option<usize>,
-    base_mean: Vec<f64>,
-    base_var: Vec<f64>,
-    all_zero: Vec<bool>,
+pub(super) struct BaseFitInput {
+    pub(super) size_factors: Vec<f64>,
+    pub(super) normalization_factors: Option<RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<RowMajorMatrix<f64>>,
+    pub(super) weights_fail: Option<Vec<bool>>,
+    pub(super) weights_design_rank: Option<usize>,
+    pub(super) base_mean: Vec<f64>,
+    pub(super) base_var: Vec<f64>,
+    pub(super) all_zero: Vec<bool>,
 }
 
-struct WeightedBaseMetadata {
-    base_mean: Vec<f64>,
-    base_var: Vec<f64>,
-    observation_weights: Option<RowMajorMatrix<f64>>,
-    weights_fail: Option<Vec<bool>>,
-    weights_design_rank: Option<usize>,
+pub(super) struct WeightedBaseMetadata {
+    pub(super) base_mean: Vec<f64>,
+    pub(super) base_var: Vec<f64>,
+    pub(super) observation_weights: Option<RowMajorMatrix<f64>>,
+    pub(super) weights_fail: Option<Vec<bool>>,
+    pub(super) weights_design_rank: Option<usize>,
 }
 
-struct WaldPipelineInput<'a> {
-    counts: &'a CountMatrix,
-    design: &'a DesignMatrix,
-    size_factors: &'a [f64],
-    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
-    observation_weights: Option<&'a RowMajorMatrix<f64>>,
-    normalized: &'a RowMajorMatrix<f64>,
-    base_mean: &'a [f64],
-    all_zero: &'a [bool],
-    dispersions: &'a [f64],
-    coefficient: usize,
+pub(super) struct WaldPipelineInput<'a> {
+    pub(super) counts: &'a CountMatrix,
+    pub(super) design: &'a DesignMatrix,
+    pub(super) size_factors: &'a [f64],
+    pub(super) normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) normalized: &'a RowMajorMatrix<f64>,
+    pub(super) base_mean: &'a [f64],
+    pub(super) all_zero: &'a [bool],
+    pub(super) dispersions: &'a [f64],
+    pub(super) coefficient: usize,
 }
 
-struct LrtPipelineInput<'a> {
-    counts: &'a CountMatrix,
-    full_design: &'a DesignMatrix,
-    reduced_design: &'a DesignMatrix,
-    size_factors: &'a [f64],
-    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
-    observation_weights: Option<&'a RowMajorMatrix<f64>>,
-    normalized: &'a RowMajorMatrix<f64>,
-    base_mean: &'a [f64],
-    all_zero: &'a [bool],
-    dispersions: &'a [f64],
-    coefficient: usize,
+pub(super) struct LrtPipelineInput<'a> {
+    pub(super) counts: &'a CountMatrix,
+    pub(super) full_design: &'a DesignMatrix,
+    pub(super) reduced_design: &'a DesignMatrix,
+    pub(super) size_factors: &'a [f64],
+    pub(super) normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) normalized: &'a RowMajorMatrix<f64>,
+    pub(super) base_mean: &'a [f64],
+    pub(super) all_zero: &'a [bool],
+    pub(super) dispersions: &'a [f64],
+    pub(super) coefficient: usize,
 }
 
 #[derive(Clone, Copy)]
-struct FixedDispersionGlmInput<'a> {
-    counts: &'a CountMatrix,
-    design: &'a DesignMatrix,
-    size_factors: &'a [f64],
-    normalization_factors: Option<&'a RowMajorMatrix<f64>>,
-    observation_weights: Option<&'a RowMajorMatrix<f64>>,
-    all_zero: &'a [bool],
-    dispersions: &'a [f64],
+pub(super) struct FixedDispersionGlmInput<'a> {
+    pub(super) counts: &'a CountMatrix,
+    pub(super) design: &'a DesignMatrix,
+    pub(super) size_factors: &'a [f64],
+    pub(super) normalization_factors: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<&'a RowMajorMatrix<f64>>,
+    pub(super) all_zero: &'a [bool],
+    pub(super) dispersions: &'a [f64],
 }
 
-struct FixedDispersionGlmOutput {
-    glm_fit: NbinomGlmFit,
-    expanded_dispersions: Vec<f64>,
+pub(super) struct FixedDispersionGlmOutput {
+    pub(super) glm_fit: NbinomGlmFit,
+    pub(super) expanded_dispersions: Vec<f64>,
 }
 
-struct WaldPipelineOutput {
-    glm_fit: NbinomGlmFit,
-    wald: WaldOutput,
-    cooks: CooksOutput,
-    results: DeseqResults,
-    expanded_dispersions: Vec<f64>,
+pub(super) struct WaldPipelineOutput {
+    pub(super) glm_fit: NbinomGlmFit,
+    pub(super) wald: WaldOutput,
+    pub(super) cooks: CooksOutput,
+    pub(super) results: DeseqResults,
+    pub(super) expanded_dispersions: Vec<f64>,
 }
 
-struct WaldContrastPipelineOutput {
-    glm_fit: NbinomGlmFit,
-    wald_contrast: WaldContrastOutput,
-    cooks: CooksOutput,
-    results: DeseqResults,
-    expanded_dispersions: Vec<f64>,
+pub(super) struct WaldContrastPipelineOutput {
+    pub(super) glm_fit: NbinomGlmFit,
+    pub(super) wald_contrast: WaldContrastOutput,
+    pub(super) cooks: CooksOutput,
+    pub(super) results: DeseqResults,
+    pub(super) expanded_dispersions: Vec<f64>,
 }
 
-struct LrtPipelineOutput {
-    full_fit: NbinomGlmFit,
-    reduced_fit: NbinomGlmFit,
-    lrt: LrtOutput,
-    cooks: CooksOutput,
-    results: DeseqResults,
-    expanded_dispersions: Vec<f64>,
+pub(super) struct LrtPipelineOutput {
+    pub(super) full_fit: NbinomGlmFit,
+    pub(super) reduced_fit: NbinomGlmFit,
+    pub(super) lrt: LrtOutput,
+    pub(super) cooks: CooksOutput,
+    pub(super) results: DeseqResults,
+    pub(super) expanded_dispersions: Vec<f64>,
 }
 
 /// Output from the limited native Wald replacement-refit path.

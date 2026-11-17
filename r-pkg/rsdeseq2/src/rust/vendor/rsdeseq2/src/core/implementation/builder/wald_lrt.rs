@@ -1,3 +1,4 @@
+use super::*;
 impl DeseqBuilder {
     /// Run the implemented native dispersion path and then a Wald test.
     ///
@@ -50,7 +51,8 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_contrast_spec(counts, design, contrast));
+            return pool
+                .install(|| self.fit_wald_linear_mu_contrast_spec(counts, design, contrast));
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
@@ -72,7 +74,9 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_factor_level_contrast(counts, design, contrast));
+            return pool.install(|| {
+                self.fit_wald_linear_mu_factor_level_contrast(counts, design, contrast)
+            });
         }
 
         let contrast_spec = match contrast.reference {
@@ -119,7 +123,8 @@ impl DeseqBuilder {
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_parametric(counts, design, coefficient));
+            return pool
+                .install(|| self.fit_wald_linear_mu_parametric(counts, design, coefficient));
         }
 
         validate_pipeline_wald_coefficient(design, coefficient)?;
@@ -138,7 +143,8 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_contrast_parametric(counts, design, contrast));
+            return pool
+                .install(|| self.fit_wald_linear_mu_contrast_parametric(counts, design, contrast));
         }
 
         let fit = self.fit_map_dispersions_linear_mu_parametric(counts, design)?;
@@ -153,7 +159,9 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_contrast_spec_parametric(counts, design, contrast));
+            return pool.install(|| {
+                self.fit_wald_linear_mu_contrast_spec_parametric(counts, design, contrast)
+            });
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
@@ -175,7 +183,9 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_linear_mu_factor_level_contrast_parametric(counts, design, contrast));
+            return pool.install(|| {
+                self.fit_wald_linear_mu_factor_level_contrast_parametric(counts, design, contrast)
+            });
         }
 
         let contrast_spec = match contrast.reference {
@@ -290,7 +300,8 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast));
+            return pool
+                .install(|| self.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast));
         }
 
         let contrast_spec = match contrast.reference {
@@ -366,7 +377,9 @@ impl DeseqBuilder {
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu(counts, full_design, reduced_design, coefficient));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu(counts, full_design, reduced_design, coefficient)
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -387,7 +400,9 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_contrast(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_contrast(counts, full_design, reduced_design, contrast)
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -404,7 +419,9 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_contrast_spec(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+            });
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
@@ -431,7 +448,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_factor_level_contrast(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_factor_level_contrast(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -481,7 +505,9 @@ impl DeseqBuilder {
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_parametric(counts, full_design, reduced_design, coefficient));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_parametric(counts, full_design, reduced_design, coefficient)
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -501,7 +527,14 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_contrast_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_contrast_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -518,7 +551,14 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_contrast_spec_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_contrast_spec_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
@@ -545,7 +585,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_linear_mu_factor_level_contrast_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_linear_mu_factor_level_contrast_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -595,7 +642,8 @@ impl DeseqBuilder {
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient));
+            return pool
+                .install(|| self.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient));
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -616,7 +664,9 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -633,7 +683,9 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+            });
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
@@ -661,7 +713,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_factor_level_contrast(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -737,7 +796,9 @@ impl DeseqBuilder {
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_parametric(counts, full_design, reduced_design, coefficient));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_parametric(counts, full_design, reduced_design, coefficient)
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -757,7 +818,14 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;
@@ -774,7 +842,14 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast_spec_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast_spec_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
@@ -801,7 +876,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_factor_level_contrast_parametric(counts, full_design, reduced_design, contrast));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_factor_level_contrast_parametric(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                )
+            });
         }
 
         validate_lrt_designs(full_design, reduced_design)?;

@@ -11,16 +11,24 @@ use super::fitted_results::{
 use crate::numeric::checked;
 
 // Count matrix storage, row access, and count summaries.
-include!("implementation/counts.rs");
+#[path = "implementation/counts.rs"]
+mod counts;
+pub use counts::*;
 
 // Inspectable fit state, builder options, and transform methods on fit state.
-include!("implementation/fit_state.rs");
+#[path = "implementation/fit_state.rs"]
+mod fit_state;
+pub use fit_state::*;
 
 // Private pipeline input/output bundles and public transform/replacement outputs.
-include!("implementation/outputs.rs");
+#[path = "implementation/outputs.rs"]
+mod outputs;
+pub use outputs::*;
 
 // Builder configuration setters and accessors.
-include!("implementation/builder/config.rs");
+#[path = "implementation/builder/config.rs"]
+mod config;
+use config::*;
 
 // Builder stage boundaries retain the existing public forwarding methods.
 #[path = "implementation/builder/stages/gene_wise.rs"]
@@ -37,29 +45,39 @@ mod builder_trends;
 mod builder_vst;
 
 // Builder Wald and LRT orchestration before replacement refits.
-include!("implementation/builder/wald_lrt.rs");
+#[path = "implementation/builder/wald_lrt.rs"]
+mod wald_lrt;
 
 // Cook's replacement-refit builder workflows.
-include!("implementation/builder/cooks_replacement.rs");
+#[path = "implementation/builder/cooks_replacement.rs"]
+mod cooks_replacement;
 
 // Native Wald/LRT fit-state attachment helpers.
-include!("implementation/builder/native_attachments.rs");
+#[path = "implementation/builder/native_attachments.rs"]
+mod native_attachments;
 
 // Fixed-dispersion Wald builder workflows.
-include!("implementation/builder/fixed_wald.rs");
+#[path = "implementation/builder/fixed_wald.rs"]
+mod fixed_wald;
 
 // Fixed-dispersion LRT builder workflows.
-include!("implementation/builder/fixed_lrt.rs");
+#[path = "implementation/builder/fixed_lrt.rs"]
+mod fixed_lrt;
 
 // Shared normalization and fixed-dispersion pipeline components.
-include!("implementation/builder/normalization_components.rs");
+#[path = "implementation/builder/normalization_components.rs"]
+mod normalization_components;
 
 // Public top-level builder workflows.
 #[path = "implementation/builder/workflows/mod.rs"]
 mod workflows;
 
 // Shared validation, compaction, expansion, and metadata helpers.
-include!("implementation/helpers.rs");
+#[path = "implementation/helpers.rs"]
+mod helpers;
+use helpers::*;
 
 // Unit tests for the core module implementation.
-include!("implementation/tests.rs");
+#[cfg(test)]
+#[path = "implementation/tests.rs"]
+mod tests;

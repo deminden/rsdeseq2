@@ -1,3 +1,4 @@
+use super::*;
 /// Inspectable fit state for all implemented and future DESeq2 stages.
 #[derive(Clone, Debug, PartialEq)]
 #[must_use]
@@ -129,24 +130,24 @@ pub struct DeseqFit {
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct DeseqBuilder {
-    fit_type: FitType,
-    test: TestType,
-    size_factor_options: SizeFactorOptions,
-    normalization_factors: Option<RowMajorMatrix<f64>>,
-    observation_weights: Option<RowMajorMatrix<f64>>,
-    observation_weight_options: ObservationWeightOptions,
-    threads: Option<usize>,
-    execution_context: ExecutionContext,
+    pub(super) fit_type: FitType,
+    pub(super) test: TestType,
+    pub(super) size_factor_options: SizeFactorOptions,
+    pub(super) normalization_factors: Option<RowMajorMatrix<f64>>,
+    pub(super) observation_weights: Option<RowMajorMatrix<f64>>,
+    pub(super) observation_weight_options: ObservationWeightOptions,
+    pub(super) threads: Option<usize>,
+    pub(super) execution_context: ExecutionContext,
     #[cfg(test)]
-    execution_observer: Option<std::sync::Arc<std::sync::Mutex<Vec<usize>>>>,
-    reduced_design: Option<DesignMatrix>,
-    model_frame: Option<FormulaModelFrame>,
-    irls_options: IrlsOptions,
-    gene_wise_dispersion_options: GeneWiseDispersionOptions,
-    automatic_dispersion_means: bool,
-    wald_test_options: WaldTestOptions,
-    cooks_cutoff: CooksCutoff,
-    independent_filtering_options: IndependentFilteringOptions,
+    pub(super) execution_observer: Option<std::sync::Arc<std::sync::Mutex<Vec<usize>>>>,
+    pub(super) reduced_design: Option<DesignMatrix>,
+    pub(super) model_frame: Option<FormulaModelFrame>,
+    pub(super) irls_options: IrlsOptions,
+    pub(super) gene_wise_dispersion_options: GeneWiseDispersionOptions,
+    pub(super) automatic_dispersion_means: bool,
+    pub(super) wald_test_options: WaldTestOptions,
+    pub(super) cooks_cutoff: CooksCutoff,
+    pub(super) independent_filtering_options: IndependentFilteringOptions,
 }
 
 impl DeseqFit {
@@ -493,12 +494,9 @@ impl DeseqFit {
             self.observation_weights.as_ref(),
         )
     }
-
-
 }
 
-
-pub(super) fn validate_fit_counts_shape(
+pub(in crate::core) fn validate_fit_counts_shape(
     fit: &DeseqFit,
     counts: &CountMatrix,
     context: &str,

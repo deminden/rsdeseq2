@@ -1,12 +1,13 @@
+use super::*;
 impl DeseqBuilder {
-    fn normalization_stages(
+    pub(super) fn normalization_stages(
         &self,
         counts: &CountMatrix,
     ) -> Result<NormalizationStages, DeseqError> {
         self.normalization_stages_inner(counts, None)
     }
 
-    fn normalization_stages_for_design(
+    pub(super) fn normalization_stages_for_design(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -28,7 +29,9 @@ impl DeseqBuilder {
             let samples = frame.n_samples()?;
             if samples != counts.n_samples() {
                 return Err(invalid_dimensions(
-                    "formula model frame samples", counts.n_samples(), samples,
+                    "formula model frame samples",
+                    counts.n_samples(),
+                    samples,
                 ));
             }
         }
@@ -40,7 +43,10 @@ impl DeseqBuilder {
                 validate_normalization_factors(counts, factors)?;
                 let size_factors = match &self.size_factor_options.supplied_size_factors {
                     Some(size_factors) => {
-                        crate::normalization::validate_size_factors(size_factors, counts.n_samples())?;
+                        crate::normalization::validate_size_factors(
+                            size_factors,
+                            counts.n_samples(),
+                        )?;
                         size_factors.clone()
                     }
                     None => vec![1.0; counts.n_samples()],
@@ -139,7 +145,7 @@ impl DeseqBuilder {
         }
     }
 
-    fn ensure_no_observation_weights(&self, feature: &str) -> Result<(), DeseqError> {
+    pub(super) fn ensure_no_observation_weights(&self, feature: &str) -> Result<(), DeseqError> {
         if self.observation_weights.is_some() {
             return Err(DeseqError::UnsupportedFeature {
                 feature: format!("{feature} with observation weights"),
@@ -148,7 +154,7 @@ impl DeseqBuilder {
         Ok(())
     }
 
-    fn fixed_dispersion_wald_components(
+    pub(super) fn fixed_dispersion_wald_components(
         &self,
         input: WaldPipelineInput<'_>,
     ) -> Result<WaldPipelineOutput, DeseqError> {
@@ -225,7 +231,7 @@ impl DeseqBuilder {
         })
     }
 
-    fn fixed_dispersion_wald_contrast_components(
+    pub(super) fn fixed_dispersion_wald_contrast_components(
         &self,
         input: FixedDispersionGlmInput<'_>,
         normalized: &RowMajorMatrix<f64>,
@@ -305,7 +311,7 @@ impl DeseqBuilder {
         })
     }
 
-    fn fixed_dispersion_lrt_components(
+    pub(super) fn fixed_dispersion_lrt_components(
         &self,
         input: LrtPipelineInput<'_>,
     ) -> Result<LrtPipelineOutput, DeseqError> {
@@ -454,7 +460,7 @@ impl DeseqBuilder {
         })
     }
 
-    fn base_fit(
+    pub(super) fn base_fit(
         &self,
         counts: &CountMatrix,
         design: Option<DesignMatrix>,
