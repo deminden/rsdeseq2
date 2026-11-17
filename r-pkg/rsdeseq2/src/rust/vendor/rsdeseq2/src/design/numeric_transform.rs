@@ -7,6 +7,8 @@ use crate::errors::invalid_options;
 use crate::matrix::{MatrixView, RowMajorMatrix};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+// The x87 extended-precision kernels are the only unsafe code in the core.
+#[allow(unsafe_code)]
 mod extended;
 mod polynomial;
 pub(super) mod polynomial_qr;

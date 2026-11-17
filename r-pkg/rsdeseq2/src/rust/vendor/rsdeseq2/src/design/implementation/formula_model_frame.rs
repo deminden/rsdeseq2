@@ -157,6 +157,8 @@ struct ResolvedFormulaModelFrame<'a> {
 }
 
 impl<'a> ResolvedFormulaModelFrame<'a> {
+    // Invariant: factor references are validated by FormulaModelFrame::validate before specs are borrowed.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
     fn new(model_frame: &'a FormulaModelFrame) -> Result<Self, DeseqError> {
         validate_formula_model_frame(model_frame)?;
         let factor_specs = model_frame

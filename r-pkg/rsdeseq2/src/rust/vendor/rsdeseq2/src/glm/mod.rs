@@ -69,6 +69,7 @@ use crate::matrix::RowMajorMatrix;
 
 /// Negative-binomial GLM fit output matching DESeq2 low-level result fields.
 #[derive(Clone, Debug)]
+#[must_use]
 pub struct NbinomGlmFit {
     /// Per-gene log likelihood.
     pub log_like: Vec<f64>,

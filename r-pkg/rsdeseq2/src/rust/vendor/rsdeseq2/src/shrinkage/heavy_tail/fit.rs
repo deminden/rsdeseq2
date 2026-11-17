@@ -173,6 +173,8 @@ impl NegativeBinomialPosterior {
         Ok(())
     }
 
+    // Invariant: `coefficient` is checked against the mode shape above.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
     pub fn coefficient_summary(
         &self,
         coefficient: usize,
@@ -263,6 +265,8 @@ pub fn fit_negative_binomial_posterior_with_rng(
     options.check_opposite_start = false;
     fit_batch(input, &options, None, Some(rng))
 }
+// Invariant: offset and regression parameters are built for every row before fitting.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 pub(super) fn fit_batch(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,

@@ -571,7 +571,7 @@ mod execution_control_tests {
             let mut builder = DeseqBuilder::new().threads(workers).size_factors(vec![1.0;8]);
             builder.execution_observer = Some(Arc::clone(&observed));
             let ambient = rayon::ThreadPoolBuilder::new().num_threads(if workers == 1 {4} else {1}).build().unwrap();
-            ambient.install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1;3], 1)).unwrap();
+            let _ = ambient.install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1;3], 1)).unwrap();
             assert_eq!(*observed.lock().unwrap(), [workers]);
             let cloned = builder.clone();
             assert_eq!(cloned.with_execution_context(rayon::current_num_threads).unwrap(), workers);
