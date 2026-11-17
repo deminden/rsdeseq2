@@ -22,7 +22,7 @@ Metrics:
       CLONE_WINDOW consecutive normalized non-trivial lines.
   r_entry_points / r_unwrapped_entry_points  `extern "C" fn rsdeseq2_r_*`
       definitions in the R bridge, and those whose body does not call
-      `run_backend`.
+      `run_backend` or `guard_value`.
   r_unsafe_uses        `unsafe` tokens in the R bridge sources.
 """
 from __future__ import annotations
@@ -178,7 +178,7 @@ def bridge_metrics() -> dict[str, int]:
             while k < len(text) and depth:
                 depth += {'{': 1, '}': -1}.get(text[k], 0)
                 k += 1
-            if 'run_backend' not in text[brace:k]:
+            if 'run_backend' not in text[brace:k] and 'guard_value' not in text[brace:k]:
                 unwrapped += 1
     return dict(r_entry_points=entries, r_unwrapped_entry_points=unwrapped, r_unsafe_uses=unsafe)
 

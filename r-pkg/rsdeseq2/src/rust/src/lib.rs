@@ -31,7 +31,23 @@ fn set_error(error: impl std::fmt::Display) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_last_error() -> *const c_char {
-    LAST_ERROR.with(|slot| slot.borrow().as_ptr())
+    // try_borrow: reading the message must not panic even while it is being set.
+    guard_value(ptr::null(), || {
+        LAST_ERROR.with(|slot| slot.try_borrow().map_or(ptr::null(), |s| s.as_ptr()))
+    })
+}
+
+/// Run an entry point that returns a value instead of a status code. A panic
+/// is caught at the FFI boundary, recorded as the last error and replaced by
+/// `fallback`, so unwinding never crosses into C.
+fn guard_value<T>(fallback: T, operation: impl FnOnce() -> T) -> T {
+    match catch_unwind(AssertUnwindSafe(operation)) {
+        Ok(value) => value,
+        Err(_) => {
+            set_error("Rust backend panicked");
+            fallback
+        }
+    }
 }
 
 fn run_backend(operation: impl FnOnce() -> Result<(), String>) -> i32 {
@@ -209,3 +225,69 @@ mod model_matrix;
 mod row_preparation;
 
 mod replacement_counts;
+
+#[cfg(test)]
+mod entry_point_tests {
+    use std::path::Path;
+
+    /// Every exported `rsdeseq2_r_*` function must catch panics at the FFI
+    /// boundary through `run_backend` or `guard_value`.
+    #[test]
+    fn every_exported_entry_point_is_panic_guarded() {
+        fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    sources(&path, out);
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    out.push((
+                        path.display().to_string(),
+                        std::fs::read_to_string(&path).unwrap(),
+                    ));
+                }
+            }
+        }
+        let mut files = Vec::new();
+        sources(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        let marker = "extern \"C\" fn rsdeseq2_r_";
+        let (mut total, mut unguarded) = (0, Vec::new());
+        for (path, text) in &files {
+            let mut rest = text.as_str();
+            while let Some(start) = rest.find(marker) {
+                let after = &rest[start..];
+                let name_end = after.find('(').unwrap();
+                let name = &after["extern \"C\" fn ".len()..name_end];
+                let open = after.find('{').unwrap();
+                let mut depth = 0;
+                let mut end = open;
+                for (offset, ch) in after[open..].char_indices() {
+                    match ch {
+                        '{' => depth += 1,
+                        '}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                end = open + offset;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let body = &after[open..=end];
+                total += 1;
+                if !body.contains("run_backend(") && !body.contains("guard_value(") {
+                    unguarded.push(format!("{path}: {name}"));
+                }
+                rest = &after[end..];
+            }
+        }
+        assert!(total >= 34, "found only {total} entry points");
+        assert!(
+            unguarded.is_empty(),
+            "unguarded entry points: {unguarded:?}"
+        );
+    }
+}

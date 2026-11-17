@@ -1,5 +1,5 @@
 //! Primitive request adapter. Numerical implementations remain in the core.
-use super::{input_slice, output_slice, run_backend};
+use super::{guard_value, input_slice, output_slice, run_backend};
 use rsdeseq2::design::expression::{
     self, Argument, Data, EvaluationOptions, Expression, Value, frame, wire,
 };
@@ -273,13 +273,17 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_bytes(
 /// A non-null slot contains NULL or a unique live owner; clears it before drop.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_formula_drop(slot: *mut *mut FormulaOutput) {
-    if slot.is_null() {
-        return;
-    }
-    let owner = unsafe { ptr::replace(&mut *slot, ptr::null_mut()) };
-    if !owner.is_null() {
-        drop(unsafe { Box::from_raw(owner) });
-    }
+    guard_value((), || {
+        if slot.is_null() {
+            return;
+        }
+        // SAFETY: the caller passes the owner slot it received from this backend.
+        let owner = unsafe { ptr::replace(&mut *slot, ptr::null_mut()) };
+        if !owner.is_null() {
+            // SAFETY: a non-null owner was produced by Box::into_raw here.
+            drop(unsafe { Box::from_raw(owner) });
+        }
+    })
 }
 
 #[cfg(test)]
@@ -377,7 +381,10 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_request_interruptible(
             LAST_POLL.with(|s| s.set(None));
         }
     }
-    let _reset = Reset(INTERRUPT.with(|s| s.replace(callback)));
-    LAST_POLL.with(|s| s.set(None));
-    unsafe { rsdeseq2_r_formula_request(input, size, output) }
+    guard_value(2, || {
+        let _reset = Reset(INTERRUPT.with(|s| s.replace(callback)));
+        LAST_POLL.with(|s| s.set(None));
+        // SAFETY: arguments are forwarded unchanged from the C caller.
+        unsafe { rsdeseq2_r_formula_request(input, size, output) }
+    })
 }

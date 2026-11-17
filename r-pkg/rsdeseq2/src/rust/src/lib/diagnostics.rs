@@ -86,13 +86,13 @@ const DIAGNOSTIC_SCHEMA_NAMES: [&[u8]; 7] = [
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_placeholder() -> i32 {
-    0
+    run_backend(|| Ok(()))
 }
 
 /// Number of DESeq2-style diagnostic schema names exported by the R bridge.
 #[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_diagnostic_schema_len() -> usize {
-    DIAGNOSTIC_SCHEMA_NAMES.len()
+    guard_value(0, || DIAGNOSTIC_SCHEMA_NAMES.len())
 }
 
 /// Return one null-terminated diagnostic schema name by index.
@@ -101,9 +101,11 @@ pub extern "C" fn rsdeseq2_r_diagnostic_schema_len() -> usize {
 /// out-of-range index.
 #[unsafe(no_mangle)]
 pub extern "C" fn rsdeseq2_r_diagnostic_schema_name(index: usize) -> *const c_char {
-    DIAGNOSTIC_SCHEMA_NAMES
-        .get(index)
-        .map_or(ptr::null(), |name| name.as_ptr().cast())
+    guard_value(ptr::null(), || {
+        DIAGNOSTIC_SCHEMA_NAMES
+            .get(index)
+            .map_or(ptr::null(), |name| name.as_ptr().cast())
+    })
 }
 
 #[cfg(test)]

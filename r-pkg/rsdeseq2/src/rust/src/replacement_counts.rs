@@ -1,5 +1,5 @@
 //! Short-lived owned output; never contains a pointer into R storage.
-use super::{copy_counts_to_r, output_slice, run_backend};
+use super::{copy_counts_to_r, guard_value, output_slice, run_backend};
 use rsdeseq2::prelude::CountMatrix;
 use std::ptr;
 
@@ -65,13 +65,17 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_copy(
 /// returned by fit. This clears the slot before releasing its allocation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_replacement_drop(slot: *mut *mut ReplacementCounts) {
-    if slot.is_null() {
-        return;
-    }
-    let owner = unsafe { ptr::replace(&mut *slot, ptr::null_mut()) };
-    if !owner.is_null() {
-        drop(unsafe { Box::from_raw(owner) });
-    }
+    guard_value((), || {
+        if slot.is_null() {
+            return;
+        }
+        // SAFETY: the caller passes the owner slot it received from this backend.
+        let owner = unsafe { ptr::replace(&mut *slot, ptr::null_mut()) };
+        if !owner.is_null() {
+            // SAFETY: a non-null owner was produced by Box::into_raw here.
+            drop(unsafe { Box::from_raw(owner) });
+        }
+    })
 }
 
 #[cfg(test)]
