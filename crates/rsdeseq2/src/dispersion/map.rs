@@ -10,6 +10,17 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked::{self, CheckedExt};
+use rayon::prelude::*;
+
+/// One gene's MAP fit, assigned to the output vectors in gene order.
+struct GeneMap {
+    initial: f64,
+    map_value: f64,
+    iterations: usize,
+    outlier: bool,
+    converged: bool,
+    dispersion: f64,
+}
 
 /// Options for DESeq2-style MAP dispersion fitting.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -129,14 +140,15 @@ pub fn estimate_map_dispersions(
     let mut converged = vec![false; input.counts.n_genes()];
     let mut disp_init = vec![f64::NAN; input.counts.n_genes()];
 
-    for gene in 0..input.counts.n_genes() {
+    // Genes are independent; fit them in parallel and assign in gene order so
+    // the lowest failing gene's error is the one reported.
+    let fit_gene = |gene: usize| -> Result<Option<GeneMap>, DeseqError> {
         if input.all_zero[gene] {
-            continue;
+            return Ok(None);
         }
         let gene_est = input.disp_gene_est[gene];
         let fit = input.disp_fit[gene];
         let initial = map_dispersion_initial_value(gene_est, fit)?;
-        disp_init[gene] = initial;
         let prior = DispersionPrior::new(fit.ln(), input.disp_prior_var)?;
         let row_mu = input.mu.row(gene)?;
         let weight_row = input
@@ -231,11 +243,29 @@ pub fn estimate_map_dispersions(
             options.outlier_sd,
             input.var_log_disp_estimates,
         );
-        disp_map[gene] = map_value;
-        disp_iter[gene] = line_search.iter;
-        disp_outlier[gene] = outlier;
-        converged[gene] = line_converged;
-        dispersion[gene] = if outlier { gene_est } else { map_value };
+        Ok(Some(GeneMap {
+            initial,
+            map_value,
+            iterations: line_search.iter,
+            outlier,
+            converged: line_converged,
+            dispersion: if outlier { gene_est } else { map_value },
+        }))
+    };
+    let fits = (0..input.counts.n_genes())
+        .into_par_iter()
+        .map(fit_gene)
+        .collect::<Vec<_>>();
+    for (gene, fit) in fits.into_iter().enumerate() {
+        let Some(fit) = fit? else {
+            continue;
+        };
+        disp_init[gene] = fit.initial;
+        disp_map[gene] = fit.map_value;
+        disp_iter[gene] = fit.iterations;
+        disp_outlier[gene] = fit.outlier;
+        converged[gene] = fit.converged;
+        dispersion[gene] = fit.dispersion;
     }
 
     Ok(MapDispersionOutput {
