@@ -102,53 +102,31 @@ impl DeseqBuilder {
 
     pub(super) fn attach_parametric_dispersion_trend(
         &self,
-        mut fit: DeseqFit,
+        fit: DeseqFit,
     ) -> Result<DeseqFit, DeseqError> {
-        let disp_gene_est =
-            fit.disp_gene_est
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
-                })?;
-        let trend_fit = fit_parametric_dispersion_trend(
-            &fit.base_mean,
-            disp_gene_est,
-            ParametricDispersionTrendOptions {
-                min_disp: self.gene_wise_dispersion_options.min_disp,
-                ..ParametricDispersionTrendOptions::default()
-            },
-        )?;
-        fit.disp_fit = Some(trend_fit.disp_fit.clone());
-        fit.dispersion_trend = Some(DispersionTrendFit::Parametric(trend_fit));
-        Ok(fit)
+        self.attach_estimated_dispersion_trend(fit, FitType::Parametric)
     }
 
     pub(super) fn attach_mean_dispersion_trend(
         &self,
-        mut fit: DeseqFit,
+        fit: DeseqFit,
     ) -> Result<DeseqFit, DeseqError> {
-        let disp_gene_est =
-            fit.disp_gene_est
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
-                })?;
-        let trend_fit = fit_mean_dispersion_trend(
-            &fit.base_mean,
-            disp_gene_est,
-            MeanDispersionTrendOptions {
-                min_disp: self.gene_wise_dispersion_options.min_disp,
-                ..MeanDispersionTrendOptions::default()
-            },
-        )?;
-        fit.disp_fit = Some(trend_fit.disp_fit.clone());
-        fit.dispersion_trend = Some(DispersionTrendFit::Mean(trend_fit));
-        Ok(fit)
+        self.attach_estimated_dispersion_trend(fit, FitType::Mean)
     }
 
     pub(super) fn attach_local_dispersion_trend(
         &self,
+        fit: DeseqFit,
+    ) -> Result<DeseqFit, DeseqError> {
+        self.attach_estimated_dispersion_trend(fit, FitType::Local)
+    }
+
+    /// DESeq2 `estimateDispersionsFit`: shared row rule, parametric-to-local
+    /// fallback and local fit on `useForFit` rows only.
+    fn attach_estimated_dispersion_trend(
+        &self,
         mut fit: DeseqFit,
+        fit_type: FitType,
     ) -> Result<DeseqFit, DeseqError> {
         let disp_gene_est =
             fit.disp_gene_est
@@ -156,16 +134,14 @@ impl DeseqBuilder {
                 .ok_or_else(|| DeseqError::InvalidDispersion {
                     reason: "gene-wise dispersions are required before trend fitting".to_string(),
                 })?;
-        let trend_fit = fit_local_dispersion_trend(
+        let trend = estimate_dispersion_trend(
             &fit.base_mean,
             disp_gene_est,
-            LocalDispersionTrendOptions {
-                min_disp: self.gene_wise_dispersion_options.min_disp,
-                ..LocalDispersionTrendOptions::default()
-            },
+            fit_type,
+            self.gene_wise_dispersion_options.min_disp,
         )?;
-        fit.disp_fit = Some(trend_fit.disp_fit.clone());
-        fit.dispersion_trend = Some(DispersionTrendFit::Local(trend_fit));
+        fit.disp_fit = Some(trend.disp_fit().to_vec());
+        fit.dispersion_trend = Some(trend);
         Ok(fit)
     }
 

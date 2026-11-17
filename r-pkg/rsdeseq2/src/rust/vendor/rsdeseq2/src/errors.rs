@@ -35,8 +35,12 @@ pub enum DeseqError {
     #[error("no usable genes for size-factor estimation")]
     NoUsableGenesForSizeFactors,
 
-    /// A value was expected to be finite.
-    #[error("non-finite value in {context} at index {index:?}: {value}")]
+    /// A value was expected to be finite, or finite and within a range
+    /// (for example positive). The message names which case occurred.
+    #[error(
+        "{} value in {context} at index {index:?}: {value}",
+        if value.is_finite() { "out-of-range" } else { "non-finite" }
+    )]
     NonFiniteValue {
         context: String,
         index: Option<usize>,
@@ -166,5 +170,27 @@ mod tests {
         );
         let io = DeseqError::from(std::io::Error::other("x"));
         assert_eq!(io.kind(), ErrorKind::Io);
+    }
+
+    #[test]
+    fn finite_out_of_range_values_are_not_called_non_finite() {
+        let negative = DeseqError::NonFiniteValue {
+            context: "dispersion".into(),
+            index: Some(1),
+            value: -0.1,
+        };
+        assert_eq!(
+            negative.to_string(),
+            "out-of-range value in dispersion at index Some(1): -0.1"
+        );
+        let nan = DeseqError::NonFiniteValue {
+            context: "dispersion".into(),
+            index: Some(1),
+            value: f64::NAN,
+        };
+        assert_eq!(
+            nan.to_string(),
+            "non-finite value in dispersion at index Some(1): NaN"
+        );
     }
 }
