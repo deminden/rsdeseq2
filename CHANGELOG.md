@@ -31,6 +31,10 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   checks, independent filtering and local VST). Numerical results are
   unchanged.
 
+- Release builds of the workspace use thin LTO and one codegen unit. Outputs
+  are bit-identical; the CLI binary is about 16% smaller. The R package build
+  keeps its own profile and unwinding panics.
+
 ### Deprecated
 
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes

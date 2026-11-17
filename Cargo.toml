@@ -8,6 +8,13 @@ license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
 repository = "https://github.com/deminden/rsdeseq2"
 rust-version = "1.97.1"
 
+# Whole-program optimisation for the CLI and benchmarks. Floating-point
+# semantics are unchanged (no fast-math); the golden harness checks outputs.
+# Do not add `panic = "abort"`: the R bridge relies on unwinding.
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
 # Hardening targets (docs/reports/hardening-progress.md). They warn while the
 # existing sites are removed; the gating Clippy command allows them explicitly
 # until Phase 2.4 turns them into errors.
