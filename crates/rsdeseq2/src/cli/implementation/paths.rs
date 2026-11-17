@@ -1,6 +1,7 @@
+use super::*;
 // Explicit path inventory for collision checks and output staging.
 impl Commands {
-    fn paths_mut(&mut self) -> (Vec<&mut PathBuf>, Vec<&mut PathBuf>) {
+    pub(super) fn paths_mut(&mut self) -> (Vec<&mut PathBuf>, Vec<&mut PathBuf>) {
         match self {
             Self::SizeFactors {
                 counts,
