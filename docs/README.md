@@ -11,6 +11,7 @@ These guides describe the current 0.5.0 source and its supported behavior.
 | Review precision, speed and memory | [GTEx comparison](reports/gtex-native-wald-benchmark.md), [benchmark procedure](benchmarks.md) |
 | Reproduce data and independent references | [Reproducibility](reproducibility.md) |
 | Run tests or inspect passing CI | [Testing and parity](testing-parity.md) |
+| Follow refactoring safety metrics | [Hardening baseline](reports/baseline-0.5.0.md), [progress](reports/hardening-progress.md) |
 | Change or package the code | [Development](development.md), [release procedure](release.md), [0.5.0 notes](releases/0.5.0.md) |
 
 `data/` contains the raw evidence used by these guides and active validation

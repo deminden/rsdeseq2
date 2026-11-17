@@ -35,6 +35,12 @@ partial gains and record attempts in the ignored local optimisation journal.
 Small changes observed under uncontrolled external load are not established
 performance gains. Report diagnostic-export timing separately from result-only timing.
 
+For Rust-only candidate/baseline pairs, `scripts/benchmarks/paired_gtex_rust_timing.py`
+runs the same result-only command for both binaries in alternating order, records
+wall time and peak RSS per process, applies the 2% summed-throughput rule and
+requires byte-identical results unless `--allow-output-change` is given. It does
+not replace the accepted DESeq2 comparison.
+
 ## Primitive and inner-loop measurements
 
 The process runner also compares size-factor and base-mean CLI operations with
