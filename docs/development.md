@@ -52,6 +52,7 @@ versions. CI rejects drift rather than repairing source before testing.
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo run --release --locked -p rsdeseq2 --example golden -- --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'

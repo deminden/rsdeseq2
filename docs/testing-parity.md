@@ -48,6 +48,17 @@ share data/encoders while keeping independent original-package assertions.
 A source-call audit supplements runtime checks with R statistical calls blocked;
 it does not replace numerical comparisons.
 
+## Golden output hashes
+
+Refactoring that must not change results is checked with the
+[golden harness](../crates/rsdeseq2/tools/validation/README.md#golden-output-harness):
+one SHA-256 per output field over raw `f64` bits, for four inputs and the main
+workflows at 1 and 4 threads. Rust CI runs it with `--check` on Linux x86_64.
+
+```sh
+cargo run --release --locked -p rsdeseq2 --example golden -- --check
+```
+
 ## Compact and full GTEx checks
 
 Ordinary tests fit a fixed-dispersion panel of **512 genes × all 61 samples**,

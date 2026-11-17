@@ -24,6 +24,8 @@ jobs:
         run: cargo doc --locked -p rsdeseq2 --no-deps
       - name: Test
         run: cargo test --workspace
+      - name: Golden output hashes
+        run: cargo run --release --locked -p rsdeseq2 --example golden -- --check
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

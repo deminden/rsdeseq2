@@ -63,5 +63,9 @@ name = "compare_se_covariance_fixture"
 path = "tools/validation/compare_se_covariance_fixture.rs"
 
 [[example]]
+name = "golden"
+path = "tools/validation/golden.rs"
+
+[[example]]
 name = "evaluate_r_interface"
 path = "tools/validation/evaluate_r_interface.rs"
