@@ -1,3 +1,4 @@
+use super::*;
 impl DeseqBuilder {
     /// Run the current GLM-mu native Wald path with limited Cook's replacement refit.
     ///
@@ -17,7 +18,14 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_with_cooks_replacement(counts, design, coefficient, replacement_options));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_with_cooks_replacement(
+                    counts,
+                    design,
+                    coefficient,
+                    replacement_options,
+                )
+            });
         }
 
         validate_pipeline_wald_coefficient(design, coefficient)?;
@@ -28,7 +36,10 @@ impl DeseqBuilder {
         let (original_fit, original_results) =
             raw_builder.fit_wald_glm_mu(counts, design, coefficient)?;
         let refit_plan = replacement_refit_plan_from_original(
-            counts, design, &original_fit, replacement_options,
+            counts,
+            design,
+            &original_fit,
+            replacement_options,
             self.observation_weights.as_ref(),
         )?;
 
@@ -101,7 +112,14 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let raw_builder = self
@@ -183,7 +201,14 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(counts, design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
@@ -211,7 +236,14 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(counts, design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let contrast_spec = match contrast.reference {
@@ -344,7 +376,15 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_with_cooks_replacement(counts, full_design, reduced_design, coefficient, replacement_options));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    coefficient,
+                    replacement_options,
+                )
+            });
         }
 
         let raw_builder = self
@@ -354,7 +394,10 @@ impl DeseqBuilder {
         let (original_fit, original_results) =
             raw_builder.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)?;
         let refit_plan = replacement_refit_plan_from_original(
-            counts, full_design, &original_fit, replacement_options,
+            counts,
+            full_design,
+            &original_fit,
+            replacement_options,
             self.observation_weights.as_ref(),
         )?;
 
@@ -424,7 +467,15 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let raw_builder = self
@@ -508,7 +559,15 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let contrast_spec = match contrast.reference {
@@ -638,7 +697,15 @@ impl DeseqBuilder {
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(counts, full_design, reduced_design, contrast, replacement_options));
+            return pool.install(|| {
+                self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                    counts,
+                    full_design,
+                    reduced_design,
+                    contrast,
+                    replacement_options,
+                )
+            });
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;

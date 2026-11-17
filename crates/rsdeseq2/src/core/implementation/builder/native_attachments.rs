@@ -1,3 +1,4 @@
+use super::*;
 impl DeseqBuilder {
     /// Run the parametric GLM-mu native dispersion path and then a Wald test.
     ///
@@ -29,7 +30,8 @@ impl DeseqBuilder {
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_contrast_parametric(counts, design, contrast));
+            return pool
+                .install(|| self.fit_wald_glm_mu_contrast_parametric(counts, design, contrast));
         }
 
         let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
@@ -44,7 +46,9 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_contrast_spec_parametric(counts, design, contrast));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_contrast_spec_parametric(counts, design, contrast)
+            });
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
@@ -66,7 +70,9 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast));
+            return pool.install(|| {
+                self.fit_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast)
+            });
         }
 
         let contrast_spec = match contrast.reference {
@@ -102,7 +108,7 @@ impl DeseqBuilder {
         Ok((fit, results))
     }
 
-    fn attach_native_wald(
+    pub(super) fn attach_native_wald(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -142,7 +148,7 @@ impl DeseqBuilder {
         Ok((fit, wald_output.results))
     }
 
-    fn attach_native_wald_contrast(
+    pub(super) fn attach_native_wald_contrast(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -184,15 +190,11 @@ impl DeseqBuilder {
         attach_glm_fit(&mut fit, wald_output.glm_fit);
         fit.wald = Some(wald_output.wald_contrast.wald);
         let mut results = wald_output.results;
-        results.set_resolved_contrast_metadata(
-            "contrast",
-            "primitive numeric contrast",
-            contrast,
-        );
+        results.set_resolved_contrast_metadata("contrast", "primitive numeric contrast", contrast);
         Ok((fit, results))
     }
 
-    fn attach_native_lrt(
+    pub(super) fn attach_native_lrt(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,
@@ -240,7 +242,7 @@ impl DeseqBuilder {
         Ok((fit, lrt_output.results))
     }
 
-    fn attach_native_lrt_contrast(
+    pub(super) fn attach_native_lrt_contrast(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,

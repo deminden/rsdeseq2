@@ -1,5 +1,9 @@
+use super::*;
 // Validate global LRT subspaces before any expensive fitting stage.
-fn validate_lrt_designs(full: &DesignMatrix, reduced: &DesignMatrix) -> Result<(), DeseqError> {
+pub(super) fn validate_lrt_designs(
+    full: &DesignMatrix,
+    reduced: &DesignMatrix,
+) -> Result<(), DeseqError> {
     if full.n_samples() != reduced.n_samples() {
         return Err(invalid_dimensions(
             "LRT reduced design samples",
@@ -36,7 +40,7 @@ fn validate_lrt_designs(full: &DesignMatrix, reduced: &DesignMatrix) -> Result<(
     Ok(())
 }
 
-fn default_results_coefficient(design: &DesignMatrix) -> Result<usize, DeseqError> {
+pub(super) fn default_results_coefficient(design: &DesignMatrix) -> Result<usize, DeseqError> {
     design
         .n_coefficients()
         .checked_sub(1)
@@ -47,7 +51,7 @@ fn default_results_coefficient(design: &DesignMatrix) -> Result<usize, DeseqErro
         })
 }
 
-fn validate_observation_weights_for_counts(
+pub(super) fn validate_observation_weights_for_counts(
     counts: &CountMatrix,
     weights: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
@@ -61,7 +65,7 @@ fn validate_observation_weights_for_counts(
     Ok(())
 }
 
-fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), DeseqError> {
+pub(super) fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), DeseqError> {
     if input.dispersions.len() != input.counts.n_genes() {
         return Err(invalid_dimensions(
             "pipeline dispersions",
@@ -117,7 +121,7 @@ fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), Deseq
     Ok(())
 }
 
-fn is_intercept_only_design(design: &DesignMatrix) -> bool {
+pub(super) fn is_intercept_only_design(design: &DesignMatrix) -> bool {
     design.n_coefficients() == 1
         && design
             .matrix()
@@ -126,7 +130,7 @@ fn is_intercept_only_design(design: &DesignMatrix) -> bool {
             .all(|value| (*value - 1.0).abs() <= f64::EPSILON)
 }
 
-fn fit_fixed_dispersion_model(
+pub(super) fn fit_fixed_dispersion_model(
     counts: &CountMatrix,
     design: &DesignMatrix,
     size_factors: &[f64],
@@ -174,7 +178,7 @@ fn fit_fixed_dispersion_model(
     }
 }
 
-fn merge_replacement_refit_results(
+pub(super) fn merge_replacement_refit_results(
     original_results: &DeseqResults,
     refit_results: Option<&DeseqResults>,
     refit_plan: &CooksRefitPlan,
@@ -250,7 +254,7 @@ fn merge_replacement_refit_results(
     Ok(merged)
 }
 
-fn replacement_refit_plan_from_original(
+pub(super) fn replacement_refit_plan_from_original(
     counts: &CountMatrix,
     design: &DesignMatrix,
     original_fit: &DeseqFit,
@@ -281,7 +285,7 @@ fn replacement_refit_plan_from_original(
     )
 }
 
-fn replacement_dispersion_inputs(
+pub(super) fn replacement_dispersion_inputs(
     original_fit: &DeseqFit,
 ) -> Result<(&DispersionTrendFit, f64, f64), DeseqError> {
     let trend =
@@ -309,7 +313,7 @@ fn replacement_dispersion_inputs(
     Ok((trend, disp_prior_var, var_log_disp_estimates))
 }
 
-fn apply_contrast_metadata_to_replacement_output(
+pub(super) fn apply_contrast_metadata_to_replacement_output(
     output: &mut CooksReplacementWaldOutput,
     result_name: String,
     comparison: String,
@@ -341,7 +345,7 @@ fn apply_contrast_metadata_to_replacement_output(
     }
 }
 
-fn apply_lrt_contrast_metadata_to_replacement_output(
+pub(super) fn apply_lrt_contrast_metadata_to_replacement_output(
     output: &mut CooksReplacementLrtOutput,
     result_name: String,
     comparison: String,
@@ -375,7 +379,7 @@ fn apply_lrt_contrast_metadata_to_replacement_output(
 
 // Policy depends on original model context, never the displayed contrast.
 // Explicit factor metadata remains usable when no model frame was supplied.
-fn apply_cooks_cutoff_for_design(
+pub(super) fn apply_cooks_cutoff_for_design(
     results: &mut DeseqResults,
     cutoff: Option<f64>,
     counts: &CountMatrix,
@@ -433,7 +437,9 @@ fn apply_cooks_cutoff_for_design(
     )
 }
 
-fn factor_level_contrast_is_single_two_level_condition(contrast: FactorLevelContrast<'_>) -> bool {
+pub(super) fn factor_level_contrast_is_single_two_level_condition(
+    contrast: FactorLevelContrast<'_>,
+) -> bool {
     let mut saw_numerator = false;
     let mut saw_denominator = false;
     for level in contrast.sample_levels {
@@ -448,7 +454,7 @@ fn factor_level_contrast_is_single_two_level_condition(contrast: FactorLevelCont
     saw_numerator && saw_denominator
 }
 
-fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
+pub(super) fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     crate::results::ReplacementRows::set_zero_values(
         &mut row.log2_fold_change,
         &mut row.lfc_se,
@@ -462,11 +468,14 @@ fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.filtered = None;
 }
 
-fn compact_counts(counts: &CountMatrix, gene_indices: &[usize]) -> Result<CountMatrix, DeseqError> {
+pub(super) fn compact_counts(
+    counts: &CountMatrix,
+    gene_indices: &[usize],
+) -> Result<CountMatrix, DeseqError> {
     counts.select_rows(gene_indices)
 }
 
-fn compact_matrix_rows(
+pub(super) fn compact_matrix_rows(
     matrix: &RowMajorMatrix<f64>,
     row_indices: &[usize],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
@@ -477,7 +486,10 @@ fn compact_matrix_rows(
     RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
 }
 
-fn compact_f64_values(values: &[f64], row_indices: &[usize]) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn compact_f64_values(
+    values: &[f64],
+    row_indices: &[usize],
+) -> Result<Vec<f64>, DeseqError> {
     let mut compact = Vec::with_capacity(row_indices.len());
     for row in row_indices {
         let Some(value) = values.get(*row) else {
@@ -492,7 +504,7 @@ fn compact_f64_values(values: &[f64], row_indices: &[usize]) -> Result<Vec<f64>,
     Ok(compact)
 }
 
-fn expand_rlog_output_with_all_zero_rows(
+pub(super) fn expand_rlog_output_with_all_zero_rows(
     compact_output: RlogOutput,
     all_zero: &[bool],
     n_samples: usize,
@@ -530,7 +542,7 @@ fn expand_rlog_output_with_all_zero_rows(
     })
 }
 
-fn expand_rlog_intercepts_with_all_zero_rows(
+pub(super) fn expand_rlog_intercepts_with_all_zero_rows(
     compact_output: &RlogOutput,
     all_zero: &[bool],
 ) -> Result<Vec<f64>, DeseqError> {
@@ -555,7 +567,7 @@ fn expand_rlog_intercepts_with_all_zero_rows(
     Ok(intercept)
 }
 
-fn expand_frozen_rlog_output_with_all_zero_rows(
+pub(super) fn expand_frozen_rlog_output_with_all_zero_rows(
     compact_output: RlogOutput,
     all_zero: &[bool],
     n_samples: usize,
@@ -601,7 +613,7 @@ fn expand_frozen_rlog_output_with_all_zero_rows(
     })
 }
 
-fn all_zero_glm_fit(
+pub(super) fn all_zero_glm_fit(
     counts: &CountMatrix,
     design: &DesignMatrix,
 ) -> Result<NbinomGlmFit, DeseqError> {
@@ -632,7 +644,7 @@ fn all_zero_glm_fit(
     })
 }
 
-fn expand_glm_fit(
+pub(super) fn expand_glm_fit(
     compact_fit: NbinomGlmFit,
     all_zero: &[bool],
 ) -> Result<NbinomGlmFit, DeseqError> {
@@ -672,7 +684,7 @@ fn expand_glm_fit(
     })
 }
 
-fn mask_wald_degrees_of_freedom_for_all_zero_rows(
+pub(super) fn mask_wald_degrees_of_freedom_for_all_zero_rows(
     wald: &mut WaldOutput,
     all_zero: &[bool],
 ) -> Result<(), DeseqError> {
@@ -694,7 +706,7 @@ fn mask_wald_degrees_of_freedom_for_all_zero_rows(
     Ok(())
 }
 
-fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
+pub(super) fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     let full_deviance = glm_fit
         .log_like
         .iter()
@@ -716,11 +728,11 @@ fn attach_glm_fit(fit: &mut DeseqFit, glm_fit: NbinomGlmFit) {
     fit.hat_diagonal = Some(glm_fit.hat_diagonal);
 }
 
-fn full_deviance_from_log_like(log_like: f64) -> f64 {
+pub(super) fn full_deviance_from_log_like(log_like: f64) -> f64 {
     checked::mul(-2.0, log_like).unwrap_or(f64::NAN)
 }
 
-fn validate_pipeline_wald_coefficient(
+pub(super) fn validate_pipeline_wald_coefficient(
     design: &DesignMatrix,
     coefficient: usize,
 ) -> Result<(), DeseqError> {
@@ -735,7 +747,7 @@ fn validate_pipeline_wald_coefficient(
 }
 
 #[cfg(test)]
-mod nested_design_tests {
+pub(super) mod nested_design_tests {
     use super::*;
 
     #[test]
