@@ -14,7 +14,6 @@ impl DeseqBuilder {
             normalization_factors: None,
             observation_weights: None,
             observation_weight_options: ObservationWeightOptions::default(),
-            execution_mode: ExecutionMode::default(),
             threads: None,
             execution_context: ExecutionContext::default(),
             #[cfg(test)]
@@ -122,12 +121,6 @@ impl DeseqBuilder {
     /// Set a logical control-gene mask with one value per gene.
     pub fn control_gene_mask(mut self, control_gene_mask: Vec<bool>) -> Self {
         self.size_factor_options.control_genes = Some(ControlGenes::Mask(control_gene_mask));
-        self
-    }
-
-    /// Set execution mode.
-    pub fn execution_mode(mut self, mode: ExecutionMode) -> Self {
-        self.execution_mode = mode;
         self
     }
 
@@ -323,10 +316,6 @@ impl DeseqBuilder {
         self.test
     }
 
-    /// Current execution mode.
-    pub fn current_execution_mode(&self) -> ExecutionMode {
-        self.execution_mode
-    }
 
     /// Requested thread count.
     pub fn requested_threads(&self) -> Option<usize> {

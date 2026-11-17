@@ -43,7 +43,7 @@ use crate::normalization::{
     validate_normalization_factors,
 };
 use crate::options::{
-    ControlGenes, CooksCutoff, ExecutionMode, FitType, SizeFactorMethod, SizeFactorOptions,
+    ControlGenes, CooksCutoff, FitType, SizeFactorMethod, SizeFactorOptions,
     TestType,
 };
 use crate::results::{

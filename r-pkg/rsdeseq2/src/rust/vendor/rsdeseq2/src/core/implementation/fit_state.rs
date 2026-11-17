@@ -133,7 +133,6 @@ pub struct DeseqBuilder {
     normalization_factors: Option<RowMajorMatrix<f64>>,
     observation_weights: Option<RowMajorMatrix<f64>>,
     observation_weight_options: ObservationWeightOptions,
-    execution_mode: ExecutionMode,
     threads: Option<usize>,
     execution_context: ExecutionContext,
     #[cfg(test)]
