@@ -1,4 +1,7 @@
 use crate::numeric::checked;
+use crate::numeric::validate::{
+    nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
+};
 mod row_preparation;
 pub use row_preparation::NormalShrinkageRows;
 
@@ -9,6 +12,7 @@ use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{
     IrlsOptions, fit_fixed_dispersion_irls,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights, fit_irls,
+    normalization_factors_from_size_factors,
 };
 use crate::glm::nb::nbinom_log_likelihood_matrix;
 use crate::matrix::RowMajorMatrix;

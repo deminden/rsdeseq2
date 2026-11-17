@@ -3,6 +3,10 @@
 //! The source is split by workflow so the public module can stay small
 //! while preserving existing paths through re-exports.
 
+use crate::normalization::{
+    validate_normalization_factor_matrix, validate_normalization_factor_value,
+    validate_size_factor_values,
+};
 use crate::numeric::checked::{self, CheckedExt};
 use rayon::prelude::*;
 

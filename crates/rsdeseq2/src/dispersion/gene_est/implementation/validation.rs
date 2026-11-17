@@ -147,12 +147,13 @@ fn validate_gene_est_inputs(
             input.size_factors.len(),
         ));
     }
-    validate_size_factors(input.size_factors)?;
+    validate_size_factor_values(input.size_factors)?;
     if let Some(normalization_factors) = input.normalization_factors {
-        validate_normalization_factors(
+        validate_normalization_factor_matrix(
             normalization_factors,
             input.counts.n_genes(),
             input.counts.n_samples(),
+            "dispersion normalization factors",
         )?;
     }
     if let Some(observation_weights) = input.observation_weights {
@@ -261,43 +262,8 @@ fn validate_dispersion_prior(prior: Option<DispersionPrior>) -> Result<(), Deseq
     Ok(())
 }
 
-fn validate_size_factors(size_factors: &[f64]) -> Result<(), DeseqError> {
-    for (idx, value) in size_factors.iter().copied().enumerate() {
-        if !value.is_finite() || value <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("size factor at sample {idx} must be finite and positive"),
-            });
-        }
-    }
-    Ok(())
-}
 
-fn validate_normalization_factors(
-    normalization_factors: &RowMajorMatrix<f64>,
-    n_genes: usize,
-    n_samples: usize,
-) -> Result<(), DeseqError> {
-    if normalization_factors.n_rows() != n_genes || normalization_factors.n_cols() != n_samples {
-        return Err(DeseqError::InvalidDimensions {
-            context: "dispersion normalization factors".to_string(),
-            expected: n_genes * n_samples,
-            actual: normalization_factors.len(),
-        });
-    }
-    for (idx, value) in normalization_factors.as_slice().iter().copied().enumerate() {
-        validate_normalization_factor(value, idx)?;
-    }
-    Ok(())
-}
 
-fn validate_normalization_factor(value: f64, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: format!("normalization factor at index {index} must be finite and positive"),
-        });
-    }
-    Ok(())
-}
 
 #[inline(always)]
 fn validate_positive_mu(mu: f64, sample: usize) -> Result<(), DeseqError> {

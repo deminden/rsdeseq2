@@ -88,8 +88,8 @@ pub fn vst_local(
         );
     }
     let row_means = normalized_count_row_means(normalized_counts)?;
-    let h1 = quantile_type7(&row_means, 0.95)?;
-    let h2 = quantile_type7(&row_means, 0.999)?;
+    let h1 = quantile_type7_checked(&row_means, 0.95)?;
+    let h2 = quantile_type7_checked(&row_means, 0.999)?;
     if h1 <= 0.0 || h2 <= h1 {
         return Err(DeseqError::InvalidDispersion {
             reason: "local VST scaling quantiles must be positive and increasing".to_string(),
@@ -120,8 +120,8 @@ pub fn vst_local_from_dispersion_grid(
         );
     }
     let row_means = normalized_count_row_means(normalized_counts)?;
-    let h1 = quantile_type7(&row_means, 0.95)?;
-    let h2 = quantile_type7(&row_means, 0.999)?;
+    let h1 = quantile_type7_checked(&row_means, 0.95)?;
+    let h2 = quantile_type7_checked(&row_means, 0.999)?;
     if h1 <= 0.0 || h2 <= h1 {
         return Err(DeseqError::InvalidDispersion {
             reason: "local VST scaling quantiles must be positive and increasing".to_string(),
@@ -492,7 +492,9 @@ fn normalized_count_row_means(
     Ok(means)
 }
 
-fn quantile_type7(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
+/// R `quantile(type = 7)` for local VST row means: rejects empty or
+/// non-finite input and evaluates `lo + f * (hi - lo)` with checked steps.
+fn quantile_type7_checked(values: &[f64], probability: f64) -> Result<f64, DeseqError> {
     if values.is_empty() {
         return Err(DeseqError::InvalidDimensions {
             context: "local VST quantile values".to_string(),
@@ -601,14 +603,14 @@ mod tests {
 
     #[test]
     fn quantile_type7_keeps_large_equal_values_finite() {
-        let value = quantile_type7(&[f64::MAX / 2.0, f64::MAX / 2.0], 0.5).unwrap();
+        let value = quantile_type7_checked(&[f64::MAX / 2.0, f64::MAX / 2.0], 0.5).unwrap();
 
         assert_eq!(value, f64::MAX / 2.0);
     }
 
     #[test]
     fn quantile_type7_rejects_overflowed_delta() {
-        let err = quantile_type7(&[-f64::MAX, f64::MAX], 0.5).unwrap_err();
+        let err = quantile_type7_checked(&[-f64::MAX, f64::MAX], 0.5).unwrap_err();
 
         assert!(matches!(
             err,

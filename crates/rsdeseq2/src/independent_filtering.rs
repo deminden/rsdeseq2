@@ -504,6 +504,8 @@ fn validate_filter(filter: &[f64]) -> Result<(), DeseqError> {
     Ok(())
 }
 
+/// R `quantile(type = 7)` on sorted input with every step of the position and
+/// interpolation checked and reported as `NonFiniteValue`.
 fn quantile_type7_sorted(sorted: &[f64], probability: f64) -> Result<f64, DeseqError> {
     if sorted.len() == 1 {
         return Ok(sorted[0]);

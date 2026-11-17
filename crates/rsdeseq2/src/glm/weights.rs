@@ -3,6 +3,7 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::qr::matrix_rank;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked;
+use crate::numeric::validate::nonnegative_finite as validate_nonnegative_finite;
 
 /// Options for DESeq2-style observation-weight preprocessing.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -242,17 +243,6 @@ fn validate_weight_options(options: ObservationWeightOptions) -> Result<(), Dese
     if !options.rank_tolerance.is_finite() || options.rank_tolerance < 0.0 {
         return Err(DeseqError::InvalidOptions {
             reason: "rank tolerance must be finite and non-negative".to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn validate_nonnegative_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
         });
     }
     Ok(())

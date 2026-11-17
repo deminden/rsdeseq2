@@ -153,21 +153,45 @@ pub fn validate_normalization_factors(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
-    if normalization_factors.n_rows() != counts.n_genes()
-        || normalization_factors.n_cols() != counts.n_samples()
-    {
+    validate_normalization_factor_matrix(
+        normalization_factors,
+        counts.n_genes(),
+        counts.n_samples(),
+        "normalization factors",
+    )
+}
+
+/// Check a genes x samples normalization-factor matrix: the shape (reported
+/// under `context`) and then every value in row-major order.
+pub(crate) fn validate_normalization_factor_matrix(
+    normalization_factors: &RowMajorMatrix<f64>,
+    n_genes: usize,
+    n_samples: usize,
+    context: &str,
+) -> Result<(), DeseqError> {
+    if normalization_factors.n_rows() != n_genes || normalization_factors.n_cols() != n_samples {
         return Err(DeseqError::InvalidDimensions {
-            context: "normalization factors".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
+            context: context.to_string(),
+            expected: n_genes * n_samples,
             actual: normalization_factors.len(),
         });
     }
     for (idx, value) in normalization_factors.as_slice().iter().copied().enumerate() {
-        if !value.is_finite() || value <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("normalization factor at index {idx} must be finite and positive"),
-            });
-        }
+        validate_normalization_factor_value(value, idx)?;
+    }
+    Ok(())
+}
+
+/// Reject a normalization factor that is not finite and positive.
+#[inline]
+pub(crate) fn validate_normalization_factor_value(
+    value: f64,
+    index: usize,
+) -> Result<(), DeseqError> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(DeseqError::InvalidSizeFactors {
+            reason: format!("normalization factor at index {index} must be finite and positive"),
+        });
     }
     Ok(())
 }
@@ -568,6 +592,11 @@ pub(crate) fn validate_size_factors(
             size_factors.len(),
         ));
     }
+    validate_size_factor_values(size_factors)
+}
+
+/// Reject the first size factor that is not finite and positive.
+pub(crate) fn validate_size_factor_values(size_factors: &[f64]) -> Result<(), DeseqError> {
     for (idx, value) in size_factors.iter().copied().enumerate() {
         if !value.is_finite() || value <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {

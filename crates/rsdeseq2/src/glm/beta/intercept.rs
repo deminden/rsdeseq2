@@ -153,26 +153,6 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
     })
 }
 
-fn normalization_factors_from_size_factors(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    if size_factors.len() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "size factors",
-            counts.n_samples(),
-            size_factors.len(),
-        ));
-    }
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
-    for _ in 0..counts.n_genes() {
-        for (idx, factor) in size_factors.iter().copied().enumerate() {
-            validate_positive_finite(factor, "size factor", idx)?;
-            values.push(factor);
-        }
-    }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
-}
 
 fn normalized_counts_with_factors(
     counts: &CountMatrix,

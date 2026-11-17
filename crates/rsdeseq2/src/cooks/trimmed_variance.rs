@@ -26,7 +26,8 @@ pub(super) fn trimmed_cell_variance(
                 .filter_map(|(sample, candidate)| (candidate == group).then_some(row[sample]))
                 .collect::<Vec<_>>();
             let bin = trim_bin(values.len());
-            let mean = trimmed_mean(values.clone(), trim_ratio(bin), "Cook's trimmed cell mean")?;
+            let mean =
+                trimmed_scaled_mean(values.clone(), trim_ratio(bin), "Cook's trimmed cell mean")?;
             let sq_errors = values
                 .into_iter()
                 .enumerate()
@@ -39,7 +40,7 @@ pub(super) fn trimmed_cell_variance(
             group_variances.push(
                 checked::try_mul(
                     trim_scale(bin),
-                    trimmed_mean(
+                    trimmed_scaled_mean(
                         sq_errors,
                         trim_ratio(bin),
                         "Cook's trimmed cell variance mean",
@@ -59,7 +60,7 @@ pub(super) fn trimmed_variance(
     let mut variances = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
-        let mean = trimmed_mean(row.to_vec(), 1.0 / 8.0, "Cook's trimmed mean")?;
+        let mean = trimmed_scaled_mean(row.to_vec(), 1.0 / 8.0, "Cook's trimmed mean")?;
         let sq_errors = row
             .iter()
             .copied()
@@ -73,7 +74,7 @@ pub(super) fn trimmed_variance(
         variances.push(
             checked::try_mul(
                 1.51,
-                trimmed_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
+                trimmed_scaled_mean(sq_errors, 1.0 / 8.0, "Cook's trimmed variance mean")?,
             )
             .nonfinite_at("Cook's trimmed variance", Some(gene))?,
         );
