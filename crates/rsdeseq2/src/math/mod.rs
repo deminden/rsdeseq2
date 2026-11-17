@@ -5,7 +5,7 @@ pub(crate) mod elementary;
 pub mod median;
 pub mod normal;
 pub mod optim;
-pub mod qr;
+pub mod rank;
 pub mod special;
 
 pub use distributions::{
