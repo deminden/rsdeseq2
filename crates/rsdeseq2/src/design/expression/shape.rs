@@ -1,4 +1,4 @@
-use super::{Argument, Data, Evaluator, Expression, Value, arguments, invalid};
+use super::{Argument, Data, Evaluator, Expression, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 
 impl Value {
@@ -37,7 +37,9 @@ impl Value {
 fn dimension(x: &Value) -> Result<usize, DeseqError> {
     let v = x.scalar_number()?;
     if !v.is_finite() || v < 0.0 || v > i32::MAX as f64 {
-        return Err(invalid("formula dimension is outside its supported range"));
+        return Err(invalid_options(
+            "formula dimension is outside its supported range",
+        ));
     }
     Ok(v as usize)
 }
@@ -137,13 +139,17 @@ impl Evaluator<'_> {
             "length" => {
                 let a = arguments(args, &["x"])?;
                 Ok(Value::new(Data::Number {
-                    values: vec![a[0].ok_or_else(|| invalid("length requires x"))?.len() as f64],
+                    values: vec![
+                        a[0].ok_or_else(|| invalid_options("length requires x"))?
+                            .len() as f64,
+                    ],
                     integer: true,
                 }))
             }
             "seq_len" => {
                 let a = arguments(args, &["length.out"])?;
-                let n = dimension(a[0].ok_or_else(|| invalid("seq_len requires a length"))?)?;
+                let n =
+                    dimension(a[0].ok_or_else(|| invalid_options("seq_len requires a length"))?)?;
                 super::checked_elements(Some(n))?;
                 Ok(Value::new(Data::Number {
                     values: (1..=n).map(|i| i as f64).collect(),
@@ -152,7 +158,9 @@ impl Evaluator<'_> {
             }
             "rep" => {
                 let a = arguments(args, &["x", "times", "length.out", "each"])?;
-                let input = a[0].ok_or_else(|| invalid("rep requires x"))?.flattened();
+                let input = a[0]
+                    .ok_or_else(|| invalid_options("rep requires x"))?
+                    .flattened();
                 let each = a[3].map(dimension).transpose()?.unwrap_or(1);
                 super::checked_elements(input.len().checked_mul(each))?;
                 let mut indices = Vec::new();
@@ -163,7 +171,7 @@ impl Evaluator<'_> {
                     let n = dimension(length)?;
                     super::checked_elements(Some(n))?;
                     if indices.is_empty() && n > 0 {
-                        return Err(invalid("rep cannot recycle empty values"));
+                        return Err(invalid_options("rep cannot recycle empty values"));
                     }
                     indices = (0..n).map(|i| indices[i % indices.len()]).collect();
                 } else if let Some(times) = a[1] {
@@ -194,7 +202,7 @@ impl Evaluator<'_> {
                             .flat_map(|(&i, n)| std::iter::repeat_n(i, n))
                             .collect();
                     } else {
-                        return Err(invalid("rep times must be scalar or one per value"));
+                        return Err(invalid_options("rep times must be scalar or one per value"));
                     }
                 }
                 Ok(input.selected(&indices))
@@ -221,11 +229,11 @@ impl Evaluator<'_> {
                 });
                 let size = rows
                     .checked_mul(cols)
-                    .ok_or_else(|| invalid("formula matrix shape overflow"))?;
+                    .ok_or_else(|| invalid_options("formula matrix shape overflow"))?;
                 super::checked_elements(Some(size))?;
                 let byrow = a[3].map(|v| v.bool_scalar()).transpose()?.unwrap_or(false);
                 if input.is_empty() && size > 0 {
-                    return Err(invalid("formula matrix requires values"));
+                    return Err(invalid_options("formula matrix requires values"));
                 }
                 let indices = (0..size)
                     .map(|i| {
@@ -243,7 +251,7 @@ impl Evaluator<'_> {
                 {
                     if let Data::List(parts) = &v.data {
                         if parts.len() != 2 {
-                            return Err(invalid("matrix dimnames must have two entries"));
+                            return Err(invalid_options("matrix dimnames must have two entries"));
                         }
                         for (i, p) in parts.iter().enumerate() {
                             if !matches!(p.data, Data::Null) {
@@ -257,7 +265,7 @@ impl Evaluator<'_> {
                             }
                         }
                     } else {
-                        return Err(invalid("matrix dimnames must be a list"));
+                        return Err(invalid_options("matrix dimnames must be a list"));
                     }
                 }
                 Ok(out)
@@ -300,10 +308,10 @@ impl Evaluator<'_> {
                         };
                     }
                     if n == 0 && rows > 0 {
-                        return Err(invalid("cbind cannot recycle empty values"));
+                        return Err(invalid_options("cbind cannot recycle empty values"));
                     }
                     if v.dimensions.is_some() && n != rows {
-                        return Err(invalid("cbind matrix rows must agree"));
+                        return Err(invalid_options("cbind matrix rows must agree"));
                     }
                     let data = v.numeric()?;
                     integer &= matches!(
@@ -340,7 +348,7 @@ impl Evaluator<'_> {
                 }
                 Ok(out)
             }
-            _ => Err(invalid("unsupported formula shape operation")),
+            _ => Err(invalid_options("unsupported formula shape operation")),
         }
     }
 }

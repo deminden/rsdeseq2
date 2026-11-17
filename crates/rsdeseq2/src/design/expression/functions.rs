@@ -1,4 +1,4 @@
-use super::{Argument, Data, Evaluator, Value, arguments, invalid};
+use super::{Argument, Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 
 pub(super) fn supported(name: &str) -> bool {
@@ -77,7 +77,7 @@ impl Evaluator<'_> {
             "(" | "I" | "offset" => {
                 let a = arguments(args, &["x"])?;
                 let mut x = a[0]
-                    .ok_or_else(|| invalid("formula function requires x"))?
+                    .ok_or_else(|| invalid_options("formula function requires x"))?
                     .clone();
                 if name == "I" {
                     let mut classes = vec![Some("AsIs".into())];
@@ -96,7 +96,9 @@ impl Evaluator<'_> {
             "+" | "-" | "*" | "/" | "^" | "%%" | "%/%" | "&" | "|" | "<" | "<=" | ">" | ">="
             | "==" | "!=" => {
                 if args.len() != 2 {
-                    return Err(invalid("binary formula operation requires two arguments"));
+                    return Err(invalid_options(
+                        "binary formula operation requires two arguments",
+                    ));
                 }
                 if matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=") {
                     self.comparison(name, &args[0].1, &args[1].1)
@@ -127,7 +129,7 @@ impl Evaluator<'_> {
             vec!["x"]
         };
         let a = arguments(args, &formals)?;
-        let input = a[0].ok_or_else(|| invalid("formula transform requires x"))?;
+        let input = a[0].ok_or_else(|| invalid_options("formula transform requires x"))?;
         if name == "as.character" {
             return self.characters(input);
         }
@@ -231,7 +233,9 @@ impl Evaluator<'_> {
             return Ok(result);
         }
         if input.has_class("factor") {
-            return Err(invalid("numeric formula transform received a factor"));
+            return Err(invalid_options(
+                "numeric formula transform received a factor",
+            ));
         }
         let base = if name == "log" {
             a[1].map(|v| v.scalar_number())

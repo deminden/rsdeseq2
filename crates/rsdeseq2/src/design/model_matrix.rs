@@ -3,17 +3,12 @@
 //! Formula parsing and expression evaluation are separate from this operation.
 //! The same validated plan can be used by native and foreign-language callers.
 use crate::errors::DeseqError;
+use crate::errors::invalid_options;
 use crate::matrix::MatrixView;
 
 mod contrasts;
 mod polynomial;
 use contrasts::CodingMatrix;
-
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: reason.into(),
-    }
-}
 
 /// Factor contrast policy. Explicit matrices are caller-supplied primitives.
 #[derive(Clone, Copy, Debug)]
@@ -131,17 +126,19 @@ impl<'a> ModelMatrixPlan<'a> {
         let mut plan = Self::new(samples, variables, &[], false)?;
         samples
             .checked_mul(columns.len())
-            .ok_or_else(|| invalid("model matrix shape overflow"))?;
+            .ok_or_else(|| invalid_options("model matrix shape overflow"))?;
         for column in columns {
             if column.name.contains('\0') {
-                return Err(invalid("model matrix column names must contain no NUL"));
+                return Err(invalid_options(
+                    "model matrix column names must contain no NUL",
+                ));
             }
             let pieces = column
                 .pieces
                 .into_iter()
                 .map(|piece| {
                     let variable = plan.variables.get(piece.variable).ok_or_else(|| {
-                        invalid("model matrix piece variable is outside the plan")
+                        invalid_options("model matrix piece variable is outside the plan")
                     })?;
                     let width = match &variable.data {
                         VariableData::Numeric(matrix) => matrix.n_cols(),
@@ -156,7 +153,9 @@ impl<'a> ModelMatrixPlan<'a> {
                         }
                     };
                     if piece.column >= width {
-                        return Err(invalid("model matrix piece column is outside its variable"));
+                        return Err(invalid_options(
+                            "model matrix piece column is outside its variable",
+                        ));
                     }
                     Ok(Piece {
                         variable: piece.variable,
@@ -195,16 +194,16 @@ impl<'a> ModelMatrixPlan<'a> {
         if response.is_some_and(|r| {
             r >= variables.len() || matches!(variables[r], ModelMatrixVariable::Factor { .. })
         }) {
-            return Err(invalid(
+            return Err(invalid_options(
                 "model matrix response must identify a numeric variable",
             ));
         }
         if samples == 0 {
-            return Err(invalid("model matrix requires samples"));
+            return Err(invalid_options("model matrix requires samples"));
         }
         for term in terms {
             if term.len() != variables.len() || term.iter().any(|c| !(0..=2).contains(c)) {
-                return Err(invalid(
+                return Err(invalid_options(
                     "model matrix terms must contain one code (0, 1 or 2) per variable",
                 ));
             }
@@ -230,7 +229,7 @@ impl<'a> ModelMatrixPlan<'a> {
                     if values.n_rows() != samples
                         || values.as_slice().iter().any(|v| !v.is_finite())
                     {
-                        return Err(invalid(
+                        return Err(invalid_options(
                             "model matrix numeric variables must have finite values and one row per sample",
                         ));
                     }
@@ -247,7 +246,7 @@ impl<'a> ModelMatrixPlan<'a> {
                         || levels.len() < 2
                         || codes.iter().any(|&v| v < 1 || v as usize > levels.len())
                     {
-                        return Err(invalid(
+                        return Err(invalid_options(
                             "model matrix factors require valid one-based codes and at least two declared levels",
                         ));
                     }
@@ -256,7 +255,7 @@ impl<'a> ModelMatrixPlan<'a> {
                         .enumerate()
                         .any(|(i, v)| levels[..i].contains(v))
                     {
-                        return Err(invalid("model matrix factor levels must be unique"));
+                        return Err(invalid_options("model matrix factor levels must be unique"));
                     }
                     let contrasted = CodingMatrix::new(levels, coding)?;
                     let suffixes = contrasted.names.clone();
@@ -272,7 +271,7 @@ impl<'a> ModelMatrixPlan<'a> {
                 }
             };
             if name.is_empty() || name.contains('\0') {
-                return Err(invalid(
+                return Err(invalid_options(
                     "model matrix variable names must be nonempty and contain no NUL",
                 ));
             }
@@ -317,10 +316,10 @@ impl<'a> ModelMatrixPlan<'a> {
                 let count = combinations
                     .len()
                     .checked_mul(width)
-                    .ok_or_else(|| invalid("model matrix interaction shape overflow"))?;
+                    .ok_or_else(|| invalid_options("model matrix interaction shape overflow"))?;
                 samples
                     .checked_mul(count)
-                    .ok_or_else(|| invalid("model matrix shape overflow"))?;
+                    .ok_or_else(|| invalid_options("model matrix shape overflow"))?;
                 let mut next = Vec::with_capacity(count);
                 for column in 0..width {
                     for previous in &combinations {
@@ -338,7 +337,7 @@ impl<'a> ModelMatrixPlan<'a> {
             // A zero-code column is not a formula term; it must not create a
             // second intercept with an unrelated assignment.
             if combinations[0].is_empty() {
-                return Err(invalid("model matrix term contains no variables"));
+                return Err(invalid_options("model matrix term contains no variables"));
             }
             for pieces in combinations {
                 let name = pieces
@@ -359,9 +358,11 @@ impl<'a> ModelMatrixPlan<'a> {
         }
         samples
             .checked_mul(plan.names.len())
-            .ok_or_else(|| invalid("model matrix shape overflow"))?;
+            .ok_or_else(|| invalid_options("model matrix shape overflow"))?;
         if plan.names.iter().any(|name| name.contains('\0')) {
-            return Err(invalid("model matrix column names must contain no NUL"));
+            return Err(invalid_options(
+                "model matrix column names must contain no NUL",
+            ));
         }
         Ok(plan)
     }
@@ -418,7 +419,7 @@ fn numeric_suffixes(columns: usize, names: Option<&[String]>) -> Result<Vec<Stri
     if let Some(names) = names
         && names.len() != columns
     {
-        return Err(invalid(
+        return Err(invalid_options(
             "model matrix numeric column names have incompatible length",
         ));
     }

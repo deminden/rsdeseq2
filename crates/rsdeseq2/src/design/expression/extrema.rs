@@ -1,4 +1,4 @@
-use super::{Data, Value, invalid};
+use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
 
 pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, DeseqError> {
@@ -8,7 +8,7 @@ pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<V
     for (label, value) in args {
         if label.as_deref() == Some("na.rm") {
             if flag_seen {
-                return Err(invalid("duplicate na.rm argument"));
+                return Err(invalid_options("duplicate na.rm argument"));
             }
             flag_seen = true;
             remove_missing = value.bool_scalar()?;
@@ -16,7 +16,7 @@ pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<V
             if value.has_class("factor")
                 || !matches!(value.data, Data::Number { .. } | Data::Logical(_))
             {
-                return Err(invalid(
+                return Err(invalid_options(
                     "parallel extrema require numeric or logical vectors",
                 ));
             }
@@ -24,7 +24,9 @@ pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<V
         }
     }
     if inputs.is_empty() {
-        return Err(invalid("parallel extrema require at least one input"));
+        return Err(invalid_options(
+            "parallel extrema require at least one input",
+        ));
     }
     let integer = inputs.iter().all(|v| {
         matches!(

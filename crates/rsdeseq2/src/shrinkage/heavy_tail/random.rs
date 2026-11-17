@@ -1,7 +1,8 @@
 //! Portable random-start state, using published MT19937/CMRG equations.
 //! R seed scrambling/state layout and two-uniform normal construction are
 //! interoperability data. No R/GPL generator implementation is copied or linked.
-use super::prior::invalid;
+use super::prior::ERROR_SCOPE;
+use crate::errors::scoped_invalid_options;
 use crate::{DeseqError, probability::normal_upper_quantile};
 
 use std::{
@@ -42,7 +43,10 @@ impl PosteriorRng {
     /// Seed either portable family without requiring R or an imported state.
     pub fn from_seed_with_kind(seed: i32, kind: PosteriorUniformKind) -> Result<Self, DeseqError> {
         if seed == i32::MIN {
-            return Err(invalid("random seed must not be NA_integer_"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "random seed must not be NA_integer_",
+            ));
         }
         let mut state = seed as u32;
         let step = |s: &mut u32| {
@@ -92,16 +96,18 @@ impl PosteriorRng {
     pub fn from_r_seed(seed: &[i32]) -> Result<Self, DeseqError> {
         let header = *seed
             .first()
-            .ok_or_else(|| invalid("missing random-state header"))?;
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "missing random-state header"))?;
         if header < 0 || header / 10000 > 1 || header / 100 % 100 != 4 {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "native random starts require an Inversion-normal RNG state",
             ));
         }
         let uniform = match header % 100 {
             3 => {
                 if seed.len() != MT_N + 2 || !(0..=MT_N as i32).contains(&seed[1]) {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "invalid Mersenne-Twister state dimensions/position",
                     ));
                 }
@@ -110,7 +116,10 @@ impl PosteriorRng {
                     *word = value as u32;
                 }
                 if words.iter().all(|&v| v == 0) {
-                    return Err(invalid("Mersenne-Twister state must not be all zero"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "Mersenne-Twister state must not be all zero",
+                    ));
                 }
                 Uniform::Mt {
                     words,
@@ -119,7 +128,10 @@ impl PosteriorRng {
             }
             7 => {
                 if seed.len() != 7 {
-                    return Err(invalid("invalid L'Ecuyer-CMRG state dimensions"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "invalid L'Ecuyer-CMRG state dimensions",
+                    ));
                 }
                 let values = std::array::from_fn(|i| i64::from(seed[i + 1] as u32));
                 if values[..3].iter().any(|&v| v >= M1)
@@ -127,12 +139,16 @@ impl PosteriorRng {
                     || values[..3].iter().all(|&v| v == 0)
                     || values[3..].iter().all(|&v| v == 0)
                 {
-                    return Err(invalid("invalid L'Ecuyer-CMRG state words"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "invalid L'Ecuyer-CMRG state words",
+                    ));
                 }
                 Uniform::Cmrg(values)
             }
             _ => {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "native random starts support Mersenne-Twister and L'Ecuyer-CMRG",
                 ));
             }

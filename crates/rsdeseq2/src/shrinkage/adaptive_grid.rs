@@ -1,4 +1,6 @@
 //! Grid preparation and component fitting shared by normal-likelihood shrinkage.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "mixture grid";
 use super::{
     FixedMixture, MixtureFit, MixtureFitOptions, NormalMixture, TruncatedNormalMixture,
     UniformMixture, fit_mixture_proportions,
@@ -89,11 +91,6 @@ pub struct MixtureGrid {
     pub dirichlet: Vec<f64>,
     pub warnings: Vec<String>,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("mixture grid: {reason}"),
-    }
-}
 
 /// Construct a supplied-scale or geometric automatic grid. Missing observations
 /// and zero/infinite SEs do not choose the automatic scale range. This operation
@@ -104,7 +101,10 @@ pub fn prepare_mixture_grid(
     options: &MixtureGridOptions,
 ) -> Result<MixtureGrid, DeseqError> {
     if standard_errors.len() != estimates.len() && standard_errors.len() != 1 {
-        return Err(invalid("SEs must have length one or match estimates"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "SEs must have length one or match estimates",
+        ));
     }
     if !options.mode.is_finite()
         || !options.grid_multiplier.is_finite()
@@ -113,7 +113,8 @@ pub fn prepare_mixture_grid(
         || options.range.1.is_nan()
         || options.range.0 > options.range.1
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "finite mode, multiplier > 1 and ordered nonmissing range are required",
         ));
     }
@@ -128,7 +129,8 @@ pub fn prepare_mixture_grid(
                     continue;
                 }
                 if !x.is_finite() || !s.is_finite() || s < 0.0 {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "automatic grid requires finite observations and nonnegative SEs",
                     ));
                 }
@@ -142,11 +144,15 @@ pub fn prepare_mixture_grid(
                 2.0 * signal.sqrt()
             };
             if minimum <= 0.0 || !minimum.is_finite() || !maximum.is_finite() {
-                return Err(invalid("no representable automatic scale range"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "no representable automatic scale range",
+                ));
             }
             let steps = ((maximum / minimum).log2() / options.grid_multiplier.log2()).ceil();
             if !steps.is_finite() || !(0.0..=1_000_000.0).contains(&steps) {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "automatic grid size is not representable or exceeds one million intervals",
                 ));
             }
@@ -156,7 +162,10 @@ pub fn prepare_mixture_grid(
         }
     };
     if scales.is_empty() || scales.iter().any(|v| !v.is_finite() || *v < 0.0) {
-        return Err(invalid("scales must be nonempty, finite and nonnegative"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "scales must be nonempty, finite and nonnegative",
+        ));
     }
     if options.point_mass {
         scales.insert(0, 0.0);
@@ -193,13 +202,19 @@ pub fn prepare_mixture_grid(
             p
         }
         MixturePriorPenalty::Parameters(values) if values.len() == scales.len() => values.clone(),
-        _ => return Err(invalid("penalty length must match the initial scale grid")),
+        _ => {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "penalty length must match the initial scale grid",
+            ));
+        }
     };
     if dirichlet
         .iter()
         .any(|v| !v.is_finite() || *v <= 0.0 || (!options.variational_prior && *v < 1.0))
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "convex fitting requires finite Dirichlet parameters >= 1",
         ));
     }
@@ -371,7 +386,10 @@ impl MixtureGrid {
             MixturePriorPenalty::Uniform => {}
             MixturePriorPenalty::Unit if variational => dirichlet.fill(1.0 / weights.len() as f64),
             MixturePriorPenalty::Unit => {
-                return Err(invalid("unit prior requires variational fitting"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "unit prior requires variational fitting",
+                ));
             }
             MixturePriorPenalty::NullBiased(w) => {
                 if let Some(first) = dirichlet.first_mut() {
@@ -385,7 +403,8 @@ impl MixtureGrid {
                 .iter()
                 .any(|v| !v.is_finite() || *v <= 0.0 || (!variational && *v < 1.0))
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "convex fitting requires matching finite Dirichlet parameters >=1",
             ));
         }
@@ -434,12 +453,17 @@ impl MixtureGrid {
         options: MixtureFitOptions,
     ) -> Result<MixtureFit, DeseqError> {
         if estimates.len() != standard_errors.len() {
-            return Err(invalid("fit estimates and SEs must have matching lengths"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "fit estimates and SEs must have matching lengths",
+            ));
         }
         estimates
             .len()
             .checked_mul(self.initial_weights.len())
-            .ok_or_else(|| invalid("likelihood matrix shape overflows"))?;
+            .ok_or_else(|| {
+                scoped_invalid_options(ERROR_SCOPE, "likelihood matrix shape overflows")
+            })?;
         let prior = self.prior(&self.initial_weights)?;
         let mut likelihoods = vec![];
         for (&x, &s) in estimates.iter().zip(standard_errors) {
@@ -470,7 +494,10 @@ impl std::str::FromStr for MixtureFamily {
             "+uniform" => Ok(Self::PositiveUniform),
             "-uniform" => Ok(Self::NegativeUniform),
             "halfnormal" => Ok(Self::HalfNormal),
-            _ => Err(invalid("unknown normal-likelihood component family")),
+            _ => Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "unknown normal-likelihood component family",
+            )),
         }
     }
 }
@@ -485,7 +512,8 @@ impl MixtureGridOptions {
         nullweight: f64,
     ) -> Result<Self, DeseqError> {
         if method.is_some() && (point_mass.is_some() || penalty.is_some()) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "specify either method or pointmass/prior, not both",
             ));
         }

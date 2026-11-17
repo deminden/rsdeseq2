@@ -1,10 +1,11 @@
 //! Deferred R-style controls for the compiled negative-binomial refinement step.
 use super::{
     negative_binomial::Row,
-    prior::invalid,
+    prior::ERROR_SCOPE,
     regression::{RegressionMethod, RegressionOptimizer, RegressionPosteriorOptions},
 };
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 
 #[derive(Clone, Debug, Default)]
 pub enum NegativeBinomialRefinementMethod {
@@ -42,17 +43,17 @@ pub(super) fn optimize(
     };
     let optimizer = RegressionOptimizer::from_r_method(name);
     if optimizer == RegressionOptimizer::Unsupported {
-        return Err(invalid(&format!(
-            "unsupported refinement optimizer '{name}'"
-        )));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            format!("unsupported refinement optimizer '{name}'"),
+        ));
     }
     let bounds = if name == "L-BFGS-B" {
         RegressionOptimizer::r_bounds(
             name,
-            control
-                .bounds
-                .as_deref()
-                .ok_or_else(|| invalid("bounded refinement requires numeric bounds"))?,
+            control.bounds.as_deref().ok_or_else(|| {
+                scoped_invalid_options(ERROR_SCOPE, "bounded refinement requires numeric bounds")
+            })?,
         )
     } else {
         (f64::NEG_INFINITY, f64::INFINITY)

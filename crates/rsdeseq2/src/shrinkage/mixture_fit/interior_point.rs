@@ -1,8 +1,9 @@
 //! Native log-barrier path following for the convex mixture problem.
 //! Scaled Newton equations avoid inverse-square weight conditioning. The
 //! accepted SQP path is neither called nor changed by this solver.
-use super::{DMatrix, DVector, Problem, invalid};
+use super::{DMatrix, DVector, ERROR_SCOPE, Problem};
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug)]
 pub struct InteriorPointOptions {
     /// Upper bound on the normalized convex dual gap. A mass-scaled
@@ -41,7 +42,8 @@ impl Problem {
         o: InteriorPointOptions,
     ) -> Result<InteriorPointFit, DeseqError> {
         if !o.relative_tolerance.is_finite() || o.relative_tolerance <= 0.0 {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "interior-point relative tolerance must be positive finite",
             ));
         }
@@ -91,7 +93,12 @@ impl Problem {
                     let v = h.solve(&rhs);
                     v.iter().all(|v| v.is_finite()).then_some(v)
                 })
-                .ok_or_else(|| invalid("interior-point scaled Hessian is not positive definite"))?;
+                .ok_or_else(|| {
+                    scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "interior-point scaled Hessian is not positive definite",
+                    )
+                })?;
             let decrement = rhs.dot(&direction);
             if decrement <= (mu * 0.1).max(1e-25) {
                 mu *= 0.1;
@@ -132,7 +139,8 @@ impl Problem {
             } else if decrement <= 1e-12 {
                 mu *= 0.1;
             } else {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "interior-point line search did not decrease the barrier",
                 ));
             }

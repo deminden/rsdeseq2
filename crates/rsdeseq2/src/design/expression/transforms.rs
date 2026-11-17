@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, Value, arguments, invalid};
+use super::{Data, Evaluator, Value, arguments, invalid_options};
 use crate::design::numeric_transform::{ScalePolicy, scale_expression};
 use crate::{
     errors::DeseqError,
@@ -13,9 +13,9 @@ impl Evaluator<'_> {
     ) -> Result<Value, DeseqError> {
         if name == "scale" {
             let a = arguments(args, &["x", "center", "scale"])?;
-            let input = a[0].ok_or_else(|| invalid("scale requires x"))?;
+            let input = a[0].ok_or_else(|| invalid_options("scale requires x"))?;
             if input.has_class("factor") {
-                return Err(invalid("scale requires numeric covariates"));
+                return Err(invalid_options("scale requires numeric covariates"));
             }
             let values = input.numeric()?;
             let [rows, cols] = input.dimensions.unwrap_or([input.len(), 1]);

@@ -1,4 +1,6 @@
 //! Shared result population and threshold policy for the ashr-style interface.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "adaptive shrinkage result";
 use super::{
     AdaptiveOutputSelection, LocationCdfOptions, LocationShrinkage, LocationShrinkageOptions,
     location_batch::shrink_location_batch_with_outputs, location_cdf_batch, threshold_svalues,
@@ -19,11 +21,6 @@ pub struct AdaptiveShrinkageResult {
     pub posterior_mean: Vec<f64>,
     pub posterior_sd: Vec<f64>,
     pub svalues: Option<Vec<f64>>,
-}
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("adaptive shrinkage result: {reason}"),
-    }
 }
 /// Fit on the supplied data and present the original result population. A
 /// threshold query always uses the original estimates/SEs and normal alpha=0
@@ -50,13 +47,17 @@ pub(super) fn adaptive_shrinkage_impl(
     output: AdaptiveOutputSelection,
 ) -> Result<AdaptiveShrinkageResult, DeseqError> {
     if !query.lfc_threshold.is_finite() || query.lfc_threshold < 0.0 {
-        return Err(invalid("LFC threshold must be finite and nonnegative"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "LFC threshold must be finite and nonnegative",
+        ));
     }
     let fit = shrink_location_batch_with_outputs(estimates, standard_errors, options, output)?;
     let n = query.estimates.len();
     let fitted = fit.posterior_mean.len();
     if n == 0 || fitted == 0 || n < fitted || !n.is_multiple_of(fitted) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "posterior length cannot be assigned to the original result population",
         ));
     }

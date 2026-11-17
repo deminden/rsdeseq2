@@ -1,4 +1,4 @@
-use super::{Argument, Data, Evaluator, NA_REAL, Value, arguments, invalid};
+use super::{Argument, Data, Evaluator, NA_REAL, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 
 fn kind(value: &Value) -> Result<u8, DeseqError> {
@@ -7,7 +7,7 @@ fn kind(value: &Value) -> Result<u8, DeseqError> {
         Data::Number { integer: true, .. } => Ok(1),
         Data::Number { integer: false, .. } => Ok(2),
         Data::Text(_) => Ok(3),
-        Data::List(_) => Err(invalid("ifelse formula branches must be atomic")),
+        Data::List(_) => Err(invalid_options("ifelse formula branches must be atomic")),
     }
 }
 
@@ -23,7 +23,7 @@ impl Evaluator<'_> {
             .collect::<Vec<_>>();
         let bound = arguments(&inputs, &["test", "yes", "no"])?;
         let test = self.expression(
-            bound[0].ok_or_else(|| invalid("ifelse requires test"))?,
+            bound[0].ok_or_else(|| invalid_options("ifelse requires test"))?,
             depth + 1,
         )?;
         let mut unshaped = test.clone();
@@ -41,7 +41,7 @@ impl Evaluator<'_> {
         let any_no = conditions.contains(&Some(false));
         let yes = if any_yes {
             Some(self.expression(
-                bound[1].ok_or_else(|| invalid("ifelse requires yes"))?,
+                bound[1].ok_or_else(|| invalid_options("ifelse requires yes"))?,
                 depth + 1,
             )?)
         } else {
@@ -49,7 +49,7 @@ impl Evaluator<'_> {
         };
         let no = if any_no {
             Some(self.expression(
-                bound[2].ok_or_else(|| invalid("ifelse requires no"))?,
+                bound[2].ok_or_else(|| invalid_options("ifelse requires no"))?,
                 depth + 1,
             )?)
         } else {
@@ -60,7 +60,9 @@ impl Evaluator<'_> {
             .flatten()
             .any(|v| matches!(v.data, Data::Null))
         {
-            return Err(invalid("ifelse selected branch has no replacement values"));
+            return Err(invalid_options(
+                "ifelse selected branch has no replacement values",
+            ));
         }
         if !any_yes && !any_no {
             return Ok(output);

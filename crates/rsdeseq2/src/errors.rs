@@ -60,6 +60,28 @@ pub enum DeseqError {
     ParseFloat { context: String, value: String },
 }
 
+/// `InvalidOptions` with the reason as given.
+pub(crate) fn invalid_options(reason: impl Into<String>) -> DeseqError {
+    DeseqError::InvalidOptions {
+        reason: reason.into(),
+    }
+}
+
+/// `InvalidOptions` whose reason is prefixed with the component that raised
+/// it: `"{scope}: {reason}"`.
+pub(crate) fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display) -> DeseqError {
+    DeseqError::InvalidOptions {
+        reason: format!("{scope}: {reason}"),
+    }
+}
+
+/// `InvalidDispersion` with the reason as given.
+pub(crate) fn invalid_dispersion(reason: impl Into<String>) -> DeseqError {
+    DeseqError::InvalidDispersion {
+        reason: reason.into(),
+    }
+}
+
 pub(crate) fn invalid_dimensions(
     context: impl Into<String>,
     expected: usize,

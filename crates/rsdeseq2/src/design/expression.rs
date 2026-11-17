@@ -1,6 +1,7 @@
 //! Standalone evaluation of built-in formula expressions. No R execution or
 //! user-defined function callback is part of this numerical interface.
 use crate::errors::DeseqError;
+use crate::errors::invalid_options;
 use icu_collator::{Collator, CollatorBorrowed};
 use icu_locale::Locale;
 
@@ -118,27 +119,27 @@ impl Value {
                 .map(|v| v.map_or(NA_REAL, |b| f64::from(u8::from(b))))
                 .collect()),
             Data::Null => Ok(Vec::new()),
-            _ => Err(invalid("formula operation requires numeric values")),
+            _ => Err(invalid_options("formula operation requires numeric values")),
         }
     }
     pub(super) fn scalar_number(&self) -> Result<f64, DeseqError> {
         let x = self.numeric()?;
         if x.len() != 1 {
-            return Err(invalid("formula argument must be a numeric scalar"));
+            return Err(invalid_options("formula argument must be a numeric scalar"));
         };
         Ok(x[0])
     }
     pub(super) fn bool_scalar(&self) -> Result<bool, DeseqError> {
         let v = self.scalar_number()?;
         if !v.is_finite() {
-            return Err(invalid("formula flag must be nonmissing"));
+            return Err(invalid_options("formula flag must be nonmissing"));
         };
         Ok(v != 0.0)
     }
     pub(super) fn text(&self) -> Result<Vec<Option<String>>, DeseqError> {
         match &self.data {
             Data::Text(v) => Ok(v.clone()),
-            _ => Err(invalid("formula argument requires text")),
+            _ => Err(invalid_options("formula argument requires text")),
         }
     }
     pub(super) fn has_class(&self, class: &str) -> bool {
@@ -191,17 +192,12 @@ impl Default for EvaluationOptions {
         }
     }
 }
-pub(super) fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: reason.into(),
-    }
-}
 // Prevent short symbolic requests (e.g. seq_len(INT_MAX)) from requesting
 // unbounded intermediate storage before the bounded transport can reject it.
 pub(super) fn checked_elements(count: Option<usize>) -> Result<usize, DeseqError> {
     count
         .filter(|n| *n <= wire::MAX_BYTES / std::mem::size_of::<f64>())
-        .ok_or_else(|| invalid("formula expression output exceeds size limit"))
+        .ok_or_else(|| invalid_options("formula expression output exceeds size limit"))
 }
 pub(super) const NA_REAL: f64 = f64::from_bits(0x7ff0_0000_0000_07a2);
 // Integer storage has one missing sentinel and no signed zero. Canonicalize
@@ -240,7 +236,9 @@ pub fn evaluate_many(
 ) -> Result<Vec<Value>, DeseqError> {
     for (index, (name, value)) in variables.iter().enumerate() {
         if name.is_empty() || variables[..index].iter().any(|(n, _)| n == name) {
-            return Err(invalid("formula bindings require unique nonempty names"));
+            return Err(invalid_options(
+                "formula bindings require unique nonempty names",
+            ));
         }
         validate_value(value, 0)?;
     }
@@ -259,11 +257,11 @@ pub fn evaluate_many(
             Collator::try_new(
                 collation
                     .parse::<Locale>()
-                    .map_err(|e| invalid(e.to_string()))?
+                    .map_err(|e| invalid_options(e.to_string()))?
                     .into(),
                 Default::default(),
             )
-            .map_err(|e| invalid(e.to_string()))?,
+            .map_err(|e| invalid_options(e.to_string()))?,
         )
     };
     let mut evaluator = Evaluator {
@@ -278,7 +276,7 @@ pub fn evaluate_many(
 impl Evaluator<'_> {
     fn expression(&mut self, expression: &Expression, depth: usize) -> Result<Value, DeseqError> {
         if depth > 128 {
-            return Err(invalid("formula expression nesting exceeds 128"));
+            return Err(invalid_options("formula expression nesting exceeds 128"));
         }
         match expression {
             Expression::Literal(v) => {
@@ -290,7 +288,7 @@ impl Evaluator<'_> {
                 .iter()
                 .find(|(n, _)| n == name)
                 .map(|(_, v)| v.clone())
-                .ok_or_else(|| invalid(format!("unknown formula variable '{name}'"))),
+                .ok_or_else(|| invalid_options(format!("unknown formula variable '{name}'"))),
             Expression::Call {
                 function,
                 arguments,
@@ -330,16 +328,20 @@ pub(crate) fn arguments<'a, T>(
             .iter()
             .position(|f| *f == name)
             .or_else(|| (matches.len() == 1).then(|| matches[0].0))
-            .ok_or_else(|| invalid(format!("unknown or ambiguous formula argument '{name}'")))?;
+            .ok_or_else(|| {
+                invalid_options(format!("unknown or ambiguous formula argument '{name}'"))
+            })?;
         if bound[i].replace(value).is_some() {
-            return Err(invalid(format!("duplicate formula argument '{name}'")));
+            return Err(invalid_options(format!(
+                "duplicate formula argument '{name}'"
+            )));
         }
     }
     for (_, value) in args.iter().filter(|(name, _)| name.is_none()) {
         let i = bound
             .iter()
             .position(Option::is_none)
-            .ok_or_else(|| invalid("too many formula arguments"))?;
+            .ok_or_else(|| invalid_options("too many formula arguments"))?;
         bound[i] = Some(value);
     }
     Ok(bound)

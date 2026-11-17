@@ -1,3 +1,5 @@
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "uniform-mixture posterior";
 use super::LocationLikelihood;
 use crate::math::elementary::language_exp;
 use crate::{DeseqError, errors::invalid_dimensions};
@@ -26,14 +28,10 @@ pub struct UniformMixturePosterior {
     mean: f64,
     standard_deviation: f64,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("uniform-mixture posterior: {reason}"),
-    }
-}
 fn observation(x: f64, s: f64) -> Result<(), DeseqError> {
     if !x.is_finite() || !s.is_finite() || s <= 0.0 {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "estimate and positive standard error must be finite",
         ));
     }
@@ -44,7 +42,10 @@ impl UniformMixture {
     /// Weights need not sum to one; zero-weight positions are retained.
     pub fn new(weights: Vec<f64>, lower: Vec<f64>, upper: Vec<f64>) -> Result<Self, DeseqError> {
         if weights.is_empty() {
-            return Err(invalid("at least one component is required"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "at least one component is required",
+            ));
         }
         for (name, len) in [
             ("uniform lower endpoints", lower.len()),
@@ -55,7 +56,8 @@ impl UniformMixture {
             }
         }
         if weights.iter().any(|v| !v.is_finite() || *v < 0.0) || !weights.iter().any(|v| *v > 0.0) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "weights must be finite, nonnegative and not all zero",
             ));
         }
@@ -64,7 +66,8 @@ impl UniformMixture {
             .zip(&upper)
             .any(|(&a, &b)| !a.is_finite() || !b.is_finite() || a > b || !(b - a).is_finite())
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite ordered endpoints and representable widths are required",
             ));
         }
@@ -111,7 +114,10 @@ impl UniformMixture {
             }
         }
         if total.is_nan() {
-            return Err(invalid("count-likelihood CDF orientation is undefined"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "count-likelihood CDF orientation is undefined",
+            ));
         }
         self.cdf_reversed = Some(total < 0.0);
         Ok(())
@@ -155,7 +161,10 @@ impl UniformMixture {
                         .filter(|d| !d.is_nan())
                         .sum::<f64>();
                     if total.is_nan() {
-                        return Err(invalid("count-likelihood CDF orientation is undefined"));
+                        return Err(scoped_invalid_options(
+                            ERROR_SCOPE,
+                            "count-likelihood CDF orientation is undefined",
+                        ));
                     }
                     total < 0.0
                 }

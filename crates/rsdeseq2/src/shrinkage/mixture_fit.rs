@@ -1,3 +1,5 @@
+use crate::errors::scoped_invalid_options;
+pub(super) const ERROR_SCOPE: &str = "mixture prior fit";
 use crate::{DeseqError, errors::invalid_dimensions, matrix::MatrixView};
 use nalgebra::{DMatrix, DVector};
 
@@ -51,12 +53,6 @@ pub struct MixtureFit {
     pub iterations: Option<usize>,
     pub posterior_concentrations: Option<Vec<f64>>,
     pub optimizer_objective: Option<f64>,
-}
-
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("mixture prior fit: {}", reason.into()),
-    }
 }
 
 struct Problem {
@@ -203,7 +199,10 @@ pub fn fit_mixture_proportions(
     }
     let k = log_likelihoods.n_cols();
     if k == 0 {
-        return Err(invalid("at least one component is required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "at least one component is required",
+        ));
     }
     if options.max_iterations == 0
         || !options.gradient_tolerance.is_finite()
@@ -215,7 +214,10 @@ pub fn fit_mixture_proportions(
         || !options.likelihood_offset.is_finite()
         || options.likelihood_offset < 0.0
     {
-        return Err(invalid("invalid optimization controls"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "invalid optimization controls",
+        ));
     }
     if dirichlet.len() != k {
         return Err(invalid_dimensions(
@@ -225,7 +227,10 @@ pub fn fit_mixture_proportions(
         ));
     }
     if dirichlet.iter().any(|p| !p.is_finite() || *p < 1.0) {
-        return Err(invalid("Dirichlet parameters must be finite and >= 1"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "Dirichlet parameters must be finite and >= 1",
+        ));
     }
     let prior_counts = dirichlet.iter().map(|p| p - 1.0).collect::<Vec<_>>();
     let a = if let Some(a) = observation_weights {
@@ -237,7 +242,8 @@ pub fn fit_mixture_proportions(
             ));
         }
         if a.iter().any(|a| !a.is_finite() || *a < 0.0) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "observation weights must be finite and nonnegative",
             ));
         }
@@ -247,11 +253,14 @@ pub fn fit_mixture_proportions(
     };
     let mass = a.iter().sum::<f64>() + prior_counts.iter().sum::<f64>();
     if !mass.is_finite() || mass <= 0.0 {
-        return Err(invalid("positive finite data or prior mass is required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "positive finite data or prior mass is required",
+        ));
     }
     let mut likelihoods = Vec::with_capacity(
         n.checked_mul(k)
-            .ok_or_else(|| invalid("matrix size overflow"))?,
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "matrix size overflow"))?,
     );
     let mut row_maxima = Vec::with_capacity(n);
     for (i, &weight) in a.iter().enumerate() {
@@ -259,13 +268,15 @@ pub fn fit_mixture_proportions(
             .map(|j| log_likelihoods.get(i, j).copied())
             .collect::<Result<Vec<_>, _>>()?;
         if row.iter().any(|l| l.is_nan() || *l == f64::INFINITY) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "log likelihoods must be finite or negative infinity",
             ));
         }
         let max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if !max.is_finite() && weight > 0.0 {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "positive-weight observation has no finite component",
             ));
         }
@@ -284,7 +295,8 @@ pub fn fit_mixture_proportions(
             ));
         }
         if initial.iter().any(|v| !v.is_finite() || *v < 0.0) || !initial.iter().any(|v| *v > 0.0) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "initial weights must be finite, nonnegative and not all zero",
             ));
         }
@@ -294,7 +306,10 @@ pub fn fit_mixture_proportions(
     };
     let total = start.iter().sum::<f64>();
     if !total.is_finite() {
-        return Err(invalid("initial weight sum overflow"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "initial weight sum overflow",
+        ));
     }
     for w in &mut start {
         *w /= total;
@@ -345,7 +360,10 @@ pub fn fit_mixture_proportions(
         };
     let total = raw_weights.iter().sum::<f64>();
     if !total.is_finite() || total <= 0.0 {
-        return Err(invalid("optimizer returned invalid total weight"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "optimizer returned invalid total weight",
+        ));
     }
     for w in &mut raw_weights {
         *w /= total;
@@ -366,7 +384,8 @@ pub fn fit_mixture_proportions(
         || !log_likelihood.is_finite()
         || !penalized_log_likelihood.is_finite()
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "optimizer returned nonfinite likelihood or penalty",
         ));
     }

@@ -1,5 +1,7 @@
 //! Complete location-scale shrinkage preparation and summaries in Rust.
 //! The default public adapter uses this engine; advanced option gates remain.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "location shrinkage";
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{
     AdaptiveOutputSelection, LocationLikelihood, MixtureComponents, MixtureFit, MixtureFitOptions,
@@ -67,11 +69,6 @@ pub struct LocationShrinkage {
     pub cdf: Vec<f64>,
     pub log_likelihood: f64,
     pub warnings: Vec<String>,
-}
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("location shrinkage: {reason}"),
-    }
 }
 
 fn zero_clip(value: f64) -> f64 {
@@ -146,7 +143,8 @@ pub(super) fn shrink_location_batch_with_outputs(
     if matches!(&options.likelihood,LocationLikelihood::Builtin(b) if matches!(b.name(),"logF"|"pois"|"binom"))
         && x.iter().chain(&se).any(|v| v.is_nan())
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "this likelihood requires nonmissing observation bounds",
         ));
     }
@@ -162,7 +160,8 @@ pub(super) fn shrink_location_batch_with_outputs(
                 .any(|(&a, &b)| a <= cutoff && cutoff <= b)
         })
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "truncated-normal posterior CDF requires a component containing each cutoff",
         ));
     }
@@ -173,7 +172,10 @@ pub(super) fn shrink_location_batch_with_outputs(
         .filter_map(|(i, &w)| (w > options.prune_threshold).then_some(i))
         .collect::<Vec<_>>();
     if keep.is_empty() {
-        return Err(invalid("pruning removed every prior component"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "pruning removed every prior component",
+        ));
     }
     let mut weights = keep.iter().map(|&i| fitted_weights[i]).collect::<Vec<_>>();
     let total: f64 = weights.iter().sum();
@@ -203,7 +205,7 @@ pub(super) fn shrink_location_batch_with_outputs(
     let mut lfdr = vec![prior_zero; n];
     let mut cdfs = Vec::with_capacity(
         n.checked_mul(options.thresholds.len())
-            .ok_or_else(|| invalid("CDF matrix shape overflows"))?,
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "CDF matrix shape overflows"))?,
     );
     let mut log_likelihood = 0.0;
     let missing_rows = x

@@ -3,7 +3,7 @@
 //! use canonical missing/zero representations), and all
 //! matrices are row-major. Atomic tags: NULL=0, double=1, integer=2, logical=3,
 //! text=4, list=5. Every value then carries dimensions/names/attributes.
-use super::{Data, Value, invalid, validation::validate_value_with_limit};
+use super::{Data, Value, invalid_options, validation::validate_value_with_limit};
 use crate::errors::DeseqError;
 
 /// Maximum transport payload, distinct from numerical API input sizes.
@@ -23,12 +23,12 @@ pub fn encode(value: &Value) -> Result<Vec<u8>, DeseqError> {
 /// Decode and validate exactly one primitive value, rejecting trailing bytes.
 pub fn decode(bytes: &[u8]) -> Result<Value, DeseqError> {
     if bytes.len() > MAX_BYTES || !bytes.starts_with(MAGIC) {
-        return Err(invalid("invalid formula transport header or size"));
+        return Err(invalid_options("invalid formula transport header or size"));
     }
     let mut r = Reader { bytes, at: 4 };
     let value = r.value(0)?;
     if r.at != bytes.len() {
-        return Err(invalid("trailing formula transport bytes"));
+        return Err(invalid_options("trailing formula transport bytes"));
     }
     validate_value_with_limit(&value, 0, MAX_DEPTH)?;
     Ok(value)
@@ -42,11 +42,11 @@ impl Writer {
             .checked_add(bytes.len())
             .is_none_or(|n| n > MAX_BYTES)
         {
-            return Err(invalid("formula transport exceeds size limit"));
+            return Err(invalid_options("formula transport exceeds size limit"));
         }
         self.0
             .try_reserve(bytes.len())
-            .map_err(|e| invalid(e.to_string()))?;
+            .map_err(|e| invalid_options(e.to_string()))?;
         self.0.extend_from_slice(bytes);
         Ok(())
     }
@@ -72,7 +72,7 @@ impl Writer {
     }
     fn value(&mut self, v: &Value, depth: usize) -> Result<(), DeseqError> {
         if depth > MAX_DEPTH {
-            return Err(invalid("formula transport nesting exceeds 1024"));
+            return Err(invalid_options("formula transport nesting exceeds 1024"));
         }
         self.byte(match v.data {
             Data::Null => 0,
@@ -137,7 +137,7 @@ impl<'a> Reader<'a> {
             .at
             .checked_add(n)
             .filter(|e| *e <= self.bytes.len())
-            .ok_or_else(|| invalid("truncated formula transport"))?;
+            .ok_or_else(|| invalid_options("truncated formula transport"))?;
         let result = &self.bytes[self.at..end];
         self.at = end;
         Ok(result)
@@ -149,25 +149,25 @@ impl<'a> Reader<'a> {
         match self.byte()? {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(invalid("invalid formula transport flag")),
+            _ => Err(invalid_options("invalid formula transport flag")),
         }
     }
     fn length(&mut self) -> Result<usize, DeseqError> {
         usize::try_from(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
-            .map_err(|e| invalid(e.to_string()))
+            .map_err(|e| invalid_options(e.to_string()))
     }
     fn count(&mut self, unit: usize) -> Result<usize, DeseqError> {
         let n = self.length()?;
         if n.checked_mul(unit)
             .is_none_or(|n| n > self.bytes.len() - self.at)
         {
-            return Err(invalid("invalid formula transport length"));
+            return Err(invalid_options("invalid formula transport length"));
         }
         Ok(n)
     }
     fn text(&mut self) -> Result<String, DeseqError> {
         let n = self.count(1)?;
-        String::from_utf8(self.take(n)?.to_vec()).map_err(|e| invalid(e.to_string()))
+        String::from_utf8(self.take(n)?.to_vec()).map_err(|e| invalid_options(e.to_string()))
     }
     fn names(&mut self) -> Result<Option<Vec<String>>, DeseqError> {
         if !self.flag()? {
@@ -178,7 +178,7 @@ impl<'a> Reader<'a> {
     }
     fn value(&mut self, depth: usize) -> Result<Value, DeseqError> {
         if depth > MAX_DEPTH {
-            return Err(invalid("formula transport nesting exceeds 1024"));
+            return Err(invalid_options("formula transport nesting exceeds 1024"));
         }
         let tag = self.byte()?;
         let n = self.count(if matches!(tag, 1 | 2) {
@@ -206,7 +206,7 @@ impl<'a> Reader<'a> {
                         0 => Ok(Some(false)),
                         1 => Ok(Some(true)),
                         2 => Ok(None),
-                        _ => Err(invalid("invalid formula logical byte")),
+                        _ => Err(invalid_options("invalid formula logical byte")),
                     })
                     .collect::<Result<_, _>>()?,
             ),
@@ -226,7 +226,7 @@ impl<'a> Reader<'a> {
                     .map(|_| self.value(depth + 1))
                     .collect::<Result<_, _>>()?,
             ),
-            _ => return Err(invalid("invalid formula transport value tag")),
+            _ => return Err(invalid_options("invalid formula transport value tag")),
         };
         let mut v = Value::new(data);
         if self.flag()? {

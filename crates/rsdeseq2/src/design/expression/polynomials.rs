@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, Value, invalid};
+use super::{Data, Evaluator, Value, invalid_options};
 use crate::design::numeric_transform::{PolynomialCoefficients, polynomial_expression};
 use crate::errors::DeseqError;
 impl Evaluator<'_> {
@@ -14,7 +14,7 @@ impl Evaluator<'_> {
                 .and_then(|n| formals.iter().position(|f| *f == n))
             {
                 if slots[i].replace(value).is_some() {
-                    return Err(invalid("duplicate polynomial argument"));
+                    return Err(invalid_options("duplicate polynomial argument"));
                 }
             } else {
                 dots.push(index);
@@ -25,7 +25,7 @@ impl Evaluator<'_> {
         {
             slots[0] = Some(&args[dots.remove(position)].1);
         }
-        let input = slots[0].ok_or_else(|| invalid("poly requires x"))?;
+        let input = slots[0].ok_or_else(|| invalid_options("poly requires x"))?;
         let scalar_degree = dots.len() == 1 && args[dots[0]].1.len() == 1;
         let degree = if scalar_degree {
             args[dots[0]].1.scalar_number()?
@@ -36,7 +36,7 @@ impl Evaluator<'_> {
                 .unwrap_or(1.0)
         };
         if !degree.is_finite() || degree < 1.0 || degree > i32::MAX as f64 {
-            return Err(invalid("poly degree must be positive and finite"));
+            return Err(invalid_options("poly degree must be positive and finite"));
         }
         let degree = degree as usize;
         let raw = slots[3]
@@ -83,16 +83,20 @@ impl Evaluator<'_> {
     ) -> Result<Value, DeseqError> {
         let nd = columns.len();
         if nd == 0 {
-            return Err(invalid("poly requires at least one column"));
+            return Err(invalid_options("poly requires at least one column"));
         }
         let rows = columns[0].len();
         if columns.iter().any(|v| v.len() != rows) {
-            return Err(invalid("polynomial arguments must have the same length"));
+            return Err(invalid_options(
+                "polynomial arguments must have the same length",
+            ));
         }
         let coefficients = coefficients
             .map(|v| match &v.data {
                 Data::List(v) if v.len() == nd => Ok(v.as_slice()),
-                _ => Err(invalid("wrong number of polynomial coefficient columns")),
+                _ => Err(invalid_options(
+                    "wrong number of polynomial coefficient columns",
+                )),
             })
             .transpose()?;
         if nd == 1 && coefficients.is_none() {
@@ -102,10 +106,11 @@ impl Evaluator<'_> {
         for i in 1..=nd {
             count = count
                 .checked_mul((degree + i) as u128)
-                .ok_or_else(|| invalid("polynomial size overflow"))?
+                .ok_or_else(|| invalid_options("polynomial size overflow"))?
                 / (i as u128);
         }
-        let count = usize::try_from(count - 1).map_err(|_| invalid("polynomial size overflow"))?;
+        let count =
+            usize::try_from(count - 1).map_err(|_| invalid_options("polynomial size overflow"))?;
         super::checked_elements(rows.checked_mul(count))?;
         super::checked_elements(nd.checked_mul(count))?;
         let mut exponents = Vec::with_capacity(count);
@@ -137,7 +142,7 @@ impl Evaluator<'_> {
                 output_coefs.push(
                     evaluated
                         .attribute("coefs")
-                        .ok_or_else(|| invalid("polynomial recurrence metadata missing"))?
+                        .ok_or_else(|| invalid_options("polynomial recurrence metadata missing"))?
                         .clone(),
                 );
             }
@@ -181,7 +186,7 @@ impl Evaluator<'_> {
             weights.push(weight);
             weight = weight
                 .checked_mul(degree + 1)
-                .ok_or_else(|| invalid("polynomial grid metadata overflow"))?;
+                .ok_or_else(|| invalid_options("polynomial grid metadata overflow"))?;
         }
         result.dimname_names[1] = Some(
             exponents
@@ -193,7 +198,7 @@ impl Evaluator<'_> {
                         .try_fold(1usize, |sum, (p, w)| {
                             p.checked_mul(*w).and_then(|v| sum.checked_add(v))
                         })
-                        .ok_or_else(|| invalid("polynomial grid metadata overflow"))?;
+                        .ok_or_else(|| invalid_options("polynomial grid metadata overflow"))?;
                     Ok(index.to_string())
                 })
                 .collect::<Result<_, DeseqError>>()?,
@@ -227,7 +232,9 @@ impl Evaluator<'_> {
         simple: bool,
     ) -> Result<Value, DeseqError> {
         if input.has_class("factor") && !input.has_class("ordered") {
-            return Err(invalid("poly requires numeric or ordered covariates"));
+            return Err(invalid_options(
+                "poly requires numeric or ordered covariates",
+            ));
         }
         let values = input.numeric()?;
         super::checked_elements(values.len().checked_mul(degree.saturating_add(1)))?;
@@ -236,17 +243,17 @@ impl Evaluator<'_> {
                 None
             } else {
                 let Data::List(fields) = &v.data else {
-                    return Err(invalid("poly coefs must be a named list"));
+                    return Err(invalid_options("poly coefs must be a named list"));
                 };
                 let names = v
                     .names
                     .as_ref()
-                    .ok_or_else(|| invalid("poly coefs require names"))?;
+                    .ok_or_else(|| invalid_options("poly coefs require names"))?;
                 let get = |name: &str| -> Result<Vec<f64>, DeseqError> {
                     let i = names
                         .iter()
                         .position(|n| n == name)
-                        .ok_or_else(|| invalid(format!("poly coefs missing {name}")))?;
+                        .ok_or_else(|| invalid_options(format!("poly coefs missing {name}")))?;
                     fields[i].numeric()
                 };
                 Some(PolynomialCoefficients {

@@ -3,6 +3,7 @@
 //! Inputs are already evaluated finite covariates in sample order. These
 //! routines do not alter fitting rank thresholds or dispatch to a frontend.
 use crate::errors::DeseqError;
+use crate::errors::invalid_options;
 use crate::matrix::{MatrixView, RowMajorMatrix};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -12,12 +13,6 @@ pub(super) mod polynomial_qr;
 mod reduction;
 pub(super) use polynomial::polynomial_expression;
 pub use polynomial::{PolynomialBasis, PolynomialCoefficients, polynomial_basis};
-
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: reason.into(),
-    }
-}
 
 /// Centering or scaling policy, with one supplied value per matrix column.
 #[derive(Clone, Copy, Debug)]
@@ -52,13 +47,15 @@ pub fn scale_covariates(
     let rows = input.n_rows();
     let columns = input.n_cols();
     if rows == 0 || columns == 0 || input.as_slice().iter().any(|v| !v.is_finite()) {
-        return Err(invalid("scaling requires nonempty finite covariates"));
+        return Err(invalid_options(
+            "scaling requires nonempty finite covariates",
+        ));
     }
     for policy in [center, scale] {
         if let ScalePolicy::Supplied(values) = policy
             && (values.len() != columns || values.iter().any(|v| !v.is_finite()))
         {
-            return Err(invalid(
+            return Err(invalid_options(
                 "scale controls require one finite value per column",
             ));
         }
@@ -71,12 +68,14 @@ pub fn scale_covariates(
             .flatten()
             .any(|v| !v.is_finite() || *v == 0.0)
     {
-        return Err(invalid(
+        return Err(invalid_options(
             "scaling produced a non-finite center or zero/non-finite divisor",
         ));
     }
     if output.values.as_slice().iter().any(|v| !v.is_finite()) {
-        return Err(invalid("scaling produced non-finite model covariates"));
+        return Err(invalid_options(
+            "scaling produced non-finite model covariates",
+        ));
     }
     Ok(output)
 }
@@ -95,7 +94,9 @@ pub(super) fn scale_expression(
         if let ScalePolicy::Supplied(values) = policy
             && values.len() != columns
         {
-            return Err(invalid("scale controls require one value per column"));
+            return Err(invalid_options(
+                "scale controls require one value per column",
+            ));
         }
     }
     let mut values = vec![0.0; rows * columns];
@@ -182,7 +183,7 @@ pub(super) fn scale_expression(
 pub fn integer_covariate(value: f64) -> Result<f64, DeseqError> {
     let integer = value.trunc();
     if !integer.is_finite() || integer <= i32::MIN as f64 || integer > i32::MAX as f64 {
-        return Err(invalid(
+        return Err(invalid_options(
             "integer formula coercion produced a missing/out-of-range value",
         ));
     }

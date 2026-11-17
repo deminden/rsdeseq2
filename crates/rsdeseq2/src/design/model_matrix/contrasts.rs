@@ -1,4 +1,4 @@
-use super::{FactorCoding, invalid};
+use super::{FactorCoding, invalid_options};
 use crate::errors::DeseqError;
 
 pub(super) struct CodingMatrix {
@@ -14,7 +14,7 @@ impl CodingMatrix {
         // migration that only needs level lookup and shared product evaluation.
         if let FactorCoding::Treatment { base } = coding {
             if base >= n {
-                return Err(invalid(
+                return Err(invalid_options(
                     "factor treatment base is outside its declared levels",
                 ));
             }
@@ -25,7 +25,7 @@ impl CodingMatrix {
                 .map(|(_, name)| name.clone())
                 .collect::<Vec<_>>();
             if names.iter().any(|name| name.contains('\0')) {
-                return Err(invalid("factor contrast names/values are invalid"));
+                return Err(invalid_options("factor contrast names/values are invalid"));
             }
             return Ok(Self {
                 names,
@@ -41,7 +41,7 @@ impl CodingMatrix {
         let mut values = vec![
             0.0;
             n.checked_mul(width)
-                .ok_or_else(|| invalid("factor coding shape overflow"))?
+                .ok_or_else(|| invalid_options("factor coding shape overflow"))?
         ];
         match coding {
             FactorCoding::Treatment { .. } => unreachable!("treatment indicators returned above"),
@@ -61,7 +61,7 @@ impl CodingMatrix {
             }
             FactorCoding::Polynomial => {
                 if n > 95 {
-                    return Err(invalid(
+                    return Err(invalid_options(
                         "orthogonal polynomial contrasts require at most 95 levels",
                     ));
                 }
@@ -80,13 +80,13 @@ impl CodingMatrix {
                 names: supplied,
             } => {
                 if matrix.n_rows() != n || matrix.as_slice().iter().any(|v| !v.is_finite()) {
-                    return Err(invalid(
+                    return Err(invalid_options(
                         "explicit factor contrasts must be a finite level-by-column matrix",
                     ));
                 }
                 if let Some(supplied) = supplied {
                     if supplied.len() != width {
-                        return Err(invalid(
+                        return Err(invalid_options(
                             "factor contrast column names have incompatible length",
                         ));
                     }
@@ -100,7 +100,7 @@ impl CodingMatrix {
             }
         }
         if names.iter().any(|s| s.contains('\0')) || values.iter().any(|v| !v.is_finite()) {
-            return Err(invalid("factor contrast names/values are invalid"));
+            return Err(invalid_options("factor contrast names/values are invalid"));
         }
         Ok(Self {
             names,

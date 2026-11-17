@@ -3,9 +3,10 @@
 //! interpolation retain the established source-grid approximation policies.
 use super::{
     analysis::{PosteriorGridDiagnostic, PosteriorIntervalKind, PosteriorIntervalOptions},
-    prior::invalid,
+    prior::ERROR_SCOPE,
 };
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 #[derive(Clone, Debug)]
 pub(super) struct GridSummary {
     pub interval: [f64; 2],
@@ -34,8 +35,12 @@ fn solve_area(x0: f64, x1: f64, y0: f64, y1: f64, area: f64) -> f64 {
 }
 fn allocate(n: usize) -> Result<Vec<f64>, DeseqError> {
     let mut out = vec![];
-    out.try_reserve_exact(n)
-        .map_err(|_| invalid("posterior grid allocation exceeds available memory"))?;
+    out.try_reserve_exact(n).map_err(|_| {
+        scoped_invalid_options(
+            ERROR_SCOPE,
+            "posterior grid allocation exceeds available memory",
+        )
+    })?;
     out.resize(n, 0.0);
     Ok(out)
 }
@@ -57,12 +62,10 @@ fn marginal(
         1
     } else {
         o.nuisance_points
-            .checked_pow(
-                (mode.len() - 1)
-                    .try_into()
-                    .map_err(|_| invalid("posterior dimension overflows"))?,
-            )
-            .ok_or_else(|| invalid("posterior grid overflows"))?
+            .checked_pow((mode.len() - 1).try_into().map_err(|_| {
+                scoped_invalid_options(ERROR_SCOPE, "posterior dimension overflows")
+            })?)
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "posterior grid overflows"))?
     };
     let mut sums = allocate(betas.len())?;
     let mut peak = f64::NEG_INFINITY;
@@ -92,7 +95,10 @@ fn marginal(
             let value = log_posterior(&candidate, shift)?;
             *evaluations += 1;
             if !value.is_finite() {
-                return Err(invalid("posterior grid log density must be finite"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "posterior grid log density must be finite",
+                ));
             }
             if value > peak {
                 let ratio = (peak - value).exp();
@@ -126,7 +132,8 @@ fn edge(first: f64, second: f64, x: f64, width: f64, left: bool) -> Result<Edge,
         (first.ln() - second.ln()) / width
     };
     if (left && slope <= 0.0) || (!left && slope >= 0.0) || !slope.is_finite() {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "posterior grid boundary does not have a decaying tail",
         ));
     }
@@ -177,7 +184,10 @@ pub(super) fn evaluate(
     let upper = mode[coefficient] + o.grid_standard_deviations * sd[coefficient];
     let width = (upper - lower) / n as f64;
     if !lower.is_finite() || !upper.is_finite() || width <= 0.0 || !width.is_finite() {
-        return Err(invalid("posterior grid bounds must be finite and distinct"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "posterior grid bounds must be finite and distinct",
+        ));
     }
     let mut betas = allocate(n + 1)?;
     for (i, x) in betas.iter_mut().enumerate() {
@@ -238,7 +248,10 @@ pub(super) fn evaluate(
     let right = edge(values[n], values[n - 1], upper, width, false)?;
     let total = integral(&values, width) + left.area + right.area;
     if !total.is_finite() || total <= 0.0 {
-        return Err(invalid("posterior grid normalization is invalid"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "posterior grid normalization is invalid",
+        ));
     }
     for value in &mut values {
         *value /= total;
@@ -252,10 +265,9 @@ pub(super) fn evaluate(
         *c = sum;
     }
     let quantile = |prob: f64| -> Result<f64, DeseqError> {
-        let first = cumulative
-            .iter()
-            .position(|&v| v > prob)
-            .ok_or_else(|| invalid("posterior grid quantile exceeds grid mass"))?;
+        let first = cumulative.iter().position(|&v| v > prob).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "posterior grid quantile exceeds grid mass")
+        })?;
         if first == 0 {
             // The source's zero R index drops the lower endpoint and recycles
             // the upper bound. Invert the already-normalized exponential tail
@@ -263,7 +275,10 @@ pub(super) fn evaluate(
             if outside_left > 0.0 && left.slope > 0.0 {
                 return Ok(lower + (prob / outside_left).ln() / left.slope);
             }
-            return Err(invalid("posterior grid quantile has no left-tail mass"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior grid quantile has no left-tail mass",
+            ));
         }
         let j = first - 1;
         Ok(solve_area(
@@ -301,7 +316,9 @@ pub(super) fn evaluate(
                 break;
             }
         }
-        let height = height.ok_or_else(|| invalid("posterior HPD mass exceeds grid"))?;
+        let height = height.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "posterior HPD mass exceeds grid")
+        })?;
         let indices = values
             .iter()
             .enumerate()
@@ -309,7 +326,8 @@ pub(super) fn evaluate(
             .map(|(i, _)| i)
             .collect::<Vec<_>>();
         if indices.len() < 2 || indices.windows(2).any(|v| v[1] != v[0] + 1) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "posterior HPD region is not one contiguous interval",
             ));
         }

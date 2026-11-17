@@ -1,3 +1,5 @@
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "normal-mixture posterior";
 use crate::{DeseqError, errors::invalid_dimensions, probability::normal_upper_tail};
 
 /// Fixed finite normal-mixture prior, including point masses (`sd == 0`).
@@ -22,17 +24,14 @@ pub struct NormalMixturePosterior {
     standard_deviation: f64,
 }
 
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("normal-mixture posterior: {}", reason.into()),
-    }
-}
-
 impl NormalMixture {
     /// Validate a fixed mixture. Zero-weight components retain their positions.
     pub fn new(weights: Vec<f64>, means: Vec<f64>, sds: Vec<f64>) -> Result<Self, DeseqError> {
         if weights.is_empty() {
-            return Err(invalid("at least one component is required"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "at least one component is required",
+            ));
         }
         for (name, actual) in [
             ("component means", means.len()),
@@ -43,18 +42,23 @@ impl NormalMixture {
             }
         }
         if weights.iter().any(|w| !w.is_finite() || *w < 0.0) || !weights.iter().any(|w| *w > 0.0) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "weights must be finite, nonnegative and not all zero",
             ));
         }
         if means.iter().any(|m| !m.is_finite()) {
-            return Err(invalid("component means must be finite"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "component means must be finite",
+            ));
         }
         if sds
             .iter()
             .any(|s| !s.is_finite() || *s < 0.0 || !(s * s).is_finite())
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "component SDs and variances must be finite and nonnegative",
             ));
         }
@@ -78,7 +82,8 @@ impl NormalMixture {
             || !variance.is_finite()
             || variance == 0.0
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "estimate and positive standard error/variance must be finite",
             ));
         }
@@ -88,7 +93,10 @@ impl NormalMixture {
             .map(|(&mean, &prior_variance)| {
                 let marginal_variance = variance + prior_variance;
                 if !marginal_variance.is_finite() {
-                    return Err(invalid("marginal variance overflow"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "marginal variance overflow",
+                    ));
                 }
                 let sd = marginal_variance.sqrt();
                 let z = (estimate - mean) / sd;
@@ -113,7 +121,8 @@ impl NormalMixture {
             || !variance.is_finite()
             || variance == 0.0
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "estimate and positive standard error/variance must be finite",
             ));
         }
@@ -128,7 +137,10 @@ impl NormalMixture {
         {
             let marginal_variance = variance + prior_variance;
             if !marginal_variance.is_finite() {
-                return Err(invalid("marginal variance overflow"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "marginal variance overflow",
+                ));
             }
             let marginal_sd = marginal_variance.sqrt();
             let z = (estimate - mean) / marginal_sd;
@@ -140,7 +152,8 @@ impl NormalMixture {
         }
         let max = weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if !max.is_finite() {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "observation exceeds the representable log-likelihood range",
             ));
         }
@@ -162,7 +175,10 @@ impl NormalMixture {
             || !second_moment.is_finite()
             || standard_deviations.iter().any(|s| !s.is_finite())
         {
-            return Err(invalid("posterior moments exceed the representable range"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior moments exceed the representable range",
+            ));
         }
         Ok(NormalMixturePosterior {
             weights,

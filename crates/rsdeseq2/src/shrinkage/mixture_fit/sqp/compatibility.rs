@@ -1,7 +1,8 @@
 //! Direction-based active-set and floored EM policy used by original mixSQP.
 //! Algorithm reference: mixsqp 0.3-54, Kim/Carbonetto/Stephens/Anitescu (MIT).
 //! See MIXSQP-LICENSE for the original copyright and permission notice.
-use super::{DMatrix, DVector, DeseqError, Problem, invalid};
+use super::{DMatrix, DVector, DeseqError, ERROR_SCOPE, Problem};
+use crate::errors::scoped_invalid_options;
 use crate::shrinkage::MixtureSqpOptions;
 
 impl Problem {
@@ -48,7 +49,10 @@ impl Problem {
                 .copied()
                 .fold(f64::NEG_INFINITY, f64::max);
             if maximum <= 0.0 || !maximum.is_finite() {
-                return Err(invalid("EM update has no positive likelihood"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "EM update has no positive likelihood",
+                ));
             }
             for p in &mut probabilities {
                 *p = *p / maximum + FLOOR;
@@ -121,7 +125,8 @@ pub(super) fn quadratic(
             + &reduced * current);
         let direction = search_direction(&reduced, &rhs, options.ridge_multiplier)?;
         if direction.iter().any(|x| !x.is_finite()) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "quadratic solution exceeds the representable range",
             ));
         }
@@ -199,10 +204,13 @@ fn search_direction(
                     f64::EPSILON,
                     1000,
                 )
-                .ok_or_else(|| invalid("quadratic direction SVD did not converge"))?;
+                .ok_or_else(|| {
+                    scoped_invalid_options(ERROR_SCOPE, "quadratic direction SVD did not converge")
+                })?;
                 let cutoff = corrected.nrows() as f64 * f64::EPSILON * svd.singular_values[0];
-                svd.solve(rhs, cutoff)
-                    .map_err(|e| invalid(format!("quadratic direction SVD: {e}")))?
+                svd.solve(rhs, cutoff).map_err(|e| {
+                    scoped_invalid_options(ERROR_SCOPE, format!("quadratic direction SVD: {e}"))
+                })?
             } else {
                 cholesky.solve(rhs)
             });
@@ -218,7 +226,12 @@ fn search_direction(
         }
         ridge = next;
     }
-    solved.ok_or_else(|| invalid("quadratic subproblem is not numerically positive definite"))
+    solved.ok_or_else(|| {
+        scoped_invalid_options(
+            ERROR_SCOPE,
+            "quadratic subproblem is not numerically positive definite",
+        )
+    })
 }
 
 #[cfg(test)]

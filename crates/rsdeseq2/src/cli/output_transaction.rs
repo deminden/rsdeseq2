@@ -1,4 +1,5 @@
 //! Filesystem publication policy, separate from numerical command execution.
+use crate::errors::invalid_options;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -48,17 +49,11 @@ struct CompletionManifest {
     files: Vec<CompletedFile>,
 }
 
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: reason.into(),
-    }
-}
-
 fn destination(path: &Path) -> Result<PathBuf, DeseqError> {
     if path.exists() {
         let resolved = path.canonicalize()?;
         if !resolved.is_file() {
-            return Err(invalid(format!(
+            return Err(invalid_options(format!(
                 "output destination is not a file: {}",
                 path.display()
             )));
@@ -73,7 +68,7 @@ fn destination(path: &Path) -> Result<PathBuf, DeseqError> {
             .unwrap_or(Path::new("."));
         let name = path
             .file_name()
-            .ok_or_else(|| invalid("output requires a file name"))?;
+            .ok_or_else(|| invalid_options("output requires a file name"))?;
         Ok(parent.canonicalize()?.join(name))
     }
 }
@@ -97,7 +92,7 @@ fn unique_temporary(parent: &Path, directory: bool) -> Result<TemporaryPath, Des
             Err(error) => return Err(error.into()),
         }
     }
-    Err(invalid("unable to reserve an output staging path"))
+    Err(invalid_options("unable to reserve an output staging path"))
 }
 
 fn aliases(a: &Path, b: &Path) -> Result<bool, DeseqError> {
@@ -143,7 +138,7 @@ impl OutputTransaction {
         // The primary output is last in the explicit path inventory.
         let main = destinations
             .last()
-            .ok_or_else(|| invalid("command has no output path"))?;
+            .ok_or_else(|| invalid_options("command has no output path"))?;
         let mut marker_name = main.file_name().unwrap().to_os_string();
         marker_name.push(".complete.json");
         destinations.push(destination(&main.with_file_name(marker_name))?);
@@ -151,7 +146,7 @@ impl OutputTransaction {
         for (index, output) in destinations.iter().enumerate() {
             for input in &inputs {
                 if aliases(output, input)? {
-                    return Err(invalid(format!(
+                    return Err(invalid_options(format!(
                         "input/output path collision: {}",
                         output.display()
                     )));
@@ -159,7 +154,7 @@ impl OutputTransaction {
             }
             for previous in &destinations[..index] {
                 if aliases(output, previous)? {
-                    return Err(invalid(format!(
+                    return Err(invalid_options(format!(
                         "output path collision: {}",
                         output.display()
                     )));
@@ -185,7 +180,7 @@ impl OutputTransaction {
             match OpenOptions::new().write(true).create_new(true).open(probe) {
                 Ok(file) => drop(file),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    return Err(invalid(format!(
+                    return Err(invalid_options(format!(
                         "output path collision on destination filesystem: {}",
                         output.display()
                     )));
@@ -226,7 +221,7 @@ impl OutputTransaction {
                 .sync_all()?;
             let (bytes, sha256) = hash_file(&file.temporary.0)?;
             if bytes == 0 {
-                return Err(invalid("requested output was not written"));
+                return Err(invalid_options("requested output was not written"));
             }
             completed.push(CompletedFile {
                 path: file.destination.clone(),
@@ -239,7 +234,7 @@ impl OutputTransaction {
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .map_err(|e| invalid(e.to_string()))?
+                .map_err(|e| invalid_options(e.to_string()))?
                 .as_nanos()
         );
         let manifest = CompletionManifest {
@@ -249,7 +244,8 @@ impl OutputTransaction {
             files: completed,
         };
         let mut marker = File::create(&self.marker.temporary.0)?;
-        serde_json::to_writer_pretty(&mut marker, &manifest).map_err(|e| invalid(e.to_string()))?;
+        serde_json::to_writer_pretty(&mut marker, &manifest)
+            .map_err(|e| invalid_options(e.to_string()))?;
         marker.write_all(b"\n")?;
         marker.sync_all()?;
         drop(marker);

@@ -1,6 +1,7 @@
 //! Resource policy independent of the likelihood and frontend.
-use super::prior::invalid;
+use super::prior::ERROR_SCOPE;
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -44,14 +45,20 @@ impl PosteriorWorkControl {
     }
     pub(crate) fn check(&self) -> Result<(), DeseqError> {
         if self.cancellation.is_cancelled() {
-            return Err(invalid("posterior operation cancelled"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior operation cancelled",
+            ));
         }
         if let Some((thread, check)) = self.interrupt
             && thread == std::thread::current().id()
             && check()
         {
             self.cancellation.cancel();
-            return Err(invalid("posterior operation cancelled"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior operation cancelled",
+            ));
         }
         Ok(())
     }
@@ -61,9 +68,12 @@ impl PosteriorWorkControl {
             .max_grid_evaluations
             .is_some_and(|limit| evaluations > limit)
         {
-            return Err(invalid(&format!(
-                "posterior grid requires {evaluations} evaluations, exceeding the configured budget"
-            )));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                format!(
+                    "posterior grid requires {evaluations} evaluations, exceeding the configured budget"
+                ),
+            ));
         }
         Ok(())
     }

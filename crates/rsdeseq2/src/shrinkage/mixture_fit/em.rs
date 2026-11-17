@@ -1,7 +1,8 @@
 //! Mixture EM and variational-Dirichlet updates with native acceleration.
 //! Equations are likelihood responsibilities and the Dirichlet ELBO, not an
 //! execution bridge or translation of foreign package source.
-use super::{MixtureFit, MixtureOptimizer, invalid, squarem};
+use super::{ERROR_SCOPE, MixtureFit, MixtureOptimizer, squarem};
+use crate::errors::scoped_invalid_options;
 use crate::probability::digamma_positive;
 use crate::{DeseqError, matrix::MatrixView};
 use libm::lgamma as ln_gamma;
@@ -47,7 +48,8 @@ impl Problem {
     }
     fn update(&self, state: &[f64]) -> Result<Vec<f64>, DeseqError> {
         if self.variational && state.iter().any(|v| !v.is_finite()) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "variational concentrations must be positive finite",
             ));
         }
@@ -56,7 +58,8 @@ impl Problem {
         for (row, &weight) in self.likelihood.chunks_exact(self.k).zip(&self.weights) {
             let marginal = row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>();
             if !marginal.is_finite() || marginal <= 0.0 {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "EM responsibility has no finite positive likelihood",
                 ));
             }
@@ -77,7 +80,10 @@ impl Problem {
             normalize(counts)
         };
         if next.iter().any(|v| !v.is_finite()) {
-            return Err(invalid("EM update returned nonfinite parameters"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "EM update returned nonfinite parameters",
+            ));
         }
         Ok(next)
     }
@@ -183,13 +189,19 @@ pub(super) fn fit(
         MixtureOptimizer::WeightedEm(o) => (o, true, false, false),
         MixtureOptimizer::VariationalEm(o) => (o, false, true, false),
         MixtureOptimizer::CxxEm(o) => (o, false, false, true),
-        _ => return Err(invalid("EM fitter requires an EM optimizer")),
+        _ => {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "EM fitter requires an EM optimizer",
+            ));
+        }
     };
     controls.validate()?;
     let n = log_likelihoods.n_rows();
     let k = log_likelihoods.n_cols();
     if weights.is_some() && !weighted {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "observation weights require the weighted EM optimizer",
         ));
     }
@@ -198,7 +210,10 @@ pub(super) fn fit(
             .iter()
             .any(|v| !v.is_finite() || *v <= 0.0 || (!variational && *v < 1.0))
     {
-        return Err(invalid("invalid EM Dirichlet parameters"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "invalid EM Dirichlet parameters",
+        ));
     }
     let weights = weights.map(<[f64]>::to_vec).unwrap_or_else(|| vec![1.0; n]);
     if weights.len() != n
@@ -206,7 +221,8 @@ pub(super) fn fit(
         || !weights.iter().sum::<f64>().is_finite()
         || weights.iter().sum::<f64>() + prior.iter().map(|p| p - 1.0).sum::<f64>() <= 0.0
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "EM observation weights must be finite nonnegative and row aligned with positive total",
         ));
     }
@@ -217,13 +233,17 @@ pub(super) fn fit(
             .map(|j| *log_likelihoods.at(i, j))
             .collect::<Vec<_>>();
         if row.iter().any(|v| v.is_nan() || *v == f64::INFINITY) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "EM log likelihoods must be finite or negative infinity",
             ));
         }
         let max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         if !max.is_finite() {
-            return Err(invalid("EM row has no finite likelihood"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "EM row has no finite likelihood",
+            ));
         }
         row_maxima.push(max);
         likelihood.extend(row.iter().map(|v| (v - max).exp()));
@@ -235,7 +255,10 @@ pub(super) fn fit(
         || initial.iter().any(|v| !v.is_finite() || *v < 0.0)
         || !initial.iter().any(|v| *v > 0.0)
     {
-        return Err(invalid("invalid initial EM weights"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "invalid initial EM weights",
+        ));
     }
     if initial.contains(&0.0) {
         for v in &mut initial {
@@ -247,7 +270,10 @@ pub(super) fn fit(
         .filter(|&j| prior[j] > 1.0 || (0..n).any(|i| likelihood[i * k + j] > 0.0))
         .collect::<Vec<_>>();
     if keep.is_empty() {
-        return Err(invalid("no nonzero likelihood components"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "no nonzero likelihood components",
+        ));
     }
     let matrix = (0..n)
         .flat_map(|i| {
@@ -306,7 +332,10 @@ pub(super) fn fit(
     let ll = problem.log_likelihood(&active);
     let pll = ll + problem.penalty(&active);
     if !ll.is_finite() || !pll.is_finite() {
-        return Err(invalid("EM fit returned nonfinite likelihood"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "EM fit returned nonfinite likelihood",
+        ));
     }
     Ok(MixtureFit {
         weights,
