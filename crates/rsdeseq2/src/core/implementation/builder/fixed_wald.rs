@@ -1,9 +1,9 @@
 impl DeseqBuilder {
     /// Run a supplied-dispersion Wald pipeline for one coefficient.
     ///
-    /// This is the current closest analogue to the core `nbinomWaldTest` path,
-    /// but it requires caller-supplied dispersions and does not yet implement
-    /// contrasts or beta priors.
+    /// Analogue of `nbinomWaldTest` with caller-supplied dispersions. Contrasts
+    /// use the `fit_fixed_dispersion_wald_contrast*` variants and beta priors
+    /// the results-level beta-prior functions.
     /// All-zero rows are skipped during GLM fitting and expanded back as
     /// missing numeric values, matching DESeq2's `buildMatrixWithNARows`
     /// pattern.

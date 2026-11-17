@@ -6,8 +6,9 @@ impl DeseqBuilder {
     /// native GLM-mu Wald branch. It preserves the original size factors,
     /// builds replacement counts from original Cook's distances, reruns the
     /// implemented GLM-mu dispersion/MAP/Wald path on replacement counts, and
-    /// merges only rows marked for refit. It does not yet implement beta
-    /// priors or Bioconductor object slots.
+    /// merges only rows marked for refit. Beta priors are applied by the
+    /// results-level beta-prior functions; Bioconductor object slots are
+    /// outside the Rust API.
     pub fn fit_wald_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,

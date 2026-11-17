@@ -26,8 +26,8 @@ impl DeseqBuilder {
     /// This mirrors the implemented subset of `estimateDispersionsGeneEst`
     /// followed by `estimateDispersionsFit(fitType="mean")`. It fills
     /// `dispGeneEst`, a constant `dispFit` for non-all-zero rows, and the
-    /// linear fitted mean matrix, but it does not yet estimate prior variance
-    /// or MAP dispersions for mean-trend fits.
+    /// linear fitted mean matrix. Prior variance and MAP dispersions are the
+    /// next stage (`fit_map_dispersions_linear_mu`).
     pub fn fit_mean_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,

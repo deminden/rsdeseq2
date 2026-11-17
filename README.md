@@ -134,8 +134,13 @@ describes complete schemas, contrasts and outputs.
 | --- | --- |
 | Normalization and fitting | Ratio/`poscounts`, normalization factors, dispersion estimation, Wald and LRT |
 | Results and diagnostics | Contrasts, Cook's replacement/refitting, independent filtering and adjusted p-values |
-| Transformations and shrinkage | VST, rlog, and supported normal, `ashr` and `apeglm` methods |
-| R integration | Matrix/list and supported formula/`DESeqDataSet` workflows; selected Bioconductor result objects |
+| Transformations and shrinkage | VST, rlog and normal shrinkage; `ashr` and `apeglm` methods are **experimental** (see below) |
+| R integration | Matrix/list and `DESeqDataSet` workflows; formula evaluation is **experimental**; selected Bioconductor result objects |
+
+**Experimental:** `ashr`- and `apeglm`-style shrinkage and R-style formula
+evaluation match their independent references, but they are not yet covered
+by property tests and fuzzing (hardening tasks 7.2 and 7.3). Expect fixes in
+these areas before the API is declared stable.
 
 Full Bioconductor object semantics, `glmGamPoi`, plotting and custom formula
 functions are outside scope. Method-specific restrictions are maintained in

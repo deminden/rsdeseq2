@@ -174,7 +174,7 @@ fn nan_equal_f64((left, right): (f64, f64)) -> bool {
     left == right || (left.is_nan() && right.is_nan())
 }
 
-/// Future Wald-test output.
+/// Per-gene Wald statistics, p-values and optional t degrees of freedom.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WaldOutput {
     /// Per-gene Wald statistics for the selected coefficient.
@@ -185,7 +185,7 @@ pub struct WaldOutput {
     pub degrees_of_freedom: Option<Vec<Option<f64>>>,
 }
 
-/// Future likelihood-ratio-test output.
+/// Per-gene likelihood-ratio deviances, p-values and reduced-model convergence.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LrtOutput {
     /// Per-gene deviance differences.

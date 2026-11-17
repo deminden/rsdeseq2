@@ -7,7 +7,7 @@ These guides describe the current 0.5.0 source and its supported behavior.
 | Run file-based analysis | [CLI](cli.md) |
 | Use R fits, results, transforms and shrinkage | [R wrapper](r-wrapper.md) |
 | Check supported methods and limits | [Compatibility](compatibility.md), [numerical ownership contract](native-supported-contract.md) |
-| Understand statistical implementation | [Algorithms](algorithms.md), [platform arithmetic](linux_numerical_parity.md) |
+| Understand statistical implementation | [Algorithms](algorithms.md), [platform arithmetic](linux_numerical_parity.md), [summation rules](summation-rules.md), [DESeq2 quirks](deseq2-quirks.md) |
 | Review precision, speed and memory | [GTEx comparison](reports/gtex-native-wald-benchmark.md), [benchmark procedure](benchmarks.md) |
 | Reproduce data and independent references | [Reproducibility](reproducibility.md) |
 | Run tests or inspect passing CI | [Testing and parity](testing-parity.md) |
