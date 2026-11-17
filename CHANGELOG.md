@@ -5,6 +5,15 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ## Unreleased
 
+### Added
+
+- Cargo features `cli` (the binary and `rsdeseq2::cli`; pulls in clap, sha2 and
+  same-file), `formula` (ICU locale collation for formula factor levels and
+  string comparisons) and `shrinkage` (`rsdeseq2::shrinkage`). All three are
+  on by default, so existing users see no change. Without `formula`, formula
+  evaluation accepts only `"C"` collation and reports `UnsupportedFeature`
+  otherwise. The R package builds with `formula` and `shrinkage` only.
+
 ### Removed
 
 - `rsdeseq2::bindings` and its `language_bindings()` placeholder, which only

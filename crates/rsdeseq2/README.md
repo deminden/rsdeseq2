@@ -87,6 +87,17 @@ fn main() -> Result<(), DeseqError> {
 }
 ```
 
+Cargo features, all enabled by default:
+
+| Feature | Provides |
+| --- | --- |
+| `cli` | The `rsdeseq2` binary and `rsdeseq2::cli` (clap, sha2, same-file) |
+| `formula` | ICU locale collation for formula factor levels; without it only `"C"` collation is accepted |
+| `shrinkage` | `rsdeseq2::shrinkage` (ashr- and apeglm-style posteriors) |
+
+A library-only build without the CLI uses
+`rsdeseq2 = { version = "...", default-features = false, features = ["formula", "shrinkage"] }`.
+
 ## CLI
 
 Run a Wald analysis with your count and numeric design tables:

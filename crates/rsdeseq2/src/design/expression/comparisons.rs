@@ -91,9 +91,7 @@ impl Evaluator<'_> {
                 } else if equal {
                     a.cmp(b)
                 } else {
-                    self.collator
-                        .as_ref()
-                        .map_or_else(|| a.cmp(b), |c| c.compare(a, b))
+                    self.collator.compare(a, b)
                 };
                 Some(match name {
                     "==" => order == Ordering::Equal,

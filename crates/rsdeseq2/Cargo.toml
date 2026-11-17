@@ -23,6 +23,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "rsdeseq2"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bench]]
 name = "deseq_pipeline_bench"
@@ -36,11 +37,22 @@ harness = false
 name = "dispersion_bench"
 harness = false
 
+[features]
+default = ["cli", "formula", "shrinkage"]
+# Command-line interface: the `rsdeseq2` binary and `rsdeseq2::cli`.
+cli = ["dep:clap", "dep:sha2", "dep:same-file"]
+# Locale-aware (ICU) collation for formula factor levels and string
+# comparisons. Without it, formula evaluation supports only "C" collation.
+formula = ["dep:icu_collator", "dep:icu_locale"]
+# Empirical-Bayes shrinkage engines (`rsdeseq2::shrinkage`: ashr- and
+# apeglm-style posteriors). Normal (beta-prior) shrinkage is always available.
+shrinkage = []
+
 [dependencies]
-clap.workspace = true
+clap = { workspace = true, optional = true }
 csv.workspace = true
-icu_collator.workspace = true
-icu_locale.workspace = true
+icu_collator = { workspace = true, optional = true }
+icu_locale = { workspace = true, optional = true }
 libm.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
@@ -48,14 +60,15 @@ rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
-same-file.workspace = true
+sha2 = { workspace = true, optional = true }
+same-file = { workspace = true, optional = true }
 statrs.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 approx.workspace = true
 criterion.workspace = true
+sha2.workspace = true
 
 [[example]]
 name = "compare_map_dispersion_fixture"
@@ -68,7 +81,9 @@ path = "tools/validation/compare_se_covariance_fixture.rs"
 [[example]]
 name = "golden"
 path = "tools/validation/golden.rs"
+required-features = ["shrinkage"]
 
 [[example]]
 name = "evaluate_r_interface"
 path = "tools/validation/evaluate_r_interface.rs"
+required-features = ["formula", "shrinkage"]

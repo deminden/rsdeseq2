@@ -22,6 +22,13 @@ jobs:
         run: >-
           cargo clippy --locked --workspace --all-targets -- -D warnings
           -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
+      - name: Library feature combinations
+        run: |
+          for features in "" "formula" "shrinkage" "formula,shrinkage"; do
+            cargo clippy --locked -p rsdeseq2 --lib --no-default-features --features "$features" -- \
+              -D warnings -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic \
+              -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
+          done
       - name: Hardening lint report (not gating)
         continue-on-error: true
         run: |

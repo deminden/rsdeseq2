@@ -161,11 +161,7 @@ impl Evaluator<'_> {
                 .collect()
         } else {
             let mut levels = values.iter().filter_map(Clone::clone).collect::<Vec<_>>();
-            levels.sort_by(|a, b| {
-                self.collator
-                    .as_ref()
-                    .map_or_else(|| a.cmp(b), |c| c.compare(a, b))
-            });
+            levels.sort_by(|a, b| self.collator.compare(a, b));
             levels.dedup();
             let mut levels = levels.into_iter().map(Some).collect::<Vec<_>>();
             if values.contains(&None) {
