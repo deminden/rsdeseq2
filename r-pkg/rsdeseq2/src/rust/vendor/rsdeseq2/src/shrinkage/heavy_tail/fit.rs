@@ -1,8 +1,9 @@
 //! Batch orchestration; likelihood, prior and optimizers have no R dependency.
 use super::{
     negative_binomial::Row,
-    prior::{CauchyCoefficientPrior, estimate_cauchy_prior_variance, invalid},
+    prior::{CauchyCoefficientPrior, ERROR_SCOPE, estimate_cauchy_prior_variance},
 };
+use crate::errors::scoped_invalid_options;
 use crate::{
     DeseqError,
     matrix::{MatrixView, RowMajorMatrix},
@@ -154,14 +155,18 @@ impl NegativeBinomialPosterior {
             || (!self.analysis.grid_diagnostics.is_empty()
                 && self.analysis.grid_diagnostics.len() != genes)
         {
-            return Err(invalid("posterior summary arrays have inconsistent shapes"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior summary arrays have inconsistent shapes",
+            ));
         }
         if let (Some(mode), Some(sd)) = (
             &self.analysis.contrast_mode,
             &self.analysis.contrast_standard_deviation,
         ) && mode.n_cols() != sd.n_cols()
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "posterior contrast arrays have inconsistent shapes",
             ));
         }
@@ -174,13 +179,17 @@ impl NegativeBinomialPosterior {
         scale: CoefficientScale,
     ) -> Result<PosteriorCoefficientSummary, DeseqError> {
         if coefficient >= self.mode.n_cols() {
-            return Err(invalid("coefficient is outside posterior matrix"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "coefficient is outside posterior matrix",
+            ));
         }
         self.validate_summary_shapes()?;
         if (self.sign_svalues.is_some() || self.threshold_svalues.is_some())
             && self.summary_coefficient != Some(coefficient)
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "requested coefficient differs from the fitted probability summary coefficient",
             ));
         }
@@ -212,7 +221,8 @@ fn optimize(row: &Row<'_>, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResul
     let scale = row.objective_gradient(&vec![0.0; p]).0.max(1.0);
     let (value, gradient) = row.objective_gradient(&start);
     if !scale.is_finite() || !value.is_finite() || gradient.iter().any(|v| !v.is_finite()) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "initial row posterior exceeds the representable range",
         ));
     }
@@ -266,7 +276,8 @@ pub(super) fn fit_batch(
     let n = input.counts.n_cols();
     let p = input.design.n_cols();
     if g == 0 || n == 0 || p == 0 || input.design.n_rows() != n || input.dispersions.len() != g {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "nonempty counts, sample-aligned design and gene-aligned dispersions are required",
         ));
     }
@@ -277,7 +288,8 @@ pub(super) fn fit_batch(
             .iter()
             .any(|v| !v.is_finite() || (regression.is_none() && *v < 0.0))
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "counts must be finite nonnegative numbers and design must be finite",
         ));
     }
@@ -286,14 +298,18 @@ pub(super) fn fit_batch(
             || m.n_cols() != n
             || m.as_slice().iter().any(|v| !v.is_finite() || *v < 0.0))
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "finite nonnegative weights must match counts shape",
         ));
     }
     let size_offsets = match input.offsets {
         PosteriorOffsets::SizeFactors(s) => {
             if s.len() != n || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
-                return Err(invalid("positive sample-aligned size factors are required"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "positive sample-aligned size factors are required",
+                ));
             }
             Some(s.iter().map(|v| v.ln()).collect::<Vec<_>>())
         }
@@ -305,7 +321,8 @@ pub(super) fn fit_batch(
                     .iter()
                     .any(|v| !v.is_finite() || (factors && *v <= 0.0))
             {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "finite log offsets or positive normalization factors must match counts",
                 ));
             }
@@ -322,7 +339,8 @@ pub(super) fn fit_batch(
             .threshold
             .is_some_and(|t| !t.is_finite() || (options.flip_sign && t <= 0.0))
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "invalid coefficient, multiplier, Hessian step or threshold",
         ));
     }
@@ -337,7 +355,8 @@ pub(super) fn fit_batch(
         && options.analysis.parameter_standard_errors.is_some()
         && regression.is_some_and(|(parameters, _)| parameters.is_none_or(|m| m.n_cols() != 1))
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "parameter uncertainty requires a scalar likelihood parameter",
         ));
     }
@@ -349,11 +368,14 @@ pub(super) fn fit_batch(
     )?;
     let mut prior = options.prior.clone();
     if let Some(mle) = input.mle {
-        let coefficient = options
-            .coefficient
-            .ok_or_else(|| invalid("MLE prior adaptation requires a coefficient"))?;
+        let coefficient = options.coefficient.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "MLE prior adaptation requires a coefficient")
+        })?;
         if mle.estimates.len() != g || mle.standard_errors.len() != g {
-            return Err(invalid("MLE population must match count rows"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "MLE population must match count rows",
+            ));
         }
         let factor = match mle.scale {
             CoefficientScale::Natural => 1.0,
@@ -401,7 +423,8 @@ pub(super) fn fit_batch(
             });
         if skip_zero && counts.iter().all(|&v| v == 0.0) {
             if regression.is_none() && !options.map_only && !options.log_link {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "compiled refinement has no prefit for an all-zero row when log_link is false",
                 ));
             }
@@ -415,7 +438,8 @@ pub(super) fn fit_batch(
         }
         let dispersion = input.dispersions[gene];
         if !dispersion.is_finite() || dispersion <= 0.0 || !(1.0 / dispersion).is_finite() {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "positive finite dispersions are required for nonzero rows",
             ));
         }
@@ -581,7 +605,8 @@ pub(super) fn fit_batch(
                 };
             }
             if regression.is_some() && covariance.is_none() {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "general posterior Hessian is singular or nonfinite",
                 ));
             }

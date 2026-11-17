@@ -1,4 +1,5 @@
-use super::{DMatrix, DVector, DeseqError, MixtureFitOptions, Problem, invalid};
+use super::{DMatrix, DVector, DeseqError, ERROR_SCOPE, MixtureFitOptions, Problem};
+use crate::errors::scoped_invalid_options;
 mod compatibility;
 
 impl Problem {
@@ -18,7 +19,10 @@ impl Problem {
             }
             let marginal = row.iter().zip(weights).map(|(l, w)| l * w).sum::<f64>();
             if marginal <= 0.0 {
-                return Err(invalid("EM update has no positive likelihood"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "EM update has no positive likelihood",
+                ));
             }
             for ((new, &likelihood), &w) in next.iter_mut().zip(row).zip(weights) {
                 *new += (a / self.mass) * ((w * likelihood) / marginal);
@@ -81,12 +85,16 @@ impl Problem {
                 }
             }
             if !weights.iter().any(|w| *w > 0.0) {
-                return Err(invalid("zero threshold removed every component"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "zero threshold removed every component",
+                ));
             }
             let (value, gradient) =
                 self.objective_gradient_with_policy(&weights, options.sqp.ashr_compatibility);
             if !value.is_finite() || gradient.iter().any(|g| !g.is_finite()) {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "objective or gradient exceeds the representable range",
                 ));
             }
@@ -107,7 +115,10 @@ impl Problem {
                 self.hessian(&weights)
             };
             if hessian.iter().any(|v| !v.is_finite()) {
-                return Err(invalid("Hessian exceeds the representable range"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "Hessian exceeds the representable range",
+                ));
             }
             let current = DVector::from_column_slice(&weights);
             let linear = DVector::from_column_slice(&gradient) - &hessian * &current;
@@ -246,10 +257,15 @@ fn nonnegative_quadratic(
             }
             ridge = next;
         }
-        let target = solved
-            .ok_or_else(|| invalid("quadratic subproblem is not numerically positive definite"))?;
+        let target = solved.ok_or_else(|| {
+            scoped_invalid_options(
+                ERROR_SCOPE,
+                "quadratic subproblem is not numerically positive definite",
+            )
+        })?;
         if target.iter().any(|v| !v.is_finite()) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "quadratic solution exceeds the representable range",
             ));
         }

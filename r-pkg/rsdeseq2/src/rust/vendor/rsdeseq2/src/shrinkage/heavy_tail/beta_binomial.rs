@@ -2,9 +2,10 @@
 //! The parameter-dependent likelihood is log (a)_y + log (b)_(n-y), where
 //! a=theta*p, b=theta*(1-p). Gamma/psi recurrences follow DLMF 5.5/5.11.
 use super::{
-    prior::{CauchyCoefficientPrior, invalid},
+    prior::{CauchyCoefficientPrior, ERROR_SCOPE},
     regression::{RegressionOptimizer, RegressionPosteriorOptions},
 };
+use crate::errors::scoped_invalid_options;
 use crate::probability::digamma_positive as psi;
 use crate::{DeseqError, matrix::MatrixView, probability::stirling_correction};
 use nalgebra::DMatrix;
@@ -138,7 +139,7 @@ impl Row<'_> {
             RegressionOptimizer::Lbfgsb => {
                 let p = start.len();
                 let bounds = Bounds::new(vec![options.bounds.0; p], vec![options.bounds.1; p])
-                    .map_err(|e| invalid(&e.to_string()))?;
+                    .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))?;
                 optim_lbfgsb_with_gradient(
                     start,
                     bounds,
@@ -146,9 +147,10 @@ impl Row<'_> {
                     |b| f(b).1,
                     OptimControl::default_for_dimension(p),
                 )
-                .map_err(|e| invalid(&e.to_string()))
+                .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))
             }
-            RegressionOptimizer::Unsupported => Err(invalid(
+            RegressionOptimizer::Unsupported => Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "unsupported posterior optimizer; use BFGS or L-BFGS-B",
             )),
         }
@@ -159,7 +161,8 @@ impl Row<'_> {
         let scale = self.objective_gradient(&anchor, false).0.abs().max(100.0);
         let (value, gradient) = self.objective_gradient(&start, true);
         if !scale.is_finite() || !value.is_finite() || gradient.iter().any(|v| !v.is_finite()) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "initial beta-binomial posterior exceeds representable range",
             ));
         }

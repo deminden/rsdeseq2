@@ -1,6 +1,7 @@
 //! Restricted regression functions are syntax/data, never foreign callbacks.
 use super::super::expression_likelihood::{scalar, validate};
-use super::{density, prior::invalid};
+use super::{density, prior::ERROR_SCOPE};
+use crate::errors::scoped_invalid_options;
 use crate::{
     DeseqError,
     design::expression::{self, Argument, Data, EvaluationOptions, Expression, Value},
@@ -40,7 +41,10 @@ fn validate_node(
 ) -> Result<(), DeseqError> {
     *nodes += 1;
     if depth > 128 || *nodes > 4096 {
-        return Err(invalid("regression expression exceeds nesting/node limit"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "regression expression exceeds nesting/node limit",
+        ));
     }
     if let Expression::Call {
         function,
@@ -50,7 +54,10 @@ fn validate_node(
         if let Some(name) = special(function) {
             if matches!(name, "%*%" | "[") {
                 if arguments.len() != 2 || arguments.iter().any(|a| a.name.is_some()) {
-                    return Err(invalid("matrix product requires two positional operands"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "matrix product requires two positional operands",
+                    ));
                 }
             } else {
                 let args = arguments
@@ -62,10 +69,14 @@ fn validate_node(
                     || (matches!(name, "dnbinom" | "dbinom" | "dt") && bound[1].is_none())
                     || (name == "dbinom" && bound[2].is_none())
                 {
-                    return Err(invalid("missing likelihood density argument"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "missing likelihood density argument",
+                    ));
                 }
                 if name == "dnbinom" && (bound[2].is_some() == bound[3].is_some()) {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "negative-binomial density requires exactly one of prob or mu",
                     ));
                 }
@@ -102,21 +113,28 @@ fn numeric(v: &Value) -> Result<Vec<f64>, DeseqError> {
             })
             .collect()),
         Data::Null => Ok(vec![]),
-        _ => Err(invalid("numeric likelihood values are required")),
+        _ => Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "numeric likelihood values are required",
+        )),
     }
 }
 /// One-dimensional primitive numeric indexing. Matrices are read in R's
 /// column order. No classes, dispatch, names or callbacks enter this evaluator.
 fn subset(input: &Value, index: &Value) -> Result<Value, DeseqError> {
     if !matches!(index.data, Data::Number { .. }) {
-        return Err(invalid("restricted likelihood indices must be numeric"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "restricted likelihood indices must be numeric",
+        ));
     }
     let indices = numeric(index)?;
     if indices
         .iter()
         .any(|v| !v.is_finite() || v.fract() != 0.0 || v.abs() > usize::MAX as f64)
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "restricted likelihood indices must be finite integers",
         ));
     }
@@ -132,7 +150,8 @@ fn subset(input: &Value, index: &Value) -> Result<Value, DeseqError> {
     };
     let negative = indices.iter().any(|v| *v < 0.0);
     if negative && indices.iter().any(|v| *v > 0.0) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "cannot mix positive and negative likelihood indices",
         ));
     }
@@ -160,14 +179,22 @@ fn product(a: &Value, b: &Value) -> Result<Value, DeseqError> {
         (None, Some([br, bc])) if av.len() == br => (1, av.len(), br, bc),
         (None, Some([1, bc])) => (av.len(), 1, 1, bc),
         (None, None) if av.len() == bv.len() => (1, av.len(), bv.len(), 1),
-        _ => return Err(invalid("nonconformable likelihood matrix product")),
+        _ => {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "nonconformable likelihood matrix product",
+            ));
+        }
     };
     if ac != br {
-        return Err(invalid("nonconformable likelihood matrix product"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "nonconformable likelihood matrix product",
+        ));
     }
-    let len = ar
-        .checked_mul(bc)
-        .ok_or_else(|| invalid("likelihood matrix product shape overflows"))?;
+    let len = ar.checked_mul(bc).ok_or_else(|| {
+        scoped_invalid_options(ERROR_SCOPE, "likelihood matrix product shape overflows")
+    })?;
     let values = (0..len)
         .map(|k| {
             let i = k / bc;
@@ -182,8 +209,11 @@ fn product(a: &Value, b: &Value) -> Result<Value, DeseqError> {
 fn distribution(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, DeseqError> {
     let f = formals(name);
     let bound = expression::arguments(args, f)?;
-    let required =
-        |index: usize| bound[index].ok_or_else(|| invalid("missing likelihood density argument"));
+    let required = |index: usize| {
+        bound[index].ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "missing likelihood density argument")
+        })
+    };
     required(0)?;
     if matches!(name, "dnbinom" | "dbinom" | "dt") {
         required(1)?;
@@ -192,7 +222,8 @@ fn distribution(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, D
         required(2)?;
     }
     if name == "dnbinom" && (bound[2].is_some() == bound[3].is_some()) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "negative-binomial density requires exactly one of prob or mu",
         ));
     }
@@ -260,12 +291,16 @@ impl RestrictedRegressionLikelihood {
         constants: Vec<(String, Value)>,
     ) -> Result<Self, DeseqError> {
         if arguments.len() != 5 {
-            return Err(invalid("regression likelihood requires five arguments"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "regression likelihood requires five arguments",
+            ));
         }
         let mut names = vec![];
         for name in arguments.iter().chain(constants.iter().map(|(n, _)| n)) {
             if name.is_empty() || names.contains(&name.as_str()) {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "regression function bindings must be unique and nonempty",
                 ));
             }
@@ -288,7 +323,9 @@ impl RestrictedRegressionLikelihood {
                 .iter()
                 .find(|(n, _)| n == s)
                 .map(|(_, v)| v.clone())
-                .ok_or_else(|| invalid("uncaptured likelihood variable")),
+                .ok_or_else(|| {
+                    scoped_invalid_options(ERROR_SCOPE, "uncaptured likelihood variable")
+                }),
             Expression::Call {
                 function,
                 arguments,
@@ -301,7 +338,9 @@ impl RestrictedRegressionLikelihood {
                         .collect::<Vec<_>>();
                     let b = expression::arguments(&inputs, &["test", "yes", "no"])?;
                     let test = self.node(
-                        b[0].ok_or_else(|| invalid("ifelse requires test"))?,
+                        b[0].ok_or_else(|| {
+                            scoped_invalid_options(ERROR_SCOPE, "ifelse requires test")
+                        })?,
                         bindings,
                     )?;
                     let conditions = numeric(&test)?;
@@ -313,7 +352,9 @@ impl RestrictedRegressionLikelihood {
                             None,
                             if yes {
                                 self.node(
-                                    b[1].ok_or_else(|| invalid("ifelse requires yes"))?,
+                                    b[1].ok_or_else(|| {
+                                        scoped_invalid_options(ERROR_SCOPE, "ifelse requires yes")
+                                    })?,
                                     bindings,
                                 )?
                             } else {
@@ -324,7 +365,9 @@ impl RestrictedRegressionLikelihood {
                             None,
                             if no {
                                 self.node(
-                                    b[2].ok_or_else(|| invalid("ifelse requires no"))?,
+                                    b[2].ok_or_else(|| {
+                                        scoped_invalid_options(ERROR_SCOPE, "ifelse requires no")
+                                    })?,
                                     bindings,
                                 )?
                             } else {
@@ -346,7 +389,9 @@ impl RestrictedRegressionLikelihood {
                     Some("[") => subset(&args[0].1, &args[1].1),
                     Some("lgamma") => {
                         let b = expression::arguments(&args, &["x"])?;
-                        let input = b[0].ok_or_else(|| invalid("lgamma requires x"))?;
+                        let input = b[0].ok_or_else(|| {
+                            scoped_invalid_options(ERROR_SCOPE, "lgamma requires x")
+                        })?;
                         let mut out = input.clone();
                         out.data = Data::Number {
                             values: numeric(input)?.into_iter().map(libm::lgamma).collect(),
@@ -386,7 +431,10 @@ impl RestrictedRegressionLikelihood {
         offset: &[f64],
     ) -> Result<Vec<f64>, DeseqError> {
         if design.n_rows() != y.len() || design.n_cols() != beta.len() || offset.len() != y.len() {
-            return Err(invalid("likelihood row shapes do not match"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "likelihood row shapes do not match",
+            ));
         }
         let mut x = Value::numbers(
             (0..design.n_rows())
@@ -412,7 +460,10 @@ impl RestrictedRegressionLikelihood {
             .collect::<Vec<_>>();
         let result = numeric(&self.node(&self.expression, &bindings)?)?;
         if result.len() != y.len() {
-            return Err(invalid("likelihood must return one value per observation"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "likelihood must return one value per observation",
+            ));
         }
         Ok(result)
     }

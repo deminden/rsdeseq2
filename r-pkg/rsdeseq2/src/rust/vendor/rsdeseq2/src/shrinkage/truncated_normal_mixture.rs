@@ -1,4 +1,6 @@
 //! Finite truncated-normal mixtures for the optional shrinkage migration.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "truncated-normal mixture";
 use super::truncated_standard::{log_phi, scaled_mean, scaled_sd};
 use crate::probability::normal_upper_tail;
 use crate::{DeseqError, errors::invalid_dimensions, math::elementary::language_exp};
@@ -29,11 +31,6 @@ pub struct TruncatedNormalMixturePosterior {
     standard_deviation: f64,
 }
 
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("truncated-normal mixture: {reason}"),
-    }
-}
 fn cdf(q: f64) -> f64 {
     normal_upper_tail(-q)
 }
@@ -48,7 +45,10 @@ impl TruncatedNormalMixture {
         upper: Vec<f64>,
     ) -> Result<Self, DeseqError> {
         if weights.is_empty() {
-            return Err(invalid("at least one component is required"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "at least one component is required",
+            ));
         }
         for (name, len) in [
             ("component means", means.len()),
@@ -61,7 +61,8 @@ impl TruncatedNormalMixture {
             }
         }
         if weights.iter().any(|v| !v.is_finite() || *v < 0.0) || !weights.iter().any(|v| *v > 0.0) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "weights must be finite, nonnegative and not all zero",
             ));
         }
@@ -70,14 +71,16 @@ impl TruncatedNormalMixture {
                 .iter()
                 .any(|v| !v.is_finite() || *v < 0.0 || !(v * v).is_finite())
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite means and finite nonnegative SDs/variances are required",
             ));
         }
         if lower.iter().zip(&upper).any(|(&a, &b)| {
             a.is_nan() || b.is_nan() || a > b || a == f64::INFINITY || b == f64::NEG_INFINITY
         }) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "ordered nonmissing bounds with nonempty finite support are required",
             ));
         }
@@ -104,7 +107,8 @@ impl TruncatedNormalMixture {
             || !variance.is_finite()
             || variance == 0.0
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite estimate and positive finite SE/variance are required",
             ));
         }
@@ -158,10 +162,9 @@ impl TruncatedNormalMixture {
                 standard_errors.len(),
             ));
         }
-        estimates
-            .len()
-            .checked_mul(self.sds.len())
-            .ok_or_else(|| invalid("posterior matrix shape overflows"))?;
+        estimates.len().checked_mul(self.sds.len()).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "posterior matrix shape overflows")
+        })?;
         estimates
             .iter()
             .zip(standard_errors)

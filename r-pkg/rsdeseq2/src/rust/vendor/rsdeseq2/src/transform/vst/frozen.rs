@@ -2,16 +2,11 @@
 //! refitting, foreign pointers, or an R interpreter.
 use super::{validate_normalized_counts_and_max, vst_local_from_dispersion_grid};
 use crate::design::expression::{self, Data, EvaluationOptions, Expression, Value};
+use crate::errors::invalid_dispersion;
 use crate::{
     errors::DeseqError,
     matrix::{CountView, MatrixView, RowMajorMatrix},
 };
-
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidDispersion {
-        reason: reason.into(),
-    }
-}
 
 fn grid_from_max(max: f64) -> Vec<f64> {
     let end = max.asinh();
@@ -34,12 +29,12 @@ pub fn frozen_local_vst_grid_from_counts(
     }
     if let Some(nf) = factors {
         if nf.n_rows() != counts.n_genes() || nf.n_cols() != counts.n_samples() {
-            return Err(invalid(
+            return Err(invalid_dispersion(
                 "frozen local normalization factor shape differs from counts",
             ));
         }
     } else if size_factors.is_none() {
-        return Err(invalid(
+        return Err(invalid_dispersion(
             "frozen local grid requires size or normalization factors",
         ));
     }
@@ -52,13 +47,15 @@ pub fn frozen_local_vst_grid_from_counts(
                 size_factors.expect("validated size factors")[sample]
             };
             if !factor.is_finite() || factor <= 0.0 {
-                return Err(invalid(
+                return Err(invalid_dispersion(
                     "frozen local normalization factors must be finite and positive",
                 ));
             }
             let normalized = f64::from(counts.at(gene, sample)) / factor;
             if !normalized.is_finite() {
-                return Err(invalid("frozen local normalized counts must be finite"));
+                return Err(invalid_dispersion(
+                    "frozen local normalized counts must be finite",
+                ));
             }
             max = max.max(normalized);
         }
@@ -96,7 +93,7 @@ impl SavedLocalDispersionFit {
                 .chain(&polynomial)
                 .any(|v| !v.is_finite())
         {
-            return Err(invalid(
+            return Err(invalid_dispersion(
                 "saved local fit requires aligned finite knots, values, slopes and quadratic coefficients",
             ));
         }
@@ -105,7 +102,7 @@ impl SavedLocalDispersionFit {
         let reorder = |x: &[f64]| order.iter().map(|i| x[*i]).collect::<Vec<_>>();
         let knots = reorder(&knots);
         if knots.windows(2).any(|x| x[0] >= x[1]) {
-            return Err(invalid("saved local fit knots must be distinct"));
+            return Err(invalid_dispersion("saved local fit knots must be distinct"));
         }
         Ok(Self {
             knots,
@@ -122,7 +119,9 @@ impl SavedLocalDispersionFit {
             .iter()
             .map(|mean| {
                 if !mean.is_finite() || *mean <= 0.0 {
-                    return Err(invalid("saved local fit means must be finite and positive"));
+                    return Err(invalid_dispersion(
+                        "saved local fit means must be finite and positive",
+                    ));
                 }
                 let x = mean.ln();
                 let upper = self.knots.partition_point(|k| *k <= x);
@@ -145,7 +144,7 @@ impl SavedLocalDispersionFit {
                     + (dx * dx / 2.0) * self.polynomial[3];
                 let prediction = (residual + global).exp();
                 if !prediction.is_finite() || prediction <= 0.0 {
-                    return Err(invalid(
+                    return Err(invalid_dispersion(
                         "saved local fit produced a non-finite or non-positive dispersion",
                     ));
                 }
@@ -182,7 +181,7 @@ impl FrozenLocalDispersion {
                 constants,
             } => {
                 if argument.is_empty() || constants.iter().any(|(name, _)| name == argument) {
-                    return Err(invalid(
+                    return Err(invalid_dispersion(
                         "frozen dispersion argument must be nonempty and distinct from constants",
                     ));
                 }
@@ -191,18 +190,20 @@ impl FrozenLocalDispersion {
                 let result =
                     expression::evaluate(expression, &bindings, &EvaluationOptions::default())?;
                 let Data::Number { values, .. } = result.data else {
-                    return Err(invalid(
+                    return Err(invalid_dispersion(
                         "frozen dispersion expression must return numeric values",
                     ));
                 };
                 if result.dimensions.is_some() {
-                    return Err(invalid("frozen dispersion expression must return a vector"));
+                    return Err(invalid_dispersion(
+                        "frozen dispersion expression must return a vector",
+                    ));
                 }
                 values
             }
         };
         if values.len() != means.len() || values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
-            return Err(invalid(
+            return Err(invalid_dispersion(
                 "frozen local dispersion function must return one finite positive value per mean",
             ));
         }

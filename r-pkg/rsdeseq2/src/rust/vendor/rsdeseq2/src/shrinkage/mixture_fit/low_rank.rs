@@ -1,6 +1,7 @@
 //! Optional deterministic spectral approximation of the augmented likelihood.
-use super::{DMatrix, Problem, invalid};
+use super::{DMatrix, ERROR_SCOPE, Problem};
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 impl Problem {
     pub(super) fn truncated(&self, tolerance: f64) -> Result<Option<Self>, DeseqError> {
         let k = self.components;
@@ -18,14 +19,19 @@ impl Problem {
                     .filter(|&&x| x > 0.0)
                     .count(),
             )
-            .ok_or_else(|| invalid("augmented likelihood row count overflows"))?;
-        let cells = rows
-            .checked_mul(k)
-            .ok_or_else(|| invalid("augmented likelihood size overflows"))?;
+            .ok_or_else(|| {
+                scoped_invalid_options(ERROR_SCOPE, "augmented likelihood row count overflows")
+            })?;
+        let cells = rows.checked_mul(k).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "augmented likelihood size overflows")
+        })?;
         let mut values = Vec::new();
-        values
-            .try_reserve_exact(cells)
-            .map_err(|_| invalid("unable to reserve augmented likelihood storage"))?;
+        values.try_reserve_exact(cells).map_err(|_| {
+            scoped_invalid_options(
+                ERROR_SCOPE,
+                "unable to reserve augmented likelihood storage",
+            )
+        })?;
         let mut weights = Vec::with_capacity(rows);
         for (j, &count) in self.prior_counts.iter().enumerate() {
             if count > 0.0 {
@@ -52,7 +58,9 @@ impl Problem {
         }
         let matrix = DMatrix::from_row_slice(rows, k, &values);
         let svd = nalgebra::linalg::SVD::try_new(matrix, true, true, f64::EPSILON, 1000)
-            .ok_or_else(|| invalid("likelihood SVD did not converge"))?;
+            .ok_or_else(|| {
+                scoped_invalid_options(ERROR_SCOPE, "likelihood SVD did not converge")
+            })?;
         // Original rank discovery doubles its requested singular subspace.
         // Its partial solver warns above half the smaller matrix dimension,
         // and mixsqp then falls back to the full matrix. Preserve that policy
@@ -76,12 +84,12 @@ impl Problem {
         if rank >= dimension {
             return Ok(None);
         }
-        let u = svd
-            .u
-            .ok_or_else(|| invalid("missing left likelihood singular vectors"))?;
-        let vt = svd
-            .v_t
-            .ok_or_else(|| invalid("missing right likelihood singular vectors"))?;
+        let u = svd.u.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "missing left likelihood singular vectors")
+        })?;
+        let vt = svd.v_t.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "missing right likelihood singular vectors")
+        })?;
         let mut minimum = 0.0_f64;
         for i in 0..rows {
             for j in 0..k {
@@ -89,7 +97,10 @@ impl Problem {
                     .map(|r| u[(i, r)] * svd.singular_values[r] * vt[(r, j)])
                     .sum::<f64>();
                 if !value.is_finite() {
-                    return Err(invalid("nonfinite truncated likelihood"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "nonfinite truncated likelihood",
+                    ));
                 }
                 values[i * k + j] = value;
                 minimum = minimum.min(value);

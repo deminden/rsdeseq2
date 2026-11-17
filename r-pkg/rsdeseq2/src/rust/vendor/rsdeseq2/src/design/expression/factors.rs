@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, Value, arguments, invalid};
+use super::{Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 
 fn numeric_label(x: f64, integer: bool) -> Option<String> {
@@ -43,7 +43,7 @@ impl Evaluator<'_> {
         let values = if input.has_class("factor") {
             let levels = input
                 .attribute("levels")
-                .ok_or_else(|| invalid("factor levels missing"))?
+                .ok_or_else(|| invalid_options("factor levels missing"))?
                 .text()?;
             input
                 .numeric()?
@@ -54,7 +54,7 @@ impl Evaluator<'_> {
                     } else {
                         let i = *v as usize;
                         if *v != i as f64 || i == 0 || i > levels.len() {
-                            Err(invalid("factor code outside levels"))
+                            Err(invalid_options("factor code outside levels"))
                         } else {
                             Ok(levels[i - 1].clone())
                         }
@@ -72,7 +72,7 @@ impl Evaluator<'_> {
                     values.iter().map(|&v| numeric_label(v, *integer)).collect()
                 }
                 Data::Null => Vec::new(),
-                _ => return Err(invalid("cannot coerce formula list to text")),
+                _ => return Err(invalid_options("cannot coerce formula list to text")),
             }
         };
         Ok(Value::new(Data::Text(values)))
@@ -97,7 +97,7 @@ impl Evaluator<'_> {
         } else {
             arguments(args, &formals)?
         };
-        let input = a[0].ok_or_else(|| invalid("factor transform requires x"))?;
+        let input = a[0].ok_or_else(|| invalid_options("factor transform requires x"))?;
         if name == "as.factor" && input.has_class("factor")
             || name == "as.ordered" && input.has_class("ordered")
         {
@@ -109,7 +109,7 @@ impl Evaluator<'_> {
             true
         } else if name == "relevel" {
             if input.has_class("ordered") {
-                return Err(invalid("relevel requires an unordered factor"));
+                return Err(invalid_options("relevel requires an unordered factor"));
             }
             false
         } else {
@@ -121,21 +121,22 @@ impl Evaluator<'_> {
                 .unwrap_or(input.has_class("ordered"))
         };
         let mut levels = if name == "relevel" {
-            let mut levels = original.ok_or_else(|| invalid("relevel requires a factor"))?;
-            let reference = a[1].ok_or_else(|| invalid("relevel requires ref"))?;
+            let mut levels =
+                original.ok_or_else(|| invalid_options("relevel requires a factor"))?;
+            let reference = a[1].ok_or_else(|| invalid_options("relevel requires ref"))?;
             let index = if matches!(reference.data, Data::Text(_)) {
                 let r = reference.text()?;
                 if r.len() != 1 {
-                    return Err(invalid("relevel ref must have length one"));
+                    return Err(invalid_options("relevel ref must have length one"));
                 }
                 levels
                     .iter()
                     .position(|v| *v == r[0])
-                    .ok_or_else(|| invalid("relevel ref is not a level"))?
+                    .ok_or_else(|| invalid_options("relevel ref is not a level"))?
             } else {
                 let x = reference.scalar_number()?;
                 if !x.is_finite() || x < 1.0 || x > levels.len() as f64 {
-                    return Err(invalid("relevel ref is outside levels"));
+                    return Err(invalid_options("relevel ref is outside levels"));
                 }
                 x as usize - 1
             };
@@ -184,7 +185,7 @@ impl Evaluator<'_> {
         levels.retain(|v| !exclude.contains(v));
         for (i, v) in levels.iter().enumerate() {
             if levels[..i].contains(v) {
-                return Err(invalid("factor levels must be unique"));
+                return Err(invalid_options("factor levels must be unique"));
             }
         }
         let labels = if name != "relevel" {
@@ -202,7 +203,7 @@ impl Evaluator<'_> {
                     .map(|i| Some(format!("{prefix}{i}")))
                     .collect()
             } else {
-                return Err(invalid(
+                return Err(invalid_options(
                     "factor labels must match the level count or be a prefix",
                 ));
             }

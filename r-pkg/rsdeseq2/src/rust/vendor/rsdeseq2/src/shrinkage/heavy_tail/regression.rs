@@ -5,9 +5,10 @@ use super::{
         CoefficientMle, NegativeBinomialPosterior, NegativeBinomialPosteriorOptions,
         PosteriorOffsets,
     },
-    prior::{CauchyCoefficientPrior, invalid},
+    prior::{CauchyCoefficientPrior, ERROR_SCOPE},
     regression_expression::RestrictedRegressionLikelihood,
 };
+use crate::errors::scoped_invalid_options;
 use crate::{DeseqError, matrix::MatrixView};
 use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb_with_gradient};
@@ -122,7 +123,8 @@ pub fn fit_regression_posterior_with_rng(
     rng: &mut super::random::PosteriorRng,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
     if options.method != RegressionMethod::BetaBinomialCStar {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "random-start regression requires BetaBinomialCStar",
         ));
     }
@@ -134,27 +136,40 @@ fn fit_regression_impl(
     random: Option<&mut super::random::PosteriorRng>,
 ) -> Result<NegativeBinomialPosterior, DeseqError> {
     if options.method == RegressionMethod::BetaBinomialCStar && random.is_none() {
-        return Err(invalid("random-start regression requires a native RNG"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "random-start regression requires a native RNG",
+        ));
     }
     if input.parameters.is_none() {
-        return Err(invalid("regression likelihood parameters must be supplied"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "regression likelihood parameters must be supplied",
+        ));
     }
     if options.prior_df.is_nan()
         || options.prior_df <= 0.0
         || !options.prior_noncentrality.is_finite()
         || !options.nuisance_mean.is_finite()
     {
-        return Err(invalid("invalid general prior parameters"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "invalid general prior parameters",
+        ));
     }
     if let Some(parameters) = input.parameters
         && parameters.n_rows() != input.observations.n_rows()
     {
-        return Err(invalid("likelihood parameters must match observation rows"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "likelihood parameters must match observation rows",
+        ));
     }
     if matches!(options.likelihood, RegressionLikelihood::NegativeBinomial)
         && input.parameters.is_none_or(|p| p.n_cols() != 1)
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "negative-binomial likelihood requires one dispersion per row",
         ));
     }
@@ -167,19 +182,22 @@ fn fit_regression_impl(
     );
     if beta_binomial {
         if !matches!(options.likelihood, RegressionLikelihood::BetaBinomial) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "beta-binomial method requires its matching likelihood",
             ));
         }
         let parameters = input.parameters.unwrap();
         if parameters.n_cols() != input.observations.n_cols() + 1 {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "beta-binomial parameters require concentration and one trial count per sample",
             ));
         }
         for i in 0..parameters.n_rows() {
             if !parameters.at(i, 0).is_finite() || *parameters.at(i, 0) <= 0.0 {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "beta-binomial concentration must be positive and finite",
                 ));
             }
@@ -187,7 +205,8 @@ fn fit_regression_impl(
                 let n = *parameters.at(i, j + 1);
                 let y = *input.observations.at(i, j);
                 if !n.is_finite() || n < 0.0 || y < 0.0 || y > n {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "beta-binomial successes must lie between zero and finite trial counts",
                     ));
                 }
@@ -198,19 +217,22 @@ fn fit_regression_impl(
                 if m.n_rows() != input.observations.n_rows()
                     || m.n_cols() != input.observations.n_cols() =>
             {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "ignored beta-binomial offsets must still match observation shape",
                 ));
             }
             PosteriorOffsets::SizeFactors(s) if s.len() != input.observations.n_cols() => {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "ignored beta-binomial size factors must match samples",
                 ));
             }
             _ => {}
         }
     } else if matches!(options.likelihood, RegressionLikelihood::BetaBinomial) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "beta-binomial likelihood requires a beta-binomial method",
         ));
     }
@@ -219,7 +241,8 @@ fn fit_regression_impl(
             || options.prior_noncentrality != 0.0
             || options.nuisance_mean != 0.0)
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "specialized posterior methods require zero-centered Cauchy priors",
         ));
     }
@@ -229,14 +252,15 @@ fn fit_regression_impl(
             || options.prior_noncentrality != 0.0
             || options.nuisance_mean != 0.0)
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "nbinomR requires the zero-centered Cauchy prior and NB likelihood",
         ));
     }
     let dispersions = if options.method == RegressionMethod::NegativeBinomialR {
         let parameters = input
             .parameters
-            .ok_or_else(|| invalid("missing NB dispersions"))?;
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "missing NB dispersions"))?;
         (0..parameters.n_rows())
             .map(|i| *parameters.at(i, 0))
             .collect()
@@ -293,10 +317,14 @@ impl GeneralRow<'_> {
                 f.evaluate(self.y, self.design, beta, parameters, self.offsets)?
             }
             RegressionLikelihood::BetaBinomial => {
-                let parameters =
-                    parameters.ok_or_else(|| invalid("missing beta-binomial parameters"))?;
+                let parameters = parameters.ok_or_else(|| {
+                    scoped_invalid_options(ERROR_SCOPE, "missing beta-binomial parameters")
+                })?;
                 if parameters.len() != self.y.len() + 1 {
-                    return Err(invalid("invalid beta-binomial parameter shape"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "invalid beta-binomial parameter shape",
+                    ));
                 }
                 self.y
                     .iter()
@@ -318,7 +346,7 @@ impl GeneralRow<'_> {
                 let dispersion = parameters
                     .and_then(|v| v.first())
                     .copied()
-                    .ok_or_else(|| invalid("missing dispersion"))?;
+                    .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "missing dispersion"))?;
                 self.y
                     .iter()
                     .enumerate()
@@ -415,7 +443,7 @@ impl GeneralRow<'_> {
                     vec![self.options.bounds.0; p],
                     vec![self.options.bounds.1; p],
                 )
-                .map_err(|e| invalid(&e.to_string()))?;
+                .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))?;
                 optim_lbfgsb_with_gradient(
                     start,
                     bounds,
@@ -423,10 +451,11 @@ impl GeneralRow<'_> {
                     |x| self.objective_gradient(x).1,
                     OptimControl::default_for_dimension(p),
                 )
-                .map_err(|e| invalid(&e.to_string()))?
+                .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))?
             }
             RegressionOptimizer::Unsupported => {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "unsupported posterior optimizer; use BFGS or L-BFGS-B",
                 ));
             }
@@ -453,7 +482,7 @@ pub(super) fn optimize_nb_r(
         RegressionOptimizer::Lbfgsb => {
             let p = start.len();
             let bounds = Bounds::new(vec![options.bounds.0; p], vec![options.bounds.1; p])
-                .map_err(|e| invalid(&e.to_string()))?;
+                .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))?;
             optim_lbfgsb_with_gradient(
                 start,
                 bounds,
@@ -461,9 +490,10 @@ pub(super) fn optimize_nb_r(
                 |b| f(b).1,
                 OptimControl::default_for_dimension(p),
             )
-            .map_err(|e| invalid(&e.to_string()))
+            .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))
         }
-        RegressionOptimizer::Unsupported => Err(invalid(
+        RegressionOptimizer::Unsupported => Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "unsupported posterior optimizer; use BFGS or L-BFGS-B",
         )),
     }

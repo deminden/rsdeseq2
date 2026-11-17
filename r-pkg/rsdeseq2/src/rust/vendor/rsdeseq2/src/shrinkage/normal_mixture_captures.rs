@@ -1,14 +1,11 @@
 //! Canonical normal-mixture capture layout and component recycling, in Rust.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "normal-mixture captures";
 use super::BuiltinLocationLikelihood;
 use crate::{
     DeseqError,
     matrix::{MatrixOrder, MatrixView},
 };
-fn invalid(s: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("normal-mixture captures: {s}"),
-    }
-}
 fn columns(m: MatrixView<'_, f64>) -> Vec<f64> {
     (0..m.n_cols())
         .flat_map(|j| (0..m.n_rows()).map(move |i| *m.at(i, j)))
@@ -29,11 +26,17 @@ pub(super) fn import(
         return BuiltinLocationLikelihood::normal_mixture(weights, columns(scales));
     }
     if !scales_are_matrix {
-        return Err(invalid("unequal capture lengths require an SD matrix"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "unequal capture lengths require an SD matrix",
+        ));
     }
     let k = scales.n_cols();
     if k == 0 || weights.is_empty() {
-        return Err(invalid("nonempty weights and SD columns are required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "nonempty weights and SD columns are required",
+        ));
     }
     if weights.len() == k {
         return BuiltinLocationLikelihood::normal_mixture_by_observation(weights, scales);
@@ -44,7 +47,7 @@ pub(super) fn import(
     let len = scales
         .n_rows()
         .checked_mul(components)
-        .ok_or_else(|| invalid("expanded capture size overflows"))?;
+        .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "expanded capture size overflows"))?;
     let mut values = Vec::with_capacity(len);
     for i in 0..scales.n_rows() {
         for j in 0..components {

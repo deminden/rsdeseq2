@@ -1,4 +1,4 @@
-use super::{Data, Value, invalid};
+use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
 
 pub(super) fn power(x: f64, y: f64) -> f64 {
@@ -58,7 +58,7 @@ pub(super) fn power(x: f64, y: f64) -> f64 {
 }
 pub(super) fn unary(name: &str, value: &Value) -> Result<Value, DeseqError> {
     if value.has_class("factor") {
-        return Err(invalid(
+        return Err(invalid_options(
             "numeric formula operations require numeric covariates",
         ));
     }
@@ -97,7 +97,7 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
         && right.dimensions.is_some()
         && left.dimensions != right.dimensions
     {
-        return Err(invalid("non-conformable formula arrays"));
+        return Err(invalid_options("non-conformable formula arrays"));
     }
     let template = if left.dimensions.is_some() {
         left
@@ -107,7 +107,7 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
         left
     };
     if template.dimensions.is_some() && template.len() != n {
-        return Err(invalid("formula vector is longer than its matrix"));
+        return Err(invalid_options("formula vector is longer than its matrix"));
     }
     let logical = matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=" | "&" | "|");
     let mut result = template.clone();
@@ -190,7 +190,7 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
                     let quotient = (x / y).floor();
                     if quotient == 0.0 { 0.0 } else { quotient }
                 }
-                _ => return Err(invalid("unsupported formula operator")),
+                _ => return Err(invalid_options("unsupported formula operator")),
             };
             out.push(
                 if integer && (!v.is_finite() || v <= i32::MIN as f64 || v > i32::MAX as f64) {

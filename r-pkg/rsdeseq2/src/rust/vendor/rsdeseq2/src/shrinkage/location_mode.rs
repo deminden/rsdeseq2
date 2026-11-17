@@ -1,4 +1,6 @@
 //! Standalone likelihood profiling for an estimated unimodal-prior location.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "prior mode search";
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{LocationLikelihood, LocationShrinkageOptions, location_fit::fit_location};
 use crate::DeseqError;
@@ -21,11 +23,6 @@ pub struct LocationModeEstimate {
     pub bounds: (f64, f64),
     pub warnings: Vec<String>,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("prior mode search: {reason}"),
-    }
-}
 
 // Golden-section fallback and inverse parabolic interpolation of three finite
 // function values. The bracket always contains the current best point. Arithmetic
@@ -42,7 +39,10 @@ fn minimize(
     let mut older = best;
     let mut value = objective(best)?;
     if !value.is_finite() {
-        return Err(invalid("profile likelihood must be finite"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "profile likelihood must be finite",
+        ));
     }
     let mut previous_value = value;
     let mut older_value = value;
@@ -97,7 +97,10 @@ fn minimize(
             };
         let trial_value = objective(trial)?;
         if !trial_value.is_finite() {
-            return Err(invalid("profile likelihood must be finite"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "profile likelihood must be finite",
+            ));
         }
         if trial_value <= value {
             if trial >= best {
@@ -128,7 +131,10 @@ fn minimize(
             }
         }
     }
-    Err(invalid("bounded profile search exhausted 1000 evaluations"))
+    Err(scoped_invalid_options(
+        ERROR_SCOPE,
+        "bounded profile search exhausted 1000 evaluations",
+    ))
 }
 
 /// Profile the unpenalized marginal likelihood, refitting mixture weights at
@@ -142,7 +148,8 @@ pub fn estimate_location_mode(
     search: PriorModeSearch,
 ) -> Result<LocationModeEstimate, DeseqError> {
     if options.supplied_grid.is_some() || options.fixed_prior {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "an estimated mode requires an unfixed generated prior",
         ));
     }
@@ -167,7 +174,8 @@ pub fn estimate_location_mode(
         }
         PriorModeSearch::ObservationRange | PriorModeSearch::ExpandedObservationRange(_) => {
             if estimates.is_empty() || estimates.iter().any(|x| !x.is_finite()) {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "finite nonmissing estimates are required for data-derived bounds",
                 ));
             }
@@ -175,7 +183,10 @@ pub fn estimate_location_mode(
             let mut upper = estimates.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             if let PriorModeSearch::ExpandedObservationRange(seed) = search {
                 if !seed.is_finite() {
-                    return Err(invalid("the range expansion must be finite"));
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "the range expansion must be finite",
+                    ));
                 }
                 lower = lower.min(seed);
                 upper = upper.max(seed);
@@ -189,11 +200,17 @@ pub fn estimate_location_mode(
         || !(upper - lower).is_finite()
         || !(lower + upper).is_finite()
     {
-        return Err(invalid("finite increasing search bounds are required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "finite increasing search bounds are required",
+        ));
     }
     let tolerance = (upper - lower) * f64::EPSILON.sqrt().sqrt();
     if tolerance == 0.0 {
-        return Err(invalid("the search interval is too small"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "the search interval is too small",
+        ));
     }
     let mut trial_options = options.clone();
     trial_options.thresholds.clear();
@@ -249,7 +266,10 @@ pub fn estimate_location_mode(
                 ll = NA;
             }
             if !ll.is_finite() {
-                return Err(invalid("profile likelihood must be finite"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "profile likelihood must be finite",
+                ));
             }
             Ok(-ll)
         },
@@ -288,7 +308,10 @@ mod tests {
         assert!((-2.0..3.0).contains(&x) && f == 4.0);
         assert!(
             minimize(
-                |_| Err(invalid("injected objective failure")),
+                |_| Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "injected objective failure"
+                )),
                 0.0,
                 1.0,
                 1e-6

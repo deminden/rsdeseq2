@@ -1,4 +1,4 @@
-use super::{Data, Expression, Value, functions, invalid};
+use super::{Data, Expression, Value, functions, invalid_options};
 use crate::errors::DeseqError;
 
 pub(super) fn function_name(function: &str) -> Result<&str, DeseqError> {
@@ -7,7 +7,7 @@ pub(super) fn function_name(function: &str) -> Result<&str, DeseqError> {
         .or_else(|| function.strip_prefix("stats::"))
         .unwrap_or(function);
     if !functions::supported(name) {
-        return Err(invalid(format!(
+        return Err(invalid_options(format!(
             "custom or unsupported formula function '{function}'; provide a supported built-in transform"
         )));
     }
@@ -17,7 +17,7 @@ pub(super) fn function_name(function: &str) -> Result<&str, DeseqError> {
         "base::"
     };
     if function.contains("::") && !function.starts_with(namespace) {
-        return Err(invalid(format!(
+        return Err(invalid_options(format!(
             "unsupported formula namespace for '{function}'"
         )));
     }
@@ -26,7 +26,7 @@ pub(super) fn function_name(function: &str) -> Result<&str, DeseqError> {
 
 pub(super) fn validate_expression(expression: &Expression, depth: usize) -> Result<(), DeseqError> {
     if depth > 128 {
-        return Err(invalid("formula expression nesting exceeds 128"));
+        return Err(invalid_options("formula expression nesting exceeds 128"));
     }
     match expression {
         Expression::Literal(value) => validate_value(value, depth),
@@ -55,15 +55,21 @@ pub(super) fn validate_value_with_limit(
     limit: usize,
 ) -> Result<(), DeseqError> {
     if depth > limit {
-        return Err(invalid(format!("formula value nesting exceeds {limit}")));
+        return Err(invalid_options(format!(
+            "formula value nesting exceeds {limit}"
+        )));
     }
     if let Some([rows, columns]) = value.dimensions {
         if rows.checked_mul(columns) != Some(value.len()) {
-            return Err(invalid("formula dimensions do not match stored values"));
+            return Err(invalid_options(
+                "formula dimensions do not match stored values",
+            ));
         }
         for (names, length) in value.dimnames.iter().zip([rows, columns]) {
             if names.as_ref().is_some_and(|n| n.len() != length) {
-                return Err(invalid("formula dimension names do not match dimensions"));
+                return Err(invalid_options(
+                    "formula dimension names do not match dimensions",
+                ));
             }
         }
         for i in 0..2 {
@@ -72,7 +78,7 @@ pub(super) fn validate_value_with_limit(
                     .as_ref()
                     .is_none_or(|v| v.len() != names.len())
             {
-                return Err(invalid(
+                return Err(invalid_options(
                     "formula label names require matching dimension labels",
                 ));
             }
@@ -83,10 +89,12 @@ pub(super) fn validate_value_with_limit(
         .chain(&value.dimname_names)
         .any(Option::is_some)
     {
-        return Err(invalid("formula dimension names require dimensions"));
+        return Err(invalid_options(
+            "formula dimension names require dimensions",
+        ));
     }
     if value.names.as_ref().is_some_and(|n| n.len() != value.len()) {
-        return Err(invalid("formula names do not match stored values"));
+        return Err(invalid_options("formula names do not match stored values"));
     }
     if let Data::Number {
         values,
@@ -100,11 +108,15 @@ pub(super) fn validate_value_with_limit(
                     || *v > i32::MAX as f64)
         })
     {
-        return Err(invalid("formula integer values are outside their range"));
+        return Err(invalid_options(
+            "formula integer values are outside their range",
+        ));
     }
     for (index, (name, attribute)) in value.attributes.iter().enumerate() {
         if name.is_empty() || value.attributes[..index].iter().any(|(n, _)| n == name) {
-            return Err(invalid("formula attributes require unique nonempty names"));
+            return Err(invalid_options(
+                "formula attributes require unique nonempty names",
+            ));
         }
         validate_value_with_limit(attribute, depth + 1, limit)?;
     }
@@ -119,14 +131,14 @@ pub(super) fn validate_value_with_limit(
             ..
         }) = value.attribute("levels")
         else {
-            return Err(invalid("formula factor requires text levels"));
+            return Err(invalid_options("formula factor requires text levels"));
         };
         let Data::Number {
             values,
             integer: true,
         } = &value.data
         else {
-            return Err(invalid("formula factor requires integer codes"));
+            return Err(invalid_options("formula factor requires integer codes"));
         };
         if levels
             .iter()
@@ -136,7 +148,9 @@ pub(super) fn validate_value_with_limit(
                 .iter()
                 .any(|v| !v.is_nan() && (*v < 1.0 || *v > levels.len() as f64))
         {
-            return Err(invalid("formula factor codes or levels are invalid"));
+            return Err(invalid_options(
+                "formula factor codes or levels are invalid",
+            ));
         }
     }
     Ok(())

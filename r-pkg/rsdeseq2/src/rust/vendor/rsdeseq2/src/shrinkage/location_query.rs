@@ -1,4 +1,6 @@
 //! Independent queries of a fitted mixture, including original-input thresholds.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "location CDF query";
 use super::{
     LocationLikelihood, MixtureComponents, MixtureGrid,
     location_missing::{NA, excluded, is_na},
@@ -29,25 +31,31 @@ pub fn location_cdf_batch(
     standard_errors: &[f64],
     options: &LocationCdfOptions,
 ) -> Result<Vec<f64>, DeseqError> {
-    let invalid = |s: &str| DeseqError::InvalidOptions {
-        reason: format!("location CDF query: {s}"),
-    };
     if standard_errors.len() != estimates.len() && standard_errors.len() != 1 {
-        return Err(invalid("SEs must have length one or match estimates"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "SEs must have length one or match estimates",
+        ));
     }
     if !options.alpha.is_finite() || options.thresholds.iter().any(|v| v.is_nan()) {
-        return Err(invalid("finite alpha and nonmissing cutoffs are required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "finite alpha and nonmissing cutoffs are required",
+        ));
     }
     let n = estimates.len();
     options.likelihood.validate_observations(n)?;
     n.checked_mul(weights.len())
-        .ok_or_else(|| invalid("posterior shape overflows"))?;
+        .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "posterior shape overflows"))?;
     let mut x = Vec::with_capacity(n);
     let mut se = Vec::with_capacity(n);
     for (i, &estimate) in estimates.iter().enumerate() {
         let s = standard_errors[if standard_errors.len() == 1 { 0 } else { i }];
         if s < 0.0 {
-            return Err(invalid("SEs must be nonnegative"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "SEs must be nonnegative",
+            ));
         }
         x.push(estimate / s.powf(options.alpha));
         se.push(s.powf(1.0 - options.alpha));
@@ -61,7 +69,10 @@ pub fn location_cdf_batch(
             .iter()
             .any(|&c| !lower.iter().zip(upper).any(|(&a, &b)| a <= c && c <= b))
     {
-        return Err(invalid("a truncated component must contain each cutoff"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "a truncated component must contain each cutoff",
+        ));
     }
     let count = x
         .iter()
@@ -71,7 +82,7 @@ pub fn location_cdf_batch(
     let mut rank = 0;
     let mut cdf = Vec::with_capacity(
         n.checked_mul(options.thresholds.len())
-            .ok_or_else(|| invalid("CDF output shape overflows"))?,
+            .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "CDF output shape overflows"))?,
     );
     for i in 0..n {
         if x[i].is_finite() && se[i] > 0.0 && se[i].is_finite() {

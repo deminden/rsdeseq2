@@ -1,10 +1,7 @@
 //! Heavy-tailed coefficient prior and empirical variance adaptation.
+use crate::errors::scoped_invalid_options;
+pub(super) const ERROR_SCOPE: &str = "heavy-tailed shrinkage";
 use crate::DeseqError;
-pub(super) fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("heavy-tailed shrinkage: {reason}"),
-    }
-}
 /// Independent Cauchy priors, with selected Gaussian nuisance coefficients.
 #[derive(Clone, Debug)]
 pub struct CauchyCoefficientPrior {
@@ -37,7 +34,8 @@ impl CauchyCoefficientPrior {
             || self.nuisance_scale * self.nuisance_scale == 0.0
             || self.nuisance.iter().any(|&i| i >= coefficients)
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite positive prior scales and valid nuisance indices are required",
             ));
         }
@@ -74,7 +72,8 @@ fn root(f: impl Fn(f64) -> f64, mut a: f64, mut b: f64, tolerance: f64) -> Resul
         return Ok(b);
     }
     if !fa.is_finite() || !fb.is_finite() || fa.signum() == fb.signum() {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "prior variance root must have finite opposite endpoint signs",
         ));
     }
@@ -135,10 +134,16 @@ fn root(f: impl Fn(f64) -> f64, mut a: f64, mut b: f64, tolerance: f64) -> Resul
         b += if d.abs() > tol { d } else { tol.copysign(half) };
         fb = f(b);
         if !fb.is_finite() {
-            return Err(invalid("nonfinite prior variance objective"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "nonfinite prior variance objective",
+            ));
         }
     }
-    Err(invalid("prior variance root did not converge"))
+    Err(scoped_invalid_options(
+        ERROR_SCOPE,
+        "prior variance root did not converge",
+    ))
 }
 /// Empirical Gaussian variance underlying adaptive Cauchy scale selection.
 /// Missing MLEs are omitted. Missing/infinite SEs of retained MLEs are errors.
@@ -148,7 +153,10 @@ pub fn estimate_cauchy_prior_variance(
     standard_errors: &[f64],
 ) -> Result<f64, DeseqError> {
     if estimates.len() != standard_errors.len() {
-        return Err(invalid("MLEs and SEs must have matching lengths"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "MLEs and SEs must have matching lengths",
+        ));
     }
     let mut squared = vec![];
     for (&x, &s) in estimates.iter().zip(standard_errors) {
@@ -156,14 +164,18 @@ pub fn estimate_cauchy_prior_variance(
             continue;
         }
         if !x.is_finite() || !s.is_finite() || !(x * x).is_finite() || !(s * s).is_finite() {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "retained MLEs and SEs must be finite and squareable",
             ));
         }
         squared.push((x * x, s * s));
     }
     if squared.is_empty() {
-        return Err(invalid("at least one nonmissing MLE is required"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "at least one nonmissing MLE is required",
+        ));
     }
     let objective = |a: f64| {
         let mut numerator = 0.0;

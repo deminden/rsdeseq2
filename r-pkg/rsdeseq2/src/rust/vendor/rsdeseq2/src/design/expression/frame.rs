@@ -1,6 +1,6 @@
 //! Shared model-frame row policy, categorical preparation and offset arithmetic.
 use super::{
-    Argument, Data, EvaluationOptions, Expression, Value, evaluate_many, invalid,
+    Argument, Data, EvaluationOptions, Expression, Value, evaluate_many, invalid_options,
     validation::validate_value,
 };
 use crate::errors::DeseqError;
@@ -100,21 +100,21 @@ pub fn assemble(
     for value in &values {
         validate_value(value, 0)?;
         if matches!(value.data, Data::Null | Data::List(_)) {
-            return Err(invalid(
+            return Err(invalid_options(
                 "model variables must be atomic vectors or matrices",
             ));
         }
     }
     let original_rows = values.first().map_or(data_rows, rows);
     if values.iter().any(|v| rows(v) != original_rows) {
-        return Err(invalid("model variable lengths differ"));
+        return Err(invalid_options("model variable lengths differ"));
     }
     let mut kept_rows = Vec::new();
     let mut omitted_rows = Vec::new();
     for row in 0..original_rows {
         let absent = values.iter().any(|v| missing(v, row));
         if absent && policy == MissingPolicy::Fail {
-            return Err(invalid("missing values in model variables"));
+            return Err(invalid_options("missing values in model variables"));
         }
         if absent && policy == MissingPolicy::Omit {
             omitted_rows.push(row);
@@ -145,7 +145,7 @@ pub fn prepare_model_values(
     options: &EvaluationOptions,
 ) -> Result<Vec<Value>, DeseqError> {
     if response.is_some_and(|i| i >= values.len()) {
-        return Err(invalid("model response index is outside columns"));
+        return Err(invalid_options("model response index is outside columns"));
     }
     let variables = values
         .iter()
@@ -207,7 +207,7 @@ pub fn offsets(
     for i in indices {
         let value = values
             .get(*i)
-            .ok_or_else(|| invalid("model offset index is outside columns"))?;
+            .ok_or_else(|| invalid_options("model offset index is outside columns"))?;
         validate_value(value, 0)?;
         result = super::arithmetic::binary("+", &result, value)?;
     }
@@ -223,7 +223,7 @@ pub fn expanded_factors(
     options: &EvaluationOptions,
 ) -> Result<Vec<Value>, DeseqError> {
     if null_level.is_empty() || null_level.contains('\0') {
-        return Err(invalid(
+        return Err(invalid_options(
             "expanded factor reference must be nonempty text without NUL",
         ));
     }
@@ -232,24 +232,24 @@ pub fn expanded_factors(
         .map(|value| {
             validate_value(value, 0)?;
             if !value.has_class("factor") || value.has_class("ordered") {
-                return Err(invalid(
+                return Err(invalid_options(
                     "expanded factor reference requires an unordered factor",
                 ));
             }
             if value.is_empty() || value.dimensions.is_some() {
-                return Err(invalid(
+                return Err(invalid_options(
                     "expanded factor requires a nonempty vector with a placeholder row",
                 ));
             }
             let mut levels = value
                 .attribute("levels")
-                .ok_or_else(|| invalid("factor levels missing"))?
+                .ok_or_else(|| invalid_options("factor levels missing"))?
                 .text()?;
             if levels
                 .iter()
                 .any(|level| level.as_deref() == Some(null_level))
             {
-                return Err(invalid(
+                return Err(invalid_options(
                     "a formula factor already uses the reserved expanded-model level",
                 ));
             }

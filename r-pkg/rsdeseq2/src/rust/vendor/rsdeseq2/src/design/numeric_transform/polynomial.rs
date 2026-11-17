@@ -1,4 +1,4 @@
-use super::{column_sum, invalid, polynomial_qr, scalar_mean};
+use super::{column_sum, invalid_options, polynomial_qr, scalar_mean};
 use crate::{errors::DeseqError, matrix::RowMajorMatrix};
 
 /// Recurrence metadata for evaluating the same polynomial basis on new values.
@@ -30,13 +30,15 @@ pub fn polynomial_basis(
     coefficients: Option<&PolynomialCoefficients>,
 ) -> Result<PolynomialBasis, DeseqError> {
     if input.is_empty() || degree == 0 || input.iter().any(|v| !v.is_finite()) {
-        return Err(invalid(
+        return Err(invalid_options(
             "polynomials require finite values and positive degree",
         ));
     }
     let result = polynomial_expression(input, degree, raw, coefficients)?;
     if result.values.as_slice().iter().any(|v| !v.is_finite()) {
-        return Err(invalid("polynomial transform produced non-finite values"));
+        return Err(invalid_options(
+            "polynomial transform produced non-finite values",
+        ));
     }
     Ok(result)
 }
@@ -48,22 +50,22 @@ pub(in crate::design) fn polynomial_expression(
     coefficients: Option<&PolynomialCoefficients>,
 ) -> Result<PolynomialBasis, DeseqError> {
     if degree == 0 || (!raw && coefficients.is_none() && input.iter().any(|v| !v.is_finite())) {
-        return Err(invalid(
+        return Err(invalid_options(
             "orthogonal polynomials require nonmissing finite input and positive degree",
         ));
     }
     let width = degree
         .checked_add(1)
-        .ok_or_else(|| invalid("polynomial degree overflow"))?;
+        .ok_or_else(|| invalid_options("polynomial degree overflow"))?;
     let size = input
         .len()
         .checked_mul(degree)
-        .ok_or_else(|| invalid("polynomial shape overflow"))?;
+        .ok_or_else(|| invalid_options("polynomial shape overflow"))?;
     if size > isize::MAX as usize / std::mem::size_of::<f64>() {
-        return Err(invalid("polynomial allocation shape overflow"));
+        return Err(invalid_options("polynomial allocation shape overflow"));
     }
     if !raw && coefficients.is_none() && degree >= input.len() {
-        return Err(invalid(
+        return Err(invalid_options(
             "polynomial degree must be less than the number of unique values",
         ));
     }
@@ -84,7 +86,7 @@ pub(in crate::design) fn polynomial_expression(
                 .iter()
                 .any(|x| !x.is_finite() || *x <= 0.0)
         {
-            return Err(invalid(
+            return Err(invalid_options(
                 "polynomial recurrence coefficients have invalid dimensions or values",
             ));
         }
@@ -106,7 +108,7 @@ pub(in crate::design) fn polynomial_expression(
     unique.sort_unstable_by(f64::total_cmp);
     unique.dedup_by(|a, b| *a == *b);
     if degree >= unique.len() {
-        return Err(invalid(
+        return Err(invalid_options(
             "polynomial degree must be less than the number of unique values",
         ));
     }
@@ -116,11 +118,13 @@ pub(in crate::design) fn polynomial_expression(
         .map(|d| centered.iter().map(|&x| power(x, d)).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     if columns.iter().flatten().any(|v| !v.is_finite()) {
-        return Err(invalid("polynomial powers produced non-finite values"));
+        return Err(invalid_options(
+            "polynomial powers produced non-finite values",
+        ));
     }
     let (columns, rank) = polynomial_qr::basis(columns);
     if rank < degree {
-        return Err(invalid(
+        return Err(invalid_options(
             "polynomial degree is too high for the numerical rank",
         ));
     }

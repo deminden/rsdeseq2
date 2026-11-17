@@ -1,13 +1,9 @@
 //! Consume replacement outputs into one reusable, row-aligned fitted state.
 use super::{CooksReplacementTestOutput, DeseqFit};
+use crate::errors::invalid_options;
 use crate::{
     cooks::CooksRefitPlan, errors::DeseqError, matrix::RowMajorMatrix, results::DeseqResults,
 };
-fn invalid(reason: impl Into<String>) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: reason.into(),
-    }
-}
 
 fn merge_vec<T: Clone>(
     original: &mut [T],
@@ -19,7 +15,7 @@ fn merge_vec<T: Clone>(
         return Ok(());
     }
     if original.len() != refit.len() || rows.iter().any(|&row| row >= original.len()) {
-        return Err(invalid(format!(
+        return Err(invalid_options(format!(
             "replacement refit {field} dimensions do not match"
         )));
     }
@@ -43,10 +39,10 @@ fn merge_optional_vec<T: Clone>(
     }
     let target = original
         .as_mut()
-        .ok_or_else(|| invalid(format!("original fit is missing {field}")))?;
+        .ok_or_else(|| invalid_options(format!("original fit is missing {field}")))?;
     let source = refit
         .as_ref()
-        .ok_or_else(|| invalid(format!("replacement refit is missing {field}")))?;
+        .ok_or_else(|| invalid_options(format!("replacement refit is missing {field}")))?;
     merge_vec(target, source, rows, field)
 }
 
@@ -64,15 +60,15 @@ fn merge_option_matrix(
     }
     let target = original
         .as_ref()
-        .ok_or_else(|| invalid(format!("original fit is missing {field}")))?;
+        .ok_or_else(|| invalid_options(format!("original fit is missing {field}")))?;
     let source = refit
         .as_ref()
-        .ok_or_else(|| invalid(format!("replacement refit is missing {field}")))?;
+        .ok_or_else(|| invalid_options(format!("replacement refit is missing {field}")))?;
     if target.n_rows() != source.n_rows()
         || target.n_cols() != source.n_cols()
         || rows.iter().any(|&row| row >= target.n_rows())
     {
-        return Err(invalid(format!(
+        return Err(invalid_options(format!(
             "replacement refit {field} dimensions do not match"
         )));
     }
@@ -80,7 +76,7 @@ fn merge_option_matrix(
     let n_cols = target.n_cols();
     let owned = original
         .take()
-        .ok_or_else(|| invalid(format!("original fit is missing {field}")))?;
+        .ok_or_else(|| invalid_options(format!("original fit is missing {field}")))?;
     let mut values = owned.into_values();
     for &row in rows {
         let start = row * n_cols;
@@ -205,22 +201,26 @@ impl CooksReplacementTestOutput {
         // to raw count zeros. Selected refit rows may acquire skip flags again.
         if plan.has_replaceable_samples() && plan.n_refit > 0 {
             if plan.replaced_all_zero.len() != fit.all_zero.len() {
-                return Err(invalid("replacement all-zero dimensions do not match"));
+                return Err(invalid_options(
+                    "replacement all-zero dimensions do not match",
+                ));
             }
             fit.all_zero.copy_from_slice(&plan.replaced_all_zero);
         }
         if let Some(refit) = &refit {
             if fit.design != refit.design || fit.reduced_design != refit.reduced_design {
-                return Err(invalid("replacement refit designs do not match"));
+                return Err(invalid_options("replacement refit designs do not match"));
             }
             merge_refit_fit_rows(&mut fit, refit, &plan.refit_rows)?;
         } else if plan.has_replaceable_samples() && !plan.refit_rows.is_empty() {
-            return Err(invalid("replacement rows require a refitted model"));
+            return Err(invalid_options("replacement rows require a refitted model"));
         }
         if plan.new_all_zero_rows.iter().any(|&i| {
             i >= fit.base_mean.len() || i >= fit.base_var.len() || i >= fit.all_zero.len()
         }) {
-            return Err(invalid("replacement new all-zero row is out of range"));
+            return Err(invalid_options(
+                "replacement new all-zero row is out of range",
+            ));
         }
         for &i in &plan.new_all_zero_rows {
             fit.base_mean[i] = 0.0;

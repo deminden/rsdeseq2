@@ -1,4 +1,6 @@
 //! Primitive, shared built-in likelihood parameters with explicit row selection.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "built-in likelihood";
 use super::{
     location_missing::NA,
     log_f,
@@ -29,11 +31,6 @@ pub struct BuiltinLocationLikelihood {
     parameters: Arc<Parameters>,
     row: usize,
     capture_recycling_warning: bool,
-}
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("built-in likelihood: {reason}"),
-    }
 }
 impl BuiltinLocationLikelihood {
     pub(super) fn with_recycling_warning(mut self) -> Self {
@@ -85,7 +82,10 @@ impl BuiltinLocationLikelihood {
         if let Parameters::Count(c) = self.parameters.as_ref() {
             c.validate_captures(y, trials)
         } else {
-            Err(invalid("adjusted captures require a count likelihood"))
+            Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "adjusted captures require a count likelihood",
+            ))
         }
     }
     pub(super) fn grid_data(&self, n: usize, se: &[f64]) -> Option<(Vec<f64>, Vec<f64>)> {
@@ -143,7 +143,8 @@ impl BuiltinLocationLikelihood {
             || scales.n_cols() != weights.len()
             || scales.n_rows() == 0
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "nonnegative nonzero weights and matching noise SD columns are required",
             ));
         }
@@ -151,13 +152,16 @@ impl BuiltinLocationLikelihood {
             scales
                 .n_rows()
                 .checked_mul(scales.n_cols())
-                .ok_or_else(|| invalid("noise matrix size overflows"))?,
+                .ok_or_else(|| {
+                    scoped_invalid_options(ERROR_SCOPE, "noise matrix size overflows")
+                })?,
         );
         for i in 0..scales.n_rows() {
             for j in 0..scales.n_cols() {
                 let s = *scales.get(i, j)?;
                 if !s.is_finite() || s < 0.0 || !(s * s).is_finite() {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "noise SDs must be finite nonnegative and squareable",
                     ));
                 }
@@ -180,7 +184,8 @@ impl BuiltinLocationLikelihood {
             || second.is_empty()
             || first.iter().chain(&second).any(|x| x.is_nan() || *x <= 0.0)
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "log-F degrees of freedom must be positive and nonmissing",
             ));
         }
@@ -208,7 +213,8 @@ impl BuiltinLocationLikelihood {
             Parameters::LogF { first, second } => valid(first.len()) && valid(second.len()),
         };
         if !ok {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "parameter rows must be one or match the complete observation count",
             ));
         }
@@ -217,7 +223,10 @@ impl BuiltinLocationLikelihood {
     pub fn for_observation(&self, row: usize, n: usize) -> Result<Self, DeseqError> {
         self.validate_observations(n)?;
         if row >= n {
-            return Err(invalid("observation index is out of range"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "observation index is out of range",
+            ));
         }
         Ok(Self {
             parameters: Arc::clone(&self.parameters),

@@ -1,4 +1,6 @@
 //! Shared location preprocessing and likelihood-only mixture fitting.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "location shrinkage";
 use super::{
     LocationLikelihood, LocationShrinkageOptions, MixtureComponents, MixtureFit, MixtureGrid,
     prepare_mixture_grid,
@@ -14,35 +16,40 @@ pub(super) struct FittedLocation {
     pub scale: Vec<f64>,
     pub warnings: Vec<String>,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("location shrinkage: {reason}"),
-    }
-}
 pub(super) fn fit_location(
     estimates: &[f64],
     standard_errors: &[f64],
     options: &LocationShrinkageOptions,
 ) -> Result<FittedLocation, DeseqError> {
     if standard_errors.len() != estimates.len() && standard_errors.len() != 1 {
-        return Err(invalid("SEs must have length one or match estimates"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "SEs must have length one or match estimates",
+        ));
     }
     if !options.alpha.is_finite()
         || !options.prune_threshold.is_finite()
         || options.prune_threshold < 0.0
         || options.thresholds.iter().any(|v| v.is_nan())
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "finite alpha/nonnegative pruning threshold and nonmissing CDF cutoffs are required",
         ));
     }
     if !estimates.iter().enumerate().any(|(i, x)| {
         !x.is_nan() && !standard_errors[if standard_errors.len() == 1 { 0 } else { i }].is_nan()
     }) {
-        return Err(invalid("all input observations are missing"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "all input observations are missing",
+        ));
     }
     if options.fixed_prior && options.supplied_grid.is_none() {
-        return Err(invalid("fixed_prior requires a supplied mixture grid"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "fixed_prior requires a supplied mixture grid",
+        ));
     }
     let n = estimates.len();
     options.likelihood.validate_observations(n)?;
@@ -53,14 +60,20 @@ pub(super) fn fit_location(
     for (i, &estimate) in estimates.iter().enumerate() {
         let s = standard_errors[if standard_errors.len() == 1 { 0 } else { i }];
         if s < 0.0 {
-            return Err(invalid("standard errors must be nonnegative"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "standard errors must be nonnegative",
+            ));
         }
         let factor = s.powf(options.alpha);
         let value = estimate / factor;
         let error = s.powf(1.0 - options.alpha);
         if !value.is_nan() && !error.is_nan() && error != 0.0 && error != f64::INFINITY {
             if !value.is_finite() || !error.is_finite() {
-                return Err(invalid("nonexcluded estimates and SEs must be finite"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "nonexcluded estimates and SEs must be finite",
+                ));
             }
             included.push(i);
         }
@@ -97,7 +110,8 @@ pub(super) fn fit_location(
         && sds.contains(&0.0)
         && x.iter().zip(&se).any(|(x, s)| x.is_nan() || s.is_nan())
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "missing observations with zero-SD truncated components are undefined",
         ));
     }
@@ -108,7 +122,8 @@ pub(super) fn fit_location(
                 || (!options.fit_options.optimizer.is_variational() && *v < 1.0)
         })
     {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "finite Dirichlet parameters >= 1 must match the prior components",
         ));
     }
@@ -131,7 +146,8 @@ pub(super) fn fit_location(
         let fit_se = included.iter().map(|&i| se[i]).collect::<Vec<_>>();
         let weights = if let Some(w) = &options.observation_weights {
             if w.len() != n {
-                return Err(invalid(
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
                     "observation weights must match the complete observation vector",
                 ));
             }
@@ -141,10 +157,9 @@ pub(super) fn fit_location(
         };
         // Use the likelihood selected above for every component family.
         let k = grid.initial_weights.len();
-        fit_x
-            .len()
-            .checked_mul(k)
-            .ok_or_else(|| invalid("likelihood matrix shape overflows"))?;
+        fit_x.len().checked_mul(k).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "likelihood matrix shape overflows")
+        })?;
         let mut ll = vec![];
         for (&row, (&value, &error)) in included.iter().zip(fit_x.iter().zip(&fit_se)) {
             ll.extend(initial_prior.log_likelihoods_at(value, error, row, n)?);

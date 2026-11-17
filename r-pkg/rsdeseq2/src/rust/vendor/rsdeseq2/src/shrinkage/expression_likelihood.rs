@@ -1,4 +1,6 @@
 //! Restricted numeric functions imported as data, never foreign callbacks.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "restricted likelihood expression";
 use super::{expression_quadrature::integrate, location_missing::NA};
 use crate::{
     DeseqError,
@@ -17,26 +19,33 @@ pub struct RestrictedFunction {
     expression: Expression,
     constants: Vec<(String, Value)>,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("restricted likelihood expression: {reason}"),
-    }
-}
 pub(super) fn scalar(value: &Value) -> Result<f64, DeseqError> {
     if value.dimensions.is_some() || !value.attributes.is_empty() {
-        return Err(invalid("only unclassed scalar values are supported"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "only unclassed scalar values are supported",
+        ));
     }
     match &value.data {
         Data::Number { values, .. } => match values.as_slice() {
             [v] => Ok(*v),
-            _ => Err(invalid("numeric value must have length one")),
+            _ => Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "numeric value must have length one",
+            )),
         },
         Data::Logical(v) => match v.as_slice() {
             [Some(v)] => Ok(f64::from(*v)),
             [None] => Ok(NA),
-            _ => Err(invalid("logical value must have length one")),
+            _ => Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "logical value must have length one",
+            )),
         },
-        _ => Err(invalid("only numeric and logical values are supported")),
+        _ => Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "only numeric and logical values are supported",
+        )),
     }
 }
 pub(super) fn validate(
@@ -47,7 +56,10 @@ pub(super) fn validate(
 ) -> Result<(), DeseqError> {
     *nodes += 1;
     if depth > 128 || *nodes > 4096 {
-        return Err(invalid("expression exceeds nesting or node limit"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "expression exceeds nesting or node limit",
+        ));
     }
     match expression {
         Expression::Literal(v) => {
@@ -55,7 +67,10 @@ pub(super) fn validate(
         }
         Expression::Symbol(s) => {
             if !bindings.contains(&s.as_str()) {
-                return Err(invalid("expression refers to an uncaptured variable"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "expression refers to an uncaptured variable",
+                ));
             }
         }
         Expression::Call {
@@ -77,19 +92,26 @@ pub(super) fn validate(
                 "ifelse" => (3, 3, &["test", "yes", "no"]),
                 "pmin" | "pmax" => (1, usize::MAX, &[]),
                 _ => {
-                    return Err(invalid(
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
                         "unsupported call; only pure elementwise arithmetic is allowed",
                     ));
                 }
             };
             if arguments.len() < minimum || arguments.len() > maximum {
-                return Err(invalid("unsupported function arity"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "unsupported function arity",
+                ));
             }
             let mut seen = vec![];
             for a in arguments {
                 if let Some(name) = &a.name {
                     if !formals.contains(&name.as_str()) || seen.contains(&name.as_str()) {
-                        return Err(invalid("unsupported or duplicate argument name"));
+                        return Err(scoped_invalid_options(
+                            ERROR_SCOPE,
+                            "unsupported or duplicate argument name",
+                        ));
                     }
                     seen.push(name.as_str());
                 }
@@ -107,18 +129,27 @@ impl RestrictedFunction {
         constants: Vec<(String, Value)>,
     ) -> Result<Self, DeseqError> {
         if arguments.is_empty() || arguments.len() > 2 {
-            return Err(invalid("one or two scalar arguments are required"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "one or two scalar arguments are required",
+            ));
         }
         let mut bindings = vec![];
         for name in &arguments {
             if name.is_empty() || bindings.contains(&name.as_str()) {
-                return Err(invalid("argument names must be nonempty and unique"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "argument names must be nonempty and unique",
+                ));
             }
             bindings.push(name.as_str());
         }
         for (name, value) in &constants {
             if name.is_empty() || bindings.contains(&name.as_str()) {
-                return Err(invalid("captured names must be nonempty and unique"));
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "captured names must be nonempty and unique",
+                ));
             }
             scalar(value)?;
             bindings.push(name.as_str());
@@ -141,7 +172,10 @@ impl RestrictedFunction {
     /// Evaluate with the same standalone expression engine used by formulas.
     pub fn evaluate(&self, arguments: &[f64]) -> Result<f64, DeseqError> {
         if arguments.len() != self.arguments.len() {
-            return Err(invalid("argument count differs from the imported function"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "argument count differs from the imported function",
+            ));
         }
         let mut bindings = self.constants.clone();
         bindings.extend(
@@ -189,7 +223,10 @@ impl RestrictedLikelihood {
             || first.as_ref().is_some_and(|f| f.arity() != 2)
             || second.as_ref().is_some_and(|f| f.arity() != 2)
         {
-            return Err(invalid("likelihood name and function arities are invalid"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "likelihood name and function arities are invalid",
+            ));
         }
         Ok(Self {
             name,
@@ -216,7 +253,12 @@ impl RestrictedLikelihood {
         let expression = match order {
             1 => self.first.as_ref(),
             2 => self.second.as_ref(),
-            _ => return Err(invalid("only first and second moments are supported")),
+            _ => {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "only first and second moments are supported",
+                ));
+            }
         };
         if let Some(f) = expression {
             return f.evaluate(&[a, b]);
@@ -229,7 +271,10 @@ impl RestrictedLikelihood {
         }
         let denominator = language_exp(self.log_cdf(b)) - language_exp(self.log_cdf(a));
         if denominator.is_nan() {
-            return Err(invalid("truncated CDF difference is missing"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "truncated CDF difference is missing",
+            ));
         }
         if denominator == 0.0 {
             return Ok(NA);

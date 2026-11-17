@@ -1,4 +1,6 @@
 //! Selection of fields consumed by the DESeq-style adaptive shrinkage wrapper.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "adaptive shrinkage output";
 use super::{
     AdaptiveShrinkageQuery, LocationShrinkage, LocationShrinkageOptions,
     adaptive_result::adaptive_shrinkage_impl, location_batch::shrink_location_batch_with_outputs,
@@ -28,7 +30,10 @@ impl AdaptiveOutputSelection {
     /// Levels four and five have the original special field selections.
     pub fn level(level: f64) -> Result<Self, DeseqError> {
         if level.is_nan() {
-            return Err(invalid("outputlevel must not be missing"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "outputlevel must not be missing",
+            ));
         }
         Ok(Self {
             posterior_mean: level > 0.0 && level != 5.0,
@@ -77,11 +82,6 @@ pub struct SelectedAdaptiveShrinkageResult {
     pub svalues: Option<Vec<f64>>,
     pub fitted_prior: bool,
 }
-fn invalid(reason: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("adaptive shrinkage output: {reason}"),
-    }
-}
 /// Fit and select the wrapper's numerical fields in the shared Rust engine.
 /// Threshold queries require a fitted prior and posterior means even when the
 /// ordinary s-value output is deselected. Without any selected summary there is
@@ -94,10 +94,14 @@ pub fn adaptive_shrinkage_with_output(
     output: AdaptiveOutputSelection,
 ) -> Result<SelectedAdaptiveShrinkageResult, DeseqError> {
     if !query.lfc_threshold.is_finite() || query.lfc_threshold < 0.0 {
-        return Err(invalid("LFC threshold must be finite and nonnegative"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "LFC threshold must be finite and nonnegative",
+        ));
     }
     if query.lfc_threshold > 0.0 && (!output.posterior_mean || !output.fitted_prior) {
-        return Err(invalid(
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
             "threshold queries require PosteriorMean and fitted_g outputs",
         ));
     }

@@ -1,7 +1,8 @@
 //! Independent squared extrapolation (Varadhan/Roland 2008), with explicit
 //! frontend policy controls. No SQUAREM/ashr source implementation is imported.
-use super::invalid;
+use super::ERROR_SCOPE;
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PolynomialExtrapolation {
     #[default]
@@ -52,7 +53,10 @@ impl SquaremOptions {
             || self.objective_increase.is_nan()
             || self.objective_increase < 0.0
         {
-            return Err(invalid("invalid squared-EM controls"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "invalid squared-EM controls",
+            ));
         }
         Ok(())
     }

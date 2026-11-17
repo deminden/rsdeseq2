@@ -2,10 +2,11 @@
 //! The polynomials minimize a residual or annihilate its last difference;
 //! squaring convolves their coefficients (Roland/Varadhan/Frangakis 2007).
 use super::{
-    invalid,
+    ERROR_SCOPE,
     squarem::{Iteration, PolynomialExtrapolation, SquaremOptions},
 };
 use crate::DeseqError;
+use crate::errors::scoped_invalid_options;
 use nalgebra::{DMatrix, DVector};
 fn norm(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
@@ -57,15 +58,18 @@ pub(super) fn run(
 ) -> Result<Iteration, DeseqError> {
     let k = o.polynomial_order;
     if k > initial.len() {
-        return Err(invalid("polynomial order exceeds retained component count"));
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "polynomial order exceeds retained component count",
+        ));
     }
     let capacity = k
         .checked_mul(2)
         .and_then(|v| v.checked_add(2))
-        .ok_or_else(|| invalid("polynomial dimensions overflow"))?;
-    capacity
-        .checked_mul(initial.len())
-        .ok_or_else(|| invalid("polynomial state dimensions overflow"))?;
+        .ok_or_else(|| scoped_invalid_options(ERROR_SCOPE, "polynomial dimensions overflow"))?;
+    capacity.checked_mul(initial.len()).ok_or_else(|| {
+        scoped_invalid_options(ERROR_SCOPE, "polynomial state dimensions overflow")
+    })?;
     let mut score = objective(&initial);
     let mut state = update(&initial)?;
     let mut residual = norm(&state, &initial);

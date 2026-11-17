@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid, is_na};
+use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid_options, is_na};
 use crate::{design::numeric_transform::scalar_mean, errors::DeseqError};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -12,7 +12,7 @@ impl Evaluator<'_> {
                 .filter(|(n, _)| n.as_deref() == Some("na.rm"))
                 .collect::<Vec<_>>();
             if controls.len() > 1 {
-                return Err(invalid("duplicate sum na.rm argument"));
+                return Err(invalid_options("duplicate sum na.rm argument"));
             }
             let remove = controls
                 .first()
@@ -27,7 +27,7 @@ impl Evaluator<'_> {
                     continue;
                 }
                 if value.has_class("factor") || value.has_class("Date") {
-                    return Err(invalid("sum requires numeric or logical values"));
+                    return Err(invalid_options("sum requires numeric or logical values"));
                 }
                 integer &= matches!(
                     value.data,
@@ -93,7 +93,7 @@ impl Evaluator<'_> {
             vec!["x", "na.rm"]
         };
         let a = arguments(args, &formals)?;
-        let input = a[0].ok_or_else(|| invalid("formula summary requires x"))?;
+        let input = a[0].ok_or_else(|| invalid_options("formula summary requires x"))?;
         if name == "mean" && matches!(input.data, Data::Null | Data::Text(_) | Data::List(_)) {
             return Ok(Value::scalar(NA_REAL));
         }
@@ -101,7 +101,7 @@ impl Evaluator<'_> {
             if name == "mean" {
                 return Ok(Value::scalar(NA_REAL));
             }
-            return Err(invalid("sd requires numeric covariates"));
+            return Err(invalid_options("sd requires numeric covariates"));
         }
         let mut x = input.flattened().numeric()?;
         let remove = a[if name == "mean" { 2 } else { 1 }]
@@ -122,14 +122,14 @@ impl Evaluator<'_> {
         } else {
             let trim = if let Some(v) = a[1] {
                 if !matches!(v.data, Data::Number { .. }) {
-                    return Err(invalid("mean trim must be numeric"));
+                    return Err(invalid_options("mean trim must be numeric"));
                 }
                 v.scalar_number()?
             } else {
                 0.0
             };
             if trim.is_nan() {
-                return Err(invalid("mean trim must not be missing"));
+                return Err(invalid_options("mean trim must not be missing"));
             }
             if cfg!(all(target_os = "linux", target_arch = "x86_64"))
                 && trim <= 0.0

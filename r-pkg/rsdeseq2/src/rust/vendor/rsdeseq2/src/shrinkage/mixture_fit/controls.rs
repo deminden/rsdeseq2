@@ -1,5 +1,6 @@
 //! Numerical policies for nondefault sequential-quadratic mixture fitting.
-use super::{DeseqError, invalid};
+use super::{DeseqError, ERROR_SCOPE};
+use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug)]
 pub struct MixtureSqpOptions {
     /// Use ashr/mixSQP's EM floors and direction-based active-set transitions.
@@ -55,7 +56,8 @@ impl MixtureSqpOptions {
                 .svd_tolerance
                 .is_some_and(|x| !x.is_finite() || x < 0.0)
         {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "invalid SQP active-set, line-search, ridge or SVD controls",
             ));
         }

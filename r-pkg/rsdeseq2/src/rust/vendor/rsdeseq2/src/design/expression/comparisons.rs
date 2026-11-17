@@ -1,4 +1,4 @@
-use super::{Data, Evaluator, Value, invalid};
+use super::{Data, Evaluator, Value, invalid_options};
 use crate::errors::DeseqError;
 use std::cmp::Ordering;
 impl Evaluator<'_> {
@@ -20,7 +20,7 @@ impl Evaluator<'_> {
             && right.dimensions.is_some()
             && left.dimensions != right.dimensions
         {
-            return Err(invalid("non-conformable formula arrays"));
+            return Err(invalid_options("non-conformable formula arrays"));
         }
         let characters = |v: &Value| {
             let mut x = v.clone();
@@ -44,23 +44,27 @@ impl Evaluator<'_> {
             left
         };
         if template.dimensions.is_some() && template.len() != n {
-            return Err(invalid("formula vector is longer than its matrix"));
+            return Err(invalid_options("formula vector is longer than its matrix"));
         }
         let equal = matches!(name, "==" | "!=");
         let levels = |v: &Value| {
             v.attribute("levels")
-                .ok_or_else(|| invalid("factor levels missing"))?
+                .ok_or_else(|| invalid_options("factor levels missing"))?
                 .text()
         };
         let ordered = left.has_class("ordered") || right.has_class("ordered");
         if factor && !equal && !ordered {
-            return Err(invalid("relational comparison requires ordered factors"));
+            return Err(invalid_options(
+                "relational comparison requires ordered factors",
+            ));
         }
         if left.has_class("factor") && right.has_class("factor") {
             let x = levels(left)?;
             let y = levels(right)?;
             if x.len() != y.len() || x.iter().any(|v| !y.contains(v)) || ordered && x != y {
-                return Err(invalid("comparison factors have different level sets"));
+                return Err(invalid_options(
+                    "comparison factors have different level sets",
+                ));
             }
         }
         let ordered_levels = if !equal && ordered {

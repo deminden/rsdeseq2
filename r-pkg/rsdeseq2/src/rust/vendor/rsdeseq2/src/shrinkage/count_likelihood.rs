@@ -1,4 +1,6 @@
 //! Count-likelihood kernels expressed as gamma/beta integrals. No R callbacks.
+use crate::errors::scoped_invalid_options;
+const ERROR_SCOPE: &str = "count likelihood";
 use super::{beta_normalization::log_regularized_beta, gamma_probability};
 use crate::DeseqError;
 
@@ -24,11 +26,6 @@ pub(super) enum CountLikelihood {
         trials: Vec<f64>,
         link: BinomialLink,
     },
-}
-fn invalid(s: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("count likelihood: {s}"),
-    }
 }
 fn at(v: &[f64], row: usize) -> f64 {
     v[if v.len() == 1 { 0 } else { row }]
@@ -127,7 +124,8 @@ impl CountLikelihood {
         link: PoissonLink,
     ) -> Result<Self, DeseqError> {
         if !vector(&y, false) || !vector(&scale, true) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite nonnegative counts and positive scales are required",
             ));
         }
@@ -139,7 +137,8 @@ impl CountLikelihood {
         link: BinomialLink,
     ) -> Result<Self, DeseqError> {
         if !vector(&y, false) || !vector(&trials, false) {
-            return Err(invalid(
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
                 "finite nonnegative counts and trial numbers are required",
             ));
         }
@@ -148,7 +147,10 @@ impl CountLikelihood {
             || (trials.len() != 1 && trials.len() != n)
             || (0..n).any(|i| at(&y, i) > at(&trials, i))
         {
-            return Err(invalid("aligned counts must not exceed trials"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "aligned counts must not exceed trials",
+            ));
         }
         Ok(Self::Binomial { y, trials, link })
     }
@@ -217,10 +219,18 @@ impl CountLikelihood {
                 trials,
                 link: BinomialLink::Logit,
             } => (y, Some(trials)),
-            _ => return Err(invalid("adjusted captures require a log/logit likelihood")),
+            _ => {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "adjusted captures require a log/logit likelihood",
+                ));
+            }
         };
         if y.len() != observed.len() || !y.iter().zip(observed).all(|(a, b)| *a == *b + 1e-5) {
-            return Err(invalid("modified adjusted count capture"));
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "modified adjusted count capture",
+            ));
         }
         match (n, trials) {
             (None, None) => Ok(()),
@@ -229,7 +239,10 @@ impl CountLikelihood {
             {
                 Ok(())
             }
-            _ => Err(invalid("modified adjusted trials capture")),
+            _ => Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "modified adjusted trials capture",
+            )),
         }
     }
     pub(super) fn lengths(&self) -> (usize, usize) {
