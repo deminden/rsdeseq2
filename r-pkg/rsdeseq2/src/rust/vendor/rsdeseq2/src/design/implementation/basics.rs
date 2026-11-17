@@ -1,7 +1,8 @@
-use super::DesignOrigin;
-use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::rank::{DEFAULT_RANK_TOLERANCE, matrix_rank, matrix_rank_relative};
-use crate::matrix::RowMajorMatrix;
+pub(super) use super::super::DesignOrigin;
+use super::*;
+pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+pub(super) use crate::math::rank::{DEFAULT_RANK_TOLERANCE, matrix_rank, matrix_rank_relative};
+pub(super) use crate::matrix::RowMajorMatrix;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
 ///

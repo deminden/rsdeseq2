@@ -1,3 +1,4 @@
+use super::*;
 // Complete workflows preserve term and matrix-valued variable order while the
 // expanded compatibility APIs retain their established explicit column layout.
 
@@ -18,7 +19,7 @@ pub fn formula_design_for_fitting_from_model_frame(
 
 // Invariant: term order is always enabled before terms are refreshed.
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-fn refresh_formula_term_order(state: &mut ExpandedFormulaDesignState<'_>) {
+pub(super) fn refresh_formula_term_order(state: &mut ExpandedFormulaDesignState<'_>) {
     if state.term_order.is_none() {
         return;
     }
@@ -39,20 +40,20 @@ fn refresh_formula_term_order(state: &mut ExpandedFormulaDesignState<'_>) {
     }
 }
 
-struct FittingNumericGroup<'a> {
+pub(super) struct FittingNumericGroup<'a> {
     key: String,
     group: Option<usize>,
     columns: Vec<&'a ExpandedNumericSpec<'a>>,
 }
 
-fn formula_fitting_design<'a>(
+pub(super) fn formula_fitting_design<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
     numeric: &'a [ExpandedNumericSpec<'a>],
     derived_factors: &[FormulaDerivedFactorCovariate],
     derived_numeric: &[FormulaDerivedNumericCovariate],
 ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
-    use super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
+    use super::super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
     use crate::matrix::{MatrixOrder, MatrixView};
     let used_factors = formula_used_factors(state, factors)?;
     let used_numeric = formula_used_numeric_covariates(state, numeric)?;
@@ -256,7 +257,8 @@ fn formula_fitting_design<'a>(
     let expanded = ModelMatrixPlan::new(samples, &variables, &expanded_terms, state.has_intercept)?;
     let standard_layout = standard.column_layout();
     let expanded_layout = expanded.column_layout();
-    let names = |plan: &ModelMatrixPlan<'_>, layout: &[Vec<super::model_matrix::ColumnPiece>]| {
+    let names = |plan: &ModelMatrixPlan<'_>,
+                 layout: &[Vec<super::super::model_matrix::ColumnPiece>]| {
         layout
             .iter()
             .map(|pieces| {

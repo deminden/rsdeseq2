@@ -1,4 +1,5 @@
-fn validate_formula_variable(variable: &str) -> Result<(), DeseqError> {
+use super::*;
+pub(super) fn validate_formula_variable(variable: &str) -> Result<(), DeseqError> {
     if variable.is_empty()
         || variable
             .chars()
@@ -11,7 +12,7 @@ fn validate_formula_variable(variable: &str) -> Result<(), DeseqError> {
     Ok(())
 }
 
-fn formula_variable_name(variable: &str) -> Result<&str, DeseqError> {
+pub(super) fn formula_variable_name(variable: &str) -> Result<&str, DeseqError> {
     let variable = variable.trim();
     if let Some(stripped) = variable
         .strip_prefix('`')
@@ -30,7 +31,7 @@ fn formula_variable_name(variable: &str) -> Result<&str, DeseqError> {
     Ok(variable)
 }
 
-fn validate_formula_model_frame_column_name(name: &str) -> Result<(), DeseqError> {
+pub(super) fn validate_formula_model_frame_column_name(name: &str) -> Result<(), DeseqError> {
     if name.is_empty() || name.contains('`') {
         return Err(DeseqError::InvalidOptions {
             reason: format!("formula model-frame column name '{name}' is not supported"),

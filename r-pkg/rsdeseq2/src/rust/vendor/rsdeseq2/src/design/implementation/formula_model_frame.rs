@@ -1,13 +1,17 @@
+use super::*;
 // Model-frame construction, validation and alias resolution.
 
-fn validate_formula_factor_name_collisions(
+pub(super) fn validate_formula_factor_name_collisions(
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<(), DeseqError> {
     for (idx, factor) in factors.iter().enumerate() {
         for previous in &factors[..idx] {
             if previous.factor == factor.factor {
                 return Err(DeseqError::InvalidOptions {
-                    reason: format!("formula variable '{}' appears more than once", factor.factor),
+                    reason: format!(
+                        "formula variable '{}' appears more than once",
+                        factor.factor
+                    ),
                 });
             }
             let previous_aliases = r_like_name_candidates(previous.factor);
@@ -28,14 +32,17 @@ fn validate_formula_factor_name_collisions(
     Ok(())
 }
 
-fn validate_formula_numeric_covariate_name_collisions(
+pub(super) fn validate_formula_numeric_covariate_name_collisions(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(), DeseqError> {
     for (idx, covariate) in numeric_covariates.iter().enumerate() {
         for previous in &numeric_covariates[..idx] {
             if previous.name == covariate.name {
                 return Err(DeseqError::InvalidOptions {
-                    reason: format!("formula variable '{}' appears more than once", covariate.name),
+                    reason: format!(
+                        "formula variable '{}' appears more than once",
+                        covariate.name
+                    ),
                 });
             }
             let previous_aliases = r_like_name_candidates(previous.name);
@@ -56,7 +63,7 @@ fn validate_formula_numeric_covariate_name_collisions(
     Ok(())
 }
 
-fn validate_formula_factor_numeric_name_collisions(
+pub(super) fn validate_formula_factor_numeric_name_collisions(
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(), DeseqError> {
@@ -64,7 +71,10 @@ fn validate_formula_factor_numeric_name_collisions(
         for covariate in numeric_covariates {
             if factor.factor == covariate.name {
                 return Err(DeseqError::InvalidOptions {
-                    reason: format!("formula variable '{}' appears more than once", factor.factor),
+                    reason: format!(
+                        "formula variable '{}' appears more than once",
+                        factor.factor
+                    ),
                 });
             }
             let factor_aliases = r_like_name_candidates(factor.factor);
@@ -85,7 +95,7 @@ fn validate_formula_factor_numeric_name_collisions(
     Ok(())
 }
 
-fn formula_model_frame_from_specs(
+pub(super) fn formula_model_frame_from_specs(
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> FormulaModelFrame {
@@ -144,22 +154,18 @@ pub fn expanded_formula_design_with_offsets_from_model_frame(
     model_frame: &FormulaModelFrame,
 ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
     let resolved = ResolvedFormulaModelFrame::new(model_frame)?;
-    expanded_formula_design_with_offsets(
-        formula,
-        &resolved.factor_specs,
-        &resolved.numeric_specs,
-    )
+    expanded_formula_design_with_offsets(formula, &resolved.factor_specs, &resolved.numeric_specs)
 }
 
-struct ResolvedFormulaModelFrame<'a> {
-    factor_specs: Vec<ExpandedFactorSpec<'a>>,
-    numeric_specs: Vec<ExpandedNumericSpec<'a>>,
+pub(super) struct ResolvedFormulaModelFrame<'a> {
+    pub(super) factor_specs: Vec<ExpandedFactorSpec<'a>>,
+    pub(super) numeric_specs: Vec<ExpandedNumericSpec<'a>>,
 }
 
 impl<'a> ResolvedFormulaModelFrame<'a> {
     // Invariant: factor references are validated by FormulaModelFrame::validate before specs are borrowed.
     #[allow(clippy::unwrap_used, clippy::expect_used)]
-    fn new(model_frame: &'a FormulaModelFrame) -> Result<Self, DeseqError> {
+    pub(super) fn new(model_frame: &'a FormulaModelFrame) -> Result<Self, DeseqError> {
         validate_formula_model_frame(model_frame)?;
         let factor_specs = model_frame
             .factors
@@ -190,7 +196,9 @@ impl<'a> ResolvedFormulaModelFrame<'a> {
     }
 }
 
-fn validate_formula_model_frame(model_frame: &FormulaModelFrame) -> Result<(), DeseqError> {
+pub(super) fn validate_formula_model_frame(
+    model_frame: &FormulaModelFrame,
+) -> Result<(), DeseqError> {
     let n_samples = formula_model_frame_sample_count(model_frame)?;
     for (idx, factor) in model_frame.factors.iter().enumerate() {
         validate_formula_model_frame_column_name(&factor.name)?;
@@ -275,7 +283,7 @@ fn validate_formula_model_frame(model_frame: &FormulaModelFrame) -> Result<(), D
     Ok(())
 }
 
-fn formula_model_frame_factor_reference(
+pub(super) fn formula_model_frame_factor_reference(
     factor: &FormulaFactorColumn,
 ) -> Result<&str, DeseqError> {
     if let Some(reference) = factor.reference.as_deref() {
@@ -294,7 +302,7 @@ fn formula_model_frame_factor_reference(
         })
 }
 
-fn resolve_formula_model_frame_reference_alias<'a>(
+pub(super) fn resolve_formula_model_frame_reference_alias<'a>(
     factor: &'a FormulaFactorColumn,
     requested: &str,
 ) -> Result<&'a str, DeseqError> {
@@ -302,7 +310,9 @@ fn resolve_formula_model_frame_reference_alias<'a>(
     resolve_formula_reference_alias_from_levels(&factor.name, &levels, requested)
 }
 
-fn formula_model_frame_factor_level_candidates(factor: &FormulaFactorColumn) -> Vec<&str> {
+pub(super) fn formula_model_frame_factor_level_candidates(
+    factor: &FormulaFactorColumn,
+) -> Vec<&str> {
     let mut levels = Vec::new();
     if let Some(declared) = &factor.levels {
         for level in declared {
@@ -319,7 +329,7 @@ fn formula_model_frame_factor_level_candidates(factor: &FormulaFactorColumn) -> 
     levels
 }
 
-fn resolve_formula_reference_alias_from_levels<'a>(
+pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
     factor_name: &str,
     levels: &[&'a str],
     requested: &str,
@@ -365,7 +375,9 @@ fn resolve_formula_reference_alias_from_levels<'a>(
     }
 }
 
-fn formula_model_frame_sample_count(model_frame: &FormulaModelFrame) -> Result<usize, DeseqError> {
+pub(super) fn formula_model_frame_sample_count(
+    model_frame: &FormulaModelFrame,
+) -> Result<usize, DeseqError> {
     if let Some(factor) = model_frame.factors.first() {
         if factor.sample_levels.is_empty() {
             return Err(DeseqError::InvalidOptions {

@@ -1,6 +1,7 @@
+use super::*;
 // Numeric transform discovery, parsing and covariate resolution.
 
-fn expand_formula_numeric_transform_terms(
+pub(super) fn expand_formula_numeric_transform_terms(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
@@ -77,7 +78,7 @@ fn expand_formula_numeric_transform_terms(
     Ok((expanded, derived))
 }
 
-fn formula_transform_close_index(after_open: &str) -> Result<usize, DeseqError> {
+pub(super) fn formula_transform_close_index(after_open: &str) -> Result<usize, DeseqError> {
     let mut depth = 0_i32;
     let mut in_backticks = false;
     let mut quote = None;
@@ -127,12 +128,12 @@ fn formula_transform_close_index(after_open: &str) -> Result<usize, DeseqError> 
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FormulaNumericTransform {
+pub(super) struct FormulaNumericTransform {
     name: &'static str,
     label: &'static str,
 }
 
-const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 11] = [
+pub(super) const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 11] = [
     FormulaNumericTransform {
         name: "poly",
         label: "poly",
@@ -179,16 +180,15 @@ const FORMULA_NUMERIC_TRANSFORMS: [FormulaNumericTransform; 11] = [
     },
 ];
 
-fn next_formula_numeric_transform(rhs: &str) -> Option<(usize, usize, FormulaNumericTransform)> {
+pub(super) fn next_formula_numeric_transform(
+    rhs: &str,
+) -> Option<(usize, usize, FormulaNumericTransform)> {
     let mut in_backticks = false;
     let mut quote = None;
     let mut escaped_quote = false;
     let mut idx = 0_usize;
     while idx < rhs.len() {
-        let character = rhs[idx..]
-            .chars()
-            .next()
-            ?;
+        let character = rhs[idx..].chars().next()?;
         if let Some(active_quote) = quote {
             if escaped_quote {
                 escaped_quote = false;
@@ -222,7 +222,7 @@ fn next_formula_numeric_transform(rhs: &str) -> Option<(usize, usize, FormulaNum
     None
 }
 
-fn formula_numeric_transform_inner_expression(
+pub(super) fn formula_numeric_transform_inner_expression(
     expression: &str,
     transform: FormulaNumericTransform,
 ) -> Option<&str> {
@@ -231,16 +231,13 @@ fn formula_numeric_transform_inner_expression(
     trimmed[after_open..].strip_suffix(')')
 }
 
-fn formula_call_after_open(text: &str, idx: usize, name: &str) -> Option<usize> {
+pub(super) fn formula_call_after_open(text: &str, idx: usize, name: &str) -> Option<usize> {
     if !formula_call_has_left_boundary(text, idx) || !text[idx..].starts_with(name) {
         return None;
     }
     let mut after_name = idx + name.len();
     while after_name < text.len() {
-        let character = text[after_name..]
-            .chars()
-            .next()
-            ?;
+        let character = text[after_name..].chars().next()?;
         if !character.is_whitespace() {
             break;
         }
@@ -253,7 +250,7 @@ fn formula_call_after_open(text: &str, idx: usize, name: &str) -> Option<usize> 
     }
 }
 
-fn formula_call_has_left_boundary(text: &str, idx: usize) -> bool {
+pub(super) fn formula_call_has_left_boundary(text: &str, idx: usize) -> bool {
     if idx == 0 {
         return true;
     }
@@ -263,7 +260,7 @@ fn formula_call_has_left_boundary(text: &str, idx: usize) -> bool {
     !(previous.is_alphanumeric() || previous == '_' || previous == '.')
 }
 
-fn formula_numeric_transform_term(
+pub(super) fn formula_numeric_transform_term(
     transform: FormulaNumericTransform,
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -288,7 +285,7 @@ fn formula_numeric_transform_term(
     }
 }
 
-fn formula_numeric_function_term(
+pub(super) fn formula_numeric_function_term(
     transform: FormulaNumericTransform,
     expression: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -310,7 +307,7 @@ fn formula_numeric_function_term(
     formula_numeric_covariate_function_values(transform, expression, covariate, base)
 }
 
-fn formula_numeric_covariate_function_values(
+pub(super) fn formula_numeric_covariate_function_values(
     transform: FormulaNumericTransform,
     expression: &str,
     covariate: &ExpandedNumericSpec<'_>,
@@ -319,7 +316,7 @@ fn formula_numeric_covariate_function_values(
     let numeric_name = covariate.name;
     let mut arguments = vec![(Some("x"), formula_numeric_value(covariate.values))];
     if let Some(base) = base {
-        arguments.push((Some("base"), super::expression::Value::scalar(base)));
+        arguments.push((Some("base"), super::super::expression::Value::scalar(base)));
     }
     let values = formula_call_values(
         transform.name,
@@ -334,7 +331,7 @@ fn formula_numeric_covariate_function_values(
     Ok((name, values))
 }
 
-fn formula_factor_numeric_coercion_term(
+pub(super) fn formula_factor_numeric_coercion_term(
     transform: FormulaNumericTransform,
     expression: &str,
     factor_name: &str,
@@ -342,7 +339,7 @@ fn formula_factor_numeric_coercion_term(
 ) -> Result<(String, Vec<f64>), DeseqError> {
     let factor = find_formula_factor(factor_name, factors)?;
     let levels = formula_factor_code_levels(factor);
-    use super::expression::{Argument, Data, Expression, Value};
+    use super::super::expression::{Argument, Data, Expression, Value};
     let text = |v: &[String]| {
         Expression::Literal(Value::new(Data::Text(
             v.iter().cloned().map(Some).collect(),
@@ -375,7 +372,7 @@ fn formula_factor_numeric_coercion_term(
     Ok((format!("{}_{}", factor.factor, transform.label), values))
 }
 
-fn formula_factor_code_levels(factor: &ExpandedFactorSpec<'_>) -> Vec<String> {
+pub(super) fn formula_factor_code_levels(factor: &ExpandedFactorSpec<'_>) -> Vec<String> {
     if let Some(levels) = factor.levels {
         return levels.to_vec();
     }
@@ -388,7 +385,7 @@ fn formula_factor_code_levels(factor: &ExpandedFactorSpec<'_>) -> Vec<String> {
     levels
 }
 
-fn formula_numeric_function_arguments(
+pub(super) fn formula_numeric_function_arguments(
     transform: FormulaNumericTransform,
     expression: &str,
 ) -> Result<(String, Option<f64>), DeseqError> {
@@ -461,7 +458,7 @@ fn formula_numeric_function_arguments(
     Ok((numeric_text, base))
 }
 
-fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqError> {
+pub(super) fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
     let parsed = value
         .parse::<f64>()
@@ -480,11 +477,11 @@ fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqErr
     Ok(parsed)
 }
 
-fn formula_numeric_label(value: f64) -> String {
+pub(super) fn formula_numeric_label(value: f64) -> String {
     value.to_string().replace('.', "_")
 }
 
-fn find_formula_numeric_covariate<'a>(
+pub(super) fn find_formula_numeric_covariate<'a>(
     numeric_name: &str,
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<&'a ExpandedNumericSpec<'a>, DeseqError> {
@@ -527,7 +524,7 @@ fn find_formula_numeric_covariate<'a>(
     }
 }
 
-fn maybe_formula_numeric_covariate<'a>(
+pub(super) fn maybe_formula_numeric_covariate<'a>(
     numeric_name: Option<&str>,
     numeric_covariates: &'a [ExpandedNumericSpec<'a>],
 ) -> Result<Option<&'a ExpandedNumericSpec<'a>>, DeseqError> {

@@ -1,10 +1,13 @@
+use super::*;
 // Identity, scalar, binary and power arithmetic transforms.
 
-fn split_formula_transform_arguments(expression: &str) -> Result<Vec<String>, DeseqError> {
+pub(super) fn split_formula_transform_arguments(
+    expression: &str,
+) -> Result<Vec<String>, DeseqError> {
     split_formula_top_level(expression, ',')
 }
 
-fn formula_numeric_identity_or_power_term(
+pub(super) fn formula_numeric_identity_or_power_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
@@ -31,7 +34,9 @@ fn formula_numeric_identity_or_power_term(
     formula_numeric_power_term(expression, numeric_name, exponent_text, numeric_covariates)
 }
 
-fn split_formula_numeric_scalar_expression(expression: &str) -> Option<(&str, char, &str)> {
+pub(super) fn split_formula_numeric_scalar_expression(
+    expression: &str,
+) -> Option<(&str, char, &str)> {
     let mut in_backticks = false;
     for (idx, op) in expression.char_indices() {
         if op == '`' {
@@ -54,7 +59,7 @@ fn split_formula_numeric_scalar_expression(expression: &str) -> Option<(&str, ch
     None
 }
 
-fn formula_numeric_scalar_expression_term(
+pub(super) fn formula_numeric_scalar_expression_term(
     expression: &str,
     left: &str,
     op: char,
@@ -98,7 +103,7 @@ fn formula_numeric_scalar_expression_term(
         });
     }
     let input = formula_numeric_value(covariate.values);
-    let scalar_value = super::expression::Value::scalar(scalar);
+    let scalar_value = super::super::expression::Value::scalar(scalar);
     let arguments = if scalar_on_left {
         vec![(None, scalar_value), (None, input)]
     } else {
@@ -116,7 +121,7 @@ fn formula_numeric_scalar_expression_term(
     ))
 }
 
-fn formula_numeric_binary_expression_term(
+pub(super) fn formula_numeric_binary_expression_term(
     expression: &str,
     left_name: &str,
     op: char,
@@ -150,7 +155,7 @@ fn formula_numeric_binary_expression_term(
     ))
 }
 
-fn parse_formula_scalar(value: &str, expression: &str) -> Result<f64, DeseqError> {
+pub(super) fn parse_formula_scalar(value: &str, expression: &str) -> Result<f64, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
     let scalar = value
         .parse::<f64>()
@@ -165,7 +170,7 @@ fn parse_formula_scalar(value: &str, expression: &str) -> Result<f64, DeseqError
     Ok(scalar)
 }
 
-fn formula_binary_operator_label(op: char) -> &'static str {
+pub(super) fn formula_binary_operator_label(op: char) -> &'static str {
     match op {
         '+' => "plus",
         '-' => "minus",
@@ -175,7 +180,7 @@ fn formula_binary_operator_label(op: char) -> &'static str {
     }
 }
 
-fn formula_scalar_operator_label(op: char, scalar_on_left: bool) -> &'static str {
+pub(super) fn formula_scalar_operator_label(op: char, scalar_on_left: bool) -> &'static str {
     match (scalar_on_left, op) {
         (_, '+') => "plus",
         (false, '-') => "minus",
@@ -187,7 +192,7 @@ fn formula_scalar_operator_label(op: char, scalar_on_left: bool) -> &'static str
     }
 }
 
-fn formula_scalar_value_label(value: &str) -> String {
+pub(super) fn formula_scalar_value_label(value: &str) -> String {
     let mut label = String::new();
     for ch in value.trim().chars() {
         match ch {
@@ -201,7 +206,7 @@ fn formula_scalar_value_label(value: &str) -> String {
     label
 }
 
-fn formula_numeric_identity_term(
+pub(super) fn formula_numeric_identity_term(
     expression: &str,
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
@@ -221,7 +226,7 @@ fn formula_numeric_identity_term(
     Ok((format!("{numeric_name}_{label}"), values))
 }
 
-fn formula_numeric_power_term(
+pub(super) fn formula_numeric_power_term(
     expression: &str,
     numeric_name: &str,
     exponent_text: &str,
@@ -245,14 +250,17 @@ fn formula_numeric_power_term(
         "^",
         vec![
             (None, formula_numeric_value(covariate.values)),
-            (None, super::expression::Value::scalar(exponent as f64)),
+            (
+                None,
+                super::super::expression::Value::scalar(exponent as f64),
+            ),
         ],
         &format!("I({expression})"),
     )?;
     Ok((format!("{numeric_name}_pow_{exponent}"), values))
 }
 
-fn formula_variable_term(name: &str) -> String {
+pub(super) fn formula_variable_term(name: &str) -> String {
     if validate_formula_variable(name).is_ok() {
         name.to_string()
     } else {

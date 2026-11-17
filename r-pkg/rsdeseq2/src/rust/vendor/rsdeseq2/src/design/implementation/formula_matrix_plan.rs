@@ -1,6 +1,7 @@
+use super::*;
 // Translate the compatibility parser's column order and labels into the shared
 // model-matrix product plan. No factor indicators/products are calculated here.
-fn formula_expanded_matrix_values(
+pub(super) fn formula_expanded_matrix_values(
     state: &ExpandedFormulaDesignState<'_>,
     factors: &[ExpandedFactorSpec<'_>],
     numeric: &[ExpandedNumericSpec<'_>],
@@ -8,8 +9,8 @@ fn formula_expanded_matrix_values(
     names: &[String],
     samples: usize,
 ) -> Result<Vec<f64>, DeseqError> {
-    use super::model_matrix::{ColumnPiece, PlannedColumn};
-    use super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
+    use super::super::model_matrix::{ColumnPiece, PlannedColumn};
+    use super::super::{FactorCoding, ModelMatrixPlan, ModelMatrixVariable};
     use crate::matrix::{MatrixOrder, MatrixView};
     let codes = factors
         .iter()
@@ -120,9 +121,12 @@ fn formula_expanded_matrix_values(
                 .iter()
                 .zip(grid)
                 .map(|(variable, level)| match variable {
-                    FormulaVariableRef::Factor(name) => {
-                        factor_piece(name, level.ok_or_else(|| crate::errors::invariant("factor grid contains a level"))?)
-                    }
+                    FormulaVariableRef::Factor(name) => factor_piece(
+                        name,
+                        level.ok_or_else(|| {
+                            crate::errors::invariant("factor grid contains a level")
+                        })?,
+                    ),
                     FormulaVariableRef::Numeric(name) => numeric_piece(name),
                 })
                 .collect::<Result<Vec<_>, DeseqError>>()?;

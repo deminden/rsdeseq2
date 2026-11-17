@@ -1,11 +1,12 @@
+use super::*;
 // Formula right-hand sides and offset extraction.
 
-struct FormulaOffsets {
+pub(super) struct FormulaOffsets {
     values: Vec<f64>,
     seen: Vec<Vec<FormulaOffsetToken>>,
 }
 
-fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
+pub(super) fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
     let trimmed = formula.trim();
     let Some(rhs) = trimmed.strip_prefix('~') else {
         return Err(DeseqError::InvalidOptions {
@@ -21,7 +22,7 @@ fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
     Ok(rhs)
 }
 
-fn extract_formula_offsets(
+pub(super) fn extract_formula_offsets(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
@@ -55,7 +56,7 @@ fn extract_formula_offsets(
     Ok((join_formula_terms(&remaining_terms), offsets.values))
 }
 
-fn formula_term_has_offset(term: &str) -> Result<bool, DeseqError> {
+pub(super) fn formula_term_has_offset(term: &str) -> Result<bool, DeseqError> {
     let term = term.trim();
     if formula_offset_expression(term)?.is_some() {
         return Ok(true);
@@ -71,7 +72,7 @@ fn formula_term_has_offset(term: &str) -> Result<bool, DeseqError> {
     Ok(false)
 }
 
-fn extract_formula_offset_term(
+pub(super) fn extract_formula_offset_term(
     sign: i8,
     term: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -129,10 +130,12 @@ fn extract_formula_offset_term(
     }
     let values = [formula_numeric_value(&offset_values)];
     let base = formula_numeric_value(&offsets.values);
-    let total = super::expression::frame::offsets(&values, &[0], Some(&base))?
+    let total = super::super::expression::frame::offsets(&values, &[0], Some(&base))?
         .ok_or_else(|| crate::errors::invariant("one offset always produces values"))?;
-    let super::expression::Data::Number { values, .. } = total.data else {
-        return Err(crate::errors::invariant("numeric offset addition produces numeric values"));
+    let super::super::expression::Data::Number { values, .. } = total.data else {
+        return Err(crate::errors::invariant(
+            "numeric offset addition produces numeric values",
+        ));
     };
     if let Some(idx) = values.iter().position(|value| !value.is_finite()) {
         return Err(DeseqError::InvalidOptions {
@@ -144,7 +147,7 @@ fn extract_formula_offset_term(
     Ok(())
 }
 
-fn formula_outer_group_for_offset(term: &str) -> Result<Option<&str>, DeseqError> {
+pub(super) fn formula_outer_group_for_offset(term: &str) -> Result<Option<&str>, DeseqError> {
     if formula_offset_expression(term)?.is_some() {
         return Ok(None);
     }
@@ -155,7 +158,7 @@ fn formula_outer_group_for_offset(term: &str) -> Result<Option<&str>, DeseqError
     Ok((stripped != term).then_some(stripped))
 }
 
-fn formula_offset_values(
+pub(super) fn formula_offset_values(
     term: &str,
     factors: &[ExpandedFactorSpec<'_>],
     numeric_covariates: &[ExpandedNumericSpec<'_>],
@@ -194,7 +197,7 @@ fn formula_offset_values(
     })
 }
 
-fn formula_offset_expression(term: &str) -> Result<Option<&str>, DeseqError> {
+pub(super) fn formula_offset_expression(term: &str) -> Result<Option<&str>, DeseqError> {
     let term = term.trim();
     let Some(after_open) = formula_call_after_open(term, 0, "offset") else {
         if term == "offset" {
