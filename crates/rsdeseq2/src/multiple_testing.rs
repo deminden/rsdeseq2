@@ -100,3 +100,42 @@ pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PreparedBh;
+
+    /// Found by cargo-mutants: replacing the count with a constant survived
+    /// the whole suite. The count must equal the number of adjusted p-values
+    /// below alpha among rows passing the filter.
+    #[test]
+    fn rejections_for_filter_counts_filtered_adjusted_pvalues_below_alpha() {
+        let pvalues = [
+            Some(0.001),
+            Some(0.04),
+            None,
+            Some(0.02),
+            Some(0.5),
+            Some(0.011),
+        ];
+        let filter = [10.0, 1.0, 5.0, 8.0, 0.5, 3.0];
+        let prepared = PreparedBh::new(&pvalues);
+        for cutoff in [0.0, 1.0, 3.0, 8.0, 11.0] {
+            for alpha in [0.01, 0.05, 0.1] {
+                let expected = prepared
+                    .adjusted_for_filter(&filter, cutoff)
+                    .iter()
+                    .filter(|value| value.is_some_and(|p| p < alpha))
+                    .count();
+                assert_eq!(
+                    prepared.rejections_for_filter(&filter, cutoff, alpha),
+                    expected,
+                    "cutoff {cutoff}, alpha {alpha}"
+                );
+            }
+        }
+        // By hand: adjusted 0.005, 0.0275, 0.0333, 0.05, 0.5; three are below 0.05.
+        assert_eq!(prepared.rejections_for_filter(&filter, 0.0, 0.05), 3);
+        assert_eq!(prepared.rejections_for_filter(&filter, 11.0, 0.05), 0);
+    }
+}
