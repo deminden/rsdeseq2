@@ -1,3 +1,4 @@
+use super::*;
 // Prior-variance estimation and upper-quantile matching.
 
 /// Estimate DESeq2-style beta prior variances from unshrunken MLE betas.

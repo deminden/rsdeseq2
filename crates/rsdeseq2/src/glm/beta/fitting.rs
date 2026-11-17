@@ -1,3 +1,4 @@
+use super::*;
 // Fixed and estimated beta-prior fitting workflows.
 
 /// Refit a fixed-dispersion GLM with supplied DESeq2-style beta prior variance.

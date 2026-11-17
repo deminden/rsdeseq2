@@ -154,25 +154,41 @@ pub fn beta_prior_variance_to_ridge_lambda(
 }
 
 // Expanded-model coefficient, covariance and contrast collapse.
-include!("beta/expanded.rs");
+#[path = "beta/expanded.rs"]
+mod expanded;
+pub use expanded::*;
 
 // Fixed and estimated beta-prior fitting workflows.
-include!("beta/fitting.rs");
+#[path = "beta/fitting.rs"]
+mod fitting;
+pub use fitting::*;
 
 // Prior-variance estimation and upper-quantile matching.
-include!("beta/prior.rs");
+#[path = "beta/prior.rs"]
+mod prior;
+pub use prior::*;
 
 // Intercept-only fits, normalization and working weights.
-include!("beta/intercept.rs");
+#[path = "beta/intercept.rs"]
+mod intercept;
+pub use intercept::*;
 
 // Expanded-fit options, validation and covariance handling.
-include!("beta/expanded_validation.rs");
+#[path = "beta/expanded_validation.rs"]
+mod expanded_validation;
+use expanded_validation::*;
 
 // Prior input checks, stable arithmetic and quantiles.
-include!("beta/prior_math.rs");
+#[path = "beta/prior_math.rs"]
+mod prior_math;
+use prior_math::*;
 
 // Fit and normalization-factor validation.
-include!("beta/validation.rs");
+#[path = "beta/validation.rs"]
+mod validation;
+use validation::*;
 
 // Private numerical regression tests.
-include!("beta/tests.rs");
+#[cfg(test)]
+#[path = "beta/tests.rs"]
+mod tests;

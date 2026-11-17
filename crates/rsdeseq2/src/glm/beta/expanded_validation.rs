@@ -1,6 +1,7 @@
+use super::*;
 // Expanded-fit options, validation and covariance handling.
 
-fn options_with_beta_prior_variance(
+pub(super) fn options_with_beta_prior_variance(
     design: &DesignMatrix,
     beta_prior_variance: &[f64],
     options: IrlsOptions,
@@ -16,7 +17,7 @@ fn options_with_beta_prior_variance(
     Ok(options.ridge_lambda_by_coefficient(ridge_lambda))
 }
 
-fn validate_expanded_coefficient_groups(
+pub(super) fn validate_expanded_coefficient_groups(
     n_coefficients: usize,
     coefficient_groups: &[Vec<usize>],
     context: &str,
@@ -38,7 +39,7 @@ fn validate_expanded_coefficient_groups(
     Ok(())
 }
 
-fn validate_expanded_covariance_inputs(
+pub(super) fn validate_expanded_covariance_inputs(
     expanded_covariance: &RowMajorMatrix<f64>,
     n_expanded_coefficients: usize,
     coefficient_groups: &[Vec<usize>],
@@ -71,7 +72,7 @@ fn validate_expanded_covariance_inputs(
     )
 }
 
-fn validate_expanded_fit_collapse_inputs(
+pub(super) fn validate_expanded_fit_collapse_inputs(
     expanded_fit: &NbinomGlmFit,
     standard_design: &DesignMatrix,
     coefficient_groups: &[Vec<usize>],
@@ -138,7 +139,7 @@ fn validate_expanded_fit_collapse_inputs(
     Ok(())
 }
 
-fn validate_expanded_fit_row_vector(
+pub(super) fn validate_expanded_fit_row_vector(
     context: &str,
     expected: usize,
     actual: usize,
@@ -149,7 +150,7 @@ fn validate_expanded_fit_row_vector(
     Ok(())
 }
 
-fn validate_expanded_contrast_group(
+pub(super) fn validate_expanded_contrast_group(
     n_coefficients: usize,
     columns: &[usize],
     context: &str,
@@ -180,7 +181,7 @@ fn validate_expanded_contrast_group(
     Ok(())
 }
 
-fn average_covariance_block(
+pub(super) fn average_covariance_block(
     covariance: &[f64],
     n_coefficients: usize,
     left_group: &[usize],
@@ -195,7 +196,8 @@ fn average_covariance_block(
                 .map(move |&right| covariance[left * n_coefficients + right])
         })
         .collect::<Vec<_>>();
-    let sum = checked::try_scaled_sum(&terms).nonfinite_at("expanded beta covariance average", Some(gene))?;
+    let sum = checked::try_scaled_sum(&terms)
+        .nonfinite_at("expanded beta covariance average", Some(gene))?;
     let denominator = left_group
         .len()
         .checked_mul(right_group.len())
@@ -204,10 +206,11 @@ fn average_covariance_block(
             expected: usize::MAX,
             actual: 0,
         })?;
-    checked::try_div(sum, denominator as f64).nonfinite_at("expanded beta covariance average", Some(gene))
+    checked::try_div(sum, denominator as f64)
+        .nonfinite_at("expanded beta covariance average", Some(gene))
 }
 
-fn beta_se_from_covariance(
+pub(super) fn beta_se_from_covariance(
     covariance: &RowMajorMatrix<f64>,
     n_coefficients: usize,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {

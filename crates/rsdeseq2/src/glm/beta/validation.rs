@@ -1,6 +1,7 @@
+use super::*;
 // Fit and normalization-factor validation.
 
-fn validate_fit_inputs(
+pub(super) fn validate_fit_inputs(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
@@ -20,7 +21,7 @@ fn validate_fit_inputs(
     validate_nf_fit_inputs(counts, &normalization_factors, dispersions, weights)
 }
 
-fn validate_nf_fit_inputs(
+pub(super) fn validate_nf_fit_inputs(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     dispersions: &[f64],
@@ -58,5 +59,3 @@ fn validate_nf_fit_inputs(
     normalization_factors.validate_finite("normalization factors")?;
     Ok(())
 }
-
-
