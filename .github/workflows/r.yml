@@ -83,7 +83,7 @@ jobs:
         env:
           RSDESEQ2_FORMULA_FITTING_REFERENCE: ${{ github.workspace }}/regenerated-formula-references/formula_fitting_r462.json
           RSDESEQ2_SPARSE_SQP_REFERENCE: ${{ github.workspace }}/sparse-sqp-reference.json
-        run: cargo test --locked -p rsdeseq2 --test formula_fitting --test sqp_controls
+        run: cargo test --locked -p rsdeseq2 --test integration -- formula_fitting:: sqp_controls::
       - name: Independently record uniform posterior references
         if: matrix.lane == 'reference'
         run: Rscript --vanilla scripts/references/generate_uniform_posterior_reference.R uniform-posterior-reference.json

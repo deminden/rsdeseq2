@@ -1,5 +1,5 @@
 //! Shared original-package posterior, missingness, state and diagnostic gates.
-use crate::support::*;
+use super::support::*;
 pub fn compare_posteriors(reference: serde_json::Value, compare_warning_events: bool) {
     let mut failures = vec![];
     for c in reference["cases"].as_array().unwrap() {

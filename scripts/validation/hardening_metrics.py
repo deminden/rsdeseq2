@@ -41,6 +41,14 @@ PLATFORM_CFG = re.compile(r'all\(\s*target_os\s*=\s*"linux"\s*,\s*target_arch\s*
 CRATE_REF = re.compile(r'\bcrate::([a-z_][a-z0-9_]*)')
 
 
+def integration_test_binaries() -> int:
+    """Explicit [[test]] targets when autotests is off, else top-level test files."""
+    manifest = (CRATE / 'Cargo.toml').read_text()
+    if re.search(r'^autotests\s*=\s*false', manifest, re.M):
+        return len(re.findall(r'^\[\[test\]\]', manifest, re.M))
+    return len(list((CRATE / 'tests').glob('*.rs')))
+
+
 def strip_comments_and_strings(text: str) -> str:
     """Blank out comments, string and char literals, keeping line structure."""
     out = []
@@ -197,7 +205,7 @@ def collect() -> dict:
         pub_fn=sum(len(re.findall(r'\bpub\s+(?:const\s+)?(?:unsafe\s+)?fn\b', t)) for t in sources.values()),
         builder_fit_methods=sum(len(re.findall(r'\bpub\s+fn\s+fit(?!_type\b)[a-z0-9_]*\s*[<(]', t))
                                 for p, t in sources.items() if builder_dir in p.parents),
-        integration_test_binaries=len(list((CRATE / 'tests').glob('*.rs'))),
+        integration_test_binaries=integration_test_binaries(),
         platform_cfg_sites=sum(len(PLATFORM_CFG.findall(strip_line_comments(t))) for t in raw.values()),
         production_lines=sum(len([l for l in t.splitlines() if l.strip()]) for t in sources.values()),
     )

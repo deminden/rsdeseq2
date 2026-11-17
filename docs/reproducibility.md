@@ -99,8 +99,8 @@ Routine tests use a 512-gene selection plus full normalization; the opt-in repla
 fits all genes. Replaying requires no R installation or data download.
 
 ```sh
-cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity
-cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald \
+cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::
+cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_wald \
   -- --ignored --nocapture
 ```
 

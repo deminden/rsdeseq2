@@ -24,11 +24,11 @@ jobs:
           python-version: '3.12'
       - name: Native and fixed-dispersion DESeq2 numerical references
         run: >-
-          cargo test --locked -p rsdeseq2
-          --test gtex_real_wald_parity --test auto_dispersion
-          --test dispersion_reference --test wald_reference --test lrt_reference
-          --test results_reference --test glm_irls --test cooks_reference
-          --test thread_invariance
+          cargo test --locked -p rsdeseq2 --test integration --
+          gtex_real_wald_parity:: auto_dispersion::
+          dispersion_reference:: wald_reference:: lrt_reference::
+          results_reference:: glm_irls:: cooks_reference::
+          thread_invariance::
       - name: Portable R optimizer oracles
         run: cargo test --locked -p rsdeseq2 --lib optim_fallback_replays_portable
       - name: Parity, fixture generation and benchmark integrity checks
@@ -40,4 +40,4 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
       - name: All 56,200 genes and all six Wald result columns
-        run: cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald -- --ignored --nocapture
+        run: cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_wald -- --ignored --nocapture

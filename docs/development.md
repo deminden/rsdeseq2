@@ -61,6 +61,11 @@ python3 scripts/validation/check_module_cycles.py
 cargo deny --all-features check   # licences, advisories, bans, sources
 ```
 
+Integration tests build as one binary, `integration`
+(`crates/rsdeseq2/tests/integration.rs`); each file in `tests/` is a module.
+Add a new test file to that list, and run one file's tests with
+`cargo test -p rsdeseq2 --test integration <file>::`.
+
 [Contributing](../CONTRIBUTING.md) summarises the IDENTICAL/NUMERIC rules and
 the pull-request template.
 

@@ -11,6 +11,7 @@ keywords = ["rnaseq", "deseq2", "bioinformatics", "gene-expression", "statistics
 categories = ["science", "command-line-utilities"]
 readme = "README.md"
 autoexamples = false
+autotests = false
 exclude = [".DS_Store", "**/.DS_Store"]
 
 [lints]
@@ -23,6 +24,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "rsdeseq2"
 path = "src/main.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
 required-features = ["cli"]
 
 [[bench]]

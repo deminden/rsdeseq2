@@ -61,7 +61,7 @@ frozen original-ashr CDF panel within `1.12e-16`.
 Rscript --vanilla scripts/references/generate_uniform_cdf_reference.R \
   "$PWD/results/uniform-cdf.tsv"
 RSDESEQ2_UNIFORM_CDF_REFERENCE="$PWD/results/uniform-cdf.tsv" \
-  cargo test --locked -p rsdeseq2 --test bounded_posterior
+  cargo test --locked -p rsdeseq2 --test integration bounded_posterior::
 ```
 
 Use an absolute reference path because Cargo executes tests from the crate.
