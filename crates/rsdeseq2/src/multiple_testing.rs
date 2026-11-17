@@ -137,5 +137,9 @@ mod tests {
         // By hand: adjusted 0.005, 0.0275, 0.0333, 0.05, 0.5; three are below 0.05.
         assert_eq!(prepared.rejections_for_filter(&filter, 0.0, 0.05), 3);
         assert_eq!(prepared.rejections_for_filter(&filter, 11.0, 0.05), 0);
+        // DESeq2 counts `padj < alpha`: an adjusted p-value equal to alpha is
+        // not a rejection (0.025 * 2 is exactly 0.05).
+        let boundary = PreparedBh::new(&[Some(0.025), Some(0.05)]);
+        assert_eq!(boundary.rejections_for_filter(&[1.0, 1.0], 0.0, 0.05), 0);
     }
 }
