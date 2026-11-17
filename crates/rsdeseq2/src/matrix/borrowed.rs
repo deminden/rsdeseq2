@@ -51,7 +51,7 @@ impl<'a, T> MatrixView<'a, T> {
         })
     }
     /// View over a slice whose length is already known to be `rows * columns`,
-    /// such as the storage of a [`crate::core::CountMatrix`].
+    /// such as the storage of a [`crate::matrix::CountMatrix`].
     pub(crate) fn from_valid_parts(
         rows: usize,
         columns: usize,

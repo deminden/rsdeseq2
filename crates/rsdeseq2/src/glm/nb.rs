@@ -1,7 +1,7 @@
 use statrs::function::gamma::ln_gamma;
 
-use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 
 /// Negative-binomial log PMF using DESeq2's `mu` and dispersion parameterization.

@@ -4,7 +4,7 @@ use std::path::Path;
 use csv::{ReaderBuilder, WriterBuilder};
 
 use crate::cooks::{CooksOutput, CooksRefitPlan};
-use crate::core::CountMatrix;
+use crate::matrix::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,

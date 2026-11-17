@@ -1,7 +1,7 @@
 //! Borrowed counts and reusable count-zero invariants for contrast requests.
 use super::all_zero::{factor_level_samples, numeric_samples};
-use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::matrix::CountMatrix;
 use crate::matrix::{MatrixOrder, MatrixView};
 
 /// Validated borrowed counts with one cached global-zero flag per gene.

@@ -2,9 +2,9 @@
 
 use super::counts_view::ContrastCounts;
 use super::resolution::{validate_factor_level_contrast, validate_numeric_contrast};
-use crate::core::CountMatrix;
 use crate::design::{DesignMatrix, r_like_name_candidates as candidate_names};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::matrix::CountMatrix;
 use crate::matrix::MatrixView;
 use crate::numeric::checked;
 use std::collections::HashSet;

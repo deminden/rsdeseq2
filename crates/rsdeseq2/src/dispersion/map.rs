@@ -1,4 +1,3 @@
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::dispersion::gene_est::{
     DispersionPrior, GeneWiseDispersionFitMethod, GeneWiseDispersionOptions,
@@ -8,6 +7,7 @@ use crate::dispersion::gene_est::{
     fit_dispersion_line_search_with_prior_and_weights,
 };
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked::{self, CheckedExt};
 

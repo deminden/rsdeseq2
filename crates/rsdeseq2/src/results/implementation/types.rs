@@ -3,7 +3,7 @@ use crate::cooks::{
     calculate_cooks_distance, prepare_cooks_replacement_refit_with_weights, CooksOutput, CooksRefitPlan,
     CooksReplacementOptions,
 };
-use crate::core::CountMatrix;
+use crate::matrix::CountMatrix;
 use crate::design::{
     expanded_factor_design, expanded_formula_design_with_offsets,
     expanded_formula_design_with_offsets_from_model_frame, DesignMatrix,

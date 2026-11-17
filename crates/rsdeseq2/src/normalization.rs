@@ -2,9 +2,9 @@ use crate::numeric::checked::{self, CheckedExt};
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
 
-use crate::core::CountMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::median::median;
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::options::SizeFactorMethod;
 
