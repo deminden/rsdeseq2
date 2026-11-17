@@ -8,12 +8,13 @@ mod implementation;
 mod replacement_policy;
 mod request;
 
+pub use crate::matrix::RowFlags;
 pub(crate) use cooks_policy::low_count_eligible_for_frame;
 pub use cooks_policy::{
     CooksMask, CooksPolicy, LowCountHeuristic, low_count_eligible, two_level_design_matches,
 };
 pub use implementation::*;
-pub use replacement_policy::{ReplacementRows, RowFlags};
+pub use replacement_policy::ReplacementRows;
 pub use request::ResultRequest;
 
 pub(crate) use implementation::{

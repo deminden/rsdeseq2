@@ -57,6 +57,7 @@ cargo run --release --locked -p rsdeseq2 --example golden -- --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 scripts/validation/check_module_cycles.py
 ```
 
 The library denies `unwrap`/`expect` outside tests, `unsafe` code outside the

@@ -48,5 +48,7 @@ jobs:
           python-version: '3.12'
       - name: Documentation and release-document checks
         run: python scripts/validation/check_docs.py
+      - name: Module dependency cycles
+        run: python scripts/validation/check_module_cycles.py
       - name: Parity and benchmark integrity checks
         run: python -m unittest discover -s scripts/tests -p 'test_*.py'

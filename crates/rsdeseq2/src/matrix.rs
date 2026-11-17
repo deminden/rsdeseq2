@@ -1,9 +1,11 @@
 pub mod borrowed;
 mod count_matrix;
 mod counts;
+mod row_flags;
 pub use borrowed::{MatrixOrder, MatrixView};
 pub use count_matrix::{CountMatrix, CountsSummary};
 pub use counts::{CountRows, CountView};
+pub use row_flags::RowFlags;
 
 use core::ops::{Bound, RangeBounds};
 

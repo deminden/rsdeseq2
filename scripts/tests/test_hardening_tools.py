@@ -19,6 +19,7 @@ def load(name, relative):
 
 
 METRICS = load('hardening_metrics', 'scripts/validation/hardening_metrics.py')
+CYCLES = load('check_module_cycles', 'scripts/validation/check_module_cycles.py')
 TIMING = load('paired_gtex_rust_timing', 'scripts/benchmarks/paired_gtex_rust_timing.py')
 
 
@@ -58,6 +59,16 @@ class ModuleCycleTests(unittest.TestCase):
             src / 'c.rs': 'use crate::a::Y;',
         }
         self.assertEqual(METRICS.mutual_pairs(sources), [('a', 'b')])
+
+
+class CycleCheckTests(unittest.TestCase):
+    def test_new_and_vanished_pairs_fail(self):
+        self.assertEqual(CYCLES.check(set(CYCLES.ALLOWED)), [])
+        problems = CYCLES.check(set(CYCLES.ALLOWED) | {('a', 'b')})
+        self.assertTrue(any('a <-> b' in p for p in problems))
+        shrunk = set(CYCLES.ALLOWED)
+        shrunk.pop()
+        self.assertTrue(any('no longer present' in p for p in CYCLES.check(shrunk)))
 
 
 class TimingTests(unittest.TestCase):

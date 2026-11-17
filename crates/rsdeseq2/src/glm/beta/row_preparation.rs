@@ -1,7 +1,7 @@
 //! Shared raw-count row selection before normal-prior refitting.
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountRows;
-use crate::results::RowFlags;
+use crate::matrix::RowFlags;
 
 /// Nonzero rows to marshal into a normal-prior fit, in original row order.
 #[derive(Debug, Clone, PartialEq, Eq)]
