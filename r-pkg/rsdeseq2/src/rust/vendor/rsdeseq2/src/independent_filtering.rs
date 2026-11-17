@@ -595,14 +595,16 @@ fn positive_residual_rmse(residuals: &[f64]) -> Result<f64, DeseqError> {
     let scale = residuals
         .iter()
         .copied()
-        .map(f64::abs)
         .try_fold(0.0_f64, |scale, value| {
-            value.is_finite().then_some(scale.max(value))
-        })
-        .ok_or_else(|| DeseqError::NonFiniteValue {
-            context: "independent-filter RMSE".to_string(),
-            index: None,
-            value: f64::NAN,
+            if value.is_finite() {
+                Ok(scale.max(value.abs()))
+            } else {
+                Err(DeseqError::NonFiniteValue {
+                    context: "independent-filter RMSE".to_string(),
+                    index: None,
+                    value,
+                })
+            }
         })?;
     if scale == 0.0 {
         return Ok(0.0);
@@ -658,7 +660,7 @@ mod tests {
     #[test]
     fn independent_filter_numeric_helpers_keep_large_finite_values() {
         assert_eq!(
-            checked::mean(&[f64::MAX, f64::MAX])
+            checked::try_mean(&[f64::MAX, f64::MAX])
                 .nonfinite_at("test mean", None)
                 .unwrap(),
             f64::MAX

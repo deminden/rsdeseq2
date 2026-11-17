@@ -1,4 +1,4 @@
-use crate::numeric::checked;
+use crate::numeric::checked::{self, CheckedExt};
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
 
@@ -88,11 +88,11 @@ pub fn normalized_counts(
     for gene in 0..counts.n_genes() {
         for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
             values.push(
-                checked::div(f64::from(count), size_factors[sample]).ok_or_else(|| {
+                checked::try_div(f64::from(count), size_factors[sample]).map_err(|error| {
                     DeseqError::NonFiniteValue {
                         context: "normalized count".to_string(),
                         index: Some(gene * counts.n_samples() + sample),
-                        value: f64::NAN,
+                        value: error.value,
                     }
                 })?,
             );
@@ -136,11 +136,11 @@ pub fn normalized_counts_with_factors(
             .zip(factor_row.iter().copied())
             .enumerate()
         {
-            values.push(checked::div(f64::from(count), factor).ok_or_else(|| {
+            values.push(checked::try_div(f64::from(count), factor).map_err(|error| {
                 DeseqError::NonFiniteValue {
                     context: "normalization-factor normalized count".to_string(),
                     index: Some(gene * counts.n_samples() + sample),
-                    value: f64::NAN,
+                    value: error.value,
                 }
             })?);
         }
@@ -202,13 +202,7 @@ pub fn base_mean(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>, De
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
-        means.push(
-            checked::mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
-                context: "baseMean".to_string(),
-                index: Some(gene),
-                value: f64::NAN,
-            })?,
-        );
+        means.push(checked::try_mean(row).nonfinite_at("baseMean", Some(gene))?);
     }
     Ok(means)
 }
@@ -247,16 +241,12 @@ pub fn base_variance(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>
             variances.push(f64::NAN);
             continue;
         }
-        let mean = checked::mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
-            context: "baseVar mean".to_string(),
-            index: Some(gene),
-            value: f64::NAN,
-        })?;
-        variances.push(checked_sample_variance(row, mean).ok_or_else(|| {
+        let mean = checked::try_mean(row).nonfinite_at("baseVar mean", Some(gene))?;
+        variances.push(checked_sample_variance(row, mean).map_err(|error| {
             DeseqError::NonFiniteValue {
                 context: "baseVar".to_string(),
                 index: Some(gene),
-                value: f64::NAN,
+                value: error.value,
             }
         })?);
     }
@@ -283,17 +273,14 @@ pub fn base_variance_with_weights(
             continue;
         }
         let weighted_values = checked_weighted_values(row, weight_row, "weighted baseVar", gene)?;
-        let mean = checked::mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
-            context: "weighted baseVar mean".to_string(),
-            index: Some(gene),
-            value: f64::NAN,
-        })?;
+        let mean = checked::try_mean(&weighted_values)
+            .nonfinite_at("weighted baseVar mean", Some(gene))?;
         variances.push(
-            checked_sample_variance(&weighted_values, mean).ok_or_else(|| {
+            checked_sample_variance(&weighted_values, mean).map_err(|error| {
                 DeseqError::NonFiniteValue {
                     context: "weighted baseVar".to_string(),
                     index: Some(gene),
-                    value: f64::NAN,
+                    value: error.value,
                 }
             })?,
         );
@@ -308,11 +295,7 @@ fn checked_weighted_mean(
     gene: usize,
 ) -> Result<f64, DeseqError> {
     let weighted_values = checked_weighted_values(values, weights, context, gene)?;
-    checked::mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
-        context: context.to_string(),
-        index: Some(gene),
-        value: f64::NAN,
-    })
+    checked::try_mean(&weighted_values).nonfinite_at(context, Some(gene))
 }
 
 fn checked_weighted_values(
@@ -323,60 +306,50 @@ fn checked_weighted_values(
 ) -> Result<Vec<f64>, DeseqError> {
     let mut out = Vec::with_capacity(values.len());
     for (value, weight) in values.iter().copied().zip(weights.iter().copied()) {
-        let Some(weighted) = checked::mul(value, weight) else {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: Some(gene),
-                value: f64::NAN,
-            });
-        };
+        let weighted = checked::try_mul(value, weight).nonfinite_at(context, Some(gene))?;
         out.push(weighted);
     }
     Ok(out)
 }
 
-fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
+fn checked_sample_variance(values: &[f64], mean: f64) -> checked::Checked {
     let mut scale = 0.0_f64;
     for value in values.iter().copied() {
-        let centered = checked::sub(value, mean)?;
-        if !centered.is_finite() {
-            return None;
-        }
+        let centered = checked::try_sub(value, mean)?;
         scale = scale.max(centered.abs());
     }
     if scale == 0.0 {
-        return Some(0.0);
+        return Ok(0.0);
     }
     let mut normalized_sum_squares = 0.0;
     for value in values.iter().copied() {
-        let centered = checked::div(checked::sub(value, mean)?, scale)?;
-        let square = checked::mul(centered, centered)?;
-        normalized_sum_squares = checked::add(normalized_sum_squares, square)?;
+        let centered = checked::try_div(checked::try_sub(value, mean)?, scale)?;
+        let square = checked::try_mul(centered, centered)?;
+        normalized_sum_squares = checked::try_add(normalized_sum_squares, square)?;
     }
-    let denominator = checked::sub(values.len() as f64, 1.0)?;
-    let normalized_variance = checked::div(normalized_sum_squares, denominator)?;
-    let scaled_deviation = checked::mul(normalized_variance.sqrt(), scale)?;
-    let variance = checked::mul(scaled_deviation, scaled_deviation)?;
-    variance.is_finite().then_some(variance)
+    let denominator = checked::try_sub(values.len() as f64, 1.0)?;
+    let normalized_variance = checked::try_div(normalized_sum_squares, denominator)?;
+    let scaled_deviation = checked::try_mul(normalized_variance.sqrt(), scale)?;
+    checked::try_mul(scaled_deviation, scaled_deviation)
 }
 
-fn checked_compensated_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
+fn checked_compensated_sum(values: impl IntoIterator<Item = f64>) -> checked::Checked {
     let mut sum = 0.0_f64;
     let mut correction = 0.0_f64;
     for value in values {
         if !value.is_finite() {
-            return None;
+            return checked::reject(value);
         }
-        let next = checked::add(sum, value)?;
+        let next = checked::try_add(sum, value)?;
         let roundoff = if sum.abs() >= value.abs() {
-            checked::add(sum - next, value)?
+            checked::try_add(sum - next, value)?
         } else {
-            checked::add(value - next, sum)?
+            checked::try_add(value - next, sum)?
         };
-        correction = checked::add(correction, roundoff)?;
+        correction = checked::try_add(correction, roundoff)?;
         sum = next;
     }
-    checked::add(sum, correction)
+    checked::try_add(sum, correction)
 }
 
 fn validate_weighted_base_inputs(
@@ -417,16 +390,12 @@ fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
                 // portable f64 arithmetic and prevents near-boundary genes
                 // from changing optimizer routes through size-factor drift.
                 let sum = checked_compensated_sum(row.iter().map(|count| f64::from(*count).ln()))
-                    .ok_or_else(|| DeseqError::NonFiniteValue {
-                    context: "ratio geometric mean log sum".to_string(),
-                    index: Some(gene),
-                    value: f64::NAN,
-                })?;
-                checked::div(sum, counts.n_samples() as f64).ok_or_else(|| {
+                    .nonfinite_at("ratio geometric mean log sum", Some(gene))?;
+                checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
                     DeseqError::NonFiniteValue {
                         context: "ratio geometric mean log mean".to_string(),
                         index: Some(gene),
-                        value: f64::NAN,
+                        value: error.value,
                     }
                 })
             }
@@ -446,16 +415,12 @@ fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError>
                         .filter(|count| **count > 0)
                         .map(|count| f64::from(*count).ln()),
                 )
-                .ok_or_else(|| DeseqError::NonFiniteValue {
-                    context: "poscounts geometric mean log sum".to_string(),
-                    index: Some(gene),
-                    value: f64::NAN,
-                })?;
-                checked::div(sum, counts.n_samples() as f64).ok_or_else(|| {
+                .nonfinite_at("poscounts geometric mean log sum", Some(gene))?;
+                checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
                     DeseqError::NonFiniteValue {
                         context: "poscounts geometric mean log mean".to_string(),
                         index: Some(gene),
-                        value: f64::NAN,
+                        value: error.value,
                     }
                 })
             }
@@ -507,11 +472,11 @@ fn estimate_from_log_geo_means(
             let count = counts.row_values(*gene)[sample];
             if log_geo_mean.is_finite() && count > 0 {
                 log_ratios.push(
-                    checked::sub(f64::from(count).ln(), log_geo_mean).ok_or_else(|| {
+                    checked::try_sub(f64::from(count).ln(), log_geo_mean).map_err(|error| {
                         DeseqError::NonFiniteValue {
                             context: "size-factor log ratio".to_string(),
                             index: Some(*gene),
-                            value: f64::NAN,
+                            value: error.value,
                         }
                     })?,
                 );
@@ -557,7 +522,7 @@ fn usable_gene_indices(
 
 fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
     let log_sum =
-        checked_compensated_sum(size_factors.iter().map(|value| value.ln())).ok_or_else(|| {
+        checked_compensated_sum(size_factors.iter().map(|value| value.ln())).map_err(|_| {
             DeseqError::InvalidSizeFactors {
                 reason: "cannot stabilize size factors to geometric mean one".to_string(),
             }
@@ -615,7 +580,7 @@ mod tests {
     fn compensated_sum_preserves_representable_low_order_terms() {
         let values = [1.0e16, 1.0, 1.0];
         let naive = values.into_iter().sum::<f64>();
-        let compensated = checked_compensated_sum(values).unwrap();
+        let compensated = checked_compensated_sum(values).ok().unwrap();
 
         assert_eq!(naive, 1.0e16);
         assert_eq!(compensated, 1.0e16 + 2.0);
@@ -623,6 +588,6 @@ mod tests {
 
     #[test]
     fn compensated_sum_rejects_non_finite_values() {
-        assert_eq!(checked_compensated_sum([1.0, f64::INFINITY]), None);
+        assert_eq!(checked_compensated_sum([1.0, f64::INFINITY]).ok(), None);
     }
 }

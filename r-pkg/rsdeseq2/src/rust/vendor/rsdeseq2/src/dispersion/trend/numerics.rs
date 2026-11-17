@@ -24,8 +24,8 @@ pub(super) fn checked_product3(
     right: f64,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    checked::mul(
-        checked::mul(left, middle).invalid_dispersion(context)?,
+    checked::try_mul(
+        checked::try_mul(left, middle).invalid_dispersion(context)?,
         right,
     )
     .invalid_dispersion(context)

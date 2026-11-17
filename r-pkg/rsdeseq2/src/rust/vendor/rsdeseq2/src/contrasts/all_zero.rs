@@ -63,11 +63,12 @@ pub(super) fn numeric_samples(
         for (column, &weight) in contrast.iter().enumerate() {
             terms.push(design.at(sample, column) * if weight == 0.0 { 0.0 } else { 1.0 });
         }
-        let score = checked::scaled_sum(&terms).ok_or_else(|| DeseqError::NonFiniteValue {
-            context: "contrastAllZero design score".into(),
-            index: Some(sample),
-            value: f64::NAN,
-        })?;
+        let score =
+            checked::try_scaled_sum(&terms).map_err(|error| DeseqError::NonFiniteValue {
+                context: "contrastAllZero design score".into(),
+                index: Some(sample),
+                value: error.value,
+            })?;
         selected.push(score != 0.0);
     }
     Ok(Some(selected))

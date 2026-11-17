@@ -51,10 +51,10 @@ fn gamma_deviance_rejects_nonfinite_accumulation() {
 
 #[test]
 fn checked_div2_rejects_zero_and_nonfinite_quotients() {
-    let zero_err = checked::div(1.0, 0.0)
+    let zero_err = checked::try_div(1.0, 0.0)
         .invalid_dispersion("test division")
         .unwrap_err();
-    let overflow_err = checked::div(f64::MAX, f64::MIN_POSITIVE)
+    let overflow_err = checked::try_div(f64::MAX, f64::MIN_POSITIVE)
         .invalid_dispersion("test division")
         .unwrap_err();
 

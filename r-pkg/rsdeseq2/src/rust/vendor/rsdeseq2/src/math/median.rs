@@ -3,8 +3,10 @@ use crate::errors::DeseqError;
 /// Deterministic median over finite input values.
 pub fn median(values: &[f64]) -> Result<f64, DeseqError> {
     if values.is_empty() {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: "cannot compute median of an empty slice".to_string(),
+        return Err(DeseqError::InvalidDimensions {
+            context: "median input".to_string(),
+            expected: 1,
+            actual: 0,
         });
     }
     let mut sorted = Vec::with_capacity(values.len());
@@ -58,6 +60,16 @@ fn midpoint(left: f64, right: f64) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::{median, median_finite};
+    use crate::errors::DeseqError;
+
+    #[test]
+    fn median_rejects_empty_input_as_dimensions() {
+        assert!(matches!(
+            median(&[]),
+            Err(DeseqError::InvalidDimensions { ref context, expected: 1, actual: 0 })
+                if context == "median input"
+        ));
+    }
 
     #[test]
     fn median_odd_length() {

@@ -80,7 +80,7 @@ impl PreparedBh {
 pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
     for (idx, value) in pvalues.iter().copied().enumerate() {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(DeseqError::InvalidSizeFactors {
+            return Err(DeseqError::InvalidOptions {
                 reason: format!("p-value at index {idx} must be finite and within [0, 1]"),
             });
         }
@@ -91,7 +91,7 @@ pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
         match value {
             Some(value) => out.push(value),
             None => {
-                return Err(DeseqError::InvalidSizeFactors {
+                return Err(DeseqError::InvalidOptions {
                     reason: "validated p-value unexpectedly produced a missing adjustment"
                         .to_string(),
                 });
