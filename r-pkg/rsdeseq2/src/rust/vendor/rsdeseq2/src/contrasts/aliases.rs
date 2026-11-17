@@ -46,7 +46,11 @@ pub(super) fn resolve_coefficient_name(
                 "coefficient '{wanted}' is not present in coefficient names or R-cleaned aliases"
             ),
         }),
-        1 => Ok(*matches.iter().next().unwrap()),
+        1 => matches
+            .iter()
+            .next()
+            .copied()
+            .ok_or_else(|| crate::errors::invariant("one coefficient alias match")),
         _ => Err(DeseqError::InvalidOptions {
             reason: format!("coefficient '{wanted}' resolves ambiguously after R-style cleanup"),
         }),
@@ -188,7 +192,11 @@ pub(super) fn find_first_coefficient(
                 candidates.join(", ")
             ),
         }),
-        1 => Ok(*matches.iter().next().unwrap()),
+        1 => matches
+            .iter()
+            .next()
+            .copied()
+            .ok_or_else(|| crate::errors::invariant("one coefficient alias match")),
         _ => Err(DeseqError::InvalidOptions {
             reason: format!(
                 "candidate coefficients resolve ambiguously after R-style cleanup: {}",

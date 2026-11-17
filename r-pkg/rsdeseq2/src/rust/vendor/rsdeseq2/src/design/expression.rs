@@ -352,8 +352,10 @@ pub(crate) fn arguments<'a, T>(
     formals: &[&str],
 ) -> Result<Vec<Option<&'a T>>, DeseqError> {
     let mut bound = vec![None; formals.len()];
-    for (name, value) in args.iter().filter(|(name, _)| name.is_some()) {
-        let name = name.as_deref().unwrap();
+    for (name, value) in args
+        .iter()
+        .filter_map(|(name, value)| name.as_deref().map(|name| (name, value)))
+    {
         let matches = formals
             .iter()
             .enumerate()

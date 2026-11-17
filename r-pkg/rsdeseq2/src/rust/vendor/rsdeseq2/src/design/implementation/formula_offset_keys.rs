@@ -16,7 +16,7 @@ fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetToken>, Deseq
         let c = expression[at..]
             .chars()
             .next()
-            .expect("valid character boundary");
+            .ok_or_else(|| crate::errors::invariant("valid character boundary"))?;
         if c.is_whitespace() {
             at += c.len_utf8();
             continue;
@@ -30,7 +30,7 @@ fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetToken>, Deseq
                 let next = expression[at..]
                     .chars()
                     .next()
-                    .expect("valid character boundary");
+                    .ok_or_else(|| crate::errors::invariant("valid character boundary"))?;
                 at += next.len_utf8();
                 if escaped {
                     escaped = false;
@@ -97,7 +97,7 @@ fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetToken>, Deseq
                 let next = expression[at..]
                     .chars()
                     .next()
-                    .expect("valid character boundary");
+                    .ok_or_else(|| crate::errors::invariant("valid character boundary"))?;
                 if !next.is_alphanumeric() && !matches!(next, '.' | '_') {
                     break;
                 }

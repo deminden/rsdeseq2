@@ -76,6 +76,14 @@ pub(crate) fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display
     }
 }
 
+/// An internal consistency check failed: a state that earlier validation
+/// rules out was reached. Reported as `InvalidOptions` so callers never panic.
+pub(crate) fn invariant(what: &str) -> DeseqError {
+    DeseqError::InvalidOptions {
+        reason: format!("internal invariant violated: {what}"),
+    }
+}
+
 /// `InvalidDispersion` with the reason as given.
 pub(crate) fn invalid_dispersion(reason: impl Into<String>) -> DeseqError {
     DeseqError::InvalidDispersion {

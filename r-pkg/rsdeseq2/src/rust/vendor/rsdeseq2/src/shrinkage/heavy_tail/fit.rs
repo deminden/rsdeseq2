@@ -507,7 +507,8 @@ pub(super) fn fit_batch(
                     .collect(),
             )?
         } else if let Some(beta_binomial) = &beta_binomial {
-            let (_, config) = regression.unwrap();
+            let (_, config) = regression
+                .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
             if config.method == super::regression::RegressionMethod::BetaBinomialR {
                 beta_binomial.optimize(vec![0.0; p], config)?
             } else {
@@ -515,7 +516,8 @@ pub(super) fn fit_batch(
             }
         } else {
             if nb_r {
-                let (_, config) = regression.unwrap();
+                let (_, config) = regression
+                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
                 let mut start = (0..p)
                     .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
                     .collect::<Vec<_>>();
@@ -563,7 +565,8 @@ pub(super) fn fit_batch(
             let h = if let Some(general) = &general {
                 general.hessian(&result.par, options.hessian_step)
             } else if let Some(beta_binomial) = &beta_binomial {
-                let (_, config) = regression.unwrap();
+                let (_, config) = regression
+                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
                 let h = beta_binomial.hessian(&result.par, options.hessian_step);
                 let invalid_covariance = h
                     .clone()
@@ -623,13 +626,25 @@ pub(super) fn fit_batch(
                 if let Some(c) = options.coefficient {
                     let mean = result.par[c];
                     let error = sd.as_slice()[gene * p + c];
-                    fsr.as_mut().unwrap()[gene] = Some(normal_upper_tail(mean.abs() / error));
+                    fsr.as_mut().ok_or_else(|| {
+                        crate::errors::invariant(
+                            "false-sign rates allocated for a selected coefficient",
+                        )
+                    })?[gene] = Some(normal_upper_tail(mean.abs() / error));
                     if let Some(rates) = &mut fsos {
                         let cutoff = if options.flip_sign {
                             (if mean == 0.0 { 0.0 } else { mean.signum() })
-                                * options.threshold.unwrap()
+                                * options.threshold.ok_or_else(|| {
+                                    crate::errors::invariant(
+                                        "threshold set when threshold rates are requested",
+                                    )
+                                })?
                         } else {
-                            options.threshold.unwrap()
+                            options.threshold.ok_or_else(|| {
+                                crate::errors::invariant(
+                                    "threshold set when threshold rates are requested",
+                                )
+                            })?
                         };
                         let z = (cutoff - mean) / error;
                         rates[gene] = Some(if options.flip_sign && mean < 0.0 {
@@ -667,7 +682,11 @@ pub(super) fn fit_batch(
                             density.value(beta, shift)
                         },
                     )? {
-                        fsr.as_mut().unwrap()[gene] = summary.false_sign_rate;
+                        fsr.as_mut().ok_or_else(|| {
+                            crate::errors::invariant(
+                                "false-sign rates allocated for a selected coefficient",
+                            )
+                        })?[gene] = summary.false_sign_rate;
                         if let Some(rates) = &mut fsos {
                             rates[gene] = summary.threshold_rate;
                         }

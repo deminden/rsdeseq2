@@ -1,4 +1,10 @@
 use super::*;
+pub(super) use crate::errors::invariant;
+
+/// A CLI option that earlier argument checks guarantee to be present.
+pub(super) fn required<T>(value: Option<T>, flag: &str) -> Result<T, DeseqError> {
+    value.ok_or_else(|| invariant(&format!("missing required option {flag}")))
+}
 
 pub(super) fn require_cli_fit<'a>(
     analysis: &'a CliAnalysisOutput,

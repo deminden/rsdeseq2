@@ -90,15 +90,12 @@ impl<'a> CountView<'a> {
 
 impl<'a> From<&'a CountMatrix> for CountView<'a> {
     fn from(counts: &'a CountMatrix) -> Self {
-        Self::from_unsigned(
-            MatrixView::new(
-                counts.n_genes(),
-                counts.n_samples(),
-                counts.as_slice(),
-                MatrixOrder::RowMajor,
-            )
-            .expect("CountMatrix has validated shape"),
-        )
+        Self::from_unsigned(MatrixView::from_valid_parts(
+            counts.n_genes(),
+            counts.n_samples(),
+            counts.as_slice(),
+            MatrixOrder::RowMajor,
+        ))
     }
 }
 

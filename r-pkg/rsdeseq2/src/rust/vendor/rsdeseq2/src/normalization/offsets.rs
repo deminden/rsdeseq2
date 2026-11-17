@@ -64,7 +64,8 @@ pub fn normalization_factors_with_offsets(
             let base = if let Some(nf) = factors {
                 *nf.at(gene, sample)
             } else {
-                size_factors.expect("validated base factors")[sample]
+                size_factors.ok_or_else(|| crate::errors::invariant("validated base factors"))?
+                    [sample]
             };
             let value = base * multiplier;
             if !value.is_finite() || value <= 0.0 {

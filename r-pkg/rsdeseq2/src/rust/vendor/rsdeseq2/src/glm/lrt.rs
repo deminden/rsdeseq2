@@ -120,7 +120,9 @@ pub fn lrt_pvalues_from_statistics(
             })?;
             cached = Some((df, distribution));
         }
-        pvalues.push(lrt_pvalue(&cached.as_ref().unwrap().1, statistic));
+        if let Some((_, distribution)) = cached.as_ref() {
+            pvalues.push(lrt_pvalue(distribution, statistic));
+        }
     }
     Ok(pvalues)
 }

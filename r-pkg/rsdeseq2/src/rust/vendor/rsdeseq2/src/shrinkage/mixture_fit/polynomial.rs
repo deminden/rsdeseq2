@@ -80,12 +80,18 @@ pub(super) fn run(
         let mut states = Vec::with_capacity(capacity);
         states.push(state);
         for _ in 0..=k {
-            states.push(update(states.last().unwrap())?);
+            states.push(update(
+                states
+                    .last()
+                    .ok_or_else(|| crate::errors::invariant("value present"))?,
+            )?);
             calls += 1;
         }
         let mut fallback_residual = norm(&states[k + 1], &states[k]);
         let Some(c) = coefficients(&states, o) else {
-            state = states.pop().unwrap();
+            state = states
+                .pop()
+                .ok_or_else(|| crate::errors::invariant("value present"))?;
             residual = fallback_residual;
             iterations += 1;
             continue;
@@ -93,7 +99,11 @@ pub(super) fn run(
         let mut proposal = vec![0.0; states[0].len()];
         if o.square {
             for _ in 1..k {
-                states.push(update(states.last().unwrap())?);
+                states.push(update(
+                    states
+                        .last()
+                        .ok_or_else(|| crate::errors::invariant("value present"))?,
+                )?);
                 calls += 1;
             }
             for i in 0..=k {
@@ -132,7 +142,9 @@ pub(super) fn run(
             candidate
         } else {
             residual = fallback_residual;
-            states.pop().unwrap()
+            states
+                .pop()
+                .ok_or_else(|| crate::errors::invariant("value present"))?
         };
     }
     Ok(Iteration {

@@ -188,7 +188,7 @@ fn next_formula_numeric_transform(rhs: &str) -> Option<(usize, usize, FormulaNum
         let character = rhs[idx..]
             .chars()
             .next()
-            .expect("idx is inside rhs char boundary");
+            ?;
         if let Some(active_quote) = quote {
             if escaped_quote {
                 escaped_quote = false;
@@ -240,7 +240,7 @@ fn formula_call_after_open(text: &str, idx: usize, name: &str) -> Option<usize> 
         let character = text[after_name..]
             .chars()
             .next()
-            .expect("after_name is inside text char boundary");
+            ?;
         if !character.is_whitespace() {
             break;
         }

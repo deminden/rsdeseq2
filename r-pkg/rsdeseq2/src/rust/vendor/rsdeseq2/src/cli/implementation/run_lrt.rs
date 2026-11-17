@@ -228,7 +228,7 @@ pub(super) fn run_lrt(command: Commands) -> Result<(), DeseqError> {
                             &CooksReplacementOptions::new(cutoff),
                         )?;
                     let CooksReplacementTestOutput::Lrt(output) = output else {
-                        unreachable!("LRT CLI branch should route to LRT");
+                        return Err(invariant("LRT CLI branch should route to LRT"));
                     };
                     cli_lrt_replacement_output(output)
                 } else {
@@ -245,7 +245,7 @@ pub(super) fn run_lrt(command: Commands) -> Result<(), DeseqError> {
                     (Some(coefficient), None) => coefficient,
                     (None, Some(name)) => resolve_coefficient_index(&design, &name)?,
                     (None, None) => default_cli_coefficient(&design)?,
-                    _ => unreachable!("checked above"),
+                    _ => return Err(invariant("checked above")),
                 };
                 if let Some(cutoff) = cutoff {
                     cli_lrt_replacement_output(builder.fit_lrt_glm_mu_with_cooks_replacement(
@@ -296,6 +296,6 @@ pub(super) fn run_lrt(command: Commands) -> Result<(), DeseqError> {
             write_cli_result_sidecars(&result_sidecars, counts.gene_names(), &analysis)?;
             write_deseq_results_tsv(output, &analysis.results)
         }
-        _ => unreachable!("command dispatch selects the matching variant"),
+        _ => Err(invariant("command dispatch selects the matching variant")),
     }
 }

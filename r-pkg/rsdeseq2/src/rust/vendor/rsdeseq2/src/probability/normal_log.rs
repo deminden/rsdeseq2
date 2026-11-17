@@ -4,8 +4,11 @@
 #![allow(clippy::excessive_precision)]
 
 fn polynomial(x: f64, ascending: &[f64]) -> f64 {
-    let mut value = *ascending.last().unwrap();
-    for &coefficient in ascending[..ascending.len() - 1].iter().rev() {
+    let Some((&last, lower)) = ascending.split_last() else {
+        return 0.0;
+    };
+    let mut value = last;
+    for &coefficient in lower.iter().rev() {
         value = value * x + coefficient;
     }
     value

@@ -50,6 +50,22 @@ impl<'a, T> MatrixView<'a, T> {
             order,
         })
     }
+    /// View over a slice whose length is already known to be `rows * columns`,
+    /// such as the storage of a [`crate::core::CountMatrix`].
+    pub(crate) fn from_valid_parts(
+        rows: usize,
+        columns: usize,
+        values: &'a [T],
+        order: MatrixOrder,
+    ) -> Self {
+        debug_assert!(columns > 0 && rows.checked_mul(columns) == Some(values.len()));
+        Self {
+            values,
+            rows,
+            columns,
+            order,
+        }
+    }
     /// Logical row count.
     pub fn n_rows(&self) -> usize {
         self.rows

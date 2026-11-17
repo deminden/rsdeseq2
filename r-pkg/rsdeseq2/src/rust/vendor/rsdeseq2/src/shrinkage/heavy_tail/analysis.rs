@@ -297,10 +297,13 @@ impl PosteriorAnalysis {
                                 .sum::<f64>()
                     })
                     .sum::<f64>();
-                self.contrast_mode.as_mut().unwrap().as_mut_slice()[gene * k + column] = mean;
+                self.contrast_mode
+                    .as_mut()
+                    .ok_or_else(|| crate::errors::invariant("contrast outputs allocated"))?
+                    .as_mut_slice()[gene * k + column] = mean;
                 self.contrast_standard_deviation
                     .as_mut()
-                    .unwrap()
+                    .ok_or_else(|| crate::errors::invariant("contrast outputs allocated"))?
                     .as_mut_slice()[gene * k + column] = variance.sqrt();
             }
         }
@@ -312,7 +315,10 @@ impl PosteriorAnalysis {
         };
         if interval.kind == PosteriorIntervalKind::Laplace {
             let z = normal_upper_quantile((1.0 - interval.level) / 2.0);
-            self.intervals.as_mut().unwrap().as_mut_slice()[gene * 2..gene * 2 + 2]
+            self.intervals
+                .as_mut()
+                .ok_or_else(|| crate::errors::invariant("interval outputs allocated"))?
+                .as_mut_slice()[gene * 2..gene * 2 + 2]
                 .copy_from_slice(&[
                     mode[coefficient] - z * sd[coefficient],
                     mode[coefficient] + z * sd[coefficient],
@@ -331,7 +337,10 @@ impl PosteriorAnalysis {
             },
             &mut log_posterior,
         )?;
-        self.intervals.as_mut().unwrap().as_mut_slice()[gene * 2..gene * 2 + 2]
+        self.intervals
+            .as_mut()
+            .ok_or_else(|| crate::errors::invariant("interval outputs allocated"))?
+            .as_mut_slice()[gene * 2..gene * 2 + 2]
             .copy_from_slice(&summary.interval);
         self.grid_diagnostics[gene] = Some(summary.diagnostic.clone());
         Ok(Some(summary))

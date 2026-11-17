@@ -44,7 +44,8 @@ pub fn frozen_local_vst_grid_from_counts(
             let factor = if let Some(nf) = factors {
                 *nf.at(gene, sample)
             } else {
-                size_factors.expect("validated size factors")[sample]
+                size_factors.ok_or_else(|| crate::errors::invariant("validated size factors"))?
+                    [sample]
             };
             if !factor.is_finite() || factor <= 0.0 {
                 return Err(invalid_dispersion(

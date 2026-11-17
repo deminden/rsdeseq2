@@ -37,7 +37,7 @@ pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<V
     let n = if inputs.iter().any(|v| v.is_empty()) {
         0
     } else {
-        inputs.iter().map(|v| v.len()).max().unwrap()
+        inputs.iter().map(|v| v.len()).max().unwrap_or(0)
     };
     let mut result = if n > 0 && inputs[0].len() == n {
         inputs[0].clone()

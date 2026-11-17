@@ -139,7 +139,10 @@ impl OutputTransaction {
         let main = destinations
             .last()
             .ok_or_else(|| invalid_options("command has no output path"))?;
-        let mut marker_name = main.file_name().unwrap().to_os_string();
+        let mut marker_name = main
+            .file_name()
+            .ok_or_else(|| invalid_options("output path has no file name"))?
+            .to_os_string();
         marker_name.push(".complete.json");
         destinations.push(destination(&main.with_file_name(marker_name))?);
         let mut probes: Vec<(PathBuf, TemporaryPath)> = Vec::new();
@@ -160,7 +163,9 @@ impl OutputTransaction {
                     )));
                 }
             }
-            let parent = output.parent().unwrap();
+            let parent = output
+                .parent()
+                .ok_or_else(|| invalid_options("output path has no parent directory"))?;
             let mut probe_index = None;
             for (i, (existing_parent, _)) in probes.iter().enumerate() {
                 if aliases(parent, existing_parent)? {
@@ -176,7 +181,11 @@ impl OutputTransaction {
             };
             // Ask the destination filesystem itself about case/Unicode aliases;
             // no assumptions about the host's filesystem or string case folding.
-            let probe = probes[i].1.0.join(output.file_name().unwrap());
+            let probe = probes[i].1.0.join(
+                output
+                    .file_name()
+                    .ok_or_else(|| invalid_options("output path has no file name"))?,
+            );
             match OpenOptions::new().write(true).create_new(true).open(probe) {
                 Ok(file) => drop(file),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -191,11 +200,18 @@ impl OutputTransaction {
         let mut staged = Vec::new();
         for destination in destinations {
             staged.push(StagedFile {
-                temporary: unique_temporary(destination.parent().unwrap(), false)?,
+                temporary: unique_temporary(
+                    destination
+                        .parent()
+                        .ok_or_else(|| invalid_options("output path has no parent directory"))?,
+                    false,
+                )?,
                 destination,
             });
         }
-        let marker = staged.pop().unwrap();
+        let marker = staged
+            .pop()
+            .ok_or_else(|| crate::errors::invariant("completion marker is staged last"))?;
         for (output, file) in outputs.iter_mut().zip(&staged) {
             **output = file.temporary.0.clone();
         }

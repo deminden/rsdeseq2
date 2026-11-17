@@ -90,13 +90,12 @@ impl<'a> ContrastCounts<'a> {
 impl<'a> From<&'a CountMatrix> for ContrastCounts<'a> {
     fn from(counts: &'a CountMatrix) -> Self {
         // CountMatrix's private constructors guarantee this complete shape.
-        let matrix = MatrixView::new(
+        let matrix = MatrixView::from_valid_parts(
             counts.n_genes(),
             counts.n_samples(),
             counts.as_slice(),
             MatrixOrder::RowMajor,
-        )
-        .expect("validated CountMatrix shape");
+        );
         Self::from_unsigned(matrix)
     }
 }

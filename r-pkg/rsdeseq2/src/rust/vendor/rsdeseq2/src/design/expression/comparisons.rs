@@ -100,7 +100,8 @@ impl Evaluator<'_> {
                     "<=" => order != Ordering::Greater,
                     ">" => order == Ordering::Greater,
                     ">=" => order != Ordering::Less,
-                    _ => unreachable!(),
+                    // Dispatch only routes the six relational operators here.
+                    _ => return None,
                 })
             })
             .collect();

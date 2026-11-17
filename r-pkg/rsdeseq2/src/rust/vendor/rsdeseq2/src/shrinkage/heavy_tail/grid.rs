@@ -332,7 +332,9 @@ pub(super) fn evaluate(
             ));
         }
         let a = indices[0];
-        let b = *indices.last().unwrap();
+        let b = *indices
+            .last()
+            .ok_or_else(|| crate::errors::invariant("value present"))?;
         let rem = (mass - o.level) / 2.0;
         [
             solve_area(betas[a], betas[a + 1], values[a], values[a + 1], rem),

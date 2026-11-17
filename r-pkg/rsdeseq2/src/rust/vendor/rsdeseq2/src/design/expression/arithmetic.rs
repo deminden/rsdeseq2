@@ -162,7 +162,8 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
                         ">=" => x >= y,
                         "==" => x == y,
                         "!=" => x != y,
-                        _ => unreachable!(),
+                        // Dispatch only routes the six relational operators here.
+                        _ => return None,
                     })
                 }
             })

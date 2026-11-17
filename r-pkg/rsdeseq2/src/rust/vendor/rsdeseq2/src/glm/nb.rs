@@ -129,14 +129,14 @@ fn nbinom_log_likelihood_with_cached_gamma(
             None => {
                 let y = f64::from(count);
                 let mu_dispersion = mu * dispersion;
-                let gamma_size = gamma_size.expect("uncached likelihood computes gamma size");
+                let gamma_size = gamma_size.unwrap_or_else(|| ln_gamma(size));
                 let gamma_y_size = if count == 0 {
                     gamma_size
                 } else {
                     ln_gamma(y + size)
                 };
                 let gamma_y_one = if count == 0 {
-                    gamma_one.expect("uncached likelihood computes gamma one")
+                    gamma_one.unwrap_or_else(|| ln_gamma(1.0))
                 } else {
                     ln_gamma(y + 1.0)
                 };
