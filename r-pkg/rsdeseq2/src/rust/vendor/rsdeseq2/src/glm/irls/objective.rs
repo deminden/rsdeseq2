@@ -1,6 +1,7 @@
+use super::*;
 // Optimizer objectives, gradients and Hessians.
 
-fn beta_log2_value_gradient(
+pub(super) fn beta_log2_value_gradient(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
 ) -> Result<(f64, Vec<f64>), DeseqError> {
@@ -8,7 +9,7 @@ fn beta_log2_value_gradient(
     Ok((value, gradient))
 }
 
-fn beta_log2_objective_gradient_hessian(
+pub(super) fn beta_log2_objective_gradient_hessian(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
 ) -> Result<(f64, Vec<f64>, DMatrix<f64>), DeseqError> {
@@ -166,7 +167,7 @@ fn beta_log2_objective_gradient_hessian(
     Ok((objective, gradient, hessian))
 }
 
-fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f64> {
+pub(super) fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f64> {
     validate_positive_finite(mu, "optim fallback mean", 0).ok()?;
     validate_positive_finite(dispersion, "dispersion", 0).ok()?;
     let count = f64::from(count);
@@ -182,15 +183,21 @@ fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) -> Option<f
     checked::add(checked::add(first, -second)?, -third)
 }
 
-fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
+pub(super) fn beta_optim_penalty(p: usize) -> (f64, Vec<f64>, DMatrix<f64>) {
     (1.0e300, vec![0.0; p], DMatrix::identity(p, p))
 }
 
-fn beta_log2_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
+pub(super) fn beta_log2_objective(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+) -> Result<f64, DeseqError> {
     beta_log2_objective_gradient_hessian(input, beta).map(|(objective, _, _)| objective)
 }
 
-fn beta_log2_r_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64, DeseqError> {
+pub(super) fn beta_log2_r_objective(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+) -> Result<f64, DeseqError> {
     let mut ll = 0.0;
     for sample in 0..input.x.nrows() {
         let mut eta = 0.0;
@@ -216,7 +223,7 @@ fn beta_log2_r_objective(input: &BetaOptimInput<'_>, beta: &[f64]) -> Result<f64
 }
 
 #[cfg(test)]
-fn beta_log2_numeric_gradient(
+pub(super) fn beta_log2_numeric_gradient(
     input: &BetaOptimInput<'_>,
     beta: &[f64],
     lower: f64,

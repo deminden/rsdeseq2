@@ -1,6 +1,7 @@
+use super::*;
 // Projected-gradient convergence and checked arithmetic.
 
-fn projected_gradient_norm(
+pub(super) fn projected_gradient_norm(
     parameters: &[f64],
     gradient: &[f64],
     lower: f64,
@@ -43,15 +44,15 @@ fn projected_gradient_norm(
     norm.is_finite().then_some(norm)
 }
 
-fn checked_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
+pub(super) fn checked_product3(left: f64, middle: f64, right: f64) -> Option<f64> {
     checked::mul(checked::mul(left, middle)?, right)
 }
 
-fn checked_product4(first: f64, second: f64, third: f64, fourth: f64) -> Option<f64> {
+pub(super) fn checked_product4(first: f64, second: f64, third: f64, fourth: f64) -> Option<f64> {
     checked::mul(checked::mul(first, second)?, checked::mul(third, fourth)?)
 }
 
-fn checked_product6(
+pub(super) fn checked_product6(
     first: f64,
     second: f64,
     third: f64,
@@ -59,10 +60,13 @@ fn checked_product6(
     fifth: f64,
     sixth: f64,
 ) -> Option<f64> {
-    checked::mul(checked_product3(first, second, third)?, checked_product3(fourth, fifth, sixth)?)
+    checked::mul(
+        checked_product3(first, second, third)?,
+        checked_product3(fourth, fifth, sixth)?,
+    )
 }
 
-fn irls_deviance_convergence_stat(dev: f64, dev_old: f64) -> Option<f64> {
+pub(super) fn irls_deviance_convergence_stat(dev: f64, dev_old: f64) -> Option<f64> {
     let delta = checked::add(dev, -dev_old)?.abs();
     let scale = checked::add(dev.abs(), 0.1)?;
     checked::div(delta, scale)

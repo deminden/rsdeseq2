@@ -1,8 +1,9 @@
+use super::*;
 // Input validation, normalization factors and output scaling.
 
 /// Size factors repeated per gene, rejecting non-positive values as
 /// `NonFiniteValue` (shared by the IRLS and beta-prior fits).
-pub(super) fn normalization_factors_from_size_factors(
+pub(in crate::glm) fn normalization_factors_from_size_factors(
     counts: &CountMatrix,
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
@@ -23,7 +24,7 @@ pub(super) fn normalization_factors_from_size_factors(
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
 }
 
-fn validate_nf_irls_inputs(
+pub(super) fn validate_nf_irls_inputs(
     counts: &CountMatrix,
     design: &DesignMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
@@ -90,9 +91,11 @@ fn validate_nf_irls_inputs(
     Ok(())
 }
 
-
-
-fn checked_log2_scale(value: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+pub(super) fn checked_log2_scale(
+    value: f64,
+    index: usize,
+    context: &str,
+) -> Result<f64, DeseqError> {
     let scaled = std::f64::consts::LOG2_E * value;
     if scaled.is_finite() {
         Ok(scaled)
@@ -105,7 +108,7 @@ fn checked_log2_scale(value: f64, index: usize, context: &str) -> Result<f64, De
     }
 }
 
-fn checked_log2_standard_error(
+pub(super) fn checked_log2_standard_error(
     covariance: f64,
     index: usize,
     context: &str,
@@ -114,7 +117,11 @@ fn checked_log2_standard_error(
     checked_log2_scale(se, index, context)
 }
 
-fn checked_log2_covariance(value: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
+pub(super) fn checked_log2_covariance(
+    value: f64,
+    index: usize,
+    context: &str,
+) -> Result<f64, DeseqError> {
     let log2_e = std::f64::consts::LOG2_E;
     let log2_e_squared = checked_log2_scale(log2_e, index, context)?;
     let scaled = log2_e_squared * value;

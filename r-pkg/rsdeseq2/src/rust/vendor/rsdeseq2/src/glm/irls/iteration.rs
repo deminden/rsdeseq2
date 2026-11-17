@@ -1,6 +1,9 @@
+use super::*;
 // Per-gene IRLS iterations and scratch reuse.
 
-fn fit_fixed_dispersion_irls_row(input: IrlsRowInput<'_>) -> Result<IrlsRowOutput, DeseqError> {
+pub(super) fn fit_fixed_dispersion_irls_row(
+    input: IrlsRowInput<'_>,
+) -> Result<IrlsRowOutput, DeseqError> {
     let gene = input.gene;
     let p = input.x.ncols();
     if input.counts.is_all_zero_gene(gene)? {

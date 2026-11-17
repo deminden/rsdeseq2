@@ -1,6 +1,7 @@
+use super::*;
 // Working weights and responses.
 
-fn working_weights(
+pub(super) fn working_weights(
     mu: &[f64],
     dispersion: f64,
     weights: Option<&[f64]>,
@@ -10,7 +11,7 @@ fn working_weights(
     Ok(output)
 }
 
-fn working_weights_into(
+pub(super) fn working_weights_into(
     mu: &[f64],
     dispersion: f64,
     weights: Option<&[f64]>,
@@ -24,12 +25,14 @@ fn working_weights_into(
         .enumerate()
         .map(|(sample, value)| -> Result<f64, DeseqError> {
             validate_positive_finite(value, "mu", sample)?;
-            let working_weight = stable_working_weight(value, dispersion).nonfinite_at("IRLS working weight", Some(sample))?;
+            let working_weight = stable_working_weight(value, dispersion)
+                .nonfinite_at("IRLS working weight", Some(sample))?;
             Ok(match weights {
                 Some(weights) => {
                     let weight = weights[sample];
                     validate_nonnegative_finite(weight, "weight", sample)?;
-                    checked::try_mul(weight, working_weight).nonfinite_at("IRLS weighted working weight", Some(sample))?
+                    checked::try_mul(weight, working_weight)
+                        .nonfinite_at("IRLS weighted working weight", Some(sample))?
                 }
                 None => working_weight,
             })
@@ -40,7 +43,7 @@ fn working_weights_into(
     Ok(())
 }
 
-fn stable_working_weight(mu: f64, dispersion: f64) -> checked::Checked {
+pub(super) fn stable_working_weight(mu: f64, dispersion: f64) -> checked::Checked {
     for value in [mu, dispersion] {
         if !value.is_finite() || value <= 0.0 {
             return checked::reject(value);
@@ -55,12 +58,12 @@ fn stable_working_weight(mu: f64, dispersion: f64) -> checked::Checked {
 }
 
 #[cfg(test)]
-fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn working_response(mu: &[f64], nf: &[f64], y: &[f64]) -> Result<Vec<f64>, DeseqError> {
     working_response_with_log_factors(mu, nf, y, None)
 }
 
 #[cfg(test)]
-fn working_response_with_log_factors(
+pub(super) fn working_response_with_log_factors(
     mu: &[f64],
     nf: &[f64],
     y: &[f64],
@@ -71,7 +74,7 @@ fn working_response_with_log_factors(
     Ok(output)
 }
 
-fn working_response_into(
+pub(super) fn working_response_into(
     mu: &[f64],
     nf: &[f64],
     y: &[f64],
@@ -93,13 +96,14 @@ fn working_response_into(
                     Some(values) => checked::try_add(mu.ln(), -values[sample]),
                     None => stable_log_normalized_mean(mu, factor),
                 };
-                let log_normalized_mu =
-                    normalized_mean.nonfinite_at("IRLS working response normalized mean", Some(sample))?;
-                let residual =
-                    checked::try_add(count, -mu).nonfinite_at("IRLS working response residual", Some(sample))?;
-                let scaled_residual =
-                    checked::try_div(residual, mu).nonfinite_at("IRLS working response scaled residual", Some(sample))?;
-                checked::try_add(log_normalized_mu, scaled_residual).nonfinite_at("IRLS working response", Some(sample))
+                let log_normalized_mu = normalized_mean
+                    .nonfinite_at("IRLS working response normalized mean", Some(sample))?;
+                let residual = checked::try_add(count, -mu)
+                    .nonfinite_at("IRLS working response residual", Some(sample))?;
+                let scaled_residual = checked::try_div(residual, mu)
+                    .nonfinite_at("IRLS working response scaled residual", Some(sample))?;
+                checked::try_add(log_normalized_mu, scaled_residual)
+                    .nonfinite_at("IRLS working response", Some(sample))
             },
         );
     for value in values {
@@ -108,7 +112,7 @@ fn working_response_into(
     Ok(())
 }
 
-fn stable_log_normalized_mean(mu: f64, factor: f64) -> checked::Checked {
+pub(super) fn stable_log_normalized_mean(mu: f64, factor: f64) -> checked::Checked {
     for value in [mu, factor] {
         if !value.is_finite() || value <= 0.0 {
             return checked::reject(value);
