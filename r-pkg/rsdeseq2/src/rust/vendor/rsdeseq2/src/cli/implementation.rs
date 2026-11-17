@@ -4,8 +4,11 @@
 //! while preserving existing paths through re-exports.
 
 // CLI imports, argument definitions, output path types, and option conversions.
-include!("implementation/args.rs");
-include!("implementation/paths.rs");
+#[path = "implementation/args.rs"]
+mod args;
+pub use args::*;
+#[path = "implementation/paths.rs"]
+mod paths;
 
 // Top-level CLI dispatch and command execution.
 #[path = "implementation/run.rs"]
@@ -30,4 +33,6 @@ mod helpers;
 use helpers::*;
 
 // Unit tests for CLI export helpers.
-include!("implementation/tests.rs");
+#[cfg(test)]
+#[path = "implementation/tests.rs"]
+mod tests;

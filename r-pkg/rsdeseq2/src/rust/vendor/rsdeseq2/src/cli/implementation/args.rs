@@ -1,23 +1,25 @@
-use std::collections::HashSet;
-use std::path::PathBuf;
+pub(super) use std::collections::HashSet;
+pub(super) use std::path::PathBuf;
 
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+pub(super) use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
-use crate::contrasts::{
-    resolve_coefficient_index, resolve_contrast, ContrastSpec, ResultsContrast,
+pub(super) use crate::contrasts::{
+    ContrastSpec, ResultsContrast, resolve_coefficient_index, resolve_contrast,
 };
-use crate::cooks::{CooksRefitPlan, CooksReplacementOptions};
-use crate::core::{
+pub(super) use crate::cooks::{CooksRefitPlan, CooksReplacementOptions};
+pub(super) use crate::core::{
     CooksReplacementLrtOutput, CooksReplacementTestOutput, CooksReplacementWaldOutput,
     DeseqBuilder, DeseqFit,
 };
-use crate::design::{
-    expanded_additive_design, expanded_additive_factor_design, expanded_factor_design,
-    ExpandedFactorSpec, ExpandedNumericSpec,
+pub(super) use crate::design::{
+    ExpandedFactorSpec, ExpandedNumericSpec, expanded_additive_design,
+    expanded_additive_factor_design, expanded_factor_design,
 };
-use crate::errors::DeseqError;
-use crate::glm::{BetaPriorRefitOptions, ExpandedModelBetaPriorDesignInput, WaldAlternative};
-use crate::io::{
+pub(super) use crate::errors::DeseqError;
+pub(super) use crate::glm::{
+    BetaPriorRefitOptions, ExpandedModelBetaPriorDesignInput, WaldAlternative,
+};
+pub(super) use crate::io::{
     align_design_matrix_to_samples, align_gene_numeric_values_to_genes,
     align_labeled_assay_matrix_to_counts, align_sample_levels_to_samples,
     align_sample_numeric_values_to_samples, read_count_matrix_tsv, read_labeled_design_matrix_tsv,
@@ -34,13 +36,20 @@ use crate::io::{
     write_independent_filter_num_rej_tsv, write_normalized_counts_tsv,
     write_optional_numeric_matrix_tsv, write_size_factors_tsv,
 };
-use crate::matrix::RowMajorMatrix;
-use crate::normalization::{
+pub(super) use crate::matrix::RowMajorMatrix;
+pub(super) use crate::normalization::{
     base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
     normalized_counts_with_factors,
 };
-use crate::options::{CooksCutoff, FitType, SizeFactorMethod, TestType};
-use crate::results::{
+pub(super) use crate::options::{CooksCutoff, FitType, SizeFactorMethod, TestType};
+pub(super) use crate::results::{
+    DeseqResults, ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
+    ExpandedAdditiveBetaPriorWaldReplacementResults, ExpandedAdditiveBetaPriorWaldResults,
+    ExpandedAdditiveBetaPriorWaldResultsInput, ExpandedBetaPriorWaldNormalizedResultsInput,
+    ExpandedBetaPriorWaldReplacementResults, ExpandedBetaPriorWaldResults,
+    ExpandedBetaPriorWaldResultsInput, ExpandedFactorBetaPriorWaldNormalizedResultsInput,
+    ExpandedFactorBetaPriorWaldReplacementResults, ExpandedFactorBetaPriorWaldResults,
+    ExpandedFactorBetaPriorWaldResultsInput,
     fit_expanded_additive_beta_prior_wald_contrast_results,
     fit_expanded_additive_beta_prior_wald_contrast_results_with_cooks_replacement,
     fit_expanded_additive_beta_prior_wald_contrast_results_with_normalization_factors_and_weights,
@@ -65,13 +74,7 @@ use crate::results::{
     fit_expanded_factor_beta_prior_wald_results_with_cooks_replacement,
     fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights,
     fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement,
-    resolve_cooks_cutoff, DeseqResults, ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
-    ExpandedAdditiveBetaPriorWaldReplacementResults, ExpandedAdditiveBetaPriorWaldResults,
-    ExpandedAdditiveBetaPriorWaldResultsInput, ExpandedBetaPriorWaldNormalizedResultsInput,
-    ExpandedBetaPriorWaldReplacementResults, ExpandedBetaPriorWaldResults,
-    ExpandedBetaPriorWaldResultsInput, ExpandedFactorBetaPriorWaldNormalizedResultsInput,
-    ExpandedFactorBetaPriorWaldReplacementResults, ExpandedFactorBetaPriorWaldResults,
-    ExpandedFactorBetaPriorWaldResultsInput,
+    resolve_cooks_cutoff,
 };
 
 /// Command-line arguments for the `rsdeseq2` analysis CLI.
@@ -80,12 +83,12 @@ use crate::results::{
 #[command(about = "DESeq2-compatible RNA-seq differential expression in Rust")]
 pub struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    pub(super) command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
-enum Commands {
+pub(super) enum Commands {
     /// Estimate sample size factors.
     SizeFactors {
         /// Tab-delimited count matrix with gene IDs in the first column.
@@ -584,20 +587,20 @@ enum Commands {
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
-enum SizeFactorMethodArg {
+pub(super) enum SizeFactorMethodArg {
     Ratio,
     Poscounts,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
-enum FitTypeArg {
+pub(super) enum FitTypeArg {
     Parametric,
     Local,
     Mean,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
-enum WaldAlternativeArg {
+pub(super) enum WaldAlternativeArg {
     GreaterAbs,
     GreaterAbsUpshot,
     GreaterAbs2014,
@@ -606,37 +609,37 @@ enum WaldAlternativeArg {
     Less,
 }
 
-struct CliAnalysisOutput {
-    results: DeseqResults,
-    fit: Option<DeseqFit>,
-    refit: Option<DeseqFit>,
-    cooks: Option<RowMajorMatrix<f64>>,
-    refit_plan: Option<CooksRefitPlan>,
+pub(super) struct CliAnalysisOutput {
+    pub(super) results: DeseqResults,
+    pub(super) fit: Option<DeseqFit>,
+    pub(super) refit: Option<DeseqFit>,
+    pub(super) cooks: Option<RowMajorMatrix<f64>>,
+    pub(super) refit_plan: Option<CooksRefitPlan>,
 }
 
-struct CliCooksOutputPaths {
-    cooks_distance: Option<PathBuf>,
-    replacement_metadata: Option<PathBuf>,
-    replacement_row_metadata: Option<PathBuf>,
-    replaced_counts: Option<PathBuf>,
-    candidate_replacement_counts: Option<PathBuf>,
-    outlier_cells: Option<PathBuf>,
+pub(super) struct CliCooksOutputPaths {
+    pub(super) cooks_distance: Option<PathBuf>,
+    pub(super) replacement_metadata: Option<PathBuf>,
+    pub(super) replacement_row_metadata: Option<PathBuf>,
+    pub(super) replaced_counts: Option<PathBuf>,
+    pub(super) candidate_replacement_counts: Option<PathBuf>,
+    pub(super) outlier_cells: Option<PathBuf>,
 }
 
-struct CliResultSidecarPaths {
-    column_metadata: Option<PathBuf>,
-    table_metadata: Option<PathBuf>,
-    independent_filter_metadata: Option<PathBuf>,
-    independent_filter_num_rej: Option<PathBuf>,
-    independent_filter_lowess: Option<PathBuf>,
-    fit_diagnostics: Option<PathBuf>,
-    refit_diagnostics: Option<PathBuf>,
-    fit_beta: Option<PathBuf>,
-    fit_beta_se: Option<PathBuf>,
-    fit_beta_optim_start: Option<PathBuf>,
-    refit_beta: Option<PathBuf>,
-    refit_beta_se: Option<PathBuf>,
-    refit_beta_optim_start: Option<PathBuf>,
+pub(super) struct CliResultSidecarPaths {
+    pub(super) column_metadata: Option<PathBuf>,
+    pub(super) table_metadata: Option<PathBuf>,
+    pub(super) independent_filter_metadata: Option<PathBuf>,
+    pub(super) independent_filter_num_rej: Option<PathBuf>,
+    pub(super) independent_filter_lowess: Option<PathBuf>,
+    pub(super) fit_diagnostics: Option<PathBuf>,
+    pub(super) refit_diagnostics: Option<PathBuf>,
+    pub(super) fit_beta: Option<PathBuf>,
+    pub(super) fit_beta_se: Option<PathBuf>,
+    pub(super) fit_beta_optim_start: Option<PathBuf>,
+    pub(super) refit_beta: Option<PathBuf>,
+    pub(super) refit_beta_se: Option<PathBuf>,
+    pub(super) refit_beta_optim_start: Option<PathBuf>,
 }
 
 impl From<SizeFactorMethodArg> for SizeFactorMethod {
