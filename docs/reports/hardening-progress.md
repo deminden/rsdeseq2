@@ -73,3 +73,15 @@ otherwise; structural counts come from
 - Found by new tests: unknown formula calls such as `~ q(age)` recursed until
   the stack overflowed (fuzzing, fixed in 7.3a); DESeq2's parametric-to-local
   fallback and local-trend row rule were missing (edge-case probing, 6.10).
+
+## Mutation testing sample (7.4)
+
+`cargo mutants` on `numeric/validate.rs` and `multiple_testing.rs` (lib and
+integration tests), 48 mutants: 45 caught, 3 missed. All 3 missed mutants
+were in the BH helpers used by independent filtering:
+`rejections_for_filter` returning a constant, `<` → `<=` at the alpha
+boundary, and `||` → `&&` in `bh_adjust_f64` validation. Unit tests now kill
+all three. The weekly `coverage and mutation` workflow covers `numeric/`,
+`multiple_testing`, `normalization` and `independent_filtering`; line
+coverage needs llvm-tools, which this environment cannot install, so it is
+measured in CI only.
