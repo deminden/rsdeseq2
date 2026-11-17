@@ -1,4 +1,5 @@
-fn diagnostic_frame_row_count(
+use super::*;
+pub(super) fn diagnostic_frame_row_count(
     columns: &[Deseq2McolsDiagnosticColumn],
 ) -> Result<usize, DeseqError> {
     let Some(first) = columns.first() else {
@@ -18,7 +19,7 @@ fn diagnostic_frame_row_count(
     Ok(expected)
 }
 
-fn diagnostic_column_len(column: &Deseq2McolsDiagnosticColumn) -> usize {
+pub(super) fn diagnostic_column_len(column: &Deseq2McolsDiagnosticColumn) -> usize {
     match &column.values {
         Deseq2McolsDiagnosticValues::Numeric(values) => values.len(),
         Deseq2McolsDiagnosticValues::OptionalNumeric(values) => values.len(),
@@ -27,7 +28,10 @@ fn diagnostic_column_len(column: &Deseq2McolsDiagnosticColumn) -> usize {
     }
 }
 
-fn format_result_column_value(values: &DeseqResultColumnValues, row_idx: usize) -> String {
+pub(super) fn format_result_column_value(
+    values: &DeseqResultColumnValues,
+    row_idx: usize,
+) -> String {
     match values {
         DeseqResultColumnValues::Numeric(values) => values
             .get(row_idx)
@@ -51,7 +55,10 @@ fn format_result_column_value(values: &DeseqResultColumnValues, row_idx: usize) 
     }
 }
 
-fn format_diagnostic_column_value(values: &Deseq2McolsDiagnosticValues, row_idx: usize) -> String {
+pub(super) fn format_diagnostic_column_value(
+    values: &Deseq2McolsDiagnosticValues,
+    row_idx: usize,
+) -> String {
     match values {
         Deseq2McolsDiagnosticValues::Numeric(values) => values
             .get(row_idx)

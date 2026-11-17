@@ -1,4 +1,5 @@
-fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
+use super::*;
+pub(super) fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
     if let Ok(value) = field.parse::<u32>() {
         return Ok(value);
     }
@@ -22,7 +23,7 @@ fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
     Ok(value as u32)
 }
 
-fn parse_finite_float_field(
+pub(super) fn parse_finite_float_field(
     field: &str,
     path: &Path,
     index: usize,
@@ -418,7 +419,7 @@ pub fn write_cooks_replacement_row_metadata_tsv(
     Ok(())
 }
 
-fn write_logical_matrix_tsv(
+pub(super) fn write_logical_matrix_tsv(
     path: impl AsRef<Path>,
     gene_names: Option<&[String]>,
     sample_names: Option<&[String]>,
@@ -460,7 +461,7 @@ pub fn write_optional_numeric_matrix_tsv(
     Ok(())
 }
 
-fn validate_cooks_refit_plan_rows(
+pub(super) fn validate_cooks_refit_plan_rows(
     refit_plan: &CooksRefitPlan,
     expected_rows: usize,
 ) -> Result<(), DeseqError> {
@@ -502,7 +503,7 @@ fn validate_cooks_refit_plan_rows(
     Ok(())
 }
 
-fn matrix_header(
+pub(super) fn matrix_header(
     sample_names: Option<&[String]>,
     n_samples: usize,
     fallback_prefix: &str,
@@ -515,14 +516,18 @@ fn matrix_header(
     header
 }
 
-fn matrix_row_name(gene_names: Option<&[String]>, gene: usize, fallback_prefix: &str) -> String {
+pub(super) fn matrix_row_name(
+    gene_names: Option<&[String]>,
+    gene: usize,
+    fallback_prefix: &str,
+) -> String {
     gene_names
         .and_then(|names| names.get(gene))
         .cloned()
         .unwrap_or_else(|| format!("{}{}", fallback_prefix, gene + 1))
 }
 
-fn matrix_sample_name(
+pub(super) fn matrix_sample_name(
     sample_names: Option<&[String]>,
     sample: usize,
     fallback_prefix: &str,
@@ -533,26 +538,30 @@ fn matrix_sample_name(
         .unwrap_or_else(|| format!("{}{}", fallback_prefix, sample + 1))
 }
 
-fn validate_optional_names(
+pub(super) fn validate_optional_names(
     context: &str,
     names: Option<&[String]>,
     expected: usize,
 ) -> Result<(), DeseqError> {
     if let Some(names) = names
-        && names.len() != expected {
-            return Err(invalid_dimensions(context, expected, names.len()));
-        }
+        && names.len() != expected
+    {
+        return Err(invalid_dimensions(context, expected, names.len()));
+    }
     Ok(())
 }
 
-fn validate_positive_finite_matrix(
+pub(super) fn validate_positive_finite_matrix(
     context: &str,
     matrix: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
     validate_positive_finite_values(context, matrix.as_slice())
 }
 
-fn validate_positive_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+pub(super) fn validate_positive_finite_values(
+    context: &str,
+    values: &[f64],
+) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() || value <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
@@ -563,7 +572,10 @@ fn validate_positive_finite_values(context: &str, values: &[f64]) -> Result<(), 
     Ok(())
 }
 
-fn validate_nonnegative_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+pub(super) fn validate_nonnegative_finite_values(
+    context: &str,
+    values: &[f64],
+) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() || value < 0.0 {
             return Err(DeseqError::NonFiniteValue {
@@ -576,7 +588,7 @@ fn validate_nonnegative_finite_values(context: &str, values: &[f64]) -> Result<(
     Ok(())
 }
 
-fn format_finite_or_na(value: f64) -> String {
+pub(super) fn format_finite_or_na(value: f64) -> String {
     if value.is_finite() {
         value.to_string()
     } else {
@@ -584,13 +596,13 @@ fn format_finite_or_na(value: f64) -> String {
     }
 }
 
-fn format_optional_finite_or_na(value: Option<f64>) -> String {
+pub(super) fn format_optional_finite_or_na(value: Option<f64>) -> String {
     value
         .map(format_finite_or_na)
         .unwrap_or_else(|| "NA".to_string())
 }
 
-fn format_r_logical(value: bool) -> String {
+pub(super) fn format_r_logical(value: bool) -> String {
     if value {
         "TRUE".to_string()
     } else {
@@ -598,7 +610,7 @@ fn format_r_logical(value: bool) -> String {
     }
 }
 
-fn format_optional_r_logical(value: Option<bool>) -> String {
+pub(super) fn format_optional_r_logical(value: Option<bool>) -> String {
     value
         .map(format_r_logical)
         .unwrap_or_else(|| "NA".to_string())

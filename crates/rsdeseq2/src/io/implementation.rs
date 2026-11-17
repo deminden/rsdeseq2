@@ -4,19 +4,31 @@
 //! while preserving existing paths through re-exports.
 
 // Input row-label types and TSV readers.
-include!("implementation/read.rs");
+#[path = "implementation/read.rs"]
+mod read;
+pub use read::*;
 
 // Label alignment helpers for sample and gene keyed inputs.
-include!("implementation/align.rs");
+#[path = "implementation/align.rs"]
+mod align;
+pub use align::*;
 
 // TSV field parsers and primitive matrix writers.
-include!("implementation/write_matrices.rs");
+#[path = "implementation/write_matrices.rs"]
+mod write_matrices;
+pub use write_matrices::*;
 
 // DESeq result, diagnostics, and independent-filtering TSV writers.
-include!("implementation/write_results.rs");
+#[path = "implementation/write_results.rs"]
+mod write_results;
+pub use write_results::*;
 
 // Formatting and export validation helpers.
-include!("implementation/format_validation.rs");
+#[path = "implementation/format_validation.rs"]
+mod format_validation;
+use format_validation::*;
 
 // Unit tests for I/O helpers.
-include!("implementation/tests.rs");
+#[cfg(test)]
+#[path = "implementation/tests.rs"]
+mod tests;

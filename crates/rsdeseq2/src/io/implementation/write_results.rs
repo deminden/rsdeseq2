@@ -1,3 +1,4 @@
+use super::*;
 /// Write an assembled DESeq2-shaped result table to a tab-delimited file.
 ///
 /// Gene identifiers are written as the first `gene` column, while statistical
@@ -22,7 +23,7 @@ pub fn write_deseq_results_tidy_tsv(
     write_deseq_results_with_row_header_tsv(path, results, "row", "row")
 }
 
-fn write_deseq_results_with_row_header_tsv(
+pub(super) fn write_deseq_results_with_row_header_tsv(
     path: impl AsRef<Path>,
     results: &DeseqResults,
     row_header: &str,
@@ -57,7 +58,7 @@ fn write_deseq_results_with_row_header_tsv(
     Ok(())
 }
 
-fn validate_deseq_results_export(results: &DeseqResults) -> Result<(), DeseqError> {
+pub(super) fn validate_deseq_results_export(results: &DeseqResults) -> Result<(), DeseqError> {
     for (idx, row) in results.rows.iter().enumerate() {
         if !row.base_mean.is_finite() || row.base_mean < 0.0 {
             return Err(DeseqError::NonFiniteValue {
@@ -77,67 +78,71 @@ fn validate_deseq_results_export(results: &DeseqResults) -> Result<(), DeseqErro
     Ok(())
 }
 
-fn validate_optional_export_finite(
+pub(super) fn validate_optional_export_finite(
     value: Option<f64>,
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
     if let Some(value) = value
-        && !value.is_finite() {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: Some(idx),
-                value,
-            });
-        }
+        && !value.is_finite()
+    {
+        return Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(idx),
+            value,
+        });
+    }
     Ok(())
 }
 
-fn validate_optional_export_probability(
+pub(super) fn validate_optional_export_probability(
     value: Option<f64>,
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
     if let Some(value) = value
-        && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
-            });
-        }
+        && (!value.is_finite() || !(0.0..=1.0).contains(&value))
+    {
+        return Err(DeseqError::InvalidOptions {
+            reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
+        });
+    }
     Ok(())
 }
 
-fn validate_optional_export_positive(
+pub(super) fn validate_optional_export_positive(
     value: Option<f64>,
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
     if let Some(value) = value
-        && (!value.is_finite() || value <= 0.0) {
-            return Err(DeseqError::InvalidDispersion {
-                reason: format!("{context} at index {idx} must be finite and positive"),
-            });
-        }
+        && (!value.is_finite() || value <= 0.0)
+    {
+        return Err(DeseqError::InvalidDispersion {
+            reason: format!("{context} at index {idx} must be finite and positive"),
+        });
+    }
     Ok(())
 }
 
-fn validate_optional_export_nonnegative(
+pub(super) fn validate_optional_export_nonnegative(
     value: Option<f64>,
     context: &str,
     idx: usize,
 ) -> Result<(), DeseqError> {
     if let Some(value) = value
-        && (!value.is_finite() || value < 0.0) {
-            return Err(DeseqError::NonFiniteValue {
-                context: context.to_string(),
-                index: Some(idx),
-                value,
-            });
-        }
+        && (!value.is_finite() || value < 0.0)
+    {
+        return Err(DeseqError::NonFiniteValue {
+            context: context.to_string(),
+            index: Some(idx),
+            value,
+        });
+    }
     Ok(())
 }
 
-fn validate_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
+pub(super) fn validate_finite_values(context: &str, values: &[f64]) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() {
             return Err(DeseqError::NonFiniteValue {
@@ -209,13 +214,14 @@ pub fn write_deseq_mcols_diagnostics_tsv(
     let frame = diagnostics.data_frame();
     let n_rows = diagnostic_frame_row_count(&frame.columns)?;
     if let Some(names) = gene_names
-        && names.len() != n_rows {
-            return Err(invalid_dimensions(
-                "diagnostic gene names",
-                n_rows,
-                names.len(),
-            ));
-        }
+        && names.len() != n_rows
+    {
+        return Err(invalid_dimensions(
+            "diagnostic gene names",
+            n_rows,
+            names.len(),
+        ));
+    }
     let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
     let mut header = Vec::with_capacity(frame.columns.len() + 1);
     header.push("gene".to_string());
@@ -292,7 +298,7 @@ pub fn write_independent_filter_metadata_tsv(
     Ok(())
 }
 
-fn validate_independent_filtering_export(
+pub(super) fn validate_independent_filtering_export(
     filtering: &IndependentFilteringOutput,
 ) -> Result<(), DeseqError> {
     if filtering.theta.len() != filtering.num_rejections.len() {
@@ -320,13 +326,14 @@ fn validate_independent_filtering_export(
         validate_finite_values("independent-filter lowess export", lowess_fit)?;
     }
     if let Some(selected_index) = filtering.selected_index
-        && selected_index >= filtering.theta.len() {
-            return Err(invalid_dimensions(
-                "independent-filter selected index",
-                filtering.theta.len().saturating_sub(1),
-                selected_index,
-            ));
-        }
+        && selected_index >= filtering.theta.len()
+    {
+        return Err(invalid_dimensions(
+            "independent-filter selected index",
+            filtering.theta.len().saturating_sub(1),
+            selected_index,
+        ));
+    }
     validate_optional_export_probability(filtering.filter_theta, "independent-filter theta", 0)?;
     validate_optional_export_nonnegative(
         filtering.filter_threshold,
