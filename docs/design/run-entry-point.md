@@ -1,6 +1,8 @@
 # Design note 4.2 — one `DeseqBuilder::run` entry point
 
-Status: **proposal, awaiting approval**. No code changes until approved.
+Status: **shape approved** (2026-11-17). One `run`, as the plan's target table
+says: "1 `run` plus deprecated wrappers, then 1"; stopping early is part of
+`run`. Implementation follows the migration steps below.
 
 ## Problem
 
@@ -74,13 +76,10 @@ pub struct RunOutput {
    Each note names the exact `Analysis` that replaces the method.
 3. **Move the R bridge and CLI to `run`.** This removes 25 call sites and
    leaves no deprecated calls inside the workspace.
-4. **Release 0.6.0** with the deprecations. Remove the wrappers in 0.7.0, or
-   keep the dozen most-used ones as convenience methods (`fit_with_results`,
-   `fit_contrast`, `fit_lrt`, `fit_formula`): your call.
+4. **Release 0.6.0** with the deprecations, and remove the wrappers in 0.7.0.
 
 The metric `builder_fit_methods` goes from 143 to 1 plus the deprecated
-wrappers, then to 1 (or about 5 if we keep convenience methods). That is the
-target already in `hardening-progress.md`.
+wrappers, then to 1, the target in `hardening-progress.md`.
 
 ## Risks
 
@@ -94,11 +93,10 @@ target already in `hardening-progress.md`.
 - **Diff size.** The wrappers are mechanical (about 1,500 lines across
   `builder/`). Steps 2 and 3 are large but contain no logic changes.
 
-## Decisions needed
+## Decisions
 
-1. Is the shape of `Analysis` / `RunOutput` above acceptable, or would you
-   prefer separate `run_wald` / `run_lrt`?
-2. After 0.7.0, keep about 5 convenience methods, or remove them all?
-3. Should `Stage` (stopping early) be part of `run`, or stay as the existing
-   staged methods (`fit_size_factors_and_base_means`, `fit_gene_wise_*`,
-   `fit_*_dispersion_trend_*`, `fit_map_dispersions_*`)?
+1. One `run(&Analysis)` returning `RunOutput`, not separate `run_wald` and
+   `run_lrt`.
+2. Deprecated in 0.6.0 and all removed in 0.7.0, leaving one entry point.
+3. Stopping early is `Analysis::stop_after: Stage`; the staged methods become
+   deprecated wrappers too.
