@@ -138,7 +138,9 @@ pub fn threshold_svalues(
         (true, true) => std::cmp::Ordering::Equal,
         (true, false) => std::cmp::Ordering::Greater,
         (false, true) => std::cmp::Ordering::Less,
-        _ => rates[i].partial_cmp(&rates[j]).unwrap(),
+        _ => rates[i]
+            .partial_cmp(&rates[j])
+            .unwrap_or(std::cmp::Ordering::Equal),
     });
     let mut cumulative = 0.0;
     let mut result = vec![0.0; rates.len()];

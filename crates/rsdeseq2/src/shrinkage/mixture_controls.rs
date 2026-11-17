@@ -116,7 +116,7 @@ fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOptimizer, Str
             match name.as_str() {
                 "tol" => options.tolerance = Some(number(control, name, 1e-7)?),
                 "maxiter" => options.max_evaluations = count(number(control, name, 5000.0)?, name)?,
-                "method" => match &field(control, name).unwrap().data {
+                "method" => match &field(control, name).ok_or("control field is present")?.data {
                     Data::Text(v) => {
                         if method == "cxxMixSquarem" {
                             return Err(
@@ -142,9 +142,11 @@ fn policy(method: &str, control: Option<&Value>) -> Result<MixtureOptimizer, Str
                 "step.max0" => options.maximum_step = number(control, name, 1.0)?,
                 "mstep" => options.step_multiplier = number(control, name, 4.0)?,
                 "objfn.inc" => options.objective_increase = number(control, name, 1.0)?,
-                "square" => options.square = flag(field(control, name).unwrap())?,
+                "square" => {
+                    options.square = flag(field(control, name).ok_or("control field is present")?)?
+                }
                 "trace" => {
-                    flag(field(control, name).unwrap())?;
+                    flag(field(control, name).ok_or("control field is present")?)?;
                 }
                 "kr" => {
                     number(control, name, 1.0)?;

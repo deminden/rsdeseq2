@@ -187,7 +187,9 @@ fn fit_regression_impl(
                 "beta-binomial method requires its matching likelihood",
             ));
         }
-        let parameters = input.parameters.unwrap();
+        let parameters = input
+            .parameters
+            .ok_or_else(|| crate::errors::invariant("value present"))?;
         if parameters.n_cols() != input.observations.n_cols() + 1 {
             return Err(scoped_invalid_options(
                 ERROR_SCOPE,

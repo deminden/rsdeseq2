@@ -249,12 +249,12 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                     cli_factor_beta_prior_wald_analysis(
                         &counts,
                         &design,
-                        beta_prior_factor.unwrap(),
-                        beta_prior_reference.unwrap(),
-                        beta_prior_sample_levels.unwrap(),
-                        beta_prior_dispersions.unwrap(),
-                        beta_prior_base_mean.unwrap(),
-                        beta_prior_disp_fit.unwrap(),
+                        required(beta_prior_factor, "--beta-prior-factor")?,
+                        required(beta_prior_reference, "--beta-prior-reference")?,
+                        required(beta_prior_sample_levels, "--beta-prior-sample-levels")?,
+                        required(beta_prior_dispersions, "--beta-prior-dispersions")?,
+                        required(beta_prior_base_mean, "--beta-prior-base-mean")?,
+                        required(beta_prior_disp_fit, "--beta-prior-disp-fit")?,
                         beta_prior_normalization_factors,
                         beta_prior_size_factors,
                         beta_prior_observation_weights,
@@ -280,9 +280,9 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                         beta_prior_additive_sample_levels.unwrap_or_default(),
                         beta_prior_additive_numeric.unwrap_or_default(),
                         beta_prior_additive_numeric_values.unwrap_or_default(),
-                        beta_prior_dispersions.unwrap(),
-                        beta_prior_base_mean.unwrap(),
-                        beta_prior_disp_fit.unwrap(),
+                        required(beta_prior_dispersions, "--beta-prior-dispersions")?,
+                        required(beta_prior_base_mean, "--beta-prior-base-mean")?,
+                        required(beta_prior_disp_fit, "--beta-prior-disp-fit")?,
                         beta_prior_normalization_factors,
                         beta_prior_size_factors,
                         beta_prior_observation_weights,
@@ -303,11 +303,14 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                     cli_expanded_beta_prior_wald_analysis(
                         &counts,
                         &design,
-                        beta_prior_expanded_design.unwrap(),
-                        &beta_prior_coefficient_groups.unwrap(),
-                        beta_prior_dispersions.unwrap(),
-                        beta_prior_base_mean.unwrap(),
-                        beta_prior_disp_fit.unwrap(),
+                        required(beta_prior_expanded_design, "--beta-prior-expanded-design")?,
+                        &required(
+                            beta_prior_coefficient_groups,
+                            "--beta-prior-coefficient-groups",
+                        )?,
+                        required(beta_prior_dispersions, "--beta-prior-dispersions")?,
+                        required(beta_prior_base_mean, "--beta-prior-base-mean")?,
+                        required(beta_prior_disp_fit, "--beta-prior-disp-fit")?,
                         beta_prior_normalization_factors,
                         beta_prior_size_factors,
                         beta_prior_observation_weights,
@@ -433,7 +436,7 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                             &CooksReplacementOptions::new(cutoff),
                         )?;
                     let CooksReplacementTestOutput::Wald(output) = output else {
-                        unreachable!("Wald CLI branch should route to Wald");
+                        return Err(invariant("Wald CLI branch should route to Wald"));
                     };
                     cli_wald_replacement_output(output)
                 } else {
@@ -449,7 +452,7 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                     (Some(coefficient), None) => coefficient,
                     (None, Some(name)) => resolve_coefficient_index(&design, &name)?,
                     (None, None) => default_cli_coefficient(&design)?,
-                    (Some(_), Some(_)) => unreachable!("checked above"),
+                    (Some(_), Some(_)) => return Err(invariant("checked above")),
                 };
                 if let Some(cutoff) = cutoff {
                     cli_wald_replacement_output(builder.fit_wald_glm_mu_with_cooks_replacement(
@@ -494,6 +497,6 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
             write_cli_result_sidecars(&result_sidecars, counts.gene_names(), &analysis)?;
             write_deseq_results_tsv(output, &analysis.results)
         }
-        _ => unreachable!("command dispatch selects the matching variant"),
+        _ => Err(invariant("command dispatch selects the matching variant")),
     }
 }

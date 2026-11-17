@@ -105,7 +105,7 @@ pub(super) fn quadratic(
             let gradient = h * &y + c;
             let i = (0..k)
                 .min_by(|&i, &j| gradient[i].total_cmp(&gradient[j]))
-                .unwrap();
+                .ok_or_else(|| crate::errors::invariant("value present"))?;
             if gradient[i] >= -options.active_tolerance {
                 break;
             }

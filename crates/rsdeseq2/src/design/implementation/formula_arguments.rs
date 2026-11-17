@@ -124,7 +124,7 @@ fn parse_formula_quoted_string(
     let quote = value
         .chars()
         .next()
-        .expect("quoted formula string is not empty");
+        .ok_or_else(|| crate::errors::invariant("quoted formula string is not empty"))?;
     let Some(inner) = value
         .strip_prefix(quote)
         .and_then(|candidate| candidate.strip_suffix(quote))

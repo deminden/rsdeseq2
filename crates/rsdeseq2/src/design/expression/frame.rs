@@ -57,7 +57,7 @@ fn missing(value: &Value, row: usize) -> bool {
         }
     })
 }
-fn select(value: &Value, kept: &[usize]) -> Value {
+fn select(value: &Value, kept: &[usize]) -> Result<Value, DeseqError> {
     let mut out = value.clone();
     let width = value.dimensions.map_or(1, |d| d[1]);
     let indices = kept
@@ -71,7 +71,11 @@ fn select(value: &Value, kept: &[usize]) -> Value {
         },
         Data::Logical(v) => Data::Logical(indices.iter().map(|i| v[*i]).collect()),
         Data::Text(v) => Data::Text(indices.iter().map(|i| v[*i].clone()).collect()),
-        _ => unreachable!("frame columns were checked before selection"),
+        _ => {
+            return Err(crate::errors::invariant(
+                "frame columns were checked before selection",
+            ));
+        }
     };
     if let Some([_, columns]) = value.dimensions {
         out.names = None;
@@ -88,7 +92,7 @@ fn select(value: &Value, kept: &[usize]) -> Value {
             .as_ref()
             .map(|n| kept.iter().map(|i| n[*i].clone()).collect());
     }
-    out
+    Ok(out)
 }
 /// Validate column row counts and apply the same missing-value policy in every
 /// frontend. With no variables, the data's row count determines an intercept.
@@ -126,7 +130,10 @@ pub fn assemble(
         .iter()
         .any(|v| v.names.is_some() || v.dimensions.is_some() || !v.attributes.is_empty());
     let values = if !omitted_rows.is_empty() || policy == MissingPolicy::Omit && update {
-        values.iter().map(|v| select(v, &kept_rows)).collect()
+        values
+            .iter()
+            .map(|v| select(v, &kept_rows))
+            .collect::<Result<_, _>>()?
     } else {
         values
     };
@@ -274,9 +281,13 @@ pub fn expanded_factors(
             };
             let mut result = super::evaluate(&expression, &[], options)?;
             let Data::Number { values, .. } = &mut result.data else {
-                unreachable!("factor recoding returns integer codes");
+                return Err(crate::errors::invariant(
+                    "factor recoding returns integer codes",
+                ));
             };
-            *values.last_mut().expect("nonempty factor checked above") = 1.0;
+            *values
+                .last_mut()
+                .ok_or_else(|| crate::errors::invariant("nonempty factor checked above"))? = 1.0;
             Ok(result)
         })
         .collect()

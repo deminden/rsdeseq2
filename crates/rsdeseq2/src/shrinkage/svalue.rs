@@ -21,7 +21,7 @@ pub fn svalues(rates: &[Option<f64>]) -> Result<Vec<Option<f64>>, DeseqError> {
         }
     }
     // partial_cmp deliberately treats -0 and +0 as equal; sorting is stable.
-    order.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    order.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     let mut out = vec![None; rates.len()];
     let mut cumulative = 0.0;
     for (rank, (index, rate)) in order.into_iter().enumerate() {

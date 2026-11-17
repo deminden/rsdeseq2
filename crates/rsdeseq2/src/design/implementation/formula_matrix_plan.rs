@@ -121,7 +121,7 @@ fn formula_expanded_matrix_values(
                 .zip(grid)
                 .map(|(variable, level)| match variable {
                     FormulaVariableRef::Factor(name) => {
-                        factor_piece(name, level.expect("factor grid contains a level"))
+                        factor_piece(name, level.ok_or_else(|| crate::errors::invariant("factor grid contains a level"))?)
                     }
                     FormulaVariableRef::Numeric(name) => numeric_piece(name),
                 })

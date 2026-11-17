@@ -44,7 +44,11 @@ impl CodingMatrix {
                 .ok_or_else(|| invalid_options("factor coding shape overflow"))?
         ];
         match coding {
-            FactorCoding::Treatment { .. } => unreachable!("treatment indicators returned above"),
+            FactorCoding::Treatment { .. } => {
+                return Err(crate::errors::invariant(
+                    "treatment indicators returned above",
+                ));
+            }
             FactorCoding::Sum => {
                 for column in 0..width {
                     values[column * width + column] = 1.0;

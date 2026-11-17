@@ -153,8 +153,14 @@ impl<'a> Reader<'a> {
         }
     }
     fn length(&mut self) -> Result<usize, DeseqError> {
-        usize::try_from(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
-            .map_err(|e| invalid_options(e.to_string()))
+        usize::try_from(self.word()?).map_err(|e| invalid_options(e.to_string()))
+    }
+    fn word(&mut self) -> Result<u64, DeseqError> {
+        let bytes: [u8; 8] = self
+            .take(8)?
+            .try_into()
+            .map_err(|_| invalid_options("truncated formula transport word"))?;
+        Ok(u64::from_le_bytes(bytes))
     }
     fn count(&mut self, unit: usize) -> Result<usize, DeseqError> {
         let n = self.length()?;
@@ -192,11 +198,7 @@ impl<'a> Reader<'a> {
             0 if n == 0 => Data::Null,
             1 | 2 => Data::Number {
                 values: (0..n)
-                    .map(|_| {
-                        Ok(f64::from_bits(u64::from_le_bytes(
-                            self.take(8)?.try_into().unwrap(),
-                        )))
-                    })
+                    .map(|_| Ok(f64::from_bits(self.word()?)))
                     .collect::<Result<_, DeseqError>>()?,
                 integer: tag == 2,
             },

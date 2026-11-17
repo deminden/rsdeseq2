@@ -19,8 +19,8 @@ fn numeric_label(x: f64, integer: bool) -> Option<String> {
         return Some(format!("{x:.0}"));
     }
     let scientific = format!("{x:.14e}");
-    let (mantissa, exponent) = scientific.split_once('e').unwrap();
-    let exponent = exponent.parse::<i32>().unwrap();
+    let (mantissa, exponent) = scientific.split_once('e')?;
+    let exponent = exponent.parse::<i32>().ok()?;
     let mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
     let sci = format!(
         "{mantissa}e{}{:02}",

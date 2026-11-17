@@ -181,7 +181,7 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
         (None, Some(name), false) => Some(resolve_coefficient_index(standard_design, &name)?),
         (None, None, false) => Some(default_cli_coefficient(standard_design)?),
         (None, None, true) => None,
-        _ => unreachable!("checked above"),
+        _ => return Err(invariant("checked above")),
     };
 
     match normalization_factors {
@@ -218,7 +218,7 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
                     Ok(cli_expanded_beta_prior_replacement_output(
                         fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
@@ -226,7 +226,7 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
                 (None, None) => Ok(cli_expanded_beta_prior_output(
                     fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights(
                         input,
-                        coefficient.unwrap(),
+                        required(coefficient, "--coefficient")?,
                     )?,
                 )),
             }
@@ -271,13 +271,16 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
                     Ok(cli_expanded_beta_prior_replacement_output(
                         fit_expanded_beta_prior_wald_results_with_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
                 }
                 (None, None) => Ok(cli_expanded_beta_prior_output(
-                    fit_expanded_beta_prior_wald_results(input, coefficient.unwrap())?,
+                    fit_expanded_beta_prior_wald_results(
+                        input,
+                        required(coefficient, "--coefficient")?,
+                    )?,
                 )),
             }
         }
@@ -355,7 +358,7 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
         )?),
         (None, None, false) => Some(default_cli_coefficient(&generated_design.standard_design)?),
         (None, None, true) => None,
-        _ => unreachable!("checked above"),
+        _ => return Err(invariant("checked above")),
     };
 
     match normalization_factors {
@@ -394,7 +397,7 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
                     Ok(cli_factor_beta_prior_replacement_output(
                         fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
@@ -402,7 +405,7 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
                 (None, None) => Ok(cli_factor_beta_prior_output(
                     fit_expanded_factor_beta_prior_wald_results_with_normalization_factors_and_weights(
                         input,
-                        coefficient.unwrap(),
+                        required(coefficient, "--coefficient")?,
                     )?,
                 )),
             }
@@ -449,13 +452,13 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
                     Ok(cli_factor_beta_prior_replacement_output(
                         fit_expanded_factor_beta_prior_wald_results_with_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
                 }
                 (None, None) => Ok(cli_factor_beta_prior_output(
-                    fit_expanded_factor_beta_prior_wald_results(input, coefficient.unwrap())?,
+                    fit_expanded_factor_beta_prior_wald_results(input, required(coefficient, "--coefficient")?)?,
                 )),
             }
         }
@@ -584,7 +587,7 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
         )?),
         (None, None, false) => Some(default_cli_coefficient(&generated_design.standard_design)?),
         (None, None, true) => None,
-        _ => unreachable!("checked above"),
+        _ => return Err(invariant("checked above")),
     };
 
     match normalization_factors {
@@ -625,7 +628,7 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
                     Ok(cli_additive_beta_prior_replacement_output(
                         fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
@@ -633,7 +636,7 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
                 (None, None) => Ok(cli_additive_beta_prior_output(
                     fit_expanded_additive_beta_prior_wald_results_with_normalization_factors_and_weights(
                         input,
-                        coefficient.unwrap(),
+                        required(coefficient, "--coefficient")?,
                     )?,
                 )),
             }
@@ -682,13 +685,13 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
                     Ok(cli_additive_beta_prior_replacement_output(
                         fit_expanded_additive_beta_prior_wald_results_with_cooks_replacement(
                             input,
-                            coefficient.unwrap(),
+                            required(coefficient, "--coefficient")?,
                             &replacement_options,
                         )?,
                     ))
                 }
                 (None, None) => Ok(cli_additive_beta_prior_output(
-                    fit_expanded_additive_beta_prior_wald_results(input, coefficient.unwrap())?,
+                    fit_expanded_additive_beta_prior_wald_results(input, required(coefficient, "--coefficient")?)?,
                 )),
             }
         }

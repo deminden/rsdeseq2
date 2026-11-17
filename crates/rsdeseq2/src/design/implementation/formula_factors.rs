@@ -67,7 +67,7 @@ fn next_formula_factor_transform(rhs: &str) -> Option<(usize, usize, FormulaFact
         let character = rhs[idx..]
             .chars()
             .next()
-            .expect("idx is inside rhs char boundary");
+            ?;
         if let Some(active_quote) = quote {
             if escaped_quote {
                 escaped_quote = false;
@@ -112,7 +112,7 @@ fn formula_factor_transform_term(
         "factor" | "as.factor" | "ordered" | "as.ordered" => {
             formula_factor_identity_transform_term(transform, expression, factors)
         }
-        _ => unreachable!("validated formula factor transform"),
+        _ => Err(crate::errors::invariant("validated formula factor transform")),
     }
 }
 

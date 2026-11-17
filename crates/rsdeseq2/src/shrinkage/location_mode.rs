@@ -170,7 +170,7 @@ pub fn estimate_location_mode(
         PriorModeSearch::ObservationRange | PriorModeSearch::ExpandedObservationRange(_)
             if builtin_bounds.is_some() =>
         {
-            builtin_bounds.unwrap()
+            builtin_bounds.ok_or_else(|| crate::errors::invariant("value present"))?
         }
         PriorModeSearch::ObservationRange | PriorModeSearch::ExpandedObservationRange(_) => {
             if estimates.is_empty() || estimates.iter().any(|x| !x.is_finite()) {

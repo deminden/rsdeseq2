@@ -130,9 +130,9 @@ fn extract_formula_offset_term(
     let values = [formula_numeric_value(&offset_values)];
     let base = formula_numeric_value(&offsets.values);
     let total = super::expression::frame::offsets(&values, &[0], Some(&base))?
-        .expect("one offset always produces values");
+        .ok_or_else(|| crate::errors::invariant("one offset always produces values"))?;
     let super::expression::Data::Number { values, .. } = total.data else {
-        unreachable!("numeric offset addition produces numeric values");
+        return Err(crate::errors::invariant("numeric offset addition produces numeric values"));
     };
     if let Some(idx) = values.iter().position(|value| !value.is_finite()) {
         return Err(DeseqError::InvalidOptions {

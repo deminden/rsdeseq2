@@ -206,7 +206,7 @@ fn expand_parenthesized_formula_operator(
             }
             Ok(terms)
         }
-        _ => unreachable!("unsupported formula delimiter"),
+        _ => Err(crate::errors::invariant("unsupported formula delimiter")),
     }
 }
 

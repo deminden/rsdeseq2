@@ -174,7 +174,7 @@ pub fn prepare_mixture_grid(
         .iter()
         .enumerate()
         .min_by(|a, b| a.1.total_cmp(b.1))
-        .unwrap()
+        .ok_or_else(|| crate::errors::invariant("value present"))?
         .0;
     let mut weights = vec![1.0; scales.len()];
     if options.concentrated_initialization {

@@ -248,7 +248,7 @@ fn distribution(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, D
     if used.iter().any(|v| v.is_empty()) {
         return Ok(Value::numbers(vec![]));
     }
-    let n = used.iter().map(|v| v.len()).max().unwrap();
+    let n = used.iter().map(|v| v.len()).max().unwrap_or(0);
     let mut out = Value::numbers(
         (0..n)
             .map(|i| {

@@ -33,7 +33,7 @@ impl Evaluator<'_> {
         unshaped.names = None;
         let logical = self.elementary("as.logical", &[(None, unshaped)])?;
         let Data::Logical(conditions) = logical.data else {
-            unreachable!()
+            return Err(crate::errors::invariant("as.logical returns logical data"));
         };
         let mut output = test.clone();
         output.data = Data::Logical(conditions.clone());
@@ -72,7 +72,8 @@ impl Evaluator<'_> {
             && test.names.is_none()
             && test.attributes.is_empty()
         {
-            let selected = if any_yes { yes.as_ref() } else { no.as_ref() }.unwrap();
+            let selected = if any_yes { yes.as_ref() } else { no.as_ref() }
+                .ok_or_else(|| crate::errors::invariant("selected ifelse branch is present"))?;
             if selected.len() == 1
                 && selected.dimensions.is_none()
                 && selected.names.is_none()

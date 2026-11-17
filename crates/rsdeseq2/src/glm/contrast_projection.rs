@@ -146,18 +146,16 @@ impl<'a> InferenceEstimates<'a> {
                 reason: "Wald contrast must contain at least one non-zero coefficient".into(),
             });
         }
-        let marginal = if nonzero == 1 {
-            self.beta_se.map(|se| (active.unwrap(), se))
-        } else {
-            None
+        let marginal = match (nonzero, active) {
+            (1, Some(column)) => self.beta_se.map(|se| (column, se)),
+            _ => None,
         };
         if marginal.is_none() && self.covariance.is_none() {
             return Err(DeseqError::UnsupportedFeature {feature:"betaCovariance (beta covariance matrices) is required for multi-coefficient or numeric contrast SEs".into()});
         }
-        let capacity = if marginal.is_some() {
-            contrast.len()
-        } else {
-            self.covariance.unwrap().values.n_cols()
+        let capacity = match (&marginal, self.covariance) {
+            (None, Some(covariance)) => covariance.values.n_cols(),
+            _ => contrast.len(),
         };
         let mut scratch = Vec::with_capacity(capacity);
         let mut log2_fold_change = Vec::with_capacity(self.n_genes());
@@ -173,7 +171,11 @@ impl<'a> InferenceEstimates<'a> {
                 (value.is_finite() && value >= 0.0).then_some(value)
             } else {
                 scratch.clear();
-                let cov = self.covariance.unwrap();
+                let Some(cov) = self.covariance else {
+                    return Err(crate::errors::invariant(
+                        "contrast covariance presence checked before projection",
+                    ));
+                };
                 let mut valid = true;
                 'covariance: for (row, &left) in contrast.iter().enumerate() {
                     for (column, &right) in contrast.iter().enumerate() {

@@ -84,7 +84,9 @@ fn legacy_qvalues(rates: &[f64], warnings: &mut Vec<String>) -> Vec<f64> {
         (true, true) => std::cmp::Ordering::Equal,
         (true, false) => std::cmp::Ordering::Greater,
         (false, true) => std::cmp::Ordering::Less,
-        (false, false) => rates[i].partial_cmp(&rates[j]).unwrap(),
+        (false, false) => rates[i]
+            .partial_cmp(&rates[j])
+            .unwrap_or(std::cmp::Ordering::Equal),
     });
     let count = order.iter().take_while(|&&i| !rates[i].is_nan()).count();
     if count == 0 {
