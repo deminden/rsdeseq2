@@ -103,7 +103,7 @@ pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
 
 #[cfg(test)]
 mod tests {
-    use super::PreparedBh;
+    use super::{PreparedBh, bh_adjust_f64};
 
     /// Found by cargo-mutants: replacing the count with a constant survived
     /// the whole suite. The count must equal the number of adjusted p-values
@@ -141,5 +141,21 @@ mod tests {
         // not a rejection (0.025 * 2 is exactly 0.05).
         let boundary = PreparedBh::new(&[Some(0.025), Some(0.05)]);
         assert_eq!(boundary.rejections_for_filter(&[1.0, 1.0], 0.0, 0.05), 0);
+    }
+
+    /// Found by cargo-mutants: each invalid p-value must be reported at its
+    /// index, including finite values outside [0, 1].
+    #[test]
+    fn bh_adjust_f64_names_each_invalid_pvalue() {
+        for bad in [1.5, -0.1, f64::NAN, f64::INFINITY] {
+            let error = bh_adjust_f64(&[0.2, bad]).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("p-value at index 1 must be finite and within [0, 1]"),
+                "{bad}: {error}"
+            );
+        }
+        assert_eq!(bh_adjust_f64(&[0.01, 0.04]).unwrap(), vec![0.02, 0.04]);
     }
 }
