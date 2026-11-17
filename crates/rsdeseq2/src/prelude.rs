@@ -117,16 +117,16 @@ pub use crate::independent_filtering::{
     select_filter_index_with_lowess,
 };
 pub use crate::io::{
-    read_count_matrix_tsv, write_base_mean_tsv, write_base_metadata_tsv,
-    write_cooks_candidate_replacement_counts_tsv, write_cooks_distance_matrix_tsv,
-    write_cooks_distance_tsv, write_cooks_outlier_cells_tsv, write_cooks_replaced_counts_tsv,
-    write_cooks_replacement_metadata_tsv, write_cooks_replacement_row_metadata_tsv,
-    write_cooks_row_metadata_tsv, write_cooks_sample_metadata_tsv, write_count_matrix_tsv,
-    write_deseq_mcols_diagnostics_tsv, write_deseq_result_column_metadata_tsv,
-    write_deseq_result_table_metadata_tsv, write_deseq_results_tidy_tsv, write_deseq_results_tsv,
-    write_independent_filter_lowess_tsv, write_independent_filter_metadata_tsv,
-    write_independent_filter_num_rej_tsv, write_normalization_factors_tsv,
-    write_normalized_counts_tsv, write_size_factors_tsv,
+    read_count_matrix_tsv, read_count_matrix_tsv_from_reader, write_base_mean_tsv,
+    write_base_metadata_tsv, write_cooks_candidate_replacement_counts_tsv,
+    write_cooks_distance_matrix_tsv, write_cooks_distance_tsv, write_cooks_outlier_cells_tsv,
+    write_cooks_replaced_counts_tsv, write_cooks_replacement_metadata_tsv,
+    write_cooks_replacement_row_metadata_tsv, write_cooks_row_metadata_tsv,
+    write_cooks_sample_metadata_tsv, write_count_matrix_tsv, write_deseq_mcols_diagnostics_tsv,
+    write_deseq_result_column_metadata_tsv, write_deseq_result_table_metadata_tsv,
+    write_deseq_results_tidy_tsv, write_deseq_results_tsv, write_independent_filter_lowess_tsv,
+    write_independent_filter_metadata_tsv, write_independent_filter_num_rej_tsv,
+    write_normalization_factors_tsv, write_normalized_counts_tsv, write_size_factors_tsv,
 };
 pub use crate::math::{
     NegativeBinomialHelpers, negative_binomial_helpers, negative_binomial_log_likelihood,

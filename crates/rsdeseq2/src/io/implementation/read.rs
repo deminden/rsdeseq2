@@ -1,5 +1,6 @@
 use super::*;
 pub(super) use std::collections::{HashMap, HashSet};
+pub(super) use std::io::Read;
 pub(super) use std::path::Path;
 
 pub(super) use csv::{ReaderBuilder, WriterBuilder};
@@ -65,10 +66,19 @@ pub struct LabeledAssayMatrix {
 /// Read a tab-delimited count matrix with gene IDs in the first column.
 pub fn read_count_matrix_tsv(path: impl AsRef<Path>) -> Result<CountMatrix, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_count_matrix_tsv_records(tsv_from_path(path_ref)?, path_ref)
+}
+
+/// Like [`read_count_matrix_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_count_matrix_tsv_from_reader(reader: impl Read) -> Result<CountMatrix, DeseqError> {
+    read_count_matrix_tsv_records(tsv_from_reader(reader), Path::new("<reader>"))
+}
+
+fn read_count_matrix_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+) -> Result<CountMatrix, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() < 2 {
         return Err(DeseqError::InvalidCounts {
@@ -122,10 +132,21 @@ pub fn read_labeled_design_matrix_tsv(
     path: impl AsRef<Path>,
 ) -> Result<LabeledDesignMatrix, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_design_matrix_tsv_records(tsv_from_path(path_ref)?, path_ref)
+}
+
+/// Like [`read_labeled_design_matrix_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_design_matrix_tsv_from_reader(
+    reader: impl Read,
+) -> Result<LabeledDesignMatrix, DeseqError> {
+    read_labeled_design_matrix_tsv_records(tsv_from_reader(reader), Path::new("<reader>"))
+}
+
+fn read_labeled_design_matrix_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+) -> Result<LabeledDesignMatrix, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() < 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -330,10 +351,21 @@ pub fn read_labeled_size_factors_tsv(
     path: impl AsRef<Path>,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_size_factors_tsv_records(tsv_from_path(path_ref)?, path_ref)
+}
+
+/// Like [`read_labeled_size_factors_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_size_factors_tsv_from_reader(
+    reader: impl Read,
+) -> Result<Vec<SampleNumericValue>, DeseqError> {
+    read_labeled_size_factors_tsv_records(tsv_from_reader(reader), Path::new("<reader>"))
+}
+
+fn read_labeled_size_factors_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -401,10 +433,21 @@ pub fn read_labeled_geometric_means_tsv(
     path: impl AsRef<Path>,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_geometric_means_tsv_records(tsv_from_path(path_ref)?, path_ref)
+}
+
+/// Like [`read_labeled_geometric_means_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_geometric_means_tsv_from_reader(
+    reader: impl Read,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
+    read_labeled_geometric_means_tsv_records(tsv_from_reader(reader), Path::new("<reader>"))
+}
+
+fn read_labeled_geometric_means_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -463,10 +506,23 @@ pub fn read_labeled_sample_numeric_tsv(
     context: &str,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_sample_numeric_tsv_records(tsv_from_path(path_ref)?, path_ref, context)
+}
+
+/// Like [`read_labeled_sample_numeric_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_sample_numeric_tsv_from_reader(
+    reader: impl Read,
+    context: &str,
+) -> Result<Vec<SampleNumericValue>, DeseqError> {
+    read_labeled_sample_numeric_tsv_records(tsv_from_reader(reader), Path::new("<reader>"), context)
+}
+
+fn read_labeled_sample_numeric_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+    context: &str,
+) -> Result<Vec<SampleNumericValue>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -514,10 +570,23 @@ pub fn read_labeled_gene_numeric_tsv(
     context: &str,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_gene_numeric_tsv_records(tsv_from_path(path_ref)?, path_ref, context)
+}
+
+/// Like [`read_labeled_gene_numeric_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_gene_numeric_tsv_from_reader(
+    reader: impl Read,
+    context: &str,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
+    read_labeled_gene_numeric_tsv_records(tsv_from_reader(reader), Path::new("<reader>"), context)
+}
+
+fn read_labeled_gene_numeric_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+    context: &str,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -576,10 +645,24 @@ pub fn read_labeled_wald_t_degrees_of_freedom_tsv(
     path: impl AsRef<Path>,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_labeled_wald_t_degrees_of_freedom_tsv_records(tsv_from_path(path_ref)?, path_ref)
+}
+
+/// Like [`read_labeled_wald_t_degrees_of_freedom_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_labeled_wald_t_degrees_of_freedom_tsv_from_reader(
+    reader: impl Read,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
+    read_labeled_wald_t_degrees_of_freedom_tsv_records(
+        tsv_from_reader(reader),
+        Path::new("<reader>"),
+    )
+}
+
+fn read_labeled_wald_t_degrees_of_freedom_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+    path_ref: &Path,
+) -> Result<Vec<GeneNumericValue>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -632,10 +715,20 @@ pub fn read_labeled_wald_t_degrees_of_freedom_tsv(
 /// columns before applying DESeq2-style factor-level contrast handling.
 pub fn read_sample_levels_tsv(path: impl AsRef<Path>) -> Result<Vec<SampleLevel>, DeseqError> {
     let path_ref = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
+    read_sample_levels_tsv_records(tsv_from_path(path_ref)?)
+}
+
+/// Like [`read_sample_levels_tsv`], reading from any [`Read`] source such as an in-memory
+/// buffer; error messages name the source `<reader>`.
+pub fn read_sample_levels_tsv_from_reader(
+    reader: impl Read,
+) -> Result<Vec<SampleLevel>, DeseqError> {
+    read_sample_levels_tsv_records(tsv_from_reader(reader))
+}
+
+fn read_sample_levels_tsv_records<R: Read>(
+    mut reader: csv::Reader<R>,
+) -> Result<Vec<SampleLevel>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
@@ -679,4 +772,18 @@ pub fn read_sample_levels_tsv(path: impl AsRef<Path>) -> Result<Vec<SampleLevel>
         });
     }
     Ok(values)
+}
+
+fn tsv_from_path(path: &Path) -> Result<csv::Reader<std::fs::File>, csv::Error> {
+    ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path)
+}
+
+fn tsv_from_reader<R: Read>(reader: R) -> csv::Reader<R> {
+    ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_reader(reader)
 }

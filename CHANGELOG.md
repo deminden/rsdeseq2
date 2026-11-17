@@ -7,6 +7,15 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `_from_reader` forms of the TSV readers that open their own file:
+  `read_count_matrix_tsv`, `read_labeled_design_matrix_tsv`,
+  `read_labeled_size_factors_tsv`, `read_labeled_geometric_means_tsv`,
+  `read_labeled_sample_numeric_tsv`, `read_labeled_gene_numeric_tsv`,
+  `read_labeled_wald_t_degrees_of_freedom_tsv` and `read_sample_levels_tsv`.
+  They accept any `std::io::Read` (for example a byte slice) and share the
+  parsing code of the path forms. `read_count_matrix_tsv_from_reader` is in
+  the prelude.
+
 - Cargo features `cli` (the binary and `rsdeseq2::cli`; pulls in clap, sha2 and
   same-file), `formula` (ICU locale collation for formula factor levels and
   string comparisons) and `shrinkage` (`rsdeseq2::shrinkage`). All three are

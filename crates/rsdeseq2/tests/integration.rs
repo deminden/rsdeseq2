@@ -164,6 +164,8 @@ mod sqp_controls;
 mod thread_invariance;
 #[path = "transform.rs"]
 mod transform;
+#[path = "tsv_readers.rs"]
+mod tsv_readers;
 #[path = "wald.rs"]
 mod wald;
 #[path = "wald_pipeline.rs"]

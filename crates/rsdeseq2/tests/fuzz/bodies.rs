@@ -2,39 +2,23 @@
 //! test in `fuzz_smoke.rs`. Each body takes arbitrary bytes and must return
 //! without panicking; errors are expected and ignored.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use rsdeseq2::design::formula_has_offset_terms;
 use rsdeseq2::io::{
-    read_count_matrix_tsv, read_labeled_design_matrix_tsv, read_labeled_sample_numeric_tsv,
-    read_sample_levels_tsv,
+    read_count_matrix_tsv_from_reader, read_labeled_design_matrix_tsv_from_reader,
+    read_labeled_sample_numeric_tsv_from_reader, read_sample_levels_tsv_from_reader,
 };
 use rsdeseq2::prelude::*;
-
-/// Write the bytes to a fresh temporary file; the readers take paths.
-fn with_file(data: &[u8], read: impl FnOnce(&std::path::Path)) {
-    static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let name = format!(
-        "rsdeseq2-fuzz-{}-{}.tsv",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    );
-    let path = std::env::temp_dir().join(name);
-    std::fs::write(&path, data).expect("write fuzz input");
-    read(&path);
-    let _ = std::fs::remove_file(&path);
-}
 
 /// TSV readers for counts, designs, sample values and sample levels.
 pub fn tsv_readers(data: &[u8]) {
     let selector = data.first().copied().unwrap_or(0) % 4;
     let body = data.get(1..).unwrap_or(&[]);
-    with_file(body, |path| match selector {
-        0 => drop(read_count_matrix_tsv(path)),
-        1 => drop(read_labeled_design_matrix_tsv(path)),
-        2 => drop(read_labeled_sample_numeric_tsv(path, "fuzz")),
-        _ => drop(read_sample_levels_tsv(path)),
-    });
+    match selector {
+        0 => drop(read_count_matrix_tsv_from_reader(body)),
+        1 => drop(read_labeled_design_matrix_tsv_from_reader(body)),
+        2 => drop(read_labeled_sample_numeric_tsv_from_reader(body, "fuzz")),
+        _ => drop(read_sample_levels_tsv_from_reader(body)),
+    }
 }
 
 /// Six samples: factors `condition` and `batch`, numeric `age` and `dose`.
