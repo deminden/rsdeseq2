@@ -1,18 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use super::*;
+pub(super) use std::collections::{HashMap, HashSet};
+pub(super) use std::path::Path;
 
-use csv::{ReaderBuilder, WriterBuilder};
+pub(super) use csv::{ReaderBuilder, WriterBuilder};
 
-use crate::cooks::{CooksOutput, CooksRefitPlan};
-use crate::matrix::CountMatrix;
-use crate::design::DesignMatrix;
-use crate::diagnostics::{
+pub(super) use crate::cooks::{CooksOutput, CooksRefitPlan};
+pub(super) use crate::design::DesignMatrix;
+pub(super) use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,
 };
-use crate::errors::{invalid_dimensions, DeseqError};
-use crate::independent_filtering::IndependentFilteringOutput;
-use crate::matrix::RowMajorMatrix;
-use crate::results::{DeseqResultColumnValues, DeseqResults};
+pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+pub(super) use crate::independent_filtering::IndependentFilteringOutput;
+pub(super) use crate::matrix::CountMatrix;
+pub(super) use crate::matrix::RowMajorMatrix;
+pub(super) use crate::results::{DeseqResultColumnValues, DeseqResults};
 
 /// One sample-level factor value loaded from a two-column TSV.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -241,7 +242,7 @@ pub fn read_labeled_observation_weights_tsv(
     Ok(weights)
 }
 
-fn read_labeled_assay_matrix_tsv(
+pub(super) fn read_labeled_assay_matrix_tsv(
     path_ref: &Path,
     column_context: &str,
     record_context: &str,

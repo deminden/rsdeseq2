@@ -1,3 +1,4 @@
+use super::*;
 /// Align sample-level factor values to count-matrix sample order.
 pub fn align_sample_levels_to_samples(
     levels: &[SampleLevel],
