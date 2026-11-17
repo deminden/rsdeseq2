@@ -35,6 +35,7 @@ fn unknown_calls_are_errors_not_stack_overflows() {
                     expanded_formula_design_with_offsets_from_model_frame(formula, &frame())
                         .err()
                         .unwrap_or_else(|| panic!("{formula} should be rejected"));
+                assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
                 assert!(
                     error.to_string().contains("is not present"),
                     "{formula}: {error}"

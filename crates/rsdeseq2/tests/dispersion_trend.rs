@@ -61,6 +61,7 @@ fn dispersion_trends_report_generic_mean_validation_context() {
         mean.evaluate(0.0).unwrap_err(),
         local.evaluate(0.0).unwrap_err(),
     ] {
+        assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Numeric);
         assert!(err.to_string().contains("dispersion trend mean"));
     }
 }
@@ -133,6 +134,7 @@ fn trend_selection_helpers_report_helper_specific_dimension_contexts() {
             .to_string()
             .contains("parametric dispersion trend rows")
     );
+    assert_eq!(local.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(local.to_string().contains("local dispersion trend rows"));
     assert!(
         mean_fit
@@ -378,6 +380,7 @@ fn mean_trend_reports_trend_specific_invalid_fit_context() {
         .evaluate(10.0)
         .unwrap_err();
 
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
     assert!(err.to_string().contains("mean dispersion trend value"));
 }
 
@@ -554,6 +557,7 @@ fn local_dispersion_trend_rejects_overflowed_fitted_value() {
     };
 
     let err = trend.evaluate(10.0).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
     assert!(err.to_string().contains("local dispersion trend produced"));
     assert!(trend.evaluate_many_allow_missing(&[0.0, 10.0]).is_err());
 }
@@ -749,6 +753,7 @@ fn mean_trend_use_for_fit_matches_deseq2_viability_threshold() {
     assert_eq!(use_for_fit, vec![false, false, true, false, false]);
 
     let err = mean_trend_use_for_fit(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(err.to_string().contains("mean dispersion trend fit rows"));
 }
 
@@ -1003,6 +1008,7 @@ fn trend_rows_follow_deseq2_use_for_fit_for_every_fit_type() {
     for fit_type in [FitType::Parametric, FitType::Local, FitType::Mean] {
         let error = estimate_dispersion_trend(&means, &floor, fit_type, min_disp).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Dispersion);
+        assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
         assert!(error.to_string().contains("within 2 orders of magnitude"));
     }
 }

@@ -74,5 +74,6 @@ fn non_nested_lrt_fails_before_dispersion_estimation() {
     let err = DeseqBuilder::new()
         .fit_lrt_with_results(&counts, &full, &reduced)
         .unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("nested"), "{err}");
 }

@@ -536,6 +536,7 @@ fn top_level_formula_contrast_replacement_uses_formula_derived_factor_metadata()
             &options,
         )
         .unwrap_err();
+    assert_eq!(invalid.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(invalid.to_string().contains("ordered factor"));
     let ordered_output = builder
         .fit_formula_with_test_results_contrast_request_with_cooks_replacement(

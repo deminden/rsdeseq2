@@ -250,6 +250,7 @@ fn factor_level_contrast_rejects_ambiguous_shared_reference_names() {
 
     let err =
         resolve_contrast(&design, &ContrastSpec::factor_level("condition", "C", "B")).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("resolves ambiguously"));
 }
 
@@ -272,6 +273,7 @@ fn factor_level_contrast_rejects_ambiguous_candidate_name_aliases() {
         &ContrastSpec::factor_level("condition", "B-1", "A-1"),
     )
     .unwrap_err();
+    assert_eq!(treatment_err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(treatment_err.to_string().contains("ambiguously"));
 
     let expanded_design = DesignMatrix::from_row_major(
@@ -291,6 +293,7 @@ fn factor_level_contrast_rejects_ambiguous_candidate_name_aliases() {
         &ContrastSpec::factor_level_with_reference("condition", "B-1", "A-1", "A-1"),
     )
     .unwrap_err();
+    assert_eq!(expanded_err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(expanded_err.to_string().contains("ambiguously"));
 }
 
@@ -313,6 +316,7 @@ fn factor_level_contrast_rejects_ambiguous_formula_factor_transform_aliases() {
         &ContrastSpec::factor_level("factor.condition..levels...c..B....A...", "A", "B"),
     )
     .unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("ambiguously"));
 }
 

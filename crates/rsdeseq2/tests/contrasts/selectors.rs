@@ -200,6 +200,7 @@ fn coefficient_name_contrast_rejects_ambiguous_component_cleaned_interaction_ali
         &ContrastSpec::coefficient_name("cell.type_B.cell_vs_T.cell:dose.value_plus_1"),
     )
     .unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("ambiguously"));
     assert!(
         resolve_coefficient_index(&design, "cell.type_B.cell_vs_T.cell:dose.value_plus_1")
@@ -439,6 +440,7 @@ fn list_contrast_rejects_ambiguous_component_cleaned_interaction_aliases() {
     );
 
     let err = resolve_contrast(&design, &contrast).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("ambiguously"));
 }
 

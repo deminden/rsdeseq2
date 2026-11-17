@@ -99,6 +99,7 @@ fn native_linear_mu_parametric_wald_validates_coefficient_index() {
     let err = native_wald_builder()
         .fit_wald_linear_mu_parametric(&counts, &design, 2)
         .unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(err.to_string().contains("Wald coefficient"));
 }
 

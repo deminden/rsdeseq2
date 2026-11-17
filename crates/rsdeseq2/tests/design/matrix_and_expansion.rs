@@ -103,6 +103,7 @@ fn design_matrix_detects_dependent_columns() {
     assert_eq!(design.rank().unwrap(), 1);
     assert!(!design.is_full_rank().unwrap());
     let error = design.validate_full_rank("test").unwrap_err();
+    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(error.to_string().contains("not full rank"));
 }
 

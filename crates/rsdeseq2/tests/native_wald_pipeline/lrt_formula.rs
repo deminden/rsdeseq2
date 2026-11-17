@@ -252,6 +252,7 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
             &ResultsContrast::character("ordered.condition..levels...c..B....A...", "A", "B"),
         )
         .unwrap_err();
+    assert_eq!(invalid.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(invalid.to_string().contains("ordered factor"));
     let (ordered_fit, mut ordered_results) = builder
         .fit_lrt_formula_with_results_contrast_request(
@@ -346,5 +347,6 @@ fn top_level_lrt_formula_contrast_uses_formula_derived_factor_metadata() {
             ),
         )
         .unwrap_err();
+    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(error.to_string().contains("ordered factor"));
 }

@@ -120,6 +120,7 @@ fn borrowed_estimates_reject_shape_aliases_and_missing_context() {
     let beta = [1.; 6];
     let wrong_se =
         InferenceEstimates::new(matrix(2, 3, &beta), Some(matrix(3, 2, &beta)), None).unwrap_err();
+    assert_eq!(wrong_se.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(wrong_se.to_string().contains("betaSE rows"));
     let covariance = [1.; 8];
     let wrong_cov = InferenceEstimates::new(
@@ -128,6 +129,7 @@ fn borrowed_estimates_reject_shape_aliases_and_missing_context() {
         Some(CovarianceView::new(2, matrix(2, 4, &covariance)).unwrap()),
     )
     .unwrap_err();
+    assert_eq!(wrong_cov.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(wrong_cov.to_string().contains("covariance coefficients"));
     let view =
         InferenceEstimates::new(matrix(2, 3, &beta), Some(matrix(2, 3, &beta)), None).unwrap();

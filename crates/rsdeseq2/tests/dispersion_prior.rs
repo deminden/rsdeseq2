@@ -22,6 +22,7 @@ fn trigamma_keeps_large_finite_recurrence_and_rejects_overflow() {
     assert!(finite > 1.0e307);
 
     let err = trigamma(1.0e-200).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Numeric);
     assert!(err.to_string().contains("trigamma recurrence"));
 }
 

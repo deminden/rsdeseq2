@@ -55,6 +55,7 @@ fn beta_prior_weighted_quantile_rejects_overflowed_weight_sum() {
     )
     .unwrap_err();
 
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(err.to_string().contains("finite total weight"));
 }
 

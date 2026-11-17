@@ -477,6 +477,7 @@ fn fixed_dispersion_wald_formula_ordered_contrast_requires_polynomial_selectors(
             model_frame,
         )
         .unwrap_err();
+    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(error.to_string().contains("ordered factor"));
     let numeric = ResultsContrast::numeric(vec![0.0, 1.0]);
     let named = ResultsContrast::list(vec![design.coefficient_names().unwrap()[1].clone()], vec![]);

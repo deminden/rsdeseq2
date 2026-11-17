@@ -688,6 +688,7 @@ fn irls_rejects_all_zero_rows() {
         no_ridge_options(),
     )
     .unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
     assert!(err.to_string().contains("all zero"));
 }
 

@@ -128,6 +128,7 @@ fn builder_default_fast_vst_uses_deseq2_nsub_default() {
         .unwrap_err();
 
     assert_eq!(DEFAULT_FAST_VST_NSUB, 1000);
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
     assert!(err.to_string().contains("1000"));
 }
 

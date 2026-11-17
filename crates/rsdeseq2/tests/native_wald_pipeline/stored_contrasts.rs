@@ -118,6 +118,7 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
             counts.gene_names(),
         )
         .unwrap_err();
+    assert_eq!(invalid.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(invalid.to_string().contains("ordered factor"));
 
     assert_eq!(
@@ -187,6 +188,7 @@ fn fitted_wald_object_uses_stored_model_frame_for_character_contrast_results() {
             ),
         )
         .unwrap_err();
+    assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
     assert!(error.to_string().contains("ordered factor"));
 }
 

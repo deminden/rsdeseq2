@@ -116,6 +116,7 @@ fn intercept_only_weighted_fit_keeps_large_finite_normalized_mean() {
 fn intercept_only_fit_rejects_all_zero_rows() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![0, 0, 0]).unwrap();
     let err = fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0, 1.0], &[0.1]).unwrap_err();
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
     assert!(err.to_string().contains("all zero"));
 }
 
@@ -171,6 +172,7 @@ fn intercept_only_fit_rejects_nonfinite_reconstructed_mu() {
     )
     .unwrap_err();
 
+    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
     assert!(err.to_string().contains("non-finite fitted intercept mean"));
 }
 
