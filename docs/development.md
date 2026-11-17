@@ -51,12 +51,20 @@ versions. CI rejects drift rather than repairing source before testing.
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets -- -D warnings \
+  -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
 cargo run --release --locked -p rsdeseq2 --example golden -- --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 ```
+
+The workspace `[lints]` table lists hardening targets (`unwrap_used`,
+`expect_used`, `panic`, `unreachable`, `undocumented_unsafe_blocks`,
+`missing_docs`, `unsafe_code`) at warning level. The gating command allows them
+until they are removed; plain `cargo clippy` shows them. Track their counts with
+`python3 scripts/validation/hardening_metrics.py` and the
+[hardening progress report](reports/hardening-progress.md).
 
 Run affected panels during implementation, then the appropriate combined gate.
 Documentation-only edits need `scripts/validation/check_docs.py` and confirmation

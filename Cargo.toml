@@ -8,6 +8,20 @@ license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
 repository = "https://github.com/deminden/rsdeseq2"
 rust-version = "1.97.1"
 
+# Hardening targets (docs/reports/hardening-progress.md). They warn while the
+# existing sites are removed; the gating Clippy command allows them explicitly
+# until Phase 2.4 turns them into errors.
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+expect_used = "warn"
+panic = "warn"
+undocumented_unsafe_blocks = "warn"
+unreachable = "warn"
+unwrap_used = "warn"
+
 [workspace.dependencies]
 approx = "0.5.1"
 clap = { version = "4.6.7", features = ["derive"] }

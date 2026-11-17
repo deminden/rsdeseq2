@@ -111,3 +111,23 @@ script for exact rules):
 
 The repeated-block share uses a different detector from the review's 5.8%
 exact-clone figure; compare it only with itself over time.
+
+## Lint baseline
+
+The workspace `[lints]` table (Phase 0.3) sets the hardening targets to warn.
+Unique warnings across all targets with `clippy.toml` allowing
+unwrap/expect/panic inside `#[test]` code:
+
+| Lint | Library and CLI | Tests, examples, benches | Total |
+| --- | ---: | ---: | ---: |
+| `missing_docs` | 335 | 54 | 389 |
+| `clippy::unwrap_used` | 79 | 435 | 514 |
+| `clippy::panic` | 0 | 44 | 44 |
+| `clippy::unreachable` | 22 | 1 | 23 |
+| `clippy::expect_used` | 18 | 2 | 20 |
+| `unsafe_code` | 7 | 0 | 7 |
+| `clippy::undocumented_unsafe_blocks` | 0 | 0 | 0 |
+| **Total** | **461** | **536** | **997** |
+
+Non-test counts in tests come from shared helper functions outside `#[test]`
+items, which Clippy's test allowances do not cover.

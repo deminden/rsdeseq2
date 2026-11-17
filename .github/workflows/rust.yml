@@ -17,10 +17,21 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        # The hardening target lints in the workspace [lints] table only warn
+        # for now; they are reported by the next step and allowed here.
+        run: >-
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          -A missing_docs -A unsafe_code -A clippy::expect_used -A clippy::panic -A clippy::undocumented_unsafe_blocks -A clippy::unreachable -A clippy::unwrap_used
+      - name: Hardening lint report (not gating)
+        continue-on-error: true
+        run: |
+          cargo clippy --locked --workspace --all-targets --message-format=short 2>&1 \
+            | grep -E ': warning: ' | sort -u > hardening-lints.txt || true
+          echo "hardening lint warnings: $(wc -l < hardening-lints.txt)" >> "$GITHUB_STEP_SUMMARY"
       - name: API documentation
         env:
-          RUSTDOCFLAGS: -D warnings
+          # missing_docs is a warn-level hardening target (Phase 2.4).
+          RUSTDOCFLAGS: -D warnings -A missing_docs
         run: cargo doc --locked -p rsdeseq2 --no-deps
       - name: Test
         run: cargo test --workspace

@@ -32,3 +32,6 @@ otherwise; structural counts come from
 - Manifests for the `portable` profile (macOS, Windows, Linux aarch64) still
   need to be generated on those hosts with `--write`; until then `--check`
   fails there by design.
+- Hardening lint warnings at baseline (workspace `[lints]`, warn only): 461 in
+  the library and CLI, 997 across all targets. See the
+  [lint baseline](baseline-0.5.0.md#lint-baseline).

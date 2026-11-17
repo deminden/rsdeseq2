@@ -1,0 +1,5 @@
+# Test code may unwrap, expect and panic; production code is held to the
+# workspace lint targets in Cargo.toml.
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true
