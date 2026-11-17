@@ -1,13 +1,13 @@
 impl DeseqBuilder {
     /// Run the implemented native dispersion path and then a Wald test.
     ///
-    /// This is an early, explicitly scoped analogue of `DESeq(..., test="Wald")`:
-    /// size factors, base means, linear-mu gene-wise dispersions, selected
-    /// trend, deterministic prior variance, MAP dispersions, fixed-dispersion
-    /// GLM fitting, Cook's distances, and selected-coefficient Wald results.
-    /// Parametric, local, and mean trends are currently implemented. It does not yet
-    /// implement DESeq2's general mean/dispersion iteration, beta priors,
-    /// contrasts, exact locfit smoothing, or observation weights.
+    /// Analogue of `DESeq(..., test="Wald")` with linear fitted means: size
+    /// factors, base means, linear-mu gene-wise dispersions, the selected
+    /// parametric, local or mean trend, prior variance, MAP dispersions, the GLM
+    /// fit, Cook's distances and Wald results for one coefficient. Contrasts use
+    /// the `fit_wald_linear_mu_contrast*` variants, observation weights the
+    /// GLM-mu branch (`fit_wald_glm_mu`), and beta priors the results-level
+    /// beta-prior functions.
     pub fn fit_wald_linear_mu(
         &self,
         counts: &CountMatrix,

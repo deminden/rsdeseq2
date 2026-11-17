@@ -9,7 +9,8 @@ use crate::{DeseqError, errors::invalid_dimensions, math::elementary::language_e
 ///
 /// This compatibility primitive preserves the established ashr component
 /// likelihood, including its zero-centered convolution for supplied components.
-/// It does not yet replace the public optional shrinkage methods.
+/// It is a building block; ashr-style shrinkage of result tables goes through
+/// `adaptive_shrinkage`.
 #[derive(Clone, Debug)]
 pub struct TruncatedNormalMixture {
     log_weights: Vec<f64>,
