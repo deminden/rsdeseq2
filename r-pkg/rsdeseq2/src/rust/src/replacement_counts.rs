@@ -23,8 +23,11 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_shape(
     samples: *mut usize,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
         let owner = unsafe { owner.as_ref() }.ok_or("replacement owner is null")?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let genes_out = unsafe { output_slice(genes, 1, "replacement genes")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let samples_out = unsafe { output_slice(samples, 1, "replacement samples")? };
         genes_out[0] = owner.counts.n_genes();
         samples_out[0] = owner.counts.n_samples();
@@ -43,6 +46,7 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_copy(
     output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
         let owner = unsafe { owner.as_ref() }.ok_or("replacement owner is null")?;
         if (genes, samples) != (owner.counts.n_genes(), owner.counts.n_samples()) {
             return Err("replacement output dimensions do not match owner".into());
@@ -50,6 +54,7 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_copy(
         let size = genes
             .checked_mul(samples)
             .ok_or("replacement shape overflow")?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
             copy_counts_to_r(
                 &owner.counts,
@@ -87,6 +92,7 @@ mod tests {
         let mut owner = Box::into_raw(Box::new(ReplacementCounts::new(counts)));
         let (mut genes, mut samples) = (0, 0);
         let mut output = [-1.0; 6];
+        // SAFETY: test-owned buffers and pointers outlive every call in this block.
         unsafe {
             assert_eq!(
                 rsdeseq2_r_replacement_shape(owner, &mut genes, &mut samples),

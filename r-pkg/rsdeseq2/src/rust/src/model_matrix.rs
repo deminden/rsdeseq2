@@ -17,6 +17,7 @@ pub unsafe extern "C" fn rsdeseq2_r_average_contrast(
     negative: *const i32,
     output: *mut f64,
 ) -> i32 {
+    // SAFETY: every pointer argument follows this export's safety contract, which the dereferences below rely on.
     run_backend(|| unsafe {
         let indices = |p, n| -> Result<Vec<usize>, String> {
             input_slice(p, n, "average contrast indices")?
@@ -58,14 +59,17 @@ unsafe fn string(pointer: *const c_char) -> Result<String, String> {
     if pointer.is_null() {
         return Err("null model variable name/label".into());
     }
+    // SAFETY: the pointer was checked non-null above, and C passes NUL-terminated strings that stay valid for this call.
     unsafe { CStr::from_ptr(pointer) }
         .to_str()
         .map(str::to_owned)
         .map_err(|e| e.to_string())
 }
 unsafe fn strings(pointer: *const *const c_char, length: usize) -> Result<Vec<String>, String> {
+    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
     unsafe { input_slice(pointer, length, "model variable labels")? }
         .iter()
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         .map(|&s| unsafe { string(s) })
         .collect()
 }
@@ -90,8 +94,10 @@ unsafe fn with_plan<T>(
     let mut metadata = Vec::with_capacity(inputs.len());
     for input in inputs {
         metadata.push(Metadata {
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             name: unsafe { string(input.name)? },
             levels: if input.kind == 1 {
+                // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                 unsafe { strings(input.levels, input.width)? }
             } else {
                 Vec::new()
@@ -99,11 +105,13 @@ unsafe fn with_plan<T>(
             names: if input.names.is_null() {
                 None
             } else {
+                // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                 Some(unsafe { strings(input.names, input.width)? })
             },
             contrast_names: if input.contrast_names.is_null() {
                 None
             } else {
+                // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                 Some(unsafe { strings(input.contrast_names, input.contrast_columns)? })
             },
         });
@@ -116,6 +124,7 @@ unsafe fn with_plan<T>(
             MatrixView::new(
                 rows,
                 columns,
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(pointer, size, "model variable values")? },
                 MatrixOrder::ColumnMajor,
             )
@@ -146,6 +155,7 @@ unsafe fn with_plan<T>(
                 };
                 ModelMatrixVariable::Factor {
                     name: &meta.name,
+                    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                     codes: unsafe { input_slice(input.codes, samples, "factor codes")? },
                     levels: &meta.levels,
                     coding,
@@ -161,6 +171,7 @@ unsafe fn with_plan<T>(
         .len()
         .checked_mul(n_terms)
         .ok_or("model term shape overflow")?;
+    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
     let term_codes = unsafe { input_slice(codes, length, "model term codes")? };
     let terms = if inputs.is_empty() {
         Vec::new()
@@ -198,6 +209,7 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_shape(
     name_bytes: *mut usize,
     response_dropped: *mut i32,
 ) -> i32 {
+    // SAFETY: every pointer argument follows this export's safety contract, which the dereferences below rely on.
     run_backend(|| unsafe {
         with_plan(
             samples,
@@ -237,6 +249,7 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_fill(
     names: *mut u8,
     name_capacity: usize,
 ) -> i32 {
+    // SAFETY: every pointer argument follows this export's safety contract, which the dereferences below rely on.
     run_backend(|| unsafe {
         with_plan(
             samples,

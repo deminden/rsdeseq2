@@ -35,7 +35,9 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
     pvalue_output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let design_values = unsafe {
             row_major_from_column_major(n_samples, n_coefficients, expanded_design_values)?
         };
@@ -56,9 +58,13 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
             Some(coefficient_names.clone()),
         )
         .map_err(|error| error.to_string())?;
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let dispersions = unsafe { input_slice(dispersions_values, n_genes, "dispersions")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let base_mean = unsafe { input_slice(base_mean_values, n_genes, "base means")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let disp_fit = unsafe { input_slice(disp_fit_values, n_genes, "dispersion fit")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let factor_groups = unsafe {
             input_slice(
                 factor_groups_values,
@@ -66,6 +72,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 "factor coefficient groups",
             )?
         };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let standard_factor_groups = unsafe {
             input_slice(
                 standard_factor_groups_values,
@@ -73,6 +80,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 "standard-design factor coefficient groups",
             )?
         };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let expanded_prior_map = unsafe {
             input_slice(
                 expanded_prior_map_values,
@@ -85,6 +93,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
         {
             return Err("factor groups and prior-map indices must be non-negative".into());
         }
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let contrast = unsafe { input_slice(contrast_values, n_coefficients, "contrast")? };
         if factor_groups.iter().any(|group| *group < 0) {
             return Err("factor coefficient groups must be non-negative".into());
@@ -93,11 +102,13 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
             return Err("lfcThreshold must be finite and non-negative".into());
         }
         let normalization_factors = if !normalization_factors_values.is_null() {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe {
                 row_major_from_column_major(n_genes, n_samples, normalization_factors_values)?
             }
         } else {
             let size_factors =
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(size_factors_values, n_samples, "size factors")? };
             normalization_factors_from_size_factors(&counts, size_factors)
                 .map_err(|error| error.to_string())?
@@ -105,6 +116,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
         let weights = if observation_weights_values.is_null() {
             None
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let weights = unsafe {
                 row_major_from_column_major(n_genes, n_samples, observation_weights_values)?
             };
@@ -115,6 +127,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
             )
         };
 
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let standard_beta = unsafe {
             row_major_from_column_major(n_genes, n_standard_coefficients, standard_beta_values)?
         };
@@ -238,14 +251,17 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 .with_lfc_threshold(lfc_threshold, WaldAlternative::GreaterAbs),
         )
         .map_err(|error| error.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(beta_output, n_genes, "shrunken contrast estimates")? }
             .iter_mut()
             .zip(wald.log2_fold_change.iter())
             .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(beta_se_output, n_genes, "shrunken contrast standard errors")? }
             .iter_mut()
             .zip(wald.lfc_se.iter())
             .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
             output_slice(
                 prior_variance_output,
@@ -254,10 +270,12 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
             )?
         }
         .copy_from_slice(&prior_variance);
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(stat_output, n_genes, "shrunken Wald statistics")? }
             .iter_mut()
             .zip(wald.wald.stat.iter())
             .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(pvalue_output, n_genes, "shrunken Wald p-values")? }
             .iter_mut()
             .zip(wald.wald.pvalue.iter())

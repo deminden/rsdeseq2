@@ -14,6 +14,7 @@ unsafe fn counts<'a>(
     MatrixView::new(
         genes,
         samples,
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         unsafe { input_slice(values, length, "counts")? },
         MatrixOrder::ColumnMajor,
     )
@@ -32,20 +33,24 @@ pub unsafe extern "C" fn rsdeseq2_r_frozen_local_grid(
     output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         let counts = CountView::from_doubles(unsafe { counts(genes, samples, values)? })
             .map_err(|e| e.to_string())?;
         let sf = if sf.is_null() {
             None
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             Some(unsafe { input_slice(sf, samples, "size factors")? })
         };
         let nf = if nf.is_null() {
             None
         } else {
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             Some(unsafe { self::counts(genes, samples, nf)? })
         };
         let grid = rsdeseq2::transform::frozen_local_vst_grid_from_counts(counts, sf, nf)
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(output, 999, "frozen local grid")? }.copy_from_slice(&grid);
         Ok(())
     })
@@ -59,6 +64,7 @@ pub unsafe extern "C" fn rsdeseq2_r_validate_counts(
     values: *const f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         CountView::from_doubles(unsafe { counts(genes, samples, values)? })
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -80,27 +86,33 @@ pub unsafe extern "C" fn rsdeseq2_r_normal_shrinkage_rows(
     used: *mut usize,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         let rows = CountRows::from_doubles(unsafe { counts(genes, samples, values)? })
             .map_err(|e| e.to_string())?;
         let flags = if excluded.is_null() {
             None
         } else {
             Some(
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 RowFlags::from_integers(unsafe { input_slice(excluded, genes, "excluded rows")? })
                     .map_err(|e| e.to_string())?,
             )
         };
         let selected = NormalShrinkageRows::new(
             &rows,
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe { input_slice(dispersions, genes, "dispersions")? },
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe { input_slice(fitted, genes, "fitted dispersions")? },
             flags,
         )
         .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let out = unsafe { output_slice(indices, genes, "selected rows")? };
         for (slot, &index) in out.iter_mut().zip(selected.indices()) {
             *slot = i32::try_from(index + 1).map_err(|e| e.to_string())?;
         }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let length = unsafe { output_slice(used, 1, "selected row count")? };
         length[0] = selected.indices().len();
         Ok(())
@@ -123,17 +135,21 @@ pub unsafe extern "C" fn rsdeseq2_r_offset_factors(
         let sf = if sf.is_null() {
             None
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             Some(unsafe { input_slice(sf, samples, "size factors")? })
         };
         let nf = if nf.is_null() {
             None
         } else {
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             Some(unsafe { counts(genes, samples, nf)? })
         };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let result = normalization_factors_with_offsets(genes, samples, sf, nf, unsafe {
             input_slice(offsets, samples, "formula offsets")?
         })
         .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let out = unsafe { output_slice(output, result.len(), "effective factors")? };
         for sample in 0..samples {
             for gene in 0..genes {

@@ -48,12 +48,17 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     let mut pending = None;
     let status = run_backend(|| {
         if replacement_output.is_null() { return Err("replacement owner output pointer is null".into()); }
+        // SAFETY: `replacement_output` is a non-null, writable owner slot (checked on entry; a null slot returns an error first).
         unsafe { *replacement_output = ptr::null_mut(); }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let lrt_df = unsafe { output_slice(lrt_df_output, 1, "LRT degrees of freedom")? };
         let fit_type_used =
+            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(fit_type_used_output, 1, "fitted dispersion trend type")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_matrix =
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe { row_major_from_column_major(n_samples, n_coefficients, design_values)? };
         let design = DesignMatrix::from_row_major(
             n_samples,
@@ -80,22 +85,26 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             .threads(threads.max(1));
         if !size_factors_values.is_null() {
             builder = builder.size_factors(
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(size_factors_values, n_samples, "size factors")? }.to_vec(),
             );
         }
         if !normalization_factors_values.is_null() {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let factors = unsafe {
                 row_major_from_column_major(n_genes, n_samples, normalization_factors_values)?
             };
             builder = builder.normalization_factors(factors);
         }
         if !observation_weights_values.is_null() {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let weights = unsafe {
                 row_major_from_column_major(n_genes, n_samples, observation_weights_values)?
             };
             builder = builder.observation_weights(weights);
         }
         if selected_test_type == TestType::Lrt {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let reduced_matrix = unsafe {
                 row_major_from_column_major(n_samples, reduced_coefficients, reduced_values)?
             };
@@ -131,6 +140,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             .map_err(|_| "LRT degrees of freedom exceed the R integer range"))
             .transpose()?.unwrap_or(0);
         const COLUMNS: usize = 13;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe {
             output_slice(
                 result_output,
@@ -202,6 +212,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             .cooks
             .as_ref()
             .ok_or("Rust fit did not retain Cook's distances")?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let beta_out = unsafe {
             output_slice(
                 beta_output,
@@ -211,6 +222,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 "beta matrix",
             )?
         };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let beta_se_out = unsafe {
             output_slice(
                 beta_se_output,
@@ -225,6 +237,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             .and_then(|value| value.checked_mul(n_coefficients))
             .ok_or("covariance dimensions overflow")?;
         let covariance_out =
+            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(covariance_output, covariance_len, "beta covariance")? };
         for gene in 0..n_genes {
             let beta_row = beta.row(gene).map_err(|error| error.to_string())?;
@@ -241,14 +254,21 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 }
             }
         }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { copy_matrix_to_r(mu, mu_output)? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { copy_matrix_to_r(cooks, cooks_output)? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let replace = unsafe { output_slice(replace_output, n_genes, "replacement flags")? };
         let replaceable_samples =
+            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(replaceable_samples_output, n_samples, "replaceable samples")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let refit_rows = unsafe { output_slice(refit_rows_output, n_genes, "refit rows")? };
         let new_all_zero_rows =
+            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(new_all_zero_rows_output, n_genes, "new all-zero rows")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let n_refit = unsafe { output_slice(n_refit_output, 1, "replacement refit count")? };
         if let Some(output) = &replacement {
             let plan = output;
@@ -289,20 +309,25 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             new_all_zero_rows.fill(0);
 
         }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(size_factors_output, n_samples, "size factors")? }
             .copy_from_slice(&fit.size_factors);
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let dispersions = unsafe { output_slice(dispersion_output, n_genes, "dispersions")? };
         match &fit.dispersion {
             Some(values) => dispersions.copy_from_slice(values),
             None => dispersions.fill(f64::NAN),
         }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let disp_fit = unsafe { output_slice(disp_fit_output, n_genes, "dispersion fit")? };
         match &fit.disp_fit {
             Some(values) => disp_fit.copy_from_slice(values),
             None => disp_fit.fill(f64::NAN),
         }
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(base_var_output, n_genes, "base variances")? }
             .copy_from_slice(&fit.base_var);
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let all_zero = unsafe { output_slice(all_zero_output, n_genes, "all-zero flags")? };
         for (target, source) in all_zero.iter_mut().zip(&fit.all_zero) {
             *target = i32::from(*source);
@@ -315,6 +340,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     });
     // Publish only after borrowed R buffers and the fit frame have been released.
     if status == 0 {
+        // SAFETY: `replacement_output` is a non-null, writable owner slot (checked on entry; a null slot returns an error first).
         unsafe { *replacement_output = pending.map_or(ptr::null_mut(), Box::into_raw); }
     }
     status

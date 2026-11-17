@@ -32,6 +32,7 @@ unsafe fn identifier<'a>(pointer: *const c_char) -> Result<&'a str, String> {
     if pointer.is_null() {
         return Err("design origin identifier is null".into());
     }
+    // SAFETY: the pointer was checked non-null above, and C passes NUL-terminated strings that stay valid for this call.
     unsafe { CStr::from_ptr(pointer) }
         .to_str()
         .map_err(|e| e.to_string())
@@ -41,6 +42,7 @@ unsafe fn design_origin(context: &ResultContext) -> Result<DesignOrigin, String>
         0 => Ok(DesignOrigin::matrix()),
         2 => Ok(DesignOrigin::legacy()),
         1 => {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let pointers = unsafe {
                 input_slice(
                     context.variables,
@@ -50,6 +52,7 @@ unsafe fn design_origin(context: &ResultContext) -> Result<DesignOrigin, String>
             };
             let variables = pointers
                 .iter()
+                // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                 .map(|&v| unsafe { identifier(v) }.map(str::to_owned))
                 .collect::<Result<Vec<_>, _>>()?;
             DesignOrigin::formula(variables).map_err(|e| e.to_string())
@@ -67,6 +70,7 @@ unsafe fn replacement_rows<'a>(
         if pointer.is_null() {
             Ok(None)
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             RowFlags::from_integers(unsafe { input_slice(pointer, genes, "replacement flags")? })
                 .map(Some)
                 .map_err(|e| e.to_string())
@@ -86,7 +90,9 @@ pub unsafe extern "C" fn rsdeseq2_r_result_replacement_storage(
     storage: *mut u8,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         let rows = unsafe { replacement_rows(genes, refitted, new_zero)? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe { output_slice(storage, 1, "replacement storage flag")? };
         output[0] = u8::from(rows.has_new_zero());
         Ok(())
@@ -115,15 +121,21 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
         if active > 1 {
             return Err("Cook's mode must be zero or one".into());
         }
+        // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
         let context = unsafe { context.as_ref() }.ok_or("result context is null")?;
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         let rows = unsafe { replacement_rows(genes, context.refitted, context.new_zero)? };
+        // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
         let origin = unsafe { design_origin(context)? };
         let needs_zero = rows.has_new_zero();
         // C only copies columns that Rust may modify. Untouched columns remain
         // shared R inputs and are never borrowed mutably here.
         let effect =
+            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(effect, if needs_zero { genes } else { 0 }, "result effects")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let se = unsafe { output_slice(se, if needs_zero { genes } else { 0 }, "result SEs")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let stat = unsafe {
             output_slice(
                 stat,
@@ -131,6 +143,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                 "result statistics",
             )?
         };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let pvalue = unsafe {
             output_slice(
                 pvalue,
@@ -138,6 +151,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                 "result p-values",
             )?
         };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let outlier = unsafe { output_slice(outlier, genes, "result outlier flags")? };
         // Disabled filtering preserves untouched IEEE NaN/NA payloads.
         if active == 0 {
@@ -149,6 +163,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
             return Ok(());
         }
         let factors =
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe { input_slice(context.factors, context.factors_len, "Cook's factors")? };
         let mut low_count = false;
         if !context.design.is_null() {
@@ -159,6 +174,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
             let design = MatrixView::new(
                 context.samples,
                 context.coefficients,
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(context.design, length, "Cook's design")? },
                 MatrixOrder::ColumnMajor,
             )
@@ -168,6 +184,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                     continue;
                 }
                 let codes =
+                    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                     unsafe { input_slice(factor.codes, context.samples, "Cook's factor codes")? };
                 // Missing factor observations cannot equal a complete finite
                 // design partition; valid factor metadata uses one-based codes.
@@ -180,6 +197,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                 let name = if factor.name.is_null() {
                     ""
                 } else {
+                    // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                     unsafe { identifier(factor.name)? }
                 };
                 if low_count_eligible(&origin, design, name, codes, factor.levels)
@@ -194,16 +212,19 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
             let length = genes
                 .checked_mul(context.samples)
                 .ok_or("Cook's shape overflow")?;
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let values = unsafe { input_slice(context.cooks, length, "Cook's distances")? };
             if values.iter().any(|v| v.is_infinite()) {
                 return Err("cooks must contain finite values or NA".into());
             }
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             Some(unsafe {
                 borrowed_cooks_heuristic(genes, context.samples, context.counts, context.cooks)?
             })
         } else {
             None
         };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let maximum = unsafe { input_slice(context.max_cooks, genes, "maximum Cook's distances")? };
         let policy = CooksPolicy::new(Some(cutoff), heuristic)
             .map_err(|e| e.to_string())?

@@ -30,6 +30,7 @@ pub(super) unsafe fn prepare_zero_inputs<'a>(
     let mut common = None;
     let mut numeric_design = None;
     for pointer in contexts {
+        // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
         let Some(context) = (unsafe { pointer.as_ref() }) else {
             continue;
         };
@@ -55,6 +56,7 @@ pub(super) unsafe fn prepare_zero_inputs<'a>(
     let length = genes
         .checked_mul(samples)
         .ok_or("contrast count shape overflow")?;
+    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
     let values = unsafe { input_slice(pointer, length, "contrast counts")? };
     let counts = ContrastCounts::from_doubles(
         MatrixView::new(genes, samples, values, MatrixOrder::ColumnMajor)
@@ -65,6 +67,7 @@ pub(super) unsafe fn prepare_zero_inputs<'a>(
         let length = samples
             .checked_mul(coefficients)
             .ok_or("contrast design shape overflow")?;
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let values = unsafe { input_slice(pointer, length, "contrast design")? };
         Some(
             MatrixView::new(samples, coefficients, values, MatrixOrder::ColumnMajor)
@@ -106,6 +109,7 @@ impl DecodedZero<'_> {
 pub(super) unsafe fn decode_zero<'a>(
     pointer: *const ContrastZero,
 ) -> Result<DecodedZero<'a>, String> {
+    // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
     let Some(context) = (unsafe { pointer.as_ref() }) else {
         return Ok(DecodedZero::None);
     };
@@ -113,11 +117,13 @@ pub(super) unsafe fn decode_zero<'a>(
         1 => Ok(DecodedZero::Numeric),
         2 => {
             let pointers =
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(context.sample_levels, context.samples, "sample levels")? };
             let text = |pointer: *const c_char| -> Result<&'a str, String> {
                 if pointer.is_null() {
                     return Err("contrast level string is null".into());
                 }
+                // SAFETY: the pointer was checked non-null above, and C passes NUL-terminated strings that stay valid for this call.
                 unsafe { CStr::from_ptr(pointer) }
                     .to_str()
                     .map_err(|e| e.to_string())

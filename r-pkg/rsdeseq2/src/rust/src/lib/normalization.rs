@@ -19,15 +19,18 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
     output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts)? };
         let geo = if geo_means.is_null() {
             None
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             Some(unsafe { input_slice(geo_means, n_genes, "geometric means")? })
         };
         let controls = if control_genes.is_null() {
             None
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             Some(unsafe { input_slice(control_genes, n_control, "control genes")? })
         };
         let method = match method {
@@ -37,6 +40,7 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
         };
         let factors = estimate_size_factors_with_options(&counts, method, geo, controls)
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(output, n_samples, "size factors")? }.copy_from_slice(&factors);
         Ok(())
     })
@@ -58,15 +62,19 @@ pub unsafe extern "C" fn rsdeseq2_r_normalized_counts(
     output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts)? };
         let normalized = if normalization_factors.is_null() {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let sf = unsafe { input_slice(size_factors, n_samples, "size factors")? };
             normalized_counts(&counts, sf).map_err(|e| e.to_string())?
         } else {
             let factors =
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { row_major_from_column_major(n_genes, n_samples, normalization_factors)? };
             normalized_counts_with_factors(&counts, &factors).map_err(|e| e.to_string())?
         };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { copy_matrix_to_r(&normalized, output) }
     })
 }
@@ -90,12 +98,15 @@ pub unsafe extern "C" fn rsdeseq2_r_base_metadata(
     all_zero: *mut u8,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts)? };
         let normalized = if normalization_factors.is_null() {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let sf = unsafe { input_slice(size_factors, n_samples, "size factors")? };
             normalized_counts(&counts, sf).map_err(|e| e.to_string())?
         } else {
             let factors =
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { row_major_from_column_major(n_genes, n_samples, normalization_factors)? };
             normalized_counts_with_factors(&counts, &factors).map_err(|e| e.to_string())?
         };
@@ -105,14 +116,18 @@ pub unsafe extern "C" fn rsdeseq2_r_base_metadata(
                 base_variance(&normalized).map_err(|e| e.to_string())?,
             )
         } else {
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let weights = unsafe { row_major_from_column_major(n_genes, n_samples, weights)? };
             (
                 base_mean_with_weights(&normalized, &weights).map_err(|e| e.to_string())?,
                 base_variance_with_weights(&normalized, &weights).map_err(|e| e.to_string())?,
             )
         };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(base_means, n_genes, "base means")? }.copy_from_slice(&means);
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(base_vars, n_genes, "base variances")? }.copy_from_slice(&vars);
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let zero = unsafe { output_slice(all_zero, n_genes, "all-zero flags")? };
         for (gene, flag) in zero.iter_mut().enumerate() {
             *flag = u8::from(counts.is_all_zero_gene(gene).map_err(|e| e.to_string())?);

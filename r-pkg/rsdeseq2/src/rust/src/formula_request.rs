@@ -239,10 +239,12 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_request(
     output: *mut *mut FormulaOutput,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let slot = unsafe { output_slice(output, 1, "formula owner")? };
         if !slot[0].is_null() {
             return Err("formula output owner slot must be empty".into());
         }
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let bytes = unsafe { input_slice(input, size, "formula input")? };
         let request = wire::decode(bytes).map_err(|e| e.to_string())?;
         let result = dispatch(&request)?;
@@ -261,7 +263,9 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_bytes(
     size: *mut usize,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: C passes null (handled here) or a pointer to a live, aligned value it owns for this call.
         let owner = unsafe { owner.as_ref() }.ok_or("formula owner is null")?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
             output_slice(bytes, 1, "formula bytes")?[0] = owner.bytes.as_ptr();
             output_slice(size, 1, "formula size")?[0] = owner.bytes.len();
@@ -312,6 +316,7 @@ mod tests {
         let bytes = wire::encode(&request).unwrap();
         let mut owner = ptr::null_mut();
         let (mut data, mut size) = (ptr::null(), 0);
+        // SAFETY: test-owned buffers and pointers outlive every call in this block.
         unsafe {
             assert_ne!(rsdeseq2_r_formula_request(ptr::null(), 1, &mut owner), 0);
             assert!(owner.is_null());

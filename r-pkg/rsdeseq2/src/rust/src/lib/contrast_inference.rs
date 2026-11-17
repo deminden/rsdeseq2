@@ -51,6 +51,7 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
             MatrixView::new(
                 genes,
                 coefficients,
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 unsafe { input_slice(values, length, "contrast estimates")? },
                 MatrixOrder::ColumnMajor,
             )
@@ -71,6 +72,7 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
                     MatrixView::new(
                         genes,
                         width,
+                        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                         unsafe { input_slice(covariance, length, "contrast covariance")? },
                         MatrixOrder::ColumnMajor,
                     )
@@ -82,8 +84,10 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
             None
         };
         let estimates = InferenceEstimates::new(beta, se, covariance).map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let requests = unsafe { input_slice(requests, count, "contrast requests")? };
         let (counts, design) =
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             unsafe { prepare_zero_inputs(requests.iter().map(|r| r.zero), genes, coefficients)? };
         let view =
             PreparedContrastView::new(estimates, counts, design).map_err(|e| e.to_string())?;
@@ -93,6 +97,7 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
                     return Err("Wald mode must be zero or one".into());
                 }
                 let options = if request.use_wald == 1 {
+                    // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                     Some(unsafe {
                         borrowed_wald_options(
                             genes,
@@ -106,22 +111,28 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
                 } else {
                     None
                 };
+                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                 let contrast = unsafe {
                     input_slice(request.contrast, coefficients, "contrast coefficients")?
                 };
+                // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
                 let zero = unsafe { decode_zero(request.zero)? };
                 let result = view
                     .evaluate(contrast, options.as_ref(), zero.rule())
                     .map_err(|e| e.to_string())?;
+                // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 let effect = unsafe { output_slice(request.lfc, genes, "contrast effects")? };
+                // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 let se = unsafe { output_slice(request.lfc_se, genes, "contrast SEs")? };
                 for gene in 0..genes {
                     effect[gene] = result.projection.log2_fold_change[gene].unwrap_or(missing);
                     se[gene] = result.projection.lfc_se[gene].unwrap_or(missing);
                 }
                 if let Some(wald) = result.wald {
+                    // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                     let stat = unsafe { output_slice(request.stat, genes, "contrast statistics")? };
                     let pvalue =
+                        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                         unsafe { output_slice(request.pvalue, genes, "contrast p-values")? };
                     for gene in 0..genes {
                         stat[gene] = wald.stat[gene].unwrap_or(missing);

@@ -15,6 +15,7 @@ unsafe fn borrowed_cooks_heuristic<'a>(
         MatrixView::new(
             genes,
             samples,
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             unsafe { input_slice(pointer, length, name)? },
             MatrixOrder::ColumnMajor,
         )
@@ -46,12 +47,15 @@ pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
     output_outlier: *mut u8,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let pvalues = unsafe { input_slice(pvalues, n_genes, "p-values")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let max_cooks = unsafe { input_slice(max_cooks, n_genes, "maximum Cook's distances")? };
         if use_low_count_heuristic > 1 {
             return Err("low-count flag must be zero or one".into());
         }
         let heuristic = if use_low_count_heuristic == 1 {
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             Some(unsafe { borrowed_cooks_heuristic(n_genes, n_samples, counts, cooks)? })
         } else {
             None
@@ -64,7 +68,9 @@ pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
                 max_cooks.iter().copied().map(finite_value),
             )
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let out_p = unsafe { output_slice(output_pvalues, n_genes, "masked p-values")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let outlier = unsafe { output_slice(output_outlier, n_genes, "Cook's outlier flags")? };
         for gene in 0..n_genes {
             out_p[gene] = mask.pvalue[gene].unwrap_or(f64::NAN);
@@ -119,6 +125,7 @@ mod tests {
             .map(|index| {
                 let pointer = rsdeseq2_r_diagnostic_schema_name(index);
                 assert!(!pointer.is_null());
+                // SAFETY: test-owned buffers and pointers outlive every call in this block.
                 unsafe { CStr::from_ptr(pointer) }
                     .to_str()
                     .unwrap()

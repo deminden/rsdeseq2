@@ -1,3 +1,5 @@
+#![deny(clippy::undocumented_unsafe_blocks)]
+
 use std::cell::RefCell;
 use std::ffi::{CString, c_char};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -6,8 +8,8 @@ use std::ptr;
 use rsdeseq2::prelude::{
     BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
     BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DesignMatrix,
-    DispersionTrendFit, FitType, ParametricDispersionTrend, RowMajorMatrix, SizeFactorMethod, TestType,
-    WaldAlternative, WaldTestOptions, base_mean, base_mean_with_weights, base_variance,
+    DispersionTrendFit, FitType, ParametricDispersionTrend, RowMajorMatrix, SizeFactorMethod,
+    TestType, WaldAlternative, WaldTestOptions, base_mean, base_mean_with_weights, base_variance,
     base_variance_with_weights, estimate_beta_prior_variance, estimate_size_factors_with_options,
     fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
     fit_glms_with_estimated_beta_prior_variance,
@@ -77,6 +79,7 @@ unsafe fn input_slice<'a, T>(
     Ok(if length == 0 {
         &[]
     } else {
+        // SAFETY: the pointer is non-null (checked above) and the caller's contract guarantees `length` valid, aligned elements for 'a.
         unsafe { std::slice::from_raw_parts(pointer, length) }
     })
 }
@@ -92,6 +95,7 @@ unsafe fn output_slice<'a, T>(
     Ok(if length == 0 {
         &mut []
     } else {
+        // SAFETY: the pointer is non-null (checked above) and the caller's contract guarantees `length` valid, aligned elements for 'a.
         unsafe { std::slice::from_raw_parts_mut(pointer, length) }
     })
 }
@@ -101,6 +105,7 @@ unsafe fn counts_from_r(
     n_samples: usize,
     values: *const f64,
 ) -> Result<CountMatrix, String> {
+    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
     let column_major = unsafe {
         input_slice(
             values,
@@ -135,6 +140,7 @@ unsafe fn row_major_from_column_major(
     n_cols: usize,
     values: *const f64,
 ) -> Result<RowMajorMatrix<f64>, String> {
+    // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
     let column_major = unsafe {
         input_slice(
             values,
@@ -156,6 +162,7 @@ unsafe fn row_major_from_column_major(
 unsafe fn copy_matrix_to_r(matrix: &RowMajorMatrix<f64>, output: *mut f64) -> Result<(), String> {
     let n_rows = matrix.n_rows();
     let n_cols = matrix.n_cols();
+    // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
     let out = unsafe {
         output_slice(
             output,

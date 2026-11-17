@@ -28,6 +28,7 @@ pub(super) unsafe fn borrowed_wald_options(
         }
         WaldTestOptions::normal()
     } else {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let df = unsafe { input_slice(df, df_len, "Wald df")? };
         if df.len() == 1 {
             WaldTestOptions::t_degrees_of_freedom(df[0])
@@ -60,12 +61,17 @@ pub unsafe extern "C" fn rsdeseq2_r_wald_statistics(
 ) -> i32 {
     run_backend(|| {
         let options =
+            // SAFETY: these pointers come from the C caller under this export's contract, which satisfies the helper's `# Safety` requirements.
             unsafe { borrowed_wald_options(genes, threshold, alternative, use_t, df_len, df)? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let beta = unsafe { input_slice(beta, genes, "Wald estimates")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let se = unsafe { input_slice(se, genes, "Wald standard errors")? };
         let result = rsdeseq2::glm::wald_test_from_estimates(beta, se, &options)
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let stat = unsafe { output_slice(stat, genes, "Wald statistics")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let pvalue = unsafe { output_slice(pvalue, genes, "Wald p-values")? };
         for gene in 0..genes {
             stat[gene] = result.stat[gene].unwrap_or(missing);
@@ -88,10 +94,13 @@ pub unsafe extern "C" fn rsdeseq2_r_lrt_pvalues(
     output: *mut f64,
 ) -> i32 {
     run_backend(|| {
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let statistics = unsafe { input_slice(statistics, genes, "LRT statistics")? };
+        // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let df = unsafe { input_slice(df, df_len, "LRT df")? };
         let result = rsdeseq2::glm::lrt_pvalues_from_statistics(statistics, df)
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe { output_slice(output, genes, "LRT p-values")? };
         for (target, value) in output.iter_mut().zip(result) {
             *target = value.unwrap_or(missing);
@@ -113,7 +122,9 @@ pub unsafe extern "C" fn rsdeseq2_r_default_cooks_cutoff(
     run_backend(|| {
         let cutoff = rsdeseq2::results::default_cooks_cutoff(samples, coefficients)
             .map_err(|e| e.to_string())?;
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe { output_slice(output, 1, "Cook's cutoff")? };
+        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let present = unsafe { output_slice(present, 1, "Cook's cutoff flag")? };
         output[0] = cutoff.unwrap_or(0.0);
         present[0] = u8::from(cutoff.is_some());
