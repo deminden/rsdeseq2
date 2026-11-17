@@ -1,3 +1,4 @@
+use super::*;
 /// Build DESeq2-shaped LRT result rows for one reported full-model coefficient.
 ///
 /// DESeq2 reports full-model beta and SE columns alongside the model-level LRT
@@ -37,7 +38,7 @@ pub(crate) fn build_lrt_results_unadjusted(
     )
 }
 
-fn assemble_lrt_coefficient(
+pub(super) fn assemble_lrt_coefficient(
     base_mean: &[f64],
     full_fit: &NbinomGlmFit,
     lrt: &LrtOutput,
@@ -167,7 +168,7 @@ pub(crate) fn build_lrt_projection_results_unadjusted_view(
     )
 }
 
-fn build_lrt_effect_results_view(
+pub(super) fn build_lrt_effect_results_view(
     base_mean: &[f64],
     full_fit: &GlmInferenceView<'_>,
     lrt: &LrtOutput,
