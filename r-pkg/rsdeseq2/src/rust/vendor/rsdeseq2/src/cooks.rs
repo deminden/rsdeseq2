@@ -593,7 +593,10 @@ fn trim_scale(bin: usize) -> f64 {
     [2.04, 1.86, 1.51][bin]
 }
 
-fn trimmed_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, DeseqError> {
+/// Trimmed mean of the central values using the scale-normalized mean; NaN
+/// for empty, NaN-containing or fully trimmed input. No `trim >= 0.5` median
+/// rule (compare [`r_trimmed_mean`]).
+fn trimmed_scaled_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, DeseqError> {
     if values.is_empty() || values.iter().any(|value| value.is_nan()) {
         return Ok(f64::NAN);
     }
@@ -607,6 +610,8 @@ fn trimmed_mean(mut values: Vec<f64>, trim: f64, context: &str) -> Result<f64, D
     checked::try_mean(kept).nonfinite_at(context, None)
 }
 
+/// R `mean(x, trim)`: median for `trim >= 0.5`, otherwise a plain sum of the
+/// central values divided by their count; NaN for non-finite input.
 fn r_trimmed_mean(mut values: Vec<f64>, trim: f64) -> f64 {
     if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
         return f64::NAN;

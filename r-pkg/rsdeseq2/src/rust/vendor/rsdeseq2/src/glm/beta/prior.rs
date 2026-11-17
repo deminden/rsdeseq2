@@ -83,7 +83,7 @@ pub fn match_upper_quantile_for_variance(
 ) -> Result<f64, DeseqError> {
     validate_upper_quantile(upper_quantile)?;
     let abs_betas = finite_abs_values(betas)?;
-    let quantile = quantile_type7(abs_betas, 1.0 - upper_quantile)?;
+    let quantile = quantile_type7_stable(abs_betas, 1.0 - upper_quantile)?;
     let normal = Normal::new(0.0, 1.0).map_err(|error| DeseqError::InvalidOptions {
         reason: format!("normal quantile construction failed: {error}"),
     })?;

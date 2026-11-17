@@ -1,6 +1,8 @@
 // Input validation, normalization factors and output scaling.
 
-fn normalization_factors_from_size_factors(
+/// Size factors repeated per gene, rejecting non-positive values as
+/// `NonFiniteValue` (shared by the IRLS and beta-prior fits).
+pub(super) fn normalization_factors_from_size_factors(
     counts: &CountMatrix,
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
@@ -88,27 +90,7 @@ fn validate_nf_irls_inputs(
     Ok(())
 }
 
-fn validate_positive_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        });
-    }
-    Ok(())
-}
 
-fn validate_nonnegative_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        });
-    }
-    Ok(())
-}
 
 fn checked_log2_scale(value: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
     let scaled = std::f64::consts::LOG2_E * value;

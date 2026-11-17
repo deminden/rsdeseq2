@@ -1,4 +1,7 @@
 use crate::numeric::checked;
+use crate::numeric::validate::{
+    nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
+};
 use nalgebra::{DMatrix, DVector, Dyn, linalg::LU};
 use rayon::prelude::*;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};

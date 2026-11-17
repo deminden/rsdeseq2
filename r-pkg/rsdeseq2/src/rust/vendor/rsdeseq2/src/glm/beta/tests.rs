@@ -22,7 +22,7 @@ mod tests {
 
     #[test]
     fn quantile_type7_rejects_overflowed_interpolation() {
-        let err = super::quantile_type7(vec![-f64::MAX, f64::MAX], 0.5).unwrap_err();
+        let err = super::quantile_type7_stable(vec![-f64::MAX, f64::MAX], 0.5).unwrap_err();
 
         assert!(matches!(
             err,

@@ -112,7 +112,7 @@ pub fn fit_mean_dispersion_trend(
         .filter_map(|(disp, used)| used.then_some(disp))
         .collect::<Vec<_>>();
     let genes_used_for_mean = mean_disps.len();
-    let mean_disp = trimmed_mean(&mean_disps, options.trim)?;
+    let mean_disp = trimmed_running_mean(&mean_disps, options.trim)?;
     let trend = MeanDispersionTrend { mean_disp };
 
     Ok(MeanDispersionTrendFit {
@@ -144,7 +144,10 @@ fn validate_mean_trend_inputs(
     Ok(())
 }
 
-fn trimmed_mean(values: &[f64], trim: f64) -> Result<f64, DeseqError> {
+/// Trimmed mean for the mean dispersion trend: exact midpoint median at
+/// `trim == 0.5`, otherwise a running mean of the central values; errors when
+/// nothing is usable.
+fn trimmed_running_mean(values: &[f64], trim: f64) -> Result<f64, DeseqError> {
     if values.is_empty() {
         return Err(DeseqError::InvalidDispersion {
             reason: "no gene-wise dispersion estimates are usable for mean trend fitting"

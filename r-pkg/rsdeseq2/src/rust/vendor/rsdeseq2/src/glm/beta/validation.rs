@@ -59,24 +59,4 @@ fn validate_nf_fit_inputs(
     Ok(())
 }
 
-fn validate_positive_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        });
-    }
-    Ok(())
-}
 
-fn validate_nonnegative_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value,
-        });
-    }
-    Ok(())
-}

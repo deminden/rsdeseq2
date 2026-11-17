@@ -144,7 +144,11 @@ fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
     Ok(out)
 }
 
-fn quantile_type7(mut values: Vec<f64>, probability: f64) -> Result<f64, DeseqError> {
+/// R `quantile(type = 7)` on an unsorted copy. Equal neighbours return the
+/// neighbour unchanged (`stable_interpolate`); a non-finite interpolation is
+/// `InvalidOptions`. Distinct from the VST and filtering versions, which
+/// report `NonFiniteValue` and always evaluate `lo + f * (hi - lo)`.
+fn quantile_type7_stable(mut values: Vec<f64>, probability: f64) -> Result<f64, DeseqError> {
     if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
         return Err(DeseqError::InvalidOptions {
             reason: "quantile probability must be finite and between 0 and 1".to_string(),

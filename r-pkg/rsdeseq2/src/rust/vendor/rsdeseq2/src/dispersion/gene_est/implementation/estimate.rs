@@ -461,7 +461,7 @@ pub fn moments_dispersion_estimates(
             base_var.len(),
         ));
     }
-    validate_size_factors(size_factors)?;
+    validate_size_factor_values(size_factors)?;
     let inverse_sum = checked_sum_indexed(
         size_factors.iter().copied().map(f64::recip),
         "moments dispersion inverse size-factor sum",
@@ -565,7 +565,7 @@ fn normalization_factor_moments_xim(
             continue;
         }
         for (sample, value) in normalization_factors.row(row)?.iter().copied().enumerate() {
-            validate_normalization_factor(value, sample)?;
+            validate_normalization_factor_value(value, sample)?;
             checked_matrix_add_assign(
                 &mut col_sums[sample],
                 value,
