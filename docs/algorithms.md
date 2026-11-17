@@ -454,6 +454,13 @@ error, matching DESeq2's guidance to use gene-wise estimates directly. Offline
 DESeq2 fixtures check both fitted training-row values and predictions at means
 outside the original fit rows.
 
+Trend dispatch (`estimate_dispersion_trend`, used by the builder and
+`fit_dispersion_trend`) follows DESeq2 1.52 `estimateDispersionsFit`: it first
+requires a row with `dispGeneEst > 100 * minDisp` and passes only those rows to
+the parametric or local fit. When the parametric fit fails, DESeq2 wraps it in
+`try()`, prints a note and fits the local trend instead; Rust does the same,
+and `DeseqFit::dispersion_trend` records that the local trend was used.
+
 The mean trend type is also implemented. It follows
 `estimateDispersionsFit(fitType="mean")`: first require at least one row with
 `dispGeneEst > 100 * minDisp`, then compute one constant fitted dispersion from
@@ -467,8 +474,9 @@ before division. An offline DESeq2 fixture checks the separate viability and
 mean-inclusion thresholds plus the constant fitted value.
 
 The local trend type has a pure-Rust locfit-compatible implementation. It follows
-DESeq2's local-fit data contract by fitting on `log(dispGeneEst)` versus
-`log(baseMean)`, retaining rows with `dispGeneEst >= 10 * minDisp`, weighting
+DESeq2's `localDispersionFit` data contract by fitting on `log(dispGeneEst)` versus
+`log(baseMean)`, retaining rows with `dispGeneEst >= 10 * minDisp` (within the
+dispatch above, every row passed in already exceeds `100 * minDisp`), weighting
 rows by `baseMean`, and returning `minDisp` when all estimates are near the
 minimum. Instead of calling R's `locfit`, Rust uses a pure-Rust compatibility
 backend for tricube local polynomial fits. The default DESeq2-sized path uses

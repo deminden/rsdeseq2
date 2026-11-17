@@ -27,6 +27,6 @@ pub use mean::{
 pub use model::DispersionTrendFit;
 
 pub use selection::{
-    fit_dispersion_trend, local_trend_use_for_fit, mean_trend_use_for_fit, mean_trend_use_for_mean,
-    parametric_trend_use_for_fit,
+    estimate_dispersion_trend, fit_dispersion_trend, local_trend_use_for_fit,
+    mean_trend_use_for_fit, mean_trend_use_for_mean, parametric_trend_use_for_fit,
 };

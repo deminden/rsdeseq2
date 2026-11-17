@@ -32,6 +32,16 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- Dispersion trend fitting follows DESeq2 1.52 `estimateDispersionsFit`
+  (NUMERIC): a failed parametric trend falls back to the local trend instead of
+  returning an error, and the local trend is fitted only on rows with
+  `dispGeneEst > 100 * minDisp` (it previously also used rows from 10 to 100
+  times `minDisp`). New `estimate_dispersion_trend(base_mean, disp_gene_est,
+  fit_type, min_disp)` exposes this dispatch; `fit_dispersion_trend` now uses
+  it. `DeseqFit::dispersion_trend` records the trend actually fitted. The
+  golden harness changed only for the toy 4x4 parametric cases, which
+  previously errored and now match the local fit bit for bit.
+
 - `NonFiniteValue` errors for a finite value that is out of range (for
   example a negative dispersion) now read "out-of-range value in ..." instead
   of "non-finite value in ...". The variant, its fields and its `ErrorKind`

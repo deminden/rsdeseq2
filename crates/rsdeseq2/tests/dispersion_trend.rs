@@ -641,8 +641,17 @@ fn fit_local_dispersion_trend_uses_min_disp_floor_when_all_estimates_are_near_mi
 
 #[test]
 fn local_dispersion_trend_enum_reports_min_disp_floor_usage() {
-    let fit =
-        fit_dispersion_trend(&[10.0, 20.0, 0.0], &[1e-8, 2e-8, 3e-8], FitType::Local).unwrap();
+    // localDispersionFit floors to minDisp, but estimateDispersionsFit (and so
+    // fit_dispersion_trend) stops before reaching it on such data.
+    assert!(fit_dispersion_trend(&[10.0, 20.0, 0.0], &[1e-8, 2e-8, 3e-8], FitType::Local).is_err());
+    let fit = DispersionTrendFit::Local(
+        fit_local_dispersion_trend(
+            &[10.0, 20.0, 0.0],
+            &[1e-8, 2e-8, 3e-8],
+            LocalDispersionTrendOptions::default(),
+        )
+        .unwrap(),
+    );
 
     assert!(matches!(fit, DispersionTrendFit::Local(_)));
     assert_eq!(fit.used_min_disp_floor(), Some(true));
@@ -907,4 +916,93 @@ fn builder_local_fit_type_dispatch_populates_local_disp_fit() {
     assert!(disp_fit[1].is_finite());
     assert!(disp_fit[2].is_finite());
     assert!(disp_fit[3].is_nan());
+}
+
+fn varied_counts(genes: usize, samples: usize) -> CountMatrix {
+    let values = (0..genes * samples)
+        .map(|index| {
+            let (gene, sample) = (index / samples, index % samples);
+            (10 + gene * 37 + sample * 13 + (gene * sample * 7919) % 97) as u32
+        })
+        .collect();
+    CountMatrix::from_row_major_u32(genes, samples, values).unwrap()
+}
+
+fn two_group_design(samples: usize) -> DesignMatrix {
+    let values = (0..samples)
+        .flat_map(|sample| [1.0, if sample < samples / 2 { 0.0 } else { 1.0 }])
+        .collect();
+    DesignMatrix::from_row_major(samples, 2, values, None).unwrap()
+}
+
+/// DESeq2 1.52 `estimateDispersionsFit` wraps `parametricDispersionFit` in
+/// `try()` and substitutes `fitType="local"` when it fails.
+#[test]
+fn failed_parametric_trend_falls_back_to_the_local_fit() {
+    let counts = varied_counts(200, 6);
+    let design = two_group_design(6);
+    let fit_with = |fit_type| {
+        DeseqBuilder::new()
+            .fit_type(fit_type)
+            .fit_with_results(&counts, &design)
+            .unwrap()
+    };
+    let disp_gene_est = DeseqBuilder::new()
+        .fit_type(FitType::Local)
+        .fit_gene_wise_dispersions_glm_mu(&counts, &design)
+        .unwrap();
+    let base_mean = &disp_gene_est.base_mean;
+    let gene_wise = disp_gene_est.disp_gene_est.as_ref().unwrap();
+    // The parametric fit on its own fails for this data set.
+    assert!(
+        fit_parametric_dispersion_trend(
+            base_mean,
+            gene_wise,
+            ParametricDispersionTrendOptions::default()
+        )
+        .is_err()
+    );
+    let parametric = fit_with(FitType::Parametric);
+    let local = fit_with(FitType::Local);
+    assert_eq!(
+        parametric
+            .0
+            .dispersion_trend
+            .as_ref()
+            .map(DispersionTrendFit::fit_type_label),
+        Some("local")
+    );
+    // Debug text compares f64 values exactly and treats NaN as equal.
+    assert_eq!(format!("{parametric:?}"), format!("{local:?}"));
+}
+
+#[test]
+fn trend_rows_follow_deseq2_use_for_fit_for_every_fit_type() {
+    let min_disp = 1e-8;
+    let means = vec![10.0, 20.0, 40.0, 80.0, 160.0, 320.0, 640.0];
+    // Row 0 sits between 10 and 100 times minDisp: localDispersionFit alone
+    // would keep it, but DESeq2 passes only `dispGeneEst > 100 * minDisp` rows.
+    let mut disps = means
+        .iter()
+        .map(|mean| 0.05 + 2.0 / mean)
+        .collect::<Vec<_>>();
+    disps[0] = 50.0 * min_disp;
+    let local = estimate_dispersion_trend(&means, &disps, FitType::Local, min_disp).unwrap();
+    assert_eq!(local.fit_type_label(), "local");
+    assert!(!local.use_for_fit()[0]);
+    assert!(local.use_for_fit()[1..].iter().all(|used| *used));
+    let mut masked = disps.clone();
+    masked[0] = f64::NAN;
+    let direct =
+        fit_local_dispersion_trend(&means, &masked, LocalDispersionTrendOptions::default())
+            .unwrap();
+    assert_eq!(local.disp_fit(), direct.disp_fit.as_slice());
+    assert!(local.disp_fit()[0].is_finite());
+
+    let floor = vec![50.0 * min_disp; means.len()];
+    for fit_type in [FitType::Parametric, FitType::Local, FitType::Mean] {
+        let error = estimate_dispersion_trend(&means, &floor, fit_type, min_disp).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Dispersion);
+        assert!(error.to_string().contains("within 2 orders of magnitude"));
+    }
 }
