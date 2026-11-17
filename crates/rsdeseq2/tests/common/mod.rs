@@ -223,3 +223,19 @@ pub fn assert_option_close(
         _ => panic!("{label}: actual={actual:?}, expected={expected:?}"),
     }
 }
+
+/// Genes whose significance at `alpha` differs between `actual` and
+/// `expected` adjusted p-values; a missing value counts as not significant.
+/// Parity tests treat any flip as a failure.
+pub fn significance_flips(actual: &[Option<f64>], expected: &[Option<f64>], alpha: f64) -> usize {
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "padj vectors differ in length"
+    );
+    actual
+        .iter()
+        .zip(expected)
+        .filter(|(a, e)| a.is_some_and(|v| v < alpha) != e.is_some_and(|v| v < alpha))
+        .count()
+}

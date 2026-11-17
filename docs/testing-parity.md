@@ -80,6 +80,12 @@ cargo test --locked -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald \
   -- --ignored --nocapture
 ```
 
+Significance agreement on the eleven contrasts (log10 errors of small p-values,
+Spearman correlation of the statistic, top-k overlap and significance flips,
+which fail the check) comes from
+`python3 scripts/validation/gtex_significance.py --output-dir results/checks/significance`;
+the compact panel test also fails on any flip at padj 0.05 or 0.1.
+
 The eleven full biological/random contrasts provide a separate acceptance panel;
 see [reproducibility](reproducibility.md#eleven-contrast-acceptance).
 

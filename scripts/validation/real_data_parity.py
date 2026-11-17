@@ -28,6 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import Iterable
 
+from scripts.validation.parity_metrics import require_no_flips, rows_by_gene, significance_metrics
+
 import numpy as np
 
 
@@ -330,6 +332,9 @@ def compare_results(got: Path, expected: Path) -> dict[str, float | int]:
                     max_by_column[col] = max(max_by_column[col], diff)
                     diffs_by_column[col].append(diff)
     out: dict[str, float | int] = {"n": n}
+    with open_text(expected) as fh:
+        expected_rows = rows_by_gene(csv.DictReader(fh, delimiter="\t"))
+    out.update(significance_metrics(got_by_gene, expected_rows))
     for col in columns:
         diffs = sorted(diffs_by_column[col])
         out[f"{col}_max_abs"] = max_by_column[col]
@@ -653,6 +658,7 @@ def contrast_run(
         raise ValueError(f"unknown contrast size-factor mode: {args.contrast_size_factors}")
     stats = run_timed(cmd)
     cmp = compare_results(got, expected)
+    require_no_flips(cmp, f"{stem} results")
     append_result_diagnostics(
         diagnostics,
         stem,

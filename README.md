@@ -47,6 +47,19 @@ and finite/NA patterns match throughout.
 | Blocked random splits | 5 | `7.15e-06` | `2.75e-05` | `3.74e-05` | `1.26e-05` |
 | Unblocked random splits | 3 | `5.28e-09` | `1.2e-05` | `1.72e-05` | `2.87e-05` |
 
+Significance agreement for the same contrasts, from
+`scripts/validation/gtex_significance.py` (Linux x86_64 build of the current
+source; the absolute errors above were measured on macOS). Significance flips
+are a hard gate.
+
+| Contrast group | Max log10 p error (p < 1e-3) | Max log10 padj error (padj < 1e-3) | Min Spearman (stat) | Min top-100 / 500 / 2,000 overlap | Flips at padj 0.05 / 0.1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original blocked | `8.1e-08` | none below 1e-3 | `0.999998` | 100% / 100% / 100% | 0 / 0 |
+| Male vs female | `4.6e-10` | `4.6e-10` | `0.999956` | 100% / 100% / 100% | 0 / 0 |
+| Male age 4 vs 3 | `4.8e-10` | `4.8e-10` | `0.999983` | 100% / 100% / 100% | 0 / 0 |
+| Blocked random splits | `1.5e-05` | `5.3e-06` | `0.999996` | 100% / 100% / 100% | 0 / 0 |
+| Unblocked random splits | `5.1e-06` | `9.2e-11` | `0.999979` | 100% / 100% / 100% | 0 / 0 |
+
 ### Speed
 
 | Contrast group | Rust (s) | DESeq2 (s) | DESeq2 / Rust |

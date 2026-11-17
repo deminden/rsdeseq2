@@ -1,3 +1,5 @@
+mod common;
+
 use rsdeseq2::prelude::*;
 use std::path::PathBuf;
 
@@ -212,6 +214,8 @@ fn check_wald(compact: bool) {
     let indexes = columns.map(|name| reference.column(name));
     let mut max_errors = [0.0_f64; 6];
     let padj = reference_padj(&reference);
+    let mut actual_padj = Vec::new();
+    let mut expected_padj = Vec::new();
     let mut comparable_rows = 0usize;
     for (index, (actual, expected_row)) in results.rows.iter().zip(&reference.rows).enumerate() {
         assert_eq!(actual.gene.as_deref(), Some(gene_names[index].as_str()));
@@ -236,6 +240,8 @@ fn check_wald(compact: bool) {
             expected_values[4],
             padj[index],
         ];
+        actual_padj.push(actual.padj);
+        expected_padj.push(padj[index]);
         for slot in 0..6 {
             let label = format!(
                 "{} {}",
@@ -267,6 +273,13 @@ fn check_wald(compact: bool) {
         max_size_factor_relative_error
     );
     eprintln!("padj max absolute error={:.3e}", max_errors[5]);
+    for alpha in [0.05, 0.1] {
+        let flips = common::significance_flips(&actual_padj, &expected_padj, alpha);
+        assert_eq!(
+            flips, 0,
+            "significance flips against DESeq2 at padj {alpha}"
+        );
+    }
     assert!(max_size_factor_relative_error < 1e-10);
     assert!(max_errors[0] < 1e-6);
     assert!(comparable_rows > n_genes / 2);
