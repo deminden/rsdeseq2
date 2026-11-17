@@ -86,6 +86,117 @@ pub struct Cli {
     pub(super) command: Commands,
 }
 
+/// Size-factor, normalization-factor, weight and dispersion-trend inputs.
+#[derive(Debug, clap::Args)]
+pub(super) struct NormalizationArgs {
+    /// Optional gene x sample normalization-factor TSV.
+    #[arg(long)]
+    pub(super) normalization_factors: Option<PathBuf>,
+    /// Optional sample-level size-factor TSV.
+    #[arg(long)]
+    pub(super) size_factors: Option<PathBuf>,
+    /// Optional gene x sample observation-weight TSV.
+    #[arg(long)]
+    pub(super) observation_weights: Option<PathBuf>,
+    /// Size-factor method.
+    #[arg(long, default_value = "ratio")]
+    pub(super) method: SizeFactorMethodArg,
+    /// Optional gene x geometric-mean TSV used for frozen size-factor estimation.
+    #[arg(long)]
+    pub(super) geometric_means: Option<PathBuf>,
+    /// Comma-delimited zero-based row indices used to estimate size factors.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) control_genes: Option<Vec<usize>>,
+    /// Dispersion trend fit type.
+    #[arg(long, default_value = "parametric")]
+    pub(super) fit_type: FitTypeArg,
+}
+
+/// Cook's cutoff and independent-filtering controls.
+#[derive(Debug, clap::Args)]
+pub(super) struct ResultFilteringArgs {
+    /// Disable Cook's distance p-value filtering and replacement/refit.
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub(super) disable_cooks_cutoff: bool,
+    /// Explicit Cook's distance cutoff. Conflicts with --disable-cooks-cutoff.
+    #[arg(long)]
+    pub(super) cooks_cutoff: Option<f64>,
+    /// Disable independent filtering and use regular BH adjustment.
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub(super) disable_independent_filtering: bool,
+    /// Alpha used for independent-filtering threshold selection.
+    #[arg(long)]
+    pub(super) independent_filtering_alpha: Option<f64>,
+    /// Comma-delimited theta grid for independent filtering.
+    #[arg(long, value_delimiter = ',')]
+    pub(super) independent_filtering_theta: Option<Vec<f64>>,
+}
+
+/// Result table path and optional metadata and diagnostic sidecars.
+#[derive(Debug, clap::Args)]
+pub(super) struct DiagnosticOutputArgs {
+    /// Optional result column metadata TSV output.
+    #[arg(long)]
+    pub(super) result_column_metadata_output: Option<PathBuf>,
+    /// Optional result table metadata TSV output.
+    #[arg(long)]
+    pub(super) result_table_metadata_output: Option<PathBuf>,
+    /// Optional independent-filtering scalar metadata TSV output.
+    #[arg(long)]
+    pub(super) independent_filter_metadata_output: Option<PathBuf>,
+    /// Optional independent-filtering rejection-count curve TSV output.
+    #[arg(long)]
+    pub(super) independent_filter_num_rej_output: Option<PathBuf>,
+    /// Optional independent-filtering lowess curve TSV output.
+    #[arg(long)]
+    pub(super) independent_filter_lowess_output: Option<PathBuf>,
+    /// Optional DESeq2-shaped fit diagnostics TSV for the original fit.
+    #[arg(long)]
+    pub(super) fit_diagnostics_output: Option<PathBuf>,
+    /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
+    #[arg(long)]
+    pub(super) refit_diagnostics_output: Option<PathBuf>,
+    /// Optional GLM beta matrix TSV for the original fit.
+    #[arg(long)]
+    pub(super) fit_beta_output: Option<PathBuf>,
+    /// Optional GLM beta standard-error matrix TSV for the original fit.
+    #[arg(long)]
+    pub(super) fit_beta_se_output: Option<PathBuf>,
+    /// Optional fallback optimizer start beta matrix TSV for the original fit.
+    #[arg(long)]
+    pub(super) fit_beta_optim_start_output: Option<PathBuf>,
+    /// Optional GLM beta matrix TSV for the replacement refit.
+    #[arg(long)]
+    pub(super) refit_beta_output: Option<PathBuf>,
+    /// Optional GLM beta standard-error matrix TSV for the replacement refit.
+    #[arg(long)]
+    pub(super) refit_beta_se_output: Option<PathBuf>,
+    /// Optional fallback optimizer start beta matrix TSV for the replacement refit.
+    #[arg(long)]
+    pub(super) refit_beta_optim_start_output: Option<PathBuf>,
+    /// Optional Cook's distance matrix TSV output.
+    #[arg(long)]
+    pub(super) cooks_distance_output: Option<PathBuf>,
+    /// Optional Cook's replacement scalar metadata TSV output.
+    #[arg(long)]
+    pub(super) cooks_replacement_metadata_output: Option<PathBuf>,
+    /// Optional Cook's replacement row metadata TSV output.
+    #[arg(long)]
+    pub(super) cooks_replacement_row_metadata_output: Option<PathBuf>,
+    /// Optional Cook's replaced-count assay TSV output.
+    #[arg(long)]
+    pub(super) cooks_replaced_counts_output: Option<PathBuf>,
+    /// Optional Cook's candidate replacement-count assay TSV output.
+    #[arg(long)]
+    pub(super) cooks_candidate_replacement_counts_output: Option<PathBuf>,
+    /// Optional Cook's outlier-cell logical assay TSV output.
+    #[arg(long)]
+    pub(super) cooks_outlier_cells_output: Option<PathBuf>,
+    /// Output TSV path.
+    #[arg(long)]
+    pub(super) output: PathBuf,
+}
+
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub(super) enum Commands {
@@ -247,27 +358,8 @@ pub(super) enum Commands {
         /// Numeric design matrix TSV with sample IDs in the first column.
         #[arg(long)]
         design: PathBuf,
-        /// Optional gene x sample normalization-factor TSV.
-        #[arg(long)]
-        normalization_factors: Option<PathBuf>,
-        /// Optional sample-level size-factor TSV.
-        #[arg(long)]
-        size_factors: Option<PathBuf>,
-        /// Optional gene x sample observation-weight TSV.
-        #[arg(long)]
-        observation_weights: Option<PathBuf>,
-        /// Size-factor method.
-        #[arg(long, default_value = "ratio")]
-        method: SizeFactorMethodArg,
-        /// Optional gene x geometric-mean TSV used for frozen size-factor estimation.
-        #[arg(long)]
-        geometric_means: Option<PathBuf>,
-        /// Comma-delimited zero-based row indices used to estimate size factors.
-        #[arg(long, value_delimiter = ',')]
-        control_genes: Option<Vec<usize>>,
-        /// Dispersion trend fit type.
-        #[arg(long, default_value = "parametric")]
-        fit_type: FitTypeArg,
+        #[command(flatten)]
+        normalization: NormalizationArgs,
         /// Zero-based coefficient index to report. Defaults to the last column.
         #[arg(long)]
         coefficient: Option<usize>,
@@ -361,81 +453,10 @@ pub(super) enum Commands {
         /// Gene x degrees-of-freedom TSV for Student t Wald p-values.
         #[arg(long)]
         t_degrees_of_freedom_file: Option<PathBuf>,
-        /// Disable Cook's distance p-value filtering and replacement/refit.
-        #[arg(long, action = ArgAction::SetTrue)]
-        disable_cooks_cutoff: bool,
-        /// Explicit Cook's distance cutoff. Conflicts with --disable-cooks-cutoff.
-        #[arg(long)]
-        cooks_cutoff: Option<f64>,
-        /// Disable independent filtering and use regular BH adjustment.
-        #[arg(long, action = ArgAction::SetTrue)]
-        disable_independent_filtering: bool,
-        /// Alpha used for independent-filtering threshold selection.
-        #[arg(long)]
-        independent_filtering_alpha: Option<f64>,
-        /// Comma-delimited theta grid for independent filtering.
-        #[arg(long, value_delimiter = ',')]
-        independent_filtering_theta: Option<Vec<f64>>,
-        /// Optional result column metadata TSV output.
-        #[arg(long)]
-        result_column_metadata_output: Option<PathBuf>,
-        /// Optional result table metadata TSV output.
-        #[arg(long)]
-        result_table_metadata_output: Option<PathBuf>,
-        /// Optional independent-filtering scalar metadata TSV output.
-        #[arg(long)]
-        independent_filter_metadata_output: Option<PathBuf>,
-        /// Optional independent-filtering rejection-count curve TSV output.
-        #[arg(long)]
-        independent_filter_num_rej_output: Option<PathBuf>,
-        /// Optional independent-filtering lowess curve TSV output.
-        #[arg(long)]
-        independent_filter_lowess_output: Option<PathBuf>,
-        /// Optional DESeq2-shaped fit diagnostics TSV for the original fit.
-        #[arg(long)]
-        fit_diagnostics_output: Option<PathBuf>,
-        /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
-        #[arg(long)]
-        refit_diagnostics_output: Option<PathBuf>,
-        /// Optional GLM beta matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_output: Option<PathBuf>,
-        /// Optional GLM beta standard-error matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_se_output: Option<PathBuf>,
-        /// Optional fallback optimizer start beta matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_optim_start_output: Option<PathBuf>,
-        /// Optional GLM beta matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_output: Option<PathBuf>,
-        /// Optional GLM beta standard-error matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_se_output: Option<PathBuf>,
-        /// Optional fallback optimizer start beta matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_optim_start_output: Option<PathBuf>,
-        /// Optional Cook's distance matrix TSV output.
-        #[arg(long)]
-        cooks_distance_output: Option<PathBuf>,
-        /// Optional Cook's replacement scalar metadata TSV output.
-        #[arg(long)]
-        cooks_replacement_metadata_output: Option<PathBuf>,
-        /// Optional Cook's replacement row metadata TSV output.
-        #[arg(long)]
-        cooks_replacement_row_metadata_output: Option<PathBuf>,
-        /// Optional Cook's replaced-count assay TSV output.
-        #[arg(long)]
-        cooks_replaced_counts_output: Option<PathBuf>,
-        /// Optional Cook's candidate replacement-count assay TSV output.
-        #[arg(long)]
-        cooks_candidate_replacement_counts_output: Option<PathBuf>,
-        /// Optional Cook's outlier-cell logical assay TSV output.
-        #[arg(long)]
-        cooks_outlier_cells_output: Option<PathBuf>,
-        /// Output TSV path.
-        #[arg(long)]
-        output: PathBuf,
+        #[command(flatten)]
+        filtering: ResultFilteringArgs,
+        #[command(flatten)]
+        outputs: DiagnosticOutputArgs,
     },
     /// Run the implemented GLM-mu LRT workflow and write DESeq2-shaped results.
     Lrt {
@@ -448,27 +469,8 @@ pub(super) enum Commands {
         /// Reduced numeric design matrix TSV with sample IDs in the first column.
         #[arg(long)]
         reduced_design: PathBuf,
-        /// Optional gene x sample normalization-factor TSV.
-        #[arg(long)]
-        normalization_factors: Option<PathBuf>,
-        /// Optional sample-level size-factor TSV.
-        #[arg(long)]
-        size_factors: Option<PathBuf>,
-        /// Optional gene x sample observation-weight TSV.
-        #[arg(long)]
-        observation_weights: Option<PathBuf>,
-        /// Size-factor method.
-        #[arg(long, default_value = "ratio")]
-        method: SizeFactorMethodArg,
-        /// Optional gene x geometric-mean TSV used for frozen size-factor estimation.
-        #[arg(long)]
-        geometric_means: Option<PathBuf>,
-        /// Comma-delimited zero-based row indices used to estimate size factors.
-        #[arg(long, value_delimiter = ',')]
-        control_genes: Option<Vec<usize>>,
-        /// Dispersion trend fit type.
-        #[arg(long, default_value = "parametric")]
-        fit_type: FitTypeArg,
+        #[command(flatten)]
+        normalization: NormalizationArgs,
         /// Zero-based full-design coefficient index to report. Defaults to the last column.
         #[arg(long)]
         coefficient: Option<usize>,
@@ -508,81 +510,10 @@ pub(super) enum Commands {
         /// Sample x level TSV required for DESeq2-style factor-level contrast handling.
         #[arg(long)]
         contrast_sample_levels: Option<PathBuf>,
-        /// Disable Cook's distance p-value filtering and replacement/refit.
-        #[arg(long, action = ArgAction::SetTrue)]
-        disable_cooks_cutoff: bool,
-        /// Explicit Cook's distance cutoff. Conflicts with --disable-cooks-cutoff.
-        #[arg(long)]
-        cooks_cutoff: Option<f64>,
-        /// Disable independent filtering and use regular BH adjustment.
-        #[arg(long, action = ArgAction::SetTrue)]
-        disable_independent_filtering: bool,
-        /// Alpha used for independent-filtering threshold selection.
-        #[arg(long)]
-        independent_filtering_alpha: Option<f64>,
-        /// Comma-delimited theta grid for independent filtering.
-        #[arg(long, value_delimiter = ',')]
-        independent_filtering_theta: Option<Vec<f64>>,
-        /// Optional result column metadata TSV output.
-        #[arg(long)]
-        result_column_metadata_output: Option<PathBuf>,
-        /// Optional result table metadata TSV output.
-        #[arg(long)]
-        result_table_metadata_output: Option<PathBuf>,
-        /// Optional independent-filtering scalar metadata TSV output.
-        #[arg(long)]
-        independent_filter_metadata_output: Option<PathBuf>,
-        /// Optional independent-filtering rejection-count curve TSV output.
-        #[arg(long)]
-        independent_filter_num_rej_output: Option<PathBuf>,
-        /// Optional independent-filtering lowess curve TSV output.
-        #[arg(long)]
-        independent_filter_lowess_output: Option<PathBuf>,
-        /// Optional DESeq2-shaped fit diagnostics TSV for the original fit.
-        #[arg(long)]
-        fit_diagnostics_output: Option<PathBuf>,
-        /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
-        #[arg(long)]
-        refit_diagnostics_output: Option<PathBuf>,
-        /// Optional GLM beta matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_output: Option<PathBuf>,
-        /// Optional GLM beta standard-error matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_se_output: Option<PathBuf>,
-        /// Optional fallback optimizer start beta matrix TSV for the original fit.
-        #[arg(long)]
-        fit_beta_optim_start_output: Option<PathBuf>,
-        /// Optional GLM beta matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_output: Option<PathBuf>,
-        /// Optional GLM beta standard-error matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_se_output: Option<PathBuf>,
-        /// Optional fallback optimizer start beta matrix TSV for the replacement refit.
-        #[arg(long)]
-        refit_beta_optim_start_output: Option<PathBuf>,
-        /// Optional Cook's distance matrix TSV output.
-        #[arg(long)]
-        cooks_distance_output: Option<PathBuf>,
-        /// Optional Cook's replacement scalar metadata TSV output.
-        #[arg(long)]
-        cooks_replacement_metadata_output: Option<PathBuf>,
-        /// Optional Cook's replacement row metadata TSV output.
-        #[arg(long)]
-        cooks_replacement_row_metadata_output: Option<PathBuf>,
-        /// Optional Cook's replaced-count assay TSV output.
-        #[arg(long)]
-        cooks_replaced_counts_output: Option<PathBuf>,
-        /// Optional Cook's candidate replacement-count assay TSV output.
-        #[arg(long)]
-        cooks_candidate_replacement_counts_output: Option<PathBuf>,
-        /// Optional Cook's outlier-cell logical assay TSV output.
-        #[arg(long)]
-        cooks_outlier_cells_output: Option<PathBuf>,
-        /// Output TSV path.
-        #[arg(long)]
-        output: PathBuf,
+        #[command(flatten)]
+        filtering: ResultFilteringArgs,
+        #[command(flatten)]
+        outputs: DiagnosticOutputArgs,
     },
 }
 
