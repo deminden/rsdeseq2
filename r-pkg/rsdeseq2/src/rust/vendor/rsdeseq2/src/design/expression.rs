@@ -2,8 +2,11 @@
 //! user-defined function callback is part of this numerical interface.
 use crate::errors::DeseqError;
 use crate::errors::invalid_options;
+#[cfg(feature = "formula")]
 use icu_collator::{Collator, CollatorBorrowed};
+#[cfg(feature = "formula")]
 use icu_locale::Locale;
+use std::cmp::Ordering;
 
 mod arithmetic;
 mod comparisons;
@@ -216,7 +219,52 @@ pub(super) fn is_na(value: f64) -> bool {
 }
 pub(super) struct Evaluator<'a> {
     variables: &'a [(String, Value)],
-    collator: Option<CollatorBorrowed<'static>>,
+    collator: StringOrder,
+}
+
+/// String order for factor levels and comparisons: ICU collation for a locale,
+/// or byte order for R's "C" collation.
+pub(super) enum StringOrder {
+    Bytes,
+    #[cfg(feature = "formula")]
+    Collator(Box<CollatorBorrowed<'static>>),
+}
+
+impl StringOrder {
+    fn for_collation(collation: &str) -> Result<Self, DeseqError> {
+        if collation == "C" {
+            return Ok(Self::Bytes);
+        }
+        #[cfg(feature = "formula")]
+        {
+            Ok(Self::Collator(Box::new(
+                Collator::try_new(
+                    collation
+                        .parse::<Locale>()
+                        .map_err(|e| invalid_options(e.to_string()))?
+                        .into(),
+                    Default::default(),
+                )
+                .map_err(|e| invalid_options(e.to_string()))?,
+            )))
+        }
+        #[cfg(not(feature = "formula"))]
+        {
+            Err(DeseqError::UnsupportedFeature {
+                feature: format!(
+                    "formula collation '{collation}' requires the `formula` feature; use \"C\""
+                ),
+            })
+        }
+    }
+
+    pub(super) fn compare(&self, left: &str, right: &str) -> Ordering {
+        match self {
+            Self::Bytes => left.cmp(right),
+            #[cfg(feature = "formula")]
+            Self::Collator(collator) => collator.compare(left, right),
+        }
+    }
 }
 /// Evaluate one expression using the standalone built-in engine. Unknown/custom
 /// functions are rejected and never dispatched to another language runtime.
@@ -250,20 +298,7 @@ pub fn evaluate_many(
     } else {
         &options.collation
     };
-    let collator = if collation == "C" {
-        None
-    } else {
-        Some(
-            Collator::try_new(
-                collation
-                    .parse::<Locale>()
-                    .map_err(|e| invalid_options(e.to_string()))?
-                    .into(),
-                Default::default(),
-            )
-            .map_err(|e| invalid_options(e.to_string()))?,
-        )
-    };
+    let collator = StringOrder::for_collation(collation)?;
     let mut evaluator = Evaluator {
         variables,
         collator,

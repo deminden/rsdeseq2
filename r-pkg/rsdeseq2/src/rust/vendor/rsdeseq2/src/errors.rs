@@ -69,6 +69,7 @@ pub(crate) fn invalid_options(reason: impl Into<String>) -> DeseqError {
 
 /// `InvalidOptions` whose reason is prefixed with the component that raised
 /// it: `"{scope}: {reason}"`.
+#[cfg_attr(not(feature = "shrinkage"), allow(dead_code))]
 pub(crate) fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display) -> DeseqError {
     DeseqError::InvalidOptions {
         reason: format!("{scope}: {reason}"),

@@ -100,6 +100,7 @@ impl<T> RowMajorMatrix<T> {
         &self.values
     }
 
+    #[cfg_attr(not(feature = "shrinkage"), allow(dead_code))]
     pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.values
     }

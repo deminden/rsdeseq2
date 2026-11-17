@@ -13,6 +13,7 @@
 //! supported settings and independent reference validation.
 
 pub(crate) mod all_zero;
+#[cfg(feature = "cli")]
 pub mod cli;
 pub mod contrasts;
 pub mod cooks;
@@ -31,8 +32,11 @@ pub mod normalization;
 pub(crate) mod numeric;
 pub mod options;
 pub mod prelude;
+// Several distributions are used only by the shrinkage engines.
+#[cfg_attr(not(feature = "shrinkage"), allow(dead_code, unused_imports))]
 mod probability;
 pub mod results;
+#[cfg(feature = "shrinkage")]
 pub mod shrinkage;
 pub mod transform;
 
