@@ -68,6 +68,7 @@ thiserror.workspace = true
 [dev-dependencies]
 approx.workspace = true
 criterion.workspace = true
+proptest.workspace = true
 sha2.workspace = true
 
 [[example]]

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 26f4305317bbbf04ad4288ddaa11eb13b5efb47c5c2ba9cd1f8990f7e356ff5a # shrinks to (genes, values) = (6, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 3777, 1413, 594, 3255, 1871, 3420, 4477, 2408, 771, 2424, 4852, 3252, 2431, 4653, 95, 3209, 41, 1100, 271]), dispersion = 0.9435089492678671
