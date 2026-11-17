@@ -32,6 +32,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- `NonFiniteValue` errors for a finite value that is out of range (for
+  example a negative dispersion) now read "out-of-range value in ..." instead
+  of "non-finite value in ...". The variant, its fields and its `ErrorKind`
+  are unchanged.
+
 - Error variants that named the wrong input: `bh_adjust_f64` now reports
   invalid p-values as `InvalidOptions` (was `InvalidSizeFactors`);
   `math::median` reports empty input as `InvalidDimensions` with context
