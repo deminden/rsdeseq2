@@ -9,6 +9,7 @@ otherwise; structural counts come from
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Baseline 0.5.0 | `ede9157` | 119 | 10.8% | 882 | 80 | 76 | 90.2 | 35.5 | 105.7 | 253.6 |
 | Phase 1 | `hardening/1.6-features` | 119 | 10.3% | 881 | 80 | 76 | 115.3 | 33.5 | 103.0 (paired: 0.5.0 109.2) | 253.6 |
+| Phases 2–4, 7, 8.1–8.2 (in progress) | `b60bd26` | 12 | 9.8% | 889 | 0 | 1 | not re-measured | 26 (one binary; 37 before 7.1) | see 5.1 (paired 1.119× vs Phase 1 at 2 threads) | 253.7 |
 
 ## Targets
 
@@ -21,7 +22,7 @@ otherwise; structural counts come from
 | Integration-test binaries | 76 | 2 |
 | Platform `cfg` sites that change numerics | 31 | 0 (runtime profile) |
 | R entry points not routed through `run_backend` | 7 of 34 | 0 |
-| Significance flips against DESeq2, gated contrasts | not yet measured (Phase 6.4) | 0 |
+| Significance flips against DESeq2, gated contrasts | 0 on the GTEx gate (measured from Phase 6.4) | 0 |
 
 ## Phase 0 notes
 
@@ -51,3 +52,24 @@ otherwise; structural counts come from
   removes them.
 - The R bridge now builds without the CLI dependencies (task 1.6).
 
+
+## Phases 2–8 notes (to `b60bd26`)
+
+- Production unwrap/expect/unreachable!: 119 → 12. The remaining 12 are
+  documented invariants with function-level allows (2.3). The library denies
+  unwrap, expect and undocumented unsafe (2.4); the R bridge now denies
+  undocumented unsafe blocks too, and all 208 carry SAFETY comments (8.2).
+- `include!` sites: 80 → 0 in the core crate (3.1, one parent per PR; rustdoc
+  item list unchanged for each). Mutual module pairs: 11 → 2, both documented
+  and checked in CI (3.2).
+- Integration-test binaries: 76 → 1 (7.1). Cold test build 66 s → 38 s;
+  test executables 7.1 GB → 0.42 GB.
+- R entry points without a panic guard: 7 of 34 → 0 (8.1).
+- `builder_fit_methods` is still 142: the `run` consolidation (4.2) waits for
+  the design note.
+- 6.10 (NUMERIC) changed only the toy 4×4 parametric golden cases, from an
+  error to the local-trend fallback DESeq2 performs. Golden manifest now has
+  8,032 fields.
+- Found by new tests: unknown formula calls such as `~ q(age)` recursed until
+  the stack overflowed (fuzzing, fixed in 7.3a); DESeq2's parametric-to-local
+  fallback and local-trend row rule were missing (edge-case probing, 6.10).
