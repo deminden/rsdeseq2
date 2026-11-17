@@ -106,8 +106,6 @@ pub enum FitType {
     Local,
     /// Mean dispersion fit.
     Mean,
-    /// Future glmGamPoi-like mode.
-    GlmGamPoi,
 }
 
 /// Test type for the future full workflow.

@@ -1,6 +1,6 @@
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::qr::matrix_rank;
+use crate::math::rank::matrix_rank;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked;
 use crate::numeric::validate::nonnegative_finite as validate_nonnegative_finite;

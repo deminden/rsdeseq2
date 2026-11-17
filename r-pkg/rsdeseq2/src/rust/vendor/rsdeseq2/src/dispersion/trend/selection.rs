@@ -142,9 +142,6 @@ pub fn fit_dispersion_trend(
             disp_gene_est,
             MeanDispersionTrendOptions::default(),
         )?)),
-        FitType::GlmGamPoi => Err(DeseqError::UnsupportedFeature {
-            feature: "glmGamPoi dispersion trend fitting".to_string(),
-        }),
     }
 }
 
