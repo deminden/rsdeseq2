@@ -1,0 +1,17 @@
+Estimate sample size factors
+
+Usage: rsdeseq2 size-factors [OPTIONS] --counts <COUNTS> --output <OUTPUT>
+
+Options:
+      --counts <COUNTS>
+          Tab-delimited count matrix with gene IDs in the first column
+      --method <METHOD>
+          Size-factor method [default: ratio] [possible values: ratio, poscounts]
+      --geometric-means <GEOMETRIC_MEANS>
+          Optional gene x geometric-mean TSV used for frozen size-factor estimation
+      --control-genes <CONTROL_GENES>
+          Comma-delimited zero-based row indices used to estimate size factors
+      --output <OUTPUT>
+          Output TSV path
+  -h, --help
+          Print help

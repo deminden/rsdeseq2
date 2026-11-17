@@ -1,0 +1,103 @@
+Run the implemented GLM-mu LRT workflow and write DESeq2-shaped results
+
+Usage: rsdeseq2 lrt [OPTIONS] --counts <COUNTS> --design <DESIGN> --reduced-design <REDUCED_DESIGN> --output <OUTPUT>
+
+Options:
+      --counts <COUNTS>
+          Tab-delimited count matrix with gene IDs in the first column
+      --design <DESIGN>
+          Full numeric design matrix TSV with sample IDs in the first column
+      --reduced-design <REDUCED_DESIGN>
+          Reduced numeric design matrix TSV with sample IDs in the first column
+      --normalization-factors <NORMALIZATION_FACTORS>
+          Optional gene x sample normalization-factor TSV
+      --size-factors <SIZE_FACTORS>
+          Optional sample-level size-factor TSV
+      --observation-weights <OBSERVATION_WEIGHTS>
+          Optional gene x sample observation-weight TSV
+      --method <METHOD>
+          Size-factor method [default: ratio] [possible values: ratio, poscounts]
+      --geometric-means <GEOMETRIC_MEANS>
+          Optional gene x geometric-mean TSV used for frozen size-factor estimation
+      --control-genes <CONTROL_GENES>
+          Comma-delimited zero-based row indices used to estimate size factors
+      --fit-type <FIT_TYPE>
+          Dispersion trend fit type [default: parametric] [possible values: parametric, local, mean]
+      --coefficient <COEFFICIENT>
+          Zero-based full-design coefficient index to report. Defaults to the last column
+      --coefficient-name <COEFFICIENT_NAME>
+          Full-design coefficient name to report
+      --contrast <CONTRAST>
+          Numeric full-model contrast vector to report, comma-delimited in design-column order
+      --contrast-name <CONTRAST_NAME>
+          Full-design coefficient name to report as an LRT effect-size contrast
+      --contrast-positive <CONTRAST_POSITIVE>
+          Comma-delimited positive full-design coefficient names for a list contrast
+      --contrast-negative <CONTRAST_NEGATIVE>
+          Comma-delimited negative full-design coefficient names for a list contrast
+      --contrast-positive-weight <CONTRAST_POSITIVE_WEIGHT>
+          Weight applied to positive list-contrast coefficients [default: 1]
+      --contrast-negative-weight <CONTRAST_NEGATIVE_WEIGHT>
+          Weight applied to negative list-contrast coefficients [default: -1]
+      --contrast-factor <CONTRAST_FACTOR>
+          Factor or variable name for a coefficient-name factor-level contrast
+      --contrast-numerator <CONTRAST_NUMERATOR>
+          Numerator level for a coefficient-name factor-level contrast
+      --contrast-denominator <CONTRAST_DENOMINATOR>
+          Denominator level for a coefficient-name factor-level contrast
+      --contrast-reference <CONTRAST_REFERENCE>
+          Optional reference level for a coefficient-name factor-level contrast
+      --contrast-sample-levels <CONTRAST_SAMPLE_LEVELS>
+          Sample x level TSV required for DESeq2-style factor-level contrast handling
+      --disable-cooks-cutoff
+          Disable Cook's distance p-value filtering and replacement/refit
+      --cooks-cutoff <COOKS_CUTOFF>
+          Explicit Cook's distance cutoff. Conflicts with --disable-cooks-cutoff
+      --disable-independent-filtering
+          Disable independent filtering and use regular BH adjustment
+      --independent-filtering-alpha <INDEPENDENT_FILTERING_ALPHA>
+          Alpha used for independent-filtering threshold selection
+      --independent-filtering-theta <INDEPENDENT_FILTERING_THETA>
+          Comma-delimited theta grid for independent filtering
+      --result-column-metadata-output <RESULT_COLUMN_METADATA_OUTPUT>
+          Optional result column metadata TSV output
+      --result-table-metadata-output <RESULT_TABLE_METADATA_OUTPUT>
+          Optional result table metadata TSV output
+      --independent-filter-metadata-output <INDEPENDENT_FILTER_METADATA_OUTPUT>
+          Optional independent-filtering scalar metadata TSV output
+      --independent-filter-num-rej-output <INDEPENDENT_FILTER_NUM_REJ_OUTPUT>
+          Optional independent-filtering rejection-count curve TSV output
+      --independent-filter-lowess-output <INDEPENDENT_FILTER_LOWESS_OUTPUT>
+          Optional independent-filtering lowess curve TSV output
+      --fit-diagnostics-output <FIT_DIAGNOSTICS_OUTPUT>
+          Optional DESeq2-shaped fit diagnostics TSV for the original fit
+      --refit-diagnostics-output <REFIT_DIAGNOSTICS_OUTPUT>
+          Optional DESeq2-shaped fit diagnostics TSV for the replacement refit
+      --fit-beta-output <FIT_BETA_OUTPUT>
+          Optional GLM beta matrix TSV for the original fit
+      --fit-beta-se-output <FIT_BETA_SE_OUTPUT>
+          Optional GLM beta standard-error matrix TSV for the original fit
+      --fit-beta-optim-start-output <FIT_BETA_OPTIM_START_OUTPUT>
+          Optional fallback optimizer start beta matrix TSV for the original fit
+      --refit-beta-output <REFIT_BETA_OUTPUT>
+          Optional GLM beta matrix TSV for the replacement refit
+      --refit-beta-se-output <REFIT_BETA_SE_OUTPUT>
+          Optional GLM beta standard-error matrix TSV for the replacement refit
+      --refit-beta-optim-start-output <REFIT_BETA_OPTIM_START_OUTPUT>
+          Optional fallback optimizer start beta matrix TSV for the replacement refit
+      --cooks-distance-output <COOKS_DISTANCE_OUTPUT>
+          Optional Cook's distance matrix TSV output
+      --cooks-replacement-metadata-output <COOKS_REPLACEMENT_METADATA_OUTPUT>
+          Optional Cook's replacement scalar metadata TSV output
+      --cooks-replacement-row-metadata-output <COOKS_REPLACEMENT_ROW_METADATA_OUTPUT>
+          Optional Cook's replacement row metadata TSV output
+      --cooks-replaced-counts-output <COOKS_REPLACED_COUNTS_OUTPUT>
+          Optional Cook's replaced-count assay TSV output
+      --cooks-candidate-replacement-counts-output <COOKS_CANDIDATE_REPLACEMENT_COUNTS_OUTPUT>
+          Optional Cook's candidate replacement-count assay TSV output
+      --cooks-outlier-cells-output <COOKS_OUTLIER_CELLS_OUTPUT>
+          Optional Cook's outlier-cell logical assay TSV output
+      --output <OUTPUT>
+          Output TSV path
+  -h, --help
+          Print help

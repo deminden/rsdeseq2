@@ -1,0 +1,17 @@
+DESeq2-compatible RNA-seq differential expression in Rust
+
+Usage: rsdeseq2 <COMMAND>
+
+Commands:
+  size-factors       Estimate sample size factors
+  base-mean          Estimate size factors, normalized counts, and base means
+  normalized-counts  Write DESeq2-style normalized counts
+  vst                Write a variance-stabilized count matrix
+  rlog               Write a regularized-log count matrix
+  wald               Run the implemented GLM-mu Wald workflow and write DESeq2-shaped results
+  lrt                Run the implemented GLM-mu LRT workflow and write DESeq2-shaped results
+  help               Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version

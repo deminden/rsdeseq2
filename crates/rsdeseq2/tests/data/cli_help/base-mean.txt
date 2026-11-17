@@ -1,0 +1,23 @@
+Estimate size factors, normalized counts, and base means
+
+Usage: rsdeseq2 base-mean [OPTIONS] --counts <COUNTS> --output <OUTPUT>
+
+Options:
+      --counts <COUNTS>
+          Tab-delimited count matrix with gene IDs in the first column
+      --normalization-factors <NORMALIZATION_FACTORS>
+          Optional gene x sample normalization-factor TSV
+      --size-factors <SIZE_FACTORS>
+          Optional sample-level size-factor TSV
+      --observation-weights <OBSERVATION_WEIGHTS>
+          Optional gene x sample observation-weight TSV
+      --method <METHOD>
+          Size-factor method [default: ratio] [possible values: ratio, poscounts]
+      --geometric-means <GEOMETRIC_MEANS>
+          Optional gene x geometric-mean TSV used for frozen size-factor estimation
+      --control-genes <CONTROL_GENES>
+          Comma-delimited zero-based row indices used to estimate size factors
+      --output <OUTPUT>
+          Output TSV path
+  -h, --help
+          Print help

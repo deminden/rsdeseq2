@@ -30,6 +30,8 @@ mod bounded_posterior;
 mod builder_cooks_policy;
 #[path = "cli.rs"]
 mod cli;
+#[path = "cli_help.rs"]
+mod cli_help;
 #[path = "compiled_method_policy.rs"]
 mod compiled_method_policy;
 #[path = "continuous_likelihood.rs"]
