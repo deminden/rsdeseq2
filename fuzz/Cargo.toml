@@ -1,0 +1,37 @@
+[package]
+name = "rsdeseq2-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Kept out of the main workspace: cargo-fuzz needs nightly and libFuzzer.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rsdeseq2 = { path = "../crates/rsdeseq2", default-features = false, features = ["formula"] }
+
+[[bin]]
+name = "tsv_readers"
+path = "fuzz_targets/tsv_readers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula"
+path = "fuzz_targets/formula.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fixed_dispersion_wald"
+path = "fuzz_targets/fixed_dispersion_wald.rs"
+test = false
+doc = false
+bench = false

@@ -74,6 +74,8 @@ mod formula_fitting;
 mod formula_term_expansion;
 #[path = "frozen_local_vst.rs"]
 mod frozen_local_vst;
+#[path = "fuzz_smoke.rs"]
+mod fuzz_smoke;
 #[path = "glm_intercept.rs"]
 mod glm_intercept;
 #[path = "glm_irls.rs"]

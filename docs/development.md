@@ -66,6 +66,10 @@ Integration tests build as one binary, `integration`
 Add a new test file to that list, and run one file's tests with
 `cargo test -p rsdeseq2 --test integration <file>::`.
 
+Fuzz targets for the TSV readers, formula parsing and fixed-dispersion fits
+live in [`fuzz/`](../fuzz/README.md); their bodies also run on stable in
+`tests/fuzz_smoke.rs`.
+
 [Contributing](../CONTRIBUTING.md) summarises the IDENTICAL/NUMERIC rules and
 the pull-request template.
 

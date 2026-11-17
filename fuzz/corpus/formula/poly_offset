@@ -1,0 +1,1 @@
+~ poly(age, 2) * condition + offset(log(dose + 1))

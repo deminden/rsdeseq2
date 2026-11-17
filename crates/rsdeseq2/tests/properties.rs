@@ -4,6 +4,7 @@
 //! the case count is kept low because the fits are deterministic per input.
 
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 use rsdeseq2::prelude::*;
 
 const SAMPLES: usize = 6;
@@ -11,6 +12,11 @@ const SAMPLES: usize = 6;
 fn config() -> ProptestConfig {
     ProptestConfig {
         cases: 48,
+        // The integration binary's root is not lib.rs or main.rs, so name the
+        // regression file directly (paths are relative to the crate).
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            "tests/properties.proptest-regressions",
+        ))),
         ..ProptestConfig::default()
     }
 }
