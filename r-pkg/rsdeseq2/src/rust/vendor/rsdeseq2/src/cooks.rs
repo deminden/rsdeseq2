@@ -7,6 +7,7 @@ use crate::normalization::{
     validate_size_factors,
 };
 use crate::numeric::checked::{self, CheckedExt};
+use rayon::prelude::*;
 
 const MIN_COOKS_DISPERSION: f64 = 0.04;
 
@@ -217,63 +218,63 @@ pub fn calculate_cooks_distance(
     let robust_dispersion = robust_method_of_moments_dispersion(normalized_counts, model_matrix)?;
     let p = model_matrix.n_coefficients() as f64;
 
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
-    for (gene, dispersion) in robust_dispersion.iter().copied().enumerate() {
-        let count_row = counts.row(gene)?;
-        let mu_row = mu.row(gene)?;
-        let h_row = hat_diagonal.row(gene)?;
-        for sample in 0..counts.n_samples() {
-            if dispersion.is_nan() {
-                values.push(f64::NAN);
-                continue;
+    // Genes are independent: fill each gene's row in parallel and report the
+    // lowest failing gene's error, as the sequential loop did.
+    let n_samples = counts.n_samples();
+    let mut values = vec![f64::NAN; counts.n_genes() * n_samples];
+    let rows = values
+        .par_chunks_mut(n_samples.max(1))
+        .zip(robust_dispersion.par_iter().copied())
+        .enumerate()
+        .map(|(gene, (out, dispersion))| -> Result<(), DeseqError> {
+            let count_row = counts.row(gene)?;
+            let mu_row = mu.row(gene)?;
+            let h_row = hat_diagonal.row(gene)?;
+            for sample in 0..counts.n_samples() {
+                if dispersion.is_nan() {
+                    out[sample] = f64::NAN;
+                    continue;
+                }
+                let mean = mu_row[sample];
+                let h = h_row[sample];
+                if mean.is_nan() || h.is_nan() {
+                    out[sample] = f64::NAN;
+                    continue;
+                }
+                let Ok(dispersion_mean) = checked::try_mul(dispersion, mean) else {
+                    out[sample] = f64::NAN;
+                    continue;
+                };
+                let Ok(variance_factor) = checked::try_add(1.0, dispersion_mean) else {
+                    out[sample] = f64::NAN;
+                    continue;
+                };
+                let Ok(variance) = checked::try_mul(mean, variance_factor) else {
+                    out[sample] = f64::NAN;
+                    continue;
+                };
+                let residual = f64::from(count_row[sample]) - mean;
+                let one_minus_h = 1.0 - h;
+                let Ok(residual_sq) = checked::try_mul(residual, residual) else {
+                    out[sample] = f64::NAN;
+                    continue;
+                };
+                let pearson_sq = residual_sq / variance;
+                let Ok(denominator) = checked::try_mul(one_minus_h, one_minus_h) else {
+                    out[sample] = f64::NAN;
+                    continue;
+                };
+                let value = pearson_sq / p * h / denominator;
+                if !value.is_finite() {
+                    out[sample] = f64::NAN;
+                    continue;
+                }
+                out[sample] = value;
             }
-            let mean = mu_row[sample];
-            let h = h_row[sample];
-            if mean.is_nan() || h.is_nan() {
-                values.push(f64::NAN);
-                continue;
-            }
-            let Ok(dispersion_mean) = checked::try_mul(dispersion, mean)
-                .nonfinite_at("Cook's dispersion mean", Some(sample))
-            else {
-                values.push(f64::NAN);
-                continue;
-            };
-            let Ok(variance_factor) = checked::try_add(1.0, dispersion_mean)
-                .nonfinite_at("Cook's variance factor", Some(sample))
-            else {
-                values.push(f64::NAN);
-                continue;
-            };
-            let Ok(variance) = checked::try_mul(mean, variance_factor)
-                .nonfinite_at("Cook's variance", Some(sample))
-            else {
-                values.push(f64::NAN);
-                continue;
-            };
-            let residual = f64::from(count_row[sample]) - mean;
-            let one_minus_h = 1.0 - h;
-            let Ok(residual_sq) = checked::try_mul(residual, residual)
-                .nonfinite_at("Cook's residual square", Some(sample))
-            else {
-                values.push(f64::NAN);
-                continue;
-            };
-            let pearson_sq = residual_sq / variance;
-            let Ok(denominator) = checked::try_mul(one_minus_h, one_minus_h)
-                .nonfinite_at("Cook's leverage denominator", Some(sample))
-            else {
-                values.push(f64::NAN);
-                continue;
-            };
-            let value = pearson_sq / p * h / denominator;
-            if !value.is_finite() {
-                values.push(f64::NAN);
-                continue;
-            }
-            values.push(value);
-        }
-    }
+            Ok(())
+        })
+        .collect::<Vec<_>>();
+    rows.into_iter().collect::<Result<(), _>>()?;
 
     let cooks = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)?;
     let samples_for_cooks = samples_for_cooks(model_matrix, 3)?;
@@ -424,23 +425,26 @@ pub fn record_max_cooks(
         return Ok(vec![None; cooks.n_rows()]);
     }
 
-    let mut max_values = Vec::with_capacity(cooks.n_rows());
-    for gene in 0..cooks.n_rows() {
-        let row = cooks.row(gene)?;
-        let mut row_max: Option<f64> = None;
-        for (sample, use_sample) in samples_for_cooks.iter().copied().enumerate() {
-            if !use_sample {
-                continue;
+    // Row maxima are independent; rows are contiguous in the row-major matrix.
+    let max_values = cooks
+        .as_slice()
+        .par_chunks(cooks.n_cols())
+        .map(|row| {
+            let mut row_max: Option<f64> = None;
+            for (sample, use_sample) in samples_for_cooks.iter().copied().enumerate() {
+                if !use_sample {
+                    continue;
+                }
+                let value = row[sample];
+                if value.is_nan() {
+                    row_max = None;
+                    break;
+                }
+                row_max = Some(row_max.map_or(value, |current| current.max(value)));
             }
-            let value = row[sample];
-            if value.is_nan() {
-                row_max = None;
-                break;
-            }
-            row_max = Some(row_max.map_or(value, |current| current.max(value)));
-        }
-        max_values.push(row_max);
-    }
+            row_max
+        })
+        .collect::<Vec<_>>();
     Ok(max_values)
 }
 
