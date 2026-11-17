@@ -500,28 +500,46 @@ struct IrlsRowOutput {
 }
 
 // Per-gene IRLS iterations and scratch reuse.
-include!("irls/iteration.rs");
+#[path = "irls/iteration.rs"]
+mod iteration;
+use iteration::*;
 
 // Bounded-optimizer fallback, starting values and acceptance checks.
-include!("irls/fallback.rs");
+#[path = "irls/fallback.rs"]
+mod fallback;
+use fallback::*;
 
 // Optimizer objectives, gradients and Hessians.
-include!("irls/objective.rs");
+#[path = "irls/objective.rs"]
+mod objective;
+use objective::*;
 
 // Projected-gradient convergence and checked arithmetic.
-include!("irls/arithmetic.rs");
+#[path = "irls/arithmetic.rs"]
+mod arithmetic;
+use arithmetic::*;
 
 // Starting coefficients and stable fitted means.
-include!("irls/means.rs");
+#[path = "irls/means.rs"]
+mod means;
+use means::*;
 
 // Working weights and responses.
-include!("irls/working.rs");
+#[path = "irls/working.rs"]
+mod working;
+use working::*;
 
 // Weighted least squares, QR, covariance and design crossproducts.
-include!("irls/linear_algebra.rs");
+#[path = "irls/linear_algebra.rs"]
+mod linear_algebra;
+use linear_algebra::*;
 
 // Input validation, normalization factors and output scaling.
-include!("irls/validation.rs");
+#[path = "irls/validation.rs"]
+mod validation;
+pub(super) use validation::*;
 
 // Private numerical regression tests.
-include!("irls/tests.rs");
+#[cfg(test)]
+#[path = "irls/tests.rs"]
+mod tests;

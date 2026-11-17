@@ -1,10 +1,15 @@
+use super::*;
 // Starting coefficients and stable fitted means.
 
-fn initial_beta(x: &DMatrix<f64>, y: &[f64], nf: &[f64]) -> Result<DVector<f64>, DeseqError> {
+pub(super) fn initial_beta(
+    x: &DMatrix<f64>,
+    y: &[f64],
+    nf: &[f64],
+) -> Result<DVector<f64>, DeseqError> {
     initial_beta_impl(x, y, nf, None)
 }
 
-fn initial_beta_impl(
+pub(super) fn initial_beta_impl(
     x: &DMatrix<f64>,
     y: &[f64],
     nf: &[f64],
@@ -32,7 +37,7 @@ fn initial_beta_impl(
 }
 
 #[cfg(test)]
-fn fitted_mu(
+pub(super) fn fitted_mu(
     x: &DMatrix<f64>,
     beta: &DVector<f64>,
     nf: &[f64],
@@ -41,7 +46,7 @@ fn fitted_mu(
     fitted_mu_impl(x, beta, nf, Some(min_mu))
 }
 
-fn fitted_mu_log2_unfloored(
+pub(super) fn fitted_mu_log2_unfloored(
     x: &DMatrix<f64>,
     beta: &[f64],
     nf: &[f64],
@@ -56,7 +61,8 @@ fn fitted_mu_log2_unfloored(
     (0..x.nrows())
         .map(|sample| {
             validate_positive_finite(nf[sample], "normalization factor", sample)?;
-            let eta = checked_row_dot_slice(x, sample, beta).nonfinite_at("optim fallback linear predictor", Some(sample))?;
+            let eta = checked_row_dot_slice(x, sample, beta)
+                .nonfinite_at("optim fallback linear predictor", Some(sample))?;
             let mu = nf[sample] * 2.0_f64.powf(eta);
             if !mu.is_finite() || mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
@@ -71,7 +77,7 @@ fn fitted_mu_log2_unfloored(
 }
 
 #[cfg(test)]
-fn fitted_mu_impl(
+pub(super) fn fitted_mu_impl(
     x: &DMatrix<f64>,
     beta: &DVector<f64>,
     nf: &[f64],
@@ -80,7 +86,7 @@ fn fitted_mu_impl(
     fitted_mu_impl_with_logs(x, beta, nf, min_mu, None)
 }
 
-fn fitted_mu_impl_with_logs(
+pub(super) fn fitted_mu_impl_with_logs(
     x: &DMatrix<f64>,
     beta: &DVector<f64>,
     nf: &[f64],
@@ -92,7 +98,7 @@ fn fitted_mu_impl_with_logs(
     Ok(output)
 }
 
-fn fitted_mu_into(
+pub(super) fn fitted_mu_into(
     x: &DMatrix<f64>,
     beta: &DVector<f64>,
     nf: &[f64],
@@ -104,10 +110,11 @@ fn fitted_mu_into(
     let values = (0..x.nrows()).zip(nf.iter().copied()).enumerate().map(
         |(sample, (row, factor))| -> Result<f64, DeseqError> {
             validate_positive_finite(factor, "normalization factor", sample)?;
-            let eta =
-                checked_row_dot_vector(x, row, beta).nonfinite_at("IRLS linear predictor", Some(sample))?;
+            let eta = checked_row_dot_vector(x, row, beta)
+                .nonfinite_at("IRLS linear predictor", Some(sample))?;
             let log_factor = log_nf.map(|values| values[sample]);
-            let mu = finite_scaled_exp_with_log(factor, eta, log_factor).nonfinite_at("IRLS fitted mean", Some(sample))?;
+            let mu = finite_scaled_exp_with_log(factor, eta, log_factor)
+                .nonfinite_at("IRLS fitted mean", Some(sample))?;
             if mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "IRLS fitted mean".to_string(),
@@ -124,7 +131,11 @@ fn fitted_mu_into(
     Ok(())
 }
 
-fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> checked::Checked {
+pub(super) fn checked_row_dot_slice(
+    x: &DMatrix<f64>,
+    row: usize,
+    beta: &[f64],
+) -> checked::Checked {
     let mut sum = 0.0;
     for col in 0..x.ncols() {
         sum = x[(row, col)].mul_add(beta[col], sum);
@@ -135,7 +146,11 @@ fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> checked:
     Ok(sum)
 }
 
-fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> checked::Checked {
+pub(super) fn checked_row_dot_vector(
+    x: &DMatrix<f64>,
+    row: usize,
+    beta: &DVector<f64>,
+) -> checked::Checked {
     let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
         sum.add(checked::try_mul(x[(row, col)], beta[col])?)?;
@@ -144,7 +159,7 @@ fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> 
 }
 
 #[derive(Default)]
-struct ScaledSum {
+pub(super) struct ScaledSum {
     scale: f64,
     normalized_sum: f64,
 }
@@ -181,7 +196,7 @@ impl ScaledSum {
     }
 }
 
-fn finite_scaled_exp_with_log(
+pub(super) fn finite_scaled_exp_with_log(
     factor: f64,
     eta: f64,
     log_factor: Option<f64>,

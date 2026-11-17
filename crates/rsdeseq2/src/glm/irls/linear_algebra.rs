@@ -1,6 +1,7 @@
+use super::*;
 // Weighted least squares, QR, covariance and design crossproducts.
 
-fn solve_weighted_least_squares(
+pub(super) fn solve_weighted_least_squares(
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
@@ -16,7 +17,7 @@ fn solve_weighted_least_squares(
     }
 }
 
-fn solve_weighted_least_squares_qr(
+pub(super) fn solve_weighted_least_squares_qr(
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
@@ -50,7 +51,7 @@ fn solve_weighted_least_squares_qr(
     r.lu().solve(&rhs)
 }
 
-fn covariance_and_hat_diagonal(
+pub(super) fn covariance_and_hat_diagonal(
     x: &DMatrix<f64>,
     w: &[f64],
     ridge_lambda: &[f64],
@@ -83,7 +84,10 @@ fn covariance_and_hat_diagonal(
         fill_active_design_columns(x, sample, &mut active);
         for (left, left_value) in active.iter().copied() {
             for (right, right_value) in active.iter().copied() {
-                value = checked::add(value, checked_product4(left_value, weight, right_value, inverse[(right, left)])?)?;
+                value = checked::add(
+                    value,
+                    checked_product4(left_value, weight, right_value, inverse[(right, left)])?,
+                )?;
             }
         }
         hat.push(value);
@@ -91,7 +95,7 @@ fn covariance_and_hat_diagonal(
     Some((beta_covariance, hat))
 }
 
-fn xtwx_and_xtwz(
+pub(super) fn xtwx_and_xtwz(
     x: &DMatrix<f64>,
     w: &[f64],
     z: &[f64],
@@ -107,7 +111,10 @@ fn xtwx_and_xtwz(
         }
         for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
             for (col, col_value) in active.iter().copied().skip(left_pos) {
-                xtwx[(row, col)] = checked::add(xtwx[(row, col)], checked_product3(row_value, weight, col_value)?)?;
+                xtwx[(row, col)] = checked::add(
+                    xtwx[(row, col)],
+                    checked_product3(row_value, weight, col_value)?,
+                )?;
                 if row != col {
                     xtwx[(col, row)] = xtwx[(row, col)];
                 }
@@ -121,14 +128,17 @@ fn xtwx_and_xtwz(
     Some((xtwx, xtwz))
 }
 
-fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
+pub(super) fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
     let mut xtwx = DMatrix::zeros(x.ncols(), x.ncols());
     let mut active = Vec::with_capacity(x.ncols());
     for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
         fill_active_design_columns(x, sample, &mut active);
         for (left_pos, (row, row_value)) in active.iter().copied().enumerate() {
             for (col, col_value) in active.iter().copied().skip(left_pos) {
-                xtwx[(row, col)] = checked::add(xtwx[(row, col)], checked_product3(row_value, weight, col_value)?)?;
+                xtwx[(row, col)] = checked::add(
+                    xtwx[(row, col)],
+                    checked_product3(row_value, weight, col_value)?,
+                )?;
                 if row != col {
                     xtwx[(col, row)] = xtwx[(row, col)];
                 }
@@ -138,7 +148,11 @@ fn xtwx_without_ridge(x: &DMatrix<f64>, w: &[f64]) -> Option<DMatrix<f64>> {
     Some(xtwx)
 }
 
-fn fill_active_design_columns(x: &DMatrix<f64>, row: usize, active: &mut Vec<(usize, f64)>) {
+pub(super) fn fill_active_design_columns(
+    x: &DMatrix<f64>,
+    row: usize,
+    active: &mut Vec<(usize, f64)>,
+) {
     active.clear();
     active.extend((0..x.ncols()).filter_map(|col| {
         let value = x[(row, col)];

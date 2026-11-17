@@ -1,7 +1,8 @@
+use super::*;
 // Bounded-optimizer fallback, starting values and acceptance checks.
 
 #[allow(clippy::too_many_arguments)]
-fn refit_optim_fallback_rows(
+pub(super) fn refit_optim_fallback_rows(
     rows: &[usize],
     beta_values: &mut [f64],
     beta_var_values: &mut [f64],
@@ -86,7 +87,9 @@ fn refit_optim_fallback_rows(
                 gene * p * p + idx,
                 "optim fallback beta covariance log2 scale",
             )?;
-            if !beta_covariance_values.is_empty() { beta_covariance_values[gene * p * p + idx] = scaled; }
+            if !beta_covariance_values.is_empty() {
+                beta_covariance_values[gene * p * p + idx] = scaled;
+            }
         }
         for (sample, value) in mu_unfloored.iter().copied().enumerate() {
             mu_values[gene * n + sample] = value;
@@ -109,7 +112,7 @@ fn refit_optim_fallback_rows(
     Ok(())
 }
 
-fn optim_start_beta_log2(
+pub(super) fn optim_start_beta_log2(
     current_beta_log2: &[f64],
     x: &DMatrix<f64>,
     counts: &[u32],
@@ -137,16 +140,16 @@ fn optim_start_beta_log2(
 }
 
 #[derive(Clone, Copy)]
-struct BetaOptimInput<'a> {
-    x: &'a DMatrix<f64>,
-    counts: &'a [u32],
-    nf: &'a [f64],
-    dispersion: f64,
-    weights: Option<&'a [f64]>,
-    ridge_lambda: &'a [f64],
+pub(super) struct BetaOptimInput<'a> {
+    pub(super) x: &'a DMatrix<f64>,
+    pub(super) counts: &'a [u32],
+    pub(super) nf: &'a [f64],
+    pub(super) dispersion: f64,
+    pub(super) weights: Option<&'a [f64]>,
+    pub(super) ridge_lambda: &'a [f64],
 }
 
-fn optimize_beta_log2(
+pub(super) fn optimize_beta_log2(
     input: BetaOptimInput<'_>,
     start: &[f64],
     options: &IrlsOptions,
@@ -162,7 +165,7 @@ fn optimize_beta_log2(
     )
 }
 
-fn minimize_beta_log2_lbfgsb(
+pub(super) fn minimize_beta_log2_lbfgsb(
     input: BetaOptimInput<'_>,
     start: &[f64],
     lower: f64,
@@ -286,7 +289,11 @@ fn minimize_beta_log2_lbfgsb(
     })
 }
 
-fn optim_fallback_control(dimension: usize, maxit: usize, gradient_tol: f64) -> OptimControl {
+pub(super) fn optim_fallback_control(
+    dimension: usize,
+    maxit: usize,
+    gradient_tol: f64,
+) -> OptimControl {
     let mut control = OptimControl::default_for_dimension(dimension);
     control.maxit = maxit;
     control.factr = 1.0e7;
@@ -295,7 +302,7 @@ fn optim_fallback_control(dimension: usize, maxit: usize, gradient_tol: f64) -> 
     control
 }
 
-fn r_optim_candidate_within_analytic_tolerance(
+pub(super) fn r_optim_candidate_within_analytic_tolerance(
     compatible_objective: f64,
     analytic_objective: f64,
     factr: f64,
@@ -318,7 +325,7 @@ fn r_optim_candidate_within_analytic_tolerance(
     compatible_objective <= analytic_objective + tolerance
 }
 
-fn r_optim_candidates_materially_disagree(
+pub(super) fn r_optim_candidates_materially_disagree(
     compatible: &[f64],
     analytic: &[f64],
     ndeps: &[f64],
