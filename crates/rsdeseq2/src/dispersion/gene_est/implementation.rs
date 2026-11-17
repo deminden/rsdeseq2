@@ -11,25 +11,41 @@ use crate::numeric::checked::{self, CheckedExt};
 use rayon::prelude::*;
 
 // Public options, inputs, outputs, and private diagnostics types.
-include!("implementation/types.rs");
+#[path = "implementation/types.rs"]
+mod types;
+pub use types::*;
 
 // Linear-mu and GLM-mu gene-wise estimation entry points.
-include!("implementation/estimate.rs");
+#[path = "implementation/estimate.rs"]
+mod estimate;
+pub use estimate::*;
 
 // Initial estimates plus line-search and grid dispersion fitting.
-include!("implementation/fit.rs");
+#[path = "implementation/fit.rs"]
+mod fit;
+pub use fit::*;
 
 // Negative-binomial likelihood kernels and derivatives.
-include!("implementation/likelihood.rs");
+#[path = "implementation/likelihood.rs"]
+mod likelihood;
+pub use likelihood::*;
 
 // Cox-Reid adjustment and derivative helpers.
-include!("implementation/cox_reid.rs");
+#[path = "implementation/cox_reid.rs"]
+mod cox_reid;
+pub use cox_reid::*;
 
 // Dispersion prior and posterior objective helpers.
-include!("implementation/posterior.rs");
+#[path = "implementation/posterior.rs"]
+mod posterior;
+pub use posterior::*;
 
 // Validation, compaction, and checked numeric helpers.
-include!("implementation/validation.rs");
+#[path = "implementation/validation.rs"]
+mod validation;
+use validation::*;
 
 // Unit tests for gene-wise dispersion numeric checks.
-include!("implementation/tests.rs");
+#[cfg(test)]
+#[path = "implementation/tests.rs"]
+mod tests;

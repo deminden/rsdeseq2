@@ -1,8 +1,9 @@
+use super::*;
 // Fixed design products for the unweighted optimizer path. Products are
 // checked at their original evaluation point, after the mean/weight checks.
-type PreparedCoxReidDesign = crate::design::SharedDesignProducts;
+pub(super) type PreparedCoxReidDesign = crate::design::SharedDesignProducts;
 
-fn prepare_unweighted_cox_reid_design(
+pub(super) fn prepare_unweighted_cox_reid_design(
     design: Option<&DesignMatrix>,
     weights: Option<&[f64]>,
     use_cox_reid: bool,
@@ -14,7 +15,7 @@ fn prepare_unweighted_cox_reid_design(
     design.cached_cox_products(|| prepare_cox_reid_products(design))
 }
 
-fn prepare_cox_reid_products(design: &DesignMatrix) -> Option<PreparedCoxReidDesign> {
+pub(super) fn prepare_cox_reid_products(design: &DesignMatrix) -> Option<PreparedCoxReidDesign> {
     let p = design.n_coefficients();
     // Bound scratch memory; large designs keep the original streaming path.
     if p > 16 {
@@ -72,7 +73,7 @@ pub fn cox_reid_adjustment_weighted(
     )
 }
 
-fn cox_reid_adjustment_weighted_with_threshold(
+pub(super) fn cox_reid_adjustment_weighted_with_threshold(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -89,7 +90,7 @@ fn cox_reid_adjustment_weighted_with_threshold(
     )
 }
 
-fn cox_reid_adjustment_weighted_with_threshold_prepared(
+pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -136,20 +137,20 @@ fn cox_reid_adjustment_weighted_with_threshold_prepared(
     Ok(-0.5 * determinant.ln())
 }
 
-struct CoxReidDesignMatrices {
+pub(super) struct CoxReidDesignMatrices {
     xtwx: DMatrix<f64>,
     d_xtwx: Option<DMatrix<f64>>,
     d2_xtwx: Option<DMatrix<f64>>,
 }
 
 #[derive(Clone, Copy)]
-enum CoxReidMatrixOrder {
+pub(super) enum CoxReidMatrixOrder {
     Value,
     Derivative,
     SecondDerivative,
 }
 
-fn cox_reid_weighted_design_matrices_prepared(
+pub(super) fn cox_reid_weighted_design_matrices_prepared(
     design: &DesignMatrix,
     mu: &[f64],
     alpha: f64,
@@ -186,7 +187,10 @@ fn cox_reid_weighted_design_matrices_prepared(
     }
 }
 
-fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE: bool>(
+pub(super) fn cox_reid_design_matrices_impl<
+    const DERIVATIVE: bool,
+    const SECOND_DERIVATIVE: bool,
+>(
     design: &DesignMatrix,
     mu: &[f64],
     alpha: f64,
@@ -252,10 +256,12 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
             cox_reid_weight_terms_for_order::<DERIVATIVE, SECOND_DERIVATIVE>(mu, alpha, sample)?;
         for (left_pos, (left_idx, left_value)) in active_columns.iter().copied().enumerate() {
             for (right_idx, right_value) in active_columns.iter().copied().skip(left_pos) {
-                let x_product = checked::try_mul(left_value, right_value).nonfinite_at("Cox-Reid weighted design product", Some(sample))?;
+                let x_product = checked::try_mul(left_value, right_value)
+                    .nonfinite_at("Cox-Reid weighted design product", Some(sample))?;
                 checked_matrix_add_assign(
                     &mut xtwx[(left_idx, right_idx)],
-                    checked::try_mul(x_product, weight_terms.weight).nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
+                    checked::try_mul(x_product, weight_terms.weight)
+                        .nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design xtwx",
                 )?;
@@ -263,7 +269,8 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
                 if let Some(d_xtwx) = &mut d_xtwx {
                     checked_matrix_add_assign(
                         &mut d_xtwx[(left_idx, right_idx)],
-                        checked::try_mul(x_product, weight_terms.d_weight).nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
+                        checked::try_mul(x_product, weight_terms.d_weight)
+                            .nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
                         sample,
                         "Cox-Reid weighted design derivative",
                     )?;
@@ -271,7 +278,10 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
                 if let Some(d2_xtwx) = &mut d2_xtwx {
                     checked_matrix_add_assign(
                         &mut d2_xtwx[(left_idx, right_idx)],
-                        checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at("Cox-Reid weighted design second derivative", Some(sample))?,
+                        checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at(
+                            "Cox-Reid weighted design second derivative",
+                            Some(sample),
+                        )?,
                         sample,
                         "Cox-Reid weighted design second derivative",
                     )?;
@@ -298,7 +308,10 @@ fn cox_reid_design_matrices_impl<const DERIVATIVE: bool, const SECOND_DERIVATIVE
     })
 }
 
-fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVATIVE: bool>(
+pub(super) fn cox_reid_prepared_design_matrices<
+    const DERIVATIVE: bool,
+    const SECOND_DERIVATIVE: bool,
+>(
     design: &DesignMatrix,
     mu: &[f64],
     alpha: f64,
@@ -334,7 +347,8 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             }
             checked_matrix_add_assign(
                 &mut xtwx[(left_idx, right_idx)],
-                checked::try_mul(x_product, weight_terms.weight).nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
+                checked::try_mul(x_product, weight_terms.weight)
+                    .nonfinite_at("Cox-Reid weighted design xtwx", Some(sample))?,
                 sample,
                 "Cox-Reid weighted design xtwx",
             )?;
@@ -342,7 +356,8 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             if let Some(d_xtwx) = &mut d_xtwx {
                 checked_matrix_add_assign(
                     &mut d_xtwx[(left_idx, right_idx)],
-                    checked::try_mul(x_product, weight_terms.d_weight).nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
+                    checked::try_mul(x_product, weight_terms.d_weight)
+                        .nonfinite_at("Cox-Reid weighted design derivative", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design derivative",
                 )?;
@@ -350,7 +365,8 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
             if let Some(d2_xtwx) = &mut d2_xtwx {
                 checked_matrix_add_assign(
                     &mut d2_xtwx[(left_idx, right_idx)],
-                    checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at("Cox-Reid weighted design second derivative", Some(sample))?,
+                    checked::try_mul(x_product, weight_terms.d2_weight)
+                        .nonfinite_at("Cox-Reid weighted design second derivative", Some(sample))?,
                     sample,
                     "Cox-Reid weighted design second derivative",
                 )?;
@@ -376,7 +392,7 @@ fn cox_reid_prepared_design_matrices<const DERIVATIVE: bool, const SECOND_DERIVA
     })
 }
 
-fn cox_reid_sample_indices(
+pub(super) fn cox_reid_sample_indices(
     weights: Option<&[f64]>,
     n_samples: usize,
     weight_threshold: f64,
@@ -392,7 +408,7 @@ fn cox_reid_sample_indices(
     }
 }
 
-fn cox_reid_column_indices(
+pub(super) fn cox_reid_column_indices(
     design: &DesignMatrix,
     selected_samples: &[usize],
 ) -> Result<Vec<usize>, DeseqError> {
@@ -414,7 +430,7 @@ fn cox_reid_column_indices(
     Ok(selected)
 }
 
-fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> Result<f64, DeseqError> {
+pub(super) fn trace_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> Result<f64, DeseqError> {
     let product = left * right;
     checked_sum_indexed(product.diagonal().iter().copied(), "Cox-Reid trace product")
 }
@@ -447,7 +463,7 @@ pub fn cox_reid_adjustment_derivative_weighted(
     )
 }
 
-fn cox_reid_adjustment_derivative_weighted_with_threshold(
+pub(super) fn cox_reid_adjustment_derivative_weighted_with_threshold(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -464,7 +480,7 @@ fn cox_reid_adjustment_derivative_weighted_with_threshold(
     )
 }
 
-fn cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
+pub(super) fn cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -527,7 +543,7 @@ pub fn cox_reid_adjustment_second_derivative_weighted(
     )
 }
 
-fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
+pub(super) fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -544,7 +560,7 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold(
     )
 }
 
-fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
+pub(super) fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
     design: &DesignMatrix,
     mu: &[f64],
     log_alpha: f64,
@@ -595,7 +611,10 @@ fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
 }
 
 #[inline(always)]
-fn cox_reid_weight_terms_for_order<const DERIVATIVE: bool, const SECOND_DERIVATIVE: bool>(
+pub(super) fn cox_reid_weight_terms_for_order<
+    const DERIVATIVE: bool,
+    const SECOND_DERIVATIVE: bool,
+>(
     mu: f64,
     alpha: f64,
     index: usize,
@@ -618,14 +637,21 @@ fn cox_reid_weight_terms_for_order<const DERIVATIVE: bool, const SECOND_DERIVATI
     } else {
         1.0
     };
-    let weight = checked::try_mul(ratio, alpha.recip()).nonfinite_at("Cox-Reid working weight", Some(index))?;
+    let weight = checked::try_mul(ratio, alpha.recip())
+        .nonfinite_at("Cox-Reid working weight", Some(index))?;
     let square = if DERIVATIVE || SECOND_DERIVATIVE {
-        checked::try_mul(weight, weight).nonfinite_at("Cox-Reid working weight square", Some(index))?
+        checked::try_mul(weight, weight)
+            .nonfinite_at("Cox-Reid working weight square", Some(index))?
     } else {
         0.0
     };
     let d2_weight = if SECOND_DERIVATIVE {
-        checked::try_mul(2.0, checked::try_mul(square, weight).nonfinite_at("Cox-Reid working weight cube", Some(index))?).nonfinite_at("Cox-Reid working second derivative weight", Some(index))?
+        checked::try_mul(
+            2.0,
+            checked::try_mul(square, weight)
+                .nonfinite_at("Cox-Reid working weight cube", Some(index))?,
+        )
+        .nonfinite_at("Cox-Reid working second derivative weight", Some(index))?
     } else {
         0.0
     };

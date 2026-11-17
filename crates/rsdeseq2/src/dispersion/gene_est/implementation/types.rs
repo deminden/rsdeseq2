@@ -1,13 +1,16 @@
-use nalgebra::DMatrix;
-use statrs::function::gamma::{digamma, ln_gamma};
+use super::*;
+pub(super) use nalgebra::DMatrix;
+pub(super) use statrs::function::gamma::{digamma, ln_gamma};
 
-use crate::matrix::CountMatrix;
-use crate::design::DesignMatrix;
-use crate::errors::{invalid_dimensions, DeseqError};
-use crate::glm::IrlsOptions;
-use crate::glm::irls::{fit_nf_irls_for_output, fit_sf_irls_for_output, OutputRequirements};
-use crate::math::trigamma;
-use crate::matrix::RowMajorMatrix;
+pub(super) use crate::design::DesignMatrix;
+pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+pub(super) use crate::glm::IrlsOptions;
+pub(super) use crate::glm::irls::{
+    OutputRequirements, fit_nf_irls_for_output, fit_sf_irls_for_output,
+};
+pub(super) use crate::math::trigamma;
+pub(super) use crate::matrix::CountMatrix;
+pub(super) use crate::matrix::RowMajorMatrix;
 
 /// Options for the initial gene-wise dispersion estimator.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -178,10 +181,10 @@ pub struct GeneWiseDispersionInput<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct GeneDispersionFitDiagnostics {
-    estimate: f64,
-    iterations: usize,
-    converged: bool,
-    initial_lp: f64,
-    last_lp: f64,
+pub(super) struct GeneDispersionFitDiagnostics {
+    pub(super) estimate: f64,
+    pub(super) iterations: usize,
+    pub(super) converged: bool,
+    pub(super) initial_lp: f64,
+    pub(super) last_lp: f64,
 }

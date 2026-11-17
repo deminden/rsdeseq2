@@ -1,3 +1,4 @@
+use super::*;
 /// DESeq2's log-dispersion prior kernel, omitting additive constants.
 pub fn dispersion_prior_log_density(
     log_alpha: f64,
@@ -9,8 +10,10 @@ pub fn dispersion_prior_log_density(
         });
     }
     validate_dispersion_prior(Some(prior))?;
-    let residual = checked::try_sub(log_alpha, prior.log_mean).nonfinite_at("dispersion prior log residual", Some(0))?;
-    let residual_square = checked::try_mul(residual, residual).nonfinite_at("dispersion prior log residual square", Some(0))?;
+    let residual = checked::try_sub(log_alpha, prior.log_mean)
+        .nonfinite_at("dispersion prior log residual", Some(0))?;
+    let residual_square = checked::try_mul(residual, residual)
+        .nonfinite_at("dispersion prior log residual square", Some(0))?;
     Ok(-0.5 * residual_square / prior.variance)
 }
 
@@ -98,7 +101,7 @@ pub fn dispersion_log_posterior_with_prior_and_weights(
     )
 }
 
-fn dispersion_log_posterior_objective(
+pub(super) fn dispersion_log_posterior_objective(
     input: DispersionObjectiveInput<'_>,
     log_alpha: f64,
 ) -> Result<f64, DeseqError> {
@@ -115,17 +118,22 @@ fn dispersion_log_posterior_objective(
                 feature: "Cox-Reid dispersion objective requires a design matrix".to_string(),
             });
         };
-        posterior = checked::try_add(posterior, cox_reid_adjustment_weighted_with_threshold_prepared(
+        posterior = checked::try_add(
+            posterior,
+            cox_reid_adjustment_weighted_with_threshold_prepared(
                 design,
                 input.mu,
                 log_alpha,
                 input.weights,
                 input.weight_threshold,
                 input.prepared_cox,
-            )?).nonfinite_at("dispersion log posterior Cox-Reid sum", Some(0))?;
+            )?,
+        )
+        .nonfinite_at("dispersion log posterior Cox-Reid sum", Some(0))?;
     }
     if let Some(prior) = input.prior {
-        checked::try_add(posterior, dispersion_prior_log_density(log_alpha, prior)?).nonfinite_at("dispersion log posterior prior sum", Some(0))
+        checked::try_add(posterior, dispersion_prior_log_density(log_alpha, prior)?)
+            .nonfinite_at("dispersion log posterior prior sum", Some(0))
     } else {
         Ok(posterior)
     }
@@ -194,7 +202,7 @@ pub fn dispersion_log_posterior_derivative_with_prior_and_weights(
     )
 }
 
-fn dispersion_log_posterior_derivative_objective(
+pub(super) fn dispersion_log_posterior_derivative_objective(
     input: DispersionObjectiveInput<'_>,
     log_alpha: f64,
 ) -> Result<f64, DeseqError> {
@@ -211,17 +219,22 @@ fn dispersion_log_posterior_derivative_objective(
                 feature: "Cox-Reid dispersion derivative requires a design matrix".to_string(),
             });
         };
-        derivative = checked::try_add(derivative, cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
+        derivative = checked::try_add(
+            derivative,
+            cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
                 design,
                 input.mu,
                 log_alpha,
                 input.weights,
                 input.weight_threshold,
                 input.prepared_cox,
-            )?).nonfinite_at("dispersion log posterior derivative Cox-Reid sum", Some(0))?;
+            )?,
+        )
+        .nonfinite_at("dispersion log posterior derivative Cox-Reid sum", Some(0))?;
     }
     if let Some(prior) = input.prior {
-        checked::try_add(derivative, dispersion_prior_derivative(log_alpha, prior)?).nonfinite_at("dispersion log posterior derivative prior sum", Some(0))
+        checked::try_add(derivative, dispersion_prior_derivative(log_alpha, prior)?)
+            .nonfinite_at("dispersion log posterior derivative prior sum", Some(0))
     } else {
         Ok(derivative)
     }
@@ -290,7 +303,7 @@ pub fn dispersion_log_posterior_second_derivative_with_prior_and_weights(
     )
 }
 
-fn dispersion_log_posterior_second_derivative_objective(
+pub(super) fn dispersion_log_posterior_second_derivative_objective(
     input: DispersionObjectiveInput<'_>,
     log_alpha: f64,
 ) -> Result<f64, DeseqError> {
@@ -308,24 +321,29 @@ fn dispersion_log_posterior_second_derivative_objective(
             });
         };
         checked::try_scaled_sum(&[
-                likelihood,
-                cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
-                    design,
-                    input.mu,
-                    log_alpha,
-                    input.weights,
-                    input.weight_threshold,
-                    input.prepared_cox,
-                )?,
-            ]).nonfinite_at("dispersion log posterior second derivative Cox-Reid sum", None)?
+            likelihood,
+            cox_reid_adjustment_second_derivative_weighted_with_threshold_prepared(
+                design,
+                input.mu,
+                log_alpha,
+                input.weights,
+                input.weight_threshold,
+                input.prepared_cox,
+            )?,
+        ])
+        .nonfinite_at(
+            "dispersion log posterior second derivative Cox-Reid sum",
+            None,
+        )?
     } else {
         likelihood
     };
     if let Some(prior) = input.prior {
         checked::try_scaled_sum(&[
-                second_derivative,
-                dispersion_prior_second_derivative(log_alpha, prior)?,
-            ]).nonfinite_at("dispersion log posterior second derivative prior sum", None)
+            second_derivative,
+            dispersion_prior_second_derivative(log_alpha, prior)?,
+        ])
+        .nonfinite_at("dispersion log posterior second derivative prior sum", None)
     } else {
         Ok(second_derivative)
     }

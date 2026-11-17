@@ -1,3 +1,4 @@
+use super::*;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
 ///
 /// This implements a clean Rust subset of `estimateDispersionsGeneEst`:
@@ -126,7 +127,7 @@ pub fn design_uses_linear_dispersion_means(design: &DesignMatrix) -> Result<bool
     Ok(groups.len() == design.n_coefficients())
 }
 
-fn estimate_gene_wise_dispersions_with_mean_fit(
+pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
     input: GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
     irls_options: IrlsOptions,
@@ -434,14 +435,19 @@ pub fn rough_dispersion_estimates(
         let mut sum = 0.0;
         for (sample, (count, fitted)) in y.iter().copied().zip(mu.iter().copied()).enumerate() {
             let fitted = fitted.max(1.0);
-            let residual = checked::try_sub(count, fitted).nonfinite_at("rough dispersion residual", Some(sample))?;
+            let residual = checked::try_sub(count, fitted)
+                .nonfinite_at("rough dispersion residual", Some(sample))?;
             let inv_fitted = fitted.recip();
-            let relative_residual = checked::try_mul(residual, inv_fitted).nonfinite_at("rough dispersion relative residual", Some(sample))?;
-            let relative_square = checked::try_mul(relative_residual, relative_residual).nonfinite_at("rough dispersion relative residual square", Some(sample))?;
-            let term = checked::try_sub(relative_square, inv_fitted).nonfinite_at("rough dispersion term", Some(sample))?;
+            let relative_residual = checked::try_mul(residual, inv_fitted)
+                .nonfinite_at("rough dispersion relative residual", Some(sample))?;
+            let relative_square = checked::try_mul(relative_residual, relative_residual)
+                .nonfinite_at("rough dispersion relative residual square", Some(sample))?;
+            let term = checked::try_sub(relative_square, inv_fitted)
+                .nonfinite_at("rough dispersion term", Some(sample))?;
             checked_matrix_add_assign(&mut sum, term, sample, "rough dispersion row sum")?;
         }
-        let average = checked::try_div(sum, residual_df).nonfinite_at("rough dispersion row mean", Some(gene))?;
+        let average = checked::try_div(sum, residual_df)
+            .nonfinite_at("rough dispersion row mean", Some(gene))?;
         estimates.push(average.max(0.0));
     }
     Ok(estimates)
@@ -465,7 +471,8 @@ pub fn moments_dispersion_estimates(
         size_factors.iter().copied().map(f64::recip),
         "moments dispersion inverse size-factor sum",
     )?;
-    let xim = checked::try_div(inverse_sum, size_factors.len() as f64).nonfinite_at("moments dispersion inverse size-factor mean", Some(0))?;
+    let xim = checked::try_div(inverse_sum, size_factors.len() as f64)
+        .nonfinite_at("moments dispersion inverse size-factor mean", Some(0))?;
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }
 
@@ -508,7 +515,7 @@ pub fn moments_dispersion_estimates_with_normalization_factors(
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }
 
-fn moments_dispersion_estimates_with_xim(
+pub(super) fn moments_dispersion_estimates_with_xim(
     base_mean: &[f64],
     base_var: &[f64],
     xim: f64,
@@ -535,7 +542,8 @@ fn moments_dispersion_estimates_with_xim(
     {
         if mean > 0.0 {
             let inv_mean = mean.recip();
-            let xim_mean = checked::try_mul(xim, mean).nonfinite_at("moments dispersion xim mean", Some(gene))?;
+            let xim_mean = checked::try_mul(xim, mean)
+                .nonfinite_at("moments dispersion xim mean", Some(gene))?;
             let centered = variance - xim_mean;
             if !centered.is_finite() {
                 return Err(DeseqError::NonFiniteValue {
@@ -544,8 +552,12 @@ fn moments_dispersion_estimates_with_xim(
                     value: centered,
                 });
             }
-            let inv_square = checked::try_mul(inv_mean, inv_mean).nonfinite_at("moments dispersion inverse mean square", Some(gene))?;
-            estimates.push(checked::try_mul(centered, inv_square).nonfinite_at("moments dispersion estimate", Some(gene))?);
+            let inv_square = checked::try_mul(inv_mean, inv_mean)
+                .nonfinite_at("moments dispersion inverse mean square", Some(gene))?;
+            estimates.push(
+                checked::try_mul(centered, inv_square)
+                    .nonfinite_at("moments dispersion estimate", Some(gene))?,
+            );
         } else {
             estimates.push(f64::NAN);
         }
@@ -553,7 +565,7 @@ fn moments_dispersion_estimates_with_xim(
     Ok(estimates)
 }
 
-fn normalization_factor_moments_xim(
+pub(super) fn normalization_factor_moments_xim(
     normalization_factors: &RowMajorMatrix<f64>,
     all_zero: Option<&[bool]>,
 ) -> Result<f64, DeseqError> {
@@ -582,7 +594,10 @@ fn normalization_factor_moments_xim(
     }
     let mut inverse_col_mean_sum = 0.0;
     for (sample, sum) in col_sums.iter().copied().enumerate() {
-        let col_mean = checked::try_div(sum, n_rows_used as f64).nonfinite_at("moments dispersion normalization-factor column mean", Some(sample))?;
+        let col_mean = checked::try_div(sum, n_rows_used as f64).nonfinite_at(
+            "moments dispersion normalization-factor column mean",
+            Some(sample),
+        )?;
         if !col_mean.is_finite() || col_mean <= 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
                 reason: format!(
@@ -597,5 +612,8 @@ fn normalization_factor_moments_xim(
             "moments dispersion inverse normalization-factor mean sum",
         )?;
     }
-    checked::try_div(inverse_col_mean_sum, normalization_factors.n_cols() as f64).nonfinite_at("moments dispersion inverse normalization-factor mean", Some(0))
+    checked::try_div(inverse_col_mean_sum, normalization_factors.n_cols() as f64).nonfinite_at(
+        "moments dispersion inverse normalization-factor mean",
+        Some(0),
+    )
 }

@@ -1,3 +1,4 @@
+use super::*;
 /// DESeq2's alpha-dependent NB log-likelihood kernel.
 ///
 /// Terms independent of alpha are omitted, matching the objective used inside
@@ -48,7 +49,8 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         let observation_weight = weights.map(|values| values[sample]).unwrap_or(1.0);
         let y = f64::from(count);
         let mu_alpha = mu * alpha;
-        let mu_plus_inv_alpha = checked::try_add(mu, inv_alpha).nonfinite_at("dispersion objective mean plus inverse alpha", Some(sample))?;
+        let mu_plus_inv_alpha = checked::try_add(mu, inv_alpha)
+            .nonfinite_at("dispersion objective mean plus inverse alpha", Some(sample))?;
         let log_gamma_y = if count == 0 {
             log_gamma_inv_alpha
         } else {
@@ -65,13 +67,17 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
                 value: term,
             });
         }
-        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at("dispersion objective weighted likelihood term", Some(sample))?;
-        total = checked::try_add(total, weighted_term).nonfinite_at("dispersion objective likelihood sum", Some(sample))?;
+        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at(
+            "dispersion objective weighted likelihood term",
+            Some(sample),
+        )?;
+        total = checked::try_add(total, weighted_term)
+            .nonfinite_at("dispersion objective likelihood sum", Some(sample))?;
     }
     Ok(total)
 }
 
-fn dispersion_lgamma(x: f64) -> f64 {
+pub(super) fn dispersion_lgamma(x: f64) -> f64 {
     if x > 10.0 {
         stirling_lgamma_positive(x)
     } else {
@@ -79,7 +85,7 @@ fn dispersion_lgamma(x: f64) -> f64 {
     }
 }
 
-fn stirling_lgamma_positive(x: f64) -> f64 {
+pub(super) fn stirling_lgamma_positive(x: f64) -> f64 {
     const LN_SQRT_2PI: f64 = 0.918_938_533_204_672_7;
     if x > 1.0e17 {
         return x * (x.ln() - 1.0);
@@ -92,7 +98,7 @@ fn stirling_lgamma_positive(x: f64) -> f64 {
     }
 }
 
-fn stirling_log_gamma_correction(x: f64) -> f64 {
+pub(super) fn stirling_log_gamma_correction(x: f64) -> f64 {
     const LGAMMA_COR_COEFFS: [f64; 5] = [
         0.166_638_948_045_186_3,
         -0.000_013_849_481_760_675_638,
@@ -104,7 +110,7 @@ fn stirling_log_gamma_correction(x: f64) -> f64 {
     chebyshev_eval(tmp * tmp * 2.0 - 1.0, &LGAMMA_COR_COEFFS) / x
 }
 
-fn chebyshev_eval(x: f64, coeffs: &[f64]) -> f64 {
+pub(super) fn chebyshev_eval(x: f64, coeffs: &[f64]) -> f64 {
     let twox = x * 2.0;
     let mut b2 = 0.0;
     let mut b1 = 0.0;
@@ -117,7 +123,7 @@ fn chebyshev_eval(x: f64, coeffs: &[f64]) -> f64 {
     (b0 - b2) * 0.5
 }
 
-fn dispersion_digamma(x: f64) -> f64 {
+pub(super) fn dispersion_digamma(x: f64) -> f64 {
     if x <= 0.0 || !x.is_finite() {
         return digamma(x);
     }
@@ -246,10 +252,7 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         } else {
             dispersion_digamma(y + inv_alpha)
         };
-        let term = digamma_inv_alpha
-            + mu_alpha.log1p
-            - mu_alpha.ratio
-            - digamma_y
+        let term = digamma_inv_alpha + mu_alpha.log1p - mu_alpha.ratio - digamma_y
             + y * mu_alpha.alpha_over_one_plus;
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
@@ -258,8 +261,12 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
                 value: term,
             });
         }
-        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at("dispersion objective weighted derivative term", Some(sample))?;
-        derivative_alpha = checked::try_add(derivative_alpha, weighted_term).nonfinite_at("dispersion objective derivative sum", Some(sample))?;
+        let weighted_term = checked::try_mul(observation_weight, term).nonfinite_at(
+            "dispersion objective weighted derivative term",
+            Some(sample),
+        )?;
+        derivative_alpha = checked::try_add(derivative_alpha, weighted_term)
+            .nonfinite_at("dispersion objective derivative sum", Some(sample))?;
     }
     checked_log_alpha_first_derivative(
         inv_alpha,
@@ -319,9 +326,7 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         let y = f64::from(count);
         let mu_alpha = mu_alpha_terms(mu, alpha, sample, "dispersion objective second derivative")?;
         let first_term =
-            digamma_inv_alpha + mu_alpha.log1p
-                - mu_alpha.ratio
-                - dispersion_digamma(y + inv_alpha)
+            digamma_inv_alpha + mu_alpha.log1p - mu_alpha.ratio - dispersion_digamma(y + inv_alpha)
                 + y * mu_alpha.alpha_over_one_plus;
         let base_trigamma = match trigamma_inv_alpha {
             Some(value) => value,
@@ -351,13 +356,19 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         }
         checked_matrix_add_assign(
             &mut first_alpha_sum,
-            checked::try_mul(observation_weight, first_term).nonfinite_at("dispersion objective weighted first derivative term", Some(sample))?,
+            checked::try_mul(observation_weight, first_term).nonfinite_at(
+                "dispersion objective weighted first derivative term",
+                Some(sample),
+            )?,
             sample,
             "dispersion objective first derivative sum",
         )?;
         checked_matrix_add_assign(
             &mut second_alpha_sum,
-            checked::try_mul(observation_weight, second_term).nonfinite_at("dispersion objective weighted second derivative term", Some(sample))?,
+            checked::try_mul(observation_weight, second_term).nonfinite_at(
+                "dispersion objective weighted second derivative term",
+                Some(sample),
+            )?,
             sample,
             "dispersion objective second derivative sum",
         )?;
