@@ -117,15 +117,3 @@ pub enum TestType {
     /// Likelihood-ratio test.
     Lrt,
 }
-
-/// Execution policy for deterministic parity, speed, or diagnostics.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ExecutionMode {
-    /// Deterministic, parity-first behavior.
-    #[default]
-    Strict,
-    /// Future aggressive parallel and approximate paths.
-    Fast,
-    /// Expose extra intermediate state and convergence diagnostics.
-    Diagnostic,
-}

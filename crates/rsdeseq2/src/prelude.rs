@@ -143,8 +143,7 @@ pub use crate::normalization::{
     normalized_counts_with_factors, validate_normalization_factors,
 };
 pub use crate::options::{
-    ControlGenes, CooksCutoff, ExecutionMode, FitType, SizeFactorMethod, SizeFactorOptions,
-    TestType,
+    ControlGenes, CooksCutoff, FitType, SizeFactorMethod, SizeFactorOptions, TestType,
 };
 pub use crate::results::{
     CooksMask, CooksPolicy, DESEQ2_RESULT_CORE_COLUMNS, DeseqResultColumn,

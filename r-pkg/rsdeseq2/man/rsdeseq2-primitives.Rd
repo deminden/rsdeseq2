@@ -32,13 +32,13 @@ static library from the vendored Rust source using Cargo.
 }
 \usage{
 DESeq(object, fitType = c("parametric", "local", "mean"),
-  test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
+  test = c("Wald", "LRT"), engine = "rust",
   nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
   normalizationFactors = NULL, weights = NULL,
   minReplicatesForReplace = 7L, ...)
 
 fitRust(object, fitType = c("parametric", "local", "mean"),
-  test = c("Wald", "LRT"), engine = "rust", parityMode = "strict",
+  test = c("Wald", "LRT"), engine = "rust",
   nproc = 1L, design = NULL, reduced = NULL, sizeFactors = NULL,
   normalizationFactors = NULL, weights = NULL,
   minReplicatesForReplace = 7L, ...)
@@ -92,7 +92,7 @@ rsdeseq2DiagnosticSchemaRust(native = FALSE)
 
 DESeq(object, fitType = c("parametric", "local", "mean"),
   test = c("Wald", "LRT"), engine = "rust",
-  parityMode = "strict", nproc = 1, design = NULL, reduced = NULL,
+  nproc = 1, design = NULL, reduced = NULL,
   sizeFactors = NULL, normalizationFactors = NULL, weights = NULL,
   minReplicatesForReplace = 7L, ...)
 
@@ -215,8 +215,7 @@ for implemented \code{results()} behavior, a list-like primitive Wald/LRT input,
 or an already-fitted DESeq2-shaped list/S4-like object with compatible \code{mcols}
 fields for direct \code{results()} dispatch, \code{nbinomWaldTestRust()}, or
 \code{nbinomLRTRust()}.}
-\item{fitType, engine, parityMode, nproc}{Trend fit, Rust engine, execution
-mode (\code{strict}, \code{fast}, or \code{diagnostic}), and thread count.}
+\item{fitType, engine, nproc}{Trend fit, Rust engine and thread count.}
 \item{blind}{Whether a transformation should ignore the dataset design and use
 an intercept-only dispersion fit.}
 \item{nsub}{Positive integer number of genes used to fit the fast VST trend.

@@ -1,3 +1,8 @@
+# rsdeseq2 (development)
+
+* Remove the `parityMode` argument of `DESeq()` and `fitRust()`. Only strict
+  parity mode was ever implemented; `"fast"` and `"diagnostic"` had no effect.
+
 # rsdeseq2 0.5.0 (prepared)
 
 * Run supported fitting, formulas, result queries, transforms and normal/ashr/

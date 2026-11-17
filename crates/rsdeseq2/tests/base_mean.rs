@@ -102,7 +102,6 @@ fn builder_returns_initial_fit_state() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
     let fit = DeseqBuilder::new()
         .size_factor_method(SizeFactorMethod::Ratio)
-        .execution_mode(ExecutionMode::Strict)
         .fit_size_factors_and_base_means(&counts)
         .unwrap();
 

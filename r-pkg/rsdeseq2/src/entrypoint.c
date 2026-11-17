@@ -165,7 +165,7 @@ SEXP rsdeseq2_base_metadata(SEXP counts, SEXP size_factors, SEXP normalization_f
     UNPROTECT(6); return out;
 }
 
-SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_factors_input, SEXP normalization_factors, SEXP observation_weights, SEXP fit_type, SEXP test_type, SEXP min_replicates_for_replace, SEXP cooks_replacement_cutoff, SEXP threads, SEXP execution_mode) {
+SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_factors_input, SEXP normalization_factors, SEXP observation_weights, SEXP fit_type, SEXP test_type, SEXP min_replicates_for_replace, SEXP cooks_replacement_cutoff, SEXP threads) {
     validate_matrix(counts, "counts");
     validate_design(design, matrix_cols(counts), "design");
     if (reduced_design != R_NilValue) validate_design(reduced_design, matrix_cols(counts), "reduced design");
@@ -175,7 +175,6 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
     validate_integer_scalar(min_replicates_for_replace, 0, INT_MAX, "min_replicates_for_replace");
     validate_real_scalar(cooks_replacement_cutoff, "cooks_replacement_cutoff");
     validate_integer_scalar(threads, 1, INT_MAX, "threads");
-    validate_integer_scalar(execution_mode, 0, 2, "execution_mode");
     checked_product(matrix_rows(counts), 13);
     checked_product(checked_product(matrix_rows(counts), matrix_cols(design)), matrix_cols(design));
 
@@ -235,7 +234,7 @@ SEXP rsdeseq2_fit(SEXP counts, SEXP design, SEXP reduced_design, SEXP size_facto
         n_coefficients, REAL(design), reduced_coefficients, reduced_values,
         Rf_asInteger(fit_type), Rf_asInteger(test_type), (size_t)Rf_asInteger(min_replicates_for_replace),
         Rf_asReal(cooks_replacement_cutoff),
-        (size_t)Rf_asInteger(threads), Rf_asInteger(execution_mode), REAL(values),
+        (size_t)Rf_asInteger(threads), REAL(values),
         REAL(beta), REAL(beta_se), REAL(beta_covariance), REAL(mu_out), REAL(cooks_out),
         &replacement_owner,
         replace_values, replaceable_values, refit_rows_values, new_all_zero_values, &n_refit_value, REAL(size_factors_out),
@@ -661,7 +660,7 @@ static const R_CallMethodDef call_methods[] = {
     {"rsdeseq2_normalized_counts", (DL_FUNC)&rsdeseq2_normalized_counts, 3},
     {"rsdeseq2_base_mean", (DL_FUNC)&rsdeseq2_base_mean, 3},
     {"rsdeseq2_base_metadata", (DL_FUNC)&rsdeseq2_base_metadata, 4},
-    {"rsdeseq2_fit", (DL_FUNC)&rsdeseq2_fit, 12},
+    {"rsdeseq2_fit", (DL_FUNC)&rsdeseq2_fit, 11},
     {"rsdeseq2_transform", (DL_FUNC)&rsdeseq2_transform, 16},
     {"rsdeseq2_lfc_shrink_normal", (DL_FUNC)&rsdeseq2_lfc_shrink_normal, 11},
     {"rsdeseq2_lfc_shrink_normal_contrast", (DL_FUNC)&rsdeseq2_lfc_shrink_normal_contrast, 16},

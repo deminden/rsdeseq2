@@ -36,7 +36,6 @@ DESeq <- function(object,
                   fitType = c("parametric", "local", "mean"),
                   test = c("Wald", "LRT"),
                   engine = "rust",
-                  parityMode = "strict",
                   nproc = 1L,
                   design = NULL,
                   reduced = NULL,
@@ -55,7 +54,6 @@ DESeq <- function(object,
   if (!identical(engine, "rust")) {
     stop("engine must be 'rust'", call. = FALSE)
   }
-  parityMode <- match.arg(parityMode, c("strict", "fast", "diagnostic"))
   .rsdeseq2_check_unused_arguments(list(...), "DESeq")
   if (length(nproc) != 1L || is.na(nproc) || !is.finite(nproc) || nproc < 1L || nproc > .Machine$integer.max || nproc != floor(nproc)) {
     stop("nproc must be a positive integer", call. = FALSE)
@@ -193,7 +191,6 @@ DESeq <- function(object,
     if (disableReplacement) 0L else as.integer(minReplicatesForReplace),
     .rsdeseq2_default_cooks_cutoff(design) %||% NA_real_,
     as.integer(nproc),
-    as.integer(match(parityMode, c("strict", "fast", "diagnostic")) - 1L),
     PACKAGE = "rsdeseq2"
   )
   rawPvalue <- results$results$rawPvalue

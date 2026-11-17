@@ -15,7 +15,7 @@ extern int rsdeseq2_r_fit(
     size_t coefficients, const double *design,
     size_t reduced_coefficients, const double *reduced,
     int fit_type, int test_type, size_t min_replicates, double replacement_cutoff,
-    size_t threads, int execution_mode,
+    size_t threads,
     double *results, double *beta, double *beta_se, double *covariance,
     double *mu, double *cooks, Rsdeseq2ReplacementCounts **replacement,
     uint8_t *replace, uint8_t *replaceable, uint8_t *refit_rows,

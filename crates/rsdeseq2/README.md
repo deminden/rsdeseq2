@@ -79,7 +79,6 @@ fn main() -> Result<(), DeseqError> {
 
     let fit = DeseqBuilder::new()
         .size_factor_method(SizeFactorMethod::Ratio)
-        .execution_mode(ExecutionMode::Strict)
         .fit_size_factors_and_base_means(&counts)?;
 
     println!("{:?}", fit.size_factors);

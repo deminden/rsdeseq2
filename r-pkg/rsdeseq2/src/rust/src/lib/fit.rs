@@ -25,7 +25,6 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     min_replicates_for_replace: usize,
     cooks_replacement_cutoff: f64,
     threads: usize,
-    execution_mode: i32,
     result_output: *mut f64,
     beta_output: *mut f64,
     beta_se_output: *mut f64,
@@ -71,17 +70,10 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             1 => TestType::Lrt,
             _ => return Err("test must be Wald or LRT".into()),
         };
-        let selected_execution_mode = match execution_mode {
-            0 => ExecutionMode::Strict,
-            1 => ExecutionMode::Fast,
-            2 => ExecutionMode::Diagnostic,
-            _ => return Err("parityMode must be strict, fast, or diagnostic".into()),
-        };
         let mut builder = DeseqBuilder::new()
             .automatic_dispersion_means()
             .fit_type(selected_fit_type)
             .test(selected_test_type)
-            .execution_mode(selected_execution_mode)
             .threads(threads.max(1));
         if !size_factors_values.is_null() {
             builder = builder.size_factors(
