@@ -43,12 +43,15 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     base_var_output: *mut f64,
     all_zero_output: *mut i32,
     lrt_df_output: *mut i32,
+    fit_type_used_output: *mut i32,
 ) -> i32 {
     let mut pending = None;
     let status = run_backend(|| {
         if replacement_output.is_null() { return Err("replacement owner output pointer is null".into()); }
         unsafe { *replacement_output = ptr::null_mut(); }
         let lrt_df = unsafe { output_slice(lrt_df_output, 1, "LRT degrees of freedom")? };
+        let fit_type_used =
+            unsafe { output_slice(fit_type_used_output, 1, "fitted dispersion trend type")? };
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_matrix =
             unsafe { row_major_from_column_major(n_samples, n_coefficients, design_values)? };
@@ -123,6 +126,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 .map_err(|error| error.to_string())?;
             (merged_fit, results, Some(plan))
         };
+        fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
         lrt_df[0] = fit.lrt.as_ref().map(|lrt| i32::try_from(lrt.degrees_of_freedom)
             .map_err(|_| "LRT degrees of freedom exceed the R integer range"))
             .transpose()?.unwrap_or(0);

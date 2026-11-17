@@ -193,6 +193,7 @@ DESeq <- function(object,
     as.integer(nproc),
     PACKAGE = "rsdeseq2"
   )
+  fitType <- .rsdeseq2_note_fit_type_used(fitType, results$fitTypeUsed)
   rawPvalue <- results$results$rawPvalue
   rawStat <- results$results$rawStat
   results$results$rawPvalue <- NULL

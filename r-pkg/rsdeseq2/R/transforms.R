@@ -190,20 +190,11 @@
       PACKAGE = "rsdeseq2"
     )
   }
-  output <- tryCatch(
-    runTransform(fitType),
-    error = function(error) {
-      parametricFailure <- grepl(
-        "dispersion fit did not converge|parametric dispersion fit failed",
-        conditionMessage(error)
-      )
-      if (fitType != "parametric" || !parametricFailure) {
-        stop(error)
-      }
-      fitType <<- "local"
-      runTransform(fitType)
-    }
-  )
+  output <- runTransform(fitType)
+  if (frozenTrendType < 0L && is.null(frozenDispFit)) {
+    # Frozen trends run the backend as "mean" and keep their stored fitType.
+    fitType <- .rsdeseq2_note_fit_type_used(fitType, output$fitTypeUsed)
+  }
   if (is.null(normalizationFactors)) {
     DESeq2::sizeFactors(object) <- output$sizeFactors
   } else {

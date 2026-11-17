@@ -1,5 +1,10 @@
 # rsdeseq2 (development)
 
+* With `fitType = "parametric"`, a failed parametric dispersion trend is now
+  replaced by the local trend inside the Rust core for `DESeq()` as well as the
+  transforms, with DESeq2's message. The fit and transform metadata record the
+  trend actually used. Previously `DESeq()` stopped with "dispersion fit did
+  not converge".
 * Remove the `parityMode` argument of `DESeq()` and `fitRust()`. Only strict
   parity mode was ever implemented; `"fast"` and `"diagnostic"` had no effect.
 

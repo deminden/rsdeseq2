@@ -31,8 +31,12 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
     size_factors_output: *mut f64,
     intercept_output: *mut f64,
     prior_variance_output: *mut f64,
+    fit_type_used_output: *mut i32,
 ) -> i32 {
     run_backend(|| {
+        let fit_type_used =
+            unsafe { output_slice(fit_type_used_output, 1, "fitted dispersion trend type")? };
+        fit_type_used[0] = fit_type;
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_values =
             unsafe { row_major_from_column_major(n_samples, n_coefficients, design_values)? };
@@ -84,6 +88,8 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                 let output = builder
                     .fast_vst_glm_mu(&counts, &design, nsub)
                     .map_err(|error| error.to_string())?;
+                fit_type_used[0] =
+                    fit_type_code(output.subset_fit.dispersion_trend.as_ref(), fit_type);
                 unsafe {
                     output_slice(size_factors_output, n_samples, "size factors")?
                         .copy_from_slice(&output.subset_fit.size_factors);
@@ -132,6 +138,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                         .map_err(|error| error.to_string())?;
                     (fit, rlog)
                 };
+                fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
                 unsafe {
                     output_slice(size_factors_output, n_samples, "size factors")?
                         .copy_from_slice(&fit.size_factors);
@@ -242,6 +249,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                         .fit_dispersion_trend_glm_mu(&counts, &design)
                         .map_err(|error| error.to_string())?;
                     let transformed = fit.vst(&counts).map_err(|error| error.to_string())?;
+                    fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
                     (transformed, fit.size_factors)
                 };
                 unsafe {
@@ -256,4 +264,16 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
         };
         unsafe { copy_matrix_to_r(&transformed, transformed_output) }
     })
+}
+
+/// R's `fitType` code (0 parametric, 1 local, 2 mean) of the trend a fit used,
+/// which differs from the request when a failed parametric fit fell back to
+/// the local trend; the request when no trend was fitted.
+fn fit_type_code(trend: Option<&DispersionTrendFit>, requested: i32) -> i32 {
+    match trend {
+        Some(DispersionTrendFit::Parametric(_)) => 0,
+        Some(DispersionTrendFit::Local(_)) => 1,
+        Some(DispersionTrendFit::Mean(_)) => 2,
+        None => requested,
+    }
 }

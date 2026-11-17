@@ -402,3 +402,36 @@ testthat::test_that("dataset fast VST matches weighted subset and eligibility be
   testthat::expect_error(vst(small_dds, nsub = 10L, fitType = "mean"))
   testthat::expect_error(DESeq2::vst(small_dds, nsub = 10L, fitType = "mean"))
 })
+
+testthat::test_that("a failed parametric trend falls back to local as in DESeq2", {
+  testthat::skip_if_not_installed("DESeq2")
+  counts <- .rsdeseq2_test_counts()
+  col_data <- data.frame(
+    condition = factor(rep(c("A", "B"), each = 4), levels = c("A", "B")),
+    row.names = colnames(counts)
+  )
+  dds <- DESeq2::DESeqDataSetFromMatrix(counts, col_data, design = ~ condition)
+  reference <- suppressMessages(
+    DESeq2::DESeq(dds, quiet = TRUE, minReplicatesForReplace = Inf)
+  )
+  testthat::skip_if_not(
+    identical(attr(DESeq2::dispersionFunction(reference), "fitType"), "local"),
+    "the parametric trend fits this fixture"
+  )
+  testthat::expect_message(
+    parametric <- DESeq(dds, minReplicatesForReplace = Inf),
+    "local regression fit was automatically substituted"
+  )
+  local <- DESeq(dds, fitType = "local", minReplicatesForReplace = Inf)
+  testthat::expect_identical(
+    S4Vectors::metadata(parametric)$rsdeseq2RustFit$fitType, "local"
+  )
+  testthat::expect_identical(
+    S4Vectors::metadata(parametric)$rsdeseq2RustFit$dispersions,
+    S4Vectors::metadata(local)$rsdeseq2RustFit$dispersions
+  )
+  testthat::expect_message(
+    vst(dds, nsub = 10L),
+    "local regression fit was automatically substituted"
+  )
+})
