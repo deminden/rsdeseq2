@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) fn cli_normalized_counts(
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     normalization_factors: Option<PathBuf>,
     size_factors: Option<PathBuf>,
     method: SizeFactorMethodArg,
@@ -121,7 +121,7 @@ pub(super) fn cli_additive_beta_prior_replacement_output(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn cli_expanded_beta_prior_wald_analysis(
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     expanded_design: PathBuf,
     coefficient_groups: &str,
@@ -289,7 +289,7 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn cli_factor_beta_prior_wald_analysis(
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     factor: String,
     reference: String,
@@ -467,7 +467,7 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn cli_additive_beta_prior_wald_analysis(
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     standard_design: &crate::design::DesignMatrix,
     factor_names: Vec<String>,
     references: Vec<String>,

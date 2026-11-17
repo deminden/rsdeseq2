@@ -1,8 +1,8 @@
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::DeseqError;
 use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{IrlsOptions, fit_fixed_dispersion_irls};
+use crate::matrix::CountMatrix;
 
 /// Fit a supplied-dispersion negative-binomial GLM.
 ///

@@ -1,7 +1,7 @@
 //! Borrowed unsigned counts in native or foreign double storage.
 use super::{MatrixOrder, MatrixView};
-use crate::core::CountMatrix;
 use crate::errors::DeseqError;
+use crate::matrix::CountMatrix;
 
 #[derive(Clone, Copy, Debug)]
 enum Storage<'a> {

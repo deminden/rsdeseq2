@@ -4,13 +4,13 @@ use super::{
     mask_cooks_policy_rows, resolve_cooks_cutoff,
 };
 use crate::contrasts::ResultsContrast;
-use crate::core::{CountMatrix, DeseqFit};
 use crate::errors::DeseqError;
 use crate::glm::{WaldTestOptions, wald::validate_wald_options};
 use crate::independent_filtering::{
     IndependentFilteringOptions, apply_independent_filtering, validate_alpha, validate_theta,
 };
 use crate::options::CooksCutoff;
+use crate::{core::DeseqFit, matrix::CountMatrix};
 
 /// A contrast and validated statistical/presentation options for a stored fit.
 ///

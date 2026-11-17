@@ -5,7 +5,6 @@ use crate::numeric::validate::{
 mod row_preparation;
 pub use row_preparation::NormalShrinkageRows;
 
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
@@ -15,6 +14,7 @@ use crate::glm::irls::{
     normalization_factors_from_size_factors,
 };
 use crate::glm::nb::nbinom_log_likelihood_matrix;
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use statrs::distribution::{ContinuousCDF, Normal};
 

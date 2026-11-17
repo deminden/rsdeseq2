@@ -38,7 +38,7 @@ pub(super) fn fit_coefficient_names(fit: &DeseqFit) -> Option<&[String]> {
 
 pub(super) fn apply_cli_normalization_inputs(
     builder: DeseqBuilder,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     normalization_factors: Option<PathBuf>,
     size_factors: Option<PathBuf>,
 ) -> Result<DeseqBuilder, DeseqError> {
@@ -56,7 +56,7 @@ pub(super) fn apply_cli_normalization_inputs(
 
 pub(super) fn apply_cli_size_factor_controls(
     mut builder: DeseqBuilder,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     geometric_means: Option<PathBuf>,
     control_genes: Option<Vec<usize>>,
 ) -> Result<DeseqBuilder, DeseqError> {
@@ -71,7 +71,7 @@ pub(super) fn apply_cli_size_factor_controls(
 
 pub(super) fn read_cli_geometric_means(
     path: Option<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<Option<Vec<f64>>, DeseqError> {
     path.map(|path| {
         align_gene_numeric_values_to_genes(
@@ -89,7 +89,7 @@ pub(super) fn read_cli_geometric_means(
 
 pub(super) fn read_cli_frozen_intercept(
     path: Option<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<Option<Vec<f64>>, DeseqError> {
     path.map(|path| {
         align_gene_numeric_values_to_genes(
@@ -108,7 +108,7 @@ pub(super) fn read_cli_frozen_intercept(
 
 pub(super) fn read_cli_gene_numeric(
     path: impl Into<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     context: &str,
 ) -> Result<Vec<f64>, DeseqError> {
     align_gene_numeric_values_to_genes(
@@ -143,7 +143,7 @@ pub(super) fn cli_rlog_prior_without_frozen_intercept() -> DeseqError {
 
 pub(super) fn read_cli_size_factors(
     path: impl Into<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<Vec<f64>, DeseqError> {
     align_sample_numeric_values_to_samples(
         &read_labeled_size_factors_tsv(path.into())?,
@@ -158,7 +158,7 @@ pub(super) fn read_cli_size_factors(
 
 pub(super) fn read_cli_normalization_factors(
     path: impl Into<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<crate::matrix::RowMajorMatrix<f64>, DeseqError> {
     align_labeled_assay_matrix_to_counts(
         read_labeled_normalization_factors_tsv(path.into())?,
@@ -169,7 +169,7 @@ pub(super) fn read_cli_normalization_factors(
 
 pub(super) fn read_cli_observation_weights(
     path: impl Into<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<crate::matrix::RowMajorMatrix<f64>, DeseqError> {
     align_labeled_assay_matrix_to_counts(
         read_labeled_observation_weights_tsv(path.into())?,
@@ -214,7 +214,7 @@ pub(super) fn apply_cli_result_options(
 
 pub(super) fn apply_cli_wald_t_options(
     builder: DeseqBuilder,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
     use_t: bool,
     t_degrees_of_freedom: Option<f64>,
     t_degrees_of_freedom_file: Option<PathBuf>,
@@ -254,7 +254,7 @@ pub(super) fn apply_cli_wald_t_options(
 
 pub(super) fn read_cli_design_matrix(
     path: impl Into<PathBuf>,
-    counts: &crate::core::CountMatrix,
+    counts: &crate::matrix::CountMatrix,
 ) -> Result<crate::design::DesignMatrix, DeseqError> {
     align_design_matrix_to_samples(
         read_labeled_design_matrix_tsv(path.into())?,

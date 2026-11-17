@@ -1,9 +1,9 @@
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::beta::{fit_prior_nf_for_output, fit_prior_sf_for_output};
 use crate::glm::irls::OutputRequirements;
 use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{normalized_counts, normalized_counts_with_factors};
 

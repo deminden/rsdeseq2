@@ -1,6 +1,6 @@
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::{
     base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,

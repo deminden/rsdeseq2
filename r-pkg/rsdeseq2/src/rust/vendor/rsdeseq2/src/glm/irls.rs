@@ -7,7 +7,6 @@ use rayon::prelude::*;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 use std::cell::RefCell;
 
-use crate::core::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
@@ -18,6 +17,7 @@ use crate::glm::nb::{
 };
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 
 /// Internal retention policy; fitting and fallback arithmetic are identical.

@@ -1,7 +1,7 @@
 use nalgebra::DMatrix;
 use statrs::function::gamma::{digamma, ln_gamma};
 
-use crate::core::CountMatrix;
+use crate::matrix::CountMatrix;
 use crate::design::DesignMatrix;
 use crate::errors::{invalid_dimensions, DeseqError};
 use crate::glm::IrlsOptions;

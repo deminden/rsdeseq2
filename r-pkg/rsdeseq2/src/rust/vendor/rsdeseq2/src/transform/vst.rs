@@ -1,6 +1,6 @@
-use crate::core::CountMatrix;
 use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDispersionTrend};
 use crate::errors::DeseqError;
+use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked::{self, CheckedExt};
 
