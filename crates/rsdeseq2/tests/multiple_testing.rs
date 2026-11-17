@@ -44,6 +44,10 @@ fn original_bh_adjust_handles_ties_endpoints_and_omitted_values() {
 
 #[test]
 fn bh_adjust_rejects_invalid_f64_input() {
-    assert!(bh_adjust_f64(&[0.1, f64::NAN]).is_err());
-    assert!(bh_adjust_f64(&[0.1, 1.2]).is_err());
+    for pvalues in [[0.1, f64::NAN], [0.1, 1.2]] {
+        assert!(matches!(
+            bh_adjust_f64(&pvalues),
+            Err(rsdeseq2::DeseqError::InvalidOptions { .. })
+        ));
+    }
 }

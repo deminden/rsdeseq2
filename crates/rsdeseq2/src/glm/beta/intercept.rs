@@ -240,13 +240,7 @@ fn intercept_working_weights(
             Some(weights) => {
                 let weight = weights[sample];
                 validate_nonnegative_finite(weight, "weight", sample)?;
-                checked::mul(weight, working_weight).ok_or_else(|| {
-                    DeseqError::NonFiniteValue {
-                        context: "intercept working weight".to_string(),
-                        index: Some(sample),
-                        value: f64::NAN,
-                    }
-                })?
+                checked::try_mul(weight, working_weight).nonfinite_at("intercept working weight", Some(sample))?
             }
             None => working_weight,
         });

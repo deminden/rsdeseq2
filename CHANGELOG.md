@@ -17,6 +17,20 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   numerical code; "fast" and "diagnostic" were accepted and ignored. Passing
   `parityMode` to the R functions is now an unused-argument error.
 
+### Changed
+
+- Error variants that named the wrong input: `bh_adjust_f64` now reports
+  invalid p-values as `InvalidOptions` (was `InvalidSizeFactors`);
+  `math::median` reports empty input as `InvalidDimensions` with context
+  `median input` (was `InvalidSizeFactors`); an impossible LRT chi-square
+  distribution is `InvalidOptions` (was `InvalidCounts`). Messages are otherwise
+  unchanged.
+- `NonFiniteValue` errors report the rejected value instead of `NaN` in 34
+  places (normalization, base means and variances, IRLS working weights,
+  responses and linear predictors, beta-prior helpers, contrast all-zero
+  checks, independent filtering and local VST). Numerical results are
+  unchanged.
+
 ### Deprecated
 
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes

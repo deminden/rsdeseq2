@@ -69,25 +69,9 @@ fn checked_mean_dispersion_working_weight(
     index: usize,
     context: &str,
 ) -> Result<f64, DeseqError> {
-    let Some(inv_mean) = checked::div(1.0, mean) else {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value: f64::NAN,
-        });
-    };
-    let Some(denominator) = checked::add(inv_mean, dispersion) else {
-        return Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: Some(index),
-            value: f64::NAN,
-        });
-    };
-    checked::div(1.0, denominator).ok_or_else(|| DeseqError::NonFiniteValue {
-        context: context.to_string(),
-        index: Some(index),
-        value: f64::NAN,
-    })
+    let inv_mean = checked::try_div(1.0, mean).nonfinite_at(context, Some(index))?;
+    let denominator = checked::try_add(inv_mean, dispersion).nonfinite_at(context, Some(index))?;
+    checked::try_div(1.0, denominator).nonfinite_at(context, Some(index))
 }
 
 fn checked_square(value: f64) -> Option<f64> {

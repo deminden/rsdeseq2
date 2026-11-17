@@ -37,6 +37,12 @@ pub(crate) struct NonFinite {
 /// Result of a checked operation that keeps the rejected value.
 pub(crate) type Checked = Result<f64, NonFinite>;
 
+/// Rejection of `value` without a reduction index.
+#[inline(always)]
+pub(crate) fn reject(value: f64) -> Checked {
+    Err(NonFinite { value, index: None })
+}
+
 #[inline(always)]
 fn finite(value: f64) -> Checked {
     if value.is_finite() {
@@ -188,8 +194,6 @@ pub(crate) trait CheckedExt {
     fn nonfinite(self, context: &str) -> Result<f64, DeseqError>;
 
     /// `NonFiniteValue` with an explicit index, replacing any recorded one.
-    ///
-    /// For `Option<f64>` the rejected value is unknown and recorded as NaN.
     fn nonfinite_at(self, context: &str, index: Option<usize>) -> Result<f64, DeseqError>;
 
     /// `InvalidDispersion` with the reason "`{context}` must remain finite".
@@ -228,23 +232,6 @@ impl CheckedExt for Checked {
     #[inline(always)]
     fn invalid_dispersion(self, context: &str) -> Result<f64, DeseqError> {
         self.map_err(|_| dispersion_error(context))
-    }
-}
-
-impl CheckedExt for Option<f64> {
-    #[inline(always)]
-    fn nonfinite(self, context: &str) -> Result<f64, DeseqError> {
-        self.nonfinite_at(context, None)
-    }
-
-    #[inline(always)]
-    fn nonfinite_at(self, context: &str, index: Option<usize>) -> Result<f64, DeseqError> {
-        self.ok_or_else(|| nonfinite_error(context, index, f64::NAN))
-    }
-
-    #[inline(always)]
-    fn invalid_dispersion(self, context: &str) -> Result<f64, DeseqError> {
-        self.ok_or_else(|| dispersion_error(context))
     }
 }
 
@@ -346,14 +333,17 @@ mod tests {
             error,
             DeseqError::NonFiniteValue { index: Some(0), value, .. } if value == f64::INFINITY
         ));
-        let error = None::<f64>.invalid_dispersion("trend").unwrap_err();
+        let error = try_div(1.0, 0.0).invalid_dispersion("trend").unwrap_err();
         assert!(matches!(
             error,
             DeseqError::InvalidDispersion { ref reason } if reason == "trend must remain finite"
         ));
-        let error = None::<f64>.nonfinite_at("mean", None).unwrap_err();
-        assert!(
-            matches!(error, DeseqError::NonFiniteValue { index: None, value, .. } if value.is_nan())
-        );
+        let error = try_mean(&[1.0, f64::NEG_INFINITY])
+            .nonfinite_at("mean", None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            DeseqError::NonFiniteValue { index: None, value, .. } if value == f64::NEG_INFINITY
+        ));
     }
 }

@@ -1,4 +1,4 @@
-use crate::numeric::checked;
+use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::validate::{
     nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
 };

@@ -22,13 +22,7 @@ pub fn average_expanded_model_coefficients(
         let row = expanded_beta.row(gene)?;
         for group in coefficient_groups {
             let grouped = group.iter().map(|&column| row[column]).collect::<Vec<_>>();
-            values.push(checked::mean(&grouped).ok_or_else(|| {
-                DeseqError::NonFiniteValue {
-                    context: "expanded beta coefficient average".to_string(),
-                    index: Some(gene),
-                    value: f64::NAN,
-                }
-            })?);
+            values.push(checked::try_mean(&grouped).nonfinite_at("expanded beta coefficient average", Some(gene))?);
         }
     }
 

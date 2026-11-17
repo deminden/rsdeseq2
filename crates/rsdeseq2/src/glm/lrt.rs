@@ -40,7 +40,7 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
 
     let degrees_of_freedom = full.beta.n_cols() - reduced.beta.n_cols();
     let distribution =
-        ChiSquared::new(degrees_of_freedom as f64).map_err(|error| DeseqError::InvalidCounts {
+        ChiSquared::new(degrees_of_freedom as f64).map_err(|error| DeseqError::InvalidOptions {
             reason: format!("invalid LRT chi-square distribution: {error}"),
         })?;
     let mut deviance = Vec::with_capacity(full.log_like.len());

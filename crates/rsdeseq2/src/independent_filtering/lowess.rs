@@ -30,7 +30,7 @@ pub(super) fn lowess_sorted(
             })
             .collect::<Result<Vec<_>, DeseqError>>()?;
         let mean_absolute_residual =
-            checked::mean(&residuals).nonfinite_at("lowess mean absolute residual", None)?;
+            checked::try_mean(&residuals).nonfinite_at("lowess mean absolute residual", None)?;
         let scale = six_mad(&residuals)?;
         if scale
             < checked::try_mul(1e-7, mean_absolute_residual)

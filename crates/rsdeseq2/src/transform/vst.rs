@@ -504,11 +504,11 @@ fn quantile_type7_checked(values: &[f64], probability: f64) -> Result<f64, Deseq
     }
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
-    if sorted.iter().any(|value| !value.is_finite()) {
+    if let Some(value) = sorted.iter().copied().find(|value| !value.is_finite()) {
         return Err(DeseqError::NonFiniteValue {
             context: "local VST row means".to_string(),
             index: None,
-            value: f64::NAN,
+            value,
         });
     }
     if sorted.len() == 1 {

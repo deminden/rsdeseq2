@@ -195,11 +195,7 @@ fn average_covariance_block(
                 .map(move |&right| covariance[left * n_coefficients + right])
         })
         .collect::<Vec<_>>();
-    let sum = checked::scaled_sum(&terms).ok_or_else(|| DeseqError::NonFiniteValue {
-        context: "expanded beta covariance average".to_string(),
-        index: Some(gene),
-        value: f64::NAN,
-    })?;
+    let sum = checked::try_scaled_sum(&terms).nonfinite_at("expanded beta covariance average", Some(gene))?;
     let denominator = left_group
         .len()
         .checked_mul(right_group.len())
@@ -208,11 +204,7 @@ fn average_covariance_block(
             expected: usize::MAX,
             actual: 0,
         })?;
-    checked::div(sum, denominator as f64).ok_or_else(|| DeseqError::NonFiniteValue {
-        context: "expanded beta covariance average".to_string(),
-        index: Some(gene),
-        value: f64::NAN,
-    })
+    checked::try_div(sum, denominator as f64).nonfinite_at("expanded beta covariance average", Some(gene))
 }
 
 fn beta_se_from_covariance(

@@ -56,13 +56,7 @@ fn fitted_mu_log2_unfloored(
     (0..x.nrows())
         .map(|sample| {
             validate_positive_finite(nf[sample], "normalization factor", sample)?;
-            let eta = checked_row_dot_slice(x, sample, beta).ok_or_else(|| {
-                DeseqError::NonFiniteValue {
-                    context: "optim fallback linear predictor".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                }
-            })?;
+            let eta = checked_row_dot_slice(x, sample, beta).nonfinite_at("optim fallback linear predictor", Some(sample))?;
             let mu = nf[sample] * 2.0_f64.powf(eta);
             if !mu.is_finite() || mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
@@ -111,19 +105,9 @@ fn fitted_mu_into(
         |(sample, (row, factor))| -> Result<f64, DeseqError> {
             validate_positive_finite(factor, "normalization factor", sample)?;
             let eta =
-                checked_row_dot_vector(x, row, beta).ok_or_else(|| DeseqError::NonFiniteValue {
-                    context: "IRLS linear predictor".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                })?;
+                checked_row_dot_vector(x, row, beta).nonfinite_at("IRLS linear predictor", Some(sample))?;
             let log_factor = log_nf.map(|values| values[sample]);
-            let mu = finite_scaled_exp_with_log(factor, eta, log_factor).ok_or_else(|| {
-                DeseqError::NonFiniteValue {
-                    context: "IRLS fitted mean".to_string(),
-                    index: Some(sample),
-                    value: f64::NAN,
-                }
-            })?;
+            let mu = finite_scaled_exp_with_log(factor, eta, log_factor).nonfinite_at("IRLS fitted mean", Some(sample))?;
             if mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "IRLS fitted mean".to_string(),
@@ -140,21 +124,21 @@ fn fitted_mu_into(
     Ok(())
 }
 
-fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f64> {
+fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> checked::Checked {
     let mut sum = 0.0;
     for col in 0..x.ncols() {
         sum = x[(row, col)].mul_add(beta[col], sum);
         if !sum.is_finite() {
-            return None;
+            return checked::reject(sum);
         }
     }
-    Some(sum)
+    Ok(sum)
 }
 
-fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> Option<f64> {
+fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> checked::Checked {
     let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
-        sum.add(checked::mul(x[(row, col)], beta[col])?)?;
+        sum.add(checked::try_mul(x[(row, col)], beta[col])?)?;
     }
     sum.finish()
 }
@@ -166,48 +150,59 @@ struct ScaledSum {
 }
 
 impl ScaledSum {
-    fn add(&mut self, value: f64) -> Option<()> {
+    fn add(&mut self, value: f64) -> Result<(), checked::NonFinite> {
         if !value.is_finite() {
-            return None;
+            checked::reject(value)?;
         }
         let abs = value.abs();
         if abs == 0.0 {
-            return Some(());
+            return Ok(());
         }
         if self.scale == 0.0 {
             self.scale = abs;
             self.normalized_sum = value / abs;
-            return Some(());
+            return Ok(());
         }
         if abs > self.scale {
             let rescaled = self.normalized_sum * (self.scale / abs);
-            self.normalized_sum = checked::add(rescaled, value / abs)?;
+            self.normalized_sum = checked::try_add(rescaled, value / abs)?;
             self.scale = abs;
         } else {
-            self.normalized_sum = checked::add(self.normalized_sum, value / self.scale)?;
+            self.normalized_sum = checked::try_add(self.normalized_sum, value / self.scale)?;
         }
-        Some(())
+        Ok(())
     }
 
-    fn finish(self) -> Option<f64> {
+    fn finish(self) -> checked::Checked {
         if self.scale == 0.0 {
-            return Some(0.0);
+            return Ok(0.0);
         }
-        checked::mul(self.normalized_sum, self.scale)
+        checked::try_mul(self.normalized_sum, self.scale)
     }
 }
 
-fn finite_scaled_exp_with_log(factor: f64, eta: f64, log_factor: Option<f64>) -> Option<f64> {
-    if !factor.is_finite() || factor <= 0.0 || !eta.is_finite() {
-        return None;
+fn finite_scaled_exp_with_log(
+    factor: f64,
+    eta: f64,
+    log_factor: Option<f64>,
+) -> checked::Checked {
+    if !factor.is_finite() || factor <= 0.0 {
+        return checked::reject(factor);
+    }
+    if !eta.is_finite() {
+        return checked::reject(eta);
     }
     let log_mu = log_factor.unwrap_or_else(|| factor.ln()) + eta;
     if log_mu >= f64::MAX.ln() {
-        return Some(f64::MAX);
+        return Ok(f64::MAX);
     }
     if log_mu <= f64::MIN_POSITIVE.ln() {
-        return Some(f64::MIN_POSITIVE);
+        return Ok(f64::MIN_POSITIVE);
     }
     let mu = log_mu.exp();
-    (mu.is_finite() && mu > 0.0).then_some(mu)
+    if mu.is_finite() && mu > 0.0 {
+        Ok(mu)
+    } else {
+        checked::reject(mu)
+    }
 }
