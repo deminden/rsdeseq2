@@ -1,3 +1,4 @@
+use super::*;
 pub fn fit_expanded_factor_beta_prior_wald_results(
     input: ExpandedFactorBetaPriorWaldResultsInput<'_>,
     coefficient: usize,

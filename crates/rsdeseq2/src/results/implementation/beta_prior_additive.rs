@@ -1,3 +1,4 @@
+use super::*;
 pub fn fit_expanded_additive_beta_prior_wald_results(
     input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
     coefficient: usize,

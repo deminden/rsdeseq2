@@ -1,3 +1,4 @@
+use super::*;
 /// Resolve a Cook's cutoff option for a model with `m` samples and `p` columns.
 pub fn resolve_cooks_cutoff(
     cutoff: CooksCutoff,
@@ -94,7 +95,7 @@ pub fn apply_cooks_cutoff_with_low_count_heuristic(
     apply_cooks_policy(results, policy)
 }
 
-fn apply_cooks_policy(
+pub(super) fn apply_cooks_policy(
     results: &mut DeseqResults,
     policy: crate::results::CooksPolicy<'_>,
 ) -> Result<(), DeseqError> {
@@ -108,7 +109,7 @@ pub(crate) fn mask_cooks_policy_rows(
     update_cooks_policy_rows(results, policy, false)
 }
 
-fn update_cooks_policy_rows(
+pub(super) fn update_cooks_policy_rows(
     results: &mut DeseqResults,
     policy: crate::results::CooksPolicy<'_>,
     adjust: bool,

@@ -1,8 +1,9 @@
+use super::*;
 // Result rows share one construction path; only private pipeline stages
 // that finalize Cook/filter policy may defer the initial BH calculation.
 
 #[derive(Clone, Copy)]
-struct RowAssembly<'a> {
+pub(super) struct RowAssembly<'a> {
     gene_names: Option<&'a [String]>,
     dispersions: Option<&'a [f64]>,
     adjust: bool,
@@ -26,8 +27,8 @@ impl<'a> RowAssembly<'a> {
 
 // Wald and LRT rows retain stable public constructor contracts.
 #[path = "row_builders/wald.rs"]
-mod wald;
+pub(super) mod wald;
 pub use wald::*;
 #[path = "row_builders/lrt.rs"]
-mod lrt;
+pub(super) mod lrt;
 pub use lrt::*;

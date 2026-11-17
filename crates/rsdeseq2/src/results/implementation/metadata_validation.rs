@@ -1,18 +1,19 @@
-fn numeric_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
+use super::*;
+pub(super) fn numeric_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
 where
     F: Fn(&DeseqResultRow) -> Option<f64>,
 {
     DeseqResultColumnValues::Numeric(rows.iter().map(selector).collect())
 }
 
-fn logical_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
+pub(super) fn logical_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
 where
     F: Fn(&DeseqResultRow) -> Option<bool>,
 {
     DeseqResultColumnValues::Logical(rows.iter().map(selector).collect())
 }
 
-fn validate_result_inputs(
+pub(super) fn validate_result_inputs(
     base_mean: &[f64],
     fit: &NbinomGlmFit,
     gene_names: Option<&[String]>,
@@ -26,7 +27,7 @@ fn validate_result_inputs(
     )
 }
 
-fn validate_result_view(
+pub(super) fn validate_result_view(
     base_mean: &[f64],
     fit: &GlmInferenceView<'_>,
     gene_names: Option<&[String]>,
@@ -84,7 +85,7 @@ fn validate_result_view(
     Ok(())
 }
 
-fn validate_wald_output(wald: &WaldOutput, n_genes: usize) -> Result<(), DeseqError> {
+pub(super) fn validate_wald_output(wald: &WaldOutput, n_genes: usize) -> Result<(), DeseqError> {
     if wald.stat.len() != n_genes {
         return Err(invalid_dimensions(
             "Wald result statistic rows",
@@ -114,7 +115,7 @@ fn validate_wald_output(wald: &WaldOutput, n_genes: usize) -> Result<(), DeseqEr
     Ok(())
 }
 
-fn validate_wald_contrast_output(
+pub(super) fn validate_wald_contrast_output(
     contrast: &WaldContrastOutput,
     n_genes: usize,
 ) -> Result<(), DeseqError> {
@@ -137,7 +138,7 @@ fn validate_wald_contrast_output(
     validate_wald_output(&contrast.wald, n_genes)
 }
 
-fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(), DeseqError> {
+pub(super) fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(), DeseqError> {
     if lrt.deviance.len() != n_genes {
         return Err(invalid_dimensions(
             "LRT statistic rows",
@@ -169,7 +170,10 @@ fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(), DeseqError
     Ok(())
 }
 
-fn validate_optional_finite(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
+pub(super) fn validate_optional_finite(
+    values: &[Option<f64>],
+    context: &str,
+) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if let Some(value) = value
             && !value.is_finite()
@@ -184,7 +188,7 @@ fn validate_optional_finite(values: &[Option<f64>], context: &str) -> Result<(),
     Ok(())
 }
 
-fn validate_optional_positive_finite(
+pub(super) fn validate_optional_positive_finite(
     values: &[Option<f64>],
     context: &str,
 ) -> Result<(), DeseqError> {
@@ -200,7 +204,10 @@ fn validate_optional_positive_finite(
     Ok(())
 }
 
-fn validate_optional_probability(values: &[Option<f64>], context: &str) -> Result<(), DeseqError> {
+pub(super) fn validate_optional_probability(
+    values: &[Option<f64>],
+    context: &str,
+) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if let Some(value) = value
             && (!value.is_finite() || !(0.0..=1.0).contains(&value))
@@ -213,7 +220,10 @@ fn validate_optional_probability(values: &[Option<f64>], context: &str) -> Resul
     Ok(())
 }
 
-fn wald_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTableMetadata {
+pub(super) fn wald_table_metadata(
+    fit: &NbinomGlmFit,
+    coefficient: usize,
+) -> DeseqResultsTableMetadata {
     DeseqResultsTableMetadata {
         test_type: Some(TestType::Wald),
         result_name: Some(result_name_for_coefficient(fit, coefficient)),
@@ -221,7 +231,10 @@ fn wald_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTa
     }
 }
 
-fn lrt_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTableMetadata {
+pub(super) fn lrt_table_metadata(
+    fit: &NbinomGlmFit,
+    coefficient: usize,
+) -> DeseqResultsTableMetadata {
     DeseqResultsTableMetadata {
         test_type: Some(TestType::Lrt),
         result_name: Some(result_name_for_coefficient(fit, coefficient)),
@@ -230,7 +243,7 @@ fn lrt_table_metadata(fit: &NbinomGlmFit, coefficient: usize) -> DeseqResultsTab
     }
 }
 
-fn result_name_for_coefficient(fit: &NbinomGlmFit, coefficient: usize) -> String {
+pub(super) fn result_name_for_coefficient(fit: &NbinomGlmFit, coefficient: usize) -> String {
     fit.model_matrix
         .coefficient_names()
         .and_then(|names| names.get(coefficient))
@@ -238,14 +251,17 @@ fn result_name_for_coefficient(fit: &NbinomGlmFit, coefficient: usize) -> String
         .unwrap_or_else(|| format!("coefficient_{coefficient}"))
 }
 
-fn result_column_type(name: &str) -> &'static str {
+pub(super) fn result_column_type(name: &str) -> &'static str {
     match name {
         "dispersion" | "converged" | "maxCooks" | "cooksOutlier" | "filtered" => "diagnostic",
         _ => "results",
     }
 }
 
-fn result_column_description(name: &str, metadata: &DeseqResultsTableMetadata) -> String {
+pub(super) fn result_column_description(
+    name: &str,
+    metadata: &DeseqResultsTableMetadata,
+) -> String {
     // Column descriptions combine stable DESeq2 column names with the selected
     // contrast/test metadata so sidecar exports stay informative but compact.
     match name {
@@ -264,14 +280,14 @@ fn result_column_description(name: &str, metadata: &DeseqResultsTableMetadata) -
     }
 }
 
-fn effect_description(metadata: &DeseqResultsTableMetadata, prefix: &str) -> String {
+pub(super) fn effect_description(metadata: &DeseqResultsTableMetadata, prefix: &str) -> String {
     match effect_description_label(metadata) {
         Some(label) => format!("{prefix}: {label}"),
         None => prefix.to_string(),
     }
 }
 
-fn statistic_description(metadata: &DeseqResultsTableMetadata) -> String {
+pub(super) fn statistic_description(metadata: &DeseqResultsTableMetadata) -> String {
     match metadata.test_type {
         Some(TestType::Wald) => {
             labelled_description("Wald statistic", test_description_label(metadata))
@@ -283,7 +299,7 @@ fn statistic_description(metadata: &DeseqResultsTableMetadata) -> String {
     }
 }
 
-fn pvalue_description(metadata: &DeseqResultsTableMetadata) -> String {
+pub(super) fn pvalue_description(metadata: &DeseqResultsTableMetadata) -> String {
     match metadata.test_type {
         Some(TestType::Wald) => {
             labelled_description("Wald test p-value", test_description_label(metadata))
@@ -295,14 +311,14 @@ fn pvalue_description(metadata: &DeseqResultsTableMetadata) -> String {
     }
 }
 
-fn labelled_description(prefix: &str, label: Option<&str>) -> String {
+pub(super) fn labelled_description(prefix: &str, label: Option<&str>) -> String {
     match label {
         Some(label) => format!("{prefix}: {label}"),
         None => prefix.to_string(),
     }
 }
 
-fn effect_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
+pub(super) fn effect_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
     match metadata.test_type {
         Some(TestType::Lrt) => metadata
             .result_name
@@ -315,21 +331,21 @@ fn effect_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str
     }
 }
 
-fn test_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
+pub(super) fn test_description_label(metadata: &DeseqResultsTableMetadata) -> Option<&str> {
     metadata
         .comparison
         .as_deref()
         .or(metadata.result_name.as_deref())
 }
 
-fn test_type_label(test_type: TestType) -> &'static str {
+pub(super) fn test_type_label(test_type: TestType) -> &'static str {
     match test_type {
         TestType::Wald => "Wald",
         TestType::Lrt => "LRT",
     }
 }
 
-fn wald_alternative_name(alternative: WaldAlternative) -> &'static str {
+pub(super) fn wald_alternative_name(alternative: WaldAlternative) -> &'static str {
     match alternative {
         WaldAlternative::GreaterAbs => "greaterAbs",
         WaldAlternative::GreaterAbsUpshot => "greaterAbsUPSHOT",
@@ -340,6 +356,6 @@ fn wald_alternative_name(alternative: WaldAlternative) -> &'static str {
     }
 }
 
-fn finite_option(value: f64) -> Option<f64> {
+pub(super) fn finite_option(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
 }
