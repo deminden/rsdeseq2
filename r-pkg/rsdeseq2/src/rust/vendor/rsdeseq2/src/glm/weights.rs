@@ -2,6 +2,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::qr::matrix_rank;
 use crate::matrix::RowMajorMatrix;
+use crate::numeric::checked;
 
 /// Options for DESeq2-style observation-weight preprocessing.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -161,7 +162,7 @@ fn cox_reid_subset_full_rank(
                 .copied()
                 .unwrap_or(0.0)
                 .abs();
-            let Some(next_sum) = checked_sum2(col_sum, value) else {
+            let Some(next_sum) = checked::add(col_sum, value) else {
                 return Err(DeseqError::NonFiniteValue {
                     context: "observation weight Cox-Reid column sum".to_string(),
                     index: Some(col),
@@ -219,7 +220,7 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
     for (sample, weight) in weights.iter().copied().enumerate() {
         for col in 0..design.n_coefficients() {
             let design_value = design.matrix().get(sample, col).copied().unwrap_or(0.0);
-            let Some(value) = checked_product2(weight, design_value) else {
+            let Some(value) = checked::mul(weight, design_value) else {
                 return Err(DeseqError::NonFiniteValue {
                     context: "weighted design value".to_string(),
                     index: Some(sample * design.n_coefficients() + col),
@@ -230,16 +231,6 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
         }
     }
     Ok(values)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
 }
 
 fn validate_weight_options(options: ObservationWeightOptions) -> Result<(), DeseqError> {

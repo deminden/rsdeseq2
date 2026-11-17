@@ -1,3 +1,4 @@
+use crate::numeric::checked;
 use statrs::distribution::{ChiSquared, ContinuousCDF};
 
 use crate::errors::{DeseqError, invalid_dimensions};
@@ -70,7 +71,7 @@ fn lrt_deviance_statistic(full_log_like: f64, reduced_log_like: f64) -> Option<f
     if !full_log_like.is_finite() || !reduced_log_like.is_finite() {
         return None;
     }
-    let statistic = checked_product2(2.0, checked_sub(full_log_like, reduced_log_like)?)?;
+    let statistic = checked::mul(2.0, checked::sub(full_log_like, reduced_log_like)?)?;
     statistic.is_finite().then_some(statistic)
 }
 
@@ -122,14 +123,4 @@ pub fn lrt_pvalues_from_statistics(
         pvalues.push(lrt_pvalue(&cached.as_ref().unwrap().1, statistic));
     }
     Ok(pvalues)
-}
-
-fn checked_sub(left: f64, right: f64) -> Option<f64> {
-    let value = left - right;
-    value.is_finite().then_some(value)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let value = left * right;
-    (left.is_finite() && right.is_finite() && value.is_finite()).then_some(value)
 }

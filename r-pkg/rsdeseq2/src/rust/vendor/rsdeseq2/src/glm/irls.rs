@@ -1,3 +1,4 @@
+use crate::numeric::checked;
 use nalgebra::{DMatrix, DVector, Dyn, linalg::LU};
 use rayon::prelude::*;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};

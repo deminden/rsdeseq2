@@ -1,3 +1,4 @@
+use crate::numeric::checked;
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
 
@@ -87,7 +88,7 @@ pub fn normalized_counts(
     for gene in 0..counts.n_genes() {
         for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
             values.push(
-                checked_div2(f64::from(count), size_factors[sample]).ok_or_else(|| {
+                checked::div(f64::from(count), size_factors[sample]).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "normalized count".to_string(),
                         index: Some(gene * counts.n_samples() + sample),
@@ -135,7 +136,7 @@ pub fn normalized_counts_with_factors(
             .zip(factor_row.iter().copied())
             .enumerate()
         {
-            values.push(checked_div2(f64::from(count), factor).ok_or_else(|| {
+            values.push(checked::div(f64::from(count), factor).ok_or_else(|| {
                 DeseqError::NonFiniteValue {
                     context: "normalization-factor normalized count".to_string(),
                     index: Some(gene * counts.n_samples() + sample),
@@ -177,11 +178,13 @@ pub fn base_mean(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>, De
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
-        means.push(checked_mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
-            context: "baseMean".to_string(),
-            index: Some(gene),
-            value: f64::NAN,
-        })?);
+        means.push(
+            checked::mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
+                context: "baseMean".to_string(),
+                index: Some(gene),
+                value: f64::NAN,
+            })?,
+        );
     }
     Ok(means)
 }
@@ -220,7 +223,7 @@ pub fn base_variance(normalized_counts: &RowMajorMatrix<f64>) -> Result<Vec<f64>
             variances.push(f64::NAN);
             continue;
         }
-        let mean = checked_mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
+        let mean = checked::mean(row).ok_or_else(|| DeseqError::NonFiniteValue {
             context: "baseVar mean".to_string(),
             index: Some(gene),
             value: f64::NAN,
@@ -256,7 +259,7 @@ pub fn base_variance_with_weights(
             continue;
         }
         let weighted_values = checked_weighted_values(row, weight_row, "weighted baseVar", gene)?;
-        let mean = checked_mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
+        let mean = checked::mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
             context: "weighted baseVar mean".to_string(),
             index: Some(gene),
             value: f64::NAN,
@@ -274,29 +277,6 @@ pub fn base_variance_with_weights(
     Ok(variances)
 }
 
-fn checked_mean(values: &[f64]) -> Option<f64> {
-    let mut scale = 0.0_f64;
-    for value in values.iter().copied() {
-        if !value.is_finite() {
-            return None;
-        }
-        scale = scale.max(value.abs());
-    }
-    if scale == 0.0 {
-        return Some(0.0);
-    }
-    let normalized_sum = checked_sum(
-        values
-            .iter()
-            .copied()
-            .map(|value| checked_div2(value, scale))
-            .collect::<Option<Vec<_>>>()?,
-    )?;
-    let normalized_mean = checked_div2(normalized_sum, values.len() as f64)?;
-    let mean = checked_product2(normalized_mean, scale)?;
-    mean.is_finite().then_some(mean)
-}
-
 fn checked_weighted_mean(
     values: &[f64],
     weights: &[f64],
@@ -304,7 +284,7 @@ fn checked_weighted_mean(
     gene: usize,
 ) -> Result<f64, DeseqError> {
     let weighted_values = checked_weighted_values(values, weights, context, gene)?;
-    checked_mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
+    checked::mean(&weighted_values).ok_or_else(|| DeseqError::NonFiniteValue {
         context: context.to_string(),
         index: Some(gene),
         value: f64::NAN,
@@ -319,7 +299,7 @@ fn checked_weighted_values(
 ) -> Result<Vec<f64>, DeseqError> {
     let mut out = Vec::with_capacity(values.len());
     for (value, weight) in values.iter().copied().zip(weights.iter().copied()) {
-        let Some(weighted) = checked_product2(value, weight) else {
+        let Some(weighted) = checked::mul(value, weight) else {
             return Err(DeseqError::NonFiniteValue {
                 context: context.to_string(),
                 index: Some(gene),
@@ -334,7 +314,7 @@ fn checked_weighted_values(
 fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
     let mut scale = 0.0_f64;
     for value in values.iter().copied() {
-        let centered = checked_sub2(value, mean)?;
+        let centered = checked::sub(value, mean)?;
         if !centered.is_finite() {
             return None;
         }
@@ -345,19 +325,15 @@ fn checked_sample_variance(values: &[f64], mean: f64) -> Option<f64> {
     }
     let mut normalized_sum_squares = 0.0;
     for value in values.iter().copied() {
-        let centered = checked_div2(checked_sub2(value, mean)?, scale)?;
-        let square = checked_product2(centered, centered)?;
-        normalized_sum_squares = checked_sum2(normalized_sum_squares, square)?;
+        let centered = checked::div(checked::sub(value, mean)?, scale)?;
+        let square = checked::mul(centered, centered)?;
+        normalized_sum_squares = checked::add(normalized_sum_squares, square)?;
     }
-    let denominator = checked_sub2(values.len() as f64, 1.0)?;
-    let normalized_variance = checked_div2(normalized_sum_squares, denominator)?;
-    let scaled_deviation = checked_product2(normalized_variance.sqrt(), scale)?;
-    let variance = checked_product2(scaled_deviation, scaled_deviation)?;
+    let denominator = checked::sub(values.len() as f64, 1.0)?;
+    let normalized_variance = checked::div(normalized_sum_squares, denominator)?;
+    let scaled_deviation = checked::mul(normalized_variance.sqrt(), scale)?;
+    let variance = checked::mul(scaled_deviation, scaled_deviation)?;
     variance.is_finite().then_some(variance)
-}
-
-fn checked_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
-    values.into_iter().try_fold(0.0, checked_sum2)
 }
 
 fn checked_compensated_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
@@ -367,36 +343,16 @@ fn checked_compensated_sum(values: impl IntoIterator<Item = f64>) -> Option<f64>
         if !value.is_finite() {
             return None;
         }
-        let next = checked_sum2(sum, value)?;
+        let next = checked::add(sum, value)?;
         let roundoff = if sum.abs() >= value.abs() {
-            checked_sum2(sum - next, value)?
+            checked::add(sum - next, value)?
         } else {
-            checked_sum2(value - next, sum)?
+            checked::add(value - next, sum)?
         };
-        correction = checked_sum2(correction, roundoff)?;
+        correction = checked::add(correction, roundoff)?;
         sum = next;
     }
-    checked_sum2(sum, correction)
-}
-
-fn checked_sum2(left: f64, right: f64) -> Option<f64> {
-    let sum = left + right;
-    (left.is_finite() && right.is_finite() && sum.is_finite()).then_some(sum)
-}
-
-fn checked_sub2(left: f64, right: f64) -> Option<f64> {
-    let difference = left - right;
-    (left.is_finite() && right.is_finite() && difference.is_finite()).then_some(difference)
-}
-
-fn checked_product2(left: f64, right: f64) -> Option<f64> {
-    let product = left * right;
-    (left.is_finite() && right.is_finite() && product.is_finite()).then_some(product)
-}
-
-fn checked_div2(left: f64, right: f64) -> Option<f64> {
-    let quotient = left / right;
-    (left.is_finite() && right.is_finite() && quotient.is_finite()).then_some(quotient)
+    checked::add(sum, correction)
 }
 
 fn validate_weighted_base_inputs(
@@ -442,7 +398,7 @@ fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
                     index: Some(gene),
                     value: f64::NAN,
                 })?;
-                checked_div2(sum, counts.n_samples() as f64).ok_or_else(|| {
+                checked::div(sum, counts.n_samples() as f64).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "ratio geometric mean log mean".to_string(),
                         index: Some(gene),
@@ -471,7 +427,7 @@ fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError>
                     index: Some(gene),
                     value: f64::NAN,
                 })?;
-                checked_div2(sum, counts.n_samples() as f64).ok_or_else(|| {
+                checked::div(sum, counts.n_samples() as f64).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "poscounts geometric mean log mean".to_string(),
                         index: Some(gene),
@@ -527,7 +483,7 @@ fn estimate_from_log_geo_means(
             let count = counts.row_values(*gene)[sample];
             if log_geo_mean.is_finite() && count > 0 {
                 log_ratios.push(
-                    checked_sub2(f64::from(count).ln(), log_geo_mean).ok_or_else(|| {
+                    checked::sub(f64::from(count).ln(), log_geo_mean).ok_or_else(|| {
                         DeseqError::NonFiniteValue {
                             context: "size-factor log ratio".to_string(),
                             index: Some(*gene),
@@ -582,7 +538,7 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
                 reason: "cannot stabilize size factors to geometric mean one".to_string(),
             }
         })?;
-    let log_mean = checked_div2(log_sum, size_factors.len() as f64).ok_or_else(|| {
+    let log_mean = checked::div(log_sum, size_factors.len() as f64).ok_or_else(|| {
         DeseqError::InvalidSizeFactors {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),
         }
@@ -594,7 +550,7 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
         });
     }
     for value in size_factors {
-        *value = checked_div2(*value, scale).ok_or_else(|| DeseqError::InvalidSizeFactors {
+        *value = checked::div(*value, scale).ok_or_else(|| DeseqError::InvalidSizeFactors {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),
         })?;
     }

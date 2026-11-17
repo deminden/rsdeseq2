@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::checked::{self, CheckedExt};
 
 pub(super) fn lowess_sorted(
     x: &[f64],
@@ -23,32 +24,41 @@ pub(super) fn lowess_sorted(
             .zip(fitted.iter().copied())
             .enumerate()
             .map(|(idx, (observed, fitted))| {
-                checked_sub(observed, fitted, idx, "lowess residual").map(f64::abs)
+                checked::try_sub(observed, fitted)
+                    .nonfinite_at("lowess residual", Some(idx))
+                    .map(f64::abs)
             })
             .collect::<Result<Vec<_>, DeseqError>>()?;
         let mean_absolute_residual =
-            checked_scaled_mean(&residuals, "lowess mean absolute residual")?;
+            checked::mean(&residuals).nonfinite_at("lowess mean absolute residual", None)?;
         let scale = six_mad(&residuals)?;
-        if scale < checked_mul(1e-7, mean_absolute_residual, 0, "lowess residual tolerance")? {
+        if scale
+            < checked::try_mul(1e-7, mean_absolute_residual)
+                .nonfinite_at("lowess residual tolerance", Some(0))?
+        {
             break;
         }
         for (weight, residual) in robustness_weights.iter_mut().zip(residuals.iter().copied()) {
             let absolute = residual.abs();
-            if absolute <= checked_mul(0.001, scale, 0, "lowess robustness low cutoff")? {
+            if absolute
+                <= checked::try_mul(0.001, scale)
+                    .nonfinite_at("lowess robustness low cutoff", Some(0))?
+            {
                 *weight = 1.0;
-            } else if absolute >= checked_mul(0.999, scale, 0, "lowess robustness high cutoff")? {
+            } else if absolute
+                >= checked::try_mul(0.999, scale)
+                    .nonfinite_at("lowess robustness high cutoff", Some(0))?
+            {
                 *weight = 0.0;
             } else {
-                let ratio = checked_div(absolute, scale, 0, "lowess robustness ratio")?;
-                let ratio_sq = checked_mul(ratio, ratio, 0, "lowess robustness ratio square")?;
-                let one_minus_ratio_sq =
-                    checked_sub(1.0, ratio_sq, 0, "lowess robustness weight base")?;
-                *weight = checked_mul(
-                    one_minus_ratio_sq,
-                    one_minus_ratio_sq,
-                    0,
-                    "lowess robustness weight",
-                )?;
+                let ratio = checked::try_div_finite_result(absolute, scale)
+                    .nonfinite_at("lowess robustness ratio", Some(0))?;
+                let ratio_sq = checked::try_mul(ratio, ratio)
+                    .nonfinite_at("lowess robustness ratio square", Some(0))?;
+                let one_minus_ratio_sq = checked::try_sub(1.0, ratio_sq)
+                    .nonfinite_at("lowess robustness weight base", Some(0))?;
+                *weight = checked::try_mul(one_minus_ratio_sq, one_minus_ratio_sq)
+                    .nonfinite_at("lowess robustness weight", Some(0))?;
             }
         }
     }
@@ -70,9 +80,10 @@ fn lowess_delta_pass(
     let mut idx = 0_usize;
     loop {
         while n_right < n - 1 {
-            let left_radius = checked_sub(x[idx], x[n_left], idx, "lowess left radius")?;
-            let next_right_radius =
-                checked_sub(x[n_right + 1], x[idx], idx, "lowess right radius")?;
+            let left_radius = checked::try_sub(x[idx], x[n_left])
+                .nonfinite_at("lowess left radius", Some(idx))?;
+            let next_right_radius = checked::try_sub(x[n_right + 1], x[idx])
+                .nonfinite_at("lowess right radius", Some(idx))?;
             if left_radius > next_right_radius {
                 n_left += 1;
                 n_right += 1;
@@ -88,39 +99,35 @@ fn lowess_delta_pass(
         if let Some(last) = last_estimated
             && last < idx - 1
         {
-            let denominator =
-                checked_sub(x[idx], x[last], idx, "lowess interpolation denominator")?;
+            let denominator = checked::try_sub(x[idx], x[last])
+                .nonfinite_at("lowess interpolation denominator", Some(idx))?;
             for point in last + 1..idx {
                 fitted[point] = if denominator.abs() <= f64::EPSILON {
                     fitted[last]
                 } else {
-                    let fraction = checked_div(
-                        checked_sub(x[point], x[last], point, "lowess interpolation x delta")?,
+                    let fraction = checked::try_div_finite_result(
+                        checked::try_sub(x[point], x[last])
+                            .nonfinite_at("lowess interpolation x delta", Some(point))?,
                         denominator,
-                        point,
-                        "lowess interpolation fraction",
-                    )?;
-                    checked_add(
-                        checked_mul(
-                            fraction,
-                            fitted[idx],
-                            point,
-                            "lowess interpolation upper term",
-                        )?,
-                        checked_mul(
-                            checked_sub(1.0, fraction, point, "lowess interpolation complement")?,
+                    )
+                    .nonfinite_at("lowess interpolation fraction", Some(point))?;
+                    checked::try_add(
+                        checked::try_mul(fraction, fitted[idx])
+                            .nonfinite_at("lowess interpolation upper term", Some(point))?,
+                        checked::try_mul(
+                            checked::try_sub(1.0, fraction)
+                                .nonfinite_at("lowess interpolation complement", Some(point))?,
                             fitted[last],
-                            point,
-                            "lowess interpolation lower term",
-                        )?,
-                        point,
-                        "lowess interpolation fitted value",
-                    )?
+                        )
+                        .nonfinite_at("lowess interpolation lower term", Some(point))?,
+                    )
+                    .nonfinite_at("lowess interpolation fitted value", Some(point))?
                 };
             }
         }
         let mut last = idx;
-        let cutoff = checked_add(x[last], delta.max(0.0), last, "lowess delta cutoff")?;
+        let cutoff = checked::try_add(x[last], delta.max(0.0))
+            .nonfinite_at("lowess delta cutoff", Some(last))?;
         let mut next = last + 1;
         while next < n {
             if x[next] > cutoff {
@@ -150,46 +157,46 @@ fn lowest_at(
     robustness_weights: &[f64],
 ) -> Result<Option<f64>, DeseqError> {
     let target_x = x[idx];
-    let range = checked_sub(x[x.len() - 1], x[0], idx, "lowess x range")?;
-    let left_bandwidth = checked_sub(target_x, x[n_left], idx, "lowess left bandwidth")?;
-    let right_bandwidth = checked_sub(x[n_right], target_x, idx, "lowess right bandwidth")?;
+    let range = checked::try_sub(x[x.len() - 1], x[0]).nonfinite_at("lowess x range", Some(idx))?;
+    let left_bandwidth =
+        checked::try_sub(target_x, x[n_left]).nonfinite_at("lowess left bandwidth", Some(idx))?;
+    let right_bandwidth =
+        checked::try_sub(x[n_right], target_x).nonfinite_at("lowess right bandwidth", Some(idx))?;
     let bandwidth = left_bandwidth.max(right_bandwidth);
-    let high = checked_mul(0.999, bandwidth, idx, "lowess high bandwidth")?;
-    let low = checked_mul(0.001, bandwidth, idx, "lowess low bandwidth")?;
+    let high =
+        checked::try_mul(0.999, bandwidth).nonfinite_at("lowess high bandwidth", Some(idx))?;
+    let low = checked::try_mul(0.001, bandwidth).nonfinite_at("lowess low bandwidth", Some(idx))?;
     let mut weights = Vec::new();
     let mut sum_weights = 0.0;
     let mut point = n_left;
     while point < x.len() {
-        let distance = checked_sub(x[point], target_x, point, "lowess distance")?.abs();
+        let distance = checked::try_sub(x[point], target_x)
+            .nonfinite_at("lowess distance", Some(point))?
+            .abs();
         if distance <= high {
             let proximity = if distance <= low {
                 1.0
             } else {
-                let ratio = checked_div(distance, bandwidth, point, "lowess distance ratio")?;
-                let ratio_sq = checked_mul(ratio, ratio, point, "lowess ratio square")?;
-                let ratio_cubed = checked_mul(ratio_sq, ratio, point, "lowess ratio cube")?;
-                let one_minus_ratio_cubed =
-                    checked_sub(1.0, ratio_cubed, point, "lowess tricube base")?;
-                checked_mul(
-                    checked_mul(
-                        one_minus_ratio_cubed,
-                        one_minus_ratio_cubed,
-                        point,
-                        "lowess tricube square",
-                    )?,
+                let ratio = checked::try_div_finite_result(distance, bandwidth)
+                    .nonfinite_at("lowess distance ratio", Some(point))?;
+                let ratio_sq = checked::try_mul(ratio, ratio)
+                    .nonfinite_at("lowess ratio square", Some(point))?;
+                let ratio_cubed = checked::try_mul(ratio_sq, ratio)
+                    .nonfinite_at("lowess ratio cube", Some(point))?;
+                let one_minus_ratio_cubed = checked::try_sub(1.0, ratio_cubed)
+                    .nonfinite_at("lowess tricube base", Some(point))?;
+                checked::try_mul(
+                    checked::try_mul(one_minus_ratio_cubed, one_minus_ratio_cubed)
+                        .nonfinite_at("lowess tricube square", Some(point))?,
                     one_minus_ratio_cubed,
-                    point,
-                    "lowess tricube proximity",
-                )?
+                )
+                .nonfinite_at("lowess tricube proximity", Some(point))?
             };
-            let weight = checked_mul(
-                proximity,
-                robustness_weights[point],
-                point,
-                "lowess tricube robustness weight",
-            )?;
+            let weight = checked::try_mul(proximity, robustness_weights[point])
+                .nonfinite_at("lowess tricube robustness weight", Some(point))?;
             weights.push((point, weight));
-            sum_weights = checked_add(sum_weights, weight, point, "lowess weight sum")?;
+            sum_weights = checked::try_add(sum_weights, weight)
+                .nonfinite_at("lowess weight sum", Some(point))?;
         } else if x[point] > target_x {
             break;
         }
@@ -200,64 +207,64 @@ fn lowest_at(
     }
 
     for (_, weight) in &mut weights {
-        *weight = checked_div(*weight, sum_weights, 0, "lowess normalized weight")?;
+        *weight = checked::try_div_finite_result(*weight, sum_weights)
+            .nonfinite_at("lowess normalized weight", Some(0))?;
     }
 
     if bandwidth > 0.0 {
         let center = weights
             .iter()
-            .map(|(point, weight)| checked_mul(*weight, x[*point], *point, "lowess weighted x"))
+            .map(|(point, weight)| {
+                checked::try_mul(*weight, x[*point]).nonfinite_at("lowess weighted x", Some(*point))
+            })
             .collect::<Result<Vec<_>, DeseqError>>()?;
-        let center = checked_sum(center, "lowess center")?;
+        let center = checked::try_sum(center).nonfinite("lowess center")?;
         let mut variance = 0.0;
         for (point, weight) in &weights {
-            let residual = checked_sub(x[*point], center, *point, "lowess centered x")?;
-            let residual_sq = checked_mul(residual, residual, *point, "lowess centered x square")?;
-            variance = checked_add(
+            let residual = checked::try_sub(x[*point], center)
+                .nonfinite_at("lowess centered x", Some(*point))?;
+            let residual_sq = checked::try_mul(residual, residual)
+                .nonfinite_at("lowess centered x square", Some(*point))?;
+            variance = checked::try_add(
                 variance,
-                checked_mul(
-                    *weight,
-                    residual_sq,
-                    *point,
-                    "lowess weighted variance term",
-                )?,
-                *point,
-                "lowess variance",
-            )?;
+                checked::try_mul(*weight, residual_sq)
+                    .nonfinite_at("lowess weighted variance term", Some(*point))?,
+            )
+            .nonfinite_at("lowess variance", Some(*point))?;
         }
-        if variance.sqrt() > checked_mul(0.001, range, idx, "lowess slope variance threshold")? {
-            let slope_factor = checked_div(
-                checked_sub(target_x, center, idx, "lowess slope target delta")?,
+        if variance.sqrt()
+            > checked::try_mul(0.001, range)
+                .nonfinite_at("lowess slope variance threshold", Some(idx))?
+        {
+            let slope_factor = checked::try_div_finite_result(
+                checked::try_sub(target_x, center)
+                    .nonfinite_at("lowess slope target delta", Some(idx))?,
                 variance,
-                idx,
-                "lowess slope factor",
-            )?;
+            )
+            .nonfinite_at("lowess slope factor", Some(idx))?;
             for (point, weight) in &mut weights {
-                let centered = checked_sub(x[*point], center, *point, "lowess slope centered x")?;
-                let adjustment = checked_add(
-                    checked_mul(
-                        slope_factor,
-                        centered,
-                        *point,
-                        "lowess slope weight adjustment",
-                    )?,
+                let centered = checked::try_sub(x[*point], center)
+                    .nonfinite_at("lowess slope centered x", Some(*point))?;
+                let adjustment = checked::try_add(
+                    checked::try_mul(slope_factor, centered)
+                        .nonfinite_at("lowess slope weight adjustment", Some(*point))?,
                     1.0,
-                    *point,
-                    "lowess slope weight factor",
-                )?;
-                *weight = checked_mul(*weight, adjustment, *point, "lowess slope weight")?;
+                )
+                .nonfinite_at("lowess slope weight factor", Some(*point))?;
+                *weight = checked::try_mul(*weight, adjustment)
+                    .nonfinite_at("lowess slope weight", Some(*point))?;
             }
         }
     }
 
     let mut fitted = 0.0;
     for (point, weight) in weights {
-        fitted = checked_add(
+        fitted = checked::try_add(
             fitted,
-            checked_mul(weight, y[point], point, "lowess fitted weighted y")?,
-            point,
-            "lowess fitted value",
-        )?;
+            checked::try_mul(weight, y[point])
+                .nonfinite_at("lowess fitted weighted y", Some(point))?,
+        )
+        .nonfinite_at("lowess fitted value", Some(point))?;
     }
     Ok(Some(fitted))
 }

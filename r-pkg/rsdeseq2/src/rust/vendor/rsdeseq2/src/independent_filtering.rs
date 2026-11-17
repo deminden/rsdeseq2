@@ -1,5 +1,6 @@
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::multiple_testing::{PreparedBh, bh_adjust};
+use crate::numeric::checked::{self, CheckedExt};
 use crate::results::DeseqResults;
 
 /// One filtered adjusted-p-value column.
@@ -299,12 +300,8 @@ pub fn default_theta(filter: &[f64]) -> Result<Vec<f64>, DeseqError> {
     }
     validate_filter(filter)?;
     let zero_count = filter.iter().filter(|value| **value == 0.0).count();
-    let lower = checked_div(
-        zero_count as f64,
-        filter.len() as f64,
-        0,
-        "independent-filter default theta lower bound",
-    )?;
+    let lower = checked::try_div_finite_result(zero_count as f64, filter.len() as f64)
+        .nonfinite_at("independent-filter default theta lower bound", Some(0))?;
     let upper = if lower < 0.95 { 0.95 } else { 1.0 };
     seq(lower, upper, 50)
 }
@@ -378,14 +375,18 @@ pub fn select_filter_index_with_lowess(
         .enumerate()
         .filter(|(_, (count, _))| *count > 0)
         .map(|(idx, (count, fitted))| {
-            checked_sub(count as f64, fitted, idx, "independent-filter residual")
+            checked::try_sub(count as f64, fitted)
+                .nonfinite_at("independent-filter residual", Some(idx))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let rmse = positive_residual_rmse(&positive_residuals)?;
     let max_fit = smooth.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let threshold = checked_sub(max_fit, rmse, 0, "independent-filter threshold")?;
-    let fallback_90 = checked_mul(0.9, max_fit, 0, "independent-filter fallback threshold")?;
-    let fallback_80 = checked_mul(0.8, max_fit, 0, "independent-filter fallback threshold")?;
+    let threshold =
+        checked::try_sub(max_fit, rmse).nonfinite_at("independent-filter threshold", Some(0))?;
+    let fallback_90 = checked::try_mul(0.9, max_fit)
+        .nonfinite_at("independent-filter fallback threshold", Some(0))?;
+    let fallback_80 = checked::try_mul(0.8, max_fit)
+        .nonfinite_at("independent-filter fallback threshold", Some(0))?;
 
     let selected = first_index_above(num_rejections, threshold)
         .or_else(|| first_index_above(num_rejections, fallback_90))
@@ -442,12 +443,12 @@ pub fn lowess_fitted_values(
         .map(|idx| num_rejections[*idx] as f64)
         .collect::<Vec<_>>();
 
-    let delta = checked_mul(
+    let delta = checked::try_mul(
         0.01,
-        checked_sub(sorted_x[n - 1], sorted_x[0], 0, "lowess delta range")?,
-        0,
-        "lowess delta",
-    )?;
+        checked::try_sub(sorted_x[n - 1], sorted_x[0])
+            .nonfinite_at("lowess delta range", Some(0))?,
+    )
+    .nonfinite_at("lowess delta", Some(0))?;
     let fitted_sorted = lowess_sorted(&sorted_x, &sorted_y, span_fraction, 3, delta)?;
     let mut fitted = vec![0.0; n];
     for (sorted_idx, original_idx) in order.into_iter().enumerate() {
@@ -507,39 +508,32 @@ fn quantile_type7_sorted(sorted: &[f64], probability: f64) -> Result<f64, DeseqE
     if sorted.len() == 1 {
         return Ok(sorted[0]);
     }
-    let h = checked_add(
+    let h = checked::try_add(
         1.0,
-        checked_mul(
-            checked_sub(sorted.len() as f64, 1.0, 0, "quantile h span")?,
+        checked::try_mul(
+            checked::try_sub(sorted.len() as f64, 1.0).nonfinite_at("quantile h span", Some(0))?,
             probability,
-            0,
-            "quantile h offset",
-        )?,
-        0,
-        "quantile h",
-    )?;
+        )
+        .nonfinite_at("quantile h offset", Some(0))?,
+    )
+    .nonfinite_at("quantile h", Some(0))?;
     let floor = h.floor();
     let lower_idx = floor as usize - 1;
-    let gamma = checked_sub(h, floor, lower_idx, "quantile interpolation gamma")?;
+    let gamma =
+        checked::try_sub(h, floor).nonfinite_at("quantile interpolation gamma", Some(lower_idx))?;
     if lower_idx + 1 >= sorted.len() {
         Ok(sorted[sorted.len() - 1])
     } else {
-        checked_add(
+        checked::try_add(
             sorted[lower_idx],
-            checked_mul(
+            checked::try_mul(
                 gamma,
-                checked_sub(
-                    sorted[lower_idx + 1],
-                    sorted[lower_idx],
-                    lower_idx,
-                    "quantile interpolation delta",
-                )?,
-                lower_idx,
-                "quantile interpolation offset",
-            )?,
-            lower_idx,
-            "quantile interpolation",
+                checked::try_sub(sorted[lower_idx + 1], sorted[lower_idx])
+                    .nonfinite_at("quantile interpolation delta", Some(lower_idx))?,
+            )
+            .nonfinite_at("quantile interpolation offset", Some(lower_idx))?,
         )
+        .nonfinite_at("quantile interpolation", Some(lower_idx))
     }
 }
 
@@ -547,25 +541,20 @@ fn seq(start: f64, end: f64, len: usize) -> Result<Vec<f64>, DeseqError> {
     if len == 1 {
         return Ok(vec![start]);
     }
-    let step = checked_div(
-        checked_sub(end, start, 0, "independent-filter theta step span")?,
-        checked_sub(
-            len as f64,
-            1.0,
-            0,
-            "independent-filter theta step denominator",
-        )?,
-        0,
-        "independent-filter theta step",
-    )?;
+    let step = checked::try_div_finite_result(
+        checked::try_sub(end, start).nonfinite_at("independent-filter theta step span", Some(0))?,
+        checked::try_sub(len as f64, 1.0)
+            .nonfinite_at("independent-filter theta step denominator", Some(0))?,
+    )
+    .nonfinite_at("independent-filter theta step", Some(0))?;
     (0..len)
         .map(|idx| {
-            checked_add(
+            checked::try_add(
                 start,
-                checked_mul(step, idx as f64, idx, "independent-filter theta offset")?,
-                idx,
-                "independent-filter theta value",
+                checked::try_mul(step, idx as f64)
+                    .nonfinite_at("independent-filter theta offset", Some(idx))?,
             )
+            .nonfinite_at("independent-filter theta value", Some(idx))
         })
         .collect()
 }
@@ -586,7 +575,7 @@ fn six_mad(residuals: &[f64]) -> Result<f64, DeseqError> {
     } else {
         sorted[sorted.len() / 2]
     };
-    checked_mul(6.0, median, 0, "lowess MAD scale")
+    checked::try_mul(6.0, median).nonfinite_at("lowess MAD scale", Some(0))
 }
 
 fn first_index_above(values: &[usize], threshold: f64) -> Option<usize> {
@@ -621,94 +610,31 @@ fn positive_residual_rmse(residuals: &[f64]) -> Result<f64, DeseqError> {
         .copied()
         .enumerate()
         .map(|(idx, value)| {
-            let scaled = checked_div(value, scale, idx, "independent-filter RMSE scaled value")?;
-            checked_mul(scaled, scaled, idx, "independent-filter RMSE scaled square")
+            let scaled = checked::try_div_finite_result(value, scale)
+                .nonfinite_at("independent-filter RMSE scaled value", Some(idx))?;
+            checked::try_mul(scaled, scaled)
+                .nonfinite_at("independent-filter RMSE scaled square", Some(idx))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mean_square = checked_div(
-        checked_sum(scaled_squares, "independent-filter RMSE sum")?,
+    let mean_square = checked::try_div_finite_result(
+        checked::try_sum(scaled_squares).nonfinite("independent-filter RMSE sum")?,
         residuals.len() as f64,
-        0,
-        "independent-filter RMSE mean square",
-    )?;
+    )
+    .nonfinite_at("independent-filter RMSE mean square", Some(0))?;
     finite_value(
-        checked_mul(scale, mean_square.sqrt(), 0, "independent-filter RMSE")?,
+        checked::try_mul(scale, mean_square.sqrt())
+            .nonfinite_at("independent-filter RMSE", Some(0))?,
         None,
         "independent-filter RMSE",
     )
 }
 
-fn checked_add(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left + right;
-    finite_value(value, Some(index), context)
-}
-
-fn checked_sub(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left - right;
-    finite_value(value, Some(index), context)
-}
-
-fn checked_mul(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    finite_value(value, Some(index), context)
-}
-
-fn checked_div(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    let value = left / right;
-    finite_value(value, Some(index), context)
-}
-
 fn checked_midpoint(left: f64, right: f64, index: usize, context: &str) -> Result<f64, DeseqError> {
-    checked_add(
-        checked_div(left, 2.0, index, context)?,
-        checked_div(right, 2.0, index, context)?,
-        index,
-        context,
+    checked::try_add(
+        checked::try_div_finite_result(left, 2.0).nonfinite_at(context, Some(index))?,
+        checked::try_div_finite_result(right, 2.0).nonfinite_at(context, Some(index))?,
     )
-}
-
-fn checked_sum(values: impl IntoIterator<Item = f64>, context: &str) -> Result<f64, DeseqError> {
-    let mut sum = 0.0;
-    for (idx, value) in values.into_iter().enumerate() {
-        sum = checked_add(sum, value, idx, context)?;
-    }
-    Ok(sum)
-}
-
-fn checked_scaled_mean(values: &[f64], context: &str) -> Result<f64, DeseqError> {
-    if values.is_empty() {
-        return Ok(0.0);
-    }
-    let scale = values
-        .iter()
-        .copied()
-        .map(f64::abs)
-        .try_fold(0.0_f64, |scale, value| {
-            value.is_finite().then_some(scale.max(value))
-        })
-        .ok_or_else(|| DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value: f64::NAN,
-        })?;
-    if scale == 0.0 {
-        return Ok(0.0);
-    }
-    let normalized_sum = checked_sum(
-        values
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, value)| checked_div(value, scale, idx, context))
-            .collect::<Result<Vec<_>, _>>()?,
-        context,
-    )?;
-    let normalized_mean = checked_div(normalized_sum, values.len() as f64, 0, context)?;
-    finite_value(
-        checked_mul(scale, normalized_mean, 0, context)?,
-        None,
-        context,
-    )
+    .nonfinite_at(context, Some(index))
 }
 
 fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, DeseqError> {
@@ -730,7 +656,9 @@ mod tests {
     #[test]
     fn independent_filter_numeric_helpers_keep_large_finite_values() {
         assert_eq!(
-            checked_scaled_mean(&[f64::MAX, f64::MAX], "test mean").unwrap(),
+            checked::mean(&[f64::MAX, f64::MAX])
+                .nonfinite_at("test mean", None)
+                .unwrap(),
             f64::MAX
         );
         assert_eq!(

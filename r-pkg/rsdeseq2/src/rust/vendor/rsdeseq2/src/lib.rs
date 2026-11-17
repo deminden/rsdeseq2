@@ -29,6 +29,7 @@ pub mod math;
 pub mod matrix;
 pub mod multiple_testing;
 pub mod normalization;
+pub(crate) mod numeric;
 pub mod options;
 pub mod prelude;
 mod probability;

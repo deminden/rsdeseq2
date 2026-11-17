@@ -336,8 +336,8 @@ mod tests {
             projected_gradient_norm(&[0.0, 0.0], &[f64::MAX, f64::MAX], -30.0, 30.0),
             None
         );
-        assert_eq!(checked_div2(1.0, 0.0), None);
-        assert_eq!(checked_div2(f64::NAN, 1.0), None);
+        assert_eq!(checked::div(1.0, 0.0), None);
+        assert_eq!(checked::div(f64::NAN, 1.0), None);
     }
 
     #[test]

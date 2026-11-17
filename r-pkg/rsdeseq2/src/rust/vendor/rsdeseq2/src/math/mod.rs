@@ -7,7 +7,6 @@ pub mod normal;
 pub mod optim;
 pub mod qr;
 pub mod special;
-pub(crate) mod sum;
 
 pub use distributions::{
     NegativeBinomialHelpers, negative_binomial_helpers, negative_binomial_log_likelihood,

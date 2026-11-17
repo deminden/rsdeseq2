@@ -9,6 +9,7 @@ use crate::dispersion::gene_est::{
 };
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::RowMajorMatrix;
+use crate::numeric::checked::{self, CheckedExt};
 
 /// Options for DESeq2-style MAP dispersion fitting.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -259,7 +260,8 @@ pub fn map_dispersion_initial_value(disp_gene_est: f64, disp_fit: f64) -> Result
             reason: "gene-wise dispersion must be finite and positive or NaN".to_string(),
         });
     }
-    let lower_fit_rule = checked_mul(0.1, disp_fit, "MAP initial fitted-dispersion threshold")?;
+    let lower_fit_rule = checked::try_mul(0.1, disp_fit)
+        .nonfinite_at("MAP initial fitted-dispersion threshold", None)?;
     if disp_gene_est > lower_fit_rule {
         Ok(disp_gene_est)
     } else {
@@ -285,18 +287,12 @@ pub fn map_dispersion_outlier(
     {
         return false;
     }
-    let residual = checked_sub(
-        disp_gene_est.ln(),
-        disp_fit.ln(),
-        "MAP dispersion outlier log residual",
-    )
-    .ok();
-    let threshold = checked_mul(
-        outlier_sd,
-        var_log_disp_estimates.sqrt(),
-        "MAP dispersion outlier threshold",
-    )
-    .ok();
+    let residual = checked::try_sub(disp_gene_est.ln(), disp_fit.ln())
+        .nonfinite_at("MAP dispersion outlier log residual", None)
+        .ok();
+    let threshold = checked::try_mul(outlier_sd, var_log_disp_estimates.sqrt())
+        .nonfinite_at("MAP dispersion outlier threshold", None)
+        .ok();
     matches!((residual, threshold), (Some(residual), Some(threshold)) if residual > threshold)
 }
 
@@ -453,32 +449,6 @@ fn validate_positive_scalar(value: f64, name: &str) -> Result<(), DeseqError> {
         });
     }
     Ok(())
-}
-
-fn checked_mul(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left * right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
-}
-
-fn checked_sub(left: f64, right: f64, context: &str) -> Result<f64, DeseqError> {
-    let value = left - right;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(DeseqError::NonFiniteValue {
-            context: context.to_string(),
-            index: None,
-            value,
-        })
-    }
 }
 
 fn max_dispersion(options: MapDispersionOptions, n_samples: usize) -> f64 {

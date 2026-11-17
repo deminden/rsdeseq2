@@ -1,3 +1,4 @@
+use crate::numeric::checked;
 mod row_preparation;
 pub use row_preparation::NormalShrinkageRows;
 

@@ -154,7 +154,7 @@ fn checked_row_dot_slice(x: &DMatrix<f64>, row: usize, beta: &[f64]) -> Option<f
 fn checked_row_dot_vector(x: &DMatrix<f64>, row: usize, beta: &DVector<f64>) -> Option<f64> {
     let mut sum = ScaledSum::default();
     for col in 0..x.ncols() {
-        sum.add(checked_product2(x[(row, col)], beta[col])?)?;
+        sum.add(checked::mul(x[(row, col)], beta[col])?)?;
     }
     sum.finish()
 }
@@ -181,10 +181,10 @@ impl ScaledSum {
         }
         if abs > self.scale {
             let rescaled = self.normalized_sum * (self.scale / abs);
-            self.normalized_sum = checked_sum2(rescaled, value / abs)?;
+            self.normalized_sum = checked::add(rescaled, value / abs)?;
             self.scale = abs;
         } else {
-            self.normalized_sum = checked_sum2(self.normalized_sum, value / self.scale)?;
+            self.normalized_sum = checked::add(self.normalized_sum, value / self.scale)?;
         }
         Some(())
     }
@@ -193,7 +193,7 @@ impl ScaledSum {
         if self.scale == 0.0 {
             return Some(0.0);
         }
-        checked_product2(self.normalized_sum, self.scale)
+        checked::mul(self.normalized_sum, self.scale)
     }
 }
 

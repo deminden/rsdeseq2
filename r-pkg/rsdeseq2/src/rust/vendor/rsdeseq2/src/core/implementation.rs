@@ -8,6 +8,7 @@ use super::fitted_results::{
     apply_contrast_all_zero_to_lrt_results, apply_contrast_all_zero_to_wald_contrast,
     factor_level_result_metadata,
 };
+use crate::numeric::checked;
 
 // Count matrix storage, row access, and count summaries.
 include!("implementation/counts.rs");

@@ -1,13 +1,12 @@
 //! Numerical edge cases for trend fitting.
 
-use super::numerics::{
-    checked_add_assign, checked_div2, checked_product_difference, stable_midpoint,
-};
+use super::numerics::{checked_add_assign, checked_product_difference, stable_midpoint};
 use super::parametric::{
     ParametricDispersionTrend, ParametricDispersionTrendOptions, fitted_values_are_positive,
     gamma_deviance, interpolate_parametric_coefficient, parametric_coefficient_change,
     robust_parametric_trend_rows, weighted_gamma_identity_least_squares,
 };
+use crate::numeric::checked::{self, CheckedExt};
 use approx::assert_relative_eq;
 
 #[test]
@@ -52,8 +51,12 @@ fn gamma_deviance_rejects_nonfinite_accumulation() {
 
 #[test]
 fn checked_div2_rejects_zero_and_nonfinite_quotients() {
-    let zero_err = checked_div2(1.0, 0.0, "test division").unwrap_err();
-    let overflow_err = checked_div2(f64::MAX, f64::MIN_POSITIVE, "test division").unwrap_err();
+    let zero_err = checked::div(1.0, 0.0)
+        .invalid_dispersion("test division")
+        .unwrap_err();
+    let overflow_err = checked::div(f64::MAX, f64::MIN_POSITIVE)
+        .invalid_dispersion("test division")
+        .unwrap_err();
 
     assert!(zero_err.to_string().contains("test division"));
     assert!(overflow_err.to_string().contains("test division"));

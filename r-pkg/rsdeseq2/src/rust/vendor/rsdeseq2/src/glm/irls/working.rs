@@ -35,7 +35,7 @@ fn working_weights_into(
                 Some(weights) => {
                     let weight = weights[sample];
                     validate_nonnegative_finite(weight, "weight", sample)?;
-                    checked_product2(weight, working_weight).ok_or_else(|| {
+                    checked::mul(weight, working_weight).ok_or_else(|| {
                         DeseqError::NonFiniteValue {
                             context: "IRLS weighted working weight".to_string(),
                             index: Some(sample),
@@ -59,8 +59,8 @@ fn stable_working_weight(mu: f64, dispersion: f64) -> Option<f64> {
     if disp_mu.is_infinite() && disp_mu.is_sign_positive() {
         return Some(dispersion.recip());
     }
-    let denominator = checked_sum2(1.0, disp_mu)?;
-    checked_div2(mu, denominator)
+    let denominator = checked::add(1.0, disp_mu)?;
+    checked::div(mu, denominator)
 }
 
 #[cfg(test)]
@@ -99,7 +99,7 @@ fn working_response_into(
                 validate_positive_finite(mu, "mu", sample)?;
                 validate_positive_finite(factor, "normalization factor", sample)?;
                 let normalized_mean = match log_nf {
-                    Some(values) => checked_sum2(mu.ln(), -values[sample]),
+                    Some(values) => checked::add(mu.ln(), -values[sample]),
                     None => stable_log_normalized_mean(mu, factor),
                 };
                 let log_normalized_mu =
@@ -109,18 +109,18 @@ fn working_response_into(
                         value: f64::NAN,
                     })?;
                 let residual =
-                    checked_sum2(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                    checked::add(count, -mu).ok_or_else(|| DeseqError::NonFiniteValue {
                         context: "IRLS working response residual".to_string(),
                         index: Some(sample),
                         value: f64::NAN,
                     })?;
                 let scaled_residual =
-                    checked_div2(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
+                    checked::div(residual, mu).ok_or_else(|| DeseqError::NonFiniteValue {
                         context: "IRLS working response scaled residual".to_string(),
                         index: Some(sample),
                         value: f64::NAN,
                     })?;
-                checked_sum2(log_normalized_mu, scaled_residual).ok_or_else(|| {
+                checked::add(log_normalized_mu, scaled_residual).ok_or_else(|| {
                     DeseqError::NonFiniteValue {
                         context: "IRLS working response".to_string(),
                         index: Some(sample),
@@ -138,5 +138,5 @@ fn working_response_into(
 fn stable_log_normalized_mean(mu: f64, factor: f64) -> Option<f64> {
     validate_positive_finite(mu, "mu", 0).ok()?;
     validate_positive_finite(factor, "normalization factor", 0).ok()?;
-    checked_sum2(mu.ln(), -factor.ln())
+    checked::add(mu.ln(), -factor.ln())
 }

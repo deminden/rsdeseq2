@@ -5,8 +5,8 @@ use super::resolution::{validate_factor_level_contrast, validate_numeric_contras
 use crate::core::CountMatrix;
 use crate::design::{DesignMatrix, r_like_name_candidates as candidate_names};
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::sum::checked_scaled_sum;
 use crate::matrix::MatrixView;
+use crate::numeric::checked;
 use std::collections::HashSet;
 
 /// Identify rows where every sample involved in a numeric contrast has zero counts.
@@ -63,7 +63,7 @@ pub(super) fn numeric_samples(
         for (column, &weight) in contrast.iter().enumerate() {
             terms.push(design.at(sample, column) * if weight == 0.0 { 0.0 } else { 1.0 });
         }
-        let score = checked_scaled_sum(&terms).ok_or_else(|| DeseqError::NonFiniteValue {
+        let score = checked::scaled_sum(&terms).ok_or_else(|| DeseqError::NonFiniteValue {
             context: "contrastAllZero design score".into(),
             index: Some(sample),
             value: f64::NAN,

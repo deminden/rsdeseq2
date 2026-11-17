@@ -3,8 +3,8 @@ use super::inference_primitives::wald_from_estimate_rows;
 use super::wald::checked_product3_ordered_by_magnitude;
 use super::{WaldContrastOutput, WaldTestOptions};
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::math::sum::checked_scaled_sum;
 use crate::matrix::{MatrixOrder, MatrixView};
+use crate::numeric::checked;
 
 /// Shape-checked per-gene covariance matrices with explicit tensor layout.
 #[derive(Clone, Copy, Debug)]
@@ -167,7 +167,7 @@ impl<'a> InferenceEstimates<'a> {
             for (column, &weight) in contrast.iter().enumerate() {
                 scratch.push(weight * self.beta.at(gene, column));
             }
-            log2_fold_change.push(checked_scaled_sum(&scratch));
+            log2_fold_change.push(checked::scaled_sum(&scratch));
             let se = if let Some((column, se)) = marginal {
                 let value = contrast[column].abs() * se.at(gene, column);
                 (value.is_finite() && value >= 0.0).then_some(value)
@@ -190,7 +190,7 @@ impl<'a> InferenceEstimates<'a> {
                     }
                 }
                 if valid {
-                    checked_scaled_sum(&scratch)
+                    checked::scaled_sum(&scratch)
                         .filter(|variance| *variance >= 0.0)
                         .map(f64::sqrt)
                         .filter(|se| se.is_finite())
