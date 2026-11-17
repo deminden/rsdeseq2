@@ -14,6 +14,10 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   evaluation accepts only `"C"` collation and reports `UnsupportedFeature`
   otherwise. The R package builds with `formula` and `shrinkage` only.
 
+- `ErrorKind` and `DeseqError::kind()`: a stable coarse classification
+  (shape, counts, normalization, dispersion, options, numeric, unsupported,
+  I/O, parse) so callers can branch without matching message text.
+
 ### Removed
 
 - `rsdeseq2::bindings` and its `language_bindings()` placeholder, which only
@@ -48,6 +52,8 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   the Cook's replacement outputs are `#[must_use]`, so discarding a fit or
   result now warns. Impossible internal states return `InvalidOptions`
   ("internal invariant violated: ...") instead of panicking.
+
+- `DeseqError` is `#[non_exhaustive]`; exhaustive matches need a wildcard arm.
 
 ### Deprecated
 

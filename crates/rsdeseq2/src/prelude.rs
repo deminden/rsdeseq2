@@ -73,7 +73,7 @@ pub use crate::dispersion::{
     moments_dispersion_estimates, moments_dispersion_estimates_with_normalization_factors,
     parametric_trend_use_for_fit, rough_dispersion_estimates,
 };
-pub use crate::errors::DeseqError;
+pub use crate::errors::{DeseqError, ErrorKind};
 pub use crate::glm::{
     BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
     BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,

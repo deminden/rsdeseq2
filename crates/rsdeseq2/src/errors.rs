@@ -1,7 +1,11 @@
 use thiserror::Error;
 
 /// Error type used by the `rsdeseq2` Rust core.
+///
+/// The enum is `#[non_exhaustive]`: match on the variants you handle and keep a
+/// wildcard arm. [`DeseqError::kind`] gives a stable coarse classification.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum DeseqError {
     /// Matrix or vector dimensions do not match the requested shape.
     #[error("invalid dimensions for {context}: expected {expected}, got {actual}")]
@@ -60,6 +64,49 @@ pub enum DeseqError {
     ParseFloat { context: String, value: String },
 }
 
+/// Coarse classification of a [`DeseqError`], stable across message changes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// Matrix or vector shapes disagree.
+    Shape,
+    /// Count data are invalid.
+    Counts,
+    /// Size or normalization factors are invalid or cannot be estimated.
+    Normalization,
+    /// Dispersion inputs or estimates are invalid.
+    Dispersion,
+    /// Options, designs, contrasts or other analysis inputs are invalid.
+    Options,
+    /// A computation produced or received a non-finite value.
+    Numeric,
+    /// The request is outside the supported contract.
+    Unsupported,
+    /// Reading or writing files failed.
+    Io,
+    /// An input table could not be parsed.
+    Parse,
+}
+
+impl DeseqError {
+    /// Coarse classification of this error.
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::InvalidDimensions { .. } => ErrorKind::Shape,
+            Self::InvalidCounts { .. } => ErrorKind::Counts,
+            Self::InvalidSizeFactors { .. } | Self::NoUsableGenesForSizeFactors => {
+                ErrorKind::Normalization
+            }
+            Self::InvalidDispersion { .. } => ErrorKind::Dispersion,
+            Self::InvalidOptions { .. } => ErrorKind::Options,
+            Self::NonFiniteValue { .. } => ErrorKind::Numeric,
+            Self::UnsupportedFeature { .. } => ErrorKind::Unsupported,
+            Self::Io(_) => ErrorKind::Io,
+            Self::Csv(_) | Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
+        }
+    }
+}
+
 /// `InvalidOptions` with the reason as given.
 pub(crate) fn invalid_options(reason: impl Into<String>) -> DeseqError {
     DeseqError::InvalidOptions {
@@ -100,5 +147,24 @@ pub(crate) fn invalid_dimensions(
         context: context.into(),
         expected,
         actual,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kinds_classify_every_variant() {
+        assert_eq!(invalid_dimensions("x", 1, 2).kind(), ErrorKind::Shape);
+        assert_eq!(invalid_options("x").kind(), ErrorKind::Options);
+        assert_eq!(invalid_dispersion("x").kind(), ErrorKind::Dispersion);
+        assert_eq!(invariant("x").kind(), ErrorKind::Options);
+        assert_eq!(
+            DeseqError::NoUsableGenesForSizeFactors.kind(),
+            ErrorKind::Normalization
+        );
+        let io = DeseqError::from(std::io::Error::other("x"));
+        assert_eq!(io.kind(), ErrorKind::Io);
     }
 }
