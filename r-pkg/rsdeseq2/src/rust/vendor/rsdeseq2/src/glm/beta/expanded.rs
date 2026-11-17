@@ -1,3 +1,4 @@
+use super::*;
 // Expanded-model coefficient, covariance and contrast collapse.
 
 /// Average expanded-model coefficients into standard model-term coefficients.
@@ -22,7 +23,10 @@ pub fn average_expanded_model_coefficients(
         let row = expanded_beta.row(gene)?;
         for group in coefficient_groups {
             let grouped = group.iter().map(|&column| row[column]).collect::<Vec<_>>();
-            values.push(checked::try_mean(&grouped).nonfinite_at("expanded beta coefficient average", Some(gene))?);
+            values.push(
+                checked::try_mean(&grouped)
+                    .nonfinite_at("expanded beta coefficient average", Some(gene))?,
+            );
         }
     }
 

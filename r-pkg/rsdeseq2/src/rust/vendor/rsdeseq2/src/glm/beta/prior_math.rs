@@ -1,6 +1,7 @@
+use super::*;
 // Prior input checks, stable arithmetic and quantiles.
 
-fn validate_beta_prior_inputs(
+pub(super) fn validate_beta_prior_inputs(
     beta_matrix: &RowMajorMatrix<f64>,
     base_mean: &[f64],
     disp_fit: &[f64],
@@ -44,7 +45,7 @@ fn validate_beta_prior_inputs(
     Ok(())
 }
 
-fn beta_prior_weights(
+pub(super) fn beta_prior_weights(
     base_mean: &[f64],
     disp_fit: &[f64],
     n_rows: usize,
@@ -63,7 +64,7 @@ fn beta_prior_weights(
     Ok(weights)
 }
 
-fn checked_mean_dispersion_working_weight(
+pub(super) fn checked_mean_dispersion_working_weight(
     mean: f64,
     dispersion: f64,
     index: usize,
@@ -74,12 +75,12 @@ fn checked_mean_dispersion_working_weight(
     checked::try_div(1.0, denominator).nonfinite_at(context, Some(index))
 }
 
-fn checked_square(value: f64) -> Option<f64> {
+pub(super) fn checked_square(value: f64) -> Option<f64> {
     let square = value * value;
     (value.is_finite() && square.is_finite()).then_some(square)
 }
 
-fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
+pub(super) fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
     let se = sigma.sqrt();
     let Some(value) = checked::mul(std::f64::consts::LOG2_E, se) else {
         return Err(DeseqError::InvalidDispersion {
@@ -89,7 +90,10 @@ fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError>
     Ok(value)
 }
 
-fn checked_intercept_beta_covariance(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
+pub(super) fn checked_intercept_beta_covariance(
+    sigma: f64,
+    gene: usize,
+) -> Result<f64, DeseqError> {
     let log2_e = std::f64::consts::LOG2_E;
     let Some(log2_e_squared) = checked::mul(log2_e, log2_e) else {
         return Err(DeseqError::InvalidDispersion {
@@ -104,7 +108,7 @@ fn checked_intercept_beta_covariance(sigma: f64, gene: usize) -> Result<f64, Des
     Ok(value)
 }
 
-fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {
+pub(super) fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {
     if !upper_quantile.is_finite() || upper_quantile <= 0.0 || upper_quantile >= 1.0 {
         return Err(DeseqError::InvalidOptions {
             reason: "upper quantile must be finite and between 0 and 1".to_string(),
@@ -113,7 +117,7 @@ fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {
     Ok(())
 }
 
-fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
+pub(super) fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
     let out = values
         .iter()
         .copied()
@@ -132,7 +136,10 @@ fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> {
 /// neighbour unchanged (`stable_interpolate`); a non-finite interpolation is
 /// `InvalidOptions`. Distinct from the VST and filtering versions, which
 /// report `NonFiniteValue` and always evaluate `lo + f * (hi - lo)`.
-fn quantile_type7_stable(mut values: Vec<f64>, probability: f64) -> Result<f64, DeseqError> {
+pub(super) fn quantile_type7_stable(
+    mut values: Vec<f64>,
+    probability: f64,
+) -> Result<f64, DeseqError> {
     if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
         return Err(DeseqError::InvalidOptions {
             reason: "quantile probability must be finite and between 0 and 1".to_string(),
@@ -161,7 +168,7 @@ fn quantile_type7_stable(mut values: Vec<f64>, probability: f64) -> Result<f64, 
     }
 }
 
-fn weighted_abs_quantile(
+pub(super) fn weighted_abs_quantile(
     betas: &[f64],
     weights: &[f64],
     probability: f64,
@@ -292,7 +299,7 @@ fn weighted_abs_quantile(
     Ok(quantile)
 }
 
-fn stable_interpolate(left: f64, right: f64, fraction: f64) -> f64 {
+pub(super) fn stable_interpolate(left: f64, right: f64, fraction: f64) -> f64 {
     if left == right {
         return left;
     }
@@ -305,7 +312,7 @@ fn stable_interpolate(left: f64, right: f64, fraction: f64) -> f64 {
     checked::add(left, offset).unwrap_or(f64::NAN)
 }
 
-fn weighted_order_statistic(
+pub(super) fn weighted_order_statistic(
     values_and_weights: &[(f64, f64)],
     cumulative_weights: &[f64],
     position: f64,

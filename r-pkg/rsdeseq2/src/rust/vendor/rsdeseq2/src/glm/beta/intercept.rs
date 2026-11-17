@@ -1,3 +1,4 @@
+use super::*;
 // Intercept-only fits, normalization and working weights.
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with size factors.
@@ -153,8 +154,7 @@ pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
     })
 }
 
-
-fn normalized_counts_with_factors(
+pub(super) fn normalized_counts_with_factors(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
@@ -175,7 +175,11 @@ fn normalized_counts_with_factors(
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
 }
 
-fn weighted_mean(values: &[f64], weights: &[f64], gene: usize) -> Result<f64, DeseqError> {
+pub(super) fn weighted_mean(
+    values: &[f64],
+    weights: &[f64],
+    gene: usize,
+) -> Result<f64, DeseqError> {
     let mut weighted_values = Vec::with_capacity(values.len());
     for (sample, (value, weight)) in values
         .iter()
@@ -221,7 +225,7 @@ fn weighted_mean(values: &[f64], weights: &[f64], gene: usize) -> Result<f64, De
     })
 }
 
-fn intercept_working_weights(
+pub(super) fn intercept_working_weights(
     mu: &[f64],
     dispersion: f64,
     weights: Option<&[f64]>,
@@ -240,7 +244,8 @@ fn intercept_working_weights(
             Some(weights) => {
                 let weight = weights[sample];
                 validate_nonnegative_finite(weight, "weight", sample)?;
-                checked::try_mul(weight, working_weight).nonfinite_at("intercept working weight", Some(sample))?
+                checked::try_mul(weight, working_weight)
+                    .nonfinite_at("intercept working weight", Some(sample))?
             }
             None => working_weight,
         });
