@@ -10,7 +10,7 @@ use crate::{
 };
 
 fn grid_from_max(max: f64) -> Vec<f64> {
-    let end = max.asinh();
+    let end = max.asinh_p();
     let delta = end / 999.0;
     (1..1000)
         .map(|i| (if i == 999 { end } else { i as f64 * delta }).sinh_p())

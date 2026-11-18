@@ -16,7 +16,7 @@ impl LocalVstIntegral {
         inverse_size_factor_mean: f64,
     ) -> Result<Self, DeseqError> {
         let grid_len = 1000usize;
-        let max_asinh = max_count.asinh();
+        let max_asinh = max_count.asinh_p();
         let mut grid = Vec::with_capacity(grid_len - 1);
         for step in 1..grid_len {
             let value = (max_asinh * step as f64 / (grid_len as f64 - 1.0)).sinh_p();
@@ -95,7 +95,7 @@ impl LocalVstIntegral {
                 .nonfinite_at("local VST integration midpoint sum", Some(idx))?;
             let midpoint = checked::try_div_finite_result(midpoint_sum, 2.0)
                 .nonfinite_at("local VST integration midpoint", Some(idx))?;
-            x.push(midpoint.asinh());
+            x.push(midpoint.asinh_p());
             y.push(cumulative);
         }
         if x.is_empty() {

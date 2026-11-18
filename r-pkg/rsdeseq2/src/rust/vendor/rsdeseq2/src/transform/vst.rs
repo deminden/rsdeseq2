@@ -139,8 +139,8 @@ fn vst_local_with_integral(
     h1: f64,
     h2: f64,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let int_h1 = integral.evaluate(h1.asinh())?;
-    let int_h2 = integral.evaluate(h2.asinh())?;
+    let int_h1 = integral.evaluate(h1.asinh_p())?;
+    let int_h2 = integral.evaluate(h2.asinh_p())?;
     if int_h2 <= int_h1 {
         return Err(DeseqError::InvalidDispersion {
             reason: "local VST integral must increase across scaling quantiles".to_string(),
@@ -161,7 +161,7 @@ fn vst_local_with_integral(
         .iter()
         .copied()
         .map(|count| {
-            integral.evaluate(count.asinh()).and_then(|value| {
+            integral.evaluate(count.asinh_p()).and_then(|value| {
                 checked::try_add(
                     checked::try_mul(eta, value).nonfinite_at("local VST scaled value", Some(0))?,
                     xi,
@@ -350,7 +350,7 @@ pub fn vst_mean_value(
         return Ok(normalized_count.log2_p());
     }
     let transformed_numerator = checked::try_sub(
-        checked::try_mul(2.0, dispersion_count.sqrt().asinh())
+        checked::try_mul(2.0, dispersion_count.sqrt().asinh_p())
             .nonfinite_at("mean VST numerator", Some(index))?,
         mean_dispersion.ln_p(),
     )

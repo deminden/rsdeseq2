@@ -172,6 +172,6 @@ pub(super) fn student(x: f64, df: f64, ncp: f64) -> f64 {
     } else {
         k / 2.0 + length / 2.0
     };
-    let peak_difference = df * (k / (2.0 * root)).asinh() + 0.5 * k * mode;
+    let peak_difference = df * (k / (2.0 * root)).asinh_p() + 0.5 * k * mode;
     central - 0.5 * ncp * ncp + peak_difference + (peak_mass(df, mode) / peak_mass(df, root)).ln_p()
 }
