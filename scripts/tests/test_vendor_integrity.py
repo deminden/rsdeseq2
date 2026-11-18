@@ -47,7 +47,10 @@ class VendorIntegrity(unittest.TestCase):
                 description = root/'r-pkg/rsdeseq2/DESCRIPTION'
                 description.parent.mkdir(parents=True)
                 description.write_text('Version: '+r_version+'\n')
-                packages = [[dict(name='rsdeseq2',version='0.3.1')], [dict(name='rsdeseq2-r',version=backend_version)]]
+                backend = root/'r-pkg/rsdeseq2/src/rust/Cargo.toml'
+                backend.parent.mkdir(parents=True)
+                backend.write_text('[package]\nname = "rsdeseq2-r"\nversion = "'+backend_version+'"\n')
+                packages = [[dict(name='rsdeseq2',version='0.3.1')]]
                 with mock.patch.object(vendor, 'ROOT', root), mock.patch.object(vendor, 'metadata', side_effect=packages), mock.patch.object(sys, 'argv', ['sync', '--check']), mock.patch.object(vendor.shutil, 'copytree') as copy:
                     with self.assertRaisesRegex(ValueError, 'versions must agree'):
                         vendor.main()

@@ -248,6 +248,8 @@ implemented fields rather than every Bioconductor convention.
 
 `nproc` controls reusable local worker pools for fitting, replacement and transforms.
 `strict`, `fast` and `diagnostic` currently select the same numerical algorithm.
-The R package statically links its vendored core and requires Cargo for source
-installation. Before packaging core changes, run `scripts/release/sync_r_vendor.sh`
-and its read-only `--check` mode from the repository root.
+The R package statically links the Rust core and requires Cargo for source
+installation. In a git checkout its configure step copies the core from
+`crates/`; the source package built by `scripts/release/build_r_source.sh`
+carries that copy and every third-party crate (`cargo vendor`), so it builds
+offline.

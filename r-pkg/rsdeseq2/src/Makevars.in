@@ -2,7 +2,7 @@ RUST_BACKEND = rust/target/release/librsdeseq2_r.a
 all: $(SHLIB)
 
 $(RUST_BACKEND): FORCE
-	cd rust && cargo build --release --locked
+	cd rust && cargo build --release --locked @CARGO_OFFLINE@
 
 FORCE:
 .PHONY: FORCE

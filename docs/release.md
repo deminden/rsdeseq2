@@ -9,8 +9,9 @@ for publication availability.
 
 ## Local source checks
 
-The Rust crate, R package, R backend, vendored core and own lockfile entries must
-agree on the version. Check the committed vendor without repairing it:
+The Rust crates, R package, R backend and own lockfile entries must agree on
+the version. Check that, and that the R package's core copy can be generated,
+without writing anything:
 
 ```sh
 scripts/release/sync_r_vendor.sh --check

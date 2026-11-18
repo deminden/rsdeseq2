@@ -96,8 +96,8 @@ Use the pinned environment and its restored dependencies. From the repository ro
 ```sh
 repo_root="$PWD"
 mkdir -p results/checks/r
+scripts/release/build_r_source.sh results/checks/r
 (cd results/checks/r && \
-  R CMD build "$repo_root/r-pkg/rsdeseq2" && \
   R CMD check --no-manual --no-build-vignettes rsdeseq2_0.5.0.tar.gz)
 cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
 Rscript --vanilla scripts/validation/check_rust_r_identity.R \

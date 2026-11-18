@@ -104,6 +104,13 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- The R package's copy of the Rust core is no longer committed. Its
+  configure step regenerates it from `crates/` in a git checkout, and
+  `scripts/release/build_r_source.sh` builds a self-contained source package
+  that also carries every third-party crate (`cargo vendor`) and builds with
+  `cargo build --offline`, as CRAN and Bioconductor require. The vendored
+  manifest leaves out the CLI's optional dependencies.
+
 - Errors are more structured; every message is unchanged. Out-of-domain
   parameters ("*x* must be finite and positive", and the other phrases in
   `Requirement`) are `DeseqError::InvalidParameter { domain, parameter,

@@ -6,6 +6,26 @@ if ! command -v cargo >/dev/null 2>&1; then
   echo "rsdeseq2 requires Cargo to build its Rust backend" >&2
   exit 1
 fi
+# The Rust core is not committed under src/rust/vendor. In a git checkout
+# configure copies it from crates/ on every build, so it is never stale; the
+# R source package (scripts/release/build_r_source.sh) ships the copy
+# together with the vendored third-party crates.
+repo_root=$(CDPATH= cd -- "$package_root/../.." && pwd)
+if [ -f "$repo_root/scripts/release/sync_r_vendor.py" ] && [ -f "$repo_root/crates/rsdeseq2/Cargo.toml" ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "rsdeseq2 configure: python3 is needed to copy the Rust core from crates/" >&2
+    exit 1
+  fi
+  python3 "$repo_root/scripts/release/sync_r_vendor.py"
+elif [ ! -f "$package_root/src/rust/vendor/rsdeseq2/Cargo.toml" ]; then
+  echo "rsdeseq2 configure: src/rust/vendor is missing; build the source package with scripts/release/build_r_source.sh" >&2
+  exit 1
+fi
+if [ -f "$package_root/src/rust/cargo/config.toml" ]; then
+  cargo_offline="--offline --config cargo/config.toml"
+else
+  cargo_offline=""
+fi
 case "$(uname -s)" in
   Linux)
     rust_link_libraries="-lpthread -lm -ldl"
@@ -22,6 +42,7 @@ case "$(uname -s)" in
 esac
 sed "s|@RUST_LINK_LIBS@|$rust_link_libraries|g" \
   "$package_root/src/Makevars.in" |
-  sed "s|@RUST_LINK_FLAGS@|$rust_linker_flags|g" \
+  sed "s|@RUST_LINK_FLAGS@|$rust_linker_flags|g" |
+  sed "s|@CARGO_OFFLINE@|$cargo_offline|g" \
   > "$package_root/src/Makevars"
 echo "rsdeseq2 configure: enabled the Rust core static library."

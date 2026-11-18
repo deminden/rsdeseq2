@@ -17,6 +17,10 @@ r-pkg/*/src/*.so
 r-pkg/*/src/*.dll
 r-pkg/*/src/*.dylib
 r-pkg/*/src/symbols.rds
+# Generated at build time (scripts/release/build_r_source.sh, configure).
+r-pkg/rsdeseq2/src/rust/vendor/
+r-pkg/rsdeseq2/src/rust/vendor-crates/
+r-pkg/rsdeseq2/src/rust/cargo/
 /results/
 __pycache__/
 .pytest_cache/

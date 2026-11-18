@@ -36,4 +36,4 @@ Changes and the `CHANGELOG.md` entry, or "none".
 - [ ] `python3 scripts/validation/check_docs.py`
 - [ ] `python3 -m unittest discover -s scripts/tests -p 'test_*.py'`
 - [ ] `python3 scripts/validation/check_module_cycles.py`
-- [ ] `scripts/release/sync_r_vendor.sh --check` (after syncing if the core changed)
+- [ ] `scripts/release/sync_r_vendor.sh --check`

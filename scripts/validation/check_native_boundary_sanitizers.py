@@ -67,6 +67,9 @@ def main():
     source = out/'source'
     if source.exists():
         raise ValueError('Use a new output directory; instrumented source is immutable per run')
+    # The Rust core copy is generated, not committed (hardening 8.3); the
+    # copied package has no crates/ to generate it from.
+    subprocess.run([sys.executable, str(ROOT/'scripts/release/sync_r_vendor.py')], check=True)
     shutil.copytree(ROOT/'r-pkg/rsdeseq2', source,
                     ignore=shutil.ignore_patterns('target', 'Makevars', 'Makevars.win', '*.o', '*.so', '*.dll', '*.a'))
     template = source/'src/Makevars.in'

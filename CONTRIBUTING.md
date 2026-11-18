@@ -35,8 +35,11 @@ python3 scripts/validation/check_module_cycles.py
 scripts/release/sync_r_vendor.sh --check
 ```
 
-After changing the core, run `scripts/release/sync_r_vendor.sh` and commit the
-regenerated vendor tree separately.
+The R package's copy of the Rust core (`r-pkg/rsdeseq2/src/rust/vendor`) is
+generated, not committed: `R CMD INSTALL r-pkg/rsdeseq2` regenerates it from
+`crates/` in its configure step, and `scripts/release/build_r_source.sh` builds
+the self-contained source package (core copy plus `cargo vendor`ed crates, built
+offline).
 
 ## Code rules
 

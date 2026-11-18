@@ -15,7 +15,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-      - name: Check committed Rust vendor and package versions
+      - name: Check R vendor manifests and package versions
         run: scripts/release/sync_r_vendor.sh --check
       - name: Format
         run: cargo fmt --all -- --check

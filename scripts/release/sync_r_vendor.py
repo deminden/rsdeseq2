@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate or check the R package's vendored core without changing check input."""
+"""Generate the R package's copy of the Rust core, or check its inputs.
+
+The copy (r-pkg/rsdeseq2/src/rust/vendor) is generated, not committed: R's
+configure runs this script in a git checkout, and
+scripts/release/build_r_source.sh runs it before `R CMD build`. `--check`
+verifies, without writing, that the copy can be generated and that versions
+and notices agree.
+"""
 import argparse
 import json
 from pathlib import Path
@@ -7,6 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import shutil
 import subprocess
+import re
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,7 +28,25 @@ def metadata(manifest):
         '--no-deps', '--format-version', '1'], text=True))['packages']
 
 
+# Features of workspace crates the R backend never enables. They are emptied,
+# and the optional dependencies only they use are left out of the vendored
+# manifests,
+# so an offline build against the vendored crates (`cargo vendor` vendors only
+# what Cargo.lock resolves) does not look for them.
+UNUSED_FEATURES = {'rsdeseq2': {'cli'}}
+
+
 def vendor_manifest(package):
+    dropped = UNUSED_FEATURES.get(package['name'], set())
+    # A dropped feature stays declared, empty, so `cfg(feature = ...)` checks pass.
+    features = {name: ([] if name in dropped else [v for v in values if v not in dropped])
+                for name, values in package.get('features', {}).items()}
+    used = {v[4:] for values in features.values() for v in values if v.startswith('dep:')}
+    dropped_deps = {v[4:] for name in dropped for v in package.get('features', {}).get(name, [])
+                    if v.startswith('dep:')} - used
+    package = dict(package, features=features,
+                   dependencies=[d for d in package['dependencies']
+                                 if (d['rename'] or d['name']) not in dropped_deps])
     lines = ['[package]']
     for key, value in [('name', package['name']), ('version', package['version']),
                        ('edition', package['edition']), ('license', package['license']),
@@ -100,8 +126,10 @@ def main():
     version = package['version']
     description = (ROOT/'r-pkg/rsdeseq2/DESCRIPTION').read_text().splitlines()
     r_version = next(line.split(':', 1)[1].strip() for line in description if line.startswith('Version:'))
-    backend = next(p for p in metadata(ROOT/'r-pkg/rsdeseq2/src/rust/Cargo.toml') if p['name'] == 'rsdeseq2-r')
-    if r_version != version or backend['version'] != version:
+    # Read, not resolved: the backend's path dependencies are the generated copy.
+    backend_manifest = (ROOT/'r-pkg/rsdeseq2/src/rust/Cargo.toml').read_text()
+    backend_version = re.search(r'^version\s*=\s*"([^"]+)"', backend_manifest, re.M).group(1)
+    if r_version != version or backend_version != version:
         raise ValueError('Rust crate, R package and R backend versions must agree')
     crates = vendored_crates(workspace)
     if any(workspace[name]['version'] != version for name in crates):
@@ -119,13 +147,11 @@ def main():
                 f'from `crates/{name}` with `scripts/release/sync_r_vendor.sh` before packaging a\n'
                 'release. Do not edit this copy directly.\n')
         expected_root = Path(temp)
-        if args.check:
-            stale = sorted(p.name for p in VENDOR_ROOT.iterdir() if p.is_dir() and p.name not in crates)
-            if stale:
-                raise ValueError('R vendor has crates that are no longer vendored: ' + ', '.join(stale))
-            for name in crates:
-                check_tree(expected_root/name, VENDOR_ROOT/name)
-        else:
+        if not args.check:
+            VENDOR_ROOT.mkdir(parents=True, exist_ok=True)
+            for path in VENDOR_ROOT.iterdir():
+                if path.is_dir() and path.name not in crates:
+                    shutil.rmtree(path)
             for name in crates:
                 target = VENDOR_ROOT/name
                 shutil.copytree(expected_root/name/'src', target/'src', dirs_exist_ok=True)
@@ -141,7 +167,7 @@ def main():
                 sync_notice(ROOT/name, Path(workspace[crate]['manifest_path']).parent/name, args.check)
         sync_notice(ROOT/'THIRD_PARTY_NOTICES.md', ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
         if args.check:
-            print('R vendor, notices, manifest and package versions match.')
+            print('R vendor manifests, notices and package versions match.')
 
 
 if __name__ == '__main__':

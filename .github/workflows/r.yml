@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: '3.12'
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
-      - name: Check committed Rust vendor and package versions
+      - name: Check R vendor manifests and package versions
         run: scripts/release/sync_r_vendor.sh --check
       - name: Reject production R numerical calculations
         run: Rscript --vanilla scripts/validation/audit_r_numerical_boundary.R r-pkg/rsdeseq2/R
@@ -97,7 +97,7 @@ jobs:
       - name: Build package
         id: r-source
         run: |
-          R CMD build r-pkg/rsdeseq2
+          scripts/release/build_r_source.sh .
           Rscript --vanilla -e 'version <- read.dcf("r-pkg/rsdeseq2/DESCRIPTION")[1L, "Version"]; cat(paste0("archive=rsdeseq2_", version, ".tar.gz\n"), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)'
       - name: Package check
         env:
