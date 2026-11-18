@@ -81,6 +81,10 @@ impl DeseqBuilder {
     /// column so the Rust core can apply DESeq2's character contrast all-zero
     /// handling. List and numeric contrasts ignore `sample_levels` and use the
     /// numeric all-zero rule.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }))"
+    )]
     pub fn fit_fixed_dispersion_wald_results_contrast<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -108,6 +112,10 @@ impl DeseqBuilder {
     /// Character triplet contrasts resolve their factor reference and
     /// per-sample levels from `model_frame`. List and numeric contrasts use the
     /// same numeric all-zero handling as [`Self::fit_fixed_dispersion_wald_results_contrast`].
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }))"
+    )]
     pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame(
         &self,
         counts: &CountMatrix,
@@ -333,6 +341,10 @@ impl DeseqBuilder {
     }
 
     /// Run supplied-dispersion Wald replacement refit for a DESeq2 `results(contrast=...)` request.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -358,6 +370,10 @@ impl DeseqBuilder {
 
     /// Run supplied-dispersion Wald replacement refit for a DESeq2
     /// `results(contrast=...)` request using formula model-frame metadata.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
