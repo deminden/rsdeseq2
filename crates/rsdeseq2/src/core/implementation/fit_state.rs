@@ -233,7 +233,7 @@ impl DeseqFit {
         &self,
         counts: &CountMatrix,
     ) -> Result<RlogOutput, DeseqError> {
-        self.regularized_log_transform_with_options(counts, IrlsOptions::default())
+        self.regularized_log_transform_with_options(counts, IrlsOptions::deseq2_rlog())
     }
 
     /// Apply the implemented regularized-log transform with explicit IRLS options.
@@ -349,7 +349,7 @@ impl DeseqFit {
             counts,
             frozen_intercept,
             sample_prior_variance,
-            IrlsOptions::default(),
+            IrlsOptions::deseq2_rlog(),
         )
     }
 

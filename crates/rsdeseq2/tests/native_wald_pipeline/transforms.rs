@@ -43,7 +43,7 @@ fn fitted_trend_state_drives_rlog_transform() {
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
         fit.disp_fit.as_ref().unwrap(),
-        IrlsOptions::default(),
+        IrlsOptions::deseq2_rlog(),
     )
     .unwrap();
 
@@ -95,7 +95,7 @@ fn fitted_trend_state_drives_rlog_transform_with_normalization_factors() {
         &fit.base_mean,
         fit.disp_fit.as_ref().unwrap(),
         fit.disp_fit.as_ref().unwrap(),
-        IrlsOptions::default(),
+        IrlsOptions::deseq2_rlog(),
     )
     .unwrap();
 
@@ -139,7 +139,7 @@ fn fitted_trend_state_drives_frozen_rlog_transform() {
         fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,
-        IrlsOptions::default(),
+        IrlsOptions::deseq2_rlog(),
     )
     .unwrap();
 
@@ -182,7 +182,7 @@ fn fitted_trend_state_drives_frozen_rlog_transform_with_normalization_factors() 
         fit.disp_fit.as_ref().unwrap(),
         learned.sample_prior_variance,
         &learned.intercept,
-        IrlsOptions::default(),
+        IrlsOptions::deseq2_rlog(),
     )
     .unwrap();
 

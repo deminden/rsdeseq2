@@ -50,6 +50,12 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- rlog now fits its sample-effect GLM with the settings DESeq2's `rlogData`
+  passes to `fitNbinomGLMs` (`betaTol = 1e-4`, no optim fallback), available as
+  `IrlsOptions::deseq2_rlog()`, and rank-deficient designs (every rlog design)
+  start IRLS as `fitNbinomGLMs` does (NUMERIC). On pasilla_holdout the largest
+  difference from `DESeq2::rlog(blind = TRUE)` drops from 1.06e-2 to 2.5e-14.
+
 - `DesignMatrix::rank`, `is_full_rank` and `validate_full_rank` (used by every
   fit's full-rank check) now follow R's default `qr(x)$rank`, the rule DESeq2's
   `checkFullRank` uses: LINPACK `dqrdc2` with tolerance 1e-7, exposed as

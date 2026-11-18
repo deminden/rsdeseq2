@@ -120,6 +120,18 @@ impl Default for IrlsOptions {
 }
 
 impl IrlsOptions {
+    /// The settings DESeq2 1.52 `rlogData` passes to `fitNbinomGLMs`:
+    /// `betaTol = 1e-4`, `useOptim = FALSE`, `useQR = TRUE`; everything else
+    /// as [`IrlsOptions::default`].
+    pub fn deseq2_rlog() -> Self {
+        Self {
+            beta_tol: 1e-4,
+            use_optim: false,
+            solver: IrlsSolver::Qr,
+            ..Self::default()
+        }
+    }
+
     /// Set natural-log-scale ridge values, one per coefficient.
     pub fn ridge_lambda_by_coefficient(mut self, ridge_lambda: Vec<f64>) -> Self {
         self.ridge_lambda_by_coefficient = Some(ridge_lambda);
