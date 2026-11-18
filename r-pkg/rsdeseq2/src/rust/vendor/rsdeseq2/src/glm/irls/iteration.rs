@@ -19,17 +19,20 @@ pub(super) fn fit_fixed_dispersion_irls_row(
         .map(f64::from)
         .collect::<Vec<_>>();
     let nf = input.normalization_factors.row(gene)?;
-    let log_nf = nf.iter().copied().map(f64::ln).collect::<Vec<_>>();
+    // Size factors share one log row across genes; per-cell factors need their own.
+    let owned_log_nf;
+    let log_nf: &[f64] = match input.shared_log_offsets {
+        Some(shared) => shared,
+        None => {
+            owned_log_nf = nf.iter().copied().map(f64::ln).collect::<Vec<_>>();
+            &owned_log_nf
+        }
+    };
     let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
     let dispersion = input.dispersions[gene];
     let mut beta = initial_beta_impl(input.x, &y, nf, Some(input.initial_lu))?;
-    let mut mu = fitted_mu_impl_with_logs(
-        input.x,
-        &beta,
-        nf,
-        Some(input.options.min_mu),
-        Some(&log_nf),
-    )?;
+    let mut mu =
+        fitted_mu_impl_with_logs(input.x, &beta, nf, Some(input.options.min_mu), Some(log_nf))?;
     let likelihood = FixedDispersionLikelihood::new(input.counts.row(gene)?, dispersion);
     let mut dev_old = 0.0;
     let mut dev = 0.0;
@@ -41,7 +44,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
     for t in 0..input.options.maxit {
         iter += 1;
         working_weights_into(&mu, dispersion, weight_row, &mut w)?;
-        working_response_into(&mu, nf, &y, Some(&log_nf), &mut z)?;
+        working_response_into(&mu, nf, &y, Some(log_nf), &mut z)?;
         let Some(next_beta) =
             solve_weighted_least_squares(input.x, &w, &z, input.ridge_lambda, input.options.solver)
         else {
@@ -61,7 +64,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             &beta,
             nf,
             Some(input.options.min_mu),
-            Some(&log_nf),
+            Some(log_nf),
             &mut mu,
         )?;
         dev = -2.0 * likelihood.log_likelihood(&mu, weight_row)?;
@@ -101,7 +104,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
                 .push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
         }
         row.mu.extend(
-            fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(&log_nf))?
+            fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(log_nf))?
                 .iter()
                 .copied(),
         );
@@ -128,7 +131,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
         )?);
     }
     row.mu.extend(
-        fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(&log_nf))?
+        fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(log_nf))?
             .iter()
             .copied(),
     );

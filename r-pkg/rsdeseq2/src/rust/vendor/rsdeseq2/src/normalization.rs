@@ -591,3 +591,27 @@ mod tests {
         assert_eq!(checked_compensated_sum([1.0, f64::INFINITY]).ok(), None);
     }
 }
+
+/// Normalization offsets for a fit: per-sample size factors, shared by every
+/// gene, or per-cell normalization factors.
+///
+/// `PerSample` lets the GLM fits read the size factors directly instead of
+/// expanding them into a genes × samples matrix first.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Offsets<'a> {
+    /// One factor per sample.
+    PerSample(&'a [f64]),
+    /// One factor per gene and sample.
+    PerCell(&'a RowMajorMatrix<f64>),
+}
+
+impl<'a> Offsets<'a> {
+    /// Factors for one gene, in sample order.
+    #[inline]
+    pub(crate) fn row(&self, gene: usize) -> Result<&'a [f64], DeseqError> {
+        match *self {
+            Self::PerSample(factors) => Ok(factors),
+            Self::PerCell(matrix) => matrix.row(gene),
+        }
+    }
+}
