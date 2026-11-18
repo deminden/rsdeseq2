@@ -1,0 +1,16 @@
+{
+  "generator": "scripts/references/generate_breadth_references.R",
+  "case": "sparse",
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "deseq2_version": "1.52.0",
+  "platform": "aarch64-apple-darwin27.2.0",
+  "genes": 983,
+  "samples": 48,
+  "design": "~condition",
+  "result": "condition_B_vs_A",
+  "size_factor_type": "poscounts",
+  "dispersion_fit_type": "parametric",
+  "replaced_genes": 4,
+  "significant_0.1": 20,
+  "significant_0.05": 15
+}

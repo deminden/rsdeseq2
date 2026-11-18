@@ -1,0 +1,16 @@
+{
+  "generator": "scripts/references/generate_breadth_references.R",
+  "case": "three_vs_three",
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "deseq2_version": "1.52.0",
+  "platform": "aarch64-apple-darwin27.2.0",
+  "genes": 1999,
+  "samples": 6,
+  "design": "~condition",
+  "result": "condition_B_vs_A",
+  "size_factor_type": "ratio",
+  "dispersion_fit_type": "parametric",
+  "replaced_genes": 0,
+  "significant_0.1": 103,
+  "significant_0.05": 93
+}

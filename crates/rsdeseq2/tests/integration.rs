@@ -30,6 +30,8 @@ mod auto_dispersion;
 mod base_mean;
 #[path = "bounded_posterior.rs"]
 mod bounded_posterior;
+#[path = "breadth_end_to_end.rs"]
+mod breadth_end_to_end;
 #[path = "builder_cooks_policy.rs"]
 mod builder_cooks_policy;
 #[path = "cli.rs"]
