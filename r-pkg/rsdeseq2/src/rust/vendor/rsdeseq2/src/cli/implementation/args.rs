@@ -38,8 +38,8 @@ pub(super) use crate::io::{
 };
 pub(super) use crate::matrix::RowMajorMatrix;
 pub(super) use crate::normalization::{
-    base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
-    normalized_counts_with_factors,
+    base_mean, base_mean_with_weights, estimate_size_factors_for_dataset,
+    estimate_size_factors_with_options, normalized_counts, normalized_counts_with_factors,
 };
 pub(super) use crate::options::{CooksCutoff, FitType, SizeFactorMethod};
 pub(super) use crate::results::{

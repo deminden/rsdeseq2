@@ -19,7 +19,7 @@ pub(super) fn cli_normalized_counts(
         normalized_counts(counts, &size_factors)
     } else {
         let geometric_means = read_cli_geometric_means(geometric_means, counts)?;
-        let size_factors = estimate_size_factors_with_options(
+        let size_factors = estimate_size_factors_for_dataset(
             counts,
             method.into(),
             geometric_means.as_deref(),
@@ -236,7 +236,7 @@ pub(super) fn cli_expanded_beta_prior_wald_analysis(
                 read_cli_size_factors(path, counts)?
             } else {
                 let geometric_means = read_cli_geometric_means(geometric_means, counts)?;
-                estimate_size_factors_with_options(
+                estimate_size_factors_for_dataset(
                     counts,
                     method.into(),
                     geometric_means.as_deref(),
@@ -415,7 +415,7 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
                 read_cli_size_factors(path, counts)?
             } else {
                 let geometric_means = read_cli_geometric_means(geometric_means, counts)?;
-                estimate_size_factors_with_options(
+                estimate_size_factors_for_dataset(
                     counts,
                     method.into(),
                     geometric_means.as_deref(),
@@ -646,7 +646,7 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
                 read_cli_size_factors(path, counts)?
             } else {
                 let geometric_means = read_cli_geometric_means(geometric_means, counts)?;
-                estimate_size_factors_with_options(
+                estimate_size_factors_for_dataset(
                     counts,
                     method.into(),
                     geometric_means.as_deref(),
