@@ -89,79 +89,17 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if sample_levels.is_none()
-            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
-        {
-            return self.leaf_fixed_dispersion_wald_factor_level_contrast(
-                counts,
-                design,
-                dispersions,
-                factor_contrast,
-            );
-        }
-        match contrast {
-            ResultsContrast::Character {
-                factor,
-                numerator,
-                denominator,
-                reference,
-            } => {
-                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "character results contrast requires sample levels for contrastAllZero"
-                        .to_string(),
-                })?;
-                let levels = levels
-                    .iter()
-                    .map(|level| level.as_ref().to_string())
-                    .collect::<Vec<_>>();
-                let contrast = factor_level_contrast_from_sample_levels(
-                    factor,
-                    numerator,
-                    denominator,
-                    reference.as_deref(),
-                    &levels,
-                )?;
-                self.leaf_fixed_dispersion_wald_factor_level_contrast(
-                    counts,
-                    design,
-                    dispersions,
+        let levels = owned_levels(sample_levels);
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                )
-            }
-            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
-                let resolved = resolve_results_contrast(design, contrast)?;
-                let stages = self.normalization_stages_for_design(counts, design)?;
-                let wald_output = self.fixed_dispersion_wald_contrast_components(
-                    FixedDispersionGlmInput {
-                        counts,
-                        design,
-                        size_factors: &stages.size_factors,
-                        normalization_factors: stages.normalization_factors.as_ref(),
-                        observation_weights: stages.observation_weights.as_ref(),
-                        all_zero: &stages.all_zero,
-                        dispersions,
-                    },
-                    &stages.normalized,
-                    &stages.base_mean,
-                    &resolved.numeric,
-                    None,
-                )?;
-                let mut fit =
-                    self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
-                fit.dispersion = Some(wald_output.expanded_dispersions);
-                fit.cooks = Some(wald_output.cooks.cooks);
-                fit.max_cooks = Some(wald_output.cooks.max_cooks);
-                attach_glm_fit(&mut fit, wald_output.glm_fit);
-                fit.wald = Some(wald_output.wald_contrast.wald);
-                let mut results = wald_output.results;
-                results.set_resolved_contrast_metadata(
-                    resolved.result_name,
-                    resolved.comparison,
-                    &resolved.numeric,
-                );
-                Ok((fit, results))
-            }
-        }
+                    sample_levels: levels.as_deref(),
+                    model_frame: None,
+                }),
+        )?
+        .into_results_pair()
     }
 
     /// Run a supplied-dispersion Wald pipeline for a DESeq2
@@ -178,36 +116,16 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.fit_fixed_dispersion_wald_results_contrast_from_model_frame(
-                    counts,
-                    design,
-                    dispersions,
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                    model_frame,
-                )
-            });
-        }
-
-        let builder = self.clone().try_model_frame(model_frame.clone())?;
-        if let Some(factor_contrast) =
-            factor_level_contrast_from_model_frame(contrast, model_frame)?
-        {
-            return builder.leaf_fixed_dispersion_wald_factor_level_contrast(
-                counts,
-                design,
-                dispersions,
-                factor_contrast,
-            );
-        }
-        builder.fit_fixed_dispersion_wald_results_contrast::<String>(
-            counts,
-            design,
-            dispersions,
-            contrast,
-            None,
-        )
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        )?
+        .into_results_pair()
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_with_cooks_replacement`] and [`DeseqBuilder::run`].
@@ -424,58 +342,18 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        if sample_levels.is_none()
-            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
-        {
-            return self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-                counts,
-                design,
-                dispersions,
-                factor_contrast,
-                replacement_options,
-            );
-        }
-        match contrast {
-            ResultsContrast::Character {
-                factor,
-                numerator,
-                denominator,
-                reference,
-            } => {
-                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "character results contrast requires sample levels for contrastAllZero"
-                        .to_string(),
-                })?;
-                let levels = levels
-                    .iter()
-                    .map(|level| level.as_ref().to_string())
-                    .collect::<Vec<_>>();
-                let contrast = factor_level_contrast_from_sample_levels(
-                    factor,
-                    numerator,
-                    denominator,
-                    reference.as_deref(),
-                    &levels,
-                )?;
-                self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-                    counts,
-                    design,
-                    dispersions,
+        let levels = owned_levels(sample_levels);
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                    replacement_options,
-                )
-            }
-            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
-                let contrast_spec = contrast.as_contrast_spec();
-                self.leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
-                    counts,
-                    design,
-                    dispersions,
-                    &contrast_spec,
-                    replacement_options,
-                )
-            }
-        }
+                    sample_levels: levels.as_deref(),
+                    model_frame: None,
+                })
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run supplied-dispersion Wald replacement refit for a DESeq2
@@ -489,31 +367,17 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_fixed_dispersion_wald_results_contrast_from_model_frame_with_cooks_replacement(counts, design, dispersions, contrast, model_frame, replacement_options));
-        }
-
-        let builder = self.clone().try_model_frame(model_frame.clone())?;
-        if let Some(factor_contrast) =
-            factor_level_contrast_from_model_frame(contrast, model_frame)?
-        {
-            return builder
-                .leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-                    counts,
-                    design,
-                    dispersions,
-                    factor_contrast,
-                    replacement_options,
-                );
-        }
-        builder.fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement::<String>(
-            counts,
-            design,
-            dispersions,
-            contrast,
-            None,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
+                    contrast,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                })
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_spec`] and [`DeseqBuilder::run`].

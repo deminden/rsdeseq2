@@ -73,7 +73,7 @@ mod fixed_lrt;
 #[path = "implementation/builder/normalization_components.rs"]
 mod normalization_components;
 
-// Public `fit*` forwarders for the leaf workflows behind `run`.
+// Explicit-path `fit*` methods, each a `run` request.
 #[path = "implementation/builder/leaf_forwarders.rs"]
 mod leaf_forwarders;
 

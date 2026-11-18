@@ -95,6 +95,10 @@ impl Fixture {
     }
 
     fn builder(&self, test: &str) -> DeseqBuilder {
+        if test == "bare" {
+            // No stored model frame: methods that take one must record it.
+            return DeseqBuilder::new();
+        }
         let builder = DeseqBuilder::new().model_frame(self.frame.clone());
         match test {
             "lrt" => builder
@@ -204,6 +208,17 @@ fn short(output: &RunOutput) -> &'static str {
 }
 
 fn check(report: &mut Vec<String>, tag: &str, method: String, run: String) {
+    // RSDESEQ2_RUN_EQUIVALENCE_DUMP=<file> records every method output, so
+    // two commits can be compared method by method.
+    if let Some(path) = std::env::var_os("RSDESEQ2_RUN_EQUIVALENCE_DUMP") {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap();
+        writeln!(file, "{tag}\t{}", method.replace(['\n', '\t'], " ")).unwrap();
+    }
     if method.starts_with("error: ") {
         ERRORS.with(|errors| errors.borrow_mut().push(format!("{tag}: {method}")));
     }
@@ -243,3 +258,52 @@ fn every_fit_method_matches_its_run_request() {
     );
 }
 
+
+#[test]
+fn run_rejects_invalid_combinations_before_work() {
+    let f = Fixture::new();
+    let b = f.builder("wald");
+    let message = |analysis: Analysis<'_>| b.run(&analysis).unwrap_err().to_string();
+    let base = || Analysis::new(&f.counts, &f.design);
+    let checks = [
+        (base().fixed_dispersion(&f.dispersions).stop_after(Stage::Map), "fixed dispersions"),
+        (base().fixed_dispersion(&f.dispersions).means(MeanModel::LinearMu), "mean model"),
+        (base().fixed_dispersion(&f.dispersions[1..]), "run fixed dispersions"),
+        (base().stop_after(Stage::Trend).cooks_replacement(&f.cooks), "full run"),
+        (base().stop_after(Stage::Trend).result(ResultColumn::Coefficient(1)), "full run"),
+        (base().lrt(&f.reduced).stop_after(Stage::Map), "full run"),
+        (base().lrt_formula(f.reduced_formula), "formula full design"),
+        (base().means(MeanModel::LinearMu).cooks_replacement(&f.cooks), "linear-mu"),
+        (Analysis::without_design(&f.counts).stop_after(Stage::Results), "without a design"),
+    ];
+    for (analysis, expected) in checks {
+        let message = message(analysis);
+        assert!(message.contains(expected), "{message:?} lacks {expected:?}");
+    }
+    let character = f.character();
+    let both = base().result(ResultColumn::Results {
+        contrast: &character,
+        sample_levels: Some(&f.levels),
+        model_frame: Some(&f.frame),
+    });
+    assert!(message(both).contains("either sample levels or a model frame"));
+}
+
+#[test]
+fn run_trend_override_matches_a_builder_with_that_trend() {
+    // The dedicated leaves and the builder-copy path must agree with a
+    // builder whose own fit type is the override.
+    let f = Fixture::new();
+    let b = f.builder("wald");
+    for fit_type in [FitType::Mean, FitType::Local] {
+        let typed = b.clone().fit_type(fit_type);
+        for stage in [Stage::Trend, Stage::Map, Stage::Results] {
+            let analysis = Analysis::new(&f.counts, &f.design).stop_after(stage);
+            assert_eq!(
+                shown(b.run(&analysis.fit_type(fit_type))),
+                shown(typed.run(&analysis)),
+                "{fit_type:?} {stage:?}"
+            );
+        }
+    }
+}

@@ -1,9 +1,6 @@
 //! Default and named top-level fit workflows.
 
-use super::super::{
-    CountMatrix, DeseqBuilder, DeseqError, DeseqFit, DeseqResults, DesignMatrix, TestType,
-    default_results_coefficient, resolve_coefficient_index,
-};
+use super::super::*;
 
 impl DeseqBuilder {
     /// Run the currently implemented DESeq-like workflow.
@@ -13,24 +10,18 @@ impl DeseqBuilder {
     /// coefficient selection shape. For `test=Lrt`, callers must first store a
     /// reduced design with [`DeseqBuilder::reduced_design`].
     pub fn fit(&self, counts: &CountMatrix, design: &DesignMatrix) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit(counts, design));
-        }
-
-        self.fit_with_results(counts, design)
-            .map(|(fit, _results)| fit)
+        let test = self.top_level_test()?;
+        self.run(&Analysis::new(counts, design).test(test))?
+            .into_fit_only()
     }
 
     /// Build a supported formula design from stored model-frame metadata and
     /// run the currently implemented DESeq-like workflow, returning only the
     /// fit state.
     pub fn fit_formula(&self, counts: &CountMatrix, formula: &str) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_formula(counts, formula));
-        }
-
-        self.fit_formula_with_results(counts, formula)
-            .map(|(fit, _results)| fit)
+        let test = self.top_level_test()?;
+        self.run(&Analysis::formula(counts, formula).test(test))?
+            .into_fit_only()
     }
 
     /// Run the currently implemented DESeq-like workflow and return result rows.
@@ -41,25 +32,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_with_results(counts, design));
-        }
-
-        match self.test {
-            TestType::Wald => {
-                let coefficient = default_results_coefficient(design)?;
-                self.with_automatic_dispersion_means()
-                    .leaf_wald_glm_mu(counts, design, coefficient)
-            }
-            TestType::Lrt => {
-                let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.with_automatic_dispersion_means().fit_lrt_with_results(
-                    counts,
-                    design,
-                    reduced_design,
-                )
-            }
-        }
+        let test = self.top_level_test()?;
+        self.run(&Analysis::new(counts, design).test(test))?
+            .into_results_pair()
     }
 
     /// Build a supported formula design from stored model-frame metadata and
@@ -70,13 +45,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         formula: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_formula_with_results(counts, formula));
-        }
-
-        let formula_design = self.formula_design_for_fitting(formula)?;
-        self.with_formula_offsets(counts, &formula_design)?
-            .fit_with_results(counts, &formula_design.design.standard_design)
+        let test = self.top_level_test()?;
+        self.run(&Analysis::formula(counts, formula).test(test))?
+            .into_results_pair()
     }
 
     /// Run the top-level Wald workflow and report a named design coefficient.
@@ -86,22 +57,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_with_results_name(counts, design, coefficient_name));
-        }
-
-        match self.test {
-            TestType::Wald => {
-                let coefficient = resolve_coefficient_index(design, coefficient_name)?;
-                self.with_automatic_dispersion_means()
-                    .leaf_wald_glm_mu(counts, design, coefficient)
-            }
-            TestType::Lrt => {
-                let reduced_design = self.reduced_design_for_top_level_lrt()?;
-                self.with_automatic_dispersion_means()
-                    .fit_lrt_with_results_name(counts, design, reduced_design, coefficient_name)
-            }
-        }
+        let test = self.top_level_test()?;
+        self.run(
+            &Analysis::new(counts, design)
+                .test(test)
+                .result(ResultColumn::Name(coefficient_name)),
+        )?
+        .into_results_pair()
     }
 
     /// Build a supported formula design from stored model-frame metadata and
@@ -112,18 +74,13 @@ impl DeseqBuilder {
         formula: &str,
         coefficient_name: &str,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.fit_formula_with_results_name(counts, formula, coefficient_name));
-        }
-
-        let formula_design = self.formula_design_for_fitting(formula)?;
-        self.with_formula_offsets(counts, &formula_design)?
-            .fit_with_results_name(
-                counts,
-                &formula_design.design.standard_design,
-                coefficient_name,
-            )
+        let test = self.top_level_test()?;
+        self.run(
+            &Analysis::formula(counts, formula)
+                .test(test)
+                .result(ResultColumn::Name(coefficient_name)),
+        )?
+        .into_results_pair()
     }
 
     /// Build a supported formula design from stored model-frame metadata and
@@ -134,11 +91,12 @@ impl DeseqBuilder {
         formula: &str,
         coefficient_name: &str,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_formula_name(counts, formula, coefficient_name));
-        }
-
-        self.fit_formula_with_results_name(counts, formula, coefficient_name)
-            .map(|(fit, _results)| fit)
+        let test = self.top_level_test()?;
+        self.run(
+            &Analysis::formula(counts, formula)
+                .test(test)
+                .result(ResultColumn::Name(coefficient_name)),
+        )?
+        .into_fit_only()
     }
 }

@@ -6,10 +6,11 @@
 use std::borrow::Cow;
 
 use super::super::{
-    Analysis, ContrastSpec, CooksReplacementOptions, CooksReplacementTestOutput, CountMatrix,
-    DeseqBuilder, DeseqError, DesignInput, DesignMatrix, DispersionRequest, FactorLevelContrast,
-    MeanModel, Replacement, ResultColumn, ResultsContrast, RunOutput, Stage, TestRequest,
-    default_results_coefficient, factor_level_contrast_from_model_frame,
+    Analysis, ContrastSpec, CooksReplacementLrtOutput, CooksReplacementOptions,
+    CooksReplacementTestOutput, CooksReplacementWaldOutput, CountMatrix, DeseqBuilder, DeseqError,
+    DeseqFit, DeseqResults, DesignInput, DesignMatrix, DispersionRequest, FactorLevelContrast,
+    FitType, MeanModel, Replacement, ResultColumn, ResultsContrast, RunOutput, Stage, TestRequest,
+    TestType, default_results_coefficient, factor_level_contrast_from_model_frame,
     factor_level_contrast_from_sample_levels, resolve_coefficient_index,
 };
 
@@ -74,13 +75,7 @@ impl DeseqBuilder {
             return pool.install(|| self.run(analysis));
         }
         validate_analysis(analysis)?;
-        let builder = match analysis.fit_type {
-            Some(fit_type) if fit_type != self.fit_type => {
-                Cow::Owned(self.clone().fit_type(fit_type))
-            }
-            _ => Cow::Borrowed(self),
-        };
-        builder.run_validated(analysis)
+        self.run_validated(analysis)
     }
 
     fn run_validated(&self, analysis: &Analysis<'_>) -> Result<RunOutput, DeseqError> {
@@ -132,13 +127,70 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         reduced: Option<&DesignMatrix>,
     ) -> Result<RunOutput, DeseqError> {
+        // A model frame supplied with a `results()` contrast replaces the
+        // stored one for this run: it is validated against the design and
+        // recorded on the fit, as the `_from_model_frame` methods do.
+        if let ResultColumn::Results {
+            model_frame: Some(frame),
+            ..
+        } = analysis.result
+        {
+            let framed = self.clone().try_model_frame(frame.clone())?;
+            return framed.run_matrix_framed(analysis, design, reduced);
+        }
+        self.run_matrix_framed(analysis, design, reduced)
+    }
+
+    fn run_matrix_framed(
+        &self,
+        analysis: &Analysis<'_>,
+        design: &DesignMatrix,
+        reduced: Option<&DesignMatrix>,
+    ) -> Result<RunOutput, DeseqError> {
         let counts = analysis.counts;
-        let builder = match (analysis.dispersion, analysis.means) {
+        let mut builder = match (analysis.dispersion, analysis.means) {
             (DispersionRequest::Estimate, MeanModel::Auto) => {
                 self.with_automatic_dispersion_means()
             }
             _ => Cow::Borrowed(self),
         };
+        // A per-run trend type that differs from the builder's. Fixed
+        // dispersions and the stages before the trend do not use it.
+        let trend = analysis
+            .fit_type
+            .filter(|fit_type| *fit_type != self.fit_type)
+            .filter(|_| matches!(analysis.dispersion, DispersionRequest::Estimate))
+            .filter(|_| !matches!(analysis.stop_after, Stage::SizeFactors | Stage::GeneWise));
+        let linear = analysis.means == MeanModel::LinearMu;
+        if let Some(fit_type) = trend {
+            // Dedicated leaves exist for these; everything else gets a builder
+            // copy with the trend type set.
+            let leaf = match (analysis.stop_after, fit_type) {
+                (Stage::Trend, _) => {
+                    Some(builder.run_trend_stage(counts, design, fit_type, linear))
+                }
+                (Stage::Map, FitType::Parametric) => Some(
+                    if linear {
+                        builder.leaf_map_dispersions_linear_mu_parametric(counts, design)
+                    } else {
+                        builder.leaf_map_dispersions_glm_mu_parametric(counts, design)
+                    }
+                    .map(RunOutput::Fit),
+                ),
+                _ => None,
+            };
+            if let Some(output) = leaf {
+                return output;
+            }
+            if !(analysis.stop_after == Stage::Results
+                && fit_type == FitType::Parametric
+                && matches!(analysis.replacement, Replacement::Off))
+            {
+                builder = Cow::Owned(builder.into_owned().fit_type(fit_type));
+            }
+        }
+        let parametric_leaves =
+            trend == Some(FitType::Parametric) && matches!(analysis.replacement, Replacement::Off);
         if analysis.stop_after != Stage::Results {
             return builder.run_stage(counts, design, analysis.stop_after, analysis.means);
         }
@@ -156,9 +208,15 @@ impl DeseqBuilder {
                 if replacement.is_some() {
                     return Err(unsupported("Cook's replacement with linear-mu dispersions"));
                 }
+                if parametric_leaves {
+                    return builder.run_linear_mu_parametric(counts, design, reduced, column);
+                }
                 builder.run_linear_mu(counts, design, reduced, column)
             }
             (DispersionRequest::Estimate, _) => {
+                if parametric_leaves {
+                    return builder.run_glm_mu_parametric(counts, design, reduced, column);
+                }
                 builder.run_glm_mu(counts, design, reduced, column, replacement)
             }
         }
@@ -242,6 +300,92 @@ impl DeseqBuilder {
                         Column::Spec(Cow::Owned(contrast.as_contrast_spec()))
                     }
                 }
+            }
+        })
+    }
+
+    fn run_trend_stage(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        fit_type: FitType,
+        linear: bool,
+    ) -> Result<RunOutput, DeseqError> {
+        match (fit_type, linear) {
+            (FitType::Parametric, true) => {
+                self.leaf_parametric_dispersion_trend_linear_mu(counts, design)
+            }
+            (FitType::Parametric, false) => {
+                self.leaf_parametric_dispersion_trend_glm_mu(counts, design)
+            }
+            (FitType::Mean, true) => self.leaf_mean_dispersion_trend_linear_mu(counts, design),
+            (FitType::Mean, false) => self.leaf_mean_dispersion_trend_glm_mu(counts, design),
+            (FitType::Local, true) => self.leaf_local_dispersion_trend_linear_mu(counts, design),
+            (FitType::Local, false) => self.leaf_local_dispersion_trend_glm_mu(counts, design),
+        }
+        .map(RunOutput::Fit)
+    }
+
+    fn run_glm_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        reduced: Option<&DesignMatrix>,
+        column: Column<'_>,
+    ) -> Result<RunOutput, DeseqError> {
+        let d = design;
+        results(match (reduced, column) {
+            (None, Column::Coefficient(c)) => self.leaf_wald_glm_mu_parametric(counts, d, c),
+            (None, Column::Numeric(v)) => self.leaf_wald_glm_mu_contrast_parametric(counts, d, v),
+            (None, Column::Spec(s)) => {
+                self.leaf_wald_glm_mu_contrast_spec_parametric(counts, d, &s)
+            }
+            (None, Column::FactorLevel(f)) => {
+                self.leaf_wald_glm_mu_factor_level_contrast_parametric(counts, d, f)
+            }
+            (Some(r), Column::Coefficient(c)) => self.leaf_lrt_glm_mu_parametric(counts, d, r, c),
+            (Some(r), Column::Numeric(v)) => {
+                self.leaf_lrt_glm_mu_contrast_parametric(counts, d, r, v)
+            }
+            (Some(r), Column::Spec(s)) => {
+                self.leaf_lrt_glm_mu_contrast_spec_parametric(counts, d, r, &s)
+            }
+            (Some(r), Column::FactorLevel(f)) => {
+                self.leaf_lrt_glm_mu_factor_level_contrast_parametric(counts, d, r, f)
+            }
+        })
+    }
+
+    fn run_linear_mu_parametric(
+        &self,
+        counts: &CountMatrix,
+        design: &DesignMatrix,
+        reduced: Option<&DesignMatrix>,
+        column: Column<'_>,
+    ) -> Result<RunOutput, DeseqError> {
+        let d = design;
+        results(match (reduced, column) {
+            (None, Column::Coefficient(c)) => self.leaf_wald_linear_mu_parametric(counts, d, c),
+            (None, Column::Numeric(v)) => {
+                self.leaf_wald_linear_mu_contrast_parametric(counts, d, v)
+            }
+            (None, Column::Spec(s)) => {
+                self.leaf_wald_linear_mu_contrast_spec_parametric(counts, d, &s)
+            }
+            (None, Column::FactorLevel(f)) => {
+                self.leaf_wald_linear_mu_factor_level_contrast_parametric(counts, d, f)
+            }
+            (Some(r), Column::Coefficient(c)) => {
+                self.leaf_lrt_linear_mu_parametric(counts, d, r, c)
+            }
+            (Some(r), Column::Numeric(v)) => {
+                self.leaf_lrt_linear_mu_contrast_parametric(counts, d, r, v)
+            }
+            (Some(r), Column::Spec(s)) => {
+                self.leaf_lrt_linear_mu_contrast_spec_parametric(counts, d, r, &s)
+            }
+            (Some(r), Column::FactorLevel(f)) => {
+                self.leaf_lrt_linear_mu_factor_level_contrast_parametric(counts, d, r, f)
             }
         })
     }
@@ -409,13 +553,81 @@ impl DeseqBuilder {
     }
 }
 
+impl DeseqBuilder {
+    /// The test a top-level `fit*` method runs: the builder's test type,
+    /// with its stored reduced design for an LRT.
+    pub(super) fn top_level_test(&self) -> Result<TestRequest<'_>, DeseqError> {
+        Ok(match self.test {
+            TestType::Wald => TestRequest::Wald,
+            TestType::Lrt => TestRequest::Lrt {
+                reduced: DesignInput::Matrix(self.reduced_design_for_top_level_lrt()?),
+            },
+        })
+    }
+}
+
+fn shape_error(expected: &str, output: &RunOutput) -> DeseqError {
+    let actual = match output {
+        RunOutput::Fit(_) => "an early-stage fit",
+        RunOutput::Results { .. } => "a fit with results",
+        RunOutput::Replacement(CooksReplacementTestOutput::Wald(_)) => "a Wald replacement output",
+        RunOutput::Replacement(CooksReplacementTestOutput::Lrt(_)) => "an LRT replacement output",
+    };
+    DeseqError::InvalidOptions {
+        reason: format!("run returned {actual} where {expected} was expected"),
+    }
+}
+
+impl RunOutput {
+    pub(in super::super) fn into_results_pair(
+        self,
+    ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+        match self {
+            Self::Results { fit, results } => Ok((fit, results)),
+            other => Err(shape_error("a fit with results", &other)),
+        }
+    }
+
+    pub(in super::super) fn into_fit_only(self) -> Result<DeseqFit, DeseqError> {
+        match self {
+            Self::Fit(fit) | Self::Results { fit, .. } => Ok(fit),
+            other => Err(shape_error("a fit", &other)),
+        }
+    }
+
+    pub(in super::super) fn into_replacement(
+        self,
+    ) -> Result<CooksReplacementTestOutput, DeseqError> {
+        match self {
+            Self::Replacement(output) => Ok(output),
+            other => Err(shape_error("a replacement output", &other)),
+        }
+    }
+
+    pub(in super::super) fn into_wald_replacement(
+        self,
+    ) -> Result<CooksReplacementWaldOutput, DeseqError> {
+        match self {
+            Self::Replacement(CooksReplacementTestOutput::Wald(output)) => Ok(output),
+            other => Err(shape_error("a Wald replacement output", &other)),
+        }
+    }
+
+    pub(in super::super) fn into_lrt_replacement(
+        self,
+    ) -> Result<CooksReplacementLrtOutput, DeseqError> {
+        match self {
+            Self::Replacement(CooksReplacementTestOutput::Lrt(output)) => Ok(output),
+            other => Err(shape_error("an LRT replacement output", &other)),
+        }
+    }
+}
+
 fn replaced(output: CooksReplacementTestOutput) -> RunOutput {
     RunOutput::Replacement(output)
 }
 
-fn results(
-    output: Result<(super::super::DeseqFit, super::super::DeseqResults), DeseqError>,
-) -> Result<RunOutput, DeseqError> {
+fn results(output: Result<(DeseqFit, DeseqResults), DeseqError>) -> Result<RunOutput, DeseqError> {
     output.map(|(fit, results)| RunOutput::Results { fit, results })
 }
 

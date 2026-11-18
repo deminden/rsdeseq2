@@ -59,6 +59,7 @@ for name,args,ret in rows:
     if name in ('fit','fit_formula','fit_formula_name','fit_contrast','fit_contrast_spec','fit_factor_level_contrast'): builders=['wald','lrt']
     if not lrt_named and not leaf and not stage and name.startswith('fit_with_results') and 'with_test' not in name and 'cooks' not in name:
         builders=['wald','lrt']
+    if any(a_.startswith('model_frame') for a_ in arglist): builders = builders + ['bare']
     for bname in builders:
       for rcn,rce in rc_variants:
         for lvn,lve in lv_variants:
