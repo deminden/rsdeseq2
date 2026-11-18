@@ -50,6 +50,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- `DesignMatrix::rank`, `is_full_rank` and `validate_full_rank` (used by every
+  fit's full-rank check) now follow R's default `qr(x)$rank`, the rule DESeq2's
+  `checkFullRank` uses: LINPACK `dqrdc2` with tolerance 1e-7, exposed as
+  `math::rank::matrix_rank_r_qr` and `R_QR_TOLERANCE` (NUMERIC). The former
+  column-relative elimination at 1e-10 accepted near-collinear designs that
+  DESeq2 rejects: 8 of 24 new R 4.6.2 reference cases, plus 2 cases of the
+  existing `rank_r462.tsv`. `rank_with_tolerance` is unchanged.
+
 - Dispersion trend fitting follows DESeq2 1.52 `estimateDispersionsFit`
   (NUMERIC): a failed parametric trend falls back to the local trend instead of
   returning an error, and the local trend is fitted only on rows with

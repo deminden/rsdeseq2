@@ -54,6 +54,8 @@ mod cooks_reference;
 mod count_likelihood;
 #[path = "design.rs"]
 mod design;
+#[path = "design_rank.rs"]
+mod design_rank;
 #[path = "diagnostics.rs"]
 mod diagnostics;
 #[path = "dispersion_gene_est.rs"]

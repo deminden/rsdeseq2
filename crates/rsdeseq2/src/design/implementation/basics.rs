@@ -1,7 +1,7 @@
 pub(super) use super::super::DesignOrigin;
 use super::*;
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
-pub(super) use crate::math::rank::{DEFAULT_RANK_TOLERANCE, matrix_rank, matrix_rank_relative};
+pub(super) use crate::math::rank::{R_QR_TOLERANCE, matrix_rank, matrix_rank_r_qr};
 pub(super) use crate::matrix::RowMajorMatrix;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
@@ -467,13 +467,14 @@ impl DesignMatrix {
             })
     }
 
-    /// Numerical rank using column-relative deterministic validation.
+    /// Numerical rank as R's default `qr(x)$rank` computes it (LINPACK
+    /// `dqrdc2`, tolerance 1e-7), the rank DESeq2's `checkFullRank` uses.
     pub fn rank(&self) -> Result<usize, DeseqError> {
-        matrix_rank_relative(
+        matrix_rank_r_qr(
             self.matrix.as_slice(),
             self.n_samples(),
             self.n_coefficients(),
-            DEFAULT_RANK_TOLERANCE,
+            R_QR_TOLERANCE,
         )
     }
 

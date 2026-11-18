@@ -41,9 +41,12 @@ fn default_rank_matches_frozen_scaled_r462_qr_decisions() {
             None,
         )
         .unwrap();
+        // Column 3 is R's default qr() rank; column 4 the former
+        // column-relative elimination rule, which accepted near aliases
+        // (for example near_intercept_1e9) that DESeq2 rejects.
         assert_eq!(
             design.rank().unwrap(),
-            row[4].parse::<usize>().unwrap(),
+            row[3].parse::<usize>().unwrap(),
             "{}",
             &row[0]
         );
