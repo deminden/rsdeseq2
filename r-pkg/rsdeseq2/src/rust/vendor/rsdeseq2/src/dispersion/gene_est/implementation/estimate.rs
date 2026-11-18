@@ -329,7 +329,7 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
                     .observation_weights
                     .map(|weights| weights.row(gene))
                     .transpose()?;
-                estimate = fit_dispersion_grid_inner(DispersionOptimizerInput {
+                estimate = grid_search_dispersion(DispersionFitInput {
                     counts: input.counts.row(gene)?,
                     mu,
                     design: Some(input.design),

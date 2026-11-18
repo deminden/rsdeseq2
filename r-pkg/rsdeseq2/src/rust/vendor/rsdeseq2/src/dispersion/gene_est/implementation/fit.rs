@@ -81,7 +81,7 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
 ) -> Result<GeneDispersionFitDiagnostics, DeseqError> {
     match options.fit_method {
         GeneWiseDispersionFitMethod::Grid => {
-            let (dispersion, evaluations) = fit_dispersion_grid_inner(DispersionOptimizerInput {
+            let (dispersion, evaluations) = grid_search_dispersion(DispersionFitInput {
                 counts,
                 mu,
                 design: Some(design),
@@ -113,7 +113,7 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
             })
         }
         GeneWiseDispersionFitMethod::LineSearch => {
-            let line_search = fit_dispersion_line_search_inner(DispersionOptimizerInput {
+            let line_search = line_search_dispersion(DispersionFitInput {
                 counts,
                 mu,
                 design: Some(design),
@@ -125,7 +125,7 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
             })?;
             let mut dispersion = line_search.dispersion;
             if !line_search.converged && dispersion > options.min_disp * 10.0 {
-                dispersion = fit_dispersion_grid_inner(DispersionOptimizerInput {
+                dispersion = grid_search_dispersion(DispersionFitInput {
                     counts,
                     mu,
                     design: Some(design),
@@ -149,6 +149,10 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
 }
 
 /// Fit one dispersion by DESeq2's Armijo line-search shape.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).design(design))"
+)]
 pub fn fit_dispersion_line_search(
     counts: &[u32],
     mu: &[f64],
@@ -157,7 +161,7 @@ pub fn fit_dispersion_line_search(
     options: GeneWiseDispersionOptions,
     n_samples: usize,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: Some(design),
@@ -170,6 +174,10 @@ pub fn fit_dispersion_line_search(
 }
 
 /// Fit one dispersion by DESeq2's Armijo line-search shape with a log-alpha prior.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).design(design).prior(prior))"
+)]
 pub fn fit_dispersion_line_search_with_prior(
     counts: &[u32],
     mu: &[f64],
@@ -179,7 +187,7 @@ pub fn fit_dispersion_line_search_with_prior(
     n_samples: usize,
     prior: DispersionPrior,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: Some(design),
@@ -192,10 +200,14 @@ pub fn fit_dispersion_line_search_with_prior(
 }
 
 /// Fit one dispersion by DESeq2's weighted Armijo line-search shape with a log-alpha prior.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(..).design(design).prior(prior).weights(weights))"
+)]
 pub fn fit_dispersion_line_search_with_prior_and_weights(
     input: WeightedDispersionFitInput<'_>,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts: input.counts,
         mu: input.mu,
         design: Some(input.design),
@@ -208,6 +220,10 @@ pub fn fit_dispersion_line_search_with_prior_and_weights(
 }
 
 /// Fit one dispersion by line search without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples))"
+)]
 pub fn fit_dispersion_line_search_no_cr(
     counts: &[u32],
     mu: &[f64],
@@ -215,7 +231,7 @@ pub fn fit_dispersion_line_search_no_cr(
     options: GeneWiseDispersionOptions,
     n_samples: usize,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -228,6 +244,10 @@ pub fn fit_dispersion_line_search_no_cr(
 }
 
 /// Fit one dispersion by line search with a log-alpha prior and without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).prior(prior))"
+)]
 pub fn fit_dispersion_line_search_no_cr_with_prior(
     counts: &[u32],
     mu: &[f64],
@@ -236,7 +256,7 @@ pub fn fit_dispersion_line_search_no_cr_with_prior(
     n_samples: usize,
     prior: DispersionPrior,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -249,6 +269,10 @@ pub fn fit_dispersion_line_search_no_cr_with_prior(
 }
 
 /// Fit one dispersion by weighted line search with a log-alpha prior and without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use line_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).prior(prior).weights(weights))"
+)]
 pub fn fit_dispersion_line_search_no_cr_with_prior_and_weights(
     counts: &[u32],
     mu: &[f64],
@@ -258,7 +282,7 @@ pub fn fit_dispersion_line_search_no_cr_with_prior_and_weights(
     prior: DispersionPrior,
     weights: &[f64],
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
-    fit_dispersion_line_search_inner(DispersionOptimizerInput {
+    line_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -270,16 +294,71 @@ pub fn fit_dispersion_line_search_no_cr_with_prior_and_weights(
     })
 }
 
-#[derive(Clone, Copy)]
-pub(super) struct DispersionOptimizerInput<'a> {
-    pub(super) counts: &'a [u32],
-    pub(super) mu: &'a [f64],
-    pub(super) design: Option<&'a DesignMatrix>,
-    pub(super) initial_dispersion: f64,
-    pub(super) options: GeneWiseDispersionOptions,
-    pub(super) n_samples: usize,
-    pub(super) prior: Option<DispersionPrior>,
-    pub(super) weights: Option<&'a [f64]>,
+/// One gene's dispersion fit for [`line_search_dispersion`] and
+/// [`grid_search_dispersion`].
+///
+/// Without a design the Cox-Reid adjustment is off whatever
+/// `options.use_cox_reid` says. Build with [`DispersionFitInput::new`] and the
+/// `design`, `prior` and `weights` setters.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct DispersionFitInput<'a> {
+    /// One gene's counts.
+    pub counts: &'a [u32],
+    /// Fitted means for the same samples.
+    pub mu: &'a [f64],
+    /// Design for the Cox-Reid adjustment.
+    pub design: Option<&'a DesignMatrix>,
+    /// Starting dispersion.
+    pub initial_dispersion: f64,
+    /// Optimizer options.
+    pub options: GeneWiseDispersionOptions,
+    /// Number of samples, for the default upper dispersion bound.
+    pub n_samples: usize,
+    /// Optional normal prior on log dispersion (MAP fit).
+    pub prior: Option<DispersionPrior>,
+    /// Optional observation weights.
+    pub weights: Option<&'a [f64]>,
+}
+
+impl<'a> DispersionFitInput<'a> {
+    /// A gene-wise fit without a design, prior or weights.
+    pub fn new(
+        counts: &'a [u32],
+        mu: &'a [f64],
+        initial_dispersion: f64,
+        options: GeneWiseDispersionOptions,
+        n_samples: usize,
+    ) -> Self {
+        Self {
+            counts,
+            mu,
+            design: None,
+            initial_dispersion,
+            options,
+            n_samples,
+            prior: None,
+            weights: None,
+        }
+    }
+
+    /// Use this design for the Cox-Reid adjustment.
+    pub fn design(mut self, design: &'a DesignMatrix) -> Self {
+        self.design = Some(design);
+        self
+    }
+
+    /// Add a normal prior on log dispersion.
+    pub fn prior(mut self, prior: DispersionPrior) -> Self {
+        self.prior = Some(prior);
+        self
+    }
+
+    /// Weight the observations.
+    pub fn weights(mut self, weights: &'a [f64]) -> Self {
+        self.weights = Some(weights);
+        self
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -294,8 +373,10 @@ pub(super) struct DispersionObjectiveInput<'a> {
     pub(super) prepared_cox: Option<&'a PreparedCoxReidDesign>,
 }
 
-pub(super) fn fit_dispersion_line_search_inner(
-    input: DispersionOptimizerInput<'_>,
+/// Fit one dispersion by DESeq2's Armijo line search on log dispersion
+/// (`fitDispWrapper`).
+pub fn line_search_dispersion(
+    input: DispersionFitInput<'_>,
 ) -> Result<DispersionLineSearchOutput, DeseqError> {
     let counts = input.counts;
     let mu = input.mu;
@@ -496,6 +577,10 @@ pub(super) fn checked_line_search_armijo_bound(
 }
 
 /// Fit a dispersion for one gene by DESeq2-style two-pass log-alpha grid search.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).design(design))"
+)]
 pub fn fit_dispersion_grid(
     counts: &[u32],
     mu: &[f64],
@@ -504,7 +589,7 @@ pub fn fit_dispersion_grid(
     options: GeneWiseDispersionOptions,
     n_samples: usize,
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: Some(design),
@@ -517,6 +602,10 @@ pub fn fit_dispersion_grid(
 }
 
 /// Fit a dispersion by two-pass log-alpha grid search with a log-alpha prior.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).design(design).prior(prior))"
+)]
 pub fn fit_dispersion_grid_with_prior(
     counts: &[u32],
     mu: &[f64],
@@ -526,7 +615,7 @@ pub fn fit_dispersion_grid_with_prior(
     n_samples: usize,
     prior: DispersionPrior,
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: Some(design),
@@ -539,10 +628,14 @@ pub fn fit_dispersion_grid_with_prior(
 }
 
 /// Fit a dispersion by weighted two-pass log-alpha grid search with a log-alpha prior.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(..).design(design).prior(prior).weights(weights))"
+)]
 pub fn fit_dispersion_grid_with_prior_and_weights(
     input: WeightedDispersionFitInput<'_>,
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts: input.counts,
         mu: input.mu,
         design: Some(input.design),
@@ -555,6 +648,10 @@ pub fn fit_dispersion_grid_with_prior_and_weights(
 }
 
 /// Fit a dispersion for one gene without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples))"
+)]
 pub fn fit_dispersion_grid_no_cr(
     counts: &[u32],
     mu: &[f64],
@@ -562,7 +659,7 @@ pub fn fit_dispersion_grid_no_cr(
     options: GeneWiseDispersionOptions,
     n_samples: usize,
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -575,6 +672,10 @@ pub fn fit_dispersion_grid_no_cr(
 }
 
 /// Fit a dispersion by two-pass log-alpha grid search with a prior and without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).prior(prior))"
+)]
 pub fn fit_dispersion_grid_no_cr_with_prior(
     counts: &[u32],
     mu: &[f64],
@@ -583,7 +684,7 @@ pub fn fit_dispersion_grid_no_cr_with_prior(
     n_samples: usize,
     prior: DispersionPrior,
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -596,6 +697,10 @@ pub fn fit_dispersion_grid_no_cr_with_prior(
 }
 
 /// Fit a dispersion by weighted two-pass log-alpha grid search with a prior and without Cox-Reid correction.
+#[deprecated(
+    since = "0.6.0",
+    note = "use grid_search_dispersion(DispersionFitInput::new(counts, mu, initial_dispersion, options, n_samples).prior(prior).weights(weights))"
+)]
 pub fn fit_dispersion_grid_no_cr_with_prior_and_weights(
     counts: &[u32],
     mu: &[f64],
@@ -605,7 +710,7 @@ pub fn fit_dispersion_grid_no_cr_with_prior_and_weights(
     prior: DispersionPrior,
     weights: &[f64],
 ) -> Result<(f64, usize), DeseqError> {
-    fit_dispersion_grid_inner(DispersionOptimizerInput {
+    grid_search_dispersion(DispersionFitInput {
         counts,
         mu,
         design: None,
@@ -617,9 +722,10 @@ pub fn fit_dispersion_grid_no_cr_with_prior_and_weights(
     })
 }
 
-pub(super) fn fit_dispersion_grid_inner(
-    input: DispersionOptimizerInput<'_>,
-) -> Result<(f64, usize), DeseqError> {
+/// Fit one dispersion by DESeq2's two-pass grid search on log dispersion
+/// (`fitDispGridWrapper`); returns the dispersion and the number of
+/// objective evaluations.
+pub fn grid_search_dispersion(input: DispersionFitInput<'_>) -> Result<(f64, usize), DeseqError> {
     let counts = input.counts;
     let mu = input.mu;
     let design = input.design;
