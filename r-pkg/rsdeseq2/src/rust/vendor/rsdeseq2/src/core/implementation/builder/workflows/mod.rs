@@ -5,3 +5,4 @@ mod entry;
 mod lrt;
 mod lrt_replacement;
 mod replacement;
+mod run;

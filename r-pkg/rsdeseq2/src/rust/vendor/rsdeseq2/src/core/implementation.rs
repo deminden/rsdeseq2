@@ -25,6 +25,11 @@ pub use fit_state::*;
 mod outputs;
 pub use outputs::*;
 
+// Request and output types for `DeseqBuilder::run`.
+#[path = "implementation/analysis.rs"]
+mod analysis;
+pub use analysis::*;
+
 // Builder configuration setters and accessors.
 #[path = "implementation/builder/config.rs"]
 mod config;
