@@ -1,5 +1,6 @@
 //! Mean-difference weights for expanded-model shrinkage list contrasts.
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use std::collections::HashSet;
 
 /// Build a difference between means of distinct selected coefficient groups.
@@ -18,10 +19,11 @@ pub fn averaged_list_contrast(
             .chain(negative)
             .any(|&i| i >= coefficients || !selected.insert(i))
     {
-        return Err(DeseqError::InvalidOptions {
-            reason: "average contrast requires distinct in-range indices and a nonempty selection"
-                .into(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "average contrast",
+            "distinct in-range indices and a nonempty selection",
+        ));
     }
     let mut values = vec![0.0; coefficients];
     for (indices, numerator) in [(positive, 1.0), (negative, -1.0)] {

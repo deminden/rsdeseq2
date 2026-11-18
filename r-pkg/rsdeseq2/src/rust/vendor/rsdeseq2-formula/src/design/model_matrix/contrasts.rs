@@ -1,5 +1,6 @@
 use super::{FactorCoding, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 pub(super) struct CodingMatrix {
     pub names: Vec<String>,
@@ -65,8 +66,10 @@ impl CodingMatrix {
             }
             FactorCoding::Polynomial => {
                 if n > 95 {
-                    return Err(invalid_options(
-                        "orthogonal polynomial contrasts require at most 95 levels",
+                    return Err(missing_prerequisite(
+                        ErrorKind::Options,
+                        "an orthogonal polynomial contrast",
+                        "at most 95 levels",
                     ));
                 }
                 values = super::polynomial::contrasts(n);

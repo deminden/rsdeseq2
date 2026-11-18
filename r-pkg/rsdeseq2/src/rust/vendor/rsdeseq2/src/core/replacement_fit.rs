@@ -1,6 +1,7 @@
 //! Consume replacement outputs into one reusable, row-aligned fitted state.
 use super::{CooksReplacementTestOutput, DeseqFit};
 use crate::errors::invalid_options;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::{
     cooks::CooksRefitPlan, errors::DeseqError, matrix::RowMajorMatrix, results::DeseqResults,
 };
@@ -213,7 +214,11 @@ impl CooksReplacementTestOutput {
             }
             merge_refit_fit_rows(&mut fit, refit, &plan.refit_rows)?;
         } else if plan.has_replaceable_samples() && !plan.refit_rows.is_empty() {
-            return Err(invalid_options("replacement rows require a refitted model"));
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "replacement",
+                "a refitted model",
+            ));
         }
         if plan.new_all_zero_rows.iter().any(|&i| {
             i >= fit.base_mean.len() || i >= fit.base_var.len() || i >= fit.all_zero.len()

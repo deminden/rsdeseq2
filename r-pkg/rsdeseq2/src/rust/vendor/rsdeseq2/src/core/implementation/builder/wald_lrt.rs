@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_wald_linear_mu`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_linear_mu(
@@ -270,13 +271,13 @@ impl DeseqBuilder {
                 design.n_samples(),
                 design.n_coefficients(),
             )?;
-            let cooks = fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before factor-level Cook's filtering"
-                        .to_string(),
-                })?;
+            let cooks = fit.cooks.as_ref().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "factor-level Cook's filtering",
+                    "Cook's distances",
+                )
+            })?;
             apply_cooks_cutoff_for_design(
                 &mut results,
                 cooks_cutoff,
@@ -617,13 +618,13 @@ impl DeseqBuilder {
                 full_design.n_samples(),
                 full_design.n_coefficients(),
             )?;
-            let cooks = fit
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "Cook's distances are required before factor-level Cook's filtering"
-                        .to_string(),
-                })?;
+            let cooks = fit.cooks.as_ref().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "factor-level Cook's filtering",
+                    "Cook's distances",
+                )
+            })?;
             apply_cooks_cutoff_for_design(
                 &mut results,
                 cooks_cutoff,

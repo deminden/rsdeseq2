@@ -3,6 +3,7 @@ use super::{
     MixtureComponents,
     truncated_standard::{scaled_mean, scaled_sd},
 };
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::{DeseqError, probability::normal_upper_tail};
 
 fn normal_cdf(q: f64, mean: f64, sd: f64) -> f64 {
@@ -75,10 +76,11 @@ impl MixtureComponents {
                 .zip(upper)
                 .any(|(&a, &b)| a <= threshold && threshold <= b)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: "truncated-normal prior CDF requires a component containing the cutoff"
-                    .into(),
-            });
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "truncated-normal prior CDF",
+                "a component containing the cutoff",
+            ));
         }
         Ok(weights
             .iter()

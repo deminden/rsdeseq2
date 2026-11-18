@@ -3,6 +3,7 @@
 use super::wald::{valid_t_df, validate_wald_options, wald_stat_and_pvalue_with_options};
 use super::{WaldDegreesOfFreedom, WaldOutput, WaldPvalueType, WaldTestOptions};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 /// Evaluate Wald hypotheses from aligned effect estimates and standard errors.
 ///
@@ -41,8 +42,12 @@ pub(super) fn wald_from_estimate_rows(
         WaldPvalueType::Normal => None,
         WaldPvalueType::T { degrees_of_freedom } => Some(match degrees_of_freedom {
             WaldDegreesOfFreedom::Residual => {
-                let df = residual_df.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "primitive Wald inference requires explicit degrees of freedom".into(),
+                let df = residual_df.ok_or_else(|| {
+                    missing_prerequisite(
+                        ErrorKind::Options,
+                        "primitive Wald inference",
+                        "explicit degrees of freedom",
+                    )
                 })?;
                 vec![valid_t_df(df); genes]
             }

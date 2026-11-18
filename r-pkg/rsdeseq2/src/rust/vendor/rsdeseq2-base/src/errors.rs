@@ -83,6 +83,20 @@ pub enum DeseqError {
         requirement: Requirement,
     },
 
+    /// An operation was asked for before something it needs: an earlier
+    /// stage's output, an input or a companion option.
+    #[error("{}: {operation} requires {prerequisite}", domain_prefix(*domain))]
+    MissingPrerequisite {
+        /// Which input family the operation belongs to: `Options`,
+        /// `Dispersion`, `Normalization` or `Counts`. It is also
+        /// [`DeseqError::kind`].
+        domain: ErrorKind,
+        /// What was asked for, for example "Wald fitting".
+        operation: String,
+        /// What it needs, for example "MAP dispersions".
+        prerequisite: String,
+    },
+
     /// A design formula could not be parsed or evaluated.
     #[error("invalid options: {reason}")]
     InvalidFormula {
@@ -203,7 +217,9 @@ impl DeseqError {
             Self::UnsupportedFeature { .. } => ErrorKind::Unsupported,
             Self::Io(_) => ErrorKind::Io,
             Self::Csv(_) | Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
-            Self::InvalidParameter { domain, .. } => *domain,
+            Self::InvalidParameter { domain, .. } | Self::MissingPrerequisite { domain, .. } => {
+                *domain
+            }
             Self::InvalidFormula { .. } => ErrorKind::Formula,
             Self::CoefficientNotFound { .. } => ErrorKind::Options,
             Self::Internal { .. } => ErrorKind::Internal,
@@ -249,6 +265,20 @@ pub fn invalid_parameter(
     }
 }
 
+/// `MissingPrerequisite` in `domain`.
+#[doc(hidden)]
+pub fn missing_prerequisite(
+    domain: ErrorKind,
+    operation: impl Into<String>,
+    prerequisite: impl Into<String>,
+) -> DeseqError {
+    DeseqError::MissingPrerequisite {
+        domain,
+        operation: operation.into(),
+        prerequisite: prerequisite.into(),
+    }
+}
+
 /// `InvalidFormula` with the reason as given.
 #[doc(hidden)]
 pub fn invalid_formula(reason: impl Into<String>) -> DeseqError {
@@ -289,6 +319,12 @@ mod tests {
         assert_eq!(invalid_dispersion("x").kind(), ErrorKind::Dispersion);
         assert_eq!(invariant("x").kind(), ErrorKind::Internal);
         assert_eq!(invalid_formula("x").kind(), ErrorKind::Formula);
+        let missing = missing_prerequisite(ErrorKind::Options, "VST", "a fitted dispersion trend");
+        assert_eq!(missing.kind(), ErrorKind::Options);
+        assert_eq!(
+            missing.to_string(),
+            "invalid options: VST requires a fitted dispersion trend"
+        );
         assert_eq!(
             invalid_parameter(ErrorKind::Dispersion, "x", Requirement::Finite).kind(),
             ErrorKind::Dispersion

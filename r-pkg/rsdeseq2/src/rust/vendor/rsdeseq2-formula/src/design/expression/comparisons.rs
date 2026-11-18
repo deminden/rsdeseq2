@@ -1,6 +1,7 @@
 use super::{Data, Evaluator, Value, invalid_options};
 use crate::errors::DeseqError;
 use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use std::cmp::Ordering;
 impl Evaluator<'_> {
     pub(super) fn comparison(
@@ -55,8 +56,10 @@ impl Evaluator<'_> {
         };
         let ordered = left.has_class("ordered") || right.has_class("ordered");
         if factor && !equal && !ordered {
-            return Err(invalid_options(
-                "relational comparison requires ordered factors",
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "relational comparison",
+                "ordered factors",
             ));
         }
         if left.has_class("factor") && right.has_class("factor") {

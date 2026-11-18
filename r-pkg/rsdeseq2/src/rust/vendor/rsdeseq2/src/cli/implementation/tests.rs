@@ -70,8 +70,9 @@ fn write_cli_result_sidecars_rejects_missing_refit_diagnostics() {
 
     assert!(matches!(
         err,
-        DeseqError::InvalidOptions { reason }
-            if reason.contains("replacement refit diagnostics sidecar output requires rows to be refit")
+        DeseqError::MissingPrerequisite { ref operation, ref prerequisite, .. }
+            if operation == "replacement refit diagnostics sidecar output"
+                && prerequisite == "rows to be refit"
     ));
 }
 

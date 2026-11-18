@@ -4,6 +4,7 @@
 //! The same validated plan can be used by native and foreign-language callers.
 use crate::errors::DeseqError;
 use crate::errors::invalid_options;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::MatrixView;
 
 mod contrasts;
@@ -204,7 +205,11 @@ impl<'a> ModelMatrixPlan<'a> {
             ));
         }
         if samples == 0 {
-            return Err(invalid_options("model matrix requires samples"));
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "model matrix",
+                "samples",
+            ));
         }
         for term in terms {
             if term.len() != variables.len() || term.iter().any(|c| !(0..=2).contains(c)) {
@@ -251,8 +256,10 @@ impl<'a> ModelMatrixPlan<'a> {
                         || levels.len() < 2
                         || codes.iter().any(|&v| v < 1 || v as usize > levels.len())
                     {
-                        return Err(invalid_options(
-                            "model matrix factors require valid one-based codes and at least two declared levels",
+                        return Err(missing_prerequisite(
+                            ErrorKind::Options,
+                            "each model matrix factor",
+                            "valid one-based codes and at least two declared levels",
                         ));
                     }
                     if levels

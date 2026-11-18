@@ -1,5 +1,6 @@
 //! Builder trends stages.
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_parametric_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
@@ -102,12 +103,13 @@ impl DeseqBuilder {
         mut fit: DeseqFit,
         fit_type: FitType,
     ) -> Result<DeseqFit, DeseqError> {
-        let disp_gene_est =
-            fit.disp_gene_est
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "gene-wise dispersions are required before trend fitting".to_string(),
-                })?;
+        let disp_gene_est = fit.disp_gene_est.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Dispersion,
+                "trend fitting",
+                "gene-wise dispersions",
+            )
+        })?;
         let trend = estimate_dispersion_trend(
             &fit.base_mean,
             disp_gene_est,

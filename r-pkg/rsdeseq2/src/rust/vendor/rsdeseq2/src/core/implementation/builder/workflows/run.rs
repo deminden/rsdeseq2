@@ -3,6 +3,7 @@
 //! `run` validates an [`Analysis`] once, resolves the design and the result
 //! request to a canonical form, and dispatches to the leaf workflows.
 
+use crate::errors::{ErrorKind, missing_prerequisite};
 use std::borrow::Cow;
 
 use super::super::{
@@ -282,9 +283,12 @@ impl DeseqBuilder {
                         denominator,
                         reference,
                     } => {
-                        let sample_levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "character results contrast requires sample levels for contrastAllZero"
-                                .to_string(),
+                        let sample_levels = sample_levels.ok_or_else(|| {
+                            missing_prerequisite(
+                                ErrorKind::Options,
+                                "character results contrast",
+                                "sample levels for contrastAllZero",
+                            )
                         })?;
                         levels.extend(sample_levels.iter().cloned());
                         Column::FactorLevel(factor_level_contrast_from_sample_levels(

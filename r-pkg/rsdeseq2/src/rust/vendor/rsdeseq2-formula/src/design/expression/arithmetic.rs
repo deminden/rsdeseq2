@@ -1,6 +1,7 @@
 use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
 use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::numeric::math::ProfileMath;
 
 pub(super) fn power(x: f64, y: f64) -> f64 {
@@ -60,8 +61,10 @@ pub(super) fn power(x: f64, y: f64) -> f64 {
 }
 pub(super) fn unary(name: &str, value: &Value) -> Result<Value, DeseqError> {
     if value.has_class("factor") {
-        return Err(invalid_options(
-            "numeric formula operations require numeric covariates",
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "a numeric formula operation",
+            "numeric covariates",
         ));
     }
     let input = value.numeric()?;

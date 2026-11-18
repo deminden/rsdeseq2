@@ -1,6 +1,7 @@
 pub(super) use super::super::DesignOrigin;
 use super::*;
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 pub(super) use crate::math::rank::{R_QR_TOLERANCE, matrix_rank, matrix_rank_r_qr};
 pub(super) use crate::matrix::RowMajorMatrix;
 
@@ -458,11 +459,13 @@ impl DesignMatrix {
 
     /// Resolve a coefficient name to its zero-based column index.
     pub fn coefficient_index(&self, name: &str) -> Result<usize, DeseqError> {
-        let names = self
-            .coefficient_names()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "coefficient names are required to resolve coefficient names".to_string(),
-            })?;
+        let names = self.coefficient_names().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "coefficient name resolution",
+                "coefficient names",
+            )
+        })?;
         names
             .iter()
             .position(|candidate| candidate == name)

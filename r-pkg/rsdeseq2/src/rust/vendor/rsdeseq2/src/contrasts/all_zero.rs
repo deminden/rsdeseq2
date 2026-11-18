@@ -4,6 +4,7 @@ use super::counts_view::ContrastCounts;
 use super::resolution::{validate_factor_level_contrast, validate_numeric_contrast};
 use crate::design::{DesignMatrix, r_like_name_candidates as candidate_names};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::CountMatrix;
 use crate::matrix::MatrixView;
 use crate::numeric::checked;
@@ -53,8 +54,12 @@ pub(super) fn numeric_samples(
     if contrast.iter().all(|value| *value >= 0.0) || contrast.iter().all(|value| *value <= 0.0) {
         return Ok(None);
     }
-    let design = design.ok_or_else(|| DeseqError::InvalidOptions {
-        reason: "numeric contrast all-zero handling requires modelMatrix".into(),
+    let design = design.ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            "numeric contrast all-zero handling",
+            "modelMatrix",
+        )
     })?;
     let mut terms = Vec::with_capacity(contrast.len());
     let mut selected = Vec::with_capacity(samples);

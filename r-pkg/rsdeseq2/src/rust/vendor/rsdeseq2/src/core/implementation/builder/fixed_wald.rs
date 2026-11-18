@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_fixed_dispersion_wald(
@@ -531,14 +532,9 @@ impl DeseqBuilder {
                 design.n_samples(),
                 design.n_coefficients(),
             )?;
-            let original_cooks =
-                original_fit
-                    .cooks
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "Cook's distances are required before replacement refit"
-                            .to_string(),
-                    })?;
+            let original_cooks = original_fit.cooks.as_ref().ok_or_else(|| {
+                missing_prerequisite(ErrorKind::Options, "replacement refit", "Cook's distances")
+            })?;
             apply_cooks_cutoff_for_design(
                 &mut results,
                 cooks_cutoff,

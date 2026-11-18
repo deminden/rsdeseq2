@@ -1,5 +1,6 @@
 use super::{Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 fn numeric_label(x: f64, integer: bool) -> Option<String> {
     if x.is_nan() {
@@ -97,7 +98,8 @@ impl Evaluator<'_> {
         } else {
             arguments(args, &formals)?
         };
-        let input = a[0].ok_or_else(|| invalid_options("factor transform requires x"))?;
+        let input =
+            a[0].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "factor transform", "x"))?;
         if name == "as.factor" && input.has_class("factor")
             || name == "as.ordered" && input.has_class("ordered")
         {
@@ -109,7 +111,11 @@ impl Evaluator<'_> {
             true
         } else if name == "relevel" {
             if input.has_class("ordered") {
-                return Err(invalid_options("relevel requires an unordered factor"));
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "relevel",
+                    "an unordered factor",
+                ));
             }
             false
         } else {
@@ -121,9 +127,10 @@ impl Evaluator<'_> {
                 .unwrap_or(input.has_class("ordered"))
         };
         let mut levels = if name == "relevel" {
-            let mut levels =
-                original.ok_or_else(|| invalid_options("relevel requires a factor"))?;
-            let reference = a[1].ok_or_else(|| invalid_options("relevel requires ref"))?;
+            let mut levels = original
+                .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "relevel", "a factor"))?;
+            let reference =
+                a[1].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "relevel", "ref"))?;
             let index = if matches!(reference.data, Data::Text(_)) {
                 let r = reference.text()?;
                 if r.len() != 1 {

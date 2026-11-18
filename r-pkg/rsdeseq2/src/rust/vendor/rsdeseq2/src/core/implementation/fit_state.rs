@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 /// Inspectable fit state for all implemented and future DESeq2 stages.
 #[derive(Clone, Debug, PartialEq)]
 #[must_use]
@@ -188,12 +189,9 @@ impl DeseqFit {
         counts: &CountMatrix,
     ) -> Result<RowMajorMatrix<f64>, DeseqError> {
         validate_fit_counts_shape(self, counts, "variance-stabilizing transform")?;
-        let trend_fit =
-            self.dispersion_trend
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "a fitted dispersion trend is required before VST".to_string(),
-                })?;
+        let trend_fit = self.dispersion_trend.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "VST", "a fitted dispersion trend")
+        })?;
         self.variance_stabilizing_transform_with_trend(counts, trend_fit)
     }
 
@@ -250,12 +248,13 @@ impl DeseqFit {
                 self.all_zero.len(),
             ));
         }
-        let disp_fit = self
-            .disp_fit
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "fitted dispersion trend values are required before rlog".to_string(),
-            })?;
+        let disp_fit = self.disp_fit.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Dispersion,
+                "rlog",
+                "fitted dispersion trend values",
+            )
+        })?;
         // DESeq2's rlogData fits sample effects using the fitted dispersion
         // trend (`dispFit`), before MAP shrinkage to final per-gene
         // dispersions. Use that same trend for both prior estimation and the
@@ -362,13 +361,13 @@ impl DeseqFit {
                 self.all_zero.len(),
             ));
         }
-        let dispersions = self
-            .disp_fit
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "fitted dispersion trend values are required before frozen rlog"
-                    .to_string(),
-            })?;
+        let dispersions = self.disp_fit.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Dispersion,
+                "frozen rlog",
+                "fitted dispersion trend values",
+            )
+        })?;
         let nonzero_rows = nonzero_gene_indices(&self.all_zero);
         if nonzero_rows.len() != counts.n_genes() {
             if nonzero_rows.is_empty() {

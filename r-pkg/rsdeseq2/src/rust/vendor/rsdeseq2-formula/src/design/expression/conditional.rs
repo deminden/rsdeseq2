@@ -1,5 +1,6 @@
 use super::{Argument, Data, Evaluator, NA_REAL, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 fn kind(value: &Value) -> Result<u8, DeseqError> {
     match &value.data {
@@ -23,7 +24,7 @@ impl Evaluator<'_> {
             .collect::<Vec<_>>();
         let bound = arguments(&inputs, &["test", "yes", "no"])?;
         let test = self.expression(
-            bound[0].ok_or_else(|| invalid_options("ifelse requires test"))?,
+            bound[0].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "ifelse", "test"))?,
             depth + 1,
         )?;
         let mut unshaped = test.clone();
@@ -40,16 +41,19 @@ impl Evaluator<'_> {
         let any_yes = conditions.contains(&Some(true));
         let any_no = conditions.contains(&Some(false));
         let yes = if any_yes {
-            Some(self.expression(
-                bound[1].ok_or_else(|| invalid_options("ifelse requires yes"))?,
-                depth + 1,
-            )?)
+            Some(
+                self.expression(
+                    bound[1]
+                        .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "ifelse", "yes"))?,
+                    depth + 1,
+                )?,
+            )
         } else {
             None
         };
         let no = if any_no {
             Some(self.expression(
-                bound[2].ok_or_else(|| invalid_options("ifelse requires no"))?,
+                bound[2].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "ifelse", "no"))?,
                 depth + 1,
             )?)
         } else {

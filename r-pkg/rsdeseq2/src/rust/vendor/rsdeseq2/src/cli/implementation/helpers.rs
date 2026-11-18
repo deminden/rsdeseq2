@@ -1,5 +1,6 @@
 use super::*;
 pub(super) use crate::errors::invariant;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 /// A CLI option that earlier argument checks guarantee to be present.
 pub(super) fn required<T>(value: Option<T>, flag: &str) -> Result<T, DeseqError> {
@@ -13,9 +14,7 @@ pub(super) fn require_cli_fit<'a>(
     analysis
         .fit
         .as_ref()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("{context} requires a native fit workflow"),
-        })
+        .ok_or_else(|| missing_prerequisite(ErrorKind::Options, context, "a native fit workflow"))
 }
 
 pub(super) fn require_cli_refit<'a>(
@@ -25,9 +24,7 @@ pub(super) fn require_cli_refit<'a>(
     analysis
         .refit
         .as_ref()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("{context} requires rows to be refit"),
-        })
+        .ok_or_else(|| missing_prerequisite(ErrorKind::Options, context, "rows to be refit"))
 }
 
 pub(super) fn fit_coefficient_names(fit: &DeseqFit) -> Option<&[String]> {
@@ -76,11 +73,13 @@ pub(super) fn read_cli_geometric_means(
     path.map(|path| {
         align_gene_numeric_values_to_genes(
             &read_labeled_geometric_means_tsv(path)?,
-            counts
-                .gene_names()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "count gene names are required to align geometric means".to_string(),
-                })?,
+            counts.gene_names().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "aligning geometric means",
+                    "count gene names",
+                )
+            })?,
             "geometric-mean",
         )
     })
@@ -94,12 +93,13 @@ pub(super) fn read_cli_frozen_intercept(
     path.map(|path| {
         align_gene_numeric_values_to_genes(
             &read_labeled_gene_numeric_tsv(path, "rlog frozen intercept")?,
-            counts
-                .gene_names()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "count gene names are required to align rlog frozen intercepts"
-                        .to_string(),
-                })?,
+            counts.gene_names().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "aligning rlog frozen intercepts",
+                    "count gene names",
+                )
+            })?,
             "rlog frozen intercept",
         )
     })
@@ -113,18 +113,24 @@ pub(super) fn read_cli_gene_numeric(
 ) -> Result<Vec<f64>, DeseqError> {
     align_gene_numeric_values_to_genes(
         &read_labeled_gene_numeric_tsv(path.into(), context)?,
-        counts
-            .gene_names()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("count gene names are required to align {context} values"),
-            })?,
+        counts.gene_names().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                format!("aligning {context} values"),
+                "count gene names",
+            )
+        })?,
         context,
     )
 }
 
 pub(super) fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64, DeseqError> {
-    let value = value.ok_or_else(|| DeseqError::InvalidOptions {
-        reason: "--rlog-prior-variance is required with --frozen-intercept".to_string(),
+    let value = value.ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            "--frozen-intercept",
+            "--rlog-prior-variance",
+        )
     })?;
     if value.is_finite() && value > 0.0 {
         Ok(value)
@@ -136,9 +142,11 @@ pub(super) fn required_cli_rlog_prior_variance(value: Option<f64>) -> Result<f64
 }
 
 pub(super) fn cli_rlog_prior_without_frozen_intercept() -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: "--rlog-prior-variance requires --frozen-intercept".to_string(),
-    }
+    missing_prerequisite(
+        ErrorKind::Options,
+        "--rlog-prior-variance",
+        "--frozen-intercept",
+    )
 }
 
 pub(super) fn read_cli_size_factors(
@@ -147,11 +155,13 @@ pub(super) fn read_cli_size_factors(
 ) -> Result<Vec<f64>, DeseqError> {
     align_sample_numeric_values_to_samples(
         &read_labeled_size_factors_tsv(path.into())?,
-        counts
-            .sample_names()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "count sample names are required to align size factors".to_string(),
-            })?,
+        counts.sample_names().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "aligning size factors",
+                "count sample names",
+            )
+        })?,
         "size-factor",
     )
 }
@@ -238,12 +248,13 @@ pub(super) fn apply_cli_wald_t_options(
         Ok(
             builder.wald_t_per_gene_degrees_of_freedom(align_gene_numeric_values_to_genes(
                 &read_labeled_wald_t_degrees_of_freedom_tsv(path)?,
-                counts
-                    .gene_names()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "count gene names are required to align Wald t degrees of freedom"
-                            .to_string(),
-                    })?,
+                counts.gene_names().ok_or_else(|| {
+                    missing_prerequisite(
+                        ErrorKind::Options,
+                        "aligning Wald t degrees of freedom",
+                        "count gene names",
+                    )
+                })?,
                 "Wald t degrees-of-freedom",
             )?),
         )
@@ -258,11 +269,13 @@ pub(super) fn read_cli_design_matrix(
 ) -> Result<crate::design::DesignMatrix, DeseqError> {
     align_design_matrix_to_samples(
         read_labeled_design_matrix_tsv(path.into())?,
-        counts
-            .sample_names()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "count sample names are required to align design rows".to_string(),
-            })?,
+        counts.sample_names().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "aligning design rows",
+                "count sample names",
+            )
+        })?,
     )
 }
 

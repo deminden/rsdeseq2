@@ -1,12 +1,15 @@
 use super::*;
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 pub(super) fn validate_additive_factor_specs(
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<(), DeseqError> {
     if factors.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "at least one factor is required".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "a factor design",
+            "at least one factor",
+        ));
     }
     let n_samples = factors[0].sample_levels.len();
     for (idx, factor) in factors.iter().enumerate() {
@@ -43,9 +46,11 @@ pub(super) fn additive_design_sample_count(
         return Ok(factor.sample_levels.len());
     }
     let Some(covariate) = numeric_covariates.first() else {
-        return Err(DeseqError::InvalidOptions {
-            reason: "at least one factor or numeric covariate is required".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "an additive design",
+            "at least one factor or numeric covariate",
+        ));
     };
     if covariate.values.is_empty() {
         return Err(invalid_parameter(

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 // Execute the LRT command after output staging.
 pub(super) fn run_lrt(command: Commands) -> Result<(), DeseqError> {
@@ -157,20 +158,22 @@ pub(super) fn run_lrt(command: Commands) -> Result<(), DeseqError> {
                             expected: 3,
                             actual: factor_inputs,
                         })?;
-                    let path =
-                        contrast_sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                            reason:
-                                "factor-level results contrast requires --contrast-sample-levels"
-                                    .to_string(),
-                        })?;
+                    let path = contrast_sample_levels.ok_or_else(|| {
+                        missing_prerequisite(
+                            ErrorKind::Options,
+                            "factor-level results contrast",
+                            "--contrast-sample-levels",
+                        )
+                    })?;
                     levels = align_sample_levels_to_samples(
                         &read_sample_levels_tsv(path)?,
-                        counts
-                            .sample_names()
-                            .ok_or_else(|| DeseqError::InvalidOptions {
-                                reason: "count sample names are required to align sample levels"
-                                    .to_string(),
-                            })?,
+                        counts.sample_names().ok_or_else(|| {
+                            missing_prerequisite(
+                                ErrorKind::Options,
+                                "aligning sample levels",
+                                "count sample names",
+                            )
+                        })?,
                     )?;
                     character = match contrast_reference {
                         Some(reference) => ResultsContrast::character_with_reference(
