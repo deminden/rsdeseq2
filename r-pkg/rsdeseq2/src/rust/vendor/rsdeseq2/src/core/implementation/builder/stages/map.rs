@@ -8,12 +8,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_map_dispersions_linear_mu(counts, design));
-        }
-
-        let fit = self.leaf_dispersion_trend_linear_mu(counts, design)?;
-        self.attach_map_dispersions(counts, design, fit)
+        self.in_pool(|| {
+            let fit = self.leaf_dispersion_trend_linear_mu(counts, design)?;
+            self.attach_map_dispersions(counts, design, fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu_parametric`] and [`DeseqBuilder::run`].
@@ -22,12 +20,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_map_dispersions_linear_mu_parametric(counts, design));
-        }
-
-        let fit = self.leaf_parametric_dispersion_trend_linear_mu(counts, design)?;
-        self.attach_map_dispersions(counts, design, fit)
+        self.in_pool(|| {
+            let fit = self.leaf_parametric_dispersion_trend_linear_mu(counts, design)?;
+            self.attach_map_dispersions(counts, design, fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu`] and [`DeseqBuilder::run`].
@@ -36,12 +32,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_map_dispersions_glm_mu(counts, design));
-        }
-
-        let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
-        self.attach_map_dispersions(counts, design, fit)
+        self.in_pool(|| {
+            let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
+            self.attach_map_dispersions(counts, design, fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu_parametric`] and [`DeseqBuilder::run`].
@@ -50,12 +44,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_map_dispersions_glm_mu_parametric(counts, design));
-        }
-
-        let fit = self.leaf_parametric_dispersion_trend_glm_mu(counts, design)?;
-        self.attach_map_dispersions(counts, design, fit)
+        self.in_pool(|| {
+            let fit = self.leaf_parametric_dispersion_trend_glm_mu(counts, design)?;
+            self.attach_map_dispersions(counts, design, fit)
+        })
     }
 
     pub(super) fn fit_map_dispersions_glm_mu_with_dispersion_function(

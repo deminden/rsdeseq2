@@ -13,12 +13,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<RlogOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.rlog_glm_mu(counts, design));
-        }
-
-        self.rlog_glm_mu_with_fit(counts, design)
-            .map(|output| output.rlog)
+        self.in_pool(|| {
+            self.rlog_glm_mu_with_fit(counts, design)
+                .map(|output| output.rlog)
+        })
     }
 
     /// Apply the implemented GLM-mu rlog workflow with explicit rlog IRLS options.
@@ -28,13 +26,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.rlog_glm_mu_with_options(counts, design, rlog_irls_options));
-        }
-
-        self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
-            .map(|output| output.rlog)
+        self.in_pool(|| {
+            self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
+                .map(|output| output.rlog)
+        })
     }
 
     /// Apply the implemented GLM-mu rlog workflow and retain the dispersion fit state.
@@ -43,11 +38,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.rlog_glm_mu_with_fit(counts, design));
-        }
-
-        self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
+        self.in_pool(|| {
+            self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
+        })
     }
 
     /// Apply the implemented GLM-mu rlog workflow with explicit options and retained fit state.
@@ -57,18 +50,14 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
-            });
-        }
-
-        let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
-        let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
-        Ok(RlogGlmMuOutput {
-            rlog,
-            fit,
-            design_mode: RlogDesignMode::DesignAware,
+        self.in_pool(|| {
+            let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
+            let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
+            Ok(RlogGlmMuOutput {
+                rlog,
+                fit,
+                design_mode: RlogDesignMode::DesignAware,
+            })
         })
     }
 
@@ -78,11 +67,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.frozen_rlog_glm_mu_with_fit(counts, design));
-        }
-
-        self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
+        self.in_pool(|| {
+            self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
+        })
     }
 
     /// Learn rlog intercepts and run frozen rlog with explicit IRLS options.
@@ -92,23 +79,20 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)
-            });
-        }
-
-        let source = self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)?;
-        let frozen_rlog = source.fit.frozen_rlog(
-            counts,
-            &source.rlog.intercept,
-            source.rlog.sample_prior_variance,
-        )?;
-        Ok(FrozenRlogGlmMuOutput {
-            source_rlog: source.rlog,
-            frozen_rlog,
-            fit: source.fit,
-            design_mode: source.design_mode,
+        self.in_pool(|| {
+            let source =
+                self.rlog_glm_mu_with_fit_and_options(counts, design, rlog_irls_options)?;
+            let frozen_rlog = source.fit.frozen_rlog(
+                counts,
+                &source.rlog.intercept,
+                source.rlog.sample_prior_variance,
+            )?;
+            Ok(FrozenRlogGlmMuOutput {
+                source_rlog: source.rlog,
+                frozen_rlog,
+                fit: source.fit,
+                design_mode: source.design_mode,
+            })
         })
     }
 
@@ -118,12 +102,10 @@ impl DeseqBuilder {
     /// dispersion fitting and rlog prior estimation ignore sample groups by
     /// using a one-column all-ones design.
     pub fn blind_rlog_glm_mu(&self, counts: &CountMatrix) -> Result<RlogOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.blind_rlog_glm_mu(counts));
-        }
-
-        self.blind_rlog_glm_mu_with_fit(counts)
-            .map(|output| output.rlog)
+        self.in_pool(|| {
+            self.blind_rlog_glm_mu_with_fit(counts)
+                .map(|output| output.rlog)
+        })
     }
 
     /// Apply blind GLM-mu rlog with explicit rlog IRLS options.
@@ -132,12 +114,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.blind_rlog_glm_mu_with_options(counts, rlog_irls_options));
-        }
-
-        self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
-            .map(|output| output.rlog)
+        self.in_pool(|| {
+            self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
+                .map(|output| output.rlog)
+        })
     }
 
     /// Apply blind GLM-mu rlog and retain the intercept-only dispersion fit state.
@@ -145,11 +125,9 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.blind_rlog_glm_mu_with_fit(counts));
-        }
-
-        self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
+        self.in_pool(|| {
+            self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
+        })
     }
 
     /// Apply blind GLM-mu rlog with explicit options and retained fit state.
@@ -158,17 +136,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<RlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.blind_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
-            });
-        }
-
-        let design = DesignMatrix::intercept_only(counts.n_samples())?;
-        let mut output =
-            self.rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
-        output.design_mode = RlogDesignMode::Blind;
-        Ok(output)
+        self.in_pool(|| {
+            let design = DesignMatrix::intercept_only(counts.n_samples())?;
+            let mut output =
+                self.rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
+            output.design_mode = RlogDesignMode::Blind;
+            Ok(output)
+        })
     }
 
     /// Learn blind rlog intercepts and run a frozen-intercept rlog reuse pass.
@@ -176,11 +150,9 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.blind_frozen_rlog_glm_mu_with_fit(counts));
-        }
-
-        self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
+        self.in_pool(|| {
+            self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
+        })
     }
 
     /// Learn blind rlog intercepts and run frozen rlog with explicit IRLS options.
@@ -189,16 +161,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         rlog_irls_options: IrlsOptions,
     ) -> Result<FrozenRlogGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, rlog_irls_options)
-            });
-        }
-
-        let design = DesignMatrix::intercept_only(counts.n_samples())?;
-        let mut output =
-            self.frozen_rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
-        output.design_mode = RlogDesignMode::Blind;
-        Ok(output)
+        self.in_pool(|| {
+            let design = DesignMatrix::intercept_only(counts.n_samples())?;
+            let mut output =
+                self.frozen_rlog_glm_mu_with_fit_and_options(counts, &design, rlog_irls_options)?;
+            output.design_mode = RlogDesignMode::Blind;
+            Ok(output)
+        })
     }
 }

@@ -7,13 +7,11 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_wald_glm_mu_parametric(counts, design, coefficient));
-        }
-
-        validate_pipeline_wald_coefficient(design, coefficient)?;
-        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
-        self.attach_native_wald(counts, design, coefficient, fit)
+        self.in_pool(|| {
+            validate_pipeline_wald_coefficient(design, coefficient)?;
+            let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
+            self.attach_native_wald(counts, design, coefficient, fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_parametric`] and [`DeseqBuilder::run`].
@@ -23,13 +21,10 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.leaf_wald_glm_mu_contrast_parametric(counts, design, contrast));
-        }
-
-        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
-        self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+        self.in_pool(|| {
+            let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
+            self.attach_native_wald_contrast(counts, design, contrast, None, fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
@@ -39,21 +34,17 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.leaf_wald_glm_mu_contrast_spec_parametric(counts, design, contrast)
-            });
-        }
-
-        let numeric_contrast = resolve_contrast(design, contrast)?;
-        let (fit, mut results) =
-            self.leaf_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
-        results.set_resolved_contrast_metadata(
-            contrast.result_name(),
-            contrast.comparison(),
-            &numeric_contrast,
-        );
-        Ok((fit, results))
+        self.in_pool(|| {
+            let numeric_contrast = resolve_contrast(design, contrast)?;
+            let (fit, mut results) =
+                self.leaf_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
+            results.set_resolved_contrast_metadata(
+                contrast.result_name(),
+                contrast.comparison(),
+                &numeric_contrast,
+            );
+            Ok((fit, results))
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
@@ -63,43 +54,39 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.leaf_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast)
-            });
-        }
-
-        let contrast_spec = match contrast.reference {
-            Some(reference) => ContrastSpec::factor_level_with_reference(
-                contrast.factor,
+        self.in_pool(|| {
+            let contrast_spec = match contrast.reference {
+                Some(reference) => ContrastSpec::factor_level_with_reference(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                    reference,
+                ),
+                None => ContrastSpec::factor_level(
+                    contrast.factor,
+                    contrast.numerator,
+                    contrast.denominator,
+                ),
+            };
+            let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
+            let contrast_all_zero = contrast_all_zero_factor_levels(
+                counts,
+                contrast.sample_levels,
                 contrast.numerator,
                 contrast.denominator,
-                reference,
-            ),
-            None => ContrastSpec::factor_level(
-                contrast.factor,
-                contrast.numerator,
-                contrast.denominator,
-            ),
-        };
-        let numeric_contrast = resolve_contrast(design, &contrast_spec)?;
-        let contrast_all_zero = contrast_all_zero_factor_levels(
-            counts,
-            contrast.sample_levels,
-            contrast.numerator,
-            contrast.denominator,
-        )?;
-        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
-        let (fit, mut results) = self.attach_native_wald_contrast(
-            counts,
-            design,
-            &numeric_contrast,
-            Some(&contrast_all_zero),
-            fit,
-        )?;
-        let (result_name, comparison) = factor_level_result_metadata(contrast);
-        results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
-        Ok((fit, results))
+            )?;
+            let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
+            let (fit, mut results) = self.attach_native_wald_contrast(
+                counts,
+                design,
+                &numeric_contrast,
+                Some(&contrast_all_zero),
+                fit,
+            )?;
+            let (result_name, comparison) = factor_level_result_metadata(contrast);
+            results.set_resolved_contrast_metadata(result_name, comparison, &numeric_contrast);
+            Ok((fit, results))
+        })
     }
 
     pub(super) fn attach_native_wald(

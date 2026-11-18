@@ -144,6 +144,15 @@ impl DeseqBuilder {
         }
     }
 
+    /// Run a fallible workflow inside the builder's worker pool, if one is
+    /// configured and the caller is not already inside it.
+    pub(super) fn in_pool<T: Send>(
+        &self,
+        workflow: impl FnOnce() -> Result<T, DeseqError> + Send,
+    ) -> Result<T, DeseqError> {
+        self.with_execution_context(workflow)?
+    }
+
     /// Store a reduced design matrix for top-level LRT workflows.
     pub fn reduced_design(mut self, reduced_design: DesignMatrix) -> Self {
         self.reduced_design = Some(reduced_design);
@@ -184,18 +193,16 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.expanded_formula_design(formula));
-        }
-
-        let model_frame = self
-            .model_frame
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "formula design construction requires builder model-frame metadata"
-                    .to_string(),
-            })?;
-        expanded_formula_design_from_model_frame(formula, model_frame)
+        self.in_pool(|| {
+            let model_frame =
+                self.model_frame
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "formula design construction requires builder model-frame metadata"
+                            .to_string(),
+                    })?;
+            expanded_formula_design_from_model_frame(formula, model_frame)
+        })
     }
 
     /// Build a supported expanded formula design plus formula offsets from stored metadata.
@@ -203,18 +210,16 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.expanded_formula_design_with_offsets(formula));
-        }
-
-        let model_frame = self
-            .model_frame
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "formula design construction requires builder model-frame metadata"
-                    .to_string(),
-            })?;
-        expanded_formula_design_with_offsets_from_model_frame(formula, model_frame)
+        self.in_pool(|| {
+            let model_frame =
+                self.model_frame
+                    .as_ref()
+                    .ok_or_else(|| DeseqError::InvalidOptions {
+                        reason: "formula design construction requires builder model-frame metadata"
+                            .to_string(),
+                    })?;
+            expanded_formula_design_with_offsets_from_model_frame(formula, model_frame)
+        })
     }
 
     /// Set IRLS options for fixed-dispersion GLM fitting.

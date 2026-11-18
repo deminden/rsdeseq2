@@ -18,33 +18,30 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub));
-        }
-
-        if nsub == 0 {
-            return Err(DeseqError::InvalidOptions {
-                reason: "fast VST subset size must be positive".to_string(),
-            });
-        }
-        design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
-        let stages = self.normalization_stages_for_design(counts, design)?;
-        let selection_means = base_mean(&stages.normalized)?;
-        let subset = build_fast_vst_subset(
-            counts,
-            &stages.normalized,
-            &selection_means,
-            nsub,
-            stages.normalization_factors.as_ref(),
-            stages.observation_weights.as_ref(),
-        )?;
-        let mut subset_builder = self.clone();
-        subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
-        subset_builder.normalization_factors = subset.normalization_factors.clone();
-        subset_builder.observation_weights = subset.observation_weights.clone();
-        let fit = subset_builder.leaf_dispersion_trend_glm_mu(&subset.counts, design)?;
-        Ok((fit, subset))
+        self.in_pool(|| {
+            if nsub == 0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: "fast VST subset size must be positive".to_string(),
+                });
+            }
+            design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
+            let stages = self.normalization_stages_for_design(counts, design)?;
+            let selection_means = base_mean(&stages.normalized)?;
+            let subset = build_fast_vst_subset(
+                counts,
+                &stages.normalized,
+                &selection_means,
+                nsub,
+                stages.normalization_factors.as_ref(),
+                stages.observation_weights.as_ref(),
+            )?;
+            let mut subset_builder = self.clone();
+            subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
+            subset_builder.normalization_factors = subset.normalization_factors.clone();
+            subset_builder.observation_weights = subset.observation_weights.clone();
+            let fit = subset_builder.leaf_dispersion_trend_glm_mu(&subset.counts, design)?;
+            Ok((fit, subset))
+        })
     }
 
     /// Fit the selected GLM-mu dispersion trend on the default fast-VST subset.
@@ -55,12 +52,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.fit_default_fast_vst_dispersion_trend_glm_mu(counts, design));
-        }
-
-        self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
+        self.in_pool(|| {
+            self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
+        })
     }
 
     /// Apply a fast-VST transform using a GLM-mu trend fit on the fast subset.
@@ -75,40 +69,37 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<FastVstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fast_vst_glm_mu(counts, design, nsub));
-        }
-
-        let (subset_fit, subset) =
-            self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub)?;
-        let trend_fit =
-            subset_fit
-                .dispersion_trend
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
+        self.in_pool(|| {
+            let (subset_fit, subset) =
+                self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub)?;
+            let trend_fit = subset_fit.dispersion_trend.as_ref().ok_or_else(|| {
+                DeseqError::InvalidDispersion {
                     reason: "a fitted fast-VST dispersion trend is required".to_string(),
-                })?;
-        // The subset supplies only the trend; the transform is still evaluated
-        // against the full count matrix and the caller's full-data offsets.
-        let full_fit = self.base_fit(
-            counts,
-            Some(design.clone()),
-            BaseFitInput {
-                size_factors: subset_fit.size_factors.clone(),
-                normalization_factors: self.normalization_factors.clone(),
-                observation_weights: None,
-                weights_fail: None,
-                weights_design_rank: None,
-                base_mean: vec![f64::NAN; counts.n_genes()],
-                base_var: vec![f64::NAN; counts.n_genes()],
-                all_zero: counts.all_zero_flags(),
-            },
-        );
-        let transformed = full_fit.variance_stabilizing_transform_with_trend(counts, trend_fit)?;
-        Ok(FastVstGlmMuOutput {
-            transformed,
-            subset_fit,
-            subset,
+                }
+            })?;
+            // The subset supplies only the trend; the transform is still evaluated
+            // against the full count matrix and the caller's full-data offsets.
+            let full_fit = self.base_fit(
+                counts,
+                Some(design.clone()),
+                BaseFitInput {
+                    size_factors: subset_fit.size_factors.clone(),
+                    normalization_factors: self.normalization_factors.clone(),
+                    observation_weights: None,
+                    weights_fail: None,
+                    weights_design_rank: None,
+                    base_mean: vec![f64::NAN; counts.n_genes()],
+                    base_var: vec![f64::NAN; counts.n_genes()],
+                    all_zero: counts.all_zero_flags(),
+                },
+            );
+            let transformed =
+                full_fit.variance_stabilizing_transform_with_trend(counts, trend_fit)?;
+            Ok(FastVstGlmMuOutput {
+                transformed,
+                subset_fit,
+                subset,
+            })
         })
     }
 
@@ -118,11 +109,7 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<FastVstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.default_fast_vst_glm_mu(counts, design));
-        }
-
-        self.fast_vst_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB)
+        self.in_pool(|| self.fast_vst_glm_mu(counts, design, DEFAULT_FAST_VST_NSUB))
     }
 
     /// Apply Rust's automatic GLM-mu VST path.
@@ -141,44 +128,42 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         nsub: usize,
     ) -> Result<VstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.vst_glm_mu_auto(counts, design, nsub));
-        }
+        self.in_pool(|| {
+            if nsub == 0 {
+                return Err(DeseqError::InvalidOptions {
+                    reason: "automatic VST subset size must be positive".to_string(),
+                });
+            }
+            let stages = self.normalization_stages_for_design(counts, design)?;
+            let selection_means = base_mean(&stages.normalized)?;
+            let eligible_rows = count_fast_vst_eligible_rows(&selection_means)?;
+            // Rust uses the deterministic subset when enough rows qualify and the
+            // full dataset otherwise. DESeq2's wrapper errors in the latter case.
+            if eligible_rows >= nsub {
+                let output = self.fast_vst_glm_mu(counts, design, nsub)?;
+                return Ok(VstGlmMuOutput {
+                    transformed: output.transformed,
+                    trend_fit: output.subset_fit,
+                    trend_source: VstTrendSource::FastSubset {
+                        nsub,
+                        eligible_rows,
+                    },
+                    fast_subset: Some(output.subset),
+                });
+            }
 
-        if nsub == 0 {
-            return Err(DeseqError::InvalidOptions {
-                reason: "automatic VST subset size must be positive".to_string(),
-            });
-        }
-        let stages = self.normalization_stages_for_design(counts, design)?;
-        let selection_means = base_mean(&stages.normalized)?;
-        let eligible_rows = count_fast_vst_eligible_rows(&selection_means)?;
-        // Rust uses the deterministic subset when enough rows qualify and the
-        // full dataset otherwise. DESeq2's wrapper errors in the latter case.
-        if eligible_rows >= nsub {
-            let output = self.fast_vst_glm_mu(counts, design, nsub)?;
-            return Ok(VstGlmMuOutput {
-                transformed: output.transformed,
-                trend_fit: output.subset_fit,
-                trend_source: VstTrendSource::FastSubset {
+            let trend_fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
+            let transformed = trend_fit.variance_stabilizing_transform(counts)?;
+            Ok(VstGlmMuOutput {
+                transformed,
+                trend_fit,
+                trend_source: VstTrendSource::FullData {
                     nsub,
                     eligible_rows,
+                    reason: VstFullDataReason::InsufficientEligibleRows,
                 },
-                fast_subset: Some(output.subset),
-            });
-        }
-
-        let trend_fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
-        let transformed = trend_fit.variance_stabilizing_transform(counts)?;
-        Ok(VstGlmMuOutput {
-            transformed,
-            trend_fit,
-            trend_source: VstTrendSource::FullData {
-                nsub,
-                eligible_rows,
-                reason: VstFullDataReason::InsufficientEligibleRows,
-            },
-            fast_subset: None,
+                fast_subset: None,
+            })
         })
     }
 
@@ -188,11 +173,7 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<VstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.default_vst_glm_mu_auto(counts, design));
-        }
-
-        self.vst_glm_mu_auto(counts, design, DEFAULT_FAST_VST_NSUB)
+        self.in_pool(|| self.vst_glm_mu_auto(counts, design, DEFAULT_FAST_VST_NSUB))
     }
 
     /// Apply automatic GLM-mu VST with an intercept-only design.
@@ -206,12 +187,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         nsub: usize,
     ) -> Result<VstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.blind_vst_glm_mu_auto(counts, nsub));
-        }
-
-        let design = DesignMatrix::intercept_only(counts.n_samples())?;
-        self.vst_glm_mu_auto(counts, &design, nsub)
+        self.in_pool(|| {
+            let design = DesignMatrix::intercept_only(counts.n_samples())?;
+            self.vst_glm_mu_auto(counts, &design, nsub)
+        })
     }
 
     /// Apply blind automatic GLM-mu VST using DESeq2's default `nsub=1000`.
@@ -219,10 +198,6 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<VstGlmMuOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.default_blind_vst_glm_mu_auto(counts));
-        }
-
-        self.blind_vst_glm_mu_auto(counts, DEFAULT_FAST_VST_NSUB)
+        self.in_pool(|| self.blind_vst_glm_mu_auto(counts, DEFAULT_FAST_VST_NSUB))
     }
 }
