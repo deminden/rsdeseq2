@@ -1,0 +1,731 @@
+//! Batch orchestration; likelihood, prior and optimizers have no R dependency.
+use super::{
+    negative_binomial::Row,
+    prior::{CauchyCoefficientPrior, ERROR_SCOPE, estimate_cauchy_prior_variance},
+};
+use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
+use crate::{
+    Error,
+    matrix::{MatrixView, RowMajorMatrix},
+    probability::normal_upper_tail,
+    shrinkage::svalues,
+};
+
+/// MLE scale supplied for empirical prior adaptation.
+#[derive(Clone, Copy, Debug)]
+pub enum CoefficientScale {
+    Natural,
+    Log2,
+}
+impl CoefficientScale {
+    pub fn to_natural(self, value: f64) -> f64 {
+        match self {
+            Self::Natural => value,
+            Self::Log2 => value * std::f64::consts::LN_2,
+        }
+    }
+}
+/// Coefficient estimates and SEs for empirical prior adaptation.
+#[derive(Clone, Copy, Debug)]
+pub struct CoefficientMle<'a> {
+    pub estimates: &'a [f64],
+    pub standard_errors: &'a [f64],
+    pub scale: CoefficientScale,
+}
+/// Log offsets or normalization values; scale conversion stays in the core.
+#[derive(Clone, Copy, Debug, Default)]
+pub enum PosteriorOffsets<'a> {
+    #[default]
+    None,
+    Log(MatrixView<'a, f64>),
+    Factors(MatrixView<'a, f64>),
+    SizeFactors(&'a [f64]),
+}
+/// Borrowed primitive data for a negative-binomial posterior batch.
+#[derive(Clone, Copy, Debug)]
+pub struct NegativeBinomialPosteriorInput<'a> {
+    pub counts: MatrixView<'a, f64>,
+    pub design: MatrixView<'a, f64>,
+    pub dispersions: &'a [f64],
+    pub offsets: PosteriorOffsets<'a>,
+    pub weights: Option<MatrixView<'a, f64>>,
+    pub mle: Option<CoefficientMle<'a>>,
+}
+#[derive(Clone, Debug)]
+pub struct NegativeBinomialPosteriorOptions {
+    pub prior: CauchyCoefficientPrior,
+    pub coefficient: Option<usize>,
+    /// Positive magnitude in natural log units; None omits FSOS calculations.
+    pub threshold: Option<f64>,
+    pub flip_sign: bool,
+    pub multiplier: f64,
+    pub map_only: bool,
+    pub check_opposite_start: bool,
+    /// Compiled CR zero-row policy; MAP-only methods ignore this flag.
+    pub log_link: bool,
+    pub refinement: super::compiled_refinement::NegativeBinomialRefinement,
+    pub hessian_step: f64,
+    pub analysis: super::analysis::PosteriorAnalysisOptions,
+}
+impl Default for NegativeBinomialPosteriorOptions {
+    fn default() -> Self {
+        Self {
+            prior: Default::default(),
+            coefficient: None,
+            threshold: None,
+            flip_sign: true,
+            multiplier: 1.0,
+            map_only: false,
+            check_opposite_start: true,
+            log_link: true,
+            refinement: Default::default(),
+            hessian_step: 1e-3,
+            analysis: Default::default(),
+        }
+    }
+}
+/// Per-row native convergence, separate from posterior-validity decisions.
+#[derive(Clone, Debug)]
+pub struct PosteriorMapDiagnostic {
+    pub convergence: Option<i32>,
+    pub function_evaluations: usize,
+    pub opposite_start_disagrees: bool,
+    pub laplace_valid: bool,
+}
+#[derive(Clone, Debug)]
+pub struct NegativeBinomialPosterior {
+    /// Coefficient owning probability summaries; only the fitter sets this identity.
+    summary_coefficient: Option<usize>,
+    /// Row-major modes and SDs in natural log coefficient units.
+    pub mode: RowMajorMatrix<f64>,
+    pub standard_deviation: Option<RowMajorMatrix<f64>>,
+    pub false_sign_rate: Option<Vec<Option<f64>>>,
+    pub sign_svalues: Option<Vec<Option<f64>>>,
+    pub false_sign_or_small_rate: Option<Vec<Option<f64>>>,
+    pub threshold_svalues: Option<Vec<Option<f64>>>,
+    pub prior: CauchyCoefficientPrior,
+    pub diagnostics: Vec<PosteriorMapDiagnostic>,
+    /// Native fitting warnings in batch/phase order, for frontend presentation.
+    pub warnings: Vec<String>,
+    /// Advanced random-start state, absent on deterministic fitting routes.
+    pub random_state: Option<Vec<i32>>,
+    pub analysis: super::analysis::PosteriorAnalysis,
+}
+/// Numerical columns for frontend presentation, with no frontend arithmetic.
+#[derive(Clone, Debug)]
+pub struct PosteriorCoefficientSummary {
+    pub mode: Vec<f64>,
+    pub standard_deviation: Vec<Option<f64>>,
+    pub sign_svalues: Option<Vec<Option<f64>>>,
+    pub threshold_svalues: Option<Vec<Option<f64>>>,
+}
+impl NegativeBinomialPosterior {
+    /// Coefficient for which the stored sign/threshold probabilities were fitted.
+    pub fn summary_coefficient(&self) -> Option<usize> {
+        self.summary_coefficient
+    }
+
+    fn validate_summary_shapes(&self) -> Result<(), Error> {
+        let genes = self.mode.n_rows();
+        let columns = self.mode.n_cols();
+        if self
+            .standard_deviation
+            .as_ref()
+            .is_some_and(|m| m.n_rows() != genes || m.n_cols() != columns)
+            || self.diagnostics.len() != genes
+            || [
+                &self.false_sign_rate,
+                &self.sign_svalues,
+                &self.false_sign_or_small_rate,
+                &self.threshold_svalues,
+            ]
+            .iter()
+            .any(|v| v.as_ref().is_some_and(|v| v.len() != genes))
+            || self
+                .analysis
+                .intervals
+                .as_ref()
+                .is_some_and(|m| m.n_rows() != genes || m.n_cols() != 2)
+            || [
+                &self.analysis.contrast_mode,
+                &self.analysis.contrast_standard_deviation,
+            ]
+            .iter()
+            .any(|m| m.as_ref().is_some_and(|m| m.n_rows() != genes))
+            || (!self.analysis.grid_diagnostics.is_empty()
+                && self.analysis.grid_diagnostics.len() != genes)
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior summary arrays have inconsistent shapes",
+            ));
+        }
+        if let (Some(mode), Some(sd)) = (
+            &self.analysis.contrast_mode,
+            &self.analysis.contrast_standard_deviation,
+        ) && mode.n_cols() != sd.n_cols()
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "posterior contrast arrays have inconsistent shapes",
+            ));
+        }
+        Ok(())
+    }
+
+    // Invariant: `coefficient` is checked against the mode shape above.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    pub fn coefficient_summary(
+        &self,
+        coefficient: usize,
+        scale: CoefficientScale,
+    ) -> Result<PosteriorCoefficientSummary, Error> {
+        if coefficient >= self.mode.n_cols() {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "coefficient is outside posterior matrix",
+            ));
+        }
+        self.validate_summary_shapes()?;
+        if (self.sign_svalues.is_some() || self.threshold_svalues.is_some())
+            && self.summary_coefficient != Some(coefficient)
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "requested coefficient differs from the fitted probability summary coefficient",
+            ));
+        }
+        let factor = match scale {
+            CoefficientScale::Natural => 1.0,
+            CoefficientScale::Log2 => 1.0 / std::f64::consts::LN_2,
+        };
+        let mode = (0..self.mode.n_rows())
+            .map(|i| self.mode.get(i, coefficient).unwrap() * factor)
+            .collect();
+        let standard_deviation = (0..self.mode.n_rows())
+            .map(|i| {
+                self.standard_deviation.as_ref().and_then(|m| {
+                    let value = *m.get(i, coefficient).unwrap();
+                    (!value.is_nan()).then_some(value * factor)
+                })
+            })
+            .collect();
+        Ok(PosteriorCoefficientSummary {
+            mode,
+            standard_deviation,
+            sign_svalues: self.sign_svalues.clone(),
+            threshold_svalues: self.threshold_svalues.clone(),
+        })
+    }
+}
+fn optimize(row: &Row<'_>, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResult, Error> {
+    let p = start.len();
+    let scale = row.objective_gradient(&vec![0.0; p]).0.max(1.0);
+    let (value, gradient) = row.objective_gradient(&start);
+    if !scale.is_finite() || !value.is_finite() || gradient.iter().any(|v| !v.is_finite()) {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "initial row posterior exceeds the representable range",
+        ));
+    }
+    Ok(super::unbounded_lbfgs::minimize(
+        |b| {
+            let (value, gradient) = row.objective_gradient(b);
+            (
+                value / scale + 10.0,
+                gradient.into_iter().map(|g| g / scale).collect(),
+            )
+        },
+        start,
+    ))
+}
+fn refine(
+    row: &Row<'_>,
+    start: Vec<f64>,
+    options: &NegativeBinomialPosteriorOptions,
+) -> Result<rcompat_lbfgsb::OptimResult, Error> {
+    super::compiled_refinement::optimize(row, start, &options.refinement)
+}
+
+pub fn fit_negative_binomial_posterior(
+    input: NegativeBinomialPosteriorInput<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+) -> Result<NegativeBinomialPosterior, Error> {
+    fit_batch(input, options, None, None)
+}
+/// MAP-only random-start fit. One shared N(0,0.5^2) vector is drawn for
+/// the entire batch. On a later fitting error the borrowed RNG remains advanced.
+pub fn fit_negative_binomial_posterior_with_rng(
+    input: NegativeBinomialPosteriorInput<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+    rng: &mut super::random::PosteriorRng,
+) -> Result<NegativeBinomialPosterior, Error> {
+    let mut options = options.clone();
+    options.map_only = true;
+    options.check_opposite_start = false;
+    fit_batch(input, &options, None, Some(rng))
+}
+// Invariant: offset and regression parameters are built for every row before fitting.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+pub(super) fn fit_batch(
+    input: NegativeBinomialPosteriorInput<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+    regression: Option<(
+        Option<MatrixView<'_, f64>>,
+        &super::regression::RegressionPosteriorOptions,
+    )>,
+    mut random: Option<&mut super::random::PosteriorRng>,
+) -> Result<NegativeBinomialPosterior, Error> {
+    let g = input.counts.n_rows();
+    let n = input.counts.n_cols();
+    let p = input.design.n_cols();
+    if g == 0 || n == 0 || p == 0 || input.design.n_rows() != n || input.dispersions.len() != g {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "nonempty counts, sample-aligned design and gene-aligned dispersions are required",
+        ));
+    }
+    if input.design.as_slice().iter().any(|v| !v.is_finite())
+        || input
+            .counts
+            .as_slice()
+            .iter()
+            .any(|v| !v.is_finite() || (regression.is_none() && *v < 0.0))
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "counts must be finite nonnegative numbers and design must be finite",
+        ));
+    }
+    if let Some(m) = input.weights
+        && (m.n_rows() != g
+            || m.n_cols() != n
+            || m.as_slice().iter().any(|v| !v.is_finite() || *v < 0.0))
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "finite nonnegative weights must match counts shape",
+        ));
+    }
+    let size_offsets = match input.offsets {
+        PosteriorOffsets::SizeFactors(s) => {
+            if s.len() != n || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "positive sample-aligned size factors are required",
+                ));
+            }
+            Some(s.iter().map(|v| v.ln_p()).collect::<Vec<_>>())
+        }
+        PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m) => {
+            let factors = matches!(input.offsets, PosteriorOffsets::Factors(_));
+            if m.n_rows() != g
+                || m.n_cols() != n
+                || m.as_slice()
+                    .iter()
+                    .any(|v| !v.is_finite() || (factors && *v <= 0.0))
+            {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "finite log offsets or positive normalization factors must match counts",
+                ));
+            }
+            None
+        }
+        PosteriorOffsets::None => None,
+    };
+    if options.coefficient.is_some_and(|c| c >= p)
+        || !options.multiplier.is_finite()
+        || options.multiplier <= 0.0
+        || !options.hessian_step.is_finite()
+        || options.hessian_step <= 0.0
+        || options
+            .threshold
+            .is_some_and(|t| !t.is_finite() || (options.flip_sign && t <= 0.0))
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "invalid coefficient, multiplier, Hessian step or threshold",
+        ));
+    }
+    options.analysis.validate(
+        g,
+        p,
+        options.coefficient,
+        options.threshold,
+        options.map_only,
+    )?;
+    if !options.map_only
+        && options.analysis.parameter_standard_errors.is_some()
+        && regression.is_some_and(|(parameters, _)| parameters.is_none_or(|m| m.n_cols() != 1))
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "parameter uncertainty requires a scalar likelihood parameter",
+        ));
+    }
+    let mut analysis = super::analysis::PosteriorAnalysis::new(
+        &options.analysis,
+        g,
+        options.coefficient,
+        options.map_only,
+    )?;
+    let mut prior = options.prior.clone();
+    if let Some(mle) = input.mle {
+        let coefficient = options.coefficient.ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "MLE prior adaptation requires a coefficient")
+        })?;
+        if mle.estimates.len() != g || mle.standard_errors.len() != g {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "MLE population must match count rows",
+            ));
+        }
+        let factor = match mle.scale {
+            CoefficientScale::Natural => 1.0,
+            CoefficientScale::Log2 => std::f64::consts::LN_2,
+        };
+        let x = mle.estimates.iter().map(|v| v * factor).collect::<Vec<_>>();
+        let s = mle
+            .standard_errors
+            .iter()
+            .map(|v| v * factor)
+            .collect::<Vec<_>>();
+        let variance = estimate_cauchy_prior_variance(&x, &s)?;
+        prior.scale = (options.multiplier * variance.sqrt()).min(1.0);
+        prior.adapted_variance = Some(variance);
+        prior.nuisance = (0..p).filter(|&j| j != coefficient).collect();
+    }
+    prior.validate(p)?;
+    let na = super::super::location_missing::NA;
+    let mut modes = RowMajorMatrix::from_elem(g, p, na)?.into_values();
+    let mut sd = if options.map_only {
+        None
+    } else {
+        Some(RowMajorMatrix::from_elem(g, p, na)?.into_values())
+    };
+    let mut fsr = options.coefficient.map(|_| vec![None; g]);
+    let mut fsos = options
+        .threshold
+        .filter(|_| options.coefficient.is_some())
+        .map(|_| vec![None; g]);
+    let mut diagnostics = Vec::with_capacity(g);
+    let mut warnings = vec![];
+    let mut second_warnings = vec![];
+    let shared_initial = random.as_deref_mut().map(|rng| rng.start_vector(p));
+    for gene in 0..g {
+        options.analysis.work.check()?;
+        let counts = (0..n)
+            .map(|i| *input.counts.at(gene, i))
+            .collect::<Vec<_>>();
+        let nb_r = regression.is_some_and(|(_, o)| {
+            o.method == super::regression::RegressionMethod::NegativeBinomialR
+        });
+        let skip_zero = regression.is_none()
+            || regression.is_some_and(|(_, o)| {
+                o.method == super::regression::RegressionMethod::NegativeBinomialR && o.log_link
+            });
+        if skip_zero && counts.iter().all(|&v| v == 0.0) {
+            if regression.is_none() && !options.map_only && !options.log_link {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "compiled refinement has no prefit for an all-zero row when log_link is false",
+                ));
+            }
+            diagnostics.push(PosteriorMapDiagnostic {
+                convergence: None,
+                function_evaluations: 0,
+                opposite_start_disagrees: false,
+                laplace_valid: false,
+            });
+            continue;
+        }
+        let dispersion = input.dispersions[gene];
+        if !dispersion.is_finite() || dispersion <= 0.0 || !(1.0 / dispersion).is_finite() {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "positive finite dispersions are required for nonzero rows",
+            ));
+        }
+        let row = Row {
+            design: input.design,
+            counts,
+            weights: (0..n)
+                .map(|i| input.weights.map(|m| *m.at(gene, i)).unwrap_or(1.0))
+                .collect(),
+            offsets: (0..n)
+                .map(|i| match input.offsets {
+                    PosteriorOffsets::None => 0.0,
+                    PosteriorOffsets::Log(m) => *m.at(gene, i),
+                    PosteriorOffsets::Factors(m) => m.at(gene, i).ln_p(),
+                    PosteriorOffsets::SizeFactors(_) => size_offsets.as_ref().unwrap()[i],
+                })
+                .collect(),
+            size: 1.0 / dispersion,
+            prior: &prior,
+        };
+        let initial = shared_initial.clone().unwrap_or_else(|| {
+            (0..p)
+                .map(|j| if j % 2 == 0 { 0.1 } else { -0.1 })
+                .collect::<Vec<_>>()
+        });
+        let general = regression
+            .filter(|(_, o)| o.method == super::regression::RegressionMethod::General)
+            .map(|(parameters, config)| super::regression::GeneralRow {
+                y: &row.counts,
+                design: input.design,
+                parameters: parameters.map(|m| (0..m.n_cols()).map(|j| *m.at(gene, j)).collect()),
+                weights: &row.weights,
+                offsets: &row.offsets,
+                prior: &prior,
+                options: config,
+                error: std::cell::RefCell::new(None),
+            });
+        let beta_parameters = regression
+            .filter(|(_, config)| {
+                matches!(
+                    config.likelihood,
+                    super::regression::RegressionLikelihood::BetaBinomial
+                )
+            })
+            .map(|(parameters, _)| {
+                let parameters = parameters.unwrap();
+                (0..parameters.n_cols())
+                    .map(|j| *parameters.at(gene, j))
+                    .collect::<Vec<_>>()
+            });
+        let beta_binomial = beta_parameters
+            .as_ref()
+            .map(|parameters| super::beta_binomial::Row {
+                design: input.design,
+                successes: &row.counts,
+                trials: &parameters[1..],
+                weights: &row.weights,
+                concentration: parameters[0],
+                prior: &prior,
+            });
+        let mut result = if let Some(general) = &general {
+            general.optimize(
+                (0..p)
+                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+                    .collect(),
+            )?
+        } else if let Some(beta_binomial) = &beta_binomial {
+            let (_, config) = regression
+                .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
+            if config.method == super::regression::RegressionMethod::BetaBinomialR {
+                beta_binomial.optimize(vec![0.0; p], config)?
+            } else {
+                beta_binomial.prefit(initial.clone())?
+            }
+        } else {
+            if nb_r {
+                let (_, config) = regression
+                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
+                let mut start = (0..p)
+                    .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+                    .collect::<Vec<_>>();
+                if config.log_link {
+                    let baseline = (0..n)
+                        .filter(|&i| {
+                            (0..p).filter(|&j| *input.design.at(i, j) == 0.0).count() == p - 1
+                        })
+                        .collect::<Vec<_>>();
+                    let mean = if baseline.is_empty() {
+                        row.counts.iter().sum::<f64>() / n as f64
+                    } else {
+                        baseline.iter().map(|&i| row.counts[i]).sum::<f64>() / baseline.len() as f64
+                    };
+                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln_p() };
+                }
+                super::regression::optimize_nb_r(&row, config, start)?
+            } else {
+                optimize(&row, initial.clone())?
+            }
+        };
+        if (regression.is_none() || beta_binomial.is_some()) && result.convergence < 0 {
+            warnings.push(result.message.clone());
+        }
+        let disagreement = if regression.is_none() && options.check_opposite_start {
+            let second = optimize(&row, initial.into_iter().map(|v| -v).collect())?;
+            if second.convergence < 0 {
+                second_warnings.push(second.message.clone());
+            }
+            result
+                .par
+                .iter()
+                .zip(second.par)
+                .any(|(a, b)| (a - b).abs() > 0.01)
+        } else {
+            false
+        };
+        let mut refined = false;
+        if regression.is_none() && !options.map_only && (result.convergence != 0 || disagreement) {
+            result = refine(&row, result.par, options)?;
+            refined = true;
+        }
+        let mut laplace_valid = false;
+        if let Some(sd) = &mut sd {
+            let h = if let Some(general) = &general {
+                general.hessian(&result.par, options.hessian_step)
+            } else if let Some(beta_binomial) = &beta_binomial {
+                let (_, config) = regression
+                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
+                let h = beta_binomial.hessian(&result.par, options.hessian_step);
+                let invalid_covariance = h
+                    .clone()
+                    .try_inverse()
+                    .is_none_or(|m| m.diagonal().iter().any(|v| !v.is_finite() || *v <= 0.0));
+                if config.method == super::regression::RegressionMethod::BetaBinomialCR
+                    && (result.convergence != 0 || invalid_covariance)
+                {
+                    result = beta_binomial.optimize(result.par, config)?;
+                    beta_binomial.hessian(&result.par, options.hessian_step)
+                } else {
+                    h
+                }
+            } else {
+                row.hessian(&result.par, options.hessian_step)
+            };
+            if let Some(e) = general.as_ref().and_then(|g| g.take_error()) {
+                return Err(e);
+            }
+            let mut covariance = if h.iter().all(|v| v.is_finite()) {
+                h.try_inverse()
+            } else {
+                None
+            };
+            // A successful compiled prefit can still have a nonpositive variance.
+            // The reference then uses the same deferred refinement controls.
+            if regression.is_none()
+                && !refined
+                && covariance
+                    .as_ref()
+                    .is_some_and(|m| m.diagonal().iter().any(|v| *v <= 0.0))
+            {
+                result = refine(&row, result.par, options)?;
+                let h = row.hessian(&result.par, options.hessian_step);
+                covariance = if h.iter().all(|v| v.is_finite()) {
+                    h.try_inverse()
+                } else {
+                    None
+                };
+            }
+            if regression.is_some() && covariance.is_none() {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "general posterior Hessian is singular or nonfinite",
+                ));
+            }
+            if let Some(covariance) = covariance
+                && covariance
+                    .diagonal()
+                    .iter()
+                    .all(|v| v.is_finite() && *v > 0.0)
+            {
+                laplace_valid = true;
+                for j in 0..p {
+                    sd.as_mut_slice()[gene * p + j] = covariance[(j, j)].sqrt();
+                }
+                if let Some(c) = options.coefficient {
+                    let mean = result.par[c];
+                    let error = sd.as_slice()[gene * p + c];
+                    fsr.as_mut().ok_or_else(|| {
+                        crate::errors::invariant(
+                            "false-sign rates allocated for a selected coefficient",
+                        )
+                    })?[gene] = Some(normal_upper_tail(mean.abs() / error));
+                    if let Some(rates) = &mut fsos {
+                        let cutoff = if options.flip_sign {
+                            (if mean == 0.0 { 0.0 } else { mean.signum() })
+                                * options.threshold.ok_or_else(|| {
+                                    crate::errors::invariant(
+                                        "threshold set when threshold rates are requested",
+                                    )
+                                })?
+                        } else {
+                            options.threshold.ok_or_else(|| {
+                                crate::errors::invariant(
+                                    "threshold set when threshold rates are requested",
+                                )
+                            })?
+                        };
+                        let z = (cutoff - mean) / error;
+                        rates[gene] = Some(if options.flip_sign && mean < 0.0 {
+                            normal_upper_tail(z)
+                        } else {
+                            normal_upper_tail(-z)
+                        });
+                    }
+                }
+                if options.analysis.interval.is_some() || options.analysis.contrasts.is_some() {
+                    let density = super::analysis::GridPosteriorRow::new(
+                        &row,
+                        regression,
+                        gene,
+                        dispersion,
+                        &options.analysis,
+                    );
+                    let mut grid_evaluations = 0usize;
+                    if let Some(summary) = analysis.row(
+                        super::analysis::AnalysisRow {
+                            gene,
+                            mode: &result.par,
+                            covariance: &covariance,
+                            sd: &sd[gene * p..(gene + 1) * p],
+                            coefficient: options.coefficient,
+                            options: &options.analysis,
+                            threshold: options.threshold,
+                            flip_sign: options.flip_sign,
+                        },
+                        |beta, shift| {
+                            if grid_evaluations.is_multiple_of(256) {
+                                options.analysis.work.check()?;
+                            }
+                            grid_evaluations += 1;
+                            density.value(beta, shift)
+                        },
+                    )? {
+                        fsr.as_mut().ok_or_else(|| {
+                            crate::errors::invariant(
+                                "false-sign rates allocated for a selected coefficient",
+                            )
+                        })?[gene] = summary.false_sign_rate;
+                        if let Some(rates) = &mut fsos {
+                            rates[gene] = summary.threshold_rate;
+                        }
+                    }
+                }
+            }
+        }
+        for (j, &value) in result.par.iter().enumerate() {
+            modes.as_mut_slice()[gene * p + j] = value;
+        }
+        diagnostics.push(PosteriorMapDiagnostic {
+            convergence: Some(result.convergence),
+            function_evaluations: result.counts.function,
+            opposite_start_disagrees: disagreement,
+            laplace_valid,
+        });
+    }
+    let sign_svalues = fsr.as_ref().map(|v| svalues(v)).transpose()?;
+    let threshold_svalues = fsos.as_ref().map(|v| svalues(v)).transpose()?;
+    warnings.extend(second_warnings);
+    Ok(NegativeBinomialPosterior {
+        summary_coefficient: options.coefficient,
+        mode: RowMajorMatrix::from_row_major(g, p, modes)?,
+        standard_deviation: sd
+            .map(|v| RowMajorMatrix::from_row_major(g, p, v))
+            .transpose()?,
+        false_sign_rate: fsr,
+        sign_svalues,
+        false_sign_or_small_rate: fsos,
+        threshold_svalues,
+        prior,
+        analysis,
+        diagnostics,
+        warnings,
+        random_state: random.as_ref().map(|rng| rng.r_seed()),
+    })
+}

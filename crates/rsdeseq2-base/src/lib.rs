@@ -14,9 +14,7 @@ pub mod math;
 pub mod matrix;
 pub mod nb;
 #[doc(hidden)]
-pub mod numeric;
-#[doc(hidden)]
-pub mod probability;
+pub use rcompat_numeric::{numeric, probability};
 
 pub use errors::DeseqError;
 pub use numeric::{NumericProfile, numeric_profile, set_numeric_profile};

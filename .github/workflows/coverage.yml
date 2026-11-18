@@ -26,7 +26,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Line coverage (lib and integration tests)
         run: |
-          cargo llvm-cov --locked --no-report -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink --lib
+          cargo llvm-cov --locked --no-report -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2-base --lib
           cargo llvm-cov --locked --no-report -p rsdeseq2 --lib --test integration
           cargo llvm-cov report --summary-only | tee coverage-summary.txt
           cargo llvm-cov report --lcov --output-path lcov.info
@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { crate: rsdeseq2-base, files: 'crates/rsdeseq2-base/src/numeric/*.rs', tests: '--cargo-test-arg=--lib' }
+          - { crate: rcompat-numeric, files: 'crates/rcompat-numeric/src/numeric/*.rs', tests: '--cargo-test-arg=--lib' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/multiple_testing.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/normalization.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/independent_filtering.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }

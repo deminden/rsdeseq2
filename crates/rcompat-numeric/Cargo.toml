@@ -1,0 +1,28 @@
+[package]
+name = "rcompat-numeric"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "R-compatible numeric primitives in Rust: run-time numeric profiles (host libm or portable), R-exact special functions and distributions, checked arithmetic and dense matrices"
+documentation = "https://docs.rs/rcompat-numeric"
+keywords = ["r", "statistics", "numerics", "special-functions", "reproducibility"]
+categories = ["science", "mathematics"]
+exclude = [".DS_Store", "**/.DS_Store"]
+
+[lints]
+workspace = true
+
+[features]
+# A `Csv` error variant converting from `csv::Error`.
+csv = ["dep:csv"]
+
+[dependencies]
+csv = { workspace = true, optional = true }
+libm.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+statrs.workspace = true

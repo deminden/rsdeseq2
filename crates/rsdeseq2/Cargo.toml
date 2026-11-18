@@ -44,10 +44,10 @@ default = ["cli", "formula", "shrinkage"]
 cli = ["dep:clap", "dep:sha2", "dep:same-file"]
 # Locale-aware (ICU) collation for formula factor levels and string
 # comparisons. Without it, formula evaluation supports only "C" collation.
-formula = ["rsdeseq2-formula/icu"]
+formula = ["rcompat-formula/icu"]
 # Empirical-Bayes shrinkage engines (`rsdeseq2::shrinkage`: ashr- and
 # apeglm-style posteriors). Normal (beta-prior) shrinkage is always available.
-shrinkage = ["dep:rsdeseq2-shrink"]
+shrinkage = ["dep:rcompat-shrinkage"]
 
 [dependencies]
 clap = { workspace = true, optional = true }
@@ -55,9 +55,9 @@ csv.workspace = true
 libm.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
+rcompat-formula.workspace = true
+rcompat-shrinkage = { workspace = true, optional = true }
 rsdeseq2-base.workspace = true
-rsdeseq2-formula.workspace = true
-rsdeseq2-shrink = { workspace = true, optional = true }
 rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true

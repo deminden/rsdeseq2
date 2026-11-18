@@ -132,7 +132,8 @@ def main():
     if r_version != version or backend_version != version:
         raise ValueError('Rust crate, R package and R backend versions must agree')
     crates = vendored_crates(workspace)
-    if any(workspace[name]['version'] != version for name in crates):
+    # The rsdeseq2 crates share one version; the rcompat crates have their own.
+    if any(workspace[name]['version'] != version for name in crates if name.startswith('rsdeseq2')):
         raise ValueError('Workspace crate versions must agree')
     with tempfile.TemporaryDirectory(prefix='rsdeseq2-vendor-') as temp:
         for name in crates:

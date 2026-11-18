@@ -27,7 +27,7 @@ pub mod cli;
 pub mod contrasts;
 pub mod cooks;
 pub mod core;
-pub use rsdeseq2_formula::design;
+pub use rcompat_formula::design;
 pub mod diagnostics;
 pub mod dispersion;
 pub use rsdeseq2_base::errors;
@@ -45,7 +45,7 @@ pub mod prelude;
 pub(crate) use rsdeseq2_base::probability;
 pub mod results;
 #[cfg(feature = "shrinkage")]
-pub use rsdeseq2_shrink::shrinkage;
+pub use rcompat_shrinkage::shrinkage;
 pub mod transform;
 
 pub use crate::errors::DeseqError;

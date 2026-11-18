@@ -1,0 +1,213 @@
+//! Shared location preprocessing and likelihood-only mixture fitting.
+use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
+const ERROR_SCOPE: &str = "location shrinkage";
+use super::{
+    LocationLikelihood, LocationShrinkageOptions, MixtureComponents, MixtureFit, MixtureGrid,
+    prepare_mixture_grid,
+};
+use crate::Error;
+
+pub(super) struct FittedLocation {
+    pub grid: MixtureGrid,
+    pub fitted_weights: Vec<f64>,
+    pub fit: Option<MixtureFit>,
+    pub x: Vec<f64>,
+    pub se: Vec<f64>,
+    pub scale: Vec<f64>,
+    pub warnings: Vec<String>,
+}
+pub(super) fn fit_location(
+    estimates: &[f64],
+    standard_errors: &[f64],
+    options: &LocationShrinkageOptions,
+) -> Result<FittedLocation, Error> {
+    if standard_errors.len() != estimates.len() && standard_errors.len() != 1 {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "SEs must have length one or match estimates",
+        ));
+    }
+    if !options.alpha.is_finite()
+        || !options.prune_threshold.is_finite()
+        || options.prune_threshold < 0.0
+        || options.thresholds.iter().any(|v| v.is_nan())
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "finite alpha/nonnegative pruning threshold and nonmissing CDF cutoffs are required",
+        ));
+    }
+    if !estimates.iter().enumerate().any(|(i, x)| {
+        !x.is_nan() && !standard_errors[if standard_errors.len() == 1 { 0 } else { i }].is_nan()
+    }) {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "all input observations are missing",
+        ));
+    }
+    if options.fixed_prior && options.supplied_grid.is_none() {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "fixed_prior requires a supplied mixture grid",
+        ));
+    }
+    let n = estimates.len();
+    options.likelihood.validate_observations(n)?;
+    let mut x = Vec::with_capacity(n);
+    let mut se = Vec::with_capacity(n);
+    let mut scale = Vec::with_capacity(n);
+    let mut included = vec![];
+    for (i, &estimate) in estimates.iter().enumerate() {
+        let s = standard_errors[if standard_errors.len() == 1 { 0 } else { i }];
+        if s < 0.0 {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "standard errors must be nonnegative",
+            ));
+        }
+        let factor = s.powf_p(options.alpha);
+        let value = estimate / factor;
+        let error = s.powf_p(1.0 - options.alpha);
+        if !value.is_nan() && !error.is_nan() && error != 0.0 && error != f64::INFINITY {
+            if !value.is_finite() || !error.is_finite() {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "nonexcluded estimates and SEs must be finite",
+                ));
+            }
+            included.push(i);
+        }
+        x.push(value);
+        se.push(error);
+        scale.push(factor);
+    }
+    let grid = match &options.supplied_grid {
+        Some(g) => g.clone(),
+        None => {
+            let mut grid = options.grid.clone();
+            if let LocationLikelihood::Builtin(b) = &options.likelihood
+                && let Some((a, b)) = b.support()
+            {
+                grid.range = (grid.range.0.max(a), grid.range.1.min(b));
+            }
+            let count_data = if grid.scales.is_none() {
+                if let LocationLikelihood::Builtin(b) = &options.likelihood {
+                    b.grid_data(n, &se)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some((x, se)) = count_data {
+                prepare_mixture_grid(&x, &se, &grid)?
+            } else {
+                prepare_mixture_grid(&x, &se, &grid)?
+            }
+        }
+    };
+    if let MixtureComponents::TruncatedNormal { sds, .. } = &grid.components
+        && sds.contains(&0.0)
+        && x.iter().zip(&se).any(|(x, s)| x.is_nan() || s.is_nan())
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "missing observations with zero-SD truncated components are undefined",
+        ));
+    }
+    if grid.dirichlet.len() != grid.initial_weights.len()
+        || grid.dirichlet.iter().any(|v| {
+            !v.is_finite()
+                || *v <= 0.0
+                || (!options.fit_options.optimizer.is_variational() && *v < 1.0)
+        })
+    {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "finite Dirichlet parameters >= 1 must match the prior components",
+        ));
+    }
+    let mut warnings = grid.warnings.clone();
+    let initial_prior = grid
+        .prior_with_likelihood(&grid.initial_weights, &options.likelihood)?
+        .orient_for(&x, &se, included.iter().copied())?;
+    if let Some(f) = super::likelihood_diagnostics::WarningLikelihood::new(&options.likelihood) {
+        warnings.extend(super::likelihood_diagnostics::likelihood(
+            f,
+            &grid.components,
+            &x,
+            &se,
+        ));
+    }
+    let fit = if options.fixed_prior {
+        None
+    } else {
+        let fit_x = included.iter().map(|&i| x[i]).collect::<Vec<_>>();
+        let fit_se = included.iter().map(|&i| se[i]).collect::<Vec<_>>();
+        let weights = if let Some(w) = &options.observation_weights {
+            if w.len() != n {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "observation weights must match the complete observation vector",
+                ));
+            }
+            Some(included.iter().map(|&i| w[i]).collect::<Vec<_>>())
+        } else {
+            None
+        };
+        // Use the likelihood selected above for every component family.
+        let k = grid.initial_weights.len();
+        fit_x.len().checked_mul(k).ok_or_else(|| {
+            scoped_invalid_options(ERROR_SCOPE, "likelihood matrix shape overflows")
+        })?;
+        let mut ll = vec![];
+        for (&row, (&value, &error)) in included.iter().zip(fit_x.iter().zip(&fit_se)) {
+            ll.extend(initial_prior.log_likelihoods_at(value, error, row, n)?);
+        }
+        let f = super::fit_mixture_proportions(
+            crate::matrix::MatrixView::new(
+                fit_x.len(),
+                k,
+                &ll,
+                crate::matrix::MatrixOrder::RowMajor,
+            )?,
+            weights.as_deref(),
+            &grid.dirichlet,
+            Some(&grid.initial_weights),
+            options.fit_options,
+        )?;
+        if !f.converged {
+            if options.fit_options.optimizer.is_sqp() {
+                // Original mixsqp warns before ashr adds its own failure warning.
+                // Preserve the source's default strwrap layout without R execution.
+                warnings.push(concat!(
+                    "Failed to converge within iterations limit. If \"maxiter.sqp\" is small,\n",
+                    "consider increasing it. Otherwise, convergence failure is typically a\n",
+                    "numerical issue remedied by increasing \"eps\" slightly, at the cost of\n",
+                    "slightly less accurate solution; see help(mixsqp). An issue report may\n",
+                    "also be submitted to https://github.com/stephenslab/mixsqp/issues,\n",
+                    "accompanied by an .rds or .RData file containing the mixsqp inputs. If\n",
+                    "these inputs are not accessible, an .RData file containing the inputs\n",
+                    "can be generated by setting options(mixsqp.debug.mode = TRUE) before\n",
+                    "running mixsqp."
+                ).into());
+            }
+            warnings.push("Optimization failed to converge. Results may be unreliable. Try increasing maxiter and rerunning.".into());
+        }
+        Some(f)
+    };
+    let fitted_weights = fit
+        .as_ref()
+        .map(|f| f.weights.clone())
+        .unwrap_or_else(|| grid.initial_weights.clone());
+    Ok(FittedLocation {
+        grid,
+        fitted_weights,
+        fit,
+        x,
+        se,
+        scale,
+        warnings,
+    })
+}

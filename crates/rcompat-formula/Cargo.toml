@@ -1,0 +1,24 @@
+[package]
+name = "rcompat-formula"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "R formula evaluation and model.matrix construction in Rust: terms, factor codings, transforms and expanded designs, reproducing R"
+documentation = "https://docs.rs/rcompat-formula"
+keywords = ["r", "formula", "model-matrix", "statistics", "design-matrix"]
+categories = ["science", "mathematics"]
+exclude = [".DS_Store", "**/.DS_Store"]
+
+[lints]
+workspace = true
+
+[features]
+# Locale-aware (ICU) collation for factor levels and string comparisons.
+icu = ["dep:icu_collator", "dep:icu_locale"]
+
+[dependencies]
+icu_collator = { workspace = true, optional = true }
+icu_locale = { workspace = true, optional = true }
+rcompat-numeric.workspace = true

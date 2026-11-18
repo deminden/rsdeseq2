@@ -923,6 +923,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcompat-formula"
+version = "0.1.0"
+dependencies = [
+ "icu_collator",
+ "icu_locale",
+ "rcompat-numeric",
+]
+
+[[package]]
 name = "rcompat-lbfgsb"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -933,6 +942,30 @@ name = "rcompat-locfit"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "242a0ea0fc186cafd47b36676c3f6393a81683463174decd0163a9ceefa4d94b"
+
+[[package]]
+name = "rcompat-numeric"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "csv",
+ "libm",
+ "statrs",
+ "thiserror",
+]
+
+[[package]]
+name = "rcompat-shrinkage"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "nalgebra",
+ "rcompat-formula",
+ "rcompat-lbfgsb",
+ "rcompat-numeric",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "regex"
@@ -975,11 +1008,11 @@ dependencies = [
  "nalgebra",
  "proptest",
  "rayon",
+ "rcompat-formula",
  "rcompat-lbfgsb",
  "rcompat-locfit",
+ "rcompat-shrinkage",
  "rsdeseq2-base",
- "rsdeseq2-formula",
- "rsdeseq2-shrink",
  "same-file",
  "serde",
  "serde_json",
@@ -992,11 +1025,8 @@ dependencies = [
 name = "rsdeseq2-base"
 version = "0.5.0"
 dependencies = [
- "approx",
- "csv",
  "libm",
- "statrs",
- "thiserror",
+ "rcompat-numeric",
 ]
 
 [[package]]
@@ -1007,28 +1037,6 @@ dependencies = [
  "rsdeseq2",
  "serde_json",
  "sha2",
-]
-
-[[package]]
-name = "rsdeseq2-formula"
-version = "0.5.0"
-dependencies = [
- "icu_collator",
- "icu_locale",
- "rsdeseq2-base",
-]
-
-[[package]]
-name = "rsdeseq2-shrink"
-version = "0.5.0"
-dependencies = [
- "libm",
- "nalgebra",
- "rcompat-lbfgsb",
- "rsdeseq2-base",
- "rsdeseq2-formula",
- "serde",
- "serde_json",
 ]
 
 [[package]]

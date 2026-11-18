@@ -13,10 +13,5 @@ exclude = [".DS_Store", "**/.DS_Store"]
 workspace = true
 
 [dependencies]
-csv.workspace = true
 libm.workspace = true
-thiserror.workspace = true
-
-[dev-dependencies]
-approx.workspace = true
-statrs.workspace = true
+rcompat-numeric = { workspace = true, features = ["csv"] }
