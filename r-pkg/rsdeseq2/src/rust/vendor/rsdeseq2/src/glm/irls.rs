@@ -19,6 +19,7 @@ use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::matrix::try_alloc_matrix;
 use crate::normalization::Offsets;
 
 /// Internal retention policy; fitting and fallback arithmetic are identical.
@@ -400,12 +401,15 @@ pub(crate) fn fit_offsets_irls_for_output(
         0
     };
     let n_means = checked_output_elements(counts.n_genes(), counts.n_samples())?;
-    let mut beta_values = Vec::with_capacity(n_beta);
-    let mut beta_var_values = Vec::with_capacity(n_beta);
-    let mut beta_optim_start_values = vec![f64::NAN; n_beta];
-    let mut beta_covariance_values = Vec::with_capacity(n_covariance);
-    let mut mu_values = Vec::with_capacity(n_means);
-    let mut hat_values = Vec::with_capacity(n_means);
+    // The sizes are checked above; these report a failed allocation as an
+    // error instead of aborting.
+    let mut beta_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
+    let mut beta_var_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
+    let mut beta_optim_start_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
+    beta_optim_start_values.resize(n_beta, f64::NAN);
+    let mut beta_covariance_values = try_alloc_matrix(n_covariance, 1, "IRLS output")?;
+    let mut mu_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
+    let mut hat_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
     let mut beta_iter = Vec::with_capacity(counts.n_genes());
     let mut beta_converged = Vec::with_capacity(counts.n_genes());
     let mut beta_optim_iter = vec![f64::NAN; counts.n_genes()];

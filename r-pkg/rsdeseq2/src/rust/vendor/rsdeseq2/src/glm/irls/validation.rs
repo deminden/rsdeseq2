@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 // Input validation, normalization factors and output scaling.
 
 /// Size factors repeated per gene, rejecting non-positive values as
@@ -14,7 +15,7 @@ pub(in crate::glm) fn normalization_factors_from_size_factors(
             size_factors.len(),
         ));
     }
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "IRLS offsets")?;
     for _ in 0..counts.n_genes() {
         for (idx, factor) in size_factors.iter().copied().enumerate() {
             validate_positive_finite(factor, "size factor", idx)?;

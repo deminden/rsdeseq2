@@ -172,8 +172,40 @@ impl<T: Clone> RowMajorMatrix<T> {
                 expected: usize::MAX,
                 actual: 0,
             })?;
-        Self::from_row_major(n_rows, n_cols, vec![value; len])
+        let mut values = try_alloc_matrix(len, 1, "row-major matrix")?;
+        values.resize(len, value);
+        Self::from_row_major(n_rows, n_cols, values)
     }
+}
+
+/// Reserve an empty buffer for `rows × columns` values.
+///
+/// Overflowing sizes and failed allocations become a
+/// [`DeseqError::InvalidDimensions`] naming `context` instead of a panic or an
+/// abort, so very large inputs fail cleanly through the R bridge.
+pub(crate) fn try_alloc_matrix<T>(
+    rows: usize,
+    columns: usize,
+    context: &str,
+) -> Result<Vec<T>, DeseqError> {
+    let max = isize::MAX as usize / std::mem::size_of::<T>().max(1);
+    let len = rows
+        .checked_mul(columns)
+        .filter(|&len| len <= max)
+        .ok_or_else(|| DeseqError::InvalidDimensions {
+            context: format!("{context} allocation overflow"),
+            expected: max,
+            actual: rows.saturating_mul(columns),
+        })?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(len)
+        .map_err(|_| DeseqError::InvalidDimensions {
+            context: format!("{context} allocation failed"),
+            expected: len,
+            actual: 0,
+        })?;
+    Ok(values)
 }
 
 impl RowMajorMatrix<f64> {

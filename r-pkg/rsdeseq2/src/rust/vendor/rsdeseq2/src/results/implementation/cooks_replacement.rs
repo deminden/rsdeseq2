@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 pub(super) fn formula_size_factor_offsets(
     counts: &CountMatrix,
     size_factors: &[f64],
@@ -15,7 +16,7 @@ pub(super) fn formula_size_factor_offsets(
         ));
     }
     let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "replacement counts")?;
     for _ in 0..counts.n_genes() {
         for (sample, size_factor) in size_factors.iter().copied().enumerate() {
             if !size_factor.is_finite() || size_factor <= 0.0 {

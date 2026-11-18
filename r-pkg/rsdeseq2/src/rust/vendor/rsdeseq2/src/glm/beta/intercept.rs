@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 // Intercept-only fits, normalization and working weights.
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with size factors.
@@ -98,8 +99,10 @@ fn intercept_only_with_factor_matrix(
 
     let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
     let mut beta_values = Vec::with_capacity(counts.n_genes());
-    let mut mu_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
-    let mut hat_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut mu_values =
+        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
+    let mut hat_values =
+        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
     let mut beta_se_values = Vec::with_capacity(counts.n_genes());
     let mut beta_covariance_values = Vec::with_capacity(counts.n_genes());
 
@@ -211,7 +214,7 @@ pub(super) fn normalized_counts_with_factors(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
     for gene in 0..counts.n_genes() {
         let count_row = counts.row(gene)?;
         let factor_row = normalization_factors.row(gene)?;

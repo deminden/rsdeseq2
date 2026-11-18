@@ -2,6 +2,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::matrix::try_alloc_matrix;
 use crate::normalization::{
     base_mean, base_variance, normalized_counts_with_factors, validate_normalization_factors,
     validate_size_factors,
@@ -663,11 +664,12 @@ fn no_replacement_output(counts: &CountMatrix) -> Result<CooksReplacementOutput,
     Ok(CooksReplacementOutput {
         replaced_counts: count_matrix_like(counts, counts.as_slice().to_vec())?,
         candidate_replacement_counts: count_matrix_like(counts, counts.as_slice().to_vec())?,
-        outlier_cells: RowMajorMatrix::from_row_major(
-            counts.n_genes(),
-            counts.n_samples(),
-            vec![false; counts.n_genes() * counts.n_samples()],
-        )?,
+        outlier_cells: RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), {
+            let mut values =
+                try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's outlier mask")?;
+            values.resize(counts.n_genes() * counts.n_samples(), false);
+            values
+        })?,
         replace: vec![Some(false); counts.n_genes()],
         replaceable_samples: vec![false; counts.n_samples()],
     })

@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
 ///
 /// This implements a clean Rust subset of `estimateDispersionsGeneEst`:
@@ -27,7 +28,15 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
     let initial_disp =
         initial_dispersion_estimates(&rough_disp, &moments_disp, options.min_disp, max_disp)?;
 
-    let mut mu_values = vec![f64::NAN; input.counts.n_genes() * input.counts.n_samples()];
+    let mut mu_values = {
+        let mut values = try_alloc_matrix(
+            input.counts.n_genes(),
+            input.counts.n_samples(),
+            "gene-wise dispersion means",
+        )?;
+        values.resize(input.counts.n_genes() * input.counts.n_samples(), f64::NAN);
+        values
+    };
     let mut disp_gene_est = vec![f64::NAN; input.counts.n_genes()];
     let mut disp_iter = vec![0; input.counts.n_genes()];
     let mut converged = vec![false; input.counts.n_genes()];
@@ -183,7 +192,15 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
         .iter()
         .map(|all_zero| !all_zero)
         .collect::<Vec<_>>();
-    let mut mu_values = vec![f64::NAN; input.counts.n_genes() * input.counts.n_samples()];
+    let mut mu_values = {
+        let mut values = try_alloc_matrix(
+            input.counts.n_genes(),
+            input.counts.n_samples(),
+            "gene-wise dispersion means",
+        )?;
+        values.resize(input.counts.n_genes() * input.counts.n_samples(), f64::NAN);
+        values
+    };
     let mut disp_iter = vec![0; input.counts.n_genes()];
     let mut initial_lp = vec![f64::NAN; input.counts.n_genes()];
     let mut last_lp = vec![f64::NAN; input.counts.n_genes()];
