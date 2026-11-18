@@ -32,9 +32,9 @@ lto = false
 
 # Library lint policy lives in crates/rsdeseq2/src/lib.rs: unwrap/expect are
 # denied outside tests and unsafe code is denied except for the documented x87
-# kernels. missing_docs warns until the public API is fully documented.
+# kernels. Every public item is documented, and missing_docs keeps it so.
 [workspace.lints.rust]
-missing_docs = "warn"
+missing_docs = "deny"
 
 [workspace.dependencies]
 rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.0" }

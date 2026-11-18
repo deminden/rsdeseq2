@@ -51,8 +51,7 @@ versions. CI rejects drift rather than repairing source before testing.
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --locked --workspace --all-targets -- -D warnings \
-  -A missing_docs
+cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo golden --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
@@ -91,8 +90,8 @@ the pull-request template.
 The library denies `unwrap`/`expect` outside tests, `unsafe` code outside the
 documented x87 kernels and unsafe blocks without `SAFETY:` comments; impossible
 states return `errors::invariant(...)` instead of panicking. `missing_docs`
-warns (workspace `[lints]`) until the public API is documented, so the gate
-allows it. Track the counts with `python3 scripts/validation/hardening_metrics.py`
+is denied (workspace `[lints]`): every public item, including examples and
+benches, carries documentation. Track the counts with `python3 scripts/validation/hardening_metrics.py`
 and the [hardening progress report](reports/hardening-progress.md).
 
 Run affected panels during implementation, then the appropriate combined gate.

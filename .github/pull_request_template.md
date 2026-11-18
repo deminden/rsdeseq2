@@ -30,7 +30,7 @@ Changes and the `CHANGELOG.md` entry, or "none".
 ## Gates
 
 - [ ] `cargo fmt --all -- --check`
-- [ ] `cargo clippy --locked --workspace --all-targets -- -D warnings -A missing_docs`
+- [ ] `cargo clippy --locked --workspace --all-targets -- -D warnings`
 - [ ] `cargo test --locked --workspace`
 - [ ] golden harness `--check`
 - [ ] `python3 scripts/validation/check_docs.py`
