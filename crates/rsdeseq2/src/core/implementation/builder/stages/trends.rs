@@ -8,13 +8,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.leaf_parametric_dispersion_trend_linear_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
-        self.attach_parametric_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
+            self.attach_parametric_dispersion_trend(fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_mean_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
@@ -23,12 +20,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_mean_dispersion_trend_linear_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
-        self.attach_mean_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
+            self.attach_mean_dispersion_trend(fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_parametric_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
@@ -37,12 +32,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_parametric_dispersion_trend_glm_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
-        self.attach_parametric_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
+            self.attach_parametric_dispersion_trend(fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_mean_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
@@ -51,12 +44,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_mean_dispersion_trend_glm_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
-        self.attach_mean_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
+            self.attach_mean_dispersion_trend(fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_local_dispersion_trend_linear_mu`] and [`DeseqBuilder::run`].
@@ -65,12 +56,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_local_dispersion_trend_linear_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
-        self.attach_local_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_linear_mu(counts, design)?;
+            self.attach_local_dispersion_trend(fit)
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_local_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
@@ -79,12 +68,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_local_dispersion_trend_glm_mu(counts, design));
-        }
-
-        let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
-        self.attach_local_dispersion_trend(fit)
+        self.in_pool(|| {
+            let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
+            self.attach_local_dispersion_trend(fit)
+        })
     }
 
     pub(super) fn attach_parametric_dispersion_trend(
@@ -148,15 +135,11 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_dispersion_trend_linear_mu(counts, design));
-        }
-
-        match self.fit_type {
+        self.in_pool(|| match self.fit_type {
             FitType::Parametric => self.leaf_parametric_dispersion_trend_linear_mu(counts, design),
             FitType::Mean => self.leaf_mean_dispersion_trend_linear_mu(counts, design),
             FitType::Local => self.leaf_local_dispersion_trend_linear_mu(counts, design),
-        }
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_dispersion_trend_glm_mu`] and [`DeseqBuilder::run`].
@@ -165,14 +148,10 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_dispersion_trend_glm_mu(counts, design));
-        }
-
-        match self.fit_type {
+        self.in_pool(|| match self.fit_type {
             FitType::Parametric => self.leaf_parametric_dispersion_trend_glm_mu(counts, design),
             FitType::Mean => self.leaf_mean_dispersion_trend_glm_mu(counts, design),
             FitType::Local => self.leaf_local_dispersion_trend_glm_mu(counts, design),
-        }
+        })
     }
 }

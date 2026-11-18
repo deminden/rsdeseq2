@@ -71,11 +71,10 @@ impl DeseqBuilder {
     /// # }
     /// ```
     pub fn run(&self, analysis: &Analysis<'_>) -> Result<RunOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.run(analysis));
-        }
-        validate_analysis(analysis)?;
-        self.run_validated(analysis)
+        self.in_pool(|| {
+            validate_analysis(analysis)?;
+            self.run_validated(analysis)
+        })
     }
 
     fn run_validated(&self, analysis: &Analysis<'_>) -> Result<RunOutput, DeseqError> {

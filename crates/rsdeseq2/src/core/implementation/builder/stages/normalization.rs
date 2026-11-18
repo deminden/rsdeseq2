@@ -7,12 +7,10 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.leaf_size_factors_and_base_means(counts));
-        }
-
-        let stages = self.normalization_stages(counts)?;
-        Ok(self.base_fit(counts, None, stages.into_base_fit_input()))
+        self.in_pool(|| {
+            let stages = self.normalization_stages(counts)?;
+            Ok(self.base_fit(counts, None, stages.into_base_fit_input()))
+        })
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_size_factors_and_base_means_with_design`] and [`DeseqBuilder::run`].
@@ -21,12 +19,9 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool
-                .install(|| self.leaf_size_factors_and_base_means_with_design(counts, design));
-        }
-
-        let stages = self.normalization_stages_for_design(counts, design)?;
-        Ok(self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input()))
+        self.in_pool(|| {
+            let stages = self.normalization_stages_for_design(counts, design)?;
+            Ok(self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input()))
+        })
     }
 }
