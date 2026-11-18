@@ -102,17 +102,28 @@ pub fn run(c: &Case) -> Result<Value, Box<dyn Error>> {
         )?;
         let design =
             DesignMatrix::from_row_major(dm.n_rows(), dm.n_cols(), dm.into_values(), None)?;
-        if c.min_replicates == 0 {
-            let (f, r) = builder.fit_with_results(&counts, &design)?;
-            (f, r, None)
-        } else {
-            let mut options =
-                CooksReplacementOptions::new(super::parse_numeric_input(&c.replacement_cutoff)?);
-            options.min_replicates = c.min_replicates;
-            let (f, r, p) = builder
-                .fit_with_test_results_with_cooks_replacement(&counts, &design, &options)?
-                .into_merged_fit()?;
-            (f, r, Some(p))
+        let mut request = Analysis::new(&counts, &design);
+        let reduced_design = builder.current_reduced_design().cloned();
+        if builder.current_test() == TestType::Lrt {
+            request = request.lrt(
+                reduced_design
+                    .as_ref()
+                    .ok_or("top-level LRT fit without a reduced design")?,
+            );
+        }
+        let mut options =
+            CooksReplacementOptions::new(super::parse_numeric_input(&c.replacement_cutoff)?);
+        options.min_replicates = c.min_replicates;
+        if c.min_replicates != 0 {
+            request = request.cooks_replacement(&options);
+        }
+        match builder.run(&request)? {
+            RunOutput::Results { fit, results } => (fit, results, None),
+            RunOutput::Replacement(output) => {
+                let (f, r, p) = output.into_merged_fit()?;
+                (f, r, Some(p))
+            }
+            _ => return Err("unexpected run output".into()),
         }
     };
     let queries = queries::evaluate(&fit, &counts, plan.as_ref(), &c.queries)?;

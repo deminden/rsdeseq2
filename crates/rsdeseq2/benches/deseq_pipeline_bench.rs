@@ -13,14 +13,14 @@ fn pipelines(c: &mut Criterion) {
     c.bench_function("normalization_2048_genes_16_samples", |b| {
         b.iter(|| {
             builder
-                .fit_size_factors_and_base_means(black_box(&data.counts))
+                .run(&Analysis::without_design(black_box(&data.counts)))
                 .unwrap()
         })
     });
     c.bench_function("native_wald_mean_2048_genes_16_samples", |b| {
         b.iter(|| {
             builder
-                .fit_with_results(black_box(&data.counts), &data.design)
+                .run(&Analysis::new(black_box(&data.counts), &data.design))
                 .unwrap()
         })
     });

@@ -35,7 +35,8 @@
 
 use rsdeseq2::cooks::{CooksRefitPlan, CooksReplacementOptions, CooksReplacementOutput};
 use rsdeseq2::core::{
-    CooksReplacementWaldOutput, CountMatrix, CountsSummary, DeseqBuilder, DeseqFit,
+    Analysis, CooksReplacementTestOutput, CooksReplacementWaldOutput, CountMatrix, CountsSummary,
+    DeseqBuilder, DeseqFit, RunOutput,
 };
 use rsdeseq2::design::DesignMatrix;
 use rsdeseq2::glm::{
@@ -858,7 +859,8 @@ fn run_input_in_pool(
     ] {
         let fit = base_builder(threads)
             .size_factor_method(method)
-            .fit_size_factors_and_base_means(counts);
+            .run(&Analysis::without_design(counts))
+            .and_then(stage_fit);
         add(label, record(fit, |o, fit| put_fit(o, "fit", fit)));
     }
 
@@ -874,37 +876,48 @@ fn run_input_in_pool(
     ] {
         let wald = builder(threads)
             .fit_type(fit_type)
-            .fit_with_results(counts, design);
+            .run(&Analysis::new(counts, design))
+            .and_then(results_pair);
         if fit_type == *primary_fit_type {
             primary_wald = wald.as_ref().ok().cloned();
         }
         add(&format!("wald_{label}"), record(wald, wald_lrt));
         let lrt = builder(threads)
             .fit_type(fit_type)
-            .fit_lrt_with_results(counts, design, reduced);
+            .run(&Analysis::new(counts, design).lrt(reduced))
+            .and_then(results_pair);
         add(&format!("lrt_{label}"), record(lrt, wald_lrt));
     }
 
     let weighted = primary(threads)
         .observation_weights(observation_weights(counts)?)
-        .fit_with_results(counts, design);
+        .run(&Analysis::new(counts, design))
+        .and_then(results_pair);
     add("wald_weights", record(weighted, wald_lrt));
     let weighted_lrt = primary(threads)
         .observation_weights(observation_weights(counts)?)
-        .fit_lrt_with_results(counts, design, reduced);
+        .run(&Analysis::new(counts, design).lrt(reduced))
+        .and_then(results_pair);
     add("lrt_weights", record(weighted_lrt, wald_lrt));
 
     let factors = primary(threads)
         .normalization_factors(normalization_factors(counts)?)
-        .fit_with_results(counts, design);
+        .run(&Analysis::new(counts, design))
+        .and_then(results_pair);
     add("wald_normalization_factors", record(factors, wald_lrt));
     let factors_lrt = primary(threads)
         .normalization_factors(normalization_factors(counts)?)
-        .fit_lrt_with_results(counts, design, reduced);
+        .run(&Analysis::new(counts, design).lrt(reduced))
+        .and_then(results_pair);
     add("lrt_normalization_factors", record(factors_lrt, wald_lrt));
 
     let options = CooksReplacementOptions::new(0.99);
-    let cooks = primary(threads).fit_with_results_with_cooks_replacement(counts, design, &options);
+    let cooks = primary(threads)
+        .run(&Analysis::new(counts, design).cooks_replacement(&options))
+        .and_then(|output| match output {
+            RunOutput::Replacement(CooksReplacementTestOutput::Wald(output)) => Ok(output),
+            _ => Err(shape_error()),
+        });
     add(
         "wald_cooks_replacement",
         record(cooks, put_cooks_replacement),
@@ -1178,5 +1191,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{failure}");
         }
         Err(format!("golden: {} fields differ from the manifest", failures.len()).into())
+    }
+}
+
+fn shape_error() -> DeseqError {
+    DeseqError::InvalidOptions {
+        reason: "golden: unexpected run output shape".to_string(),
+    }
+}
+
+fn stage_fit(output: RunOutput) -> Result<DeseqFit, DeseqError> {
+    match output {
+        RunOutput::Fit(fit) => Ok(fit),
+        _ => Err(shape_error()),
+    }
+}
+
+fn results_pair(output: RunOutput) -> Result<(DeseqFit, DeseqResults), DeseqError> {
+    match output {
+        RunOutput::Results { fit, results } => Ok((fit, results)),
+        _ => Err(shape_error()),
     }
 }

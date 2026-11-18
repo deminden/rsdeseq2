@@ -27,9 +27,12 @@ fn glm_stages(c: &mut Criterion) {
                 .unwrap()
         })
     });
-    let (fit, _) = builder
-        .fit_with_results(&data.counts, &data.design)
-        .unwrap();
+    let fit = builder
+        .run(&Analysis::new(&data.counts, &data.design))
+        .unwrap()
+        .into_fit_and_results()
+        .unwrap()
+        .0;
     let request = ResultsContrast::Numeric(vec![0.0, 1.0]);
     c.bench_function("fitted_contrast_512_genes_16_samples", |b| {
         b.iter(|| {

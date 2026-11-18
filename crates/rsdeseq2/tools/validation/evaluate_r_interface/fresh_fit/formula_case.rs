@@ -63,31 +63,30 @@ impl FormulaCase {
         } else {
             None
         };
-        if case.min_replicates == 0 {
-            let (fit, results) = if let Some(reduced) = reduced {
-                builder.fit_lrt_formula_with_results(counts, &self.full, reduced)?
-            } else {
-                builder.fit_formula_with_results(counts, &self.full)?
-            };
-            Ok((fit, results, None))
-        } else {
-            let mut options = CooksReplacementOptions::new(super::super::parse_numeric_input(
-                &case.replacement_cutoff,
-            )?);
-            options.min_replicates = case.min_replicates;
-            let output = if let Some(reduced) = reduced {
-                CooksReplacementTestOutput::Lrt(
-                    builder.fit_lrt_formula_with_results_with_cooks_replacement(
-                        counts, &self.full, reduced, &options,
-                    )?,
-                )
-            } else {
-                builder.fit_formula_with_test_results_with_cooks_replacement(
-                    counts, &self.full, &options,
-                )?
-            };
-            let (f, r, p) = output.into_merged_fit()?;
-            Ok((f, r, Some(p)))
+        let mut request = Analysis::formula(counts, &self.full);
+        if let Some(reduced) = reduced {
+            request = request.lrt_formula(reduced);
+        } else if builder.current_test() == TestType::Lrt {
+            request = request.lrt(
+                builder
+                    .current_reduced_design()
+                    .ok_or("top-level LRT fit without a reduced design")?,
+            );
+        }
+        let mut options = CooksReplacementOptions::new(super::super::parse_numeric_input(
+            &case.replacement_cutoff,
+        )?);
+        options.min_replicates = case.min_replicates;
+        if case.min_replicates != 0 {
+            request = request.cooks_replacement(&options);
+        }
+        match builder.run(&request)? {
+            RunOutput::Results { fit, results } => Ok((fit, results, None)),
+            RunOutput::Replacement(output) => {
+                let (f, r, p) = output.into_merged_fit()?;
+                Ok((f, r, Some(p)))
+            }
+            _ => Err("unexpected run output".into()),
         }
     }
 }
