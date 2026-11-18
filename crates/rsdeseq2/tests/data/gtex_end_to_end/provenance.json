@@ -1,0 +1,16 @@
+{
+  "generator": "scripts/references/generate_gtex_end_to_end_reference.R",
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "deseq2_version": "1.52.0",
+  "platform": "aarch64-apple-darwin27.2.0",
+  "genes": 3745,
+  "samples": 61,
+  "selection": "every 13th gene with a nonzero row sum, original order",
+  "design": "~ sex",
+  "result": "sex_male_vs_female",
+  "defaults": "DESeq() and results() defaults: parametric fit, minReplicatesForReplace = 7, Cook's cutoff and independent filtering on, alpha = 0.1",
+  "replaced_genes": 50,
+  "dispersion_fit_type": "parametric",
+  "significant_0.1": 8,
+  "significant_0.05": 7
+}

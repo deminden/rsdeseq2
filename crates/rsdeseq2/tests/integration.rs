@@ -84,6 +84,8 @@ mod fuzz_smoke;
 mod glm_intercept;
 #[path = "glm_irls.rs"]
 mod glm_irls;
+#[path = "gtex_end_to_end.rs"]
+mod gtex_end_to_end;
 #[path = "gtex_real_wald_parity.rs"]
 mod gtex_real_wald_parity;
 #[path = "heavy_tail.rs"]

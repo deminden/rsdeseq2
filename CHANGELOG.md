@@ -7,6 +7,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- End-to-end parity test against `DESeq()` + `results()` defaults on a
+  3,745-gene GTEx kidney-cortex panel (size factors, parametric dispersion
+  trend, Cook's replacement, independent filtering). 3,744 genes match R to
+  about 1e-13; one very high-count gene (GPX3) ends its MAP line search at a
+  different point because the Armijo test there compares log posteriors that
+  agree to the last bit. Its dispersion differs by 2.6e-5 on the log scale and
+  its p-value by 3.7e-6; no significance call changes.
+
 - `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`: the
   platform-specific R arithmetic (x87 extended reductions and the OpenBLAS
   Haswell dot schedule used by R on Linux x86_64) is now chosen at run time
