@@ -117,7 +117,11 @@ fn check(case: &str, formula: &str) {
     let reference = common::read_tsv(&data(case, "reference_beta_prior_variance.tsv"));
     let names = output.expanded_design.coefficient_names().unwrap();
     assert_eq!(names.len(), reference.len(), "{case}: expanded columns");
-    for ((name, actual), expected) in names.iter().zip(&output.beta_prior_variance).zip(&reference) {
+    for ((name, actual), expected) in names
+        .iter()
+        .zip(&output.beta_prior_variance)
+        .zip(&reference)
+    {
         assert_eq!(*name, expected["coefficient"], "{case}: column order");
         let expected: f64 = expected["variance"].parse().unwrap();
         assert!(
@@ -151,7 +155,10 @@ fn beta_prior_needs_a_formula_wald_run() {
     let error = builder
         .run(&Analysis::new(&counts, &design).beta_prior(true))
         .unwrap_err();
-    assert!(error.to_string().contains("needs a formula design"), "{error}");
+    assert!(
+        error.to_string().contains("needs a formula design"),
+        "{error}"
+    );
     let error = builder
         .run(
             &Analysis::formula(&counts, "~ condition")

@@ -41,7 +41,7 @@ jobs:
         env:
           # missing_docs is a warn-level hardening target (Phase 2.4).
           RUSTDOCFLAGS: -D warnings -A missing_docs
-        run: cargo doc --locked -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink -p rsdeseq2 --no-deps
+        run: cargo doc --locked -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink -p rsdeseq2 -p rsdeseq2-cli --no-deps
       - name: Test
         run: cargo test --locked --workspace
       - name: Fuzz targets build (stable; fuzzing itself runs weekly on nightly)
@@ -69,7 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Build and test at the MSRV
         run: |
-          cargo build --locked -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink -p rsdeseq2 --all-features
+          cargo build --locked -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink -p rsdeseq2 -p rsdeseq2-cli --all-features
           cargo test --locked -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink -p rsdeseq2 --lib
 
   deny:

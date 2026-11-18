@@ -104,6 +104,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- The `rsdeseq2` binary is built by the new `rsdeseq2-cli` crate
+  (`cargo install rsdeseq2-cli`; `cargo install --path crates/rsdeseq2-cli`).
+  The `rsdeseq2` library crate no longer has a binary target. Command-line
+  behaviour, options and outputs are unchanged.
+
 - The R package's copy of the Rust core is no longer committed. Its
   configure step regenerates it from `crates/` in a git checkout, and
   `scripts/release/build_r_source.sh` builds a self-contained source package
@@ -209,6 +214,9 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- `rsdeseq2::cli` (feature `cli`): the command-line implementation moves to
+  the `rsdeseq2-cli` crate in 0.7.0.
 
 - `local_vst_inverse_size_factor_mean{,_from_normalization_factors}` and
   `vst_with_dispersion_trend_and_{size,normalization}_factors`: use the

@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 pub type TsvRow = HashMap<String, String>;
 
 pub fn reference_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/deseq2_reference")
+    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../rsdeseq2"))
+        .join("tests/data/deseq2_reference")
 }
 
 pub fn reference_file(name: &str) -> PathBuf {

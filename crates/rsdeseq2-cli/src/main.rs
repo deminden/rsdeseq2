@@ -1,3 +1,9 @@
+//! The `rsdeseq2` command-line tool.
+//!
+//! In 0.6.0 the implementation is still `rsdeseq2::cli` (deprecated there); it
+//! moves into this crate in 0.7.0.
+#![allow(deprecated)]
+
 use std::process::ExitCode;
 
 fn main() -> ExitCode {

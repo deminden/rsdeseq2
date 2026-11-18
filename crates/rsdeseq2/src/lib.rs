@@ -14,9 +14,15 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![deny(unsafe_code, clippy::undocumented_unsafe_blocks)]
+// The unit tests of deprecated modules (`cli`) are run through the test harness.
+#![cfg_attr(test, allow(deprecated))]
 
 pub(crate) mod all_zero;
 #[cfg(feature = "cli")]
+#[deprecated(
+    since = "0.6.0",
+    note = "the command-line interface moves to the rsdeseq2-cli crate in 0.7.0; install the binary with `cargo install rsdeseq2-cli`"
+)]
 pub mod cli;
 pub mod contrasts;
 pub mod cooks;

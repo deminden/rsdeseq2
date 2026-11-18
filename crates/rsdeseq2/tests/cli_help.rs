@@ -28,7 +28,8 @@ fn help(command: &str) -> String {
 
 #[test]
 fn help_text_matches_snapshots() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cli_help");
+    let dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../rsdeseq2"))
+        .join("tests/data/cli_help");
     let update = std::env::var_os("RSDESEQ2_UPDATE_HELP").is_some();
     let mut changed = Vec::new();
     for command in COMMANDS {

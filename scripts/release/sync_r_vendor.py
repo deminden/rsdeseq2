@@ -163,7 +163,8 @@ def main():
                     shutil.copyfile(expected_root/name/file, target/file)
             print(f'Synchronized Rust core ({", ".join(crates)}) into {VENDOR_ROOT}')
         for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
-            for crate in crates:
+            # Every published workspace crate ships the notices.
+            for crate in sorted(workspace):
                 sync_notice(ROOT/name, Path(workspace[crate]['manifest_path']).parent/name, args.check)
         sync_notice(ROOT/'THIRD_PARTY_NOTICES.md', ROOT/'r-pkg/rsdeseq2/inst/COPYRIGHTS', args.check)
         if args.check:

@@ -105,7 +105,7 @@ jobs:
           fi
 
       - name: Build
-        run: cargo build -p rsdeseq2 --release --locked --target ${{ matrix.target }}
+        run: cargo build -p rsdeseq2-cli --release --locked --target ${{ matrix.target }}
 
       - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         if: matrix.asset_suffix == 'windows-x86_64' || matrix.asset_suffix == 'macos-x86_64'

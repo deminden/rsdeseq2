@@ -44,7 +44,7 @@ Generate into a fresh output directory:
 python3 scripts/references/generate_gtex_mode_contrasts.py \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
   --output-dir results/benchmarks/reproduced-gtex
-cargo build --release --locked -p rsdeseq2 --bin rsdeseq2
+cargo build --release --locked -p rsdeseq2-cli
 python3 scripts/benchmarks/benchmark_gtex_native_wald.py --exploration --repeats 1 \
   --rscript "$CONDA_PREFIX/bin/Rscript" \
   --fixture-root results/benchmarks/reproduced-gtex \
@@ -65,7 +65,7 @@ exact hashes from [the reference manifest](data/gtex_dispersion_reference_sha256
 A missing or changed reference fails rather than triggering regeneration.
 
 ```sh
-cargo build --release --locked -p rsdeseq2
+cargo build --release --locked -p rsdeseq2-cli
 python3 scripts/validation/check_gtex_dispersion_improvement.py \
   --workers 1 --output-dir results/checks/gtex
 ```

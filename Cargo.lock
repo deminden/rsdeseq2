@@ -1000,6 +1000,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsdeseq2-cli"
+version = "0.5.0"
+dependencies = [
+ "csv",
+ "rsdeseq2",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "rsdeseq2-formula"
 version = "0.5.0"
 dependencies = [
