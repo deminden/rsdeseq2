@@ -135,7 +135,7 @@ def production_sources() -> dict[Path, str]:
 
 
 def crate_prefix(path: Path) -> str:
-    """'' for `rsdeseq2`, `<suffix>::` for a sibling crate such as `rsdeseq2-base`."""
+    """'' for `rsdeseq2`, `<suffix>::` for a sibling crate such as `rcompat-numeric`."""
     crate = path.relative_to(CRATE.parent).parts[0]
     return '' if crate == CRATE.name else crate.removeprefix(CRATE.name + '-') + '::'
 

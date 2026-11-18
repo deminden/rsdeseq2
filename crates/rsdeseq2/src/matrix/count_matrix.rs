@@ -167,8 +167,7 @@ impl CountMatrix {
         Ok(&self.counts[start..end])
     }
 
-    #[doc(hidden)]
-    pub fn row_values(&self, gene: usize) -> &[u32] {
+    pub(crate) fn row_values(&self, gene: usize) -> &[u32] {
         let start = gene * self.n_samples;
         &self.counts[start..start + self.n_samples]
     }

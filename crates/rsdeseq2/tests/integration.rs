@@ -36,6 +36,10 @@ mod bounded_posterior;
 mod breadth_end_to_end;
 #[path = "builder_cooks_policy.rs"]
 mod builder_cooks_policy;
+#[path = "cli.rs"]
+mod cli;
+#[path = "cli_help.rs"]
+mod cli_help;
 #[path = "compiled_method_policy.rs"]
 mod compiled_method_policy;
 #[path = "continuous_likelihood.rs"]
@@ -192,12 +196,10 @@ mod wald_reference;
 mod weighted_refit_metadata;
 
 /// With `autotests = false`, a test file missing from this list would never
-/// run; fail instead. `cli.rs` and `cli_help.rs` run against the binary from
-/// `crates/rsdeseq2-cli/tests/cli.rs`.
+/// run; fail instead.
 #[test]
 fn every_test_file_is_listed() {
     let listed = include_str!("integration.rs");
-    let cli = include_str!("../../rsdeseq2-cli/tests/cli.rs");
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let mut missing = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap() {
@@ -205,7 +207,6 @@ fn every_test_file_is_listed() {
         if let Some(stem) = name.strip_suffix(".rs")
             && stem != "integration"
             && !listed.contains(&format!("\nmod {stem};\n"))
-            && !cli.contains(&format!("\nmod {stem};\n"))
         {
             missing.push(name);
         }

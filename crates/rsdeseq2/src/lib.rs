@@ -14,15 +14,9 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![deny(unsafe_code, clippy::undocumented_unsafe_blocks)]
-// The unit tests of deprecated modules (`cli`) are run through the test harness.
-#![cfg_attr(test, allow(deprecated))]
 
 pub(crate) mod all_zero;
 #[cfg(feature = "cli")]
-#[deprecated(
-    since = "0.6.0",
-    note = "the command-line interface moves to the rsdeseq2-cli crate in 0.7.0; install the binary with `cargo install rsdeseq2-cli`"
-)]
 pub mod cli;
 pub mod contrasts;
 pub mod cooks;
@@ -30,19 +24,19 @@ pub mod core;
 pub use rcompat_formula::design;
 pub mod diagnostics;
 pub mod dispersion;
-pub use rsdeseq2_base::errors;
+pub mod errors;
 pub mod glm;
 pub mod independent_filtering;
 pub mod io;
-pub use rsdeseq2_base::math;
-pub use rsdeseq2_base::matrix;
+pub mod math;
+pub mod matrix;
 pub mod multiple_testing;
 pub mod normalization;
 pub use numeric::{NumericProfile, numeric_profile, set_numeric_profile};
-pub(crate) use rsdeseq2_base::numeric;
+pub(crate) use rcompat_numeric::numeric;
 pub mod options;
 pub mod prelude;
-pub(crate) use rsdeseq2_base::probability;
+pub(crate) use rcompat_numeric::probability;
 pub mod results;
 #[cfg(feature = "shrinkage")]
 pub use rcompat_shrinkage::shrinkage;

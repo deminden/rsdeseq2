@@ -104,11 +104,6 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
-- The `rsdeseq2` binary is built by the new `rsdeseq2-cli` crate
-  (`cargo install rsdeseq2-cli`; `cargo install --path crates/rsdeseq2-cli`).
-  The `rsdeseq2` library crate no longer has a binary target. Command-line
-  behaviour, options and outputs are unchanged.
-
 - The R package's copy of the Rust core is no longer committed. Its
   configure step regenerates it from `crates/` in a git checkout, and
   `scripts/release/build_r_source.sh` builds a self-contained source package
@@ -136,21 +131,19 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   required before Wald fitting" is now "Wald fitting requires MAP
   dispersions". The full list is in `docs/design/structured-errors.md`.
 
-- The library is split into workspace crates; `rsdeseq2` depends on them and
-  re-exports every public path unchanged, so no user code changes, and its
-  `formula` and `shrinkage` features work as before:
+- The reusable R-compatibility code is split into crates of the rcompat
+  series, which do not depend on rsdeseq2 and keep their own versions:
   - `rcompat-numeric` (0.1.0): numeric profiles, R-exact special functions
     and distributions, checked arithmetic, dense matrices and the error type
     (`rsdeseq2::DeseqError` is its `Error` under the old name);
   - `rcompat-formula` (0.1.0): R formula evaluation and model matrices
     (`rsdeseq2::design`);
   - `rcompat-shrinkage` (0.1.0): ashr- and apeglm-style posteriors
-    (`rsdeseq2::shrinkage`);
-  - `rsdeseq2-base`: the DESeq2-specific glue (count matrices, row flags,
-    negative-binomial likelihoods).
-  The rcompat crates do not depend on any rsdeseq2 crate and keep their own
-  versions; releases publish a new rcompat version only when it changed. The
-  R package vendors all of them.
+    (`rsdeseq2::shrinkage`).
+  `rsdeseq2` depends on them and re-exports every public path unchanged, so no
+  user code changes, and its `formula` and `shrinkage` features work as
+  before. Releases publish a new rcompat version only when it changed; the R
+  package vendors them.
 
 - rlog now fits its sample-effect GLM with the settings DESeq2's `rlogData`
   passes to `fitNbinomGLMs` (`betaTol = 1e-4`, no optim fallback), available as
@@ -220,9 +213,6 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
-
-- `rsdeseq2::cli` (feature `cli`): the command-line implementation moves to
-  the `rsdeseq2-cli` crate in 0.7.0.
 
 - `local_vst_inverse_size_factor_mean{,_from_normalization_factors}` and
   `vst_with_dispersion_trend_and_{size,normalization}_factors`: use the

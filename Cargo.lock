@@ -1011,32 +1011,14 @@ dependencies = [
  "rcompat-formula",
  "rcompat-lbfgsb",
  "rcompat-locfit",
+ "rcompat-numeric",
  "rcompat-shrinkage",
- "rsdeseq2-base",
  "same-file",
  "serde",
  "serde_json",
  "sha2",
  "statrs",
  "thiserror",
-]
-
-[[package]]
-name = "rsdeseq2-base"
-version = "0.5.0"
-dependencies = [
- "libm",
- "rcompat-numeric",
-]
-
-[[package]]
-name = "rsdeseq2-cli"
-version = "0.5.0"
-dependencies = [
- "csv",
- "rsdeseq2",
- "serde_json",
- "sha2",
 ]
 
 [[package]]

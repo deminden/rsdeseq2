@@ -21,6 +21,10 @@ workspace = true
 name = "rsdeseq2"
 path = "src/lib.rs"
 
+[[bin]]
+name = "rsdeseq2"
+path = "src/main.rs"
+
 [[test]]
 name = "integration"
 path = "tests/integration.rs"
@@ -57,7 +61,7 @@ nalgebra.workspace = true
 rayon.workspace = true
 rcompat-formula.workspace = true
 rcompat-shrinkage = { workspace = true, optional = true }
-rsdeseq2-base.workspace = true
+rcompat-numeric = { workspace = true, features = ["csv"] }
 rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true

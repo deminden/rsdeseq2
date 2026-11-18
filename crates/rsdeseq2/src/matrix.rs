@@ -8,5 +8,4 @@ pub use counts::{CountRows, CountView};
 pub use row_flags::RowFlags;
 
 pub use rcompat_numeric::matrix::{MatrixOrder, MatrixView, RowMajorMatrix, borrowed};
-#[doc(hidden)]
-pub use rcompat_numeric::matrix::{normalize_index_range, try_alloc_matrix};
+pub(crate) use rcompat_numeric::matrix::{normalize_index_range, try_alloc_matrix};

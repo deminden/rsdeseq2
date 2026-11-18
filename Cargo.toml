@@ -4,8 +4,6 @@ members = [
     "crates/rcompat-numeric",
     "crates/rcompat-shrinkage",
     "crates/rsdeseq2",
-    "crates/rsdeseq2-base",
-    "crates/rsdeseq2-cli",
 ]
 resolver = "3"
 
@@ -33,7 +31,6 @@ rcompat-formula = { path = "crates/rcompat-formula", version = "0.1.0" }
 rcompat-numeric = { path = "crates/rcompat-numeric", version = "0.1.0" }
 rcompat-shrinkage = { path = "crates/rcompat-shrinkage", version = "0.1.0" }
 rsdeseq2 = { path = "crates/rsdeseq2", version = "0.5.0", default-features = false }
-rsdeseq2-base = { path = "crates/rsdeseq2-base", version = "0.5.0" }
 approx = "0.5.1"
 clap = { version = "4.6.7", features = ["derive"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }

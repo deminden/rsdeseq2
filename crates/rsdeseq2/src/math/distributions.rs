@@ -1,10 +1,10 @@
 use crate::errors::DeseqError;
-use crate::matrix::CountMatrix;
-use crate::matrix::RowMajorMatrix;
-use crate::nb::{
+use crate::glm::nb::{
     nbinom_log_likelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
     nbinom_log_pmf, nbinom_negative_twice_log_likelihood,
 };
+use crate::matrix::CountMatrix;
+use crate::matrix::RowMajorMatrix;
 
 /// Convenience namespace for DESeq2-parameterized negative-binomial helpers.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

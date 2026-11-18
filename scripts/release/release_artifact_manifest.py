@@ -28,7 +28,7 @@ def source_identity():
 
 
 # Workspace crates published to crates.io (sorted; cargo publishes them in dependency order).
-PUBLISHED_CRATES = ['rcompat-formula', 'rcompat-numeric', 'rcompat-shrinkage', 'rsdeseq2', 'rsdeseq2-base', 'rsdeseq2-cli']
+PUBLISHED_CRATES = ['rcompat-formula', 'rcompat-numeric', 'rcompat-shrinkage', 'rsdeseq2']
 
 
 def check_files(root, files):

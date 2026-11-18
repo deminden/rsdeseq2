@@ -26,8 +26,7 @@ impl<'a> RowFlags<'a> {
         }
         Ok(Self(Flags::Integer(values)))
     }
-    #[doc(hidden)]
-    pub fn from_indices(genes: usize, rows: &'a [usize]) -> Result<Self, DeseqError> {
+    pub(crate) fn from_indices(genes: usize, rows: &'a [usize]) -> Result<Self, DeseqError> {
         if rows.iter().any(|&row| row >= genes) || rows.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(DeseqError::InvalidOptions {
                 reason: "replacement row indices must be in range and strictly increasing".into(),
@@ -44,8 +43,7 @@ impl<'a> RowFlags<'a> {
             Flags::Indices { genes, .. } => genes,
         }
     }
-    #[doc(hidden)]
-    pub fn at(self, gene: usize) -> bool {
+    pub(crate) fn at(self, gene: usize) -> bool {
         match self.0 {
             Flags::Boolean(v) => v[gene],
             Flags::Integer(v) => v[gene] == 1,

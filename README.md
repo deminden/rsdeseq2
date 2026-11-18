@@ -102,8 +102,7 @@ the tested inputs and settings; the complete Bioconductor API is outside scope.
 
 The library and CLI are distributed through [crates.io](https://crates.io/crates/rsdeseq2/0.5.0).
 Install the published CLI with `cargo install rsdeseq2 --version 0.5.0 --locked`,
-or add the library with `cargo add rsdeseq2@0.5.0`. From 0.6.0 the CLI is the
-`rsdeseq2-cli` crate (`cargo install rsdeseq2-cli --locked`). Prebuilt CLI archives are
+or add the library with `cargo add rsdeseq2@0.5.0`. Prebuilt CLI archives are
 attached to the [versioned GitHub release](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0).
 
 For source installation, check out `main`:
@@ -120,7 +119,7 @@ R 4.6.2 is the pinned comparison environment; see the
 
 | Interface | Install from the checkout root | Usage |
 | --- | --- | --- |
-| CLI | `cargo install --path crates/rsdeseq2-cli --locked` | [Commands and input schemas](docs/cli.md) |
+| CLI | `cargo install --path crates/rsdeseq2 --locked` | [Commands and input schemas](docs/cli.md) |
 | Rust library | `cargo add rsdeseq2 --path /absolute/path/to/rsdeseq2/crates/rsdeseq2` from your application | [Library usage](crates/rsdeseq2/README.md#rust-usage) |
 | R package | `R CMD INSTALL r-pkg/rsdeseq2` | [Fitting and results](docs/r-wrapper.md) |
 

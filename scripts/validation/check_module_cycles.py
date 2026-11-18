@@ -20,6 +20,9 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(METRICS)
 
 ALLOWED = {
+    # math::distributions re-exports the negative-binomial kernels from
+    # glm::nb as public convenience paths; glm uses math special functions.
+    ('glm', 'math'),
     # independent_filtering::apply_independent_filtering takes DeseqResults
     # in its public signature; results calls independent filtering.
     ('independent_filtering', 'results'),

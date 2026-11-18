@@ -11,7 +11,7 @@ pub(super) fn temp_dir(label: &str) -> PathBuf {
 }
 
 pub(super) fn reference_data_path(name: &str) -> PathBuf {
-    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../rsdeseq2"))
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/data/deseq2_reference")
         .join(name)
 }

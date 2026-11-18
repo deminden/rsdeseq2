@@ -16,14 +16,14 @@ Requires **Rust 1.97.1 or newer**.
 # Embed the library.
 cargo add rsdeseq2@0.5.0
 
-# Install the CLI (from 0.6.0 it is the rsdeseq2-cli crate).
+# Install the CLI.
 cargo install rsdeseq2 --version 0.5.0 --locked
 ```
 
 For source installation from a repository checkout:
 
 ```sh
-cargo install --path crates/rsdeseq2-cli --locked
+cargo install --path crates/rsdeseq2 --locked
 ```
 
 [Release procedure][release] describes checked artifacts, version tags and
