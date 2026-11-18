@@ -148,7 +148,7 @@ mod normalization_tests {
     #[test]
     fn component_normalization_matches_independent_original_leaves() {
         let r: Reference = serde_json::from_str(include_str!(
-            "../../tests/data/student_component_leaves_r462.json"
+            "../../../rsdeseq2/tests/data/student_component_leaves_r462.json"
         ))
         .unwrap();
         let mut failures = vec![];
@@ -191,7 +191,7 @@ mod normalization_tests {
             cases: Vec<Case>,
         }
         let reference: MathematicalReference = serde_json::from_str(include_str!(
-            "../../tests/data/student_beta_mathematical.json"
+            "../../../rsdeseq2/tests/data/student_beta_mathematical.json"
         ))
         .unwrap();
         let mut failures = vec![];

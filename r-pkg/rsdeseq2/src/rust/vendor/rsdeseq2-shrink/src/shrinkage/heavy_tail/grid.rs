@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn fixed_grid_queries_match_original_reference_without_optimizer_drift() {
         let reference: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../tests/data/posterior_analysis_r462.json"
+            "../../../../rsdeseq2/tests/data/posterior_analysis_r462.json"
         ))
         .unwrap();
         let mut failures = vec![];

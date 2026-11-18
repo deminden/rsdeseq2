@@ -13,14 +13,14 @@ path = "src/lib.rs"
 [dependencies]
 clap = { version = "^4.6.7", features = ["derive"], optional = true }
 csv = { version = "^1.4.0" }
-icu_collator = { version = "^2.4.0", optional = true }
-icu_locale = { version = "^2.4.0", optional = true }
 libm = { version = "^0.2.16" }
 nalgebra = { version = "^0.35.0" }
 rayon = { version = "^1.12.0" }
 rcompat-lbfgsb = { version = "^0.3.0" }
 rcompat-locfit = { version = "^0.2.0" }
 rsdeseq2-base = { path = "../rsdeseq2-base", version = "^0.5.0" }
+rsdeseq2-formula = { path = "../rsdeseq2-formula", version = "^0.5.0" }
+rsdeseq2-shrink = { path = "../rsdeseq2-shrink", version = "^0.5.0", optional = true }
 same-file = { version = "^1.0.6", optional = true }
 serde = { version = "^1.0.229", features = ["derive"] }
 serde_json = { version = "^1.0.154" }
@@ -30,5 +30,5 @@ thiserror = { version = "^2.0.21" }
 [features]
 cli = ["dep:clap", "dep:sha2", "dep:same-file"]
 default = ["cli", "formula", "shrinkage"]
-formula = ["dep:icu_collator", "dep:icu_locale"]
-shrinkage = []
+formula = ["rsdeseq2-formula/icu"]
+shrinkage = ["dep:rsdeseq2-shrink"]

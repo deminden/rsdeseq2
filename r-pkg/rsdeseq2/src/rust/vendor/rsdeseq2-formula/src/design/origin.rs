@@ -54,7 +54,8 @@ impl DesignOrigin {
             ordered_factors: Arc::from([]),
         }))
     }
-    pub(crate) fn with_ordered_factors(mut self, factors: Vec<String>) -> Self {
+    #[doc(hidden)]
+    pub fn with_ordered_factors(mut self, factors: Vec<String>) -> Self {
         if let Source::Formula {
             ordered_factors, ..
         } = &mut self.0

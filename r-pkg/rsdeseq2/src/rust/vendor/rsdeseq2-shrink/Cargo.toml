@@ -1,0 +1,18 @@
+[package]
+name = "rsdeseq2-shrink"
+version = "0.5.0"
+edition = "2024"
+license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
+rust-version = "1.97.1"
+exclude = [".DS_Store", "**/.DS_Store"]
+
+[lib]
+name = "rsdeseq2_shrink"
+path = "src/lib.rs"
+
+[dependencies]
+libm = { version = "^0.2.16" }
+nalgebra = { version = "^0.35.0" }
+rcompat-lbfgsb = { version = "^0.3.0" }
+rsdeseq2-base = { path = "../rsdeseq2-base", version = "^0.5.0" }
+rsdeseq2-formula = { path = "../rsdeseq2-formula", version = "^0.5.0" }

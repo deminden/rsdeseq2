@@ -20,9 +20,12 @@ pub struct DesignMatrix {
     cox_products: std::sync::OnceLock<Option<std::sync::Arc<SharedDesignProducts>>>,
 }
 
-pub(crate) struct SharedDesignProducts {
-    pub(crate) offsets: Vec<usize>,
-    pub(crate) products: Vec<(usize, usize, f64)>,
+#[doc(hidden)]
+pub struct SharedDesignProducts {
+    #[doc(hidden)]
+    pub offsets: Vec<usize>,
+    #[doc(hidden)]
+    pub products: Vec<(usize, usize, f64)>,
 }
 
 impl PartialEq for DesignMatrix {
@@ -354,7 +357,8 @@ impl FormulaModelFrame {
 }
 
 impl DesignMatrix {
-    pub(crate) fn cached_cox_products(
+    #[doc(hidden)]
+    pub fn cached_cox_products(
         &self,
         build: impl FnOnce() -> Option<SharedDesignProducts>,
     ) -> Option<std::sync::Arc<SharedDesignProducts>> {
