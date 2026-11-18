@@ -371,6 +371,10 @@ impl DeseqBuilder {
     /// numeric all-zero rule. As in DESeq2 LRT result tables, the selected
     /// contrast controls the reported LFC and SE while the statistic and
     /// p-value remain the LRT model-comparison values.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }))"
+    )]
     pub fn fit_fixed_dispersion_lrt_results_contrast<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -400,6 +404,10 @@ impl DeseqBuilder {
     /// Character triplet contrasts resolve their factor reference and
     /// per-sample levels from `model_frame`. List and numeric contrasts use the
     /// same numeric all-zero handling as [`Self::fit_fixed_dispersion_lrt_results_contrast`].
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }))"
+    )]
     pub fn fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
         &self,
         counts: &CountMatrix,
@@ -465,6 +473,10 @@ impl DeseqBuilder {
 
     /// Run supplied-dispersion LRT replacement refit for a DESeq2 `results(contrast=...)` request.
     #[allow(clippy::too_many_arguments)]
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -493,6 +505,10 @@ impl DeseqBuilder {
     /// Run supplied-dispersion LRT replacement refit for a DESeq2
     /// `results(contrast=...)` request using formula model-frame metadata.
     #[allow(clippy::too_many_arguments)]
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_results_contrast_from_model_frame_with_cooks_replacement(
         &self,
         counts: &CountMatrix,

@@ -17,6 +17,10 @@ impl DeseqBuilder {
     /// merges only rows marked for refit. Beta priors are applied by the
     /// results-level beta-prior functions; Bioconductor object slots are
     /// outside the Rust API.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Coefficient(coefficient)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_wald_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -39,6 +43,10 @@ impl DeseqBuilder {
     /// primitive numeric contrasts: original and replacement-count refits both
     /// use the native GLM-mu contrast path, then only rows marked by the
     /// replacement plan are merged into the final result table.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_wald_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -56,6 +64,10 @@ impl DeseqBuilder {
     }
 
     /// Run native GLM-mu Wald replacement refit for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -73,6 +85,10 @@ impl DeseqBuilder {
     }
 
     /// Run native GLM-mu Wald replacement refit for a caller-supplied factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -98,6 +114,10 @@ impl DeseqBuilder {
     /// original size factors, and merge only rows marked by the refit plan.
     /// Broader DESeq2 behavior for contrasts, beta priors, and Bioconductor
     /// object metadata remains future work.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Coefficient(coefficient)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_lrt_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -117,6 +137,10 @@ impl DeseqBuilder {
     }
 
     /// Run the current GLM-mu native LRT contrast path with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_lrt_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -136,6 +160,10 @@ impl DeseqBuilder {
     }
 
     /// Run native GLM-mu LRT replacement refit for a caller-supplied factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -155,6 +183,10 @@ impl DeseqBuilder {
     }
 
     /// Run native GLM-mu LRT replacement refit for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -179,6 +211,10 @@ impl DeseqBuilder {
     /// dispersions are already available. The full-model beta fields are
     /// exposed in result rows alongside the model-level LRT statistic and
     /// p-value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_fixed_dispersion_lrt(
         &self,
         counts: &CountMatrix,
@@ -197,6 +233,10 @@ impl DeseqBuilder {
     }
 
     /// Run the supplied-dispersion LRT path with Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Coefficient(coefficient)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -220,6 +260,10 @@ impl DeseqBuilder {
     ///
     /// This keeps the LRT model comparison unchanged while reporting contrast
     /// estimates and standard errors from the full model in result rows.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_lrt_contrast(
         &self,
         counts: &CountMatrix,
@@ -238,6 +282,10 @@ impl DeseqBuilder {
     }
 
     /// Run the supplied-dispersion LRT numeric-contrast path with Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -258,6 +306,10 @@ impl DeseqBuilder {
     }
 
     /// Run a supplied-dispersion LRT and report a named full-model contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_lrt_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -276,6 +328,10 @@ impl DeseqBuilder {
     }
 
     /// Run supplied-dispersion LRT replacement refit for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -302,6 +358,10 @@ impl DeseqBuilder {
     /// caller-supplied sample levels. As in DESeq2 LRT result tables, the
     /// all-zero cleanup only zeroes the displayed LFC; the model-comparison
     /// statistic and p-values remain unchanged.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_lrt_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -320,6 +380,10 @@ impl DeseqBuilder {
     }
 
     /// Run supplied-dispersion LRT replacement refit for a factor-level full-model contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).fixed_dispersion(dispersions).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -347,6 +411,10 @@ impl DeseqBuilder {
     /// All-zero rows are skipped during GLM fitting and expanded back as
     /// missing numeric values, matching DESeq2's `buildMatrixWithNARows`
     /// pattern.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_fixed_dispersion_wald(
         &self,
         counts: &CountMatrix,
@@ -367,6 +435,10 @@ impl DeseqBuilder {
     /// The contrast vector must contain one finite value per design
     /// coefficient. This is the Rust primitive analogue of DESeq2's numeric
     /// contrast path after R has resolved formula terms and coefficient names.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_wald_contrast(
         &self,
         counts: &CountMatrix,
@@ -388,6 +460,10 @@ impl DeseqBuilder {
     /// core path. Dispersions remain caller-supplied for both the original fit
     /// and the replacement-count refit; no native dispersion re-estimation or
     /// beta-prior refit is performed here.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Coefficient(coefficient)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -406,6 +482,10 @@ impl DeseqBuilder {
     }
 
     /// Run the supplied-dispersion Wald numeric-contrast path with Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -424,6 +504,10 @@ impl DeseqBuilder {
     }
 
     /// Run supplied-dispersion Wald replacement refit for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -446,6 +530,10 @@ impl DeseqBuilder {
     /// This resolves coefficient names and DESeq2-style positive/negative
     /// coefficient-name lists to a numeric contrast before calling
     /// `fit_fixed_dispersion_wald_contrast`.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_wald_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -467,6 +555,10 @@ impl DeseqBuilder {
     /// applies DESeq2-style character contrast all-zero handling using
     /// caller-supplied sample levels. Model-frame callers can use
     /// [`Self::fit_fixed_dispersion_wald_results_contrast_from_model_frame`].
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_fixed_dispersion_wald_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -483,6 +575,10 @@ impl DeseqBuilder {
     }
 
     /// Run supplied-dispersion Wald replacement refit for a factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).fixed_dispersion(dispersions).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options))"
+    )]
     pub fn fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -504,6 +600,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_wald_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -523,6 +623,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -539,6 +643,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric GLM-mu native Wald path for a named primitive contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -555,6 +663,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric GLM-mu native Wald path for a factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -577,6 +689,10 @@ impl DeseqBuilder {
     /// normalized counts, base row metadata, linear fitted means, and
     /// fixed-mean gene-wise dispersions. Cox-Reid correction, iterative GLM
     /// mean refits, trend fitting, and MAP shrinkage remain future stages.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).stop_after(Stage::GeneWise))"
+    )]
     pub fn fit_gene_wise_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -599,6 +715,10 @@ impl DeseqBuilder {
     /// the same design-aware stage used by fixed-dispersion Wald/LRT paths and
     /// then passed into both the fixed-dispersion mean fit and fixed-mean
     /// dispersion objective.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).stop_after(Stage::GeneWise))"
+    )]
     pub fn fit_gene_wise_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -620,6 +740,10 @@ impl DeseqBuilder {
     /// `estimateDispersionsMAP(type="DESeq2")`: no observation weights and
     /// deterministic prior-variance estimation, including the low-df
     /// histogram/KL branch.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).stop_after(Stage::Map))"
+    )]
     pub fn fit_map_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -637,6 +761,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps the original parametric-only
     /// behavior even if the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).stop_after(Stage::Map))"
+    )]
     pub fn fit_map_dispersions_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -657,6 +785,10 @@ impl DeseqBuilder {
     /// Parametric, local, and mean trends are implemented. Builder-supplied
     /// observation weights flow through the GLM-mu gene-wise, MAP, and native
     /// Wald stages after DESeq2-style preprocessing.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).stop_after(Stage::Map))"
+    )]
     pub fn fit_map_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -674,6 +806,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).stop_after(Stage::Map))"
+    )]
     pub fn fit_map_dispersions_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -689,6 +825,10 @@ impl DeseqBuilder {
     }
 
     /// Run only the implemented initial normalization stages.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::without_design(counts))"
+    )]
     pub fn fit_size_factors_and_base_means(
         &self,
         counts: &CountMatrix,
@@ -703,6 +843,10 @@ impl DeseqBuilder {
     /// `baseVar`, weights are row-normalized for fitting checks, design/rank
     /// failures are recorded in `weights_fail`, and failed rows are marked in
     /// `all_zero` for downstream skipping.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).stop_after(Stage::SizeFactors))"
+    )]
     pub fn fit_size_factors_and_base_means_with_design(
         &self,
         counts: &CountMatrix,
@@ -718,6 +862,10 @@ impl DeseqBuilder {
     /// followed by `estimateDispersionsFit(fitType="parametric")`. It fills
     /// `dispGeneEst`, `dispFit`, and the linear fitted mean matrix, but it does
     /// not yet estimate prior variance or MAP dispersions.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).stop_after(Stage::Trend))"
+    )]
     pub fn fit_parametric_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -739,6 +887,10 @@ impl DeseqBuilder {
     /// `dispGeneEst`, a constant `dispFit` for non-all-zero rows, and the
     /// linear fitted mean matrix. Prior variance and MAP dispersions are the
     /// next stage (`fit_map_dispersions_linear_mu`).
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Mean).stop_after(Stage::Trend))"
+    )]
     pub fn fit_mean_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -757,6 +909,10 @@ impl DeseqBuilder {
     ///
     /// This mirrors the current non-`linearMu` gene-wise branch
     /// followed by `estimateDispersionsFit(fitType="parametric")`.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).stop_after(Stage::Trend))"
+    )]
     pub fn fit_parametric_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -772,6 +928,10 @@ impl DeseqBuilder {
     }
 
     /// Run GLM-mu gene-wise dispersion estimation and fit the mean trend.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Mean).stop_after(Stage::Trend))"
+    )]
     pub fn fit_mean_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -787,6 +947,10 @@ impl DeseqBuilder {
     }
 
     /// Run linear-mu gene-wise dispersion estimation and fit the local trend.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Local).stop_after(Stage::Trend))"
+    )]
     pub fn fit_local_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -802,6 +966,10 @@ impl DeseqBuilder {
     }
 
     /// Run GLM-mu gene-wise dispersion estimation and fit the local trend.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).fit_type(FitType::Local).stop_after(Stage::Trend))"
+    )]
     pub fn fit_local_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -819,6 +987,10 @@ impl DeseqBuilder {
     /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
     ///
     /// Dispatches to the parametric, local or mean trend.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).stop_after(Stage::Trend))"
+    )]
     pub fn fit_dispersion_trend_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -835,6 +1007,10 @@ impl DeseqBuilder {
     /// Run the implemented GLM-mu dispersion trend path selected by `fit_type`.
     ///
     /// Dispatches to the parametric, local or mean trend.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).stop_after(Stage::Trend))"
+    )]
     pub fn fit_dispersion_trend_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -857,6 +1033,10 @@ impl DeseqBuilder {
     /// the `fit_wald_linear_mu_contrast*` variants, observation weights the
     /// GLM-mu branch (`fit_wald_glm_mu`), and beta priors the results-level
     /// beta-prior functions.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_wald_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -876,6 +1056,10 @@ impl DeseqBuilder {
     /// This is the primitive contrast companion to [`Self::fit_wald_linear_mu`].
     /// It reuses the implemented linear-mu dispersion/MAP path, then reports
     /// the requested contrast from the final fixed-dispersion GLM fit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -891,6 +1075,10 @@ impl DeseqBuilder {
     }
 
     /// Run the linear-mu native Wald path for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -906,6 +1094,10 @@ impl DeseqBuilder {
     }
 
     /// Run the linear-mu native Wald path for a caller-supplied factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -924,6 +1116,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps the original parametric-only
     /// behavior even if the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_wald_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -943,6 +1139,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -959,6 +1159,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric linear-mu native Wald path for a named primitive contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -975,6 +1179,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric linear-mu native Wald path for a factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_wald_linear_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -996,6 +1204,10 @@ impl DeseqBuilder {
     /// alternation before trend, MAP, fixed-dispersion GLM, Cook's distances,
     /// and selected-coefficient Wald results. Builder-supplied observation
     /// weights are supported for this branch.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_wald_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -1016,6 +1228,10 @@ impl DeseqBuilder {
     /// as [`Self::fit_wald_glm_mu`], then reports a primitive numeric
     /// contrast over the fitted coefficient vector. Higher-level formula and
     /// factor handling remains caller or wrapper responsibility.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -1035,6 +1251,10 @@ impl DeseqBuilder {
     /// This resolves coefficient names, coefficient-name lists, or supported
     /// factor-level coefficient shapes to a numeric contrast before running
     /// the implemented native GLM-mu Wald contrast path.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -1054,6 +1274,10 @@ impl DeseqBuilder {
     /// In addition to resolving the coefficient contrast, this applies
     /// DESeq2-style character `contrastAllZero` handling using the supplied
     /// per-sample factor levels.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).means(MeanModel::GlmMu).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_wald_glm_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -1074,6 +1298,10 @@ impl DeseqBuilder {
     /// used for the currently implemented linear-mu dispersion/MAP stages, then
     /// full and reduced fixed-dispersion GLMs are fit using those final
     /// dispersions.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_lrt_linear_mu(
         &self,
         counts: &CountMatrix,
@@ -1095,6 +1323,10 @@ impl DeseqBuilder {
     /// The likelihood-ratio statistic and p-values remain the full-vs-reduced
     /// model comparison; the result table's effect-size columns come from the
     /// supplied contrast over the full-model coefficients.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -1112,6 +1344,10 @@ impl DeseqBuilder {
     }
 
     /// Run the linear-mu native LRT path and report a named full-model contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -1129,6 +1365,10 @@ impl DeseqBuilder {
     }
 
     /// Run the linear-mu native LRT path for a factor-level full-model contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -1149,6 +1389,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps the original parametric-only
     /// behavior even if the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_lrt_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -1170,6 +1414,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -1188,6 +1436,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric linear-mu native LRT path and report a named contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -1206,6 +1458,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric linear-mu native LRT path for a factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::LinearMu).fit_type(FitType::Parametric).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_lrt_linear_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -1227,6 +1483,10 @@ impl DeseqBuilder {
     ///
     /// Builder-supplied observation weights are supported for the GLM-mu branch
     /// through the same preprocessing used by native Wald.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_lrt_glm_mu(
         &self,
         counts: &CountMatrix,
@@ -1248,6 +1508,10 @@ impl DeseqBuilder {
     /// The model comparison, deviance, and p-values come from the LRT. The
     /// result table's effect-size columns use the supplied contrast over the
     /// fitted full-model coefficients, matching DESeq2's result-table shape.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_contrast(
         &self,
         counts: &CountMatrix,
@@ -1265,6 +1529,10 @@ impl DeseqBuilder {
     }
 
     /// Run the GLM-mu native LRT path and report a named full-model contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -1287,6 +1555,10 @@ impl DeseqBuilder {
     /// DESeq2-style character `contrastAllZero` handling using the supplied
     /// per-sample factor levels. For LRT result tables, only the reported LFC
     /// is zeroed; the full-vs-reduced statistic and p-values are preserved.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -1307,6 +1579,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Coefficient(coefficient)))"
+    )]
     pub fn fit_lrt_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
@@ -1328,6 +1604,10 @@ impl DeseqBuilder {
     ///
     /// This compatibility-named entry point keeps parametric behavior even if
     /// the builder's `fit_type` is set to another value.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Numeric(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
@@ -1346,6 +1626,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric GLM-mu native LRT path and report a named contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::Spec(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
@@ -1364,6 +1648,10 @@ impl DeseqBuilder {
     }
 
     /// Run the parametric GLM-mu native LRT path for a factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, full_design).lrt(reduced_design).means(MeanModel::GlmMu).fit_type(FitType::Parametric).result(ResultColumn::FactorLevel(contrast)))"
+    )]
     pub fn fit_lrt_glm_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,

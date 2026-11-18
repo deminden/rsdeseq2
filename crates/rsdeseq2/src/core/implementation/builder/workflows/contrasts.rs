@@ -9,6 +9,10 @@ impl DeseqBuilder {
     /// It follows the implemented GLM-mu native Wald path when `test=Wald`.
     /// Top-level LRT remains explicit because a contrast is not an LRT reduced
     /// model.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Numeric(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_results_contrast(
         &self,
         counts: &CountMatrix,
@@ -25,6 +29,10 @@ impl DeseqBuilder {
     }
 
     /// Run the currently implemented top-level Wald workflow for a numeric contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Numeric(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_contrast(
         &self,
         counts: &CountMatrix,
@@ -41,6 +49,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level Wald workflow for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Spec(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_results_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -62,6 +74,10 @@ impl DeseqBuilder {
     /// column so the Rust core can apply DESeq2's character contrast all-zero
     /// handling. List and numeric contrasts ignore `sample_levels` and use the
     /// numeric all-zero rule.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Results { contrast, sample_levels, model_frame: None })), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_results_contrast_request<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -85,6 +101,10 @@ impl DeseqBuilder {
 
     /// Build a supported formula design from stored model-frame metadata and
     /// run a DESeq2 `results(contrast=...)` request.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: None })), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_formula_with_results_contrast_request(
         &self,
         counts: &CountMatrix,
@@ -110,6 +130,10 @@ impl DeseqBuilder {
     /// Character triplet contrasts resolve their factor reference and
     /// per-sample levels from `model_frame`. List and numeric contrasts use the
     /// same numeric all-zero handling as [`Self::fit_with_results_contrast_request`].
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) })), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_results_contrast_request_from_model_frame(
         &self,
         counts: &CountMatrix,
@@ -131,6 +155,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level Wald workflow for a named primitive contrast specification.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Spec(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_contrast_spec(
         &self,
         counts: &CountMatrix,
@@ -147,6 +175,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::FactorLevel(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_results_factor_level_contrast(
         &self,
         counts: &CountMatrix,
@@ -163,6 +195,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level Wald workflow for a caller-supplied factor-level contrast.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::FactorLevel(contrast))), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_factor_level_contrast(
         &self,
         counts: &CountMatrix,

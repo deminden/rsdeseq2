@@ -4,6 +4,10 @@ use super::super::*;
 
 impl DeseqBuilder {
     /// Run the top-level Wald workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_with_results_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -21,6 +25,10 @@ impl DeseqBuilder {
 
     /// Build a supported formula design from stored model-frame metadata and
     /// run the top-level Wald workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_formula_with_results_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -37,6 +45,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level named Wald workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Name(coefficient_name)).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_with_results_name_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -60,6 +72,10 @@ impl DeseqBuilder {
     /// Build a supported formula design from stored model-frame metadata and
     /// run the top-level named Wald workflow with limited Cook's replacement
     /// refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).result(ResultColumn::Name(coefficient_name)).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_formula_with_results_name_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -84,6 +100,10 @@ impl DeseqBuilder {
     ///
     /// Unlike [`Self::fit_with_results_with_cooks_replacement`], this method
     /// returns an enum so `test=Lrt` can route through a stored reduced design.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -101,6 +121,10 @@ impl DeseqBuilder {
 
     /// Build a supported formula design from stored model-frame metadata and
     /// run the top-level workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_formula_with_test_results_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -120,6 +144,10 @@ impl DeseqBuilder {
     ///
     /// The returned enum keeps Wald and LRT replacement output types explicit
     /// while allowing `test=Lrt` to use the builder's stored reduced design.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Name(coefficient_name)).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_name_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -139,6 +167,10 @@ impl DeseqBuilder {
 
     /// Build a supported formula design from stored model-frame metadata and
     /// run the top-level named workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).result(ResultColumn::Name(coefficient_name)).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_formula_with_test_results_name_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -157,6 +189,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level Wald contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_with_results_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -178,6 +214,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level numeric-contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Numeric(contrast)).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -196,6 +236,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level named Wald contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_with_results_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -218,6 +262,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level named-contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Spec(contrast)).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -236,6 +284,10 @@ impl DeseqBuilder {
     }
 
     /// Run a DESeq2 `results(contrast=...)` request with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Results { contrast, sample_levels, model_frame: None }).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_contrast_request_with_cooks_replacement<S: AsRef<str>>(
         &self,
         counts: &CountMatrix,
@@ -262,6 +314,10 @@ impl DeseqBuilder {
     /// Build a supported formula design from stored model-frame metadata and
     /// run a DESeq2 `results(contrast=...)` request with limited Cook's
     /// replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::formula(counts, formula).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: None }).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_formula_with_test_results_contrast_request_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -285,6 +341,10 @@ impl DeseqBuilder {
 
     /// Run a DESeq2 `results(contrast=...)` request with limited Cook's
     /// replacement refit using formula model-frame metadata.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::Results { contrast, sample_levels: None, model_frame: Some(model_frame) }).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_contrast_request_from_model_frame_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -308,6 +368,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level factor-level Wald contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options)) (Wald builders only)"
+    )]
     pub fn fit_with_results_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
@@ -330,6 +394,10 @@ impl DeseqBuilder {
     }
 
     /// Run the top-level factor-level contrast workflow with limited Cook's replacement refit.
+    #[deprecated(
+        since = "0.6.0",
+        note = "use DeseqBuilder::run(&Analysis::new(counts, design).result(ResultColumn::FactorLevel(contrast)).cooks_replacement(replacement_options)), adding .lrt(reduced) when the builder test is LRT"
+    )]
     pub fn fit_with_test_results_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,

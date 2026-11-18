@@ -8,7 +8,11 @@
 //! declared by each file that uses them, exactly as when every file was its
 //! own crate, so the same source is compiled once per user and a file module
 //! may share its helper's name.
+//!
+//! The deprecated `DeseqBuilder::fit*` methods stay covered here until they
+//! are removed in 0.7.0; `run_equivalence` checks each against `run`.
 #![allow(clippy::duplicate_mod, clippy::module_inception)]
+#![allow(deprecated)]
 
 #[path = "adaptive_result.rs"]
 mod adaptive_result;

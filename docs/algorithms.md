@@ -1233,46 +1233,32 @@ This follows the DESeq2 `DESeq()` stage order at a high level:
 implemented Rust path remains narrower than DESeq2 because it only supports
 the supported linear-mu no-weight or GLM-mu optionally weighted,
 parametric/local/mean-trend, deterministic-prior branches.
-`DeseqBuilder::fit()` and `DeseqBuilder::fit_with_results()` expose the
-implemented GLM-mu Wald branch as a limited top-level workflow and report the
-last design coefficient by default, matching DESeq2's default result-coefficient
-shape. `fit_with_results_name()` exposes the selected-coefficient path by
-design coefficient name, using the same exact-first R-cleaned aliases as named
-primitive contrasts. `fit_contrast()`,
-`fit_contrast_spec()`, and
-`fit_factor_level_contrast()` expose fit-only top-level Wald contrast helpers;
-`fit_with_results_contrast()`, `fit_with_results_contrast_spec()`, and
-`fit_with_results_factor_level_contrast()` expose the same branch with result
-rows for primitive numeric, named/list, and caller-supplied factor-level Wald
-contrasts. Compatibility-named parametric Wald helpers expose the same
-contrast shapes while pinning the dispersion trend to the parametric branch.
-Builder-created `DeseqFit` objects retain optional formula/model-frame
-metadata, including factor levels and references, for later wrapper or
-already-fitted-object Wald/LRT `results(contrast=...)` assembly through the
-unified fitted-object contrast dispatcher.
-The corresponding `*_with_cooks_replacement()` helpers expose the limited
-replacement-refit workflow when callers supply replacement options; formula
-contrast-request replacement helpers use the same exact-first R-cleaned
-coefficient aliases as the non-replacement result routes. Stored formula
-model-frame metadata also lets selected-coefficient Wald replacement refits
-reuse the two-group low-count Cook's condition when the selected coefficient is the
-non-reference comparison for one two-level factor. LRT
-remains available through `DeseqBuilder::fit_lrt()`,
-`DeseqBuilder::fit_lrt_name()`,
-`DeseqBuilder::fit_lrt_contrast()`,
-`DeseqBuilder::fit_lrt_contrast_spec()`,
-`DeseqBuilder::fit_lrt_factor_level_contrast()`,
-`DeseqBuilder::fit_lrt_with_results()`,
-`DeseqBuilder::fit_lrt_with_results_name()`,
-`DeseqBuilder::fit_lrt_with_results_contrast()`,
-`DeseqBuilder::fit_lrt_with_results_contrast_spec()`,
-`DeseqBuilder::fit_lrt_with_results_factor_level_contrast()`,
-`DeseqBuilder::fit_lrt_with_results_with_cooks_replacement()`,
-`DeseqBuilder::fit_lrt_with_results_name_with_cooks_replacement()`,
-`DeseqBuilder::fit_lrt_with_results_factor_level_contrast_with_cooks_replacement()`,
-and the
-branch-specific `fit_lrt_*` entry points because callers must provide a
-reduced design. LRT contrast result tables report the requested full-model
+`DeseqBuilder::run(&Analysis)` is the entry point for every combination of
+these choices. `Analysis::new(counts, design)` runs the GLM-mu Wald branch with
+automatic dispersion means and reports the last design coefficient, matching
+DESeq2's default result coefficient. `Analysis::result` selects another column:
+`ResultColumn::Name` (a design coefficient by name, using the same exact-first
+R-cleaned aliases as named primitive contrasts), `Numeric`, `Spec` (named or
+list contrasts), `FactorLevel` (caller-supplied factor-level contrasts) or
+`Results` (a DESeq2 `results(contrast = ...)` request, resolved against
+per-sample levels or the stored or supplied formula model frame).
+`Analysis::fit_type` pins the trend type for one run, `Analysis::means` picks
+linear or GLM fitted means, `Analysis::fixed_dispersion` skips estimation, and
+`Analysis::stop_after` stops after size factors, gene-wise estimates, the
+trend or MAP dispersions. Builder-created `DeseqFit` objects retain optional
+formula/model-frame metadata, including factor levels and references, for
+later wrapper or already-fitted-object Wald/LRT `results(contrast=...)`
+assembly through the unified fitted-object contrast dispatcher.
+`Analysis::cooks_replacement` runs the limited replacement-refit workflow;
+formula contrast requests use the same exact-first R-cleaned coefficient
+aliases as without replacement. Stored formula model-frame metadata also lets
+selected-coefficient Wald replacement refits reuse the two-group low-count
+Cook's condition when the selected coefficient is the non-reference
+comparison for one two-level factor. An LRT is `Analysis::lrt(reduced)` (or
+`lrt_formula` with a formula design), because callers must provide a reduced
+design. The older `DeseqBuilder::fit*` methods are deprecated one-line
+wrappers around `run` and will be removed in 0.7.0.
+LRT contrast result tables report the requested full-model
 effect size, but keep the full-vs-reduced LRT statistic and p-value; when
 DESeq2's numeric or character/factor-level `contrastAllZero` rule applies,
 only the reported `log2FoldChange` is zeroed for LRT rows.

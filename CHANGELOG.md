@@ -127,6 +127,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Deprecated
 
+- All 140 `DeseqBuilder::fit*` methods (for example `fit_with_results`,
+  `fit_lrt_with_results`, `fit_wald_glm_mu_contrast_spec`,
+  `fit_fixed_dispersion_wald_with_cooks_replacement`,
+  `fit_map_dispersions_glm_mu`): use `DeseqBuilder::run` with an `Analysis`.
+  Each deprecation note gives the exact replacement request. The methods are
+  one-line wrappers with unchanged output and will be removed in 0.7.0. The
+  fast-VST trend helpers are not affected.
+
 - `rsdeseq2::math::qr`, renamed to `rsdeseq2::math::rank`: the module computes
   matrix ranks and contains no QR factorization. The old path re-exports the
   same items for one release.
