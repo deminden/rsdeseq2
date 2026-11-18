@@ -205,3 +205,15 @@ fn invalid_contrasts_and_threads_are_rejected() {
         .fit_with_results(&varied(50, 6), &design);
     assert_eq!(kind(threads).0, ErrorKind::Options);
 }
+
+#[test]
+fn oversized_matrices_fail_with_an_error_instead_of_aborting() {
+    // 2^41 values (16 TiB): the size fits in usize, the allocation cannot succeed.
+    let error = RowMajorMatrix::from_elem(1usize << 31, 1usize << 10, 0.0f64).unwrap_err();
+    assert!(
+        matches!(&error, DeseqError::InvalidDimensions { context, .. } if context == "row-major matrix allocation failed"),
+        "{error:?}"
+    );
+    let error = RowMajorMatrix::from_elem(usize::MAX, 2, 0.0f64).unwrap_err();
+    assert!(matches!(error, DeseqError::InvalidDimensions { .. }));
+}

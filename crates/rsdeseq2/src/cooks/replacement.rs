@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 use crate::numeric::checked::{self, CheckedExt};
 
 /// Replace Cook's outlier counts with trimmed-mean predictions.
@@ -35,7 +36,8 @@ pub fn replace_outlier_counts(
         None => samples_for_cooks(model_matrix, options.min_replicates)?,
     };
 
-    let mut candidate_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut candidate_values =
+        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's replacement")?;
     for gene in 0..counts.n_genes() {
         let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
         let scale_row = match normalization_factors {
@@ -51,7 +53,8 @@ pub fn replace_outlier_counts(
         }
     }
 
-    let mut outlier_values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut outlier_values =
+        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's replacement")?;
     let mut replace = Vec::with_capacity(counts.n_genes());
     let mut replaced_values = counts.as_slice().to_vec();
     for gene in 0..counts.n_genes() {

@@ -1,3 +1,4 @@
+use crate::matrix::try_alloc_matrix;
 use crate::numeric::checked::{self, CheckedExt};
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
@@ -84,7 +85,7 @@ pub fn normalized_counts(
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
     validate_size_factors(size_factors, counts.n_samples())?;
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "normalized counts")?;
     for gene in 0..counts.n_genes() {
         for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
             values.push(
@@ -110,7 +111,7 @@ pub fn normalization_factors_from_size_factors(
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
     validate_size_factors(size_factors, counts.n_samples())?;
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "normalized counts")?;
     for _ in 0..counts.n_genes() {
         values.extend_from_slice(size_factors);
     }
@@ -126,7 +127,7 @@ pub fn normalized_counts_with_factors(
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
     validate_normalization_factors(counts, normalization_factors)?;
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "normalized counts")?;
     for gene in 0..counts.n_genes() {
         let count_row = counts.row_values(gene);
         let factor_row = normalization_factors.row(gene)?;

@@ -5,6 +5,7 @@ use crate::glm::irls::OutputRequirements;
 use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::matrix::try_alloc_matrix;
 use crate::normalization::{Offsets, normalized_counts, normalized_counts_with_factors};
 
 /// Wide log2-scale prior variance used for the rlog intercept.
@@ -686,7 +687,7 @@ fn rlog_normalization_factors_from_size_factors(
     counts: &CountMatrix,
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = Vec::with_capacity(counts.n_genes() * counts.n_samples());
+    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "rlog output")?;
     for _gene in 0..counts.n_genes() {
         for (sample, size_factor) in size_factors.iter().enumerate() {
             if !size_factor.is_finite() || *size_factor <= 0.0 {
