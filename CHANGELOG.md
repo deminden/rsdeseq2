@@ -7,6 +7,9 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `local_vst_inverse_factor_mean(Offsets)` and
+  `vst_with_dispersion_trend_and_offsets`.
+
 - `rlog_transform`, `rlog_fit`, `rlog_frozen` and `rlog_with_estimated_prior`
   take `Offsets` (size factors or normalization factors).
 
@@ -145,6 +148,10 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- `local_vst_inverse_size_factor_mean{,_from_normalization_factors}` and
+  `vst_with_dispersion_trend_and_{size,normalization}_factors`: use the
+  `Offsets` forms above. Output is unchanged; removal in 0.7.0.
 
 - The eight `rlog_*_with_size_factors` / `rlog_*_with_normalization_factors`
   functions (including `rlog_with_estimated_prior_and_*`): use the four

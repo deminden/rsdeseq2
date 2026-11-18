@@ -209,16 +209,7 @@ impl DeseqFit {
     ) -> Result<RowMajorMatrix<f64>, DeseqError> {
         validate_fit_counts_shape(self, counts, "variance-stabilizing transform")?;
         let normalized = self.normalized_counts(counts)?;
-        match &self.normalization_factors {
-            Some(factors) => {
-                vst_with_dispersion_trend_and_normalization_factors(&normalized, trend_fit, factors)
-            }
-            None => vst_with_dispersion_trend_and_size_factors(
-                &normalized,
-                trend_fit,
-                &self.size_factors,
-            ),
-        }
+        vst_with_dispersion_trend_and_offsets(&normalized, trend_fit, self.offsets())
     }
 
     /// Short alias for [`DeseqFit::variance_stabilizing_transform`].

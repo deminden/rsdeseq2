@@ -313,4 +313,46 @@ fn deprecated_beta_prior_fits_all_run() {
     for (tag, value) in rlogs {
         record(tag, value);
     }
+    let normalized = normalized_counts(&rlog_counts, &size_factors).unwrap();
+    let trend = DispersionTrendFit::Mean(
+        fit_mean_dispersion_trend(
+            &[20.0, 5.0, 140.0],
+            &[0.1, 0.2, 0.05],
+            MeanDispersionTrendOptions::default(),
+        )
+        .unwrap(),
+    );
+    #[allow(deprecated)]
+    let vsts = [
+        (
+            "vst_inverse/sf",
+            s(local_vst_inverse_size_factor_mean(&size_factors).map(|v| format!("{v:?}"))),
+        ),
+        (
+            "vst_inverse/nf",
+            s(
+                local_vst_inverse_size_factor_mean_from_normalization_factors(&rlog_factors)
+                    .map(|v| format!("{v:?}")),
+            ),
+        ),
+        (
+            "vst_trend/sf",
+            s(
+                vst_with_dispersion_trend_and_size_factors(&normalized, &trend, &size_factors)
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "vst_trend/nf",
+            s(vst_with_dispersion_trend_and_normalization_factors(
+                &normalized,
+                &trend,
+                &rlog_factors,
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+    ];
+    for (tag, value) in vsts {
+        record(tag, value);
+    }
 }

@@ -38,13 +38,13 @@ pub fn evaluate(input: Input) -> Result<Json, Box<dyn Error>> {
             let nf = RowMajorMatrix::from_row_major(case.genes, case.samples, parse(nf)?)?;
             (
                 normalized_counts_with_factors(&counts, &nf)?,
-                local_vst_inverse_size_factor_mean_from_normalization_factors(&nf)?,
+                local_vst_inverse_factor_mean(Offsets::PerCell(&nf))?,
             )
         } else {
             let sf = parse(case.size_factors.ok_or("size factors required")?)?;
             (
                 normalized_counts(&counts, &sf)?,
-                local_vst_inverse_size_factor_mean(&sf)?,
+                local_vst_inverse_factor_mean(Offsets::PerSample(&sf))?,
             )
         };
         let model = &case.model;
