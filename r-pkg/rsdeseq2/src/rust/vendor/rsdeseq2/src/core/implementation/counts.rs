@@ -5,7 +5,7 @@ pub(super) use crate::all_zero::{
 pub(super) use crate::contrasts::{
     ContrastSpec, FactorLevelContrast, ResultsContrast, contrast_all_zero_factor_levels,
     contrast_all_zero_numeric, factor_level_contrast_from_model_frame, resolve_coefficient_index,
-    resolve_contrast, resolve_results_contrast,
+    resolve_contrast,
 };
 pub(super) use crate::cooks::{
     CooksOutput, CooksRefitPlan, CooksReplacementOptions, calculate_cooks_distance,

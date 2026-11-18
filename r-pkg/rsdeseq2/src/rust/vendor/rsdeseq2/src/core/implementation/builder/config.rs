@@ -556,6 +556,16 @@ pub(super) fn resolve_sample_level_alias_for_builder<'a>(
     }
 }
 
+/// Per-sample levels as owned strings for a `results()` contrast request.
+pub(super) fn owned_levels<S: AsRef<str>>(levels: Option<&[S]>) -> Option<Vec<String>> {
+    levels.map(|levels| {
+        levels
+            .iter()
+            .map(|level| level.as_ref().to_string())
+            .collect()
+    })
+}
+
 #[cfg(test)]
 pub(super) mod execution_control_tests {
     use super::*;

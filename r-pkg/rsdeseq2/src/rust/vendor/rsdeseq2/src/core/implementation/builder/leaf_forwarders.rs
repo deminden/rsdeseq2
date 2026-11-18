@@ -1,7 +1,6 @@
-//! Public `fit*` forwarders for the leaf workflows behind `DeseqBuilder::run`.
-//!
-//! Each method forwards to its private `leaf_*` workflow unchanged; the
-//! leaves are shared with [`DeseqBuilder::run`].
+//! Explicit-path `fit*` methods (GLM-mu, linear-mu, fixed dispersion,
+//! `_parametric` and stage methods), each a one-line [`DeseqBuilder::run`]
+//! request. The workflows themselves are the private `leaf_*` methods.
 
 #![allow(clippy::too_many_arguments)]
 
@@ -25,12 +24,13 @@ impl DeseqBuilder {
         coefficient: usize,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_wald_glm_mu_with_cooks_replacement(
-            counts,
-            design,
-            coefficient,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(coefficient))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run the current GLM-mu native Wald contrast path with limited Cook's replacement refit.
@@ -46,12 +46,13 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_wald_glm_mu_contrast_with_cooks_replacement(
-            counts,
-            design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run native GLM-mu Wald replacement refit for a named primitive contrast specification.
@@ -62,12 +63,13 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(
-            counts,
-            design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run native GLM-mu Wald replacement refit for a caller-supplied factor-level contrast.
@@ -78,12 +80,13 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
-            counts,
-            design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run the current GLM-mu native LRT path with limited Cook's replacement refit.
@@ -103,13 +106,14 @@ impl DeseqBuilder {
         coefficient: usize,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_lrt_glm_mu_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            coefficient,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(coefficient))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run the current GLM-mu native LRT contrast path with limited Cook's replacement refit.
@@ -121,13 +125,14 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_lrt_glm_mu_contrast_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run native GLM-mu LRT replacement refit for a caller-supplied factor-level contrast.
@@ -139,13 +144,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run native GLM-mu LRT replacement refit for a named primitive contrast specification.
@@ -157,13 +163,14 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run a supplied-dispersion likelihood-ratio test pipeline.
@@ -180,13 +187,13 @@ impl DeseqBuilder {
         dispersions: &[f64],
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_lrt(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            coefficient,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the supplied-dispersion LRT path with Cook's replacement refit.
@@ -199,14 +206,14 @@ impl DeseqBuilder {
         coefficient: usize,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_fixed_dispersion_lrt_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            coefficient,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Coefficient(coefficient))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run a supplied-dispersion likelihood-ratio test and report a numeric contrast.
@@ -221,13 +228,13 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_lrt_contrast(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the supplied-dispersion LRT numeric-contrast path with Cook's replacement refit.
@@ -240,14 +247,14 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_fixed_dispersion_lrt_contrast_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Numeric(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run a supplied-dispersion LRT and report a named full-model contrast.
@@ -259,13 +266,13 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_lrt_contrast_spec(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run supplied-dispersion LRT replacement refit for a named primitive contrast specification.
@@ -278,14 +285,14 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Spec(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run a supplied-dispersion LRT and report a factor-level full-model contrast.
@@ -303,13 +310,13 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_lrt_factor_level_contrast(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run supplied-dispersion LRT replacement refit for a factor-level full-model contrast.
@@ -322,14 +329,14 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        self.leaf_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::FactorLevel(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run a supplied-dispersion Wald pipeline for one coefficient.
@@ -347,7 +354,12 @@ impl DeseqBuilder {
         dispersions: &[f64],
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_wald(counts, design, dispersions, coefficient)
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run a supplied-dispersion Wald pipeline for a primitive numeric contrast.
@@ -362,7 +374,12 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_wald_contrast(counts, design, dispersions, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the supplied-dispersion Wald coefficient path with Cook's replacement refit.
@@ -379,13 +396,13 @@ impl DeseqBuilder {
         coefficient: usize,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_fixed_dispersion_wald_with_cooks_replacement(
-            counts,
-            design,
-            dispersions,
-            coefficient,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Coefficient(coefficient))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run the supplied-dispersion Wald numeric-contrast path with Cook's replacement refit.
@@ -397,13 +414,13 @@ impl DeseqBuilder {
         contrast: &[f64],
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
-            counts,
-            design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Numeric(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run supplied-dispersion Wald replacement refit for a named primitive contrast specification.
@@ -415,13 +432,13 @@ impl DeseqBuilder {
         contrast: &ContrastSpec,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
-            counts,
-            design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Spec(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.
@@ -436,7 +453,12 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_wald_contrast_spec(counts, design, dispersions, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run a supplied-dispersion Wald pipeline for a factor-level contrast.
@@ -452,7 +474,12 @@ impl DeseqBuilder {
         dispersions: &[f64],
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_fixed_dispersion_wald_factor_level_contrast(counts, design, dispersions, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run supplied-dispersion Wald replacement refit for a factor-level contrast.
@@ -464,13 +491,13 @@ impl DeseqBuilder {
         contrast: FactorLevelContrast<'_>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
-        self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-            counts,
-            design,
-            dispersions,
-            contrast,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::FactorLevel(contrast))
+                .cooks_replacement(replacement_options),
+        )?
+        .into_wald_replacement()
     }
 
     /// Run the parametric GLM-mu native dispersion path and then a Wald test.
@@ -483,7 +510,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_parametric(counts, design, coefficient)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native Wald path for a numeric contrast.
@@ -496,7 +529,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_contrast_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native Wald path for a named primitive contrast.
@@ -506,7 +545,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_contrast_spec_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native Wald path for a factor-level contrast.
@@ -516,7 +561,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the current linear-mu gene-wise dispersion estimator.
@@ -531,7 +582,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_gene_wise_dispersions_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .stop_after(Stage::GeneWise),
+        )?
+        .into_fit_only()
     }
 
     /// Run the current GLM-mu gene-wise dispersion estimator.
@@ -548,7 +604,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_gene_wise_dispersions_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::GeneWise),
+        )?
+        .into_fit_only()
     }
 
     /// Run linear-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
@@ -564,7 +625,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_map_dispersions_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .stop_after(Stage::Map),
+        )?
+        .into_fit_only()
     }
 
     /// Run linear-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
@@ -576,7 +642,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_map_dispersions_linear_mu_parametric(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .stop_after(Stage::Map),
+        )?
+        .into_fit_only()
     }
 
     /// Run GLM-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
@@ -590,7 +662,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_map_dispersions_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Map),
+        )?
+        .into_fit_only()
     }
 
     /// Run GLM-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
@@ -602,7 +679,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_map_dispersions_glm_mu_parametric(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .stop_after(Stage::Map),
+        )?
+        .into_fit_only()
     }
 
     /// Run only the implemented initial normalization stages.
@@ -610,7 +693,7 @@ impl DeseqBuilder {
         &self,
         counts: &CountMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_size_factors_and_base_means(counts)
+        self.run(&Analysis::without_design(counts))?.into_fit_only()
     }
 
     /// Run initial normalization stages with design-aware observation-weight checks.
@@ -625,7 +708,8 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_size_factors_and_base_means_with_design(counts, design)
+        self.run(&Analysis::new(counts, design).stop_after(Stage::SizeFactors))?
+            .into_fit_only()
     }
 
     /// Run linear-mu gene-wise dispersion estimation and fit the parametric trend.
@@ -639,7 +723,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_parametric_dispersion_trend_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run linear-mu gene-wise dispersion estimation and fit the mean trend.
@@ -654,7 +744,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_mean_dispersion_trend_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Mean)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run GLM-mu gene-wise dispersion estimation and fit the parametric trend.
@@ -666,7 +762,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_parametric_dispersion_trend_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run GLM-mu gene-wise dispersion estimation and fit the mean trend.
@@ -675,7 +777,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_mean_dispersion_trend_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Mean)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run linear-mu gene-wise dispersion estimation and fit the local trend.
@@ -684,7 +792,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_local_dispersion_trend_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Local)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run GLM-mu gene-wise dispersion estimation and fit the local trend.
@@ -693,7 +807,13 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_local_dispersion_trend_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Local)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run the implemented linear-mu dispersion trend path selected by `fit_type`.
@@ -704,7 +824,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_dispersion_trend_linear_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run the implemented GLM-mu dispersion trend path selected by `fit_type`.
@@ -715,7 +840,12 @@ impl DeseqBuilder {
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
-        self.leaf_dispersion_trend_glm_mu(counts, design)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .stop_after(Stage::Trend),
+        )?
+        .into_fit_only()
     }
 
     /// Run the implemented native dispersion path and then a Wald test.
@@ -733,7 +863,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu(counts, design, coefficient)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native dispersion path and then a Wald test for a numeric contrast.
@@ -747,7 +882,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_contrast(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native Wald path for a named primitive contrast specification.
@@ -757,7 +897,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_contrast_spec(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native Wald path for a caller-supplied factor-level contrast.
@@ -767,7 +912,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_factor_level_contrast(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric native dispersion path and then a Wald test.
@@ -780,7 +930,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_parametric(counts, design, coefficient)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native Wald path for a numeric contrast.
@@ -793,7 +949,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_contrast_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native Wald path for a named primitive contrast.
@@ -803,7 +965,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_contrast_spec_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native Wald path for a factor-level contrast.
@@ -813,7 +981,13 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_linear_mu_factor_level_contrast_parametric(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native dispersion path and then a Wald test.
@@ -828,7 +1002,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu(counts, design, coefficient)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native dispersion path and then a Wald test for a numeric contrast.
@@ -843,7 +1022,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_contrast(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native Wald path for a named primitive contrast specification.
@@ -857,7 +1041,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_contrast_spec(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native Wald path for a factor-level contrast.
@@ -871,7 +1060,12 @@ impl DeseqBuilder {
         design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_wald_glm_mu_factor_level_contrast(counts, design, contrast)
+        self.run(
+            &Analysis::new(counts, design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the implemented linear-mu native dispersion path and then an LRT.
@@ -887,7 +1081,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu(counts, full_design, reduced_design, coefficient)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native LRT path and report a full-model numeric contrast.
@@ -902,7 +1102,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_contrast(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native LRT path and report a named full-model contrast.
@@ -913,7 +1119,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the linear-mu native LRT path for a factor-level full-model contrast.
@@ -924,7 +1136,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native dispersion path and then an LRT.
@@ -938,7 +1156,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_parametric(counts, full_design, reduced_design, coefficient)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native LRT path and report a numeric contrast.
@@ -952,7 +1177,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_contrast_parametric(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native LRT path and report a named contrast.
@@ -963,12 +1195,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_contrast_spec_parametric(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric linear-mu native LRT path for a factor-level contrast.
@@ -979,12 +1213,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_linear_mu_factor_level_contrast_parametric(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::LinearMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the implemented GLM-mu native dispersion path and then an LRT.
@@ -998,7 +1234,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu(counts, full_design, reduced_design, coefficient)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native LRT path and report a full-model numeric contrast.
@@ -1013,7 +1255,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native LRT path and report a named full-model contrast.
@@ -1024,7 +1272,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the GLM-mu native LRT path for a factor-level full-model contrast.
@@ -1040,7 +1294,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native dispersion path and then an LRT.
@@ -1054,7 +1314,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_parametric(counts, full_design, reduced_design, coefficient)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Coefficient(coefficient)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native LRT path and report a numeric contrast.
@@ -1068,7 +1335,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &[f64],
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_contrast_parametric(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Numeric(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native LRT path and report a named contrast.
@@ -1079,7 +1353,14 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: &ContrastSpec,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_contrast_spec_parametric(counts, full_design, reduced_design, contrast)
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::Spec(contrast)),
+        )?
+        .into_results_pair()
     }
 
     /// Run the parametric GLM-mu native LRT path for a factor-level contrast.
@@ -1090,11 +1371,13 @@ impl DeseqBuilder {
         reduced_design: &DesignMatrix,
         contrast: FactorLevelContrast<'_>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        self.leaf_lrt_glm_mu_factor_level_contrast_parametric(
-            counts,
-            full_design,
-            reduced_design,
-            contrast,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .means(MeanModel::GlmMu)
+                .fit_type(FitType::Parametric)
+                .result(ResultColumn::FactorLevel(contrast)),
+        )?
+        .into_results_pair()
     }
 }

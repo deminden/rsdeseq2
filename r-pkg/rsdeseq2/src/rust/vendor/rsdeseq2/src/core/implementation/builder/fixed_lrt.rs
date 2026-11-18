@@ -380,58 +380,18 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         sample_levels: Option<&[S]>,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if sample_levels.is_none()
-            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
-        {
-            return self.leaf_fixed_dispersion_lrt_factor_level_contrast(
-                counts,
-                full_design,
-                reduced_design,
-                dispersions,
-                factor_contrast,
-            );
-        }
-        match contrast {
-            ResultsContrast::Character {
-                factor,
-                numerator,
-                denominator,
-                reference,
-            } => {
-                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "character results contrast requires sample levels for contrastAllZero"
-                        .to_string(),
-                })?;
-                let levels = levels
-                    .iter()
-                    .map(|level| level.as_ref().to_string())
-                    .collect::<Vec<_>>();
-                let contrast = factor_level_contrast_from_sample_levels(
-                    factor,
-                    numerator,
-                    denominator,
-                    reference.as_deref(),
-                    &levels,
-                )?;
-                self.leaf_fixed_dispersion_lrt_factor_level_contrast(
-                    counts,
-                    full_design,
-                    reduced_design,
-                    dispersions,
+        let levels = owned_levels(sample_levels);
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                )
-            }
-            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
-                let contrast_spec = contrast.as_contrast_spec();
-                self.leaf_fixed_dispersion_lrt_contrast_spec(
-                    counts,
-                    full_design,
-                    reduced_design,
-                    dispersions,
-                    &contrast_spec,
-                )
-            }
-        }
+                    sample_levels: levels.as_deref(),
+                    model_frame: None,
+                }),
+        )?
+        .into_results_pair()
     }
 
     /// Run a supplied-dispersion LRT for a DESeq2
@@ -449,39 +409,17 @@ impl DeseqBuilder {
         contrast: &ResultsContrast,
         model_frame: &FormulaModelFrame,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| {
-                self.fit_fixed_dispersion_lrt_results_contrast_from_model_frame(
-                    counts,
-                    full_design,
-                    reduced_design,
-                    dispersions,
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                    model_frame,
-                )
-            });
-        }
-
-        let builder = self.clone().try_model_frame(model_frame.clone())?;
-        if let Some(factor_contrast) =
-            factor_level_contrast_from_model_frame(contrast, model_frame)?
-        {
-            return builder.leaf_fixed_dispersion_lrt_factor_level_contrast(
-                counts,
-                full_design,
-                reduced_design,
-                dispersions,
-                factor_contrast,
-            );
-        }
-        builder.fit_fixed_dispersion_lrt_results_contrast::<String>(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-            None,
-        )
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                }),
+        )?
+        .into_results_pair()
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
@@ -537,61 +475,19 @@ impl DeseqBuilder {
         sample_levels: Option<&[S]>,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        if sample_levels.is_none()
-            && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
-        {
-            return self.leaf_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
-                counts,
-                full_design,
-                reduced_design,
-                dispersions,
-                factor_contrast,
-                replacement_options,
-            );
-        }
-        match contrast {
-            ResultsContrast::Character {
-                factor,
-                numerator,
-                denominator,
-                reference,
-            } => {
-                let levels = sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "character results contrast requires sample levels for contrastAllZero"
-                        .to_string(),
-                })?;
-                let levels = levels
-                    .iter()
-                    .map(|level| level.as_ref().to_string())
-                    .collect::<Vec<_>>();
-                let contrast = factor_level_contrast_from_sample_levels(
-                    factor,
-                    numerator,
-                    denominator,
-                    reference.as_deref(),
-                    &levels,
-                )?;
-                self.leaf_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
-                    counts,
-                    full_design,
-                    reduced_design,
-                    dispersions,
+        let levels = owned_levels(sample_levels);
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
                     contrast,
-                    replacement_options,
-                )
-            }
-            ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
-                let contrast_spec = contrast.as_contrast_spec();
-                self.leaf_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
-                    counts,
-                    full_design,
-                    reduced_design,
-                    dispersions,
-                    &contrast_spec,
-                    replacement_options,
-                )
-            }
-        }
+                    sample_levels: levels.as_deref(),
+                    model_frame: None,
+                })
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Run supplied-dispersion LRT replacement refit for a DESeq2
@@ -607,32 +503,18 @@ impl DeseqBuilder {
         model_frame: &FormulaModelFrame,
         replacement_options: &CooksReplacementOptions,
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
-        if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_fixed_dispersion_lrt_results_contrast_from_model_frame_with_cooks_replacement(counts, full_design, reduced_design, dispersions, contrast, model_frame, replacement_options));
-        }
-
-        let builder = self.clone().try_model_frame(model_frame.clone())?;
-        if let Some(factor_contrast) =
-            factor_level_contrast_from_model_frame(contrast, model_frame)?
-        {
-            return builder.leaf_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
-                counts,
-                full_design,
-                reduced_design,
-                dispersions,
-                factor_contrast,
-                replacement_options,
-            );
-        }
-        builder.fit_fixed_dispersion_lrt_results_contrast_with_cooks_replacement::<String>(
-            counts,
-            full_design,
-            reduced_design,
-            dispersions,
-            contrast,
-            None,
-            replacement_options,
-        )
+        self.run(
+            &Analysis::new(counts, full_design)
+                .lrt(reduced_design)
+                .fixed_dispersion(dispersions)
+                .result(ResultColumn::Results {
+                    contrast,
+                    sample_levels: None,
+                    model_frame: Some(model_frame),
+                })
+                .cooks_replacement(replacement_options),
+        )?
+        .into_lrt_replacement()
     }
 
     /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_lrt_factor_level_contrast`] and [`DeseqBuilder::run`].
