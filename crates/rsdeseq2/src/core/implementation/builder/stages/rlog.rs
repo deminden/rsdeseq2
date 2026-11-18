@@ -63,7 +63,7 @@ impl DeseqBuilder {
             });
         }
 
-        let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
+        let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
         let rlog = fit.regularized_log_transform_with_options(counts, rlog_irls_options)?;
         Ok(RlogGlmMuOutput {
             rlog,

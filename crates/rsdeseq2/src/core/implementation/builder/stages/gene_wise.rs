@@ -2,20 +2,14 @@
 use super::*;
 
 impl DeseqBuilder {
-    /// Run the current linear-mu gene-wise dispersion estimator.
-    ///
-    /// This is a narrow Phase 3 stage for designs where DESeq2's
-    /// `linearMu=TRUE` branch is appropriate. It estimates size factors,
-    /// normalized counts, base row metadata, linear fitted means, and
-    /// fixed-mean gene-wise dispersions. Cox-Reid correction, iterative GLM
-    /// mean refits, trend fitting, and MAP shrinkage remain future stages.
-    pub fn fit_gene_wise_dispersions_linear_mu(
+    /// Leaf workflow behind [`DeseqBuilder::fit_gene_wise_dispersions_linear_mu`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_gene_wise_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_gene_wise_dispersions_linear_mu(counts, design));
+            return pool.install(|| self.leaf_gene_wise_dispersions_linear_mu(counts, design));
         }
 
         self.ensure_no_observation_weights("native linear-mu dispersion estimation")?;
@@ -43,22 +37,14 @@ impl DeseqBuilder {
         Ok(fit)
     }
 
-    /// Run the current GLM-mu gene-wise dispersion estimator.
-    ///
-    /// This is the first non-`linearMu` foundation for
-    /// `estimateDispersionsGeneEst`: rough/moments starts are followed by
-    /// fixed-dispersion NB GLM mean fitting and fixed-mean dispersion
-    /// optimization. Builder-supplied observation weights are preprocessed in
-    /// the same design-aware stage used by fixed-dispersion Wald/LRT paths and
-    /// then passed into both the fixed-dispersion mean fit and fixed-mean
-    /// dispersion objective.
-    pub fn fit_gene_wise_dispersions_glm_mu(
+    /// Leaf workflow behind [`DeseqBuilder::fit_gene_wise_dispersions_glm_mu`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_gene_wise_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_gene_wise_dispersions_glm_mu(counts, design));
+            return pool.install(|| self.leaf_gene_wise_dispersions_glm_mu(counts, design));
         }
 
         design.validate_full_rank("GLM-mu dispersion")?;

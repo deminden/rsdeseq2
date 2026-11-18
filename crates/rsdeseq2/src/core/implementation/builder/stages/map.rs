@@ -2,77 +2,59 @@
 use super::*;
 
 impl DeseqBuilder {
-    /// Run linear-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
-    ///
-    /// This fills final `dispersion` values using the builder's `fit_type`.
-    /// Parametric, local, and mean trends are implemented. It follows the implemented
-    /// subset of DESeq2's
-    /// `estimateDispersionsMAP(type="DESeq2")`: no observation weights and
-    /// deterministic prior-variance estimation, including the low-df
-    /// histogram/KL branch.
-    pub fn fit_map_dispersions_linear_mu(
+    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_map_dispersions_linear_mu(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_map_dispersions_linear_mu(counts, design));
+            return pool.install(|| self.leaf_map_dispersions_linear_mu(counts, design));
         }
 
-        let fit = self.fit_dispersion_trend_linear_mu(counts, design)?;
+        let fit = self.leaf_dispersion_trend_linear_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
 
-    /// Run linear-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
-    ///
-    /// This compatibility-named entry point keeps the original parametric-only
-    /// behavior even if the builder's `fit_type` is set to another value.
-    pub fn fit_map_dispersions_linear_mu_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_map_dispersions_linear_mu_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_map_dispersions_linear_mu_parametric(counts, design));
+            return pool.install(|| self.leaf_map_dispersions_linear_mu_parametric(counts, design));
         }
 
-        let fit = self.fit_parametric_dispersion_trend_linear_mu(counts, design)?;
+        let fit = self.leaf_parametric_dispersion_trend_linear_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
 
-    /// Run GLM-mu gene-wise, selected trend, prior variance, and MAP dispersion stages.
-    ///
-    /// This fills final `dispersion` values using the builder's `fit_type`.
-    /// Parametric, local, and mean trends are implemented. Builder-supplied
-    /// observation weights flow through the GLM-mu gene-wise, MAP, and native
-    /// Wald stages after DESeq2-style preprocessing.
-    pub fn fit_map_dispersions_glm_mu(
+    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_map_dispersions_glm_mu(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_map_dispersions_glm_mu(counts, design));
+            return pool.install(|| self.leaf_map_dispersions_glm_mu(counts, design));
         }
 
-        let fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
+        let fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
 
-    /// Run GLM-mu gene-wise, parametric trend, prior variance, and MAP dispersion stages.
-    ///
-    /// This compatibility-named entry point keeps parametric behavior even if
-    /// the builder's `fit_type` is set to another value.
-    pub fn fit_map_dispersions_glm_mu_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_glm_mu_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_map_dispersions_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
     ) -> Result<DeseqFit, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_map_dispersions_glm_mu_parametric(counts, design));
+            return pool.install(|| self.leaf_map_dispersions_glm_mu_parametric(counts, design));
         }
 
-        let fit = self.fit_parametric_dispersion_trend_glm_mu(counts, design)?;
+        let fit = self.leaf_parametric_dispersion_trend_glm_mu(counts, design)?;
         self.attach_map_dispersions(counts, design, fit)
     }
 
@@ -84,7 +66,7 @@ impl DeseqBuilder {
         disp_prior_var: f64,
         var_log_disp_estimates: f64,
     ) -> Result<DeseqFit, DeseqError> {
-        let fit = self.fit_gene_wise_dispersions_glm_mu(counts, design)?;
+        let fit = self.leaf_gene_wise_dispersions_glm_mu(counts, design)?;
         let fit = self.attach_existing_dispersion_trend(fit, trend)?;
         self.attach_map_dispersions_with_prior_values(
             counts,

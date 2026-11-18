@@ -1,14 +1,7 @@
 use super::*;
 impl DeseqBuilder {
-    /// Run a supplied-dispersion Wald pipeline for one coefficient.
-    ///
-    /// Analogue of `nbinomWaldTest` with caller-supplied dispersions. Contrasts
-    /// use the `fit_fixed_dispersion_wald_contrast*` variants and beta priors
-    /// the results-level beta-prior functions.
-    /// All-zero rows are skipped during GLM fitting and expanded back as
-    /// missing numeric values, matching DESeq2's `buildMatrixWithNARows`
-    /// pattern.
-    pub fn fit_fixed_dispersion_wald(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -17,7 +10,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald(counts, design, dispersions, coefficient)
+                self.leaf_fixed_dispersion_wald(counts, design, dispersions, coefficient)
             });
         }
 
@@ -43,12 +36,8 @@ impl DeseqBuilder {
         Ok((fit, wald_output.results))
     }
 
-    /// Run a supplied-dispersion Wald pipeline for a primitive numeric contrast.
-    ///
-    /// The contrast vector must contain one finite value per design
-    /// coefficient. This is the Rust primitive analogue of DESeq2's numeric
-    /// contrast path after R has resolved formula terms and coefficient names.
-    pub fn fit_fixed_dispersion_wald_contrast(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_contrast(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -57,7 +46,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_contrast(counts, design, dispersions, contrast)
+                self.leaf_fixed_dispersion_wald_contrast(counts, design, dispersions, contrast)
             });
         }
 
@@ -103,7 +92,7 @@ impl DeseqBuilder {
         if sample_levels.is_none()
             && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
         {
-            return self.fit_fixed_dispersion_wald_factor_level_contrast(
+            return self.leaf_fixed_dispersion_wald_factor_level_contrast(
                 counts,
                 design,
                 dispersions,
@@ -132,7 +121,7 @@ impl DeseqBuilder {
                     reference.as_deref(),
                     &levels,
                 )?;
-                self.fit_fixed_dispersion_wald_factor_level_contrast(
+                self.leaf_fixed_dispersion_wald_factor_level_contrast(
                     counts,
                     design,
                     dispersions,
@@ -205,7 +194,7 @@ impl DeseqBuilder {
         if let Some(factor_contrast) =
             factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return builder.fit_fixed_dispersion_wald_factor_level_contrast(
+            return builder.leaf_fixed_dispersion_wald_factor_level_contrast(
                 counts,
                 design,
                 dispersions,
@@ -221,13 +210,8 @@ impl DeseqBuilder {
         )
     }
 
-    /// Run the supplied-dispersion Wald coefficient path with Cook's replacement refit.
-    ///
-    /// This extends the replacement/refit machinery to the fixed-dispersion
-    /// core path. Dispersions remain caller-supplied for both the original fit
-    /// and the replacement-count refit; no native dispersion re-estimation or
-    /// beta-prior refit is performed here.
-    pub fn fit_fixed_dispersion_wald_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -237,7 +221,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -252,7 +236,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_fixed_dispersion_wald(counts, design, dispersions, coefficient)?;
+            raw_builder.leaf_fixed_dispersion_wald(counts, design, dispersions, coefficient)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             design,
@@ -265,7 +249,7 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_fixed_dispersion_wald(
+            let (fit, results) = refit_builder.leaf_fixed_dispersion_wald(
                 &refit_plan.replacement.replaced_counts,
                 design,
                 dispersions,
@@ -307,8 +291,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run the supplied-dispersion Wald numeric-contrast path with Cook's replacement refit.
-    pub fn fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -318,7 +302,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -332,7 +316,7 @@ impl DeseqBuilder {
             .clone()
             .disable_cooks_cutoff()
             .disable_independent_filtering();
-        let (original_fit, original_results) = raw_builder.fit_fixed_dispersion_wald_contrast(
+        let (original_fit, original_results) = raw_builder.leaf_fixed_dispersion_wald_contrast(
             counts,
             design,
             dispersions,
@@ -350,7 +334,7 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_fixed_dispersion_wald_contrast(
+            let (fit, results) = refit_builder.leaf_fixed_dispersion_wald_contrast(
                 &refit_plan.replacement.replaced_counts,
                 design,
                 dispersions,
@@ -392,8 +376,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run supplied-dispersion Wald replacement refit for a named primitive contrast specification.
-    pub fn fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -403,7 +387,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -414,7 +398,7 @@ impl DeseqBuilder {
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
-        let mut output = self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(
+        let mut output = self.leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
             counts,
             design,
             dispersions,
@@ -443,7 +427,7 @@ impl DeseqBuilder {
         if sample_levels.is_none()
             && let Some(factor_contrast) = self.model_frame_factor_level_contrast(contrast)?
         {
-            return self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+            return self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
                 counts,
                 design,
                 dispersions,
@@ -473,7 +457,7 @@ impl DeseqBuilder {
                     reference.as_deref(),
                     &levels,
                 )?;
-                self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -483,7 +467,7 @@ impl DeseqBuilder {
             }
             ResultsContrast::List { .. } | ResultsContrast::Numeric(_) => {
                 let contrast_spec = contrast.as_contrast_spec();
-                self.fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -513,13 +497,14 @@ impl DeseqBuilder {
         if let Some(factor_contrast) =
             factor_level_contrast_from_model_frame(contrast, model_frame)?
         {
-            return builder.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
-                counts,
-                design,
-                dispersions,
-                factor_contrast,
-                replacement_options,
-            );
+            return builder
+                .leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                    counts,
+                    design,
+                    dispersions,
+                    factor_contrast,
+                    replacement_options,
+                );
         }
         builder.fit_fixed_dispersion_wald_results_contrast_with_cooks_replacement::<String>(
             counts,
@@ -531,12 +516,8 @@ impl DeseqBuilder {
         )
     }
 
-    /// Run a supplied-dispersion Wald pipeline for a named primitive contrast specification.
-    ///
-    /// This resolves coefficient names and DESeq2-style positive/negative
-    /// coefficient-name lists to a numeric contrast before calling
-    /// `fit_fixed_dispersion_wald_contrast`.
-    pub fn fit_fixed_dispersion_wald_contrast_spec(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_contrast_spec`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_contrast_spec(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -545,12 +526,12 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_contrast_spec(counts, design, dispersions, contrast)
+                self.leaf_fixed_dispersion_wald_contrast_spec(counts, design, dispersions, contrast)
             });
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
-        let (fit, mut results) = self.fit_fixed_dispersion_wald_contrast(
+        let (fit, mut results) = self.leaf_fixed_dispersion_wald_contrast(
             counts,
             design,
             dispersions,
@@ -564,13 +545,8 @@ impl DeseqBuilder {
         Ok((fit, results))
     }
 
-    /// Run a supplied-dispersion Wald pipeline for a factor-level contrast.
-    ///
-    /// This resolves DESeq2-shaped coefficient names from the design matrix and
-    /// applies DESeq2-style character contrast all-zero handling using
-    /// caller-supplied sample levels. Model-frame callers can use
-    /// [`Self::fit_fixed_dispersion_wald_results_contrast_from_model_frame`].
-    pub fn fit_fixed_dispersion_wald_factor_level_contrast(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_factor_level_contrast`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_factor_level_contrast(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -579,7 +555,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_factor_level_contrast(
+                self.leaf_fixed_dispersion_wald_factor_level_contrast(
                     counts,
                     design,
                     dispersions,
@@ -661,8 +637,8 @@ impl DeseqBuilder {
         Ok((fit, wald_output.results))
     }
 
-    /// Run supplied-dispersion Wald replacement refit for a factor-level contrast.
-    pub fn fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -672,7 +648,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
                     counts,
                     design,
                     dispersions,
@@ -701,7 +677,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) = raw_builder
-            .fit_fixed_dispersion_wald_factor_level_contrast(
+            .leaf_fixed_dispersion_wald_factor_level_contrast(
                 counts,
                 design,
                 dispersions,
@@ -719,7 +695,7 @@ impl DeseqBuilder {
             let mut refit_builder = raw_builder.clone();
             refit_builder.size_factor_options.supplied_size_factors =
                 Some(original_fit.size_factors.clone());
-            let (fit, results) = refit_builder.fit_fixed_dispersion_wald_factor_level_contrast(
+            let (fit, results) = refit_builder.leaf_fixed_dispersion_wald_factor_level_contrast(
                 &refit_plan.replacement.replaced_counts,
                 design,
                 dispersions,

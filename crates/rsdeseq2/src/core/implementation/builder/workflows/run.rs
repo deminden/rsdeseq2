@@ -87,7 +87,7 @@ impl DeseqBuilder {
         let counts = analysis.counts;
         match analysis.design {
             DesignInput::None => self
-                .fit_size_factors_and_base_means(counts)
+                .leaf_size_factors_and_base_means(counts)
                 .map(RunOutput::Fit),
             DesignInput::Matrix(design) => {
                 let reduced = match analysis.test {
@@ -173,13 +173,13 @@ impl DeseqBuilder {
     ) -> Result<RunOutput, DeseqError> {
         let linear = means == MeanModel::LinearMu;
         match stage {
-            Stage::SizeFactors => self.fit_size_factors_and_base_means_with_design(counts, design),
-            Stage::GeneWise if linear => self.fit_gene_wise_dispersions_linear_mu(counts, design),
-            Stage::GeneWise => self.fit_gene_wise_dispersions_glm_mu(counts, design),
-            Stage::Trend if linear => self.fit_dispersion_trend_linear_mu(counts, design),
-            Stage::Trend => self.fit_dispersion_trend_glm_mu(counts, design),
-            Stage::Map if linear => self.fit_map_dispersions_linear_mu(counts, design),
-            Stage::Map => self.fit_map_dispersions_glm_mu(counts, design),
+            Stage::SizeFactors => self.leaf_size_factors_and_base_means_with_design(counts, design),
+            Stage::GeneWise if linear => self.leaf_gene_wise_dispersions_linear_mu(counts, design),
+            Stage::GeneWise => self.leaf_gene_wise_dispersions_glm_mu(counts, design),
+            Stage::Trend if linear => self.leaf_dispersion_trend_linear_mu(counts, design),
+            Stage::Trend => self.leaf_dispersion_trend_glm_mu(counts, design),
+            Stage::Map if linear => self.leaf_map_dispersions_linear_mu(counts, design),
+            Stage::Map => self.leaf_map_dispersions_glm_mu(counts, design),
             Stage::Results => unreachable!("run_stage handles early stages only"),
         }
         .map(RunOutput::Fit)
@@ -257,54 +257,56 @@ impl DeseqBuilder {
         use CooksReplacementTestOutput::{Lrt, Wald};
         let (d, r) = (design, reduced);
         Ok(match (r, replacement, column) {
-            (None, None, Column::Coefficient(c)) => results(self.fit_wald_glm_mu(counts, d, c))?,
+            (None, None, Column::Coefficient(c)) => results(self.leaf_wald_glm_mu(counts, d, c))?,
             (None, None, Column::Numeric(v)) => {
-                results(self.fit_wald_glm_mu_contrast(counts, d, v))?
+                results(self.leaf_wald_glm_mu_contrast(counts, d, v))?
             }
             (None, None, Column::Spec(s)) => {
-                results(self.fit_wald_glm_mu_contrast_spec(counts, d, &s))?
+                results(self.leaf_wald_glm_mu_contrast_spec(counts, d, &s))?
             }
             (None, None, Column::FactorLevel(f)) => {
-                results(self.fit_wald_glm_mu_factor_level_contrast(counts, d, f))?
+                results(self.leaf_wald_glm_mu_factor_level_contrast(counts, d, f))?
             }
             (None, Some(o), Column::Coefficient(c)) => replaced(Wald(
-                self.fit_wald_glm_mu_with_cooks_replacement(counts, d, c, o)?,
+                self.leaf_wald_glm_mu_with_cooks_replacement(counts, d, c, o)?,
             )),
             (None, Some(o), Column::Numeric(v)) => replaced(Wald(
-                self.fit_wald_glm_mu_contrast_with_cooks_replacement(counts, d, v, o)?,
+                self.leaf_wald_glm_mu_contrast_with_cooks_replacement(counts, d, v, o)?,
             )),
             (None, Some(o), Column::Spec(s)) => replaced(Wald(
-                self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(counts, d, &s, o)?,
+                self.leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(counts, d, &s, o)?,
             )),
             (None, Some(o), Column::FactorLevel(f)) => replaced(Wald(
-                self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(counts, d, f, o)?,
+                self.leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                    counts, d, f, o,
+                )?,
             )),
             (Some(r), None, Column::Coefficient(c)) => {
-                results(self.fit_lrt_glm_mu(counts, d, r, c))?
+                results(self.leaf_lrt_glm_mu(counts, d, r, c))?
             }
             (Some(r), None, Column::Numeric(v)) => {
-                results(self.fit_lrt_glm_mu_contrast(counts, d, r, v))?
+                results(self.leaf_lrt_glm_mu_contrast(counts, d, r, v))?
             }
             (Some(r), None, Column::Spec(s)) => {
-                results(self.fit_lrt_glm_mu_contrast_spec(counts, d, r, &s))?
+                results(self.leaf_lrt_glm_mu_contrast_spec(counts, d, r, &s))?
             }
             (Some(r), None, Column::FactorLevel(f)) => {
-                results(self.fit_lrt_glm_mu_factor_level_contrast(counts, d, r, f))?
+                results(self.leaf_lrt_glm_mu_factor_level_contrast(counts, d, r, f))?
             }
             (Some(r), Some(o), Column::Coefficient(c)) => replaced(Lrt(
-                self.fit_lrt_glm_mu_with_cooks_replacement(counts, d, r, c, o)?
+                self.leaf_lrt_glm_mu_with_cooks_replacement(counts, d, r, c, o)?
             )),
             (Some(r), Some(o), Column::Numeric(v)) => replaced(Lrt(
-                self.fit_lrt_glm_mu_contrast_with_cooks_replacement(counts, d, r, v, o)?
+                self.leaf_lrt_glm_mu_contrast_with_cooks_replacement(counts, d, r, v, o)?
             )),
             (Some(r), Some(o), Column::Spec(s)) => {
                 replaced(Lrt(self
-                    .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                    .leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                         counts, d, r, &s, o,
                     )?))
             }
             (Some(r), Some(o), Column::FactorLevel(f)) => replaced(Lrt(self
-                .fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+                .leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
                     counts, d, r, f, o,
                 )?)),
         })
@@ -319,17 +321,17 @@ impl DeseqBuilder {
     ) -> Result<RunOutput, DeseqError> {
         let d = design;
         results(match (reduced, column) {
-            (None, Column::Coefficient(c)) => self.fit_wald_linear_mu(counts, d, c),
-            (None, Column::Numeric(v)) => self.fit_wald_linear_mu_contrast(counts, d, v),
-            (None, Column::Spec(s)) => self.fit_wald_linear_mu_contrast_spec(counts, d, &s),
+            (None, Column::Coefficient(c)) => self.leaf_wald_linear_mu(counts, d, c),
+            (None, Column::Numeric(v)) => self.leaf_wald_linear_mu_contrast(counts, d, v),
+            (None, Column::Spec(s)) => self.leaf_wald_linear_mu_contrast_spec(counts, d, &s),
             (None, Column::FactorLevel(f)) => {
-                self.fit_wald_linear_mu_factor_level_contrast(counts, d, f)
+                self.leaf_wald_linear_mu_factor_level_contrast(counts, d, f)
             }
-            (Some(r), Column::Coefficient(c)) => self.fit_lrt_linear_mu(counts, d, r, c),
-            (Some(r), Column::Numeric(v)) => self.fit_lrt_linear_mu_contrast(counts, d, r, v),
-            (Some(r), Column::Spec(s)) => self.fit_lrt_linear_mu_contrast_spec(counts, d, r, &s),
+            (Some(r), Column::Coefficient(c)) => self.leaf_lrt_linear_mu(counts, d, r, c),
+            (Some(r), Column::Numeric(v)) => self.leaf_lrt_linear_mu_contrast(counts, d, r, v),
+            (Some(r), Column::Spec(s)) => self.leaf_lrt_linear_mu_contrast_spec(counts, d, r, &s),
             (Some(r), Column::FactorLevel(f)) => {
-                self.fit_lrt_linear_mu_factor_level_contrast(counts, d, r, f)
+                self.leaf_lrt_linear_mu_factor_level_contrast(counts, d, r, f)
             }
         })
     }
@@ -347,58 +349,60 @@ impl DeseqBuilder {
         let (d, x) = (design, dispersions);
         Ok(match (reduced, replacement, column) {
             (None, None, Column::Coefficient(c)) => {
-                results(self.fit_fixed_dispersion_wald(counts, d, x, c))?
+                results(self.leaf_fixed_dispersion_wald(counts, d, x, c))?
             }
             (None, None, Column::Numeric(v)) => {
-                results(self.fit_fixed_dispersion_wald_contrast(counts, d, x, v))?
+                results(self.leaf_fixed_dispersion_wald_contrast(counts, d, x, v))?
             }
             (None, None, Column::Spec(s)) => {
-                results(self.fit_fixed_dispersion_wald_contrast_spec(counts, d, x, &s))?
+                results(self.leaf_fixed_dispersion_wald_contrast_spec(counts, d, x, &s))?
             }
             (None, None, Column::FactorLevel(f)) => {
-                results(self.fit_fixed_dispersion_wald_factor_level_contrast(counts, d, x, f))?
+                results(self.leaf_fixed_dispersion_wald_factor_level_contrast(counts, d, x, f))?
             }
             (None, Some(o), Column::Coefficient(c)) => replaced(Wald(
-                self.fit_fixed_dispersion_wald_with_cooks_replacement(counts, d, x, c, o)?,
+                self.leaf_fixed_dispersion_wald_with_cooks_replacement(counts, d, x, c, o)?,
             )),
             (None, Some(o), Column::Numeric(v)) => replaced(Wald(
-                self.fit_fixed_dispersion_wald_contrast_with_cooks_replacement(counts, d, x, v, o)?,
+                self.leaf_fixed_dispersion_wald_contrast_with_cooks_replacement(
+                    counts, d, x, v, o,
+                )?,
             )),
             (None, Some(o), Column::Spec(s)) => replaced(Wald(
-                self.fit_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_contrast_spec_with_cooks_replacement(
                     counts, d, x, &s, o,
                 )?,
             )),
             (None, Some(o), Column::FactorLevel(f)) => replaced(Wald(
-                self.fit_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
+                self.leaf_fixed_dispersion_wald_factor_level_contrast_with_cooks_replacement(
                     counts, d, x, f, o,
                 )?,
             )),
             (Some(r), None, Column::Coefficient(c)) => {
-                results(self.fit_fixed_dispersion_lrt(counts, d, r, x, c))?
+                results(self.leaf_fixed_dispersion_lrt(counts, d, r, x, c))?
             }
             (Some(r), None, Column::Numeric(v)) => {
-                results(self.fit_fixed_dispersion_lrt_contrast(counts, d, r, x, v))?
+                results(self.leaf_fixed_dispersion_lrt_contrast(counts, d, r, x, v))?
             }
             (Some(r), None, Column::Spec(s)) => {
-                results(self.fit_fixed_dispersion_lrt_contrast_spec(counts, d, r, x, &s))?
+                results(self.leaf_fixed_dispersion_lrt_contrast_spec(counts, d, r, x, &s))?
             }
             (Some(r), None, Column::FactorLevel(f)) => {
-                results(self.fit_fixed_dispersion_lrt_factor_level_contrast(counts, d, r, x, f))?
+                results(self.leaf_fixed_dispersion_lrt_factor_level_contrast(counts, d, r, x, f))?
             }
             (Some(r), Some(o), Column::Coefficient(c)) => replaced(Lrt(
-                self.fit_fixed_dispersion_lrt_with_cooks_replacement(counts, d, r, x, c, o)?
+                self.leaf_fixed_dispersion_lrt_with_cooks_replacement(counts, d, r, x, c, o)?
             )),
             (Some(r), Some(o), Column::Numeric(v)) => replaced(Lrt(self
-                .fit_fixed_dispersion_lrt_contrast_with_cooks_replacement(
+                .leaf_fixed_dispersion_lrt_contrast_with_cooks_replacement(
                     counts, d, r, x, v, o,
                 )?)),
             (Some(r), Some(o), Column::Spec(s)) => replaced(Lrt(self
-                .fit_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
+                .leaf_fixed_dispersion_lrt_contrast_spec_with_cooks_replacement(
                     counts, d, r, x, &s, o,
                 )?)),
             (Some(r), Some(o), Column::FactorLevel(f)) => replaced(Lrt(self
-                .fit_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
+                .leaf_fixed_dispersion_lrt_factor_level_contrast_with_cooks_replacement(
                     counts, d, r, x, f, o,
                 )?)),
         })
