@@ -2,9 +2,9 @@
 //! user-defined function callback is part of this numerical interface.
 use crate::errors::DeseqError;
 use crate::errors::invalid_options;
-#[cfg(feature = "formula")]
+#[cfg(feature = "icu")]
 use icu_collator::{Collator, CollatorBorrowed};
-#[cfg(feature = "formula")]
+#[cfg(feature = "icu")]
 use icu_locale::Locale;
 use std::cmp::Ordering;
 
@@ -226,7 +226,7 @@ pub(super) struct Evaluator<'a> {
 /// or byte order for R's "C" collation.
 pub(super) enum StringOrder {
     Bytes,
-    #[cfg(feature = "formula")]
+    #[cfg(feature = "icu")]
     Collator(Box<CollatorBorrowed<'static>>),
 }
 
@@ -235,7 +235,7 @@ impl StringOrder {
         if collation == "C" {
             return Ok(Self::Bytes);
         }
-        #[cfg(feature = "formula")]
+        #[cfg(feature = "icu")]
         {
             Ok(Self::Collator(Box::new(
                 Collator::try_new(
@@ -248,7 +248,7 @@ impl StringOrder {
                 .map_err(|e| invalid_options(e.to_string()))?,
             )))
         }
-        #[cfg(not(feature = "formula"))]
+        #[cfg(not(feature = "icu"))]
         {
             Err(DeseqError::UnsupportedFeature {
                 feature: format!(
@@ -261,7 +261,7 @@ impl StringOrder {
     pub(super) fn compare(&self, left: &str, right: &str) -> Ordering {
         match self {
             Self::Bytes => left.cmp(right),
-            #[cfg(feature = "formula")]
+            #[cfg(feature = "icu")]
             Self::Collator(collator) => collator.compare(left, right),
         }
     }
@@ -347,7 +347,8 @@ impl Evaluator<'_> {
     }
 }
 
-pub(crate) fn arguments<'a, T>(
+#[doc(hidden)]
+pub fn arguments<'a, T>(
     args: &'a [(Option<String>, T)],
     formals: &[&str],
 ) -> Result<Vec<Option<&'a T>>, DeseqError> {

@@ -98,9 +98,13 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 - The numeric foundation (`errors`, `math`, `matrix`, `glm::nb`, numeric
   profiles, special functions and distributions) moved into a new
-  `rsdeseq2-base` crate. `rsdeseq2` depends on it and re-exports every public
-  path unchanged, so no user code changes; releases now publish
-  `rsdeseq2-base` before `rsdeseq2`, and the R package vendors both.
+  `rsdeseq2-base` crate, formula evaluation and design matrices
+  (`rsdeseq2::design`) into `rsdeseq2-formula`, and the empirical-Bayes
+  shrinkage engines (`rsdeseq2::shrinkage`) into `rsdeseq2-shrink`.
+  `rsdeseq2` depends on them and re-exports every public path unchanged, so no
+  user code changes, and its `formula` and `shrinkage` features work as
+  before. Releases publish the four crates together, and the R package
+  vendors all four.
 
 - rlog now fits its sample-effect GLM with the settings DESeq2's `rlogData`
   passes to `fitNbinomGLMs` (`betaTol = 1e-4`, no optim fallback), available as

@@ -27,8 +27,8 @@ def source_identity():
     return subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
 
 
-# Workspace crates published to crates.io, in dependency order.
-PUBLISHED_CRATES = ['rsdeseq2', 'rsdeseq2-base']
+# Workspace crates published to crates.io (sorted; cargo publishes them in dependency order).
+PUBLISHED_CRATES = ['rsdeseq2', 'rsdeseq2-base', 'rsdeseq2-formula', 'rsdeseq2-shrink']
 
 
 def check_files(root, files):

@@ -430,7 +430,8 @@ pub(super) fn numeric_interaction_coefficient_name(
     format!("{left_numeric}:{right_numeric}")
 }
 
-pub(crate) fn r_like_name_candidates(raw: &str) -> Vec<String> {
+#[doc(hidden)]
+pub fn r_like_name_candidates(raw: &str) -> Vec<String> {
     let made = r_like_make_name(raw);
     if made == raw {
         vec![raw.to_string()]
@@ -439,7 +440,8 @@ pub(crate) fn r_like_name_candidates(raw: &str) -> Vec<String> {
     }
 }
 
-pub(crate) fn r_like_make_name(raw: &str) -> String {
+#[doc(hidden)]
+pub fn r_like_make_name(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len().max(1));
     for ch in raw.chars() {
         if ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' {

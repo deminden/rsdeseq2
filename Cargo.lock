@@ -971,8 +971,6 @@ dependencies = [
  "clap",
  "criterion",
  "csv",
- "icu_collator",
- "icu_locale",
  "libm",
  "nalgebra",
  "proptest",
@@ -980,6 +978,8 @@ dependencies = [
  "rcompat-lbfgsb",
  "rcompat-locfit",
  "rsdeseq2-base",
+ "rsdeseq2-formula",
+ "rsdeseq2-shrink",
  "same-file",
  "serde",
  "serde_json",
@@ -997,6 +997,28 @@ dependencies = [
  "libm",
  "statrs",
  "thiserror",
+]
+
+[[package]]
+name = "rsdeseq2-formula"
+version = "0.5.0"
+dependencies = [
+ "icu_collator",
+ "icu_locale",
+ "rsdeseq2-base",
+]
+
+[[package]]
+name = "rsdeseq2-shrink"
+version = "0.5.0"
+dependencies = [
+ "libm",
+ "nalgebra",
+ "rcompat-lbfgsb",
+ "rsdeseq2-base",
+ "rsdeseq2-formula",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

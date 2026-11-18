@@ -26,7 +26,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Line coverage (lib and integration tests)
         run: |
-          cargo llvm-cov --locked --no-report -p rsdeseq2-base --lib
+          cargo llvm-cov --locked --no-report -p rsdeseq2-base -p rsdeseq2-formula -p rsdeseq2-shrink --lib
           cargo llvm-cov --locked --no-report -p rsdeseq2 --lib --test integration
           cargo llvm-cov report --summary-only | tee coverage-summary.txt
           cargo llvm-cov report --lcov --output-path lcov.info

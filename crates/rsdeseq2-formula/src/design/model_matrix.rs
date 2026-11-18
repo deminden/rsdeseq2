@@ -70,13 +70,15 @@ struct Piece {
 
 /// An explicit column layout supplied by a native term parser. It uses the
 /// same variable preparation and product evaluation as the R-style term plan.
-pub(crate) struct PlannedColumn {
+#[doc(hidden)]
+pub struct PlannedColumn {
     pub name: String,
     pub assignment: usize,
     pub pieces: Vec<ColumnPiece>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ColumnPiece {
+#[doc(hidden)]
+pub struct ColumnPiece {
     pub variable: usize,
     pub column: usize,
     pub full: bool,
@@ -95,7 +97,8 @@ pub struct ModelMatrixPlan<'a> {
     response_dropped: bool,
 }
 impl<'a> ModelMatrixPlan<'a> {
-    pub(crate) fn column_layout(&self) -> Vec<Vec<ColumnPiece>> {
+    #[doc(hidden)]
+    pub fn column_layout(&self) -> Vec<Vec<ColumnPiece>> {
         self.columns
             .iter()
             .map(|column| {
@@ -110,7 +113,8 @@ impl<'a> ModelMatrixPlan<'a> {
             })
             .collect()
     }
-    pub(crate) fn piece_name(&self, piece: &ColumnPiece) -> String {
+    #[doc(hidden)]
+    pub fn piece_name(&self, piece: &ColumnPiece) -> String {
         let variable = &self.variables[piece.variable];
         let suffix = match &variable.data {
             VariableData::Factor { levels, .. } if piece.full => &levels[piece.column],
@@ -118,7 +122,8 @@ impl<'a> ModelMatrixPlan<'a> {
         };
         format!("{}{suffix}", variable.name)
     }
-    pub(crate) fn from_columns(
+    #[doc(hidden)]
+    pub fn from_columns(
         samples: usize,
         variables: &[ModelMatrixVariable<'a>],
         columns: Vec<PlannedColumn>,

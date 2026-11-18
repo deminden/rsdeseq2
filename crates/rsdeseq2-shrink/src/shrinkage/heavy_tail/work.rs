@@ -43,7 +43,8 @@ impl PosteriorWorkControl {
         self.interrupt = Some((std::thread::current().id(), check));
         self
     }
-    pub(crate) fn check(&self) -> Result<(), DeseqError> {
+    #[doc(hidden)]
+    pub fn check(&self) -> Result<(), DeseqError> {
         if self.cancellation.is_cancelled() {
             return Err(scoped_invalid_options(
                 ERROR_SCOPE,

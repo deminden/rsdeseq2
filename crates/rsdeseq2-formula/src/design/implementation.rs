@@ -116,4 +116,5 @@ use formula_validation::*;
 // Shared design validation and coefficient-name helpers.
 #[path = "implementation/validation.rs"]
 mod validation;
-pub(crate) use validation::*;
+#[doc(hidden)]
+pub use validation::*;
