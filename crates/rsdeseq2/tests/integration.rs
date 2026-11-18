@@ -28,6 +28,8 @@ mod ashr_output;
 mod auto_dispersion;
 #[path = "base_mean.rs"]
 mod base_mean;
+#[path = "beta_prior_run.rs"]
+mod beta_prior_run;
 #[path = "bounded_posterior.rs"]
 mod bounded_posterior;
 #[path = "breadth_end_to_end.rs"]

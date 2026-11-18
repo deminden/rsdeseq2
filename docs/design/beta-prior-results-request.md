@@ -1,7 +1,8 @@
 # Design note 4.3d — one beta-prior Wald results entry point
 
-Status: **proposal, waiting for approval** (2026-11-18). Nothing is
-implemented; the shape follows the approved `run` design (note 4.2).
+Status: **beta prior on `run` implemented** (2026-11-18). Denis chose the
+`run` option ("yes, if original DESeq offers it": DESeq2 has
+`DESeq(betaPrior = TRUE)`). The request-type collapse below is not done.
 
 ## Problem
 
@@ -76,3 +77,43 @@ data once.
    `DeseqBuilder::run` instead (DESeq2's `DESeq(betaPrior = TRUE)`), with
    these functions kept only as low-level primitives?
 2. Keep one output enum, or keep the five per-design result structs?
+
+## Implemented: `Analysis::beta_prior`
+
+`Analysis::formula(&counts, formula).beta_prior(true)` runs DESeq2's
+`DESeq(betaPrior = TRUE)` and returns `RunOutput::BetaPrior`
+(`BetaPriorRunOutput`: fit, results, expanded design, `betaPriorVar`,
+expanded MAP fit and contrast). It follows `nbinomWaldTest(betaPrior = TRUE)`
+with the expanded model matrix (`fitGLMsWithPrior`, `estimateBetaPriorVar`,
+`addAllContrasts`, `averagePriorsOverLevels`); see
+`core/implementation/builder/beta_prior.rs`.
+
+- Prior variances come from the MLE fold changes of the *standard* design,
+  plus every pairwise difference between a factor's non-reference levels,
+  averaged over each factor and assigned to all its expanded level columns.
+- Cook's distances use the standard-design MLE fit's means and hat
+  diagonals, as in DESeq2.
+- The reported column is the expanded contrast equal to the requested
+  standard column (`condition_B_vs_A` is `conditionB - conditionA`).
+- Not supported, with an error: matrix designs, LRT, fixed dispersions,
+  early stages, interaction terms (DESeq2 rejects these too), Cook's
+  replacement, and sample-level factor contrasts.
+
+Against R 4.6.2 / DESeq2 1.52.0 `DESeq(betaPrior = TRUE,
+minReplicatesForReplace = Inf)` on `three_vs_three` (`~ condition`) and
+`many_samples` (`~ batch + condition`, 500 samples): `betaPriorVar` within
+1e-12 relative, every result field within 7e-12 relative, identical
+missingness, 0 flips at padj < 0.1 (`tests/beta_prior_run.rs`).
+
+## Finding: the expanded primitives do not reproduce `DESeq(betaPrior = TRUE)`
+
+The 40 `fit_expanded_*_beta_prior_wald_*` functions (and the CLI's
+`--beta-prior-expanded-design` path) estimate the prior variances from an
+MLE fit on the *expanded* design and report coefficients "collapsed" onto the
+standard design by averaging expanded columns. DESeq2 estimates the
+variances from the standard-design MLE (above) and reports expanded
+contrasts. On `three_vs_three` the primitives give a prior variance of
+2.97/3.13 where DESeq2 gives 0.53, and log2 fold changes 40 % smaller than
+DESeq2's. They have no end-to-end DESeq2 reference. Options: deprecate them in
+favour of `run`, or re-base them on the `run` implementation; this needs
+Denis's decision.

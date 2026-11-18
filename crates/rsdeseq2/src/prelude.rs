@@ -13,12 +13,12 @@ pub use crate::cooks::{
     replace_outlier_counts, robust_method_of_moments_dispersion, samples_for_cooks,
 };
 pub use crate::core::{
-    Analysis, CooksReplacementLrtOutput, CooksReplacementTestOutput, CooksReplacementWaldOutput,
-    CountMatrix, CountsSummary, DEFAULT_FAST_VST_NSUB, DeseqBuilder, DeseqFit, DesignInput,
-    DispersionRequest, FastVstGlmMuMetadata, FastVstGlmMuOutput, FrozenRlogGlmMuMetadata,
-    FrozenRlogGlmMuOutput, MeanModel, Replacement, ResultColumn, RlogDesignMode, RlogGlmMuMetadata,
-    RlogGlmMuOutput, RunOutput, Stage, TestRequest, VstFullDataReason, VstGlmMuMetadata,
-    VstGlmMuOutput, VstTrendSource,
+    Analysis, BetaPriorRunOutput, CooksReplacementLrtOutput, CooksReplacementTestOutput,
+    CooksReplacementWaldOutput, CountMatrix, CountsSummary, DEFAULT_FAST_VST_NSUB, DeseqBuilder,
+    DeseqFit, DesignInput, DispersionRequest, FastVstGlmMuMetadata, FastVstGlmMuOutput,
+    FrozenRlogGlmMuMetadata, FrozenRlogGlmMuOutput, MeanModel, Replacement, ResultColumn,
+    RlogDesignMode, RlogGlmMuMetadata, RlogGlmMuOutput, RunOutput, Stage, TestRequest,
+    VstFullDataReason, VstGlmMuMetadata, VstGlmMuOutput, VstTrendSource,
 };
 pub use crate::design::{
     DesignMatrix, DesignOrigin, ExpandedAdditiveFactorDesign, ExpandedFactorDesign,

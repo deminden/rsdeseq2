@@ -9,6 +9,7 @@ use crate::contrasts::{ContrastSpec, FactorLevelContrast, ResultsContrast};
 use crate::cooks::CooksReplacementOptions;
 use crate::design::{DesignMatrix, FormulaModelFrame};
 use crate::errors::DeseqError;
+use crate::glm::NbinomGlmFit;
 use crate::options::FitType;
 use crate::results::DeseqResults;
 
@@ -150,6 +151,12 @@ pub struct Analysis<'a> {
     pub stop_after: Stage,
     /// Dispersion trend type for this run; `None` uses the builder's.
     pub fit_type: Option<FitType>,
+    /// Shrink the log fold changes with DESeq2's beta prior
+    /// (`DESeq(betaPrior = TRUE)`): an expanded model matrix with a
+    /// zero-centred normal prior whose variance is estimated from the MLE
+    /// fold changes. Needs a formula design without interactions, the Wald
+    /// test and estimated dispersions.
+    pub beta_prior: bool,
 }
 
 impl<'a> Analysis<'a> {
@@ -179,6 +186,7 @@ impl<'a> Analysis<'a> {
             replacement: Replacement::Off,
             stop_after: Stage::Results,
             fit_type: None,
+            beta_prior: false,
         }
     }
 
@@ -239,6 +247,13 @@ impl<'a> Analysis<'a> {
         self.fit_type = Some(fit_type);
         self
     }
+
+    /// Use DESeq2's beta prior (`DESeq(betaPrior = TRUE)`); see
+    /// [`Analysis::beta_prior`](Self#structfield.beta_prior).
+    pub fn beta_prior(mut self, beta_prior: bool) -> Self {
+        self.beta_prior = beta_prior;
+        self
+    }
 }
 
 /// The output of [`DeseqBuilder::run`](super::DeseqBuilder::run).
@@ -265,6 +280,28 @@ pub enum RunOutput {
     },
     /// A full run with Cook's replacement.
     Replacement(CooksReplacementTestOutput),
+    /// A full run with DESeq2's beta prior ([`Analysis::beta_prior`]).
+    BetaPrior(BetaPriorRunOutput),
+}
+
+/// The output of a run with DESeq2's beta prior (`DESeq(betaPrior = TRUE)`).
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct BetaPriorRunOutput {
+    /// Fit state. Its GLM fields hold the MLE fit on the standard design,
+    /// which DESeq2 uses for Cook's distances and the prior variances.
+    pub fit: DeseqFit,
+    /// Result rows from the expanded-model MAP fit.
+    pub results: DeseqResults,
+    /// The expanded model matrix (one column per factor level).
+    pub expanded_design: DesignMatrix,
+    /// Beta prior variances on the log2 scale, one per expanded column
+    /// (DESeq2's `attr(dds, "betaPriorVar")`).
+    pub beta_prior_variance: Vec<f64>,
+    /// The MAP fit on the expanded design.
+    pub expanded_fit: NbinomGlmFit,
+    /// The reported contrast over the expanded columns.
+    pub expanded_contrast: Vec<f64>,
 }
 
 impl RunOutput {
@@ -274,6 +311,7 @@ impl RunOutput {
             Self::Fit(_) => None,
             Self::Results { results, .. } => Some(results),
             Self::Replacement(output) => Some(output.results()),
+            Self::BetaPrior(output) => Some(&output.results),
         }
     }
 
@@ -286,6 +324,7 @@ impl RunOutput {
                 CooksReplacementTestOutput::Wald(output) => &output.original_fit,
                 CooksReplacementTestOutput::Lrt(output) => &output.original_fit,
             },
+            Self::BetaPrior(output) => &output.fit,
         }
     }
 
@@ -298,6 +337,7 @@ impl RunOutput {
                 let (fit, results, _plan) = output.into_merged_fit()?;
                 Ok((fit, Some(results)))
             }
+            Self::BetaPrior(output) => Ok((output.fit, Some(output.results))),
         }
     }
 }

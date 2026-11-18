@@ -200,7 +200,10 @@ pub fn integer_covariate(value: f64) -> Result<f64, DeseqError> {
 
 // Scalar mean used by polynomial construction. Binary64 reduction and the
 // correction/overflow fallback are explicit and shared across all frontends.
-pub(super) fn scalar_mean(values: &[f64]) -> f64 {
+/// R's `mean()` for doubles under the active numeric profile (two-pass,
+/// extended precision under `r-linux-x86_64`).
+#[doc(hidden)]
+pub fn scalar_mean(values: &[f64]) -> f64 {
     if crate::numeric::profile::r_linux_x86() {
         extended::mean(values)
     } else {

@@ -7,6 +7,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `Analysis::beta_prior(true)`: DESeq2's `DESeq(betaPrior = TRUE)` through
+  `run` (expanded model matrix, prior variances from the standard-design MLE
+  fold changes as in `estimateBetaPriorVar`), returning
+  `RunOutput::BetaPrior(BetaPriorRunOutput)`. Matches R's DESeq2 1.52.0 to
+  1e-11 relative with no significance flips on two reference designs.
+  Formula designs without interactions, Wald test, estimated dispersions and
+  no Cook's replacement.
+
 - `local_vst_inverse_factor_mean(Offsets)` and
   `vst_with_dispersion_trend_and_offsets`.
 

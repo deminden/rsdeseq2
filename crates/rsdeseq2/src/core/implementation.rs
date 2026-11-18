@@ -73,6 +73,10 @@ mod fixed_lrt;
 #[path = "implementation/builder/normalization_components.rs"]
 mod normalization_components;
 
+// DESeq2's beta prior (`DESeq(betaPrior = TRUE)`) for `run`.
+#[path = "implementation/builder/beta_prior.rs"]
+mod beta_prior;
+
 // Explicit-path `fit*` methods, each a `run` request.
 #[path = "implementation/builder/leaf_forwarders.rs"]
 mod leaf_forwarders;

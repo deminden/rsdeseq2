@@ -126,12 +126,7 @@ fn initialize_profile() -> NumericProfile {
         .filter(|profile| profile.is_available())
         .unwrap_or_else(NumericProfile::host_default);
     // Another thread may have set the profile meanwhile; keep theirs.
-    let _ = PROFILE.compare_exchange(
-        UNSET,
-        encode(profile),
-        Ordering::Relaxed,
-        Ordering::Relaxed,
-    );
+    let _ = PROFILE.compare_exchange(UNSET, encode(profile), Ordering::Relaxed, Ordering::Relaxed);
     numeric_profile()
 }
 
