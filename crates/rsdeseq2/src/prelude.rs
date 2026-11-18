@@ -35,12 +35,15 @@ pub use crate::diagnostics::{
     Deseq2McolsDiagnosticColumn, Deseq2McolsDiagnosticValues, Deseq2McolsDiagnostics,
     Deseq2McolsDiagnosticsDataFrame, DiagnosticSummary,
 };
+// The fit_dispersion_{line_search,grid}* wrappers are deprecated; they stay
+// in the prelude until their removal in 0.7.0.
+#[allow(deprecated)]
 pub use crate::dispersion::{
-    DispersionLineSearchOutput, DispersionPrior, DispersionPriorVarianceOutput, DispersionTrendFit,
-    GeneWiseDispersionFitMethod, GeneWiseDispersionInput, GeneWiseDispersionOptions,
-    GeneWiseDispersionOutput, LocalDispersionTrend, LocalDispersionTrendFit,
-    LocalDispersionTrendOptions, MapDispersionInput, MapDispersionOptions, MapDispersionOutput,
-    MeanDispersionTrend, MeanDispersionTrendFit, MeanDispersionTrendOptions,
+    DispersionFitInput, DispersionLineSearchOutput, DispersionPrior, DispersionPriorVarianceOutput,
+    DispersionTrendFit, GeneWiseDispersionFitMethod, GeneWiseDispersionInput,
+    GeneWiseDispersionOptions, GeneWiseDispersionOutput, LocalDispersionTrend,
+    LocalDispersionTrendFit, LocalDispersionTrendOptions, MapDispersionInput, MapDispersionOptions,
+    MapDispersionOutput, MeanDispersionTrend, MeanDispersionTrendFit, MeanDispersionTrendOptions,
     ParametricDispersionTrend, ParametricDispersionTrendFit, ParametricDispersionTrendOptions,
     WeightedDispersionFitInput, cox_reid_adjustment, cox_reid_adjustment_derivative,
     cox_reid_adjustment_derivative_weighted, cox_reid_adjustment_second_derivative,
@@ -69,11 +72,12 @@ pub use crate::dispersion::{
     fit_dispersion_line_search_no_cr_with_prior_and_weights, fit_dispersion_line_search_with_prior,
     fit_dispersion_line_search_with_prior_and_weights, fit_dispersion_trend,
     fit_local_dispersion_trend, fit_mean_dispersion_trend, fit_parametric_dispersion_trend,
-    initial_dispersion_estimates, linear_model_mu, local_trend_use_for_fit,
-    log_dispersion_residuals_above_min, mad_squared, map_dispersion_initial_value,
-    map_dispersion_outlier, mean_trend_use_for_fit, mean_trend_use_for_mean,
-    moments_dispersion_estimates, moments_dispersion_estimates_with_normalization_factors,
-    parametric_trend_use_for_fit, rough_dispersion_estimates,
+    grid_search_dispersion, initial_dispersion_estimates, line_search_dispersion, linear_model_mu,
+    local_trend_use_for_fit, log_dispersion_residuals_above_min, mad_squared,
+    map_dispersion_initial_value, map_dispersion_outlier, mean_trend_use_for_fit,
+    mean_trend_use_for_mean, moments_dispersion_estimates,
+    moments_dispersion_estimates_with_normalization_factors, parametric_trend_use_for_fit,
+    rough_dispersion_estimates,
 };
 pub use crate::errors::{DeseqError, ErrorKind};
 pub use crate::glm::{

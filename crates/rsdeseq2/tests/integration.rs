@@ -62,6 +62,8 @@ mod design;
 mod design_rank;
 #[path = "diagnostics.rs"]
 mod diagnostics;
+#[path = "dispersion_fit_input.rs"]
+mod dispersion_fit_input;
 #[path = "dispersion_gene_est.rs"]
 mod dispersion_gene_est;
 #[path = "dispersion_map.rs"]

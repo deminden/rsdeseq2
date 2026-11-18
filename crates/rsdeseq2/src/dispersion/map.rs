@@ -1,10 +1,7 @@
 use crate::design::DesignMatrix;
 use crate::dispersion::gene_est::{
-    DispersionPrior, GeneWiseDispersionFitMethod, GeneWiseDispersionOptions,
-    WeightedDispersionFitInput, fit_dispersion_grid_with_prior,
-    fit_dispersion_grid_with_prior_and_weights, fit_dispersion_line_search_no_cr_with_prior,
-    fit_dispersion_line_search_no_cr_with_prior_and_weights, fit_dispersion_line_search_with_prior,
-    fit_dispersion_line_search_with_prior_and_weights,
+    DispersionFitInput, DispersionPrior, GeneWiseDispersionFitMethod, GeneWiseDispersionOptions,
+    grid_search_dispersion, line_search_dispersion,
 };
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountMatrix;
@@ -155,81 +152,32 @@ pub fn estimate_map_dispersions(
             .observation_weights
             .map(|weights| weights.row(gene))
             .transpose()?;
-        let line_search = if options.use_cox_reid {
-            match weight_row {
-                Some(weights) => {
-                    fit_dispersion_line_search_with_prior_and_weights(WeightedDispersionFitInput {
-                        counts: input.counts.row(gene)?,
-                        mu: row_mu,
-                        design: input.design,
-                        initial_dispersion: initial,
-                        options: optimizer_options,
-                        n_samples: input.counts.n_samples(),
-                        prior,
-                        weights,
-                    })?
-                }
-                None => fit_dispersion_line_search_with_prior(
-                    input.counts.row(gene)?,
-                    row_mu,
-                    input.design,
-                    initial,
-                    optimizer_options,
-                    input.counts.n_samples(),
-                    prior,
-                )?,
-            }
+        let mut fit_input = DispersionFitInput::new(
+            input.counts.row(gene)?,
+            row_mu,
+            initial,
+            optimizer_options,
+            input.counts.n_samples(),
+        )
+        .prior(prior);
+        if let Some(weights) = weight_row {
+            fit_input = fit_input.weights(weights);
+        }
+        // Without Cox-Reid the line search gets no design; the grid fallback
+        // always gets one, as in DESeq2's estimateDispersionsMAP.
+        let line_search = line_search_dispersion(if options.use_cox_reid {
+            fit_input.design(input.design)
         } else {
-            match weight_row {
-                Some(weights) => fit_dispersion_line_search_no_cr_with_prior_and_weights(
-                    input.counts.row(gene)?,
-                    row_mu,
-                    initial,
-                    optimizer_options,
-                    input.counts.n_samples(),
-                    prior,
-                    weights,
-                )?,
-                None => fit_dispersion_line_search_no_cr_with_prior(
-                    input.counts.row(gene)?,
-                    row_mu,
-                    initial,
-                    optimizer_options,
-                    input.counts.n_samples(),
-                    prior,
-                )?,
-            }
-        };
+            fit_input
+        })?;
         let line_converged = line_search.iter < options.maxit;
         let mut map_value = line_search.dispersion;
         if !line_converged {
-            map_value = match weight_row {
-                Some(weights) => {
-                    fit_dispersion_grid_with_prior_and_weights(WeightedDispersionFitInput {
-                        counts: input.counts.row(gene)?,
-                        mu: row_mu,
-                        design: input.design,
-                        initial_dispersion: map_value,
-                        options: optimizer_options,
-                        n_samples: input.counts.n_samples(),
-                        prior,
-                        weights,
-                    })?
-                    .0
-                }
-                None => {
-                    fit_dispersion_grid_with_prior(
-                        input.counts.row(gene)?,
-                        row_mu,
-                        input.design,
-                        map_value,
-                        optimizer_options,
-                        input.counts.n_samples(),
-                        prior,
-                    )?
-                    .0
-                }
-            };
+            map_value = grid_search_dispersion(DispersionFitInput {
+                initial_dispersion: map_value,
+                ..fit_input.design(input.design)
+            })?
+            .0;
         }
         if !map_value.is_finite() || map_value <= 0.0 {
             return Err(DeseqError::InvalidDispersion {

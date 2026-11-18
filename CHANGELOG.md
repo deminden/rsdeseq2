@@ -7,6 +7,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `DispersionFitInput` with `line_search_dispersion` and
+  `grid_search_dispersion`: one input struct (counts, means, optional design,
+  prior and weights) for a single gene's dispersion fit, in place of twelve
+  argument-combination functions.
+
 - `DeseqBuilder::run(&Analysis) -> RunOutput`: one entry point for the
   whole pipeline. `Analysis` holds the design (matrix, formula, or none for
   size factors only), the test, fixed or estimated dispersions, the mean
@@ -126,6 +131,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- The twelve `fit_dispersion_{line_search,grid}{,_with_prior,_with_prior_and_weights}`
+  and `_no_cr` variants: use `line_search_dispersion` or
+  `grid_search_dispersion` with a `DispersionFitInput`. `_no_cr` is a
+  `DispersionFitInput` without a design. Output is unchanged; removal in 0.7.0.
 
 - All 140 `DeseqBuilder::fit*` methods (for example `fit_with_results`,
   `fit_lrt_with_results`, `fit_wald_glm_mu_contrast_spec`,

@@ -5,8 +5,9 @@ pub mod map;
 pub mod prior;
 pub mod trend;
 
+#[allow(deprecated)]
 pub use gene_est::{
-    DispersionLineSearchOutput, DispersionPrior, GeneWiseDispersionFitMethod,
+    DispersionFitInput, DispersionLineSearchOutput, DispersionPrior, GeneWiseDispersionFitMethod,
     GeneWiseDispersionInput, GeneWiseDispersionOptions, GeneWiseDispersionOutput,
     WeightedDispersionFitInput, cox_reid_adjustment, cox_reid_adjustment_derivative,
     cox_reid_adjustment_derivative_weighted, cox_reid_adjustment_second_derivative,
@@ -31,9 +32,10 @@ pub use gene_est::{
     fit_dispersion_line_search, fit_dispersion_line_search_no_cr,
     fit_dispersion_line_search_no_cr_with_prior,
     fit_dispersion_line_search_no_cr_with_prior_and_weights, fit_dispersion_line_search_with_prior,
-    fit_dispersion_line_search_with_prior_and_weights, initial_dispersion_estimates,
-    linear_model_mu, moments_dispersion_estimates,
-    moments_dispersion_estimates_with_normalization_factors, rough_dispersion_estimates,
+    fit_dispersion_line_search_with_prior_and_weights, grid_search_dispersion,
+    initial_dispersion_estimates, line_search_dispersion, linear_model_mu,
+    moments_dispersion_estimates, moments_dispersion_estimates_with_normalization_factors,
+    rough_dispersion_estimates,
 };
 
 pub use prior::{

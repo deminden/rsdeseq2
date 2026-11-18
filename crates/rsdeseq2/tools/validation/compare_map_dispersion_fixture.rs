@@ -273,14 +273,16 @@ fn run_line_search_trace(
     let options = GeneWiseDispersionOptions::default();
     for (gene_idx, gene) in genes.iter().enumerate() {
         let prior = DispersionPrior::new(selected[gene]["dispFit"].ln(), disp_prior_var)?;
-        let fit = fit_dispersion_line_search_with_prior(
-            counts.row(gene_idx)?,
-            mu.row(gene_idx)?,
-            design,
-            selected[gene]["dispInit"],
-            options,
-            counts.n_samples(),
-            prior,
+        let fit = line_search_dispersion(
+            DispersionFitInput::new(
+                counts.row(gene_idx)?,
+                mu.row(gene_idx)?,
+                selected[gene]["dispInit"],
+                options,
+                counts.n_samples(),
+            )
+            .design(design)
+            .prior(prior),
         )?;
         trace.log_alpha.push(fit.log_alpha);
         trace.iter.push(fit.iter);
