@@ -315,6 +315,7 @@ pub(crate) fn fit_offsets_irls_for_output(
         design.matrix().as_slice(),
     );
     let initial_lu = (x.transpose() * &x).lu();
+    let initial_beta = InitialBeta::for_design(design)?;
     let shared_log_offsets = match normalization_factors {
         Offsets::PerSample(factors) => {
             Some(factors.iter().copied().map(f64::ln).collect::<Vec<_>>())
@@ -363,6 +364,7 @@ pub(crate) fn fit_offsets_irls_for_output(
                     counts,
                     x: &x,
                     initial_lu: &initial_lu,
+                    initial_beta,
                     normalization_factors,
                     dispersions,
                     weights,
@@ -513,6 +515,7 @@ struct IrlsRowInput<'a> {
     counts: &'a CountMatrix,
     x: &'a DMatrix<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
+    initial_beta: InitialBeta,
     normalization_factors: Offsets<'a>,
     dispersions: &'a [f64],
     weights: Option<&'a RowMajorMatrix<f64>>,
