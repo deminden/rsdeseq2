@@ -103,6 +103,9 @@ jobs:
         env:
           RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
+      - name: Fail on skipped or failing R tests
+        if: matrix.lane == 'reference'
+        run: Rscript --vanilla scripts/validation/check_no_skipped_r_tests.R rsdeseq2.Rcheck r-pkg/rsdeseq2/tests/testthat
       - name: Check actual posterior interruption and interpreter reuse
         if: matrix.lane == 'reference'
         run: python scripts/validation/check_posterior_interruption.py --rscript "$(command -v Rscript)" --r-library rsdeseq2.Rcheck
