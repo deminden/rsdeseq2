@@ -1,5 +1,6 @@
 //! Stable gamma normalization and chi-square tails.
 use super::quadrature::integrate_positive_tail;
+use crate::numeric::math::ProfileMath;
 
 // log Gamma(a+1/2) - log Gamma(a) - (1/2)log(a), a>=32.
 // Bernoulli-polynomial gamma-ratio expansion, DLMF 5.11.13.
@@ -55,7 +56,7 @@ pub(crate) fn stirling_correction(mut a: f64) -> f64 {
 // Stable remainder log(1+x)-x, needed in gamma and beta log densities.
 pub(crate) fn log1pmx(x: f64) -> f64 {
     if x.abs() > 0.125 {
-        return x.ln_1p() - x;
+        return x.ln_1p_p() - x;
     }
     let mut term = -0.5 * x * x;
     let mut sum = term;
@@ -90,7 +91,7 @@ pub(crate) fn large_shape_chi_square_tail(statistic: f64, df: f64) -> f64 {
         if u <= -1.0 {
             return 0.0;
         }
-        0.3989422804014327 * (-correction + a * log1pmx(u) - u.ln_1p()).exp()
+        0.3989422804014327 * (-correction + a * log1pmx(u) - u.ln_1p_p()).exp_p()
     });
     (if lower { 1.0 - integral } else { integral }).clamp(0.0, 1.0)
 }
@@ -99,13 +100,12 @@ pub(crate) fn large_shape_chi_square_tail(statistic: f64, df: f64) -> f64 {
 // argument is an upper-tail probability, including the small complementary
 // probability used by DESeq2/R's large-df F approximation.
 pub(super) fn chi_square_upper_quantile(upper: f64, df: f64) -> f64 {
-    use statrs::distribution::{ChiSquared, ContinuousCDF};
     if df == 2.0 {
-        return -2.0 * upper.ln();
+        return -2.0 * upper.ln_p();
     }
-    let distribution = match ChiSquared::new(df) {
-        Ok(value) => value,
-        Err(_) => return f64::NAN,
+    let distribution = match crate::numeric::special::GammaDistribution::chi_squared(df) {
+        Some(value) => value,
+        None => return f64::NAN,
     };
     let survival = |x: f64| {
         if df >= 64.0 {
@@ -115,17 +115,17 @@ pub(super) fn chi_square_upper_quantile(upper: f64, df: f64) -> f64 {
         }
     };
     let mut low = -740.0;
-    let mut high = (df + 1.0).ln() + 8.0;
+    let mut high = (df + 1.0).ln_p() + 8.0;
     for _ in 0..96 {
         let mid = low + (high - low) * 0.5;
         if mid == low || mid == high {
             break;
         }
-        if survival(mid.exp()) > upper {
+        if survival(mid.exp_p()) > upper {
             low = mid;
         } else {
             high = mid;
         }
     }
-    (low + 0.5 * (high - low)).exp()
+    (low + 0.5 * (high - low)).exp_p()
 }

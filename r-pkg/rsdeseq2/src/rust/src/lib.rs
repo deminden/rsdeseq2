@@ -41,6 +41,7 @@ pub extern "C" fn rsdeseq2_r_last_error() -> *const c_char {
 /// is caught at the FFI boundary, recorded as the last error and replaced by
 /// `fallback`, so unwinding never crosses into C.
 fn guard_value<T>(fallback: T, operation: impl FnOnce() -> T) -> T {
+    use_r_profile();
     match catch_unwind(AssertUnwindSafe(operation)) {
         Ok(value) => value,
         Err(_) => {
@@ -50,7 +51,19 @@ fn guard_value<T>(fallback: T, operation: impl FnOnce() -> T) -> T {
     }
 }
 
+/// The R package reproduces R's DESeq2 on the host, so it selects the host's R
+/// profile once unless the user chose one through `RSDESEQ2_NUMERIC_PROFILE`.
+fn use_r_profile() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        if std::env::var_os("RSDESEQ2_NUMERIC_PROFILE").is_none() {
+            let _ = rsdeseq2::set_numeric_profile(rsdeseq2::NumericProfile::r_host());
+        }
+    });
+}
+
 fn run_backend(operation: impl FnOnce() -> Result<(), String>) -> i32 {
+    use_r_profile();
     match catch_unwind(AssertUnwindSafe(operation)) {
         Ok(Ok(())) => 0,
         Ok(Err(error)) => {

@@ -1,5 +1,6 @@
 //! Private numerical regression tests.
 use super::*;
+use crate::numeric::math::ProfileMath;
 use approx::assert_relative_eq;
 use serde::Deserialize;
 
@@ -97,7 +98,7 @@ fn optim_start_preserves_backup_qr_natural_log_values() {
     let nf = [1.0, 1.0];
     let start = optim_start_beta_log2(&[f64::NAN], &x, &counts, &nf, 30.0).unwrap();
 
-    assert_relative_eq!(start[0], 9.1_f64.ln(), epsilon = 1e-14);
+    assert_relative_eq!(start[0], 9.1_f64.ln_p(), epsilon = 1e-14);
 }
 
 #[test]
@@ -182,7 +183,7 @@ fn beta_objective_uses_log2_mu_and_nb_kernel_without_gamma_constants() {
         beta_log2_objective_gradient_hessian(&input, &[1.0]).unwrap();
     let size = 2.0_f64;
     let mu = 4.0_f64;
-    let expected = (3.0 + size) * (size + mu).ln() - size * size.ln() - 3.0 * mu.ln();
+    let expected = (3.0 + size) * (size + mu).ln_p() - size * size.ln_p() - 3.0 * mu.ln_p();
     let expected_gradient = std::f64::consts::LN_2 * (mu - 3.0) / (1.0 + 0.5 * mu);
     let expected_hessian =
         std::f64::consts::LN_2.powi(2) * mu * (1.0 + 0.5 * 3.0) / (1.0 + 0.5 * mu).powi(2);

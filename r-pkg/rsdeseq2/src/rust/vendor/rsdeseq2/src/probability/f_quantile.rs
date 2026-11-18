@@ -1,6 +1,7 @@
 //! Fixed Cook's F quantile from a stable beta-logistic density.
 use super::gamma::{chi_square_upper_quantile, log1pmx, stirling_correction};
 use super::quadrature::integrate_positive_tail;
+use crate::numeric::math::ProfileMath;
 
 fn expm1mx(x: f64) -> f64 {
     let mut term = 0.5 * x * x;
@@ -17,9 +18,9 @@ fn expm1mx(x: f64) -> f64 {
 
 fn logistic_loss(y: f64, p: f64) -> f64 {
     if y.abs() < 0.1 {
-        log1pmx(p * y.exp_m1()) + p * expm1mx(y)
+        log1pmx(p * y.exp_m1_p()) + p * expm1mx(y)
     } else {
-        (p * y.exp_m1()).ln_1p() - p * y
+        (p * y.exp_m1_p()).ln_1p_p() - p * y
     }
 }
 
@@ -37,11 +38,11 @@ pub(crate) fn f_99_quantile(df1: f64, df2: f64) -> f64 {
 
     // Closed exponential/beta cases avoid an unnecessary inversion.
     if df1 == 2.0 {
-        let value = (0.5 * df2) * (-2.0 * (1.0_f64 - 0.99).ln() / df2).exp_m1();
+        let value = (0.5 * df2) * (-2.0 * (1.0_f64 - 0.99).ln_p() / df2).exp_m1_p();
         return from_inverse_beta(value, df1, df2);
     }
     if df2 == 2.0 {
-        let value = 1.0 / ((0.5 * df1) * (-2.0 * 0.99_f64.ln() / df1).exp_m1());
+        let value = 1.0 / ((0.5 * df1) * (-2.0 * 0.99_f64.ln_p() / df1).exp_m1_p());
         return from_inverse_beta(value, df1, df2);
     }
     let mut a = 0.5 * df1;
@@ -58,7 +59,7 @@ pub(crate) fn f_99_quantile(df1: f64, df2: f64) -> f64 {
     // large and unequal df. Reflection changes only the log-density argument.
     let density = |z: f64| {
         let y = sigma * if reflected { -z } else { z };
-        0.3989422804014327 * (correction - total * logistic_loss(y, p)).exp()
+        0.3989422804014327 * (correction - total * logistic_loss(y, p)).exp_p()
     };
     let upper_tail = |z: f64| integrate_positive_tail(|s| density(z + s));
     let target = 1.0 - 0.99;
@@ -81,7 +82,7 @@ pub(crate) fn f_99_quantile(df1: f64, df2: f64) -> f64 {
             high = mid;
         }
     }
-    from_inverse_beta((sigma * (low + 0.5 * (high - low))).exp(), df1, df2)
+    from_inverse_beta((sigma * (low + 0.5 * (high - low))).exp_p(), df1, df2)
 }
 
 // Assemble the F quantile through its inverse-beta representation, as qf

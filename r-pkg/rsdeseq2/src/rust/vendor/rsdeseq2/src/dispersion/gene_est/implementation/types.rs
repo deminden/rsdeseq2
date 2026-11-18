@@ -1,6 +1,6 @@
 use super::*;
+pub(super) use crate::numeric::special::{digamma, ln_gamma};
 pub(super) use nalgebra::DMatrix;
-pub(super) use statrs::function::gamma::{digamma, ln_gamma};
 
 pub(super) use crate::design::DesignMatrix;
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};

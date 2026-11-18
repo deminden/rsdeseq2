@@ -1,6 +1,6 @@
 use crate::numeric::checked;
+use crate::numeric::special::standard_normal_pdf;
 use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
-use statrs::distribution::{Continuous, Normal};
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::inference::GlmInferenceView;
@@ -356,7 +356,6 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
     if threshold == 0.0 {
         return Some(two_sided_normal_pvalue(abs_beta / beta_se));
     }
-    let distribution = Normal::new(0.0, 1.0).ok()?;
     let a = checked_shifted_stat(abs_beta, threshold, beta_se)?;
     let b = checked_shifted_stat(abs_beta, -threshold, beta_se)?;
     let denominator = checked::sub(b, a)?;
@@ -367,9 +366,9 @@ fn greater_abs_upshot_normal_pvalue(abs_beta: f64, beta_se: f64, threshold: f64)
         scale,
         checked::scaled_sum(&[
             checked::mul(-a, left_tail_a)?,
-            distribution.pdf(a),
+            standard_normal_pdf(a),
             checked::mul(b, left_tail_b)?,
-            -distribution.pdf(b),
+            -standard_normal_pdf(b),
         ])?,
     )?;
     clamp_probability(value)

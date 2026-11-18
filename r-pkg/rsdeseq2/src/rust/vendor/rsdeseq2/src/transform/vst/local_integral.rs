@@ -1,5 +1,6 @@
 use super::*;
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 
 #[derive(Clone, Debug)]
 pub(super) struct LocalVstIntegral {
@@ -18,7 +19,7 @@ impl LocalVstIntegral {
         let max_asinh = max_count.asinh();
         let mut grid = Vec::with_capacity(grid_len - 1);
         for step in 1..grid_len {
-            let value = (max_asinh * step as f64 / (grid_len as f64 - 1.0)).sinh();
+            let value = (max_asinh * step as f64 / (grid_len as f64 - 1.0)).sinh_p();
             grid.push(value);
         }
         let dispersions = trend.evaluate_many_allow_missing(&grid)?;

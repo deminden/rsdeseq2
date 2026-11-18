@@ -3,6 +3,7 @@
 use super::numerics::validate_positive_mean;
 use super::selection::{local_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::numeric::math::ProfileMath;
 use rcompat_locfit::{Kernel, LocalFit, LocalRegressionConfig, PredictionMethod};
 
 /// Options for the pure-Rust local log-dispersion trend.
@@ -64,9 +65,9 @@ impl LocalDispersionTrend {
         }
         let predicted = self
             .rcompat_fit()?
-            .predict_one(mean.ln())
+            .predict_one(mean.ln_p())
             .map_err(rcompat_local_dispersion_error)?;
-        let dispersion = predicted.exp();
+        let dispersion = predicted.exp_p();
         if !dispersion.is_finite() || dispersion <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
                 reason: "local dispersion trend produced a non-finite or non-positive fitted value"
@@ -113,9 +114,9 @@ impl LocalDispersionTrend {
             .map(|mean| {
                 if mean.is_finite() && mean > 0.0 {
                     let predicted = trend
-                        .predict_one(mean.ln())
+                        .predict_one(mean.ln_p())
                         .map_err(rcompat_local_dispersion_error)?;
-                    let dispersion = predicted.exp();
+                    let dispersion = predicted.exp_p();
                     if !dispersion.is_finite() || dispersion <= 0.0 {
                         return Err(DeseqError::InvalidDispersion {
                             reason: "local dispersion trend produced a non-finite or non-positive fitted value"
@@ -131,7 +132,7 @@ impl LocalDispersionTrend {
     }
 
     fn single_row_dispersion(&self) -> Result<f64, DeseqError> {
-        let dispersion = self.log_disps[0].exp();
+        let dispersion = self.log_disps[0].exp_p();
         if !dispersion.is_finite() || dispersion <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
                 reason: "local dispersion trend produced a non-finite or non-positive fitted value"
@@ -232,7 +233,7 @@ pub fn fit_local_dispersion_trend(
             .zip(use_for_fit.iter().copied())
         {
             if used {
-                local_rows.push((mean.ln(), disp.ln(), mean));
+                local_rows.push((mean.ln_p(), disp.ln_p(), mean));
             }
         }
     }

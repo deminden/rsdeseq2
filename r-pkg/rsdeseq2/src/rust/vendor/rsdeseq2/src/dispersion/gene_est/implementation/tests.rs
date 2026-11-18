@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 use approx::assert_relative_eq;
 
 #[test]
@@ -139,7 +140,7 @@ fn mu_alpha_terms_keep_overflowed_product_finite() {
 fn dispersion_derivatives_keep_overflowed_mu_alpha_products_finite() {
     let counts = [0, 10];
     let mu = [f64::MAX / 2.0, f64::MAX / 3.0];
-    let log_alpha = 4.0_f64.ln();
+    let log_alpha = 4.0_f64.ln_p();
 
     let derivative =
         dispersion_nb_log_likelihood_kernel_derivative(&counts, &mu, log_alpha).unwrap();
@@ -233,7 +234,7 @@ fn dispersion_prior_log_density_rejects_overflowed_residual_square() {
 fn dispersion_kernel_keeps_small_mu_alpha_terms_stable() {
     let counts = [0, 1, 2];
     let mu = [1.0e-6, 2.0e-6, 3.0e-6];
-    let log_alpha = 1.0e-8_f64.ln();
+    let log_alpha = 1.0e-8_f64.ln_p();
 
     let kernel = dispersion_nb_log_likelihood_kernel(&counts, &mu, log_alpha).unwrap();
     let derivative =

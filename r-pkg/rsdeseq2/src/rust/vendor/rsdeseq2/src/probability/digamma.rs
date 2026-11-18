@@ -1,4 +1,5 @@
 //! Positive digamma via DLMF 5.5 recurrence and 5.11 Bernoulli expansion.
+use crate::numeric::math::ProfileMath;
 pub(crate) fn digamma_positive(mut x: f64) -> f64 {
     if x == f64::INFINITY {
         return x;
@@ -13,7 +14,7 @@ pub(crate) fn digamma_positive(mut x: f64) -> f64 {
     }
     let inv = 1.0 / x;
     let square = inv * inv;
-    correction + x.ln()
+    correction + x.ln_p()
         - 0.5 * inv
         - square
             * (1.0 / 12.0

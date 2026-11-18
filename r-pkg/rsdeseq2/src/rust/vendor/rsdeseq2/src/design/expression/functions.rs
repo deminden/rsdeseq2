@@ -1,5 +1,6 @@
 use super::{Argument, Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
+use crate::numeric::math::ProfileMath;
 
 pub(super) fn supported(name: &str) -> bool {
     matches!(
@@ -249,17 +250,17 @@ impl Evaluator<'_> {
             .map(|&v| match name {
                 "log" => {
                     if base == 2.0 {
-                        v.log2()
+                        v.log2_p()
                     } else if base == 10.0 {
-                        v.log10()
+                        v.log10_p()
                     } else if base == std::f64::consts::E {
-                        v.ln()
+                        v.ln_p()
                     } else {
-                        v.ln() / base.ln()
+                        v.ln_p() / base.ln_p()
                     }
                 }
-                "log2" => v.log2(),
-                "log10" => v.log10(),
+                "log2" => v.log2_p(),
+                "log10" => v.log10_p(),
                 "log1p" => crate::math::elementary::language_log1p(v),
                 "exp" => crate::math::elementary::language_exp(v),
                 "expm1" => crate::math::elementary::language_expm1(v),

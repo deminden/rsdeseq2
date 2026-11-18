@@ -9,6 +9,7 @@ use super::{
     regression_expression::RestrictedRegressionLikelihood,
 };
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 use crate::{DeseqError, matrix::MatrixView};
 use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb_with_gradient};
@@ -337,7 +338,7 @@ impl GeneralRow<'_> {
                             .enumerate()
                             .map(|(j, b)| self.design.at(i, j) * b)
                             .sum::<f64>();
-                        let a = parameters[0] / (1.0 + (-eta).exp());
+                        let a = parameters[0] / (1.0 + (-eta).exp_p());
                         let b = parameters[0] - a;
                         super::beta_binomial::log_rising(a, y)
                             + super::beta_binomial::log_rising(b, parameters[i + 1] - y)
@@ -361,7 +362,7 @@ impl GeneralRow<'_> {
                         density::negative_binomial(
                             y,
                             1.0 / dispersion,
-                            (linear + self.offsets[i]).exp(),
+                            (linear + self.offsets[i]).exp_p(),
                         )
                     })
                     .collect()

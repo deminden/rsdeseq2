@@ -1,5 +1,6 @@
 use super::*;
 use crate::matrix::try_alloc_matrix;
+use crate::numeric::math::ProfileMath;
 pub(super) fn formula_size_factor_offsets(
     counts: &CountMatrix,
     size_factors: &[f64],
@@ -236,7 +237,7 @@ pub(super) fn formula_offset_scales(
         .copied()
         .enumerate()
         .map(|(sample, offset)| {
-            let scale = offset.exp();
+            let scale = offset.exp_p();
             if !scale.is_finite() || scale <= 0.0 {
                 return Err(DeseqError::InvalidOptions {
                     reason: format!(

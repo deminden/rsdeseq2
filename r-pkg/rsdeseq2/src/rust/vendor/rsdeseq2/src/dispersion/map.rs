@@ -7,6 +7,7 @@ use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 use rayon::prelude::*;
 
 /// One gene's MAP fit, assigned to the output vectors in gene order.
@@ -146,7 +147,7 @@ pub fn estimate_map_dispersions(
         let gene_est = input.disp_gene_est[gene];
         let fit = input.disp_fit[gene];
         let initial = map_dispersion_initial_value(gene_est, fit)?;
-        let prior = DispersionPrior::new(fit.ln(), input.disp_prior_var)?;
+        let prior = DispersionPrior::new(fit.ln_p(), input.disp_prior_var)?;
         let row_mu = input.mu.row(gene)?;
         let weight_row = input
             .observation_weights
@@ -265,7 +266,7 @@ pub fn map_dispersion_outlier(
     {
         return false;
     }
-    let residual = checked::try_sub(disp_gene_est.ln(), disp_fit.ln())
+    let residual = checked::try_sub(disp_gene_est.ln_p(), disp_fit.ln_p())
         .nonfinite_at("MAP dispersion outlier log residual", None)
         .ok();
     let threshold = checked::try_mul(outlier_sd, var_log_disp_estimates.sqrt())
@@ -380,7 +381,7 @@ fn validate_map_inputs(
 
 fn validate_map_options(options: MapDispersionOptions, n_samples: usize) -> Result<(), DeseqError> {
     validate_positive_scalar(options.min_disp, "MAP min_disp")?;
-    if (options.min_disp / 10.0).ln() <= -30.0 {
+    if (options.min_disp / 10.0).ln_p() <= -30.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "log(min_disp / 10) must be above -30 for numerical stability".to_string(),
         });

@@ -1,7 +1,8 @@
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::{median_finite, trigamma};
 use crate::numeric::checked::{self, CheckedExt};
-use statrs::distribution::{ChiSquared, ContinuousCDF, Normal};
+use crate::numeric::math::ProfileMath;
+use crate::numeric::special::{GammaDistribution, standard_normal_inverse_cdf};
 
 const LOW_DF_HIST_MIN: f64 = -10.0;
 const LOW_DF_HIST_MAX: f64 = 10.0;
@@ -134,7 +135,7 @@ pub fn log_dispersion_residuals_above_min(
             let above_min = gene_est >= min_disp * 100.0;
             above_min_disp.push(above_min);
             if above_min {
-                residuals.push((gene_est / fit).ln());
+                residuals.push((gene_est / fit).ln_p());
             }
         } else if gene_est.is_nan() || fit.is_nan() {
             above_min_disp.push(false);
@@ -326,7 +327,7 @@ fn kl_divergence(observed: &[f64], simulated: &[f64]) -> Result<f64, DeseqError>
             .nonfinite_at("low-df dispersion KL simulated bin", None)?;
         let ratio = checked::try_div(obs_adjusted, sim_adjusted)
             .nonfinite_at("low-df dispersion KL bin ratio", None)?;
-        let log_ratio = ratio.ln();
+        let log_ratio = ratio.ln_p();
         if !log_ratio.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "low-df dispersion KL log ratio".to_string(),
@@ -346,22 +347,20 @@ fn low_df_quasi_samples(
     residual_degrees_of_freedom: usize,
     n: usize,
 ) -> Result<(Vec<f64>, Vec<f64>), DeseqError> {
-    let chi_squared = ChiSquared::new(residual_degrees_of_freedom as f64).map_err(|err| {
-        DeseqError::InvalidDispersion {
-            reason: format!("failed to construct low-df chi-squared distribution: {err}"),
-        }
-    })?;
-    let normal = Normal::new(0.0, 1.0).map_err(|err| DeseqError::InvalidDispersion {
-        reason: format!("failed to construct low-df normal distribution: {err}"),
-    })?;
-    let log_df = (residual_degrees_of_freedom as f64).ln();
+    let chi_squared = GammaDistribution::chi_squared(residual_degrees_of_freedom as f64)
+        .ok_or_else(|| DeseqError::InvalidDispersion {
+            reason: format!(
+                "failed to construct low-df chi-squared distribution: {residual_degrees_of_freedom} degrees of freedom"
+            ),
+        })?;
+    let log_df = (residual_degrees_of_freedom as f64).ln_p();
     let mut base_samples = Vec::with_capacity(n);
     let mut normal_samples = Vec::with_capacity(n);
     for idx in 1..=n {
         let u_chi = clamp_probability(halton(idx, 2));
         let u_norm = clamp_probability(halton(idx, 3));
-        base_samples.push(chi_squared.inverse_cdf(u_chi).ln() - log_df);
-        normal_samples.push(normal.inverse_cdf(u_norm));
+        base_samples.push(chi_squared.inverse_cdf(u_chi).ln_p() - log_df);
+        normal_samples.push(standard_normal_inverse_cdf(u_norm));
     }
     Ok((base_samples, normal_samples))
 }

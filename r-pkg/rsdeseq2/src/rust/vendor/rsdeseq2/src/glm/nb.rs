@@ -1,4 +1,5 @@
-use statrs::function::gamma::ln_gamma;
+use crate::numeric::math::ProfileMath;
+use crate::numeric::special::ln_gamma;
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::CountMatrix;
@@ -238,15 +239,15 @@ fn count_log_term(y: f64, mu_dispersion: f64) -> f64 {
     if y == 0.0 || (mu_dispersion.is_infinite() && mu_dispersion.is_sign_positive()) {
         0.0
     } else {
-        -y * mu_dispersion.recip().ln_1p()
+        -y * mu_dispersion.recip().ln_1p_p()
     }
 }
 
 fn log1p_mu_dispersion(mu: f64, dispersion: f64, mu_dispersion: f64) -> f64 {
     if mu_dispersion.is_finite() {
-        mu_dispersion.ln_1p()
+        mu_dispersion.ln_1p_p()
     } else {
-        mu.ln() + dispersion.ln()
+        mu.ln_p() + dispersion.ln_p()
     }
 }
 

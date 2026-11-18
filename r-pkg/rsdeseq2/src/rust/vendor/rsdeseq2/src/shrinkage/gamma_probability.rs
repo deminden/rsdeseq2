@@ -1,9 +1,10 @@
 //! Positive incomplete-gamma log probabilities from series and continued fractions.
+use crate::numeric::math::ProfileMath;
 fn log_complement(log: f64) -> f64 {
     if log < -std::f64::consts::LN_2 {
-        (-log.exp()).ln_1p()
+        (-log.exp_p()).ln_1p_p()
     } else {
-        (-log.exp_m1()).ln()
+        (-log.exp_m1_p()).ln_p()
     }
 }
 
@@ -20,7 +21,7 @@ pub(super) fn log_gamma_probability(a: f64, x: f64, lower: bool) -> f64 {
     if a >= 1e5 {
         return super::large_shape::gamma_log_probability(a, x, lower);
     }
-    let front = a * x.ln() - x - statrs::function::gamma::ln_gamma(a);
+    let front = a * x.ln_p() - x - crate::numeric::special::ln_gamma(a);
     let (value, direct_lower) = if x < a + 1.0 {
         let mut term = 1.0 / a;
         let mut sum = term;
@@ -29,9 +30,9 @@ pub(super) fn log_gamma_probability(a: f64, x: f64, lower: bool) -> f64 {
             sum += term;
             if term.abs() <= f64::EPSILON * sum.abs() {
                 return if lower {
-                    front + sum.ln()
+                    front + sum.ln_p()
                 } else {
-                    log_complement(front + sum.ln())
+                    log_complement(front + sum.ln_p())
                 };
             }
         }
@@ -57,7 +58,7 @@ pub(super) fn log_gamma_probability(a: f64, x: f64, lower: bool) -> f64 {
             let delta = d * c;
             fraction *= delta;
             if (delta - 1.0).abs() <= f64::EPSILON {
-                let log = front + fraction.ln();
+                let log = front + fraction.ln_p();
                 return if lower { log_complement(log) } else { log };
             }
         }
@@ -84,18 +85,18 @@ pub(super) fn gamma_probability(a: f64, x: f64, lower: bool) -> f64 {
             let term = coefficient / (a + n);
             sum += term;
             if term.abs() <= f64::EPSILON * sum.abs() {
-                let log_scale = a * x.ln() - statrs::function::gamma::ln_gamma(a + 1.0);
+                let log_scale = a * x.ln_p() - crate::numeric::special::ln_gamma(a + 1.0);
                 return if lower {
-                    (1.0 + sum) * log_scale.exp()
+                    (1.0 + sum) * log_scale.exp_p()
                 } else {
-                    let delta = log_scale.exp_m1();
+                    let delta = log_scale.exp_m1_p();
                     -(sum + delta + sum * delta)
                 };
             }
         }
         f64::NAN
     } else {
-        log_gamma_probability(a, x, lower).exp()
+        log_gamma_probability(a, x, lower).exp_p()
     }
 }
 
@@ -110,6 +111,6 @@ mod tests {
         }
         let x = 0.001;
         let p = log_gamma_probability(1.0, x, true);
-        assert!((p - (-(-x).exp_m1()).ln()).abs() < 1e-13);
+        assert!((p - (-(-x).exp_m1_p()).ln_p()).abs() < 1e-13);
     }
 }

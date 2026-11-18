@@ -2,6 +2,7 @@
 use super::super::expression_likelihood::{scalar, validate};
 use super::{density, prior::ERROR_SCOPE};
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 use crate::{
     DeseqError,
     design::expression::{self, Argument, Data, EvaluationOptions, Expression, Value},
@@ -274,7 +275,7 @@ fn distribution(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, D
                     ),
                     _ => unreachable!(),
                 };
-                if log { value } else { value.exp() }
+                if log { value } else { value.exp_p() }
             })
             .collect(),
     );

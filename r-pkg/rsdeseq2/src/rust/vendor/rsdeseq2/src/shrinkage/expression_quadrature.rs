@@ -1,4 +1,5 @@
 //! Adaptive Gauss integration for imported elementwise density expressions.
+use crate::numeric::math::ProfileMath;
 use crate::probability::quadrature::GAUSS_LEGENDRE_16;
 fn panel(f: &impl Fn(f64) -> f64, a: f64, b: f64) -> f64 {
     let middle = (a + b) / 2.0;
@@ -41,7 +42,7 @@ pub(super) fn integrate(f: impl Fn(f64) -> f64, a: f64, b: f64) -> Option<f64> {
             return f(t);
         }
         if a.is_infinite() && b.is_infinite() {
-            let q = (std::f64::consts::PI * (t - 0.5)).tan();
+            let q = (std::f64::consts::PI * (t - 0.5)).tan_p();
             return f(q) * std::f64::consts::PI * (1.0 + q * q);
         }
         let q = t / (1.0 - t);

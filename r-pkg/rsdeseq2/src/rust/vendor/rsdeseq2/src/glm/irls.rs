@@ -1,4 +1,5 @@
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 use crate::numeric::validate::{
     nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
 };
@@ -387,7 +388,7 @@ pub(crate) fn fit_offsets_irls_for_output(
     let initial_beta = InitialBeta::for_design(design)?;
     let shared_log_offsets = match normalization_factors {
         Offsets::PerSample(factors) => {
-            Some(factors.iter().copied().map(f64::ln).collect::<Vec<_>>())
+            Some(factors.iter().copied().map(f64::ln_p).collect::<Vec<_>>())
         }
         Offsets::PerCell(_) => None,
     };

@@ -1,5 +1,6 @@
 //! Finite truncated-normal mixtures for the optional shrinkage migration.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "truncated-normal mixture";
 use super::truncated_standard::{log_phi, scaled_mean, scaled_sd};
 use crate::probability::normal_upper_tail;
@@ -86,7 +87,7 @@ impl TruncatedNormalMixture {
             ));
         }
         Ok(Self {
-            log_weights: weights.into_iter().map(f64::ln).collect(),
+            log_weights: weights.into_iter().map(f64::ln_p).collect(),
             means,
             sds,
             lower,
@@ -117,7 +118,7 @@ impl TruncatedNormalMixture {
         for ((&sd, &a), &b) in self.sds.iter().zip(&self.lower).zip(&self.upper) {
             let v = sd * sd + variance;
             let marginal_sd = v.sqrt();
-            let density = log_phi(estimate / marginal_sd) - marginal_sd.ln();
+            let density = log_phi(estimate / marginal_sd) - marginal_sd.ln_p();
             let value = if sd == 0.0 {
                 density
             } else {
@@ -126,11 +127,12 @@ impl TruncatedNormalMixture {
                 if a == b {
                     // Match the established point-boundary limit, rather than
                     // replacing the supplied component by a different prior.
-                    (log_phi(precision * b - shift).exp() / log_phi(b / sd).exp()).ln() + density
-                        - v.ln()
+                    (log_phi(precision * b - shift).exp_p() / log_phi(b / sd).exp_p()).ln_p()
+                        + density
+                        - v.ln_p()
                 } else {
-                    (cdf(precision * b - shift) - cdf(precision * a - shift)).ln() + density
-                        - (cdf(b / sd) - cdf(a / sd)).ln()
+                    (cdf(precision * b - shift) - cdf(precision * a - shift)).ln_p() + density
+                        - (cdf(b / sd) - cdf(a / sd)).ln_p()
                 }
             };
             result.push(value);

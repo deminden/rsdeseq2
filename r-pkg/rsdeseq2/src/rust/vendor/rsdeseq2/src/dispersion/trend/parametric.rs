@@ -7,6 +7,7 @@ use super::numerics::{
 use super::selection::{parametric_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 
 const PARAMETRIC_WLS_SUM_CONTEXT: &str = "parametric dispersion weighted least-squares sums";
 
@@ -444,7 +445,7 @@ pub(super) fn gamma_deviance(
         let relative_delta = ratio - 1.0;
         checked_add_assign(
             &mut deviance,
-            2.0 * (relative_delta - relative_delta.ln_1p()),
+            2.0 * (relative_delta - relative_delta.ln_1p_p()),
             "parametric dispersion gamma deviance",
         )?;
     }
@@ -487,10 +488,10 @@ pub(super) fn parametric_coefficient_change(
     let context = "parametric dispersion coefficient change";
     let asympt_change = checked::try_div(new.asympt_disp, old.asympt_disp)
         .invalid_dispersion(context)?
-        .ln();
+        .ln_p();
     let extra_pois_change = checked::try_div(new.extra_pois, old.extra_pois)
         .invalid_dispersion(context)?
-        .ln();
+        .ln_p();
     checked::try_add(
         checked::try_mul(asympt_change, asympt_change).invalid_dispersion(context)?,
         checked::try_mul(extra_pois_change, extra_pois_change).invalid_dispersion(context)?,

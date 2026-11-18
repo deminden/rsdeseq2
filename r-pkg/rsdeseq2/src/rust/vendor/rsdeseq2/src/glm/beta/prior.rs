@@ -85,10 +85,7 @@ pub fn match_upper_quantile_for_variance(
     validate_upper_quantile(upper_quantile)?;
     let abs_betas = finite_abs_values(betas)?;
     let quantile = quantile_type7_stable(abs_betas, 1.0 - upper_quantile)?;
-    let normal = Normal::new(0.0, 1.0).map_err(|error| DeseqError::InvalidOptions {
-        reason: format!("normal quantile construction failed: {error}"),
-    })?;
-    let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
+    let normal_quantile = standard_normal_inverse_cdf(1.0 - upper_quantile / 2.0);
     let scale = quantile / normal_quantile;
     checked_square(scale).ok_or_else(|| DeseqError::InvalidOptions {
         reason: "beta prior variance quantile produced non-finite variance".to_string(),
@@ -110,10 +107,7 @@ pub fn match_weighted_upper_quantile_for_variance(
         ));
     }
     let weighted_quantile = weighted_abs_quantile(betas, weights, 1.0 - upper_quantile)?;
-    let normal = Normal::new(0.0, 1.0).map_err(|error| DeseqError::InvalidOptions {
-        reason: format!("normal quantile construction failed: {error}"),
-    })?;
-    let normal_quantile = normal.inverse_cdf(1.0 - upper_quantile / 2.0);
+    let normal_quantile = standard_normal_inverse_cdf(1.0 - upper_quantile / 2.0);
     let scale = weighted_quantile / normal_quantile;
     checked_square(scale).ok_or_else(|| DeseqError::InvalidOptions {
         reason: "weighted beta prior variance quantile produced non-finite variance".to_string(),

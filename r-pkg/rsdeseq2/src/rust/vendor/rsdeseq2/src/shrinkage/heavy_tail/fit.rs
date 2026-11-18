@@ -4,6 +4,7 @@ use super::{
     prior::{CauchyCoefficientPrior, ERROR_SCOPE, estimate_cauchy_prior_variance},
 };
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 use crate::{
     DeseqError,
     matrix::{MatrixView, RowMajorMatrix},
@@ -315,7 +316,7 @@ pub(super) fn fit_batch(
                     "positive sample-aligned size factors are required",
                 ));
             }
-            Some(s.iter().map(|v| v.ln()).collect::<Vec<_>>())
+            Some(s.iter().map(|v| v.ln_p()).collect::<Vec<_>>())
         }
         PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m) => {
             let factors = matches!(input.offsets, PosteriorOffsets::Factors(_));
@@ -457,7 +458,7 @@ pub(super) fn fit_batch(
                 .map(|i| match input.offsets {
                     PosteriorOffsets::None => 0.0,
                     PosteriorOffsets::Log(m) => *m.at(gene, i),
-                    PosteriorOffsets::Factors(m) => m.at(gene, i).ln(),
+                    PosteriorOffsets::Factors(m) => m.at(gene, i).ln_p(),
                     PosteriorOffsets::SizeFactors(_) => size_offsets.as_ref().unwrap()[i],
                 })
                 .collect(),
@@ -536,7 +537,7 @@ pub(super) fn fit_batch(
                     } else {
                         baseline.iter().map(|&i| row.counts[i]).sum::<f64>() / baseline.len() as f64
                     };
-                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln() };
+                    start[0] = if mean == 0.0 { 0.0 } else { mean.ln_p() };
                 }
                 super::regression::optimize_nb_r(&row, config, start)?
             } else {

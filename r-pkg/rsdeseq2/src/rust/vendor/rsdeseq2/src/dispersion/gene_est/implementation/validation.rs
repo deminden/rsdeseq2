@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 pub(super) fn best_log_alpha(
     objective: DispersionObjectiveInput<'_>,
     grid: &[f64],
@@ -197,7 +198,7 @@ pub(super) fn validate_gene_est_options(
             reason: "min_disp must be finite and positive".to_string(),
         });
     }
-    if (options.min_disp / 10.0).ln() <= -30.0 {
+    if (options.min_disp / 10.0).ln_p() <= -30.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "log(min_disp / 10) must be above -30 for numerical stability".to_string(),
         });
@@ -360,14 +361,22 @@ pub(super) fn mu_alpha_terms_impl<const NEED_LOG: bool>(
             "mean curvature term",
         )?;
         MuAlphaTerms {
-            log1p: if NEED_LOG { (1.0 + mu_alpha).ln() } else { 0.0 },
+            log1p: if NEED_LOG {
+                (1.0 + mu_alpha).ln_p()
+            } else {
+                0.0
+            },
             ratio,
             alpha_over_one_plus,
             mu_squared_alpha_over_one_plus_squared,
             inv_one_plus_squared,
         }
     } else {
-        let log1p = if NEED_LOG { mu.ln() + alpha.ln() } else { 0.0 };
+        let log1p = if NEED_LOG {
+            mu.ln_p() + alpha.ln_p()
+        } else {
+            0.0
+        };
         let alpha_over_one_plus = mu.recip();
         let mu_squared_alpha_over_one_plus_squared = alpha.recip();
         MuAlphaTerms {

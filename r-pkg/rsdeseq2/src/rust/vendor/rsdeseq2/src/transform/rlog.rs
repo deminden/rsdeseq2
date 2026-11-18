@@ -7,6 +7,7 @@ use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::matrix::try_alloc_matrix;
 use crate::normalization::{Offsets, normalized_counts, normalized_counts_with_factors};
+use crate::numeric::math::ProfileMath;
 
 /// Wide log2-scale prior variance used for the rlog intercept.
 ///
@@ -298,7 +299,7 @@ pub fn estimate_rlog_sample_prior_variance_with_quantile(
             });
         }
         let weight = 1.0 / variance;
-        let mean_log = (mean + 0.5).log2();
+        let mean_log = (mean + 0.5).log2_p();
         for sample in 0..normalized_counts.n_cols() {
             let value = normalized_counts
                 .get(gene, sample)
@@ -311,7 +312,7 @@ pub fn estimate_rlog_sample_prior_variance_with_quantile(
                     value,
                 });
             }
-            log_fold_changes.push((value + 0.5).log2() - mean_log);
+            log_fold_changes.push((value + 0.5).log2_p() - mean_log);
             weights.push(weight);
         }
     }
@@ -748,7 +749,7 @@ fn checked_intercept_factor(intercept: f64, gene: usize) -> Result<f64, DeseqErr
             value: intercept,
         });
     }
-    let factor = 2.0_f64.powf(intercept);
+    let factor = 2.0_f64.powf_p(intercept);
     if !factor.is_finite() || factor <= 0.0 {
         return Err(DeseqError::NonFiniteValue {
             context: "rlog frozen intercept factor".to_string(),

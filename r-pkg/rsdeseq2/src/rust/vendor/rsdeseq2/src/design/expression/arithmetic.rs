@@ -1,5 +1,6 @@
 use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
+use crate::numeric::math::ProfileMath;
 
 pub(super) fn power(x: f64, y: f64) -> f64 {
     if y == 2.0 {
@@ -26,7 +27,7 @@ pub(super) fn power(x: f64, y: f64) -> f64 {
         }
     }
     if x.is_finite() && y.is_finite() {
-        return x.powf(y);
+        return x.powf_p(y);
     }
     if x.is_nan() || y.is_nan() {
         return x + y;

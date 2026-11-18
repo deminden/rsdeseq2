@@ -1,5 +1,6 @@
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
 
@@ -99,7 +100,7 @@ pub fn estimate_size_factors_for_dataset(
             // takes it: exp and log are applied as in R.
             let geo_means = poscounts_log_geo_means(counts)?
                 .into_iter()
-                .map(f64::exp)
+                .map(f64::exp_p)
                 .collect::<Vec<_>>();
             let log_geo_means = supplied_log_geo_means(counts, &geo_means)?;
             estimate_from_log_geo_means(counts, &log_geo_means, control_genes, true)
@@ -419,7 +420,7 @@ fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
                 // compensated sum preserves the same low-order information in
                 // portable f64 arithmetic and prevents near-boundary genes
                 // from changing optimizer routes through size-factor drift.
-                let sum = checked_compensated_sum(row.iter().map(|count| f64::from(*count).ln()))
+                let sum = checked_compensated_sum(row.iter().map(|count| f64::from(*count).ln_p()))
                     .nonfinite_at("ratio geometric mean log sum", Some(gene))?;
                 checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
                     DeseqError::NonFiniteValue {
@@ -443,7 +444,7 @@ fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError>
                 let sum = checked_compensated_sum(
                     row.iter()
                         .filter(|count| **count > 0)
-                        .map(|count| f64::from(*count).ln()),
+                        .map(|count| f64::from(*count).ln_p()),
                 )
                 .nonfinite_at("poscounts geometric mean log sum", Some(gene))?;
                 checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
@@ -478,7 +479,7 @@ fn supplied_log_geo_means(counts: &CountMatrix, geo_means: &[f64]) -> Result<Vec
             } else if value == 0.0 {
                 Ok(f64::NEG_INFINITY)
             } else {
-                Ok(value.ln())
+                Ok(value.ln_p())
             }
         })
         .collect()
@@ -502,7 +503,7 @@ fn estimate_from_log_geo_means(
             let count = counts.row_values(*gene)[sample];
             if log_geo_mean.is_finite() && count > 0 {
                 log_ratios.push(
-                    checked::try_sub(f64::from(count).ln(), log_geo_mean).map_err(|error| {
+                    checked::try_sub(f64::from(count).ln_p(), log_geo_mean).map_err(|error| {
                         DeseqError::NonFiniteValue {
                             context: "size-factor log ratio".to_string(),
                             index: Some(*gene),
@@ -517,7 +518,7 @@ fn estimate_from_log_geo_means(
                 reason: format!("sample {sample} has no usable positive count ratios"),
             });
         }
-        size_factors.push(median(&log_ratios)?.exp());
+        size_factors.push(median(&log_ratios)?.exp_p());
     }
     validate_size_factors(&size_factors, counts.n_samples())?;
     if stabilize_to_geometric_mean_one {
@@ -552,7 +553,7 @@ fn usable_gene_indices(
 
 fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
     let log_sum =
-        checked_compensated_sum(size_factors.iter().map(|value| value.ln())).map_err(|_| {
+        checked_compensated_sum(size_factors.iter().map(|value| value.ln_p())).map_err(|_| {
             DeseqError::InvalidSizeFactors {
                 reason: "cannot stabilize size factors to geometric mean one".to_string(),
             }
@@ -562,7 +563,7 @@ fn stabilize_size_factors(size_factors: &mut [f64]) -> Result<(), DeseqError> {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),
         }
     })?;
-    let scale = log_mean.exp();
+    let scale = log_mean.exp_p();
     if !scale.is_finite() || scale <= 0.0 {
         return Err(DeseqError::InvalidSizeFactors {
             reason: "cannot stabilize size factors to geometric mean one".to_string(),

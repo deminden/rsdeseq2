@@ -3,6 +3,7 @@
 //! execution bridge or translation of foreign package source.
 use super::{ERROR_SCOPE, MixtureFit, MixtureOptimizer, squarem};
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 use crate::probability::digamma_positive;
 use crate::{DeseqError, matrix::MatrixView};
 use libm::lgamma as ln_gamma;
@@ -17,7 +18,7 @@ fn digamma(x: f64) -> f64 {
         return f64::NAN;
     }
     let angle = std::f64::consts::PI * x.rem_euclid(1.0);
-    digamma_positive(1.0 - x) - std::f64::consts::PI * angle.cos() / angle.sin()
+    digamma_positive(1.0 - x) - std::f64::consts::PI * angle.cos_p() / angle.sin_p()
 }
 struct Problem {
     likelihood: Vec<f64>,
@@ -39,7 +40,10 @@ impl Problem {
     fn effective(&self, state: &[f64]) -> Vec<f64> {
         if self.variational {
             let total = digamma(state.iter().sum());
-            state.iter().map(|p| (digamma(*p) - total).exp()).collect()
+            state
+                .iter()
+                .map(|p| (digamma(*p) - total).exp_p())
+                .collect()
         } else if self.compiled {
             state.to_vec()
         } else {
@@ -96,7 +100,7 @@ impl Problem {
                 if *w == 0.0 {
                     0.0
                 } else {
-                    w * (max + row.iter().zip(pi).map(|(l, p)| l * p).sum::<f64>().ln())
+                    w * (max + row.iter().zip(pi).map(|(l, p)| l * p).sum::<f64>().ln_p())
                 }
             })
             .sum()
@@ -106,7 +110,7 @@ impl Problem {
             .iter()
             .zip(pi)
             .filter(|(a, _)| **a != 1.0)
-            .map(|(a, p)| (a - 1.0) * p.ln())
+            .map(|(a, p)| (a - 1.0) * p.ln_p())
             .sum()
     }
     fn objective(&self, state: &[f64]) -> f64 {
@@ -120,7 +124,7 @@ impl Problem {
                     if *w == 0.0 {
                         0.0
                     } else {
-                        w * row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>().ln()
+                        w * row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>().ln_p()
                     }
                 })
                 .sum::<f64>()
@@ -137,11 +141,11 @@ impl Problem {
             for (i, &marginal) in marginals.iter().enumerate() {
                 let l = self.likelihood[i * self.k + j];
                 let q = l * p / marginal;
-                let term = q * (l * p).ln();
+                let term = q * (l * p).ln_p();
                 if !term.is_nan() {
                     energy += term;
                 }
-                entropy += q * q.ln();
+                entropy += q * q.ln_p();
             }
         }
         let sum = state.iter().sum::<f64>();
@@ -246,7 +250,7 @@ pub(super) fn fit(
             ));
         }
         row_maxima.push(max);
-        likelihood.extend(row.iter().map(|v| (v - max).exp()));
+        likelihood.extend(row.iter().map(|v| (v - max).exp_p()));
     }
     let mut initial = initial
         .map(<[f64]>::to_vec)

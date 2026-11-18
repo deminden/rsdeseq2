@@ -7,6 +7,7 @@ use super::{
 };
 use crate::DeseqError;
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 #[derive(Clone, Debug)]
 pub(super) struct GridSummary {
     pub interval: [f64; 2],
@@ -30,8 +31,8 @@ fn integral(values: &[f64], width: f64) -> f64 {
             + 4.0 * (1..n).step_by(2).map(|i| values[i]).sum::<f64>())
 }
 fn solve_area(x0: f64, x1: f64, y0: f64, y1: f64, area: f64) -> f64 {
-    let slope = (y1.ln() - y0.ln()) / (x1 - x0);
-    x0 + (slope / y0 * area).ln_1p() / slope
+    let slope = (y1.ln_p() - y0.ln_p()) / (x1 - x0);
+    x0 + (slope / y0 * area).ln_1p_p() / slope
 }
 fn allocate(n: usize) -> Result<Vec<f64>, DeseqError> {
     let mut out = vec![];
@@ -101,13 +102,13 @@ fn marginal(
                 ));
             }
             if value > peak {
-                let ratio = (peak - value).exp();
+                let ratio = (peak - value).exp_p();
                 for sum in &mut sums {
                     *sum *= ratio;
                 }
                 peak = value;
             }
-            sums[j] += (value - peak).exp();
+            sums[j] += (value - peak).exp_p();
         }
     }
     Ok(sums)
@@ -127,9 +128,9 @@ fn edge(first: f64, second: f64, x: f64, width: f64, left: bool) -> Result<Edge,
         });
     }
     let slope = if left {
-        (second.ln() - first.ln()) / width
+        (second.ln_p() - first.ln_p()) / width
     } else {
-        (first.ln() - second.ln()) / width
+        (first.ln_p() - second.ln_p()) / width
     };
     if (left && slope <= 0.0) || (!left && slope >= 0.0) || !slope.is_finite() {
         return Err(scoped_invalid_options(
@@ -137,8 +138,8 @@ fn edge(first: f64, second: f64, x: f64, width: f64, left: bool) -> Result<Edge,
             "posterior grid boundary does not have a decaying tail",
         ));
     }
-    let amplitude = (first.ln() - slope * x).exp();
-    let endpoint = (slope * x).exp();
+    let amplitude = (first.ln_p() - slope * x).exp_p();
+    let endpoint = (slope * x).exp_p();
     if !amplitude.is_finite() || !endpoint.is_finite() {
         return Ok(Edge {
             area: 0.0,
@@ -205,7 +206,7 @@ pub(super) fn evaluate(
             );
             let part = marginal(&input, &betas, error * z, log_posterior, &mut evaluations)?;
             let area = integral(&part, width);
-            let weight = (-0.5 * z * z).exp() * 0.3989422804014327;
+            let weight = (-0.5 * z * z).exp_p() * 0.3989422804014327;
             for (sum, v) in mixed.iter_mut().zip(part) {
                 *sum += v / area * weight;
             }
@@ -273,7 +274,7 @@ pub(super) fn evaluate(
             // the upper bound. Invert the already-normalized exponential tail
             // instead; this also handles mass in the first rectangular cell.
             if outside_left > 0.0 && left.slope > 0.0 {
-                return Ok(lower + (prob / outside_left).ln() / left.slope);
+                return Ok(lower + (prob / outside_left).ln_p() / left.slope);
             }
             return Err(scoped_invalid_options(
                 ERROR_SCOPE,
@@ -352,7 +353,7 @@ pub(super) fn evaluate(
                     + outside_left,
             )
         } else {
-            Some(left.zero * (left.slope * x).exp() / total)
+            Some(left.zero * (left.slope * x).exp_p() / total)
         }
     };
     let fsr = if parameter_sd.is_some() {

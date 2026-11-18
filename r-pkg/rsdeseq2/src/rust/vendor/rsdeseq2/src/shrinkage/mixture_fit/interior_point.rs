@@ -4,6 +4,7 @@
 use super::{DMatrix, DVector, ERROR_SCOPE, Problem};
 use crate::DeseqError;
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 #[derive(Clone, Copy, Debug)]
 pub struct InteriorPointOptions {
     /// Upper bound on the normalized convex dual gap. A mass-scaled
@@ -33,7 +34,7 @@ fn barrier(problem: &Problem, w: &[f64], mu: f64, evaluations: &mut usize) -> f6
         return f64::INFINITY;
     }
     *evaluations += 1;
-    problem.objective_gradient(w).0 - mu * w.iter().map(|v| v.ln()).sum::<f64>()
+    problem.objective_gradient(w).0 - mu * w.iter().map(|v| v.ln_p()).sum::<f64>()
 }
 impl Problem {
     pub(super) fn solve_interior_point(
@@ -116,7 +117,7 @@ impl Problem {
                 .zip(&delta)
                 .map(|((g, x), d)| (g - mu / x) * d)
                 .sum::<f64>();
-            let before = f - mu * x.iter().map(|v| v.ln()).sum::<f64>();
+            let before = f - mu * x.iter().map(|v| v.ln_p()).sum::<f64>();
             let mut step = 1.0_f64;
             for (&w, &d) in x.iter().zip(&delta) {
                 if d < 0.0 {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::matrix::try_alloc_matrix;
+use crate::numeric::math::ProfileMath;
 // Intercept-only fits, normalization and working weights.
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with size factors.
@@ -130,11 +131,11 @@ fn intercept_only_with_factor_matrix(
             });
         }
 
-        let beta_log2 = mean_normalized.log2();
+        let beta_log2 = mean_normalized.log2_p();
         beta_values.push(beta_log2);
 
         for factor in normalization_factors.row(gene)? {
-            let mu = *factor * 2.0_f64.powf(beta_log2);
+            let mu = *factor * 2.0_f64.powf_p(beta_log2);
             if !mu.is_finite() || mu <= 0.0 {
                 return Err(DeseqError::InvalidCounts {
                     reason: format!("gene {gene} has non-finite fitted intercept mean"),

@@ -1,4 +1,5 @@
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "normal-mixture posterior";
 use crate::{DeseqError, errors::invalid_dimensions, probability::normal_upper_tail};
 
@@ -63,7 +64,7 @@ impl NormalMixture {
             ));
         }
         Ok(Self {
-            log_weights: weights.into_iter().map(f64::ln).collect(),
+            log_weights: weights.into_iter().map(f64::ln_p).collect(),
             means,
             variances: sds.into_iter().map(|s| s * s).collect(),
         })
@@ -100,7 +101,7 @@ impl NormalMixture {
                 }
                 let sd = marginal_variance.sqrt();
                 let z = (estimate - mean) / sd;
-                Ok(-0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln() - sd.ln())
+                Ok(-0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln_p() - sd.ln_p())
             })
             .collect()
     }
@@ -145,7 +146,7 @@ impl NormalMixture {
             let marginal_sd = marginal_variance.sqrt();
             let z = (estimate - mean) / marginal_sd;
             let log_density =
-                -0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln() - marginal_sd.ln();
+                -0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln_p() - marginal_sd.ln_p();
             weights.push(log_weight + log_density);
             means.push((variance * mean + estimate * prior_variance) / marginal_variance);
             standard_deviations.push((variance * prior_variance / marginal_variance).sqrt());
@@ -158,7 +159,7 @@ impl NormalMixture {
             ));
         }
         for weight in &mut weights {
-            *weight = (*weight - max).exp();
+            *weight = (*weight - max).exp_p();
         }
         let total: f64 = weights.iter().sum();
         for weight in &mut weights {

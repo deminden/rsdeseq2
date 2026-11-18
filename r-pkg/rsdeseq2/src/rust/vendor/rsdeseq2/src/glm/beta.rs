@@ -15,7 +15,7 @@ use crate::glm::nb::nbinom_log_likelihood_matrix;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::Offsets;
-use statrs::distribution::{ContinuousCDF, Normal};
+use crate::numeric::special::standard_normal_inverse_cdf;
 
 /// Method used to estimate DESeq2's beta prior variance.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

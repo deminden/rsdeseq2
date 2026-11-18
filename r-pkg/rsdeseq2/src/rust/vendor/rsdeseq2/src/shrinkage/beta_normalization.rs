@@ -1,11 +1,12 @@
 //! Ordinary beta normalization for conditioned posterior moments.
 //! Exact endpoint checks retain representable complements close to one.
 use super::gamma_normalization::gamma_positive;
+use crate::numeric::math::ProfileMath;
 pub(super) fn beta_positive(a: f64, b: f64) -> f64 {
     if a + b < 170.0 {
         (1.0 / gamma_positive(a + b)) * gamma_positive(a) * gamma_positive(b)
     } else {
-        statrs::function::beta::beta(a, b)
+        crate::numeric::special::beta(a, b)
     }
 }
 // Moment normalization intentionally follows the source's gamma-product
@@ -81,7 +82,7 @@ fn small_shape_series(a: f64, b: f64, x: f64) -> f64 {
         sum = next;
         // Bound the remaining geometric tail, rather than only its next term.
         if term.abs() <= 0.125 * f64::EPSILON * (1.0 - x) * sum.abs() {
-            return (x.powf(a) * sum) / probability_beta(a, b);
+            return (x.powf_p(a) * sum) / probability_beta(a, b);
         }
     }
     f64::NAN
@@ -97,10 +98,10 @@ pub(super) fn regularized_beta(a: f64, b: f64, x: f64) -> f64 {
         return 1.0;
     }
     if b == 1.0 {
-        return x.powf(a);
+        return x.powf_p(a);
     }
     if a == 1.0 {
-        return -(b * (-x).ln_1p()).exp_m1();
+        return -(b * (-x).ln_1p_p()).exp_m1_p();
     }
     if (b == 0.5 || b == 1.5) && x > 0.5 && x < 0.98 {
         return small_shape_series(a, b, x);
@@ -108,9 +109,9 @@ pub(super) fn regularized_beta(a: f64, b: f64, x: f64) -> f64 {
     let reflect = x >= (a + 1.0) / (a + b + 2.0);
     let (a, b, x) = if reflect { (b, a, 1.0 - x) } else { (a, b, x) };
     let normalization = probability_beta(a, b);
-    let mut front = (x.powf(a) * (1.0 - x).powf(b)) / normalization;
+    let mut front = (x.powf_p(a) * (1.0 - x).powf_p(b)) / normalization;
     if !front.is_finite() || front == 0.0 {
-        front = (a * x.ln() + b * (-x).ln_1p() - normalization.ln()).exp();
+        front = (a * x.ln_p() + b * (-x).ln_1p_p() - normalization.ln_p()).exp_p();
     }
     let probability = (front * fraction(a, b, x)) / a;
     if reflect {
@@ -129,10 +130,10 @@ pub(super) fn log_regularized_beta(a: f64, b: f64, x: f64) -> f64 {
     }
     if a.max(b) >= 1e5 {
         if b == 1.0 {
-            return a * x.ln();
+            return a * x.ln_p();
         }
         if a == 1.0 {
-            return (-(b * (-x).ln_1p()).exp_m1()).ln();
+            return (-(b * (-x).ln_1p_p()).exp_m1_p()).ln_p();
         }
     }
     if super::large_shape::beta_large(a, b) {
@@ -143,8 +144,13 @@ pub(super) fn log_regularized_beta(a: f64, b: f64, x: f64) -> f64 {
     let normalization = if a.max(b) >= 1e5 {
         super::large_shape::log_beta(a, b)
     } else {
-        statrs::function::beta::ln_beta(a, b)
+        crate::numeric::special::ln_beta(a, b)
     };
-    let log = a * x.ln() + b * (-x).ln_1p() - normalization + fraction(a, b, x).ln() - a.ln();
-    if reflect { (-log.exp()).ln_1p() } else { log }
+    let log =
+        a * x.ln_p() + b * (-x).ln_1p_p() - normalization + fraction(a, b, x).ln_p() - a.ln_p();
+    if reflect {
+        (-log.exp_p()).ln_1p_p()
+    } else {
+        log
+    }
 }

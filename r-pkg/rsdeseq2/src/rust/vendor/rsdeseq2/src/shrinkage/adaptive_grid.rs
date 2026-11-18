@@ -1,5 +1,6 @@
 //! Grid preparation and component fitting shared by normal-likelihood shrinkage.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "mixture grid";
 use super::{
     FixedMixture, MixtureFit, MixtureFitOptions, NormalMixture, TruncatedNormalMixture,
@@ -149,7 +150,7 @@ pub fn prepare_mixture_grid(
                     "no representable automatic scale range",
                 ));
             }
-            let steps = ((maximum / minimum).log2() / options.grid_multiplier.log2()).ceil();
+            let steps = ((maximum / minimum).log2_p() / options.grid_multiplier.log2_p()).ceil();
             if !steps.is_finite() || !(0.0..=1_000_000.0).contains(&steps) {
                 return Err(scoped_invalid_options(
                     ERROR_SCOPE,
@@ -157,7 +158,7 @@ pub fn prepare_mixture_grid(
                 ));
             }
             (-(steps as i32)..=0)
-                .map(|exponent| options.grid_multiplier.powf(f64::from(exponent)) * maximum)
+                .map(|exponent| options.grid_multiplier.powf_p(f64::from(exponent)) * maximum)
                 .collect()
         }
     };

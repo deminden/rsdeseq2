@@ -1,5 +1,6 @@
 //! Independent density equations for imported regression likelihoods.
 use super::super::expression_quadrature::integrate;
+use crate::numeric::math::ProfileMath;
 use crate::probability::{log_half_gamma_ratio_correction, log1pmx, stirling_correction};
 const LOG_2_PI: f64 = 1.8378770664093453;
 pub(super) fn normal(x: f64, mean: f64, sd: f64) -> f64 {
@@ -17,13 +18,13 @@ pub(super) fn normal(x: f64, mean: f64, sd: f64) -> f64 {
         };
     }
     let z = (x - mean) / sd;
-    -0.5 * z * z - 0.5 * LOG_2_PI - sd.ln()
+    -0.5 * z * z - 0.5 * LOG_2_PI - sd.ln_p()
 }
 fn stirling(x: f64) -> f64 {
     if x >= 0.5 {
         stirling_correction(x)
     } else {
-        libm::lgamma(x) - (x - 0.5) * x.ln() + x - 0.5 * LOG_2_PI
+        libm::lgamma(x) - (x - 0.5) * x.ln_p() + x - 0.5 * LOG_2_PI
     }
 }
 fn deviance(x: f64, mean: f64) -> f64 {
@@ -48,7 +49,7 @@ fn deviance(x: f64, mean: f64) -> f64 {
         }
         sum
     } else {
-        x * (x / mean).ln() + mean - x
+        x * (x / mean).ln_p() + mean - x
     }
 }
 fn count(x: f64) -> Option<f64> {
@@ -72,17 +73,17 @@ pub(super) fn binomial(x: f64, size: f64, p: f64) -> f64 {
         return f64::NEG_INFINITY;
     }
     if x == 0.0 {
-        return if n == 0.0 { 0.0 } else { n * (-p).ln_1p() };
+        return if n == 0.0 { 0.0 } else { n * (-p).ln_1p_p() };
     }
     if x == n {
-        return n * p.ln();
+        return n * p.ln_p();
     }
     stirling(n)
         - stirling(x)
         - stirling(n - x)
         - deviance(x, n * p)
         - deviance(n - x, n * (1.0 - p))
-        - 0.5 * (LOG_2_PI + x.ln() + (-x / n).ln_1p())
+        - 0.5 * (LOG_2_PI + x.ln_p() + (-x / n).ln_1p_p())
 }
 pub(super) fn negative_binomial(x: f64, size: f64, mu: f64) -> f64 {
     if x.is_nan() || size.is_nan() || mu.is_nan() || size < 0.0 || mu < 0.0 {
@@ -101,11 +102,11 @@ pub(super) fn negative_binomial(x: f64, size: f64, mu: f64) -> f64 {
         return if x == 0.0 {
             -mu
         } else {
-            -stirling(x) - deviance(x, mu) - 0.5 * (LOG_2_PI + x.ln())
+            -stirling(x) - deviance(x, mu) - 0.5 * (LOG_2_PI + x.ln_p())
         };
     }
     if x == 0.0 {
-        return -size * (mu / size).ln_1p();
+        return -size * (mu / size).ln_1p_p();
     }
     let n = x + size;
     let ratio = mu / size;
@@ -120,16 +121,16 @@ pub(super) fn negative_binomial(x: f64, size: f64, mu: f64) -> f64 {
         - stirling(size)
         - deviance(x, n * q)
         - deviance(size, n * p)
-        - 0.5 * (LOG_2_PI + x.ln())
-        + 0.5 * (size / n).ln()
+        - 0.5 * (LOG_2_PI + x.ln_p())
+        + 0.5 * (size / n).ln_p()
 }
 fn central_student(x: f64, df: f64) -> f64 {
     if df >= 64.0 {
         let ratio = x * x / df;
         let logarithm = if ratio.is_finite() {
-            ratio.ln_1p()
+            ratio.ln_1p_p()
         } else {
-            2.0 * x.abs().ln() - df.ln()
+            2.0 * x.abs().ln_p() - df.ln_p()
         };
         log_half_gamma_ratio_correction(df / 2.0) - 0.5 * LOG_2_PI - 0.5 * (df + 1.0) * logarithm
     } else {
@@ -141,7 +142,7 @@ fn peak_mass(df: f64, mode: f64) -> f64 {
         if u <= -mode {
             0.0
         } else {
-            (df * log1pmx(u / mode) - 0.5 * u * u).exp()
+            (df * log1pmx(u / mode) - 0.5 * u * u).exp_p()
         }
     };
     // The log density has curvature <= -1. Beyond 16 mode-distance units
@@ -164,13 +165,13 @@ pub(super) fn student(x: f64, df: f64, ncp: f64) -> f64 {
         return central;
     }
     let root = df.sqrt();
-    let k = ncp * (x / (x.hypot(root)));
-    let length = k.hypot(2.0 * root);
+    let k = ncp * (x / (x.hypot_p(root)));
+    let length = k.hypot_p(2.0 * root);
     let mode = if k < 0.0 {
         df / (length / 2.0 - k / 2.0)
     } else {
         k / 2.0 + length / 2.0
     };
     let peak_difference = df * (k / (2.0 * root)).asinh() + 0.5 * k * mode;
-    central - 0.5 * ncp * ncp + peak_difference + (peak_mass(df, mode) / peak_mass(df, root)).ln()
+    central - 0.5 * ncp * ncp + peak_difference + (peak_mass(df, mode) / peak_mass(df, root)).ln_p()
 }

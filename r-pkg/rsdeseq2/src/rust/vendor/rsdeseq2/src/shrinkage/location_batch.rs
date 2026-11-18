@@ -1,6 +1,7 @@
 //! Complete location-scale shrinkage preparation and summaries in Rust.
 //! The default public adapter uses this engine; advanced option gates remain.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "location shrinkage";
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{
@@ -236,7 +237,7 @@ pub(super) fn shrink_location_batch_with_outputs(
             let ll = raw_prior.log_likelihoods_at(x[i], se[i], i, n)?;
             log_likelihood += log_marginal(&ll, &fitted_weights)
                 - options.alpha
-                    * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln();
+                    * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln_p();
         } else {
             let (raw_cdfs, ll) = excluded(
                 &grid.components,
@@ -253,7 +254,7 @@ pub(super) fn shrink_location_batch_with_outputs(
             cdfs.extend(raw_cdfs);
             log_likelihood += ll
                 - options.alpha
-                    * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln();
+                    * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln_p();
         }
         means[i] *= scale[i];
         sds[i] *= scale[i];

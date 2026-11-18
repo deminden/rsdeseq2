@@ -6,6 +6,7 @@ use super::{
     regression::{RegressionOptimizer, RegressionPosteriorOptions},
 };
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 use crate::probability::digamma_positive as psi;
 use crate::{DeseqError, matrix::MatrixView, probability::stirling_correction};
 use nalgebra::DMatrix;
@@ -18,9 +19,9 @@ fn psi_difference(x: f64, k: f64) -> f64 {
     if x < 32.0 {
         return psi(x + k) - psi(x);
     }
-    let logarithm = (k / x).ln_1p();
+    let logarithm = (k / x).ln_1p_p();
     let inverse = 1.0 / x;
-    let mut out = logarithm - 0.5 * inverse * (-logarithm).exp_m1();
+    let mut out = logarithm - 0.5 * inverse * (-logarithm).exp_m1_p();
     for (i, coefficient) in [
         1.0 / 12.0,
         -1.0 / 120.0,
@@ -33,7 +34,7 @@ fn psi_difference(x: f64, k: f64) -> f64 {
     .enumerate()
     {
         let power = 2 * (i + 1) as i32;
-        out -= coefficient * inverse.powi(power) * (-f64::from(power) * logarithm).exp_m1();
+        out -= coefficient * inverse.powi(power) * (-f64::from(power) * logarithm).exp_m1_p();
     }
     out
 }
@@ -46,8 +47,9 @@ pub(super) fn log_rising(x: f64, k: f64) -> f64 {
     }
     // Algebraically subtract Stirling terms before evaluation, retaining small
     // increments even when x+k rounds to x or the two log-gammas nearly agree.
-    let logarithm = (k / x).ln_1p();
-    k * x.ln() + (x + k - 0.5) * logarithm - k + stirling_correction(x + k) - stirling_correction(x)
+    let logarithm = (k / x).ln_1p_p();
+    k * x.ln_p() + (x + k - 0.5) * logarithm - k + stirling_correction(x + k)
+        - stirling_correction(x)
 }
 pub(super) struct Row<'a> {
     pub design: MatrixView<'a, f64>,
@@ -75,7 +77,7 @@ impl Row<'_> {
                 .enumerate()
                 .map(|(j, b)| self.design.at(i, j) * b)
                 .sum::<f64>();
-            let odds = (-eta).exp();
+            let odds = (-eta).exp_p();
             let odds = if capped {
                 odds.clamp(0.001, 999.0)
             } else {

@@ -3,6 +3,7 @@
 //! needed when posterior moments subtract nearby log probabilities.
 #![allow(clippy::excessive_precision)]
 
+use crate::numeric::math::ProfileMath;
 fn polynomial(x: f64, ascending: &[f64]) -> f64 {
     let Some((&last, lower)) = ascending.split_last() else {
         return 0.0;
@@ -83,7 +84,8 @@ pub(crate) fn normal_log_upper_tail(q: f64) -> f64 {
             47.20258190468824187,
             1.0,
         ];
-        return (0.5 - q * polynomial(square, &numerator) / polynomial(square, &denominator)).ln();
+        return (0.5 - q * polynomial(square, &numerator) / polynomial(square, &denominator))
+            .ln_p();
     }
     if magnitude > 1e155 {
         return if q > 0.0 { f64::NEG_INFINITY } else { -0.0 };
@@ -93,8 +95,8 @@ pub(crate) fn normal_log_upper_tail(q: f64) -> f64 {
     let remainder = -((magnitude - coarse) * (magnitude + coarse)) / 2.0;
     let factor = tail_factor(magnitude);
     if q > 0.0 {
-        leading + remainder + factor.ln()
+        leading + remainder + factor.ln_p()
     } else {
-        (-leading.exp() * remainder.exp() * factor).ln_1p()
+        (-leading.exp_p() * remainder.exp_p() * factor).ln_1p_p()
     }
 }

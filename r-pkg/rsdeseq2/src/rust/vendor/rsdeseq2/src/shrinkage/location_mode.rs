@@ -1,5 +1,6 @@
 //! Standalone likelihood profiling for an estimated unimodal-prior location.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "prior mode search";
 use super::location_missing::{NA, excluded, is_na, log_marginal};
 use super::{LocationLikelihood, LocationShrinkageOptions, location_fit::fit_location};
@@ -260,7 +261,7 @@ pub fn estimate_location_mode(
                 };
                 ll += value
                     - options.alpha
-                        * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln();
+                        * standard_errors[if standard_errors.len() == 1 { 0 } else { i }].ln_p();
             }
             if fitted.x.iter().chain(&fitted.se).any(|x| is_na(*x)) {
                 ll = NA;

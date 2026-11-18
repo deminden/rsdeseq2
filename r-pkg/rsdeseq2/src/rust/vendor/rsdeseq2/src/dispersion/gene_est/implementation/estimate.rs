@@ -1,5 +1,6 @@
 use super::*;
 use crate::matrix::try_alloc_matrix;
+use crate::numeric::math::ProfileMath;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
 ///
 /// This implements a clean Rust subset of `estimateDispersionsGeneEst`:
@@ -309,7 +310,7 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
                 if all_zero {
                     return false;
                 }
-                let move_size = (alpha_hat_new[gene] / alpha_hat[gene]).ln().abs();
+                let move_size = (alpha_hat_new[gene] / alpha_hat[gene]).ln_p().abs();
                 move_size.is_finite() && move_size > 0.05
             })
             .collect();
