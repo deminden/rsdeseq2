@@ -7,6 +7,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `DeseqBuilder::run(&Analysis) -> RunOutput`: one entry point for the
+  whole pipeline. `Analysis` holds the design (matrix, formula, or none for
+  size factors only), the test, fixed or estimated dispersions, the mean
+  model, the reported column (`ResultColumn`), Cook's replacement, an early
+  `Stage` and an optional trend type. Invalid combinations are rejected before
+  any work. Every existing `fit*` method gives bit-identical output to its
+  `run` request; those methods will be deprecated in 0.6.0.
+
 - End-to-end parity test against `DESeq()` + `results()` defaults on a
   3,745-gene GTEx kidney-cortex panel (size factors, parametric dispersion
   trend, Cook's replacement, independent filtering). 3,744 genes match R to

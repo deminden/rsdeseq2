@@ -93,6 +93,31 @@ wrappers, then to 1, the target in `hardening-progress.md`.
 - **Diff size.** The wrappers are mechanical (about 1,500 lines across
   `builder/`). Steps 2 and 3 are large but contain no logic changes.
 
+## Implementation notes (step 1, 2026-11-18)
+
+Three small changes from the sketch above, found while writing step 1:
+
+- `ResultRequest` is named `ResultColumn`, because `rsdeseq2::results`
+  already exports a `ResultRequest`. The early-stop "fit only" form needs no
+  variant: methods that return only a fit still choose a column, and the fit
+  records that column's test, so their wrappers take `run(..)?.fit()`.
+- `RunOutput` is an enum (`Fit`, `Results`, `Replacement`) rather than a
+  struct. With replacement, the merged fit is built by consuming the original
+  fit, so a struct holding both would need a full copy of the fit.
+  `RunOutput::into_fit_and_results` merges on request.
+- `DesignInput::Formula` takes the formula only and uses the builder's stored
+  model frame, as the formula methods do today; a different frame for one run
+  is `ResultColumn::Results { model_frame, .. }` for contrast resolution. The
+  `_parametric` suffix is `Analysis::fit_type`, an optional per-run override
+  of the builder's trend type, so wrappers do not clone the builder to change
+  it. `DesignInput::None` covers the design-free size-factor stage.
+
+Step 1 dispatches to the existing leaf methods. The generated test
+`tests/run_equivalence.rs` (from `tools/validation/gen_run_equivalence.py`)
+checks 208 method/request pairs, covering all 140 `fit*` methods except the
+two fast-VST trend helpers, which stay outside `run` and will be renamed in
+4.3. All 208 pairs are identical, and none fails on both sides.
+
 ## Decisions
 
 1. One `run(&Analysis)` returning `RunOutput`, not separate `run_wald` and

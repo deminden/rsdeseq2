@@ -156,6 +156,8 @@ mod results;
 mod results_reference;
 #[path = "row_preparation.rs"]
 mod row_preparation;
+#[path = "run_equivalence.rs"]
+mod run_equivalence;
 #[path = "se_covariance_reference.rs"]
 mod se_covariance_reference;
 #[path = "size_factors.rs"]
