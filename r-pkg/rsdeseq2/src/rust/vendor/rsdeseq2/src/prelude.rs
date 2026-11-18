@@ -218,6 +218,7 @@ pub use crate::results::{
     low_count_eligible, recompute_padj, resolve_cooks_cutoff,
     rsdeseq2_result_diagnostic_column_names, two_level_design_matches,
 };
+#[allow(deprecated)]
 pub use crate::transform::{
     FastVstSubset, FastVstSubsetMetadata, FrozenLocalDispersion, RLOG_INTERCEPT_PRIOR_VARIANCE,
     RLOG_PRIOR_UPPER_QUANTILE, RlogFitOutput, RlogMetadata, RlogOffsetMode, RlogOutput,
@@ -226,10 +227,11 @@ pub use crate::transform::{
     fast_vst_subset_indices, fast_vst_subset_matrix_rows, fast_vst_subset_normalized_counts,
     frozen_local_vst_grid_from_counts, local_vst_inverse_size_factor_mean,
     local_vst_inverse_size_factor_mean_from_normalization_factors, norm_transform,
-    norm_transform_value, rlog_beta_prior_variance, rlog_fit_with_normalization_factors,
-    rlog_fit_with_size_factors, rlog_frozen_with_normalization_factors,
+    norm_transform_value, rlog_beta_prior_variance, rlog_fit, rlog_fit_with_normalization_factors,
+    rlog_fit_with_size_factors, rlog_frozen, rlog_frozen_with_normalization_factors,
     rlog_frozen_with_size_factors, rlog_sample_design, rlog_sample_effect_design,
-    rlog_sample_effect_prior_variance, rlog_with_estimated_prior_and_normalization_factors,
+    rlog_sample_effect_prior_variance, rlog_transform, rlog_with_estimated_prior,
+    rlog_with_estimated_prior_and_normalization_factors,
     rlog_with_estimated_prior_and_size_factors, rlog_with_normalization_factors,
     rlog_with_size_factors, vst, vst_frozen_local, vst_local, vst_local_from_dispersion_grid,
     vst_mean, vst_mean_value, vst_parametric, vst_parametric_value, vst_with_dispersion_trend,

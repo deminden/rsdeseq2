@@ -52,11 +52,8 @@ pub(super) use crate::results::{
 pub(super) use crate::transform::{
     FastVstSubset, RlogMetadata, RlogOffsetMode, RlogOutput,
     fast_vst_eligible_count as count_fast_vst_eligible_rows,
-    fast_vst_subset as build_fast_vst_subset, norm_transform,
-    rlog_frozen_with_normalization_factors, rlog_frozen_with_size_factors,
-    rlog_with_estimated_prior_and_normalization_factors,
-    rlog_with_estimated_prior_and_size_factors,
-    vst_with_dispersion_trend_and_normalization_factors,
+    fast_vst_subset as build_fast_vst_subset, norm_transform, rlog_frozen,
+    rlog_with_estimated_prior, vst_with_dispersion_trend_and_normalization_factors,
     vst_with_dispersion_trend_and_size_factors,
 };
 

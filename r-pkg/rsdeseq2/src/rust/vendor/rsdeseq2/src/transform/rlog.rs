@@ -5,7 +5,7 @@ use crate::glm::irls::OutputRequirements;
 use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
-use crate::normalization::{normalized_counts, normalized_counts_with_factors};
+use crate::normalization::{Offsets, normalized_counts, normalized_counts_with_factors};
 
 /// Wide log2-scale prior variance used for the rlog intercept.
 ///
@@ -101,7 +101,7 @@ impl RlogOutput {
 /// prior variance. Full high-level DESeq2 rlog object semantics, including
 /// automatic dispersion/prior estimation and blind/design-aware wrapper
 /// dispatch, remain separate workflow work.
-pub fn rlog_with_size_factors(
+fn rlog_with_size_factors_impl(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
@@ -120,7 +120,7 @@ pub fn rlog_with_size_factors(
 }
 
 /// Fit the low-level rlog sample-effect model with size factors and retain the GLM fit.
-pub fn rlog_fit_with_size_factors(
+fn rlog_fit_with_size_factors_impl(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
@@ -164,7 +164,7 @@ fn rlog_fit_with_size_factors_for_output(
 /// The supplied intercepts are treated as gene-specific log2 offsets. Only the
 /// sample-effect coefficients are fit, using the shared sample prior variance,
 /// and the output is assembled as `frozen_intercept_i + sample_effect_ij`.
-pub fn rlog_frozen_with_size_factors(
+fn rlog_frozen_with_size_factors_impl(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
@@ -180,7 +180,7 @@ pub fn rlog_frozen_with_size_factors(
         ));
     }
     let normalization_factors = rlog_normalization_factors_from_size_factors(counts, size_factors)?;
-    rlog_frozen_with_normalization_factors(
+    rlog_frozen_with_normalization_factors_impl(
         counts,
         &normalization_factors,
         dispersions,
@@ -199,7 +199,7 @@ pub fn rlog_frozen_with_size_factors(
 /// This keeps the caller in control of dispersion inputs while avoiding a
 /// duplicated manual prior-estimation step for workflows that already have
 /// `baseMean` and fitted dispersion-trend values.
-pub fn rlog_with_estimated_prior_and_size_factors(
+fn rlog_with_estimated_prior_and_size_factors_impl(
     counts: &CountMatrix,
     size_factors: &[f64],
     base_mean: &[f64],
@@ -318,7 +318,7 @@ pub fn estimate_rlog_sample_prior_variance_with_quantile(
 }
 
 /// Fit the low-level regularized-log sample-effect model with normalization factors.
-pub fn rlog_with_normalization_factors(
+fn rlog_with_normalization_factors_impl(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     dispersions: &[f64],
@@ -337,7 +337,7 @@ pub fn rlog_with_normalization_factors(
 }
 
 /// Fit the low-level rlog sample-effect model with normalization factors and retain the GLM fit.
-pub fn rlog_fit_with_normalization_factors(
+fn rlog_fit_with_normalization_factors_impl(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     dispersions: &[f64],
@@ -377,7 +377,7 @@ fn rlog_fit_with_normalization_factors_for_output(
 }
 
 /// Fit an rlog transform using caller-supplied frozen intercepts and normalization factors.
-pub fn rlog_frozen_with_normalization_factors(
+fn rlog_frozen_with_normalization_factors_impl(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     dispersions: &[f64],
@@ -416,7 +416,7 @@ pub fn rlog_frozen_with_normalization_factors(
 }
 
 /// Estimate the rlog sample prior and fit with gene/sample normalization factors.
-pub fn rlog_with_estimated_prior_and_normalization_factors(
+fn rlog_with_estimated_prior_and_normalization_factors_impl(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     base_mean: &[f64],
@@ -756,4 +756,294 @@ fn checked_intercept_factor(intercept: f64, gene: usize) -> Result<f64, DeseqErr
         });
     }
     Ok(factor)
+}
+
+/// Fit DESeq2's low-level rlog sample-effect model (an unpenalized intercept
+/// plus one regularized effect per sample) and return the log2 values.
+pub fn rlog_transform(
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => rlog_with_size_factors_impl(
+            counts,
+            size_factors,
+            dispersions,
+            sample_prior_variance,
+            options,
+        ),
+        Offsets::PerCell(normalization_factors) => rlog_with_normalization_factors_impl(
+            counts,
+            normalization_factors,
+            dispersions,
+            sample_prior_variance,
+            options,
+        ),
+    }
+}
+
+/// Deprecated form of [`rlog_transform`] with `Offsets::PerSample`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_transform(counts, Offsets::PerSample(size_factors), ..)"
+)]
+pub fn rlog_with_size_factors(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    rlog_transform(
+        counts,
+        Offsets::PerSample(size_factors),
+        dispersions,
+        sample_prior_variance,
+        options,
+    )
+}
+
+/// Deprecated form of [`rlog_transform`] with `Offsets::PerCell`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_transform(counts, Offsets::PerCell(normalization_factors), ..)"
+)]
+pub fn rlog_with_normalization_factors(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    rlog_transform(
+        counts,
+        Offsets::PerCell(normalization_factors),
+        dispersions,
+        sample_prior_variance,
+        options,
+    )
+}
+
+/// Fit the low-level rlog sample-effect model and keep the GLM fit.
+pub fn rlog_fit(
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RlogFitOutput, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => rlog_fit_with_size_factors_impl(
+            counts,
+            size_factors,
+            dispersions,
+            sample_prior_variance,
+            options,
+        ),
+        Offsets::PerCell(normalization_factors) => rlog_fit_with_normalization_factors_impl(
+            counts,
+            normalization_factors,
+            dispersions,
+            sample_prior_variance,
+            options,
+        ),
+    }
+}
+
+/// Deprecated form of [`rlog_fit`] with `Offsets::PerSample`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_fit(counts, Offsets::PerSample(size_factors), ..)"
+)]
+pub fn rlog_fit_with_size_factors(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RlogFitOutput, DeseqError> {
+    rlog_fit(
+        counts,
+        Offsets::PerSample(size_factors),
+        dispersions,
+        sample_prior_variance,
+        options,
+    )
+}
+
+/// Deprecated form of [`rlog_fit`] with `Offsets::PerCell`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_fit(counts, Offsets::PerCell(normalization_factors), ..)"
+)]
+pub fn rlog_fit_with_normalization_factors(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    options: IrlsOptions,
+) -> Result<RlogFitOutput, DeseqError> {
+    rlog_fit(
+        counts,
+        Offsets::PerCell(normalization_factors),
+        dispersions,
+        sample_prior_variance,
+        options,
+    )
+}
+
+/// Fit rlog with caller-supplied frozen intercepts: only the sample effects
+/// are fit, and the output is `frozen_intercept_i + sample_effect_ij`.
+pub fn rlog_frozen(
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    frozen_intercept: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => rlog_frozen_with_size_factors_impl(
+            counts,
+            size_factors,
+            dispersions,
+            sample_prior_variance,
+            frozen_intercept,
+            options,
+        ),
+        Offsets::PerCell(normalization_factors) => rlog_frozen_with_normalization_factors_impl(
+            counts,
+            normalization_factors,
+            dispersions,
+            sample_prior_variance,
+            frozen_intercept,
+            options,
+        ),
+    }
+}
+
+/// Deprecated form of [`rlog_frozen`] with `Offsets::PerSample`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_frozen(counts, Offsets::PerSample(size_factors), ..)"
+)]
+pub fn rlog_frozen_with_size_factors(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    frozen_intercept: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    rlog_frozen(
+        counts,
+        Offsets::PerSample(size_factors),
+        dispersions,
+        sample_prior_variance,
+        frozen_intercept,
+        options,
+    )
+}
+
+/// Deprecated form of [`rlog_frozen`] with `Offsets::PerCell`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_frozen(counts, Offsets::PerCell(normalization_factors), ..)"
+)]
+pub fn rlog_frozen_with_normalization_factors(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    sample_prior_variance: f64,
+    frozen_intercept: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    rlog_frozen(
+        counts,
+        Offsets::PerCell(normalization_factors),
+        dispersions,
+        sample_prior_variance,
+        frozen_intercept,
+        options,
+    )
+}
+
+/// Estimate the rlog sample prior variance from normalized counts, then fit.
+pub fn rlog_with_estimated_prior(
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    dispersions: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => rlog_with_estimated_prior_and_size_factors_impl(
+            counts,
+            size_factors,
+            base_mean,
+            disp_fit,
+            dispersions,
+            options,
+        ),
+        Offsets::PerCell(normalization_factors) => {
+            rlog_with_estimated_prior_and_normalization_factors_impl(
+                counts,
+                normalization_factors,
+                base_mean,
+                disp_fit,
+                dispersions,
+                options,
+            )
+        }
+    }
+}
+
+/// Deprecated form of [`rlog_with_estimated_prior`] with `Offsets::PerSample`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_with_estimated_prior(counts, Offsets::PerSample(size_factors), ..)"
+)]
+pub fn rlog_with_estimated_prior_and_size_factors(
+    counts: &CountMatrix,
+    size_factors: &[f64],
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    dispersions: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    rlog_with_estimated_prior(
+        counts,
+        Offsets::PerSample(size_factors),
+        base_mean,
+        disp_fit,
+        dispersions,
+        options,
+    )
+}
+
+/// Deprecated form of [`rlog_with_estimated_prior`] with `Offsets::PerCell`.
+#[deprecated(
+    since = "0.6.0",
+    note = "use rlog_with_estimated_prior(counts, Offsets::PerCell(normalization_factors), ..)"
+)]
+pub fn rlog_with_estimated_prior_and_normalization_factors(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    base_mean: &[f64],
+    disp_fit: &[f64],
+    dispersions: &[f64],
+    options: IrlsOptions,
+) -> Result<RlogOutput, DeseqError> {
+    rlog_with_estimated_prior(
+        counts,
+        Offsets::PerCell(normalization_factors),
+        base_mean,
+        disp_fit,
+        dispersions,
+        options,
+    )
 }
