@@ -1,4 +1,5 @@
 // VST/rlog transformation export and frozen fit inputs.
+use super::*;
 
 /// # Safety
 ///
@@ -279,7 +280,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
 /// R's `fitType` code (0 parametric, 1 local, 2 mean) of the trend a fit used,
 /// which differs from the request when a failed parametric fit fell back to
 /// the local trend; the request when no trend was fitted.
-fn fit_type_code(trend: Option<&DispersionTrendFit>, requested: i32) -> i32 {
+pub(crate) fn fit_type_code(trend: Option<&DispersionTrendFit>, requested: i32) -> i32 {
     match trend {
         Some(DispersionTrendFit::Parametric(_)) => 0,
         Some(DispersionTrendFit::Local(_)) => 1,
@@ -289,7 +290,7 @@ fn fit_type_code(trend: Option<&DispersionTrendFit>, requested: i32) -> i32 {
 }
 
 /// Run the pipeline through the dispersion trend with GLM fitted means.
-fn trend_stage_fit(
+pub(crate) fn trend_stage_fit(
     builder: &DeseqBuilder,
     counts: &CountMatrix,
     design: &DesignMatrix,

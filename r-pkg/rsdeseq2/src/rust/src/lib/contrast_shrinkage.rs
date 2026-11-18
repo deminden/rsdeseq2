@@ -1,4 +1,5 @@
 // Expanded-model contrast shrinkage export.
+use super::*;
 
 /// # Safety
 ///

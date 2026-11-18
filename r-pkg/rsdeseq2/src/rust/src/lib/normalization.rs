@@ -1,5 +1,6 @@
 // Size factors, normalized counts and base metadata exports.
 // Optional geometric means use natural-scale units, as in the standalone API.
+use super::*;
 
 /// # Safety
 ///

@@ -1,5 +1,6 @@
 // No R numerical callback: these are the standalone library's entry points.
-fn filtering_pvalues(values: &[f64]) -> Vec<Option<f64>> {
+use super::*;
+pub(crate) fn filtering_pvalues(values: &[f64]) -> Vec<Option<f64>> {
     values
         .iter()
         .map(|&value| (!value.is_nan()).then_some(value))

@@ -192,29 +192,50 @@ unsafe fn copy_counts_to_r(counts: &CountMatrix, output: &mut [f64]) -> Result<(
 }
 
 // Size factors, normalized counts and base metadata exports.
-include!("lib/normalization.rs");
+#[path = "lib/normalization.rs"]
+mod normalization_exports;
+#[allow(unused_imports)]
+pub use normalization_exports::*;
 
 // Wald/LRT fitting export, replacement and fitted output buffers.
-include!("lib/fit.rs");
+#[path = "lib/fit.rs"]
+mod fit_exports;
+#[allow(unused_imports)]
+pub use fit_exports::*;
 
 // Coefficient shrinkage export.
-include!("lib/shrinkage.rs");
+#[path = "lib/shrinkage.rs"]
+mod shrinkage_exports;
+#[allow(unused_imports)]
+pub use shrinkage_exports::*;
 
 // Expanded-model contrast shrinkage export.
-include!("lib/contrast_shrinkage.rs");
+#[path = "lib/contrast_shrinkage.rs"]
+mod contrast_shrinkage_exports;
+#[allow(unused_imports)]
+pub use contrast_shrinkage_exports::*;
 
 // VST/rlog transformation export and frozen fit inputs.
-include!("lib/transform.rs");
+#[path = "lib/transform.rs"]
+mod transform_exports;
+#[allow(unused_imports)]
+pub use transform_exports::*;
 
 // Standalone Wald/LRT probabilities and default Cook's cutoff.
 #[path = "lib/inference_statistics.rs"]
 mod inference_statistics;
 
 // Standalone result adjustment and filtering; no R numerical callbacks.
-include!("lib/result_filtering.rs");
+#[path = "lib/result_filtering.rs"]
+mod result_filtering_exports;
+#[allow(unused_imports)]
+pub use result_filtering_exports::*;
 
 // Cook's filtering and stable diagnostic schema exports; test module is last.
-include!("lib/diagnostics.rs");
+#[path = "lib/diagnostics.rs"]
+mod diagnostics_exports;
+#[allow(unused_imports)]
+pub use diagnostics_exports::*;
 
 #[path = "lib/contrast_inference.rs"]
 mod contrast_inference;

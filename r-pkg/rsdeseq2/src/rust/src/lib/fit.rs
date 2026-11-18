@@ -1,4 +1,5 @@
 // Wald/LRT fitting export, replacement and fitted output buffers.
+use super::*;
 
 /// # Safety
 ///

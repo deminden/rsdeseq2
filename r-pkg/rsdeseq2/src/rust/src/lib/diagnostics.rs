@@ -1,9 +1,10 @@
 // Borrowed Cook's filtering and stable diagnostic schema exports.
-fn finite_value(value: f64) -> Option<f64> {
+use super::*;
+pub(crate) fn finite_value(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
 }
 
-unsafe fn borrowed_cooks_heuristic<'a>(
+pub(crate) unsafe fn borrowed_cooks_heuristic<'a>(
     genes: usize,
     samples: usize,
     counts: *const f64,
@@ -80,7 +81,7 @@ pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
     })
 }
 
-const DIAGNOSTIC_SCHEMA_NAMES: [&[u8]; 7] = [
+pub(crate) const DIAGNOSTIC_SCHEMA_NAMES: [&[u8]; 7] = [
     b"betaConv\0",
     b"fullBetaConv\0",
     b"reducedBetaConv\0",
