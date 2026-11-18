@@ -239,3 +239,60 @@ pub fn significance_flips(actual: &[Option<f64>], expected: &[Option<f64>], alph
         .filter(|(a, e)| a.is_some_and(|v| v < alpha) != e.is_some_and(|v| v < alpha))
         .count()
 }
+
+/// Assert `actual` equals `expected` to an absolute 1e-12 (or relative
+/// machine epsilon), treating an expected NaN as "must be NaN".
+pub fn assert_float_close_or_nan(actual: f64, expected: f64, label: &str) {
+    if expected.is_nan() {
+        assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
+    } else {
+        approx::assert_relative_eq!(actual, expected, epsilon = 1e-12);
+    }
+}
+
+/// [`assert_float_close_or_nan`] element by element, after a length check.
+pub fn assert_slice_close_or_nan(actual: &[f64], expected: &[f64], label: &str) {
+    assert_eq!(actual.len(), expected.len(), "{label}: length mismatch");
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert_float_close_or_nan(*actual, *expected, &format!("{label}[{index}]"));
+    }
+}
+
+/// [`assert_slice_close_or_nan`] over two matrices of the same shape.
+pub fn assert_matrix_close_or_nan(
+    actual: &RowMajorMatrix<f64>,
+    expected: &RowMajorMatrix<f64>,
+    label: &str,
+) {
+    assert_eq!(actual.n_rows(), expected.n_rows(), "{label}: row mismatch");
+    assert_eq!(
+        actual.n_cols(),
+        expected.n_cols(),
+        "{label}: column mismatch"
+    );
+    assert_slice_close_or_nan(actual.as_slice(), expected.as_slice(), label);
+}
+
+/// Parse a number as R writes it: `bits:<hex>` for exact bits, `NA` and
+/// `NaN` as NaN, `Inf` and `-Inf`, otherwise decimal.
+pub fn r_number(value: &str) -> f64 {
+    if let Some(bits) = value.strip_prefix("bits:") {
+        return f64::from_bits(u64::from_str_radix(bits, 16).unwrap());
+    }
+    match value {
+        "NA" | "NaN" => f64::NAN,
+        "Inf" => f64::INFINITY,
+        "-Inf" => f64::NEG_INFINITY,
+        _ => value.parse().unwrap(),
+    }
+}
+
+/// [`r_number`] over a list.
+pub fn r_numbers(values: &[String]) -> Vec<f64> {
+    values.iter().map(|value| r_number(value)).collect()
+}
+
+/// The 16-digit lower-case hex of a float's bits, as the JSON fixtures store it.
+pub fn hex_bits(value: f64) -> String {
+    format!("{:016x}", value.to_bits())
+}

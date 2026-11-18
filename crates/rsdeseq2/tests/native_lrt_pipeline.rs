@@ -1,6 +1,8 @@
 //! Numerical coverage grouped by responsibility; shared fixtures stay in this test crate.
 
+mod common;
 use approx::assert_relative_eq;
+use common::{assert_float_close_or_nan, assert_matrix_close_or_nan, assert_slice_close_or_nan};
 use rsdeseq2::prelude::*;
 
 fn full_design() -> DesignMatrix {
@@ -78,54 +80,11 @@ fn native_lrt_builder() -> DeseqBuilder {
         .disable_independent_filtering()
 }
 
-fn assert_matrix_close_or_nan(
-    actual: &RowMajorMatrix<f64>,
-    expected: &RowMajorMatrix<f64>,
-    label: &str,
-) {
-    assert_eq!(actual.n_rows(), expected.n_rows(), "{label}: row mismatch");
-    assert_eq!(
-        actual.n_cols(),
-        expected.n_cols(),
-        "{label}: column mismatch"
-    );
-    for (index, (actual, expected)) in actual
-        .as_slice()
-        .iter()
-        .zip(expected.as_slice().iter())
-        .enumerate()
-    {
-        if expected.is_nan() {
-            assert!(
-                actual.is_nan(),
-                "{label}[{index}]: expected NaN, got {actual}"
-            );
-        } else {
-            assert_relative_eq!(*actual, *expected, epsilon = 1e-12);
-        }
-    }
-}
-
-fn assert_float_close_or_nan(actual: f64, expected: f64, label: &str) {
-    if expected.is_nan() {
-        assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
-        return;
-    }
-    assert_relative_eq!(actual, expected, epsilon = 1e-12);
-}
-
 fn assert_option_close(actual: Option<f64>, expected: Option<f64>, label: &str) {
     match (actual, expected) {
         (Some(actual), Some(expected)) => assert_float_close_or_nan(actual, expected, label),
         (None, None) => {}
         _ => panic!("{label}: actual={actual:?}, expected={expected:?}"),
-    }
-}
-
-fn assert_slice_close_or_nan(actual: &[f64], expected: &[f64], label: &str) {
-    assert_eq!(actual.len(), expected.len(), "{label}: length mismatch");
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        assert_float_close_or_nan(*actual, *expected, &format!("{label}[{index}]"));
     }
 }
 

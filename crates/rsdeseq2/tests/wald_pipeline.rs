@@ -1,6 +1,8 @@
 //! Numerical coverage grouped by responsibility; shared fixtures stay in this test crate.
 
+mod common;
 use approx::assert_relative_eq;
+use common::{assert_matrix_close_or_nan, assert_slice_close_or_nan};
 use rsdeseq2::prelude::*;
 
 fn assert_wald_likelihood_state(fit: &DeseqFit, counts: &CountMatrix) {
@@ -18,35 +20,6 @@ fn assert_wald_likelihood_state(fit: &DeseqFit, counts: &CountMatrix) {
             assert_relative_eq!(*deviance, -2.0 * *log_like, epsilon = 1e-12);
         }
     }
-}
-
-fn assert_float_close_or_nan(actual: f64, expected: f64, label: &str) {
-    if expected.is_nan() {
-        assert!(actual.is_nan(), "{label}: expected NaN, got {actual}");
-    } else {
-        assert_relative_eq!(actual, expected, epsilon = 1e-12);
-    }
-}
-
-fn assert_slice_close_or_nan(actual: &[f64], expected: &[f64], label: &str) {
-    assert_eq!(actual.len(), expected.len(), "{label}: length mismatch");
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        assert_float_close_or_nan(*actual, *expected, &format!("{label}[{index}]"));
-    }
-}
-
-fn assert_matrix_close_or_nan(
-    actual: &RowMajorMatrix<f64>,
-    expected: &RowMajorMatrix<f64>,
-    label: &str,
-) {
-    assert_eq!(actual.n_rows(), expected.n_rows(), "{label}: row mismatch");
-    assert_eq!(
-        actual.n_cols(),
-        expected.n_cols(),
-        "{label}: column mismatch"
-    );
-    assert_slice_close_or_nan(actual.as_slice(), expected.as_slice(), label);
 }
 
 fn assert_wald_fit_intermediates_match(actual: &DeseqFit, expected: &DeseqFit, label: &str) {

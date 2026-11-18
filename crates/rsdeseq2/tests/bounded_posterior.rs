@@ -1,3 +1,5 @@
+mod common;
+use common::{r_number as number, r_numbers as numbers};
 #[macro_use]
 #[path = "support/formula_reference.rs"]
 mod reference;
@@ -29,20 +31,6 @@ struct Case {
     posterior_mean: Vec<String>,
     posterior_sd: Vec<String>,
     cdf: Vec<String>,
-}
-fn number(v: &str) -> f64 {
-    if let Some(bits) = v.strip_prefix("bits:") {
-        return f64::from_bits(u64::from_str_radix(bits, 16).unwrap());
-    }
-    match v {
-        "NaN" | "NA" => f64::NAN,
-        "Inf" => f64::INFINITY,
-        "-Inf" => f64::NEG_INFINITY,
-        _ => v.parse().unwrap(),
-    }
-}
-fn numbers(v: &[String]) -> Vec<f64> {
-    v.iter().map(|v| number(v)).collect()
 }
 fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: &mut Vec<String>) {
     if (b.is_nan() && a.is_nan()) || a == b {

@@ -1,3 +1,5 @@
+mod common;
+use common::hex_bits as bits;
 use std::error::Error;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/heavy_tail.rs"]
@@ -6,9 +8,6 @@ mod heavy_tail;
 #[path = "../tools/validation/evaluate_r_interface/random.rs"]
 mod random;
 use rsdeseq2::shrinkage::estimate_cauchy_prior_variance;
-fn bits(x: f64) -> String {
-    format!("{:016x}", x.to_bits())
-}
 fn parse_numeric_input(s: &str) -> Result<f64, Box<dyn Error>> {
     Ok(if let Some(s) = s.strip_prefix("bits:") {
         f64::from_bits(u64::from_str_radix(s, 16)?)

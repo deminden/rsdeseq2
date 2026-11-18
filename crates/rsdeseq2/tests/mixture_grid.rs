@@ -1,3 +1,5 @@
+mod common;
+use common::{r_number as number, r_numbers as numbers};
 use rsdeseq2::shrinkage::{
     MixtureComponents, MixtureFamily, MixtureGridOptions, MixturePriorPenalty, prepare_mixture_grid,
 };
@@ -25,20 +27,6 @@ struct Case {
     lower: Option<Vec<String>>,
     upper: Option<Vec<String>>,
     warnings: Vec<String>,
-}
-fn number(v: &str) -> f64 {
-    if let Some(bits) = v.strip_prefix("bits:") {
-        return f64::from_bits(u64::from_str_radix(bits, 16).unwrap());
-    }
-    match v {
-        "NA" | "NaN" => f64::NAN,
-        "Inf" => f64::INFINITY,
-        "-Inf" => f64::NEG_INFINITY,
-        _ => v.parse().unwrap(),
-    }
-}
-fn numbers(v: &[String]) -> Vec<f64> {
-    v.iter().map(|v| number(v)).collect()
 }
 fn close(actual: &[f64], expected: &[String], context: &str) {
     assert_eq!(actual.len(), expected.len(), "{context}: lengths");

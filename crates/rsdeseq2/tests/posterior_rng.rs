@@ -1,11 +1,10 @@
 //! Independent original-R seed, uniform, normal and state-transition references.
+mod common;
+use common::hex_bits as bits;
 use rsdeseq2::shrinkage::PosteriorRng;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/random.rs"]
 mod random;
-fn bits(v: f64) -> String {
-    format!("{:016x}", v.to_bits())
-}
 fn ordered(v: f64) -> u64 {
     let x = v.to_bits();
     if x >> 63 == 0 { x | 1 << 63 } else { !x }

@@ -1,10 +1,9 @@
+mod common;
+use common::hex_bits as bits;
 use std::error::Error;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/adaptive.rs"]
 mod adaptive;
-fn bits(value: f64) -> String {
-    format!("{:016x}", value.to_bits())
-}
 fn parse_numeric_input(s: &str) -> Result<f64, Box<dyn Error>> {
     Ok(if let Some(s) = s.strip_prefix("bits:") {
         f64::from_bits(u64::from_str_radix(s, 16)?)
