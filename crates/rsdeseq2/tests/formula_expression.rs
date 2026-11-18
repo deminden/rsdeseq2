@@ -78,7 +78,7 @@ fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
 #[test]
 fn sum_preserves_r_missing_precedence_across_nan_orders() {
     let na = f64::from_bits(0x7ff0_0000_0000_07a2);
-    let linux_x86 = cfg!(all(target_os = "linux", target_arch = "x86_64"));
+    let linux_x86 = rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::RLinuxX86;
     let generated_nan = if linux_x86 {
         0xfff8_0000_0000_0000
     } else {
@@ -139,7 +139,7 @@ fn sum_preserves_r_missing_precedence_across_nan_orders() {
 fn mean_preserves_r_missing_and_nan_order() {
     let na = f64::from_bits(0x7ff0_0000_0000_07a2);
     let options = EvaluationOptions::default();
-    let linux_x86 = cfg!(all(target_os = "linux", target_arch = "x86_64"));
+    let linux_x86 = rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::RLinuxX86;
     for (values, expected) in [
         (vec![na, f64::NAN], 0x7ff8_0000_0000_07a2),
         (
@@ -342,9 +342,12 @@ fn rejects_custom_calls_even_in_unused_branches_and_validates_owned_inputs() {
     );
 }
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[test]
 fn sum_cancellation_retains_r_argument_rounding_boundaries() {
+    if !(rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::RLinuxX86) {
+        // These boundaries describe R's x87 accumulation only.
+        return;
+    }
     let options = EvaluationOptions::default();
     // Original R rsum accumulates one vector in LDOUBLE, then do_summary
     // combines the individually rounded arguments in binary64.

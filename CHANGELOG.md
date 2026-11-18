@@ -7,6 +7,15 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`: the
+  platform-specific R arithmetic (x87 extended reductions and the OpenBLAS
+  Haswell dot schedule used by R on Linux x86_64) is now chosen at run time
+  instead of at compile time. The default still follows the host, so output is
+  unchanged; `RSDESEQ2_NUMERIC_PROFILE=portable|r-linux-x86_64` overrides it,
+  and the R profile can now run on any x86_64 host. Transcendental functions
+  still use the host libm, so `Portable` on Linux does not reproduce R on
+  macOS bit for bit in formula transforms that call `log10`, `expm1`, `pow`.
+
 - `_from_reader` forms of the TSV readers that open their own file:
   `read_count_matrix_tsv`, `read_labeled_design_matrix_tsv`,
   `read_labeled_size_factors_tsv`, `read_labeled_geometric_means_tsv`,

@@ -1014,11 +1014,7 @@ fn apeglm(
 // Manifest
 
 fn profile() -> &'static str {
-    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        "r-linux-x86_64"
-    } else {
-        "portable"
-    }
+    rsdeseq2::numeric_profile().name()
 }
 
 fn manifest_path() -> PathBuf {

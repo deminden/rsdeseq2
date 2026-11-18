@@ -34,11 +34,11 @@ impl Evaluator<'_> {
                     Data::Number { integer: true, .. } | Data::Logical(_) | Data::Null
                 );
                 let input = value.flattened().numeric()?;
-                #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-                let input = if input
-                    .iter()
-                    .filter(|value| !remove || !value.is_nan())
-                    .all(|value| value.is_finite())
+                let input = if crate::numeric::profile::r_linux_x86()
+                    && input
+                        .iter()
+                        .filter(|value| !remove || !value.is_nan())
+                        .all(|value| value.is_finite())
                 {
                     // R rounds each argument's extended reduction before the
                     // binary64 accumulation across variadic arguments.
@@ -61,12 +61,11 @@ impl Evaluator<'_> {
                                 if total.is_nan() {
                                     // R's accumulator yields a negative NaN
                                     // for Inf + -Inf on x86 Linux.
-                                    total =
-                                        if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                                            f64::from_bits(0xfff8_0000_0000_0000)
-                                        } else {
-                                            f64::NAN
-                                        };
+                                    total = if crate::numeric::profile::r_linux_x86() {
+                                        f64::from_bits(0xfff8_0000_0000_0000)
+                                    } else {
+                                        f64::NAN
+                                    };
                                 }
                             }
                         }
@@ -75,7 +74,7 @@ impl Evaluator<'_> {
             }
             if integer && total.is_nan() {
                 total = NA_REAL;
-            } else if missing && !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            } else if missing && !crate::numeric::profile::r_linux_x86() {
                 // Apple's R gives NA precedence over an earlier NaN. On x86
                 // Linux, R preserves the accumulator's first NaN instead.
                 total = f64::from_bits(0x7ff8_0000_0000_07a2);
@@ -131,7 +130,7 @@ impl Evaluator<'_> {
             if trim.is_nan() {
                 return Err(invalid_options("mean trim must not be missing"));
             }
-            if cfg!(all(target_os = "linux", target_arch = "x86_64"))
+            if crate::numeric::profile::r_linux_x86()
                 && trim <= 0.0
                 && x.iter().any(|value| is_na(*value))
             {
