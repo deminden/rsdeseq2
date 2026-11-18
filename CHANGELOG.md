@@ -7,6 +7,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `fit_fixed_dispersion_glm(GlmInput, design, options)` and
+  `fit_intercept_only_glm(GlmInput)`: the fixed-dispersion IRLS fit and the
+  intercept-only closed form with size-factor or normalization-factor
+  `Offsets` and optional weights.
+
 - `Offsets` (per-sample size factors or a per-cell normalization-factor
   matrix) is now public, with `GlmInput` (counts, offsets, dispersions,
   optional weights) and three beta-prior fits that take it:
@@ -137,6 +142,11 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- `fit_fixed_dispersion_irls{,_with_weights,_with_normalization_factors,_with_normalization_factors_and_weights}`
+  and `fit_intercept_only_fixed_dispersion{,_with_weights,_with_normalization_factors}`:
+  use `fit_fixed_dispersion_glm` or `fit_intercept_only_glm` with a
+  `GlmInput`. Output is unchanged; removal in 0.7.0. `fit_irls` stays.
 
 - The twelve `fit_glms_with_beta_prior_variance*`,
   `fit_glms_with_estimated_beta_prior_variance*` and

@@ -106,4 +106,99 @@ fn deprecated_beta_prior_fits_all_run() {
     for (tag, value) in outputs {
         record(tag, value);
     }
+    let one_design = DesignMatrix::intercept_only(6).unwrap();
+    #[allow(deprecated)]
+    let fits = [
+        (
+            "irls/sf",
+            s(fit_fixed_dispersion_irls(
+                &counts,
+                &design,
+                &size_factors,
+                &dispersions,
+                irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "irls/sf+w",
+            s(fit_fixed_dispersion_irls_with_weights(
+                &counts,
+                &design,
+                &size_factors,
+                &dispersions,
+                Some(&weights),
+                irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "irls/nf",
+            s(fit_fixed_dispersion_irls_with_normalization_factors(
+                &counts,
+                &design,
+                &factors,
+                &dispersions,
+                irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "irls/nf+w",
+            s(
+                fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+                    &counts,
+                    &design,
+                    &factors,
+                    &dispersions,
+                    Some(&weights),
+                    irls.clone(),
+                )
+                .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "irls/intercept-design",
+            s(fit_irls(
+                &counts,
+                &one_design,
+                &size_factors,
+                &dispersions,
+                irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "intercept/sf",
+            s(
+                fit_intercept_only_fixed_dispersion(&counts, &size_factors, &dispersions)
+                    .map(|f| format!("{f:?}")),
+            ),
+        ),
+        (
+            "intercept/sf+w",
+            s(fit_intercept_only_fixed_dispersion_with_weights(
+                &counts,
+                &size_factors,
+                &dispersions,
+                Some(&weights),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "intercept/nf+w",
+            s(
+                fit_intercept_only_fixed_dispersion_with_normalization_factors(
+                    &counts,
+                    &factors,
+                    &dispersions,
+                    Some(&weights),
+                )
+                .map(|f| format!("{f:?}")),
+            ),
+        ),
+    ];
+    for (tag, value) in fits {
+        record(tag, value);
+    }
 }

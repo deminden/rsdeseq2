@@ -1,5 +1,4 @@
 use super::*;
-use crate::normalization::Offsets;
 use std::borrow::Cow;
 // Fixed and estimated beta-prior fitting workflows.
 
@@ -59,22 +58,26 @@ pub fn fit_glms_with_beta_prior(
 ) -> Result<NbinomGlmFit, DeseqError> {
     if let (Offsets::PerSample(size_factors), None) = (input.offsets, input.weights) {
         let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-        return fit_fixed_dispersion_irls(
-            input.counts,
+        return fit_fixed_dispersion_glm(
+            GlmInput::new(
+                input.counts,
+                Offsets::PerSample(size_factors),
+                input.dispersions,
+            ),
             design,
-            size_factors,
-            input.dispersions,
             options,
         );
     }
     let normalization_factors = input.normalization_factor_matrix()?;
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
-        input.counts,
+    fit_fixed_dispersion_glm(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerCell(&normalization_factors),
+            dispersions: input.dispersions,
+            weights: input.weights,
+        },
         design,
-        &normalization_factors,
-        input.dispersions,
-        input.weights,
         options,
     )
 }
@@ -134,12 +137,14 @@ fn estimated_prior_with_factor_matrix(
         unreachable!("called with a normalization-factor matrix");
     };
     let fit_options = options.fit_options;
-    let mle_fit = fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
-        input.counts,
+    let mle_fit = fit_fixed_dispersion_glm(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerCell(normalization_factors),
+            dispersions: input.dispersions,
+            weights: input.weights,
+        },
         design,
-        normalization_factors,
-        input.dispersions,
-        input.weights,
         fit_options.clone(),
     )?;
     let beta_prior_variance = estimate_beta_prior_variance(
@@ -550,12 +555,14 @@ fn expanded_with_factor_matrix(
     }
 
     let fit_options = options.fit_options;
-    let expanded_mle_fit = fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
-        counts,
+    let expanded_mle_fit = fit_fixed_dispersion_glm(
+        GlmInput {
+            counts,
+            offsets: Offsets::PerCell(normalization_factors),
+            dispersions,
+            weights,
+        },
         design.expanded_design,
-        normalization_factors,
-        dispersions,
-        weights,
         fit_options.clone(),
     )?;
     let beta_prior_variance = estimate_beta_prior_variance(

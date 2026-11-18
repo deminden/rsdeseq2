@@ -15,11 +15,13 @@ fn glm_stages(c: &mut Criterion) {
         b.iter(|| {
             builder
                 .with_execution_context(|| {
-                    fit_fixed_dispersion_irls(
-                        black_box(&data.counts),
+                    fit_fixed_dispersion_glm(
+                        GlmInput::new(
+                            black_box(&data.counts),
+                            Offsets::PerSample(&data.size_factors),
+                            &data.dispersions,
+                        ),
                         &data.design,
-                        &data.size_factors,
-                        &data.dispersions,
                         IrlsOptions::default(),
                     )
                     .unwrap()

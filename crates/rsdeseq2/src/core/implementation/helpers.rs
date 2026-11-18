@@ -143,35 +143,39 @@ pub(super) fn fit_fixed_dispersion_model(
         && irls_options.uses_intercept_shortcut_for_coefficients(design.n_coefficients())?
     {
         match normalization_factors {
-            Some(factors) => fit_intercept_only_fixed_dispersion_with_normalization_factors(
+            Some(factors) => fit_intercept_only_glm(GlmInput {
                 counts,
-                factors,
+                offsets: Offsets::PerCell(factors),
                 dispersions,
                 weights,
-            ),
-            None => fit_intercept_only_fixed_dispersion_with_weights(
+            }),
+            None => fit_intercept_only_glm(GlmInput {
                 counts,
-                size_factors,
+                offsets: Offsets::PerSample(size_factors),
                 dispersions,
                 weights,
-            ),
+            }),
         }
     } else {
         match normalization_factors {
-            Some(factors) => fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
-                counts,
+            Some(factors) => fit_fixed_dispersion_glm(
+                GlmInput {
+                    counts,
+                    offsets: Offsets::PerCell(factors),
+                    dispersions,
+                    weights,
+                },
                 design,
-                factors,
-                dispersions,
-                weights,
                 irls_options,
             ),
-            None => fit_fixed_dispersion_irls_with_weights(
-                counts,
+            None => fit_fixed_dispersion_glm(
+                GlmInput {
+                    counts,
+                    offsets: Offsets::PerSample(size_factors),
+                    dispersions,
+                    weights,
+                },
                 design,
-                size_factors,
-                dispersions,
-                weights,
                 irls_options,
             ),
         }

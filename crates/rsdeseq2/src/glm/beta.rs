@@ -9,13 +9,12 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{
-    IrlsOptions, fit_fixed_dispersion_irls,
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights, fit_irls,
-    normalization_factors_from_size_factors,
+    IrlsOptions, fit_fixed_dispersion_glm, fit_irls, normalization_factors_from_size_factors,
 };
 use crate::glm::nb::nbinom_log_likelihood_matrix;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::normalization::Offsets;
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Method used to estimate DESeq2's beta prior variance.

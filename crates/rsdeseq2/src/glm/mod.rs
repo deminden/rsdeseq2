@@ -35,8 +35,8 @@ pub use beta::{
     fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
     fit_glms_with_estimated_beta_prior_variance_and_weights, fit_intercept_only_fixed_dispersion,
     fit_intercept_only_fixed_dispersion_with_normalization_factors,
-    fit_intercept_only_fixed_dispersion_with_weights, match_upper_quantile_for_variance,
-    match_weighted_upper_quantile_for_variance,
+    fit_intercept_only_fixed_dispersion_with_weights, fit_intercept_only_glm,
+    match_upper_quantile_for_variance, match_weighted_upper_quantile_for_variance,
 };
 pub use contrast_projection::{
     ContrastProjection, CovarianceView, InferenceEstimates, wald_test_contrast_from_estimates,
@@ -45,8 +45,9 @@ pub use contrast_view::{ContrastInference, ContrastZeroRule, PreparedContrastVie
 pub use dispersion_fit::fit_with_dispersion;
 pub use fallback::{OptimFallbackRows, optim_fallback_rows};
 pub use inference_primitives::wald_test_from_estimates;
+#[allow(deprecated)]
 pub use irls::{
-    IrlsOptions, IrlsSolver, fit_fixed_dispersion_irls,
+    IrlsOptions, IrlsSolver, fit_fixed_dispersion_glm, fit_fixed_dispersion_irls,
     fit_fixed_dispersion_irls_with_normalization_factors,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
     fit_fixed_dispersion_irls_with_weights, fit_irls,

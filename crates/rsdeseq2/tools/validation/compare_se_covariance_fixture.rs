@@ -40,14 +40,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let expected_mu = read_named_matrix(&fixture.join("mu_no_optim.tsv"))?;
     let expected_hat = read_named_matrix(&fixture.join("hat_no_optim.tsv"))?;
 
-    let fit = fit_fixed_dispersion_irls_with_normalization_factors(
-        &counts,
+    let fit = fit_fixed_dispersion_glm(
+        GlmInput::new(
+            &counts,
+            Offsets::PerCell(&normalization),
+            &genes
+                .iter()
+                .map(|gene| dispersions[gene])
+                .collect::<Vec<_>>(),
+        ),
         &design,
-        &normalization,
-        &genes
-            .iter()
-            .map(|gene| dispersions[gene])
-            .collect::<Vec<_>>(),
         IrlsOptions {
             use_optim: false,
             solver: IrlsSolver::NormalEquations,
