@@ -19,6 +19,7 @@ use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::normalization::Offsets;
 
 /// Internal retention policy; fitting and fallback arithmetic are identical.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -198,14 +199,15 @@ pub fn fit_fixed_dispersion_irls_with_weights(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
+    validate_size_factor_offsets(counts, size_factors)?;
+    fit_offsets_irls_for_output(
         counts,
         design,
-        &normalization_factors,
+        Offsets::PerSample(size_factors),
         dispersions,
         weights,
         options,
+        OutputRequirements::Inference,
     )
 }
 
@@ -257,11 +259,11 @@ pub(crate) fn fit_sf_irls_for_output(
     options: IrlsOptions,
     requirements: OutputRequirements,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
-    fit_nf_irls_for_output(
+    validate_size_factor_offsets(counts, size_factors)?;
+    fit_offsets_irls_for_output(
         counts,
         design,
-        &normalization_factors,
+        Offsets::PerSample(size_factors),
         dispersions,
         weights,
         options,
@@ -273,6 +275,26 @@ pub(crate) fn fit_nf_irls_for_output(
     counts: &CountMatrix,
     design: &DesignMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    options: IrlsOptions,
+    requirements: OutputRequirements,
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_offsets_irls_for_output(
+        counts,
+        design,
+        Offsets::PerCell(normalization_factors),
+        dispersions,
+        weights,
+        options,
+        requirements,
+    )
+}
+
+pub(crate) fn fit_offsets_irls_for_output(
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+    normalization_factors: Offsets<'_>,
     dispersions: &[f64],
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
@@ -293,6 +315,12 @@ pub(crate) fn fit_nf_irls_for_output(
         design.matrix().as_slice(),
     );
     let initial_lu = (x.transpose() * &x).lu();
+    let shared_log_offsets = match normalization_factors {
+        Offsets::PerSample(factors) => {
+            Some(factors.iter().copied().map(f64::ln).collect::<Vec<_>>())
+        }
+        Offsets::PerCell(_) => None,
+    };
     let p = design.n_coefficients();
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;
     let n_beta = checked_output_elements(counts.n_genes(), p)?;
@@ -331,6 +359,7 @@ pub(crate) fn fit_nf_irls_for_output(
             .map(|gene| {
                 fit_fixed_dispersion_irls_row(IrlsRowInput {
                     gene,
+                    shared_log_offsets: shared_log_offsets.as_deref(),
                     counts,
                     x: &x,
                     initial_lu: &initial_lu,
@@ -470,7 +499,7 @@ fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqEr
 struct OptimFallbackInput<'a> {
     counts: &'a CountMatrix,
     x: &'a DMatrix<f64>,
-    normalization_factors: &'a RowMajorMatrix<f64>,
+    normalization_factors: Offsets<'a>,
     dispersions: &'a [f64],
     weights: Option<&'a RowMajorMatrix<f64>>,
     ridge_lambda: &'a [f64],
@@ -479,10 +508,12 @@ struct OptimFallbackInput<'a> {
 
 struct IrlsRowInput<'a> {
     gene: usize,
+    /// `ln` of the size factors when every gene shares them.
+    shared_log_offsets: Option<&'a [f64]>,
     counts: &'a CountMatrix,
     x: &'a DMatrix<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
-    normalization_factors: &'a RowMajorMatrix<f64>,
+    normalization_factors: Offsets<'a>,
     dispersions: &'a [f64],
     weights: Option<&'a RowMajorMatrix<f64>>,
     ridge_lambda: &'a [f64],
