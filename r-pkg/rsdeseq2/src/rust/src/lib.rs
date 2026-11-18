@@ -6,16 +6,14 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use rsdeseq2::prelude::{
-    Analysis, DeseqFit, MeanModel, RunOutput, Stage,
-    BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
+    Analysis, DeseqFit, GlmInput, MeanModel, Offsets, RunOutput, Stage,
+    fit_glms_with_beta_prior, fit_glms_with_estimated_beta_prior,
+    BetaPriorRefitOptions,
     BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DesignMatrix,
     DispersionTrendFit, FitType, ParametricDispersionTrend, RowMajorMatrix, SizeFactorMethod,
     TestType, WaldAlternative, WaldTestOptions, base_mean, base_mean_with_weights, base_variance,
     base_variance_with_weights, estimate_beta_prior_variance, estimate_size_factors_with_options,
-    fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_estimated_beta_prior_variance,
-    fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_estimated_beta_prior_variance_and_weights, local_vst_inverse_size_factor_mean,
+    local_vst_inverse_size_factor_mean,
     local_vst_inverse_size_factor_mean_from_normalization_factors,
     normalization_factors_from_size_factors, normalized_counts, normalized_counts_with_factors,
     preprocess_observation_weights, vst_local_from_dispersion_grid, vst_mean, vst_parametric,

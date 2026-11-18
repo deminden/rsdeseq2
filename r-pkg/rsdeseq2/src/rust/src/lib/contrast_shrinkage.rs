@@ -234,15 +234,11 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 "expanded model prior variances could not be mapped to every coefficient".into(),
             );
         }
-        let prior_fit = fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights(
-            &counts,
-            &design,
-            &normalization_factors,
-            dispersions,
-            weights.as_ref(),
-            &prior_variance,
-            Default::default(),
-        )
+        let mut input = GlmInput::new(&counts, Offsets::PerCell(&normalization_factors), dispersions);
+        if let Some(weights) = weights.as_ref() {
+            input = input.weights(weights);
+        }
+        let prior_fit = fit_glms_with_beta_prior(input, &design, &prior_variance, Default::default())
         .map_err(|error| error.to_string())?;
         let wald = wald_test_contrast_with_options(
             &prior_fit,

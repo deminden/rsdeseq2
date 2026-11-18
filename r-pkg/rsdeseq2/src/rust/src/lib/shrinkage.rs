@@ -73,52 +73,28 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal(
                     .weights,
             )
         };
-        let fitted = if !normalization_factors_values.is_null() {
+        let factors;
+        let offsets = if !normalization_factors_values.is_null() {
             // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-            let factors = unsafe {
+            factors = unsafe {
                 row_major_from_column_major(n_genes, n_samples, normalization_factors_values)?
             };
-            fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
-                &counts,
-                &design,
-                BetaPriorNormalizationFactorWeightInput {
-                    normalization_factors: &factors,
-                    weights: weights.as_ref(),
-                },
-                dispersions,
-                base_mean,
-                disp_fit,
-                BetaPriorRefitOptions::default(),
-            )
+            Offsets::PerCell(&factors)
         } else {
-            let size_factors =
-                // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-                unsafe { input_slice(size_factors_values, n_samples, "size factors")? };
-            if let Some(weights) = weights.as_ref() {
-                fit_glms_with_estimated_beta_prior_variance_and_weights(
-                    &counts,
-                    &design,
-                    BetaPriorSizeFactorWeightInput {
-                        size_factors,
-                        weights: Some(weights),
-                    },
-                    dispersions,
-                    base_mean,
-                    disp_fit,
-                    BetaPriorRefitOptions::default(),
-                )
-            } else {
-                fit_glms_with_estimated_beta_prior_variance(
-                    &counts,
-                    &design,
-                    size_factors,
-                    dispersions,
-                    base_mean,
-                    disp_fit,
-                    BetaPriorRefitOptions::default(),
-                )
-            }
+            // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
+            Offsets::PerSample(unsafe { input_slice(size_factors_values, n_samples, "size factors")? })
+        };
+        let mut input = GlmInput::new(&counts, offsets, dispersions);
+        if let Some(weights) = weights.as_ref() {
+            input = input.weights(weights);
         }
+        let fitted = fit_glms_with_estimated_beta_prior(
+            input,
+            &design,
+            base_mean,
+            disp_fit,
+            BetaPriorRefitOptions::default(),
+        )
         .map_err(|error| error.to_string())?;
         if !lfc_threshold.is_finite() || lfc_threshold < 0.0 {
             return Err("lfcThreshold must be finite and non-negative".into());
