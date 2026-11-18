@@ -30,7 +30,9 @@ use crate::errors::Error;
 /// A rejected value, with the reduction index that produced it when known.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NonFinite {
+    /// The rejected value.
     pub value: f64,
+    /// The reduction index that produced it, when known.
     pub index: Option<usize>,
 }
 

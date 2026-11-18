@@ -29,7 +29,12 @@ use validation::{function_name, validate_expression, validate_value};
 #[derive(Clone, Debug, PartialEq)]
 pub enum Data {
     /// Double values, or integer values represented exactly as doubles.
-    Number { values: Vec<f64>, integer: bool },
+    Number {
+        /// The values; `NaN` marks missing (`NA`).
+        values: Vec<f64>,
+        /// Whether R stores them as integers.
+        integer: bool,
+    },
     /// Logical values with explicit missingness.
     Logical(Vec<Option<bool>>),
     /// UTF-8 text with explicit missingness.
@@ -169,7 +174,9 @@ pub enum Expression {
     Symbol(String),
     /// Built-in function/operator with positional or named arguments.
     Call {
+        /// Function or operator name.
         function: String,
+        /// Arguments in call order.
         arguments: Vec<Argument>,
     },
 }

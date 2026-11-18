@@ -115,7 +115,9 @@ pub struct CooksReplacementMetadata {
 /// Name/value metadata entry for Cook's replacement/refit summaries.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CooksReplacementMetadataEntry {
+    /// Entry name.
     pub name: String,
+    /// Entry value, formatted as text.
     pub value: String,
 }
 

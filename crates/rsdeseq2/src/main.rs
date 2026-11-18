@@ -1,3 +1,5 @@
+//! The `rsdeseq2` command-line tool; see `rsdeseq2 --help`.
+
 use std::process::ExitCode;
 
 fn main() -> ExitCode {

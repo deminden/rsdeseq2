@@ -24,6 +24,8 @@ fn logistic_loss(y: f64, p: f64) -> f64 {
     }
 }
 
+/// The 0.99 quantile of the F distribution with `df1` and `df2` degrees of
+/// freedom, as DESeq2 uses for its Cook's distance cutoff.
 pub fn f_99_quantile(df1: f64, df2: f64) -> f64 {
     // Match the established qf large-df limit policy used by DESeq2. This is
     // a compatibility approximation, applied identically by both interfaces:

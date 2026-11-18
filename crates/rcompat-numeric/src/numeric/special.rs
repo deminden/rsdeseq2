@@ -409,6 +409,7 @@ impl GammaDistribution {
         self.shape * 2.0
     }
 
+    /// Lower cumulative probability `P(X <= x)`.
     pub fn cdf(&self, x: f64) -> f64 {
         if x <= 0.0 {
             0.0
@@ -423,6 +424,7 @@ impl GammaDistribution {
         }
     }
 
+    /// Upper tail probability `P(X > x)`.
     pub fn sf(&self, x: f64) -> f64 {
         if x <= 0.0 {
             1.0

@@ -15,7 +15,10 @@ use contrasts::CodingMatrix;
 #[derive(Clone, Copy, Debug)]
 pub enum FactorCoding<'a> {
     /// Omit a zero-based reference level.
-    Treatment { base: usize },
+    Treatment {
+        /// The zero-based reference level.
+        base: usize,
+    },
     /// Sum-to-zero contrasts, with the last level represented by minus ones.
     Sum,
     /// Helmert contrasts in declared level order.
@@ -24,7 +27,9 @@ pub enum FactorCoding<'a> {
     Polynomial,
     /// A level-by-column matrix with optional suffixes for its columns.
     Matrix {
+        /// Level-by-column contrast values.
         values: MatrixView<'a, f64>,
+        /// Optional column-name suffixes.
         names: Option<&'a [String]>,
     },
 }
@@ -35,16 +40,23 @@ pub enum ModelMatrixVariable<'a> {
     /// A numeric vector or matrix. One-column variables retain the term name;
     /// wider variables append column names, or one-based column numbers.
     Numeric {
+        /// Term name.
         name: &'a str,
+        /// Sample-by-column values.
         values: MatrixView<'a, f64>,
+        /// Optional column names for wider variables.
         names: Option<&'a [String]>,
     },
     /// One-based factor codes and their declared level order, including unused
     /// levels. Logical variables can be transported as two-level factors.
     Factor {
+        /// Term name.
         name: &'a str,
+        /// One-based level code per sample.
         codes: &'a [i32],
+        /// Declared level order, including unused levels.
         levels: &'a [String],
+        /// Contrast coding.
         coding: FactorCoding<'a>,
     },
 }

@@ -63,6 +63,7 @@ fn tail_factor(q: f64) -> f64 {
             / q
     }
 }
+/// `log P(Z > q)` for a standard normal `Z`, accurate in the far tails.
 pub fn normal_log_upper_tail(q: f64) -> f64 {
     if q.is_nan() {
         return q;

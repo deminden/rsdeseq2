@@ -19,21 +19,27 @@ pub(crate) mod all_zero;
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod contrasts;
+/// Cook's distances, outlier cutoffs and outlier replacement with refits.
 pub mod cooks;
 pub mod core;
 pub use rcompat_formula::design;
+/// Per-gene fit diagnostics and their tabular exports.
 pub mod diagnostics;
 pub mod dispersion;
 pub mod errors;
 pub mod glm;
+/// DESeq2's independent filtering on the mean of normalized counts.
 pub mod independent_filtering;
 pub mod io;
 pub mod math;
 pub mod matrix;
+/// Benjamini-Hochberg adjustment as R's `p.adjust(method = "BH")`.
 pub mod multiple_testing;
+/// Size factors, normalization factors, offsets and base means.
 pub mod normalization;
 pub use numeric::{NumericProfile, numeric_profile, set_numeric_profile};
 pub(crate) use rcompat_numeric::numeric;
+/// Shared option enums (dispersion trend type, test type, size-factor method).
 pub mod options;
 pub mod prelude;
 pub(crate) use rcompat_numeric::probability;

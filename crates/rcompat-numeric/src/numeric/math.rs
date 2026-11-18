@@ -15,18 +15,31 @@ use super::profile::host_libm;
 /// Each method mirrors the `f64` method of the same name without the `_p`
 /// suffix.
 pub trait ProfileMath: Copy {
+    /// Natural logarithm.
     fn ln_p(self) -> f64;
+    /// Exponential.
     fn exp_p(self) -> f64;
+    /// Real power.
     fn powf_p(self, exponent: f64) -> f64;
+    /// Base-10 logarithm.
     fn log10_p(self) -> f64;
+    /// Base-2 logarithm.
     fn log2_p(self) -> f64;
+    /// `exp(x) - 1`.
     fn exp_m1_p(self) -> f64;
+    /// `ln(1 + x)`.
     fn ln_1p_p(self) -> f64;
+    /// Sine.
     fn sin_p(self) -> f64;
+    /// Cosine.
     fn cos_p(self) -> f64;
+    /// Tangent.
     fn tan_p(self) -> f64;
+    /// Hyperbolic sine.
     fn sinh_p(self) -> f64;
+    /// `sqrt(x^2 + y^2)` without undue overflow.
     fn hypot_p(self, other: f64) -> f64;
+    /// Inverse hyperbolic sine.
     fn asinh_p(self) -> f64;
 }
 

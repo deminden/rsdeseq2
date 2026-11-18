@@ -441,6 +441,7 @@ pub(super) fn write_logical_matrix_tsv(
     Ok(())
 }
 
+/// Write a gene x sample numeric matrix as TSV; non-finite values become `NA`.
 pub fn write_optional_numeric_matrix_tsv(
     path: impl AsRef<Path>,
     gene_names: Option<&[String]>,

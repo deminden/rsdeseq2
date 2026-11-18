@@ -1,5 +1,8 @@
 use super::*;
 
+/// Parse a primitive formula, fit the expanded beta-prior model and assemble
+/// coefficient Wald rows. Not `DESeq(betaPrior = TRUE)`: use
+/// [`Analysis::beta_prior`](crate::core::Analysis::beta_prior) for that.
 pub fn fit_expanded_formula_beta_prior_wald_results(
     input: ExpandedFormulaBetaPriorWaldResultsInput<'_>,
     coefficient: usize,

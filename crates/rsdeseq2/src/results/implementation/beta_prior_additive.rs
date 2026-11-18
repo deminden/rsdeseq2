@@ -1,4 +1,7 @@
 use super::*;
+/// Build an additive-factor expanded design, fit the expanded beta-prior
+/// model and assemble coefficient Wald rows. Not `DESeq(betaPrior = TRUE)`: use
+/// [`Analysis::beta_prior`](crate::core::Analysis::beta_prior) for that.
 pub fn fit_expanded_additive_beta_prior_wald_results(
     input: ExpandedAdditiveBetaPriorWaldResultsInput<'_>,
     coefficient: usize,

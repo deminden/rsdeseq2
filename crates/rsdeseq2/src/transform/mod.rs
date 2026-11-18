@@ -1,7 +1,10 @@
 //! Implemented and planned DESeq2-compatible transformations.
 
+/// Normalized-count transformations (`normTransform`).
 pub mod norm;
+/// The regularized log transformation (`rlog`).
 pub mod rlog;
+/// The variance-stabilizing transformation (`vst`, `varianceStabilizingTransformation`).
 pub mod vst;
 
 pub use norm::{norm_transform, norm_transform_value};

@@ -1,17 +1,24 @@
 //! Negative-binomial GLM fitting primitives.
 
+/// Beta-prior (ridge) GLM fits and prior-variance estimation.
 pub mod beta;
 mod contrast_projection;
 mod contrast_view;
+/// GLM fits paired with dispersion estimates.
 pub mod dispersion_fit;
+/// Rows routed to the L-BFGS-B fallback after IRLS fails to converge.
 pub mod fallback;
 pub(crate) mod inference;
 mod inference_primitives;
+/// Iteratively reweighted least squares for fixed-dispersion GLMs.
 pub mod irls;
+/// Likelihood-ratio tests between full and reduced fits.
 pub mod lrt;
 pub mod nb;
 mod r_arithmetic;
+/// Wald tests for coefficients and numeric contrasts.
 pub mod wald;
+/// Observation-weight preprocessing (`getAndCheckWeights`).
 pub mod weights;
 
 #[allow(deprecated)]

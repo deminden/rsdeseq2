@@ -1,7 +1,9 @@
 //! Dispersion estimation stages and DESeq2-shaped low-level primitives.
 
 pub mod gene_est;
+/// Maximum a posteriori (MAP) dispersion shrinkage towards the trend.
 pub mod map;
+/// The dispersion prior variance (`estimateDispersionsPriorVar`).
 pub mod prior;
 pub mod trend;
 
