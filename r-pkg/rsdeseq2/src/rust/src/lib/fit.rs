@@ -103,6 +103,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             };
             builder = builder.observation_weights(weights);
         }
+        let mut reduced_design = None;
         if selected_test_type == TestType::Lrt {
             // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
             let reduced_matrix = unsafe {
@@ -115,25 +116,26 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 None,
             )
             .map_err(|error| error.to_string())?;
-            builder = builder.reduced_design(reduced);
+            reduced_design = Some(reduced);
         }
-        let (fit, results, replacement) = if min_replicates_for_replace == 0 {
-            let result = builder.fit_with_results(&counts, &design)
-                .map_err(|error| error.to_string())?;
-            (result.0, result.1, None)
-        } else {
-            let mut replacement_options = CooksReplacementOptions::new(cooks_replacement_cutoff);
-            replacement_options.min_replicates = min_replicates_for_replace;
-            let output = builder
-                .fit_with_test_results_with_cooks_replacement(
-                    &counts,
-                    &design,
-                    &replacement_options,
-                )
-                .map_err(|error| error.to_string())?;
-            let (merged_fit, results, plan) = output.into_merged_fit()
-                .map_err(|error| error.to_string())?;
-            (merged_fit, results, Some(plan))
+        // DESeq() defaults: automatic dispersion means, the last coefficient.
+        let mut request = Analysis::new(&counts, &design);
+        if let Some(reduced) = &reduced_design {
+            request = request.lrt(reduced);
+        }
+        let mut replacement_options = CooksReplacementOptions::new(cooks_replacement_cutoff);
+        replacement_options.min_replicates = min_replicates_for_replace;
+        if min_replicates_for_replace != 0 {
+            request = request.cooks_replacement(&replacement_options);
+        }
+        let (fit, results, replacement) = match builder.run(&request).map_err(|error| error.to_string())? {
+            RunOutput::Results { fit, results } => (fit, results, None),
+            RunOutput::Replacement(output) => {
+                let (merged_fit, results, plan) = output.into_merged_fit()
+                    .map_err(|error| error.to_string())?;
+                (merged_fit, results, Some(plan))
+            }
+            _ => return Err("the fit run returned no results".into()),
         };
         fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
         lrt_df[0] = fit.lrt.as_ref().map(|lrt| i32::try_from(lrt.degrees_of_freedom)

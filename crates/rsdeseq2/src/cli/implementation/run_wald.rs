@@ -337,141 +337,103 @@ pub(super) fn run_wald(command: Commands) -> Result<(), DeseqError> {
                         cutoff,
                     )?
                 }
-            } else if let Some(contrast) = contrast {
-                if let Some(cutoff) = cutoff {
-                    cli_wald_replacement_output(
-                        builder.fit_wald_glm_mu_contrast_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &contrast,
-                            &CooksReplacementOptions::new(cutoff),
-                        )?,
-                    )
-                } else {
-                    cli_fit_output(builder.fit_wald_glm_mu_contrast(&counts, &design, &contrast)?)
-                }
-            } else if let Some(contrast_name) = contrast_name {
-                let contrast = ContrastSpec::coefficient_name(contrast_name);
-                if let Some(cutoff) = cutoff {
-                    cli_wald_replacement_output(
-                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &contrast,
-                            &CooksReplacementOptions::new(cutoff),
-                        )?,
-                    )
-                } else {
-                    cli_fit_output(
-                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
-                    )
-                }
-            } else if contrast_positive.is_some() || contrast_negative.is_some() {
-                let contrast = ContrastSpec::list_with_values(
-                    contrast_positive.unwrap_or_default(),
-                    contrast_negative.unwrap_or_default(),
-                    contrast_positive_weight,
-                    contrast_negative_weight,
-                );
-                if let Some(cutoff) = cutoff {
-                    cli_wald_replacement_output(
-                        builder.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &contrast,
-                            &CooksReplacementOptions::new(cutoff),
-                        )?,
-                    )
-                } else {
-                    cli_fit_output(
-                        builder.fit_wald_glm_mu_contrast_spec(&counts, &design, &contrast)?,
-                    )
-                }
-            } else if contrast_factor.is_some()
-                || contrast_numerator.is_some()
-                || contrast_denominator.is_some()
-                || contrast_reference.is_some()
-                || contrast_sample_levels.is_some()
-            {
-                let factor_inputs = usize::from(contrast_factor.is_some())
-                    + usize::from(contrast_numerator.is_some())
-                    + usize::from(contrast_denominator.is_some());
-                let factor = contrast_factor.ok_or_else(|| DeseqError::InvalidDimensions {
-                    context: "factor-level contrast inputs".to_string(),
-                    expected: 3,
-                    actual: factor_inputs,
-                })?;
-                let numerator =
-                    contrast_numerator.ok_or_else(|| DeseqError::InvalidDimensions {
-                        context: "factor-level contrast inputs".to_string(),
-                        expected: 3,
-                        actual: factor_inputs,
-                    })?;
-                let denominator =
-                    contrast_denominator.ok_or_else(|| DeseqError::InvalidDimensions {
-                        context: "factor-level contrast inputs".to_string(),
-                        expected: 3,
-                        actual: factor_inputs,
-                    })?;
-                let path = contrast_sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "factor-level results contrast requires --contrast-sample-levels"
-                        .to_string(),
-                })?;
-                let levels = align_sample_levels_to_samples(
-                    &read_sample_levels_tsv(path)?,
-                    counts
-                        .sample_names()
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "count sample names are required to align sample levels"
-                                .to_string(),
-                        })?,
-                )?;
-                let contrast = match contrast_reference {
-                    Some(reference) => ResultsContrast::character_with_reference(
-                        factor,
-                        numerator,
-                        denominator,
-                        reference,
-                    ),
-                    None => ResultsContrast::character(factor, numerator, denominator),
-                };
-                if let Some(cutoff) = cutoff {
-                    let output = builder
-                        .fit_with_test_results_contrast_request_with_cooks_replacement(
-                            &counts,
-                            &design,
-                            &contrast,
-                            Some(&levels),
-                            &CooksReplacementOptions::new(cutoff),
-                        )?;
-                    let CooksReplacementTestOutput::Wald(output) = output else {
-                        return Err(invariant("Wald CLI branch should route to Wald"));
-                    };
-                    cli_wald_replacement_output(output)
-                } else {
-                    cli_fit_output(builder.fit_with_results_contrast_request(
-                        &counts,
-                        &design,
-                        &contrast,
-                        Some(&levels),
-                    )?)
-                }
             } else {
-                let coefficient = match (coefficient, coefficient_name) {
-                    (Some(coefficient), None) => coefficient,
-                    (None, Some(name)) => resolve_coefficient_index(&design, &name)?,
-                    (None, None) => default_cli_coefficient(&design)?,
-                    (Some(_), Some(_)) => return Err(invariant("checked above")),
-                };
-                if let Some(cutoff) = cutoff {
-                    cli_wald_replacement_output(builder.fit_wald_glm_mu_with_cooks_replacement(
-                        &counts,
-                        &design,
-                        coefficient,
-                        &CooksReplacementOptions::new(cutoff),
-                    )?)
+                // One run request: the column comes from whichever contrast
+                // or coefficient option was given.
+                let spec;
+                let character;
+                let levels;
+                let column = if let Some(contrast) = &contrast {
+                    ResultColumn::Numeric(contrast)
+                } else if let Some(contrast_name) = contrast_name {
+                    spec = ContrastSpec::coefficient_name(contrast_name);
+                    ResultColumn::Spec(&spec)
+                } else if contrast_positive.is_some() || contrast_negative.is_some() {
+                    spec = ContrastSpec::list_with_values(
+                        contrast_positive.unwrap_or_default(),
+                        contrast_negative.unwrap_or_default(),
+                        contrast_positive_weight,
+                        contrast_negative_weight,
+                    );
+                    ResultColumn::Spec(&spec)
+                } else if contrast_factor.is_some()
+                    || contrast_numerator.is_some()
+                    || contrast_denominator.is_some()
+                    || contrast_reference.is_some()
+                    || contrast_sample_levels.is_some()
+                {
+                    let factor_inputs = usize::from(contrast_factor.is_some())
+                        + usize::from(contrast_numerator.is_some())
+                        + usize::from(contrast_denominator.is_some());
+                    let factor = contrast_factor.ok_or_else(|| DeseqError::InvalidDimensions {
+                        context: "factor-level contrast inputs".to_string(),
+                        expected: 3,
+                        actual: factor_inputs,
+                    })?;
+                    let numerator =
+                        contrast_numerator.ok_or_else(|| DeseqError::InvalidDimensions {
+                            context: "factor-level contrast inputs".to_string(),
+                            expected: 3,
+                            actual: factor_inputs,
+                        })?;
+                    let denominator =
+                        contrast_denominator.ok_or_else(|| DeseqError::InvalidDimensions {
+                            context: "factor-level contrast inputs".to_string(),
+                            expected: 3,
+                            actual: factor_inputs,
+                        })?;
+                    let path =
+                        contrast_sample_levels.ok_or_else(|| DeseqError::InvalidOptions {
+                            reason:
+                                "factor-level results contrast requires --contrast-sample-levels"
+                                    .to_string(),
+                        })?;
+                    levels = align_sample_levels_to_samples(
+                        &read_sample_levels_tsv(path)?,
+                        counts
+                            .sample_names()
+                            .ok_or_else(|| DeseqError::InvalidOptions {
+                                reason: "count sample names are required to align sample levels"
+                                    .to_string(),
+                            })?,
+                    )?;
+                    character = match contrast_reference {
+                        Some(reference) => ResultsContrast::character_with_reference(
+                            factor,
+                            numerator,
+                            denominator,
+                            reference,
+                        ),
+                        None => ResultsContrast::character(factor, numerator, denominator),
+                    };
+                    ResultColumn::Results {
+                        contrast: &character,
+                        sample_levels: Some(&levels),
+                        model_frame: None,
+                    }
                 } else {
-                    cli_fit_output(builder.fit_wald_glm_mu(&counts, &design, coefficient)?)
+                    ResultColumn::Coefficient(match (coefficient, coefficient_name) {
+                        (Some(coefficient), None) => coefficient,
+                        (None, Some(name)) => resolve_coefficient_index(&design, &name)?,
+                        (None, None) => default_cli_coefficient(&design)?,
+                        (Some(_), Some(_)) => return Err(invariant("checked above")),
+                    })
+                };
+                // The builder selects dispersion means automatically, so the
+                // GLM-mu request is DESeq2's default path.
+                let replacement = cutoff.map(CooksReplacementOptions::new);
+                let mut request = Analysis::new(&counts, &design)
+                    .means(MeanModel::GlmMu)
+                    .result(column);
+                if let Some(options) = &replacement {
+                    request = request.cooks_replacement(options);
+                }
+                match builder.run(&request)? {
+                    RunOutput::Results { fit, results } => cli_fit_output((fit, results)),
+                    RunOutput::Replacement(CooksReplacementTestOutput::Wald(output)) => {
+                        cli_wald_replacement_output(output)
+                    }
+                    _ => return Err(invariant("Wald CLI run should return Wald results")),
                 }
             };
             let sidecars = CliCooksOutputPaths {

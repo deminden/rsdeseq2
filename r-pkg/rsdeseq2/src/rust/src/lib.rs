@@ -6,6 +6,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use rsdeseq2::prelude::{
+    Analysis, DeseqFit, MeanModel, RunOutput, Stage,
     BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions, BetaPriorSizeFactorWeightInput,
     BetaPriorVarianceOptions, CooksReplacementOptions, CountMatrix, DeseqBuilder, DesignMatrix,
     DispersionTrendFit, FitType, ParametricDispersionTrend, RowMajorMatrix, SizeFactorMethod,

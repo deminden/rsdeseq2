@@ -108,9 +108,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
             1 => {
                 let (fit, rlog) = if frozen_intercept_values.is_null() {
                     if !frozen_disp_fit_values.is_null() {
-                        let mut fit = builder
-                            .fit_dispersion_trend_glm_mu(&counts, &design)
-                            .map_err(|error| error.to_string())?;
+                        let mut fit = trend_stage_fit(&builder, &counts, &design)?;
                         // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
                         fit.disp_fit = Some(unsafe {
                             input_slice(frozen_disp_fit_values, n_genes, "frozen rlog dispFit")?
@@ -138,9 +136,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                     let frozen_intercept = unsafe {
                         input_slice(frozen_intercept_values, n_genes, "frozen rlog intercepts")?
                     };
-                    let fit = builder
-                        .fit_dispersion_trend_glm_mu(&counts, &design)
-                        .map_err(|error| error.to_string())?;
+                    let fit = trend_stage_fit(&builder, &counts, &design)?;
                     let rlog = builder
                         .with_execution_context(|| fit.frozen_rlog(&counts, frozen_intercept, sample_prior_variance))
                         .and_then(|result| result)
@@ -261,9 +257,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                         .map_err(|error| error.to_string())?;
                     (transformed, size_factors)
                 } else {
-                    let fit = builder
-                        .fit_dispersion_trend_glm_mu(&counts, &design)
-                        .map_err(|error| error.to_string())?;
+                    let fit = trend_stage_fit(&builder, &counts, &design)?;
                     let transformed = fit.vst(&counts).map_err(|error| error.to_string())?;
                     fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
                     (transformed, fit.size_factors)
@@ -293,5 +287,20 @@ fn fit_type_code(trend: Option<&DispersionTrendFit>, requested: i32) -> i32 {
         Some(DispersionTrendFit::Local(_)) => 1,
         Some(DispersionTrendFit::Mean(_)) => 2,
         None => requested,
+    }
+}
+
+/// Run the pipeline through the dispersion trend with GLM fitted means.
+fn trend_stage_fit(
+    builder: &DeseqBuilder,
+    counts: &CountMatrix,
+    design: &DesignMatrix,
+) -> Result<DeseqFit, String> {
+    let request = Analysis::new(counts, design)
+        .means(MeanModel::GlmMu)
+        .stop_after(Stage::Trend);
+    match builder.run(&request).map_err(|error| error.to_string())? {
+        RunOutput::Fit(fit) => Ok(fit),
+        _ => Err("the trend-stage run returned no fit".into()),
     }
 }
