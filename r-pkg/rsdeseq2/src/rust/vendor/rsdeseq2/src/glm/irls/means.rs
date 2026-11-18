@@ -9,6 +9,57 @@ pub(super) fn initial_beta(
     initial_beta_impl(x, y, nf, None)
 }
 
+/// How `fitNbinomGLMs` (DESeq2 1.52, R/fitNbinomGLMs.R) starts IRLS.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::glm) enum InitialBeta {
+    /// Full-rank design (`qr(x)$rank == ncol(x)`): least squares on
+    /// `log(normalized count + 0.1)`.
+    LeastSquares,
+    /// Rank-deficient design with an `Intercept` column: that coefficient
+    /// starts at `log(rowMeans(normalized counts))`, the others at 0.
+    LogBaseMeanIntercept(usize),
+    /// Rank-deficient design without an intercept: every coefficient is 1.
+    Ones,
+}
+
+impl InitialBeta {
+    pub(in crate::glm) fn for_design(design: &DesignMatrix) -> Result<Self, DeseqError> {
+        if design.rank()? == design.n_coefficients() {
+            return Ok(Self::LeastSquares);
+        }
+        let intercept = design.coefficient_names().and_then(|names| {
+            names
+                .iter()
+                .position(|name| name == "Intercept" || name == "(Intercept)")
+        });
+        Ok(intercept.map_or(Self::Ones, Self::LogBaseMeanIntercept))
+    }
+}
+
+/// Starting coefficients by DESeq2's rule for this design.
+pub(super) fn initial_beta_for_rule(
+    x: &DMatrix<f64>,
+    y: &[f64],
+    nf: &[f64],
+    initial_lu: Option<&LU<f64, Dyn, Dyn>>,
+    rule: InitialBeta,
+) -> Result<DVector<f64>, DeseqError> {
+    match rule {
+        InitialBeta::LeastSquares => initial_beta_impl(x, y, nf, initial_lu),
+        InitialBeta::Ones => Ok(DVector::from_element(x.ncols(), 1.0)),
+        InitialBeta::LogBaseMeanIntercept(intercept) => {
+            let mut total = 0.0;
+            for (count, factor) in y.iter().copied().zip(nf.iter().copied()) {
+                validate_positive_finite(factor, "normalization factor", 0)?;
+                total += count / factor;
+            }
+            let mut beta = DVector::from_element(x.ncols(), 0.0);
+            beta[intercept] = (total / y.len() as f64).ln();
+            Ok(beta)
+        }
+    }
+}
+
 pub(super) fn initial_beta_impl(
     x: &DMatrix<f64>,
     y: &[f64],

@@ -5,7 +5,7 @@ impl DeseqBuilder {
     /// Apply the implemented GLM-mu rlog workflow in one builder call.
     ///
     /// This fits GLM-mu gene-wise dispersions and the selected trend, then
-    /// applies the fit-state rlog transform with default IRLS options. As in
+    /// applies the fit-state rlog transform with `IrlsOptions::deseq2_rlog()`. As in
     /// DESeq2's `rlogData`, sample effects are fit with the trend values before
     /// MAP shrinkage to final per-gene dispersions.
     pub fn rlog_glm_mu(
@@ -47,7 +47,7 @@ impl DeseqBuilder {
             return pool.install(|| self.rlog_glm_mu_with_fit(counts, design));
         }
 
-        self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
+        self.rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
     }
 
     /// Apply the implemented GLM-mu rlog workflow with explicit options and retained fit state.
@@ -82,7 +82,7 @@ impl DeseqBuilder {
             return pool.install(|| self.frozen_rlog_glm_mu_with_fit(counts, design));
         }
 
-        self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::default())
+        self.frozen_rlog_glm_mu_with_fit_and_options(counts, design, IrlsOptions::deseq2_rlog())
     }
 
     /// Learn rlog intercepts and run frozen rlog with explicit IRLS options.
@@ -149,7 +149,7 @@ impl DeseqBuilder {
             return pool.install(|| self.blind_rlog_glm_mu_with_fit(counts));
         }
 
-        self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
+        self.blind_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
     }
 
     /// Apply blind GLM-mu rlog with explicit options and retained fit state.
@@ -180,7 +180,7 @@ impl DeseqBuilder {
             return pool.install(|| self.blind_frozen_rlog_glm_mu_with_fit(counts));
         }
 
-        self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::default())
+        self.blind_frozen_rlog_glm_mu_with_fit_and_options(counts, IrlsOptions::deseq2_rlog())
     }
 
     /// Learn blind rlog intercepts and run frozen rlog with explicit IRLS options.

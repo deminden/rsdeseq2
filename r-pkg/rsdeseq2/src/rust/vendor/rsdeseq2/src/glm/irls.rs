@@ -120,6 +120,18 @@ impl Default for IrlsOptions {
 }
 
 impl IrlsOptions {
+    /// The settings DESeq2 1.52 `rlogData` passes to `fitNbinomGLMs`:
+    /// `betaTol = 1e-4`, `useOptim = FALSE`, `useQR = TRUE`; everything else
+    /// as [`IrlsOptions::default`].
+    pub fn deseq2_rlog() -> Self {
+        Self {
+            beta_tol: 1e-4,
+            use_optim: false,
+            solver: IrlsSolver::Qr,
+            ..Self::default()
+        }
+    }
+
     /// Set natural-log-scale ridge values, one per coefficient.
     pub fn ridge_lambda_by_coefficient(mut self, ridge_lambda: Vec<f64>) -> Self {
         self.ridge_lambda_by_coefficient = Some(ridge_lambda);
@@ -315,6 +327,7 @@ pub(crate) fn fit_offsets_irls_for_output(
         design.matrix().as_slice(),
     );
     let initial_lu = (x.transpose() * &x).lu();
+    let initial_beta = InitialBeta::for_design(design)?;
     let shared_log_offsets = match normalization_factors {
         Offsets::PerSample(factors) => {
             Some(factors.iter().copied().map(f64::ln).collect::<Vec<_>>())
@@ -363,6 +376,7 @@ pub(crate) fn fit_offsets_irls_for_output(
                     counts,
                     x: &x,
                     initial_lu: &initial_lu,
+                    initial_beta,
                     normalization_factors,
                     dispersions,
                     weights,
@@ -513,6 +527,7 @@ struct IrlsRowInput<'a> {
     counts: &'a CountMatrix,
     x: &'a DMatrix<f64>,
     initial_lu: &'a LU<f64, Dyn, Dyn>,
+    initial_beta: InitialBeta,
     normalization_factors: Offsets<'a>,
     dispersions: &'a [f64],
     weights: Option<&'a RowMajorMatrix<f64>>,

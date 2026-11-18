@@ -30,7 +30,8 @@ pub(super) fn fit_fixed_dispersion_irls_row(
     };
     let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
     let dispersion = input.dispersions[gene];
-    let mut beta = initial_beta_impl(input.x, &y, nf, Some(input.initial_lu))?;
+    let mut beta =
+        initial_beta_for_rule(input.x, &y, nf, Some(input.initial_lu), input.initial_beta)?;
     let mut mu =
         fitted_mu_impl_with_logs(input.x, &beta, nf, Some(input.options.min_mu), Some(log_nf))?;
     let likelihood = FixedDispersionLikelihood::new(input.counts.row(gene)?, dispersion);
