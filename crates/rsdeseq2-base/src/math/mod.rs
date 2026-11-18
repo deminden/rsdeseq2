@@ -1,11 +1,16 @@
 //! Small numerical helpers used by the core algorithms.
 
+/// DESeq2-parameterized negative-binomial likelihood helpers.
 pub mod distributions;
 #[doc(hidden)]
 pub mod elementary;
+/// Medians as R's `median()` computes them.
 pub mod median;
+/// Normal-distribution log tail probabilities.
 pub mod normal;
+/// A small deterministic bounded optimizer.
 pub mod optim;
+/// Matrix rank by Gaussian elimination and by R's pivoted QR rule.
 pub mod rank;
 
 /// Former name of [`rank`], which computes ranks and has no QR factorization.
@@ -13,6 +18,7 @@ pub mod rank;
 pub mod qr {
     pub use super::rank::*;
 }
+/// The trigamma function.
 pub mod special;
 
 pub use distributions::{

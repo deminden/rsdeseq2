@@ -12,26 +12,41 @@ pub enum DeseqError {
     /// Matrix or vector dimensions do not match the requested shape.
     #[error("invalid dimensions for {context}: expected {expected}, got {actual}")]
     InvalidDimensions {
+        /// What was being checked.
         context: String,
+        /// The required length or count.
         expected: usize,
+        /// The length or count supplied.
         actual: usize,
     },
 
     /// Count data failed validation.
     #[error("invalid counts: {reason}")]
-    InvalidCounts { reason: String },
+    InvalidCounts {
+        /// What is wrong with the counts.
+        reason: String,
+    },
 
     /// Size factors failed validation or could not be estimated.
     #[error("invalid size factors: {reason}")]
-    InvalidSizeFactors { reason: String },
+    InvalidSizeFactors {
+        /// What is wrong with the size factors.
+        reason: String,
+    },
 
     /// Dispersion values failed validation.
     #[error("invalid dispersion: {reason}")]
-    InvalidDispersion { reason: String },
+    InvalidDispersion {
+        /// What is wrong with the dispersions.
+        reason: String,
+    },
 
     /// Analysis options failed validation.
     #[error("invalid options: {reason}")]
-    InvalidOptions { reason: String },
+    InvalidOptions {
+        /// What is wrong with the options.
+        reason: String,
+    },
 
     /// No rows can contribute to median-ratio size-factor estimation.
     #[error("no usable genes for size-factor estimation")]
@@ -44,14 +59,20 @@ pub enum DeseqError {
         if value.is_finite() { "out-of-range" } else { "non-finite" }
     )]
     NonFiniteValue {
+        /// Where the value occurred.
         context: String,
+        /// Its index (gene, sample or element), when known.
         index: Option<usize>,
+        /// The offending value.
         value: f64,
     },
 
     /// The requested behavior is not implemented yet.
     #[error("unsupported feature: {feature}")]
-    UnsupportedFeature { feature: String },
+    UnsupportedFeature {
+        /// The unsupported request.
+        feature: String,
+    },
 
     /// I/O error.
     #[error(transparent)]
@@ -63,11 +84,21 @@ pub enum DeseqError {
 
     /// Integer parsing error in an input table.
     #[error("failed to parse integer value '{value}' in {context}")]
-    ParseInt { context: String, value: String },
+    ParseInt {
+        /// Where the value occurred.
+        context: String,
+        /// The text that failed to parse.
+        value: String,
+    },
 
     /// Floating-point parsing error in an input table.
     #[error("failed to parse floating-point value '{value}' in {context}")]
-    ParseFloat { context: String, value: String },
+    ParseFloat {
+        /// Where the value occurred.
+        context: String,
+        /// The text that failed to parse.
+        value: String,
+    },
 
     /// A named parameter is outside its domain, for example a tolerance that
     /// must be finite and positive.
