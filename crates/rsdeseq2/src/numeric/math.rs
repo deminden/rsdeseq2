@@ -27,6 +27,7 @@ pub(crate) trait ProfileMath: Copy {
     fn tan_p(self) -> f64;
     fn sinh_p(self) -> f64;
     fn hypot_p(self, other: f64) -> f64;
+    fn asinh_p(self) -> f64;
 }
 
 impl ProfileMath for f64 {
@@ -135,6 +136,15 @@ impl ProfileMath for f64 {
             self.hypot(other)
         } else {
             libm::hypot(self, other)
+        }
+    }
+
+    #[inline]
+    fn asinh_p(self) -> f64 {
+        if host_libm() {
+            self.asinh()
+        } else {
+            libm::asinh(self)
         }
     }
 }
