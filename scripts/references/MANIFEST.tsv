@@ -1,0 +1,72 @@
+# Which script writes each file under crates/rsdeseq2/tests/data.
+# Columns: glob (relative to tests/data), generator, note. The first matching
+# row wins, so specific globs come before the directory-wide ones. A generator
+# of "-" means the file has no generator; the note says why.
+# Checked by scripts/tests/test_reference_manifest.py.
+pattern	generator	note
+README.md	-	index of this directory
+cli_help/*.txt	crates/rsdeseq2/tests/cli_help.rs	written by the test itself with RSDESEQ2_UPDATE_HELP=1
+breadth/*/reference_results_beta_prior.tsv	scripts/references/generate_beta_prior_references.R	
+breadth/*/reference_beta_prior_variance.tsv	scripts/references/generate_beta_prior_references.R	
+breadth/*/*	scripts/references/generate_breadth_references.R	
+deseq2_reference/hard_se_covariance_*.tsv	scripts/references/generate_se_covariance_hard_fixtures.R	copied in under the hard_se_covariance_ prefix; deseq2/io.R keeps these on regeneration
+deseq2_reference/*	scripts/references/generate_deseq2_references.R	helpers in scripts/references/deseq2/
+gtex_auto_dispersion/*	scripts/references/generate_gtex_auto_dispersion_reference.R	
+gtex_end_to_end/*	scripts/references/generate_gtex_end_to_end_reference.R	
+gtex_v8_real_wald/compact/*	scripts/references/generate_gtex_compact_fixture.py	calls generate_gtex_compact_reference.R
+gtex_v8_real_wald/*	scripts/references/generate_gtex_real_wald_fixture.py	calls generate_gtex_real_wald_reference.R
+pasilla_holdout/*	scripts/references/generate_pasilla_validation.py	calls generate_pasilla_reference.R
+rank_r462.tsv	-	frozen by hand from R 4.6.2 qr() rank decisions; no generator committed
+rank_reference_r462.json	scripts/references/generate_rank_reference.R	
+formula_elementary_boundaries_r462.json	scripts/references/generate_elementary_expression_reference.R	
+fixed_prior_controls_r462.json	scripts/references/generate_fixed_prior_control_reference.R	
+formula_expression_extended_r462*.json	scripts/references/generate_extended_formula_reference.R	
+likelihood_warnings_r462.json	scripts/references/generate_likelihood_warning_reference.R	
+sqp_controls_r462.json	scripts/references/generate_sqp_control_reference.R	
+student_beta_mathematical.json	scripts/references/generate_beta_mathematical_reference.py	
+student_uniform_posterior_r462.json	scripts/references/generate_student_uniform_reference.R	
+inference_r462.tsv*	scripts/references/generate_inference_reference.R	the .session.txt is written alongside
+adaptive_result_r462*.json	scripts/references/generate_adaptive_result_reference.R	
+ashr_advanced_optimizer_r462*.json	scripts/references/generate_ashr_advanced_optimizer_reference.R	
+ashr_mode_r462*.json	scripts/references/generate_ashr_mode_reference.R	
+ashr_optimizer_r462*.json	scripts/references/generate_ashr_optimizer_reference.R	
+ashr_output_r462*.json	scripts/references/generate_ashr_output_reference.R	
+beta_binomial_posterior_r462*.json	scripts/references/generate_beta_binomial_posterior_reference.R	
+cauchy_posterior_r462*.json	scripts/references/generate_cauchy_posterior_reference.R	
+compiled_method_policy_r462*.json	scripts/references/generate_compiled_method_policy_reference.R	
+continuous_likelihood_r462*.json	scripts/references/generate_continuous_likelihood_reference.R	
+cooks_policy_r462*.json	scripts/references/generate_cooks_policy_reference.R	
+count_likelihood_r462*.json	scripts/references/generate_count_likelihood_reference.R	
+count_mode_r462*.json	scripts/references/generate_count_mode_reference.R	
+custom_likelihood_r462*.json	scripts/references/generate_custom_likelihood_reference.R	
+formula_expression_r462*.json	scripts/references/generate_formula_expression_reference.R	
+formula_fitting_r462*.json	scripts/references/generate_formula_fitting_reference.R	
+frozen_local_vst_r462*.json	scripts/references/generate_frozen_local_vst_reference.R	
+interior_mixture_truth.json	scripts/references/generate_interior_mixture_truth.py	
+large_shape_density_truth.json	scripts/references/generate_large_shape_density_truth.py	
+large_shape_likelihood_r462*.json	scripts/references/generate_large_shape_likelihood_reference.R	
+location_shrinkage_r462*.json	scripts/references/generate_location_shrinkage_reference.R	
+mixture_convergence_r462*.json	scripts/references/generate_mixture_convergence_reference.R	
+mixture_fit_r462*.json	scripts/references/generate_mixture_fit_reference.R	
+mixture_grid_r462*.json	scripts/references/generate_mixture_grid_reference.R	
+model_matrix_r462*.json	scripts/references/generate_model_matrix_reference.R	
+native_factor_r462*.json	scripts/references/generate_native_factor_reference.R	
+native_formula_r462*.json	scripts/references/generate_native_formula_reference.R	
+normal_log_r462*.json	scripts/references/generate_normal_log_reference.R	
+normal_mixture_posterior_r462*.json	scripts/references/generate_normal_mixture_posterior_reference.R	
+normalmix_capture_r462*.json	scripts/references/generate_normalmix_capture_reference.R	
+numeric_transform_r462*.json	scripts/references/generate_numeric_transform_reference.R	
+posterior_analysis_r462*.json	scripts/references/generate_posterior_analysis_reference.R	
+posterior_rng_r462*.json	scripts/references/generate_posterior_rng_reference.R	
+random_start_posterior_r462*.json	scripts/references/generate_random_start_posterior_reference.R	
+regression_density_truth.json	scripts/references/generate_regression_density_truth.py	
+regression_method_policy_r462*.json	scripts/references/generate_regression_method_policy_reference.R	
+regression_posterior_r462*.json	scripts/references/generate_regression_posterior_reference.R	
+replacement_execution_r462*.json	scripts/references/generate_replacement_execution_reference.R	
+row_preparation_r462*.json	scripts/references/generate_row_preparation_reference.R	
+sparse_sqp_r462*.json	scripts/references/generate_sparse_sqp_reference.R	
+student_component_leaves_r462*.json	scripts/references/generate_student_component_leaves.R	
+truncated_posterior_r462*.json	scripts/references/generate_truncated_posterior_reference.R	
+uniform_posterior_r462*.json	scripts/references/generate_uniform_posterior_reference.R	
+weighted_refit_metadata_r462*.json	scripts/references/generate_weighted_refit_metadata_reference.R	
+weighted_replacement_state_r462*.json	scripts/references/generate_weighted_replacement_state_reference.R	
