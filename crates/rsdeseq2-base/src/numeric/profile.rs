@@ -86,6 +86,7 @@ impl NumericProfile {
 
     /// Whether `log`, `exp`, `pow` and the other elementary functions come
     /// from the host C library (the R profiles) rather than pure Rust.
+    #[inline]
     pub fn uses_host_libm(self) -> bool {
         !matches!(self, Self::Portable)
     }
@@ -105,27 +106,33 @@ fn encode(profile: NumericProfile) -> u8 {
 /// The active profile. The first call reads `RSDESEQ2_NUMERIC_PROFILE`; when it
 /// is unset, unknown or unavailable, [`NumericProfile::host_default`]
 /// (`Portable`) is used.
+#[inline]
 pub fn numeric_profile() -> NumericProfile {
     match PROFILE.load(Ordering::Relaxed) {
         0 => NumericProfile::Portable,
         1 => NumericProfile::RLinuxX86,
         2 => NumericProfile::RMacos,
-        _ => {
-            let profile = std::env::var("RSDESEQ2_NUMERIC_PROFILE")
-                .ok()
-                .and_then(|name| NumericProfile::from_name(&name))
-                .filter(|profile| profile.is_available())
-                .unwrap_or_else(NumericProfile::host_default);
-            // Another thread may have set the profile meanwhile; keep theirs.
-            let _ = PROFILE.compare_exchange(
-                UNSET,
-                encode(profile),
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            );
-            numeric_profile()
-        }
+        _ => initialize_profile(),
     }
+}
+
+/// Resolve the profile from the environment on first use.
+#[cold]
+#[inline(never)]
+fn initialize_profile() -> NumericProfile {
+    let profile = std::env::var("RSDESEQ2_NUMERIC_PROFILE")
+        .ok()
+        .and_then(|name| NumericProfile::from_name(&name))
+        .filter(|profile| profile.is_available())
+        .unwrap_or_else(NumericProfile::host_default);
+    // Another thread may have set the profile meanwhile; keep theirs.
+    let _ = PROFILE.compare_exchange(
+        UNSET,
+        encode(profile),
+        Ordering::Relaxed,
+        Ordering::Relaxed,
+    );
+    numeric_profile()
 }
 
 /// Select the profile for the rest of the process. Call it before any
