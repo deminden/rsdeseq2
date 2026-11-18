@@ -98,6 +98,8 @@ mod heavy_tail;
 mod independent_filtering;
 #[path = "inference_primitives.rs"]
 mod inference_primitives;
+#[path = "labelled_readers.rs"]
+mod labelled_readers;
 #[path = "large_shape_likelihood.rs"]
 mod large_shape_likelihood;
 #[path = "location_shrinkage.rs"]
