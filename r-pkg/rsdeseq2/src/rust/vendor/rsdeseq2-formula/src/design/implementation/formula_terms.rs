@@ -1,4 +1,5 @@
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 
 pub(super) fn expand_parenthesized_formula_terms(rhs: &str) -> Result<String, DeseqError> {
     let signed_terms = split_formula_signed_terms(rhs)?;
@@ -73,9 +74,7 @@ pub(super) fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>,
             ')' => {
                 depth -= 1;
                 if depth < 0 {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: "formula parentheses are unbalanced".to_string(),
-                    });
+                    return Err(invalid_formula("formula parentheses are unbalanced"));
                 }
             }
             '+' | '-' if depth == 0 => {
@@ -104,25 +103,19 @@ pub(super) fn split_formula_signed_terms(rhs: &str) -> Result<Vec<(i8, String)>,
         }
     }
     if depth != 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula parentheses are unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula parentheses are unbalanced"));
     }
     if in_backticks {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula backtick-quoted variable name is unbalanced",
+        ));
     }
     if quote.is_some() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula quoted string is unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula quoted string is unbalanced"));
     }
     let term = rhs[start..].trim();
     if term.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula contains an empty term".to_string(),
-        });
+        return Err(invalid_formula("formula contains an empty term"));
     }
     let term = if sign < 0 && preserve_negative_one_sentinel && term == "1" {
         "-1"
@@ -171,9 +164,9 @@ fn expand_parenthesized_formula_in_operator(
     pieces: &[String],
 ) -> Result<Vec<String>, DeseqError> {
     if pieces.len() != 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula nesting term '{term}' must use one '%in%' operator"),
-        });
+        return Err(invalid_formula(format!(
+            "formula nesting term '{term}' must use one '%in%' operator"
+        )));
     }
     let inner = split_formula_additive_group(&pieces[0])?;
     let outer = split_formula_additive_group(&pieces[1])?;
@@ -242,9 +235,9 @@ fn expand_parenthesized_formula_power(
     pieces: &[String],
 ) -> Result<Vec<String>, DeseqError> {
     if pieces.len() != 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' must have one exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' must have one exponent"
+        )));
     }
     let terms = split_formula_power_base_terms(&pieces[0])?;
     if terms.iter().any(|term| term == ".") {
@@ -273,19 +266,19 @@ fn split_formula_power_base_terms(term: &str) -> Result<Vec<String>, DeseqError>
 fn parse_formula_interaction_power(term: &str, exponent: &str) -> Result<usize, DeseqError> {
     let exponent = exponent.trim();
     if exponent.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' has an empty exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' has an empty exponent"
+        )));
     }
-    let order = exponent
-        .parse::<usize>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' requires a positive integer exponent"),
-        })?;
+    let order = exponent.parse::<usize>().map_err(|_| {
+        invalid_formula(format!(
+            "formula power term '{term}' requires a positive integer exponent"
+        ))
+    })?;
     if order == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' requires a positive integer exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' requires a positive integer exponent"
+        )));
     }
     Ok(order)
 }
@@ -345,9 +338,9 @@ fn expand_signed_additive_formula_group(term: &str) -> Result<Vec<String>, Deseq
     let stripped = strip_formula_outer_parentheses(term.trim())?;
     let signed_terms = split_formula_signed_terms(stripped)?;
     if signed_terms.len() == 1 && signed_terms[0].0 >= 0 && signed_terms[0].1.trim() == stripped {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' contains unsupported nested subtraction"),
-        });
+        return Err(invalid_formula(format!(
+            "formula term '{term}' contains unsupported nested subtraction"
+        )));
     }
     let mut terms = Vec::new();
     for (sign, signed_term) in signed_terms {
@@ -388,9 +381,7 @@ pub(super) fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqE
                 ')' => {
                     depth -= 1;
                     if depth < 0 {
-                        return Err(DeseqError::InvalidOptions {
-                            reason: "formula parentheses are unbalanced".to_string(),
-                        });
+                        return Err(invalid_formula("formula parentheses are unbalanced"));
                     }
                     if depth == 0 && idx + character.len_utf8() < stripped.len() {
                         encloses_whole_term = false;
@@ -401,14 +392,10 @@ pub(super) fn strip_formula_outer_parentheses(term: &str) -> Result<&str, DeseqE
             }
         }
         if depth != 0 {
-            return Err(DeseqError::InvalidOptions {
-                reason: "formula parentheses are unbalanced".to_string(),
-            });
+            return Err(invalid_formula("formula parentheses are unbalanced"));
         }
         if quote.is_some() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "formula quoted string is unbalanced".to_string(),
-            });
+            return Err(invalid_formula("formula quoted string is unbalanced"));
         }
         if !encloses_whole_term {
             return Ok(stripped);
@@ -454,17 +441,15 @@ pub(super) fn split_formula_top_level(
             ')' => {
                 depth -= 1;
                 if depth < 0 {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: "formula parentheses are unbalanced".to_string(),
-                    });
+                    return Err(invalid_formula("formula parentheses are unbalanced"));
                 }
             }
             _ if character == delimiter && depth == 0 => {
                 let piece = term[start..idx].trim();
                 if piece.is_empty() {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!("formula term '{term}' contains an empty component"),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula term '{term}' contains an empty component"
+                    )));
                 }
                 pieces.push(piece.to_string());
                 start = idx + character.len_utf8();
@@ -473,25 +458,21 @@ pub(super) fn split_formula_top_level(
         }
     }
     if depth != 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula parentheses are unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula parentheses are unbalanced"));
     }
     if in_backticks {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula backtick-quoted variable name is unbalanced",
+        ));
     }
     if quote.is_some() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula quoted string is unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula quoted string is unbalanced"));
     }
     let piece = term[start..].trim();
     if piece.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' contains an empty component"),
-        });
+        return Err(invalid_formula(format!(
+            "formula term '{term}' contains an empty component"
+        )));
     }
     pieces.push(piece.to_string());
     Ok(pieces)
@@ -603,17 +584,15 @@ fn split_formula_top_level_operator(term: &str, operator: &str) -> Result<Vec<St
             ')' => {
                 depth -= 1;
                 if depth < 0 {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: "formula parentheses are unbalanced".to_string(),
-                    });
+                    return Err(invalid_formula("formula parentheses are unbalanced"));
                 }
             }
             _ if depth == 0 && term[idx..].starts_with(operator) => {
                 let piece = term[start..idx].trim();
                 if piece.is_empty() {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!("formula term '{term}' contains an empty component"),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula term '{term}' contains an empty component"
+                    )));
                 }
                 pieces.push(piece.to_string());
                 idx += operator.len();
@@ -625,25 +604,21 @@ fn split_formula_top_level_operator(term: &str, operator: &str) -> Result<Vec<St
         idx += character.len_utf8();
     }
     if depth != 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula parentheses are unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula parentheses are unbalanced"));
     }
     if in_backticks {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula backtick-quoted variable name is unbalanced".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula backtick-quoted variable name is unbalanced",
+        ));
     }
     if quote.is_some() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula quoted string is unbalanced".to_string(),
-        });
+        return Err(invalid_formula("formula quoted string is unbalanced"));
     }
     let piece = term[start..].trim();
     if piece.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' contains an empty component"),
-        });
+        return Err(invalid_formula(format!(
+            "formula term '{term}' contains an empty component"
+        )));
     }
     pieces.push(piece.to_string());
     Ok(pieces)
@@ -748,9 +723,9 @@ const MAX_EXPANDED_TERMS: usize = 16_384;
 
 pub(super) fn check_expansion_size(size: usize) -> Result<(), DeseqError> {
     if size > MAX_EXPANDED_TERMS {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula expansion exceeds {MAX_EXPANDED_TERMS} terms"),
-        });
+        return Err(invalid_formula(format!(
+            "formula expansion exceeds {MAX_EXPANDED_TERMS} terms"
+        )));
     }
     Ok(())
 }
@@ -794,9 +769,7 @@ fn canonical_interaction(term: &str) -> Result<String, DeseqError> {
 
 pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), DeseqError> {
     if rhs.len() > 1_048_576 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula exceeds 1 MiB".into(),
-        });
+        return Err(invalid_formula("formula exceeds 1 MiB"));
     }
     // Syntax validation remains in the parser; this preflight bounds recursive
     // group expansion while ignoring parentheses in strings and quoted names.
@@ -817,9 +790,7 @@ pub(super) fn validate_expansion_input(rhs: &str) -> Result<(), DeseqError> {
         } else if c == '(' {
             depth += 1;
             if depth > 128 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "formula nesting exceeds 128 levels".into(),
-                });
+                return Err(invalid_formula("formula nesting exceeds 128 levels"));
             }
         } else if c == ')' {
             depth = depth.saturating_sub(1);

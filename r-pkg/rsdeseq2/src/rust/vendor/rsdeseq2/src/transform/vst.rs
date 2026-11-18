@@ -1,5 +1,6 @@
 use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDispersionTrend};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::Offsets;
@@ -192,9 +193,11 @@ fn local_vst_inverse_size_factor_mean_impl(size_factors: &[f64]) -> Result<f64, 
     let mut inverse_size_factors = Vec::with_capacity(size_factors.len());
     for (idx, size_factor) in size_factors.iter().copied().enumerate() {
         if !size_factor.is_finite() || size_factor <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("local VST size factor at index {idx} must be finite and positive"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Normalization,
+                format!("local VST size factor at index {idx}"),
+                Requirement::FiniteAndPositive,
+            ));
         }
         inverse_size_factors.push(size_factor.recip());
     }
@@ -213,12 +216,14 @@ fn local_vst_inverse_size_factor_mean_from_normalization_factors_impl(
     for row in 0..normalization_factors.n_rows() {
         for (sample, factor) in normalization_factors.row(row)?.iter().copied().enumerate() {
             if !factor.is_finite() || factor <= 0.0 {
-                return Err(DeseqError::InvalidSizeFactors {
-                    reason: format!(
-                        "local VST normalization factor at index {} must be finite and positive",
+                return Err(invalid_parameter(
+                    ErrorKind::Normalization,
+                    format!(
+                        "local VST normalization factor at index {}",
                         row * normalization_factors.n_cols() + sample
                     ),
-                });
+                    Requirement::FiniteAndPositive,
+                ));
             }
             checked_add_assign(
                 &mut log_col_sums[sample],
@@ -414,24 +419,29 @@ use local_integral::LocalVstIntegral;
 
 fn validate_mean_dispersion(mean_dispersion: f64) -> Result<(), DeseqError> {
     if !mean_dispersion.is_finite() || mean_dispersion <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "mean dispersion for VST must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "mean dispersion for VST",
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }
 
 fn validate_parametric_trend(trend: ParametricDispersionTrend) -> Result<(), DeseqError> {
     if !trend.asympt_disp.is_finite() || trend.asympt_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "parametric VST asymptotic dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "parametric VST asymptotic dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !trend.extra_pois.is_finite() || trend.extra_pois < 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "parametric VST extra-Poisson coefficient must be finite and non-negative"
-                .to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "parametric VST extra-Poisson coefficient",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     Ok(())
 }
@@ -463,9 +473,11 @@ fn validate_normalized_count(normalized_count: f64, index: usize) -> Result<(), 
 
 fn validate_inverse_size_factor_mean(value: f64) -> Result<(), DeseqError> {
     if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: "local VST inverse size-factor mean must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Normalization,
+            "local VST inverse size-factor mean",
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

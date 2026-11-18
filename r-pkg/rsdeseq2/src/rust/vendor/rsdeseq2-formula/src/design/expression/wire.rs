@@ -5,6 +5,7 @@
 //! text=4, list=5. Every value then carries dimensions/names/attributes.
 use super::{Data, Value, invalid_options, validation::validate_value_with_limit};
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 
 /// Maximum transport payload, distinct from numerical API input sizes.
 pub const MAX_BYTES: usize = 256 * 1024 * 1024;
@@ -42,7 +43,7 @@ impl Writer {
             .checked_add(bytes.len())
             .is_none_or(|n| n > MAX_BYTES)
         {
-            return Err(invalid_options("formula transport exceeds size limit"));
+            return Err(invalid_formula("formula transport exceeds size limit"));
         }
         self.0
             .try_reserve(bytes.len())
@@ -72,7 +73,7 @@ impl Writer {
     }
     fn value(&mut self, v: &Value, depth: usize) -> Result<(), DeseqError> {
         if depth > MAX_DEPTH {
-            return Err(invalid_options("formula transport nesting exceeds 1024"));
+            return Err(invalid_formula("formula transport nesting exceeds 1024"));
         }
         self.byte(match v.data {
             Data::Null => 0,
@@ -184,7 +185,7 @@ impl<'a> Reader<'a> {
     }
     fn value(&mut self, depth: usize) -> Result<Value, DeseqError> {
         if depth > MAX_DEPTH {
-            return Err(invalid_options("formula transport nesting exceeds 1024"));
+            return Err(invalid_formula("formula transport nesting exceeds 1024"));
         }
         let tag = self.byte()?;
         let n = self.count(if matches!(tag, 1 | 2) {

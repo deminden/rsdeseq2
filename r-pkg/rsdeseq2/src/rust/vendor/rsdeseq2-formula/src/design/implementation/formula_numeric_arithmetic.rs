@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Identity, scalar, binary and power arithmetic transforms.
 
 pub(super) fn split_formula_transform_arguments(
@@ -15,9 +16,9 @@ pub(super) fn formula_numeric_identity_or_power_term(
         if key == "x" {
             return formula_numeric_identity_or_power_term(value, numeric_covariates);
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'I({expression})' has unsupported argument '{key}'"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'I({expression})' has unsupported argument '{key}'"
+        )));
     }
     let Some((numeric_name, exponent_text)) = expression.split_once('^') else {
         if let Some((left, op, right)) = split_formula_numeric_scalar_expression(expression) {
@@ -87,20 +88,16 @@ pub(super) fn formula_numeric_scalar_expression_term(
             );
         }
         (None, None) => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform 'I({expression})' must contain one supplied numeric covariate"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula transform 'I({expression})' must contain one supplied numeric covariate"
+            )));
         }
     };
     let scalar = parse_formula_scalar(scalar_text, expression)?;
     if op == '/' && !scalar_on_left && scalar == 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'I({expression})' scalar '{scalar_text}' must be non-zero for division"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'I({expression})' scalar '{scalar_text}' must be non-zero for division"
+        )));
     }
     let input = formula_numeric_value(covariate.values);
     let scalar_value = super::super::expression::Value::scalar(scalar);
@@ -130,11 +127,9 @@ pub(super) fn formula_numeric_binary_expression_term(
     right: &ExpandedNumericSpec<'_>,
 ) -> Result<(String, Vec<f64>), DeseqError> {
     if left.values.len() != right.values.len() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'I({expression})' received numeric covariates with different sample counts"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'I({expression})' received numeric covariates with different sample counts"
+        )));
     }
     let values = formula_call_values(
         &op.to_string(),
@@ -157,15 +152,15 @@ pub(super) fn formula_numeric_binary_expression_term(
 
 pub(super) fn parse_formula_scalar(value: &str, expression: &str) -> Result<f64, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
-    let scalar = value
-        .parse::<f64>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula transform 'I({expression})' scalar '{value}' must be finite"),
-        })?;
+    let scalar = value.parse::<f64>().map_err(|_| {
+        invalid_formula(format!(
+            "formula transform 'I({expression})' scalar '{value}' must be finite"
+        ))
+    })?;
     if !scalar.is_finite() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'I({expression})' scalar '{value}' must be finite"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'I({expression})' scalar '{value}' must be finite"
+        )));
     }
     Ok(scalar)
 }
@@ -233,16 +228,15 @@ pub(super) fn formula_numeric_power_term(
     numeric_covariates: &[ExpandedNumericSpec<'_>],
 ) -> Result<(String, Vec<f64>), DeseqError> {
     let numeric_name = formula_variable_name(numeric_name.trim())?;
-    let exponent = exponent_text
-        .trim()
-        .parse::<i32>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula transform exponent '{exponent_text}' must be an integer"),
-        })?;
+    let exponent = exponent_text.trim().parse::<i32>().map_err(|_| {
+        invalid_formula(format!(
+            "formula transform exponent '{exponent_text}' must be an integer"
+        ))
+    })?;
     if !(2..=16).contains(&exponent) {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula transform powers must be integers from 2 through 16".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula transform powers must be integers from 2 through 16",
+        ));
     }
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;

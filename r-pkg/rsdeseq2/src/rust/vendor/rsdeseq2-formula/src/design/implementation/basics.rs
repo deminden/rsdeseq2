@@ -466,8 +466,9 @@ impl DesignMatrix {
         names
             .iter()
             .position(|candidate| candidate == name)
-            .ok_or_else(|| DeseqError::InvalidOptions {
+            .ok_or_else(|| DeseqError::CoefficientNotFound {
                 reason: format!("coefficient '{name}' is not present in coefficient names"),
+                candidates: vec![name.to_string()],
             })
     }
 

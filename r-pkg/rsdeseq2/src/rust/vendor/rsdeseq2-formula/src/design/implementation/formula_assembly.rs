@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 pub(super) fn expanded_formula_design_from_state<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -188,11 +189,9 @@ pub(super) fn expanded_formula_design_from_state<'a>(
             let col = expanded_names
                 .iter()
                 .position(|candidate| candidate == expanded_name)
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: format!(
+                .ok_or_else(|| invalid_formula(format!(
                         "formula standard column '{expanded_name}' is not present in expanded design"
-                    ),
-                })?;
+                    )))?;
             standard_values.push(
                 expanded_design
                     .matrix()
@@ -214,10 +213,10 @@ pub(super) fn expanded_formula_design_from_state<'a>(
         let col = expanded_names
             .iter()
             .position(|candidate| candidate == expanded_name)
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!(
+            .ok_or_else(|| {
+                invalid_formula(format!(
                     "formula standard column '{expanded_name}' is not present in expanded design"
-                ),
+                ))
             })?;
         coefficient_groups.push(vec![col]);
     }
@@ -385,17 +384,18 @@ pub(super) fn formula_design_sample_count(
     }
     if let Some(covariate) = used_numeric_covariates.first() {
         if covariate.values.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "numeric covariate values must be non-empty".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                "numeric covariate values",
+                Requirement::NonEmpty,
+            ));
         }
         return Ok(covariate.values.len());
     }
     if !state.has_intercept {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula without an intercept must include at least one design term"
-                .to_string(),
-        });
+        return Err(invalid_formula(
+            "formula without an intercept must include at least one design term",
+        ));
     }
     if let Some(factor) = supplied_factors.first() {
         if factor.sample_levels.is_empty() {
@@ -456,8 +456,10 @@ pub(super) fn formula_factor_spec<'a>(
         .iter()
         .find(|candidate| candidate.factor == factor)
         .cloned()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("formula factor '{factor}' is not present in supplied design metadata"),
+        .ok_or_else(|| {
+            invalid_formula(format!(
+                "formula factor '{factor}' is not present in supplied design metadata"
+            ))
         })
 }
 
@@ -469,10 +471,10 @@ pub(super) fn formula_numeric_spec<'a>(
         .iter()
         .find(|candidate| candidate.name == numeric)
         .cloned()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!(
+        .ok_or_else(|| {
+            invalid_formula(format!(
                 "formula numeric covariate '{numeric}' is not present in supplied design metadata"
-            ),
+            ))
         })
 }
 
@@ -484,8 +486,10 @@ pub(super) fn formula_factor_levels<'a>(
     let idx = factors
         .iter()
         .position(|candidate| candidate.factor == factor)
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("formula factor '{factor}' is not present in supplied design metadata"),
+        .ok_or_else(|| {
+            invalid_formula(format!(
+                "formula factor '{factor}' is not present in supplied design metadata"
+            ))
         })?;
     Ok(&factor_levels[idx])
 }
@@ -681,9 +685,9 @@ where
                 FormulaVariableRef::Factor(factor) => {
                     let factor_spec = formula_factor_spec(factor, used_factors)?;
                     let Some(level) = level else {
-                        return Err(DeseqError::InvalidOptions {
-                            reason: "formula factor interaction level is missing".to_string(),
-                        });
+                        return Err(invalid_formula(
+                            "formula factor interaction level is missing",
+                        ));
                     };
                     if use_treatment_for_factor(factor) {
                         pieces.push(standard_factor_coefficient_name(
@@ -807,9 +811,9 @@ pub(super) fn add_factor_numeric_formula_interaction<'a>(
 pub(super) fn split_formula_pieces(term: &str, delimiter: char) -> Result<Vec<String>, DeseqError> {
     let pieces = split_formula_top_level(term, delimiter)?;
     if pieces.len() < 2 || pieces.iter().any(|piece| piece.is_empty()) {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' must contain non-empty variables"),
-        });
+        return Err(invalid_formula(format!(
+            "formula term '{term}' must contain non-empty variables"
+        )));
     }
     Ok(pieces)
 }

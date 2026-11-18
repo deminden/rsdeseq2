@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 // Prior input checks, stable arithmetic and quantiles.
 
 pub(super) fn validate_beta_prior_inputs(
@@ -33,14 +34,18 @@ pub(super) fn validate_beta_prior_inputs(
     }
     validate_upper_quantile(options.upper_quantile)?;
     if !options.wide_prior_variance.is_finite() || options.wide_prior_variance <= 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "wide beta prior variance must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "wide beta prior variance",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !options.finite_beta_cutoff.is_finite() || options.finite_beta_cutoff <= 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "finite beta cutoff must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "finite beta cutoff",
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

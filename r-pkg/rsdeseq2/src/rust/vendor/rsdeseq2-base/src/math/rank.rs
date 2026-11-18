@@ -1,4 +1,5 @@
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Default absolute tolerance for deterministic matrix-rank checks.
 pub const DEFAULT_RANK_TOLERANCE: f64 = 1e-10;
@@ -14,9 +15,11 @@ pub fn matrix_rank(
     tolerance: f64,
 ) -> Result<usize, DeseqError> {
     if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rank tolerance must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "rank tolerance",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     let expected = n_rows
         .checked_mul(n_cols)
@@ -170,9 +173,11 @@ pub fn matrix_rank_r_qr(
     tolerance: f64,
 ) -> Result<usize, DeseqError> {
     if !tolerance.is_finite() || tolerance < 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rank tolerance must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "rank tolerance",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     let expected = n_rows
         .checked_mul(n_cols)

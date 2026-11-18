@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
 
@@ -47,11 +48,11 @@ impl LocalVstIntegral {
                 });
             }
             if !dispersion.is_finite() || *dispersion <= 0.0 {
-                return Err(DeseqError::InvalidDispersion {
-                    reason: format!(
-                        "local VST frozen dispersion at index {idx} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Dispersion,
+                    format!("local VST frozen dispersion at index {idx}"),
+                    Requirement::FiniteAndPositive,
+                ));
             }
         }
         let integrand = grid
@@ -68,9 +69,11 @@ impl LocalVstIntegral {
                 let variance = checked::try_add(dispersion_q2, poisson_q)
                     .nonfinite_at("local VST variance curve", Some(0))?;
                 if !variance.is_finite() || variance <= 0.0 {
-                    return Err(DeseqError::InvalidDispersion {
-                        reason: "local VST variance curve must be finite and positive".to_string(),
-                    });
+                    return Err(invalid_parameter(
+                        ErrorKind::Dispersion,
+                        "local VST variance curve",
+                        Requirement::FiniteAndPositive,
+                    ));
                 }
                 Ok(variance.sqrt().recip())
             })
@@ -286,9 +289,11 @@ fn fmm_spline_second_derivatives(x: &[f64], y: &[f64]) -> Result<Vec<f64>, Deseq
     }
     let second: Vec<f64> = sigma.into_iter().map(|value| 6.0 * value).collect();
     if second.iter().any(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local VST FMM spline coefficients must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "local VST FMM spline coefficients",
+            Requirement::Finite,
+        ));
     }
     Ok(second)
 }

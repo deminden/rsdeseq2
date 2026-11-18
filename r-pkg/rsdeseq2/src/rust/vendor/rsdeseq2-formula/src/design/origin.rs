@@ -1,5 +1,6 @@
 //! Formula provenance affects result policy without changing a numeric design.
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,10 +41,9 @@ impl DesignOrigin {
         let mut unique = Vec::with_capacity(variables.len());
         for variable in variables {
             if variable.is_empty() || variable.contains('\0') {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "formula origin variables must be nonempty identifiers without NUL"
-                        .into(),
-                });
+                return Err(invalid_formula(
+                    "formula origin variables must be nonempty identifiers without NUL",
+                ));
             }
             if !unique.contains(&variable) {
                 unique.push(variable);

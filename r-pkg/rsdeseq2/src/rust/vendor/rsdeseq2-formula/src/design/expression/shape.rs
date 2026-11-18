@@ -1,5 +1,6 @@
 use super::{Argument, Data, Evaluator, Expression, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 
 impl Value {
     pub(super) fn flattened(&self) -> Self {
@@ -37,7 +38,7 @@ impl Value {
 fn dimension(x: &Value) -> Result<usize, DeseqError> {
     let v = x.scalar_number()?;
     if !v.is_finite() || v < 0.0 || v > i32::MAX as f64 {
-        return Err(invalid_options(
+        return Err(invalid_formula(
             "formula dimension is outside its supported range",
         ));
     }
@@ -229,11 +230,11 @@ impl Evaluator<'_> {
                 });
                 let size = rows
                     .checked_mul(cols)
-                    .ok_or_else(|| invalid_options("formula matrix shape overflow"))?;
+                    .ok_or_else(|| invalid_formula("formula matrix shape overflow"))?;
                 super::checked_elements(Some(size))?;
                 let byrow = a[3].map(|v| v.bool_scalar()).transpose()?.unwrap_or(false);
                 if input.is_empty() && size > 0 {
-                    return Err(invalid_options("formula matrix requires values"));
+                    return Err(invalid_formula("formula matrix requires values"));
                 }
                 let indices = (0..size)
                     .map(|i| {

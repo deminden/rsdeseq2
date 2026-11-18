@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // R terms deduplicates language expressions before model.offset sums them.
 // Compare lexical primitives, not evaluated vectors: different variables can
 // contain identical values and must still contribute independently.
@@ -43,9 +44,9 @@ pub(super) fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetTo
                 }
             }
             if !closed {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "formula offset has an unbalanced quoted token".into(),
-                });
+                return Err(invalid_formula(
+                    "formula offset has an unbalanced quoted token",
+                ));
             }
             let text = &expression[start..at];
             tokens.push(if c == '`' {
@@ -78,12 +79,9 @@ pub(super) fn formula_offset_key(expression: &str) -> Result<Vec<FormulaOffsetTo
                     break;
                 }
             }
-            let number =
-                expression[start..at]
-                    .parse::<f64>()
-                    .map_err(|_| DeseqError::InvalidOptions {
-                        reason: "formula offset contains an invalid numeric token".into(),
-                    })?;
+            let number = expression[start..at]
+                .parse::<f64>()
+                .map_err(|_| invalid_formula("formula offset contains an invalid numeric token"))?;
             let integer = expression[at..].starts_with('L');
             if integer {
                 at += 1;

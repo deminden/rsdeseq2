@@ -1,4 +1,5 @@
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::math::{median_finite, trigamma};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
@@ -118,9 +119,11 @@ pub fn log_dispersion_residuals_above_min(
         ));
     }
     if !min_disp.is_finite() || min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "min_disp",
+            Requirement::FiniteAndPositive,
+        ));
     }
 
     let mut residuals = Vec::new();
@@ -237,9 +240,11 @@ fn validate_prior_variance_inputs(
         });
     }
     if !min_disp.is_finite() || min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "min_disp",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if n_samples == 0 {
         return Err(DeseqError::InvalidDimensions {

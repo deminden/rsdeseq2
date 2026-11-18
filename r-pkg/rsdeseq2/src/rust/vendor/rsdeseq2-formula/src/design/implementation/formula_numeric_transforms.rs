@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Numeric transform discovery, parsing and covariate resolution.
 
 pub(super) fn expand_formula_numeric_transform_terms(
@@ -113,18 +114,18 @@ pub(super) fn formula_transform_close_index(after_open: &str) -> Result<usize, D
         }
     }
     if in_backticks {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula transform has unbalanced backtick-quoted variable name".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula transform has unbalanced backtick-quoted variable name",
+        ));
     }
     if quote.is_some() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula transform has unbalanced quoted string".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula transform has unbalanced quoted string",
+        ));
     }
-    Err(DeseqError::InvalidOptions {
-        reason: "formula transform has unbalanced parentheses".to_string(),
-    })
+    Err(invalid_formula(
+        "formula transform has unbalanced parentheses",
+    ))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -418,12 +419,10 @@ pub(super) fn formula_numeric_function_arguments(
                     continue;
                 }
                 _ => {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!(
-                            "formula transform '{}({expression})' has unsupported argument '{argument}'",
-                            transform.label
-                        ),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                        transform.label
+                    )));
                 }
             }
         }
@@ -440,39 +439,31 @@ pub(super) fn formula_numeric_function_arguments(
             }
             _ => {}
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{}({expression})' has unsupported argument '{argument}'",
-                transform.label
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{}({expression})' has unsupported argument '{argument}'",
+            transform.label
+        )));
     }
     let Some(numeric_text) = numeric_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{}({expression})' must provide a numeric covariate",
-                transform.label
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{}({expression})' must provide a numeric covariate",
+            transform.label
+        )));
     };
     Ok((numeric_text, base))
 }
 
 pub(super) fn parse_formula_log_base(value: &str, expression: &str) -> Result<f64, DeseqError> {
     let value = strip_formula_outer_parentheses(value.trim())?;
-    let parsed = value
-        .parse::<f64>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'log({expression})' base must be finite and positive"
-            ),
-        })?;
+    let parsed = value.parse::<f64>().map_err(|_| {
+        invalid_formula(format!(
+            "formula transform 'log({expression})' base must be finite and positive"
+        ))
+    })?;
     if !parsed.is_finite() || parsed <= 0.0 || parsed == 1.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'log({expression})' base must be finite and positive"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'log({expression})' base must be finite and positive"
+        )));
     }
     Ok(parsed)
 }
@@ -493,11 +484,9 @@ pub(super) fn find_formula_numeric_covariate<'a>(
         [covariate] => return Ok(*covariate),
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula numeric covariate '{numeric_name}' appears more than once"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula numeric covariate '{numeric_name}' appears more than once"
+            )));
         }
     }
 
@@ -511,16 +500,12 @@ pub(super) fn find_formula_numeric_covariate<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [covariate] => Ok(*covariate),
-        [] => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
-            ),
-        }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
-            ),
-        }),
+        [] => Err(invalid_formula(format!(
+            "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
+        ))),
+        _ => Err(invalid_formula(format!(
+            "formula numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
+        ))),
     }
 }
 

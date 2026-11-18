@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Public formula design entry points.
 
 /// Build an expanded additive design from a primitive DESeq2-style formula subset.
@@ -105,9 +106,9 @@ pub(super) fn formula_design_with_column_order<'a>(
         (|| -> Result<(), DeseqError> {
             let term = raw_term.trim();
             if term.is_empty() {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!("formula '{formula}' contains an empty term"),
-                });
+                return Err(invalid_formula(format!(
+                    "formula '{formula}' contains an empty term"
+                )));
             }
             if sign < 0 {
                 remove_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;
@@ -126,11 +127,9 @@ pub(super) fn formula_design_with_column_order<'a>(
                 return Ok(());
             }
             if formula_contains_top_level(term, '(')? || formula_contains_top_level(term, ')')? {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula term '{term}' is not supported by the primitive parser"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula term '{term}' is not supported by the primitive parser"
+                )));
             }
             if formula_contains_top_level(term, '/')? {
                 add_nested_formula_term(term, &all_factors, &all_numeric_covariates, &mut state)?;

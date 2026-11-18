@@ -1,13 +1,16 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 /// DESeq2's log-dispersion prior kernel, omitting additive constants.
 pub fn dispersion_prior_log_density(
     log_alpha: f64,
     prior: DispersionPrior,
 ) -> Result<f64, DeseqError> {
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     validate_dispersion_prior(Some(prior))?;
     let residual = checked::try_sub(log_alpha, prior.log_mean)
@@ -23,9 +26,11 @@ pub fn dispersion_prior_derivative(
     prior: DispersionPrior,
 ) -> Result<f64, DeseqError> {
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     validate_dispersion_prior(Some(prior))?;
     Ok(-(log_alpha - prior.log_mean) / prior.variance)
@@ -37,9 +42,11 @@ pub fn dispersion_prior_second_derivative(
     prior: DispersionPrior,
 ) -> Result<f64, DeseqError> {
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     validate_dispersion_prior(Some(prior))?;
     Ok(-prior.variance.recip())

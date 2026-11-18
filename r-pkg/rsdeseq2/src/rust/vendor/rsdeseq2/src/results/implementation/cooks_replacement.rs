@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::math::ProfileMath;
 pub(super) fn formula_size_factor_offsets(
@@ -21,17 +22,17 @@ pub(super) fn formula_size_factor_offsets(
     for _ in 0..counts.n_genes() {
         for (sample, size_factor) in size_factors.iter().copied().enumerate() {
             if !size_factor.is_finite() || size_factor <= 0.0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!("size factor at sample {sample} must be finite and positive"),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    format!("size factor at sample {sample}"),
+                    Requirement::FiniteAndPositive,
+                ));
             }
             let factor = size_factor * offset_scales[sample];
             if !factor.is_finite() || factor <= 0.0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula offset normalization factor at sample {sample} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula offset normalization factor at sample {sample} must be finite and positive"
+                )));
             }
             values.push(factor);
         }
@@ -61,19 +62,17 @@ pub(super) fn formula_normalization_factor_offsets(
     for gene in 0..normalization_factors.n_rows() {
         for (sample, value) in normalization_factors.row(gene)?.iter().copied().enumerate() {
             if !value.is_finite() || value <= 0.0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "normalization factor at gene {gene}, sample {sample} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    format!("normalization factor at gene {gene}, sample {sample}"),
+                    Requirement::FiniteAndPositive,
+                ));
             }
             let factor = value * offset_scales[sample];
             if !factor.is_finite() || factor <= 0.0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula offset normalization factor at gene {gene}, sample {sample} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula offset normalization factor at gene {gene}, sample {sample} must be finite and positive"
+                )));
             }
             values.push(factor);
         }
@@ -239,11 +238,9 @@ pub(super) fn formula_offset_scales(
         .map(|(sample, offset)| {
             let scale = offset.exp_p();
             if !scale.is_finite() || scale <= 0.0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula offset scale at sample {sample} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula offset scale at sample {sample} must be finite and positive"
+                )));
             }
             Ok(scale)
         })

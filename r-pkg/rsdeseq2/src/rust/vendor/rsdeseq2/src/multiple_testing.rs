@@ -1,4 +1,5 @@
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Benjamini-Hochberg adjusted p-values with missing-value support.
 ///
@@ -80,9 +81,11 @@ impl PreparedBh {
 pub fn bh_adjust_f64(pvalues: &[f64]) -> Result<Vec<f64>, DeseqError> {
     for (idx, value) in pvalues.iter().copied().enumerate() {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("p-value at index {idx} must be finite and within [0, 1]"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("p-value at index {idx}"),
+                Requirement::FiniteInUnitInterval,
+            ));
         }
     }
     let adjusted = bh_adjust(&pvalues.iter().copied().map(Some).collect::<Vec<_>>());

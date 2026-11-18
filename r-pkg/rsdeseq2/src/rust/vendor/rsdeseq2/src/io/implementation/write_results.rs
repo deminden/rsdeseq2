@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 /// Write an assembled DESeq2-shaped result table to a tab-delimited file.
 ///
 /// Gene identifiers are written as the first `gene` column, while statistical
@@ -103,9 +104,11 @@ pub(super) fn validate_optional_export_probability(
     if let Some(value) = value
         && (!value.is_finite() || !(0.0..=1.0).contains(&value))
     {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            format!("{context} at index {idx}"),
+            Requirement::FiniteInUnitInterval,
+        ));
     }
     Ok(())
 }
@@ -118,9 +121,11 @@ pub(super) fn validate_optional_export_positive(
     if let Some(value) = value
         && (!value.is_finite() || value <= 0.0)
     {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} at index {idx} must be finite and positive"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            format!("{context} at index {idx}"),
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

@@ -3,6 +3,7 @@ use super::{
     RestrictedLikelihood, student_t,
     truncated_standard::{log_phi, truncated_mean, truncated_second},
 };
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::{DeseqError, math::normal_log_cdf};
 use std::sync::Arc;
 /// Location-scale observation likelihood, independent of the calling frontend.
@@ -37,9 +38,11 @@ impl LocationLikelihood {
     }
     pub(super) fn validated(self) -> Result<Self, DeseqError> {
         match self {
-            Self::StudentT(df) if df.is_nan() || df <= 0.0 => Err(DeseqError::InvalidOptions {
-                reason: "Student-t degrees of freedom must be positive".into(),
-            }),
+            Self::StudentT(df) if df.is_nan() || df <= 0.0 => Err(invalid_parameter(
+                ErrorKind::Options,
+                "Student-t degrees of freedom",
+                Requirement::Positive,
+            )),
             Self::StudentT(df) if df == f64::INFINITY => Ok(Self::Normal),
             other => Ok(other),
         }

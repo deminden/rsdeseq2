@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Shared transform arguments, options and string parsing.
 
 pub(super) fn reject_duplicate_formula_poly_argument(
@@ -16,11 +17,9 @@ pub(super) fn reject_duplicate_formula_transform_argument(
     expression: &str,
 ) -> Result<(), DeseqError> {
     if seen {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{transform}({expression})' argument '{argument}' matched multiple times"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{transform}({expression})' argument '{argument}' matched multiple times"
+        )));
     }
     Ok(())
 }
@@ -86,11 +85,9 @@ pub(super) fn parse_formula_bool_option(
     {
         "true" | "t" => Ok(true),
         "false" | "f" => Ok(false),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'poly({expression})' argument '{argument}' must be TRUE or FALSE"
-            ),
-        }),
+        _ => Err(invalid_formula(format!(
+            "formula transform 'poly({expression})' argument '{argument}' must be TRUE or FALSE"
+        ))),
     }
 }
 
@@ -107,11 +104,9 @@ pub(super) fn parse_formula_string_argument(
         value.to_string()
     };
     if parsed.is_empty() || parsed.contains('`') {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{transform}({expression})' argument '{argument}' must be a simple level string"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{transform}({expression})' argument '{argument}' must be a simple level string"
+        )));
     }
     Ok(parsed)
 }
@@ -130,22 +125,18 @@ pub(super) fn parse_formula_quoted_string(
         .strip_prefix(quote)
         .and_then(|candidate| candidate.strip_suffix(quote))
     else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{transform}({expression})' argument '{argument}' must be a balanced quoted string"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{transform}({expression})' argument '{argument}' must be a balanced quoted string"
+        )));
     };
     let mut parsed = String::with_capacity(inner.len());
     let mut chars = inner.chars();
     while let Some(character) = chars.next() {
         if character == '\\' {
             let Some(escaped) = chars.next() else {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform '{transform}({expression})' argument '{argument}' has a trailing string escape"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula transform '{transform}({expression})' argument '{argument}' has a trailing string escape"
+                )));
             };
             parsed.push(match escaped {
                 'n' => '\n',
@@ -176,30 +167,24 @@ pub(super) fn parse_formula_string_vector_argument(
         .strip_prefix("c(")
         .and_then(|candidate| candidate.strip_suffix(')'))
     else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{transform}({expression})' argument '{argument}' must be c(\"level\", ...)"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{transform}({expression})' argument '{argument}' must be c(\"level\", ...)"
+        )));
     };
     let mut levels = Vec::new();
     for level in split_formula_transform_arguments(inner)? {
         let parsed = parse_formula_string_argument(&level, transform, argument, expression)?;
         if argument != "labels" && levels.iter().any(|candidate| candidate == &parsed) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform '{transform}({expression})' argument '{argument}' contains duplicate level '{parsed}'"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula transform '{transform}({expression})' argument '{argument}' contains duplicate level '{parsed}'"
+            )));
         }
         levels.push(parsed);
     }
     if levels.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{transform}({expression})' argument '{argument}' must contain at least one level"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{transform}({expression})' argument '{argument}' must contain at least one level"
+        )));
     }
     Ok(levels)
 }

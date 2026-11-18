@@ -11,6 +11,7 @@ use super::types::{
 };
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Resolve a DESeq2 `results(contrast=...)` request into the primitive numeric
 /// vector plus the all-zero rule implied by the original contrast form.
@@ -298,9 +299,11 @@ pub(super) fn validate_factor_level_contrast(
     denominator: &str,
 ) -> Result<(), DeseqError> {
     if factor.is_empty() || numerator.is_empty() || denominator.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "factor-level contrast factor and levels must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "factor-level contrast factor and levels",
+            Requirement::NonEmpty,
+        ));
     }
     if numerator == denominator {
         return Err(DeseqError::InvalidOptions {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Ordered factors use the same polynomial coding and product plan as the R
 // primitive interface. Unordered expanded columns retain full indicators.
 pub(super) fn formula_ordered_design(
@@ -34,9 +35,7 @@ pub(super) fn formula_ordered_design(
                         .iter()
                         .position(|level| level == sample)
                         .and_then(|i| i32::try_from(i + 1).ok())
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "formula factor code is outside levels".into(),
-                        })
+                        .ok_or_else(|| invalid_formula("formula factor code is outside levels"))
                 })
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -90,8 +89,8 @@ pub(super) fn formula_ordered_design(
             .iter()
             .position(|f| f.factor == name)
             .map(|i| positions[i])
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("formula factor '{name}' is absent from the plan"),
+            .ok_or_else(|| {
+                invalid_formula(format!("formula factor '{name}' is absent from the plan"))
             })
     };
     let numeric_index = |name: &str| {
@@ -99,8 +98,10 @@ pub(super) fn formula_ordered_design(
             .iter()
             .position(|v| v.name == name)
             .map(|i| positions[factors.len() + i])
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("formula covariate '{name}' is absent from the plan"),
+            .ok_or_else(|| {
+                invalid_formula(format!(
+                    "formula covariate '{name}' is absent from the plan"
+                ))
             })
     };
     let empty = || vec![0; variables.len()];

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Row-aligned subset for fast-VST trend fitting.
 ///
@@ -57,9 +58,11 @@ impl FastVstSubset {
 /// indices are zero-based row indices into the original matrix.
 pub fn fast_vst_subset_indices(base_mean: &[f64], nsub: usize) -> Result<Vec<usize>, DeseqError> {
     if nsub == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "fast VST subset size must be positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "fast VST subset size",
+            Requirement::Positive,
+        ));
     }
     let mut eligible = fast_vst_eligible_rows(base_mean)?;
     if eligible.len() < nsub {

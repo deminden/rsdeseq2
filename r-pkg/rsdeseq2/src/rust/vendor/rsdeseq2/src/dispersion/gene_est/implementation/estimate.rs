@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::math::ProfileMath;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
@@ -546,10 +547,11 @@ pub(super) fn moments_dispersion_estimates_with_xim(
         ));
     }
     if !xim.is_finite() || xim <= 0.0 {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: "moments dispersion normalization factor summary must be finite and positive"
-                .to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Normalization,
+            "moments dispersion normalization factor summary",
+            Requirement::FiniteAndPositive,
+        ));
     }
     let mut estimates = Vec::with_capacity(base_mean.len());
     for (gene, (mean, variance)) in base_mean
@@ -617,11 +619,11 @@ pub(super) fn normalization_factor_moments_xim(
             Some(sample),
         )?;
         if !col_mean.is_finite() || col_mean <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!(
-                    "normalization-factor column mean at sample {sample} must be finite and positive"
-                ),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Normalization,
+                format!("normalization-factor column mean at sample {sample}"),
+                Requirement::FiniteAndPositive,
+            ));
         }
         checked_matrix_add_assign(
             &mut inverse_col_mean_sum,

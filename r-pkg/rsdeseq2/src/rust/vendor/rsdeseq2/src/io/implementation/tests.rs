@@ -17,11 +17,19 @@ fn parse_count_field_rejects_non_integer_numeric_values() {
     let path = Path::new("counts.tsv");
     assert!(matches!(
         parse_count_field("1.5", path),
-        Err(DeseqError::InvalidCounts { .. })
+        Err(DeseqError::InvalidCounts { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Counts,
+                ..
+            })
     ));
     assert!(matches!(
         parse_count_field("-1", path),
-        Err(DeseqError::InvalidCounts { .. })
+        Err(DeseqError::InvalidCounts { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Counts,
+                ..
+            })
     ));
 }
 
@@ -248,7 +256,11 @@ fn read_normalization_factors_tsv_validates_shape_and_values() {
     .unwrap();
     assert!(matches!(
         read_normalization_factors_tsv(&bad_value),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     let _ = fs::remove_file(&bad_value);
 
@@ -447,7 +459,11 @@ fn read_size_factors_tsv_validates_shape_and_values() {
     .unwrap();
     assert!(matches!(
         read_size_factors_tsv(&bad_value),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     let _ = fs::remove_file(&bad_value);
 
@@ -570,7 +586,11 @@ fn read_geometric_means_tsv_validates_shape_and_values() {
     fs::write(&bad_value, concat!("gene\tgeo_mean\n", "gene_1\t-1\n")).unwrap();
     assert!(matches!(
         read_geometric_means_tsv(&bad_value),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     let _ = fs::remove_file(&bad_value);
 
@@ -851,7 +871,11 @@ fn write_normalization_factors_tsv_writes_deseq2_shape_and_validates_values() {
             None,
             &RowMajorMatrix::from_row_major(1, 2, vec![1.0, 0.0]).unwrap(),
         ),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     assert!(matches!(
         write_normalization_factors_tsv(
@@ -876,11 +900,19 @@ fn write_size_factors_tsv_validates_names_and_values() {
     ));
     assert!(matches!(
         write_size_factors_tsv(&path, None, &[1.0, 0.0]),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     assert!(matches!(
         write_size_factors_tsv(&path, None, &[1.0, f64::NAN]),
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: crate::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     let _ = fs::remove_file(&path);
 }

@@ -1,4 +1,5 @@
 use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid_options, is_na};
+use crate::errors::invalid_formula;
 use crate::{design::numeric_transform::scalar_mean, errors::DeseqError};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -92,7 +93,7 @@ impl Evaluator<'_> {
             vec!["x", "na.rm"]
         };
         let a = arguments(args, &formals)?;
-        let input = a[0].ok_or_else(|| invalid_options("formula summary requires x"))?;
+        let input = a[0].ok_or_else(|| invalid_formula("formula summary requires x"))?;
         if name == "mean" && matches!(input.data, Data::Null | Data::Text(_) | Data::List(_)) {
             return Ok(Value::scalar(NA_REAL));
         }

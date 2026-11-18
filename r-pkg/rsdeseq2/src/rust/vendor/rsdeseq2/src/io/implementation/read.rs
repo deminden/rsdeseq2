@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 pub(super) use std::collections::{HashMap, HashSet};
 pub(super) use std::io::Read;
 pub(super) use std::path::Path;
@@ -430,9 +431,11 @@ fn read_labeled_geometric_means_tsv_records<R: Read>(
     )?;
     for (idx, value) in values.iter().map(|entry| entry.value).enumerate() {
         if value < 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("geometric mean at index {idx} must be non-negative"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Normalization,
+                format!("geometric mean at index {idx}"),
+                Requirement::NonNegative,
+            ));
         }
     }
     Ok(values)

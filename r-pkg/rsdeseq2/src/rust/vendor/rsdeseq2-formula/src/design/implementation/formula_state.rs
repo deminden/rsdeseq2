@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 pub(super) fn remove_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -6,9 +7,9 @@ pub(super) fn remove_formula_term<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     if term.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula subtraction must be followed by a term".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula subtraction must be followed by a term",
+        ));
     }
     if term == "1" {
         state.has_intercept = false;
@@ -27,9 +28,9 @@ pub(super) fn remove_formula_term<'a>(
         return Ok(());
     }
     if formula_contains_top_level(term, '(')? || formula_contains_top_level(term, ')')? {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula term '{term}' is not supported by the primitive parser"),
-        });
+        return Err(invalid_formula(format!(
+            "formula term '{term}' is not supported by the primitive parser"
+        )));
     }
     if formula_contains_top_level(term, '/')? {
         remove_nested_formula_term(term, factors, numeric_covariates, state)?;
@@ -259,9 +260,9 @@ pub(super) fn apply_power_formula_term<'a>(
 ) -> Result<(), DeseqError> {
     let pieces = split_formula_pieces(term, '^')?;
     if pieces.len() != 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' must have one exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' must have one exponent"
+        )));
     }
     let base = strip_formula_outer_parentheses(&pieces[0])?;
     let variables = formula_piece_variables(base, factors, numeric_covariates)?;
@@ -328,19 +329,19 @@ pub(super) fn parse_formula_state_interaction_power(
 ) -> Result<usize, DeseqError> {
     let exponent = exponent.trim();
     if exponent.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' has an empty exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' has an empty exponent"
+        )));
     }
-    let order = exponent
-        .parse::<usize>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' requires a positive integer exponent"),
-        })?;
+    let order = exponent.parse::<usize>().map_err(|_| {
+        invalid_formula(format!(
+            "formula power term '{term}' requires a positive integer exponent"
+        ))
+    })?;
     if order == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula power term '{term}' requires a positive integer exponent"),
-        });
+        return Err(invalid_formula(format!(
+            "formula power term '{term}' requires a positive integer exponent"
+        )));
     }
     Ok(order)
 }
@@ -388,9 +389,9 @@ pub(super) fn add_main_formula_term<'a>(
         selected_numeric_covariates.push(covariate.clone());
         return Ok(());
     }
-    Err(DeseqError::InvalidOptions {
-        reason: format!("formula variable '{variable}' is not present in supplied design metadata"),
-    })
+    Err(invalid_formula(format!(
+        "formula variable '{variable}' is not present in supplied design metadata"
+    )))
 }
 
 pub(super) fn remove_main_formula_term<'a>(
@@ -420,9 +421,9 @@ pub(super) fn remove_main_formula_term<'a>(
             .retain(|candidate| candidate.name != variable);
         return Ok(());
     }
-    Err(DeseqError::InvalidOptions {
-        reason: format!("formula variable '{variable}' is not present in supplied design metadata"),
-    })
+    Err(invalid_formula(format!(
+        "formula variable '{variable}' is not present in supplied design metadata"
+    )))
 }
 
 pub(super) fn add_formula_dot_main_terms<'a>(
@@ -470,9 +471,9 @@ pub(super) fn formula_piece_variables<'a>(
         variables.extend(factors.iter().map(|factor| factor.factor));
         variables.extend(numeric_covariates.iter().map(|covariate| covariate.name));
         if variables.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "formula '.' requires at least one supplied design column".to_string(),
-            });
+            return Err(invalid_formula(
+                "formula '.' requires at least one supplied design column",
+            ));
         }
         return Ok(variables);
     }
@@ -626,9 +627,9 @@ pub(super) fn add_interaction_formula_term<'a>(
         added_any = true;
     }
     if !added_any && !has_dot {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{term}' cannot use one variable twice"),
-        });
+        return Err(invalid_formula(format!(
+            "formula interaction '{term}' cannot use one variable twice"
+        )));
     }
     Ok(())
 }
@@ -644,9 +645,9 @@ pub(super) fn add_pairwise_formula_interaction<'a>(
     let left_variable_name = resolved_formula_variable_name(left, factors, numeric_covariates)?;
     let right_variable_name = resolved_formula_variable_name(right, factors, numeric_covariates)?;
     if left_variable_name == right_variable_name {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{display_term}' cannot use one variable twice"),
-        });
+        return Err(invalid_formula(format!(
+            "formula interaction '{display_term}' cannot use one variable twice"
+        )));
     }
 
     let left_numeric = numeric_covariates
@@ -712,11 +713,9 @@ pub(super) fn add_pairwise_formula_interaction<'a>(
                 });
         }
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula interaction '{display_term}' references variables missing from supplied design metadata"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula interaction '{display_term}' references variables missing from supplied design metadata"
+            )));
         }
     }
     Ok(())
@@ -756,9 +755,9 @@ pub(super) fn remove_interaction_formula_term<'a>(
         removed_any = true;
     }
     if !removed_any && !has_dot {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{term}' cannot use one variable twice"),
-        });
+        return Err(invalid_formula(format!(
+            "formula interaction '{term}' cannot use one variable twice"
+        )));
     }
     Ok(())
 }
@@ -773,9 +772,9 @@ pub(super) fn remove_pairwise_formula_interaction<'a>(
     let left_variable_name = resolved_formula_variable_name(left, factors, numeric_covariates)?;
     let right_variable_name = resolved_formula_variable_name(right, factors, numeric_covariates)?;
     if left_variable_name == right_variable_name {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula interaction '{left}:{right}' cannot use one variable twice"),
-        });
+        return Err(invalid_formula(format!(
+            "formula interaction '{left}:{right}' cannot use one variable twice"
+        )));
     }
     let left_variable = resolve_formula_variable(left_variable_name, factors, numeric_covariates)?;
     let right_variable =
@@ -815,11 +814,9 @@ pub(super) fn add_higher_order_formula_interaction<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     if pieces.len() < 3 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula interaction '{display_term}' must use at least three variables"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula interaction '{display_term}' must use at least three variables"
+        )));
     }
     let mut variables = Vec::with_capacity(pieces.len());
     for piece in pieces {
@@ -828,11 +825,9 @@ pub(super) fn add_higher_order_formula_interaction<'a>(
             .iter()
             .any(|variable: &FormulaVariableRef<'_>| variable.name() == variable_name)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula interaction '{display_term}' cannot use one variable twice"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula interaction '{display_term}' cannot use one variable twice"
+            )));
         }
         variables.push(resolve_formula_variable(
             variable_name,
@@ -860,9 +855,9 @@ pub(super) fn remove_higher_order_formula_interaction<'a>(
     state: &mut ExpandedFormulaDesignState<'a>,
 ) -> Result<(), DeseqError> {
     if pieces.len() < 3 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula interaction removal must use at least three variables".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula interaction removal must use at least three variables",
+        ));
     }
     let mut variables = Vec::with_capacity(pieces.len());
     for piece in pieces {
@@ -871,12 +866,10 @@ pub(super) fn remove_higher_order_formula_interaction<'a>(
             .iter()
             .any(|variable: &FormulaVariableRef<'_>| variable.name() == variable_name)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula interaction '{}' cannot use one variable twice",
-                    pieces.join(":")
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula interaction '{}' cannot use one variable twice",
+                pieces.join(":")
+            )));
         }
         variables.push(resolve_formula_variable(
             variable_name,
@@ -903,9 +896,9 @@ pub(super) fn resolve_formula_variable<'a>(
         [_] => {}
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula variable '{variable}' appears more than once"),
-            });
+            return Err(invalid_formula(format!(
+                "formula variable '{variable}' appears more than once"
+            )));
         }
     }
     let exact_numeric = numeric_covariates
@@ -916,15 +909,15 @@ pub(super) fn resolve_formula_variable<'a>(
         [_] => {}
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula variable '{variable}' appears more than once"),
-            });
+            return Err(invalid_formula(format!(
+                "formula variable '{variable}' appears more than once"
+            )));
         }
     }
     if exact_factors.len() + exact_numeric.len() > 1 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula variable '{variable}' appears more than once"),
-        });
+        return Err(invalid_formula(format!(
+            "formula variable '{variable}' appears more than once"
+        )));
     }
     if let [factor] = exact_factors.as_slice() {
         return Ok(FormulaVariableRef::Factor(factor.factor));
@@ -950,11 +943,9 @@ pub(super) fn resolve_formula_variable<'a>(
         })
         .collect::<Vec<_>>();
     if factor_aliases.len() + numeric_aliases.len() > 1 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula variable '{variable}' resolves ambiguously after R-style cleanup"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula variable '{variable}' resolves ambiguously after R-style cleanup"
+        )));
     }
     if let [factor] = factor_aliases.as_slice() {
         return Ok(FormulaVariableRef::Factor(factor.factor));
@@ -962,9 +953,9 @@ pub(super) fn resolve_formula_variable<'a>(
     if let [covariate] = numeric_aliases.as_slice() {
         return Ok(FormulaVariableRef::Numeric(covariate.name));
     }
-    Err(DeseqError::InvalidOptions {
-        reason: format!("formula variable '{variable}' is not present in supplied design metadata"),
-    })
+    Err(invalid_formula(format!(
+        "formula variable '{variable}' is not present in supplied design metadata"
+    )))
 }
 
 pub(super) fn resolved_formula_variable_name<'a>(
