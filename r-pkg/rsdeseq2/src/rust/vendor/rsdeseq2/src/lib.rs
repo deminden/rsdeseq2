@@ -33,6 +33,7 @@ pub mod matrix;
 pub mod multiple_testing;
 pub mod normalization;
 pub(crate) mod numeric;
+pub use numeric::{NumericProfile, numeric_profile, set_numeric_profile};
 pub mod options;
 pub mod prelude;
 // Several distributions are used only by the shrinkage engines.

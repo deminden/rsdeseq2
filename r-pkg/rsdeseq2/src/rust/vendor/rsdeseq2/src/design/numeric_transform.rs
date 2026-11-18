@@ -6,9 +6,14 @@ use crate::errors::DeseqError;
 use crate::errors::invalid_options;
 use crate::matrix::{MatrixView, RowMajorMatrix};
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 // The x87 extended-precision kernels are the only unsafe code in the core.
+// Elsewhere a binary64 stand-in keeps the R-profile branches compiling; that
+// profile cannot be selected on those hosts.
+#[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
+mod extended;
+#[cfg(not(target_arch = "x86_64"))]
+#[path = "numeric_transform/extended_unavailable.rs"]
 mod extended;
 mod polynomial;
 pub(super) mod polynomial_qr;
@@ -114,15 +119,12 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|row| *input.at(row, column))
                     .filter(|v| !v.is_nan());
-                #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-                {
+                if crate::numeric::profile::r_linux_x86() {
                     let count = present.clone().count();
                     let mut total = extended::sum(present);
                     total.divide(count as f64);
                     total.value()
-                }
-                #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-                {
+                } else {
                     let (total, count) = present.fold((0.0, 0usize), |(sum, count), value| {
                         (sum + value, count + 1)
                     });
@@ -144,14 +146,11 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|r| values[r * columns + column])
                     .filter(|v| !v.is_nan());
-                #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-                {
+                if crate::numeric::profile::r_linux_x86() {
                     (extended::sum(present.clone().map(|x| x * x)).value()
                         / present.count().saturating_sub(1).max(1) as f64)
                         .sqrt()
-                }
-                #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-                {
+                } else {
                     let (squares, count) =
                         present.fold((0.0, 0usize), |(sum, count), x| (sum + x * x, count + 1));
                     (squares / count.saturating_sub(1).max(1) as f64).sqrt()
@@ -195,15 +194,13 @@ pub fn integer_covariate(value: f64) -> Result<f64, DeseqError> {
 // Scalar mean used by polynomial construction. Binary64 reduction and the
 // correction/overflow fallback are explicit and shared across all frontends.
 pub(super) fn scalar_mean(values: &[f64]) -> f64 {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
+    if crate::numeric::profile::r_linux_x86() {
         extended::mean(values)
+    } else {
+        scalar_mean_binary64(values)
     }
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-    scalar_mean_binary64(values)
 }
 
-#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 fn scalar_mean_binary64(values: &[f64]) -> f64 {
     let n = values.len() as f64;
     let total = values.iter().fold(0.0, |sum, x| sum + x);
@@ -224,12 +221,9 @@ fn scalar_mean_binary64(values: &[f64]) -> f64 {
 }
 
 pub(super) fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
+    if crate::numeric::profile::r_linux_x86() {
         extended::sum(values).value()
-    }
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-    {
+    } else {
         values.sum()
     }
 }

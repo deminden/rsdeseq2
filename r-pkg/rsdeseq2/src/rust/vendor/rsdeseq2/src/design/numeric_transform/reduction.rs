@@ -5,14 +5,12 @@
 //! These operations specify rounding rather than delegating it to whichever
 //! BLAS the calling frontend happens to load. Rust and R use the same schedule.
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
+    if crate::numeric::profile::r_linux_x86() {
         dot_reference_haswell(x, y)
+    } else {
+        dot_binary64(x, y)
     }
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-    dot_binary64(x, y)
 }
-#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
     let blocks = x.len() / 32;
     let mut lanes = [0.0; 16];
@@ -39,14 +37,12 @@ fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
     sum
 }
 pub(super) fn norm(x: &[f64]) -> f64 {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
+    if crate::numeric::profile::r_linux_x86() {
         super::extended::norm(x)
+    } else {
+        norm_binary64(x)
     }
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-    norm_binary64(x)
 }
-#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 fn norm_binary64(x: &[f64]) -> f64 {
     let mut scale = 0.0;
     let mut squares = 1.0;
@@ -63,7 +59,6 @@ fn norm_binary64(x: &[f64]) -> f64 {
     scale * squares.sqrt()
 }
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn dot_reference_haswell(x: &[f64], y: &[f64]) -> f64 {
     let mut lanes = [0.0; 16];
     let end = x.len() / 16 * 16;
@@ -86,11 +81,12 @@ fn dot_reference_haswell(x: &[f64], y: &[f64]) -> f64 {
     }
     total
 }
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+/// OpenBLAS Haswell daxpy: fused multiply-add in 16-wide blocks, then plain
+/// multiply-add for the tail.
 pub(super) fn axpy(weight: f64, x: &[f64], y: &mut [f64]) {
     let end = x.len() / 16 * 16;
     for (i, (v, &x)) in y.iter_mut().zip(x).enumerate() {
-        *v = if cfg!(all(target_os = "linux", target_arch = "x86_64")) && i >= end {
+        *v = if i >= end {
             *v + weight * x
         } else {
             weight.mul_add(x, *v)
