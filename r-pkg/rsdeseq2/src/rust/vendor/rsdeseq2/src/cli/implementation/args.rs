@@ -8,8 +8,8 @@ pub(super) use crate::contrasts::{
 };
 pub(super) use crate::cooks::{CooksRefitPlan, CooksReplacementOptions};
 pub(super) use crate::core::{
-    CooksReplacementLrtOutput, CooksReplacementTestOutput, CooksReplacementWaldOutput,
-    DeseqBuilder, DeseqFit,
+    Analysis, CooksReplacementLrtOutput, CooksReplacementTestOutput, CooksReplacementWaldOutput,
+    DeseqBuilder, DeseqFit, MeanModel, ResultColumn, RunOutput, Stage,
 };
 pub(super) use crate::design::{
     ExpandedFactorSpec, ExpandedNumericSpec, expanded_additive_design,
@@ -41,7 +41,7 @@ pub(super) use crate::normalization::{
     base_mean, base_mean_with_weights, estimate_size_factors_with_options, normalized_counts,
     normalized_counts_with_factors,
 };
-pub(super) use crate::options::{CooksCutoff, FitType, SizeFactorMethod, TestType};
+pub(super) use crate::options::{CooksCutoff, FitType, SizeFactorMethod};
 pub(super) use crate::results::{
     DeseqResults, ExpandedAdditiveBetaPriorWaldNormalizedResultsInput,
     ExpandedAdditiveBetaPriorWaldReplacementResults, ExpandedAdditiveBetaPriorWaldResults,

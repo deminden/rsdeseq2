@@ -167,10 +167,9 @@ pub(super) fn run_staged(cli: Cli) -> Result<(), DeseqError> {
             let transformed = if blind {
                 if let Some(frozen_intercept) = frozen_intercept {
                     let prior = required_cli_rlog_prior_variance(rlog_prior_variance)?;
-                    let fit = builder.fit_map_dispersions_glm_mu(
-                        &counts,
-                        &crate::design::DesignMatrix::intercept_only(counts.n_samples())?,
-                    )?;
+                    let intercept =
+                        crate::design::DesignMatrix::intercept_only(counts.n_samples())?;
+                    let fit = cli_map_dispersions(&builder, &counts, &intercept)?;
                     fit.frozen_rlog(&counts, &frozen_intercept, prior)?
                         .transformed
                 } else {
@@ -188,7 +187,7 @@ pub(super) fn run_staged(cli: Cli) -> Result<(), DeseqError> {
                 let design = read_cli_design_matrix(design, &counts)?;
                 if let Some(frozen_intercept) = frozen_intercept {
                     let prior = required_cli_rlog_prior_variance(rlog_prior_variance)?;
-                    let fit = builder.fit_map_dispersions_glm_mu(&counts, &design)?;
+                    let fit = cli_map_dispersions(&builder, &counts, &design)?;
                     fit.frozen_rlog(&counts, &frozen_intercept, prior)?
                         .transformed
                 } else {
@@ -207,5 +206,20 @@ pub(super) fn run_staged(cli: Cli) -> Result<(), DeseqError> {
         }
         command @ Commands::Wald { .. } => run_wald::run_wald(command),
         command @ Commands::Lrt { .. } => run_lrt::run_lrt(command),
+    }
+}
+
+// MAP dispersions with GLM means, as the frozen-intercept rlog needs.
+fn cli_map_dispersions(
+    builder: &DeseqBuilder,
+    counts: &crate::matrix::CountMatrix,
+    design: &crate::design::DesignMatrix,
+) -> Result<DeseqFit, DeseqError> {
+    let request = Analysis::new(counts, design)
+        .means(MeanModel::GlmMu)
+        .stop_after(Stage::Map);
+    match builder.run(&request)? {
+        RunOutput::Fit(fit) => Ok(fit),
+        _ => Err(invariant("a MAP-stage run should return a fit")),
     }
 }
