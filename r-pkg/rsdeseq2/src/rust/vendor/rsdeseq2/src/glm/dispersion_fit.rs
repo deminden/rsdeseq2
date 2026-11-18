@@ -1,8 +1,10 @@
 use crate::design::DesignMatrix;
 use crate::errors::DeseqError;
 use crate::glm::NbinomGlmFit;
-use crate::glm::irls::{IrlsOptions, fit_fixed_dispersion_irls};
+use crate::glm::beta::GlmInput;
+use crate::glm::irls::{IrlsOptions, fit_fixed_dispersion_glm};
 use crate::matrix::CountMatrix;
+use crate::normalization::Offsets;
 
 /// Fit a supplied-dispersion negative-binomial GLM.
 ///
@@ -16,5 +18,9 @@ pub fn fit_with_dispersion(
     dispersions: &[f64],
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    fit_fixed_dispersion_irls(counts, design, size_factors, dispersions, options)
+    fit_fixed_dispersion_glm(
+        GlmInput::new(counts, Offsets::PerSample(size_factors), dispersions),
+        design,
+        options,
+    )
 }

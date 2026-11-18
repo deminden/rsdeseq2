@@ -27,21 +27,17 @@ pub(super) use crate::dispersion::{
 };
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
 pub(super) use crate::glm::{
-    IrlsOptions, LrtOutput, NbinomGlmFit, ObservationWeightOptions, WaldAlternative,
-    WaldContrastOutput, WaldOutput, WaldTestOptions,
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_fixed_dispersion_irls_with_weights,
-    fit_intercept_only_fixed_dispersion_with_normalization_factors,
-    fit_intercept_only_fixed_dispersion_with_weights, lrt_test,
-    preprocess_observation_weights_with_options, wald_test_coefficient_with_options,
-    wald_test_contrast_with_options,
+    GlmInput, IrlsOptions, LrtOutput, NbinomGlmFit, ObservationWeightOptions, WaldAlternative,
+    WaldContrastOutput, WaldOutput, WaldTestOptions, fit_fixed_dispersion_glm,
+    fit_intercept_only_glm, lrt_test, preprocess_observation_weights_with_options,
+    wald_test_coefficient_with_options, wald_test_contrast_with_options,
 };
 pub(super) use crate::independent_filtering::{
     IndependentFilteringOptions, apply_independent_filtering,
 };
 pub(super) use crate::matrix::RowMajorMatrix;
 pub(super) use crate::normalization::{
-    base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
+    Offsets, base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
     estimate_size_factors_with_options, normalized_counts, normalized_counts_with_factors,
     validate_normalization_factors,
 };

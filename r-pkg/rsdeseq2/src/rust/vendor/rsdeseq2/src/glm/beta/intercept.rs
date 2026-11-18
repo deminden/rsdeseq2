@@ -5,29 +5,64 @@ use super::*;
 ///
 /// This mirrors the `justIntercept` branch in DESeq2 `fitNbinomGLMs` for the
 /// common unweighted size-factor case.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_intercept_only_glm(GlmInput::new(counts, Offsets::PerSample(size_factors), dispersions))"
+)]
 pub fn fit_intercept_only_fixed_dispersion(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
 ) -> Result<NbinomGlmFit, DeseqError> {
-    fit_intercept_only_fixed_dispersion_with_weights(counts, size_factors, dispersions, None)
+    fit_intercept_only_glm(GlmInput::new(
+        counts,
+        Offsets::PerSample(size_factors),
+        dispersions,
+    ))
 }
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with optional weights.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_intercept_only_glm with Offsets::PerSample and GlmInput::weights"
+)]
 pub fn fit_intercept_only_fixed_dispersion_with_weights(
     counts: &CountMatrix,
     size_factors: &[f64],
     dispersions: &[f64],
     weights: Option<&RowMajorMatrix<f64>>,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    validate_fit_inputs(counts, size_factors, dispersions, weights)?;
-    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
-    fit_intercept_only_fixed_dispersion_with_normalization_factors(
+    fit_intercept_only_glm(GlmInput {
         counts,
-        &normalization_factors,
+        offsets: Offsets::PerSample(size_factors),
         dispersions,
         weights,
-    )
+    })
+}
+
+/// Fit the intercept-only fixed-dispersion GLM in closed form (DESeq2's
+/// `fitNbinomGLMs` intercept shortcut) with size-factor or
+/// normalization-factor offsets and optional observation weights.
+pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, DeseqError> {
+    match input.offsets {
+        Offsets::PerSample(size_factors) => {
+            validate_fit_inputs(input.counts, size_factors, input.dispersions, input.weights)?;
+            let normalization_factors =
+                normalization_factors_from_size_factors(input.counts, size_factors)?;
+            intercept_only_with_factor_matrix(
+                input.counts,
+                &normalization_factors,
+                input.dispersions,
+                input.weights,
+            )
+        }
+        Offsets::PerCell(normalization_factors) => intercept_only_with_factor_matrix(
+            input.counts,
+            normalization_factors,
+            input.dispersions,
+            input.weights,
+        ),
+    }
 }
 
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with normalization factors.
@@ -35,7 +70,25 @@ pub fn fit_intercept_only_fixed_dispersion_with_weights(
 /// DESeq2's low-level code reconstructs `mu` as
 /// `normalizationFactors * 2^betaMatrix`; this function exposes that matrix
 /// form directly for future support of gene/sample normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_intercept_only_glm with Offsets::PerCell and GlmInput::weights"
+)]
 pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
+    counts: &CountMatrix,
+    normalization_factors: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_intercept_only_glm(GlmInput {
+        counts,
+        offsets: Offsets::PerCell(normalization_factors),
+        dispersions,
+        weights,
+    })
+}
+
+fn intercept_only_with_factor_matrix(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
     dispersions: &[f64],

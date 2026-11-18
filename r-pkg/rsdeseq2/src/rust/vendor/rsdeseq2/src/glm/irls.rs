@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
-use crate::glm::beta::fit_intercept_only_fixed_dispersion;
+use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
 use crate::glm::fallback::{OptimFallbackRows, optim_fallback_rows, record_optim_fallback_row};
 use crate::glm::nb::{
     FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
@@ -48,9 +48,17 @@ pub fn fit_irls(
     if is_intercept_only_design(design)
         && options.uses_intercept_shortcut_for_coefficients(design.n_coefficients())?
     {
-        fit_intercept_only_fixed_dispersion(counts, size_factors, dispersions)
+        fit_intercept_only_glm(GlmInput::new(
+            counts,
+            Offsets::PerSample(size_factors),
+            dispersions,
+        ))
     } else {
-        fit_fixed_dispersion_irls(counts, design, size_factors, dispersions, options)
+        fit_fixed_dispersion_glm(
+            GlmInput::new(counts, Offsets::PerSample(size_factors), dispersions),
+            design,
+            options,
+        )
     }
 }
 
@@ -188,6 +196,10 @@ fn is_intercept_only_design(design: &DesignMatrix) -> bool {
 /// supported, and fallback rows can be refit with bounded limited-memory
 /// BFGS-style pure-Rust optimization. Explicit contrast testing is layered on top of the stored
 /// beta covariance matrices.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_fixed_dispersion_glm(GlmInput::new(counts, Offsets::PerSample(size_factors), dispersions), design, options)"
+)]
 pub fn fit_fixed_dispersion_irls(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -195,7 +207,11 @@ pub fn fit_fixed_dispersion_irls(
     dispersions: &[f64],
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    fit_fixed_dispersion_irls_with_weights(counts, design, size_factors, dispersions, None, options)
+    fit_fixed_dispersion_glm(
+        GlmInput::new(counts, Offsets::PerSample(size_factors), dispersions),
+        design,
+        options,
+    )
 }
 
 /// Fit an unweighted or observation-weighted fixed-dispersion NB GLM by IRLS.
@@ -203,6 +219,10 @@ pub fn fit_fixed_dispersion_irls(
 /// Observation weights follow DESeq2's low-level `fitBeta` semantics: the
 /// caller supplies non-negative gene/sample weights, and each row's working
 /// weights and log likelihood are multiplied by those values.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_fixed_dispersion_glm with Offsets::PerSample and GlmInput::weights"
+)]
 pub fn fit_fixed_dispersion_irls_with_weights(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -211,19 +231,23 @@ pub fn fit_fixed_dispersion_irls_with_weights(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    validate_size_factor_offsets(counts, size_factors)?;
-    fit_offsets_irls_for_output(
-        counts,
+    fit_fixed_dispersion_glm(
+        GlmInput {
+            counts,
+            offsets: Offsets::PerSample(size_factors),
+            dispersions,
+            weights,
+        },
         design,
-        Offsets::PerSample(size_factors),
-        dispersions,
-        weights,
         options,
-        OutputRequirements::Inference,
     )
 }
 
 /// Fit an unweighted fixed-dispersion NB GLM by IRLS with normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_fixed_dispersion_glm(GlmInput::new(counts, Offsets::PerCell(normalization_factors), dispersions), design, options)"
+)]
 pub fn fit_fixed_dispersion_irls_with_normalization_factors(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -231,18 +255,19 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors(
     dispersions: &[f64],
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
-        counts,
+    fit_fixed_dispersion_glm(
+        GlmInput::new(counts, Offsets::PerCell(normalization_factors), dispersions),
         design,
-        normalization_factors,
-        dispersions,
-        None,
         options,
     )
 }
 
 /// Fit an unweighted or observation-weighted fixed-dispersion NB GLM by IRLS
 /// with gene/sample normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_fixed_dispersion_glm with Offsets::PerCell and GlmInput::weights"
+)]
 pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     counts: &CountMatrix,
     design: &DesignMatrix,
@@ -251,15 +276,46 @@ pub fn fit_fixed_dispersion_irls_with_normalization_factors_and_weights(
     weights: Option<&RowMajorMatrix<f64>>,
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    fit_nf_irls_for_output(
-        counts,
+    fit_fixed_dispersion_glm(
+        GlmInput {
+            counts,
+            offsets: Offsets::PerCell(normalization_factors),
+            dispersions,
+            weights,
+        },
         design,
-        normalization_factors,
-        dispersions,
-        weights,
         options,
-        OutputRequirements::Inference,
     )
+}
+
+/// Fit a fixed-dispersion NB GLM by IRLS (DESeq2's `fitBeta` loop) with
+/// size-factor or normalization-factor offsets and optional observation
+/// weights.
+pub fn fit_fixed_dispersion_glm(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+) -> Result<NbinomGlmFit, DeseqError> {
+    match input.offsets {
+        Offsets::PerSample(size_factors) => fit_sf_irls_for_output(
+            input.counts,
+            design,
+            size_factors,
+            input.dispersions,
+            input.weights,
+            options,
+            OutputRequirements::Inference,
+        ),
+        Offsets::PerCell(normalization_factors) => fit_nf_irls_for_output(
+            input.counts,
+            design,
+            normalization_factors,
+            input.dispersions,
+            input.weights,
+            options,
+            OutputRequirements::Inference,
+        ),
+    }
 }
 
 pub(crate) fn fit_sf_irls_for_output(
