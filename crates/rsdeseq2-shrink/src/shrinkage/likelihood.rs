@@ -3,6 +3,7 @@ use super::{
     RestrictedLikelihood, student_t,
     truncated_standard::{log_phi, truncated_mean, truncated_second},
 };
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::{DeseqError, math::normal_log_cdf};
 use std::sync::Arc;
@@ -102,11 +103,11 @@ impl super::MixtureGrid {
                             .with_likelihood(likelihood.clone())?,
                     ))
                 }
-                _ => Err(DeseqError::InvalidOptions {
-                    reason:
-                        "normal/truncated-normal mixtures require a normal observation likelihood"
-                            .into(),
-                }),
+                _ => Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "a normal or truncated-normal mixture",
+                    "a normal observation likelihood",
+                )),
             },
         }
     }

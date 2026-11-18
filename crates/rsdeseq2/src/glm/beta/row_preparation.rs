@@ -1,5 +1,6 @@
 //! Shared raw-count row selection before normal-prior refitting.
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::CountRows;
 use crate::matrix::RowFlags;
 
@@ -47,7 +48,11 @@ impl NormalShrinkageRows {
                 || !fitted[gene].is_finite()
                 || fitted[gene] <= 0.0
             {
-                return Err(DeseqError::InvalidOptions {reason:"normal lfcShrink requires finite positive dispersions and fitted trends for non-zero genes".into()});
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "normal lfcShrink",
+                    "finite positive dispersions and fitted trends for non-zero genes",
+                ));
             }
             indices.push(gene);
         }

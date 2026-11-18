@@ -4,6 +4,7 @@ use super::{
     validation::validate_value,
 };
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 /// Missing-value action supplied as metadata by a frontend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,13 +240,17 @@ pub fn expanded_factors(
         .map(|value| {
             validate_value(value, 0)?;
             if !value.has_class("factor") || value.has_class("ordered") {
-                return Err(invalid_options(
-                    "expanded factor reference requires an unordered factor",
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "expanded factor reference",
+                    "an unordered factor",
                 ));
             }
             if value.is_empty() || value.dimensions.is_some() {
-                return Err(invalid_options(
-                    "expanded factor requires a nonempty vector with a placeholder row",
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "expanded factor",
+                    "a nonempty vector with a placeholder row",
                 ));
             }
             let mut levels = value

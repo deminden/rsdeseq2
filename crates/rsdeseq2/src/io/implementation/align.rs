@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 /// Align sample-level factor values to count-matrix sample order.
 pub fn align_sample_levels_to_samples(
     levels: &[SampleLevel],
@@ -109,16 +110,20 @@ pub fn align_labeled_assay_matrix_to_counts(
     counts: &CountMatrix,
     context: &str,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let gene_names = counts
-        .gene_names()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("count gene names are required to align {context}"),
-        })?;
-    let sample_names = counts
-        .sample_names()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("count sample names are required to align {context}"),
-        })?;
+    let gene_names = counts.gene_names().ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            format!("aligning {context}"),
+            "count gene names",
+        )
+    })?;
+    let sample_names = counts.sample_names().ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            format!("aligning {context}"),
+            "count sample names",
+        )
+    })?;
     if labeled.gene_names.len() != gene_names.len() {
         return Err(DeseqError::InvalidDimensions {
             context: format!("{context} gene rows"),

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 pub(super) fn cli_normalized_counts(
     counts: &crate::matrix::CountMatrix,
@@ -318,12 +319,13 @@ pub(super) fn cli_factor_beta_prior_wald_analysis(
     }
     let sample_levels = align_sample_levels_to_samples(
         &read_sample_levels_tsv(sample_levels)?,
-        counts
-            .sample_names()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "count sample names are required to align beta-prior sample levels"
-                    .to_string(),
-            })?,
+        counts.sample_names().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "aligning beta-prior sample levels",
+                "count sample names",
+            )
+        })?,
     )?;
     let generated_design = expanded_factor_design(&factor, &sample_levels, &reference)?;
     if &generated_design.standard_design != standard_design {
@@ -510,12 +512,13 @@ pub(super) fn cli_additive_beta_prior_wald_analysis(
             actual: numeric_value_paths.len(),
         });
     }
-    let sample_names = counts
-        .sample_names()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: "count sample names are required to align beta-prior additive sample levels"
-                .to_string(),
-        })?;
+    let sample_names = counts.sample_names().ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            "aligning beta-prior additive sample levels",
+            "count sample names",
+        )
+    })?;
     let sample_levels = sample_level_paths
         .iter()
         .map(|path| align_sample_levels_to_samples(&read_sample_levels_tsv(path)?, sample_names))

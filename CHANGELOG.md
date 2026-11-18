@@ -109,6 +109,13 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   invariants (`ErrorKind::Internal`). Design note:
   `docs/design/structured-errors.md`.
 
+- Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
+  `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
+  (119 sites). 57 of these messages were reworded into the one form
+  "*operation* requires *prerequisite*"; for example "MAP dispersions are
+  required before Wald fitting" is now "Wald fitting requires MAP
+  dispersions". The full list is in `docs/design/structured-errors.md`.
+
 - The numeric foundation (`errors`, `math`, `matrix`, `glm::nb`, numeric
   profiles, special functions and distributions) moved into a new
   `rsdeseq2-base` crate, formula evaluation and design matrices

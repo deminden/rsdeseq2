@@ -1,5 +1,6 @@
 //! Builder vst stages.
 use super::*;
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 impl DeseqBuilder {
@@ -76,9 +77,11 @@ impl DeseqBuilder {
             let (subset_fit, subset) =
                 self.fit_fast_vst_dispersion_trend_glm_mu(counts, design, nsub)?;
             let trend_fit = subset_fit.dispersion_trend.as_ref().ok_or_else(|| {
-                DeseqError::InvalidDispersion {
-                    reason: "a fitted fast-VST dispersion trend is required".to_string(),
-                }
+                missing_prerequisite(
+                    ErrorKind::Dispersion,
+                    "fast VST",
+                    "a fitted fast-VST dispersion trend",
+                )
             })?;
             // The subset supplies only the trend; the transform is still evaluated
             // against the full count matrix and the caller's full-data offsets.

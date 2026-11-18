@@ -1,4 +1,5 @@
 use super::{column_sum, invalid_options, polynomial_qr, scalar_mean};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::numeric::math::ProfileMath;
 use crate::{errors::DeseqError, matrix::RowMajorMatrix};
 
@@ -31,8 +32,10 @@ pub fn polynomial_basis(
     coefficients: Option<&PolynomialCoefficients>,
 ) -> Result<PolynomialBasis, DeseqError> {
     if input.is_empty() || degree == 0 || input.iter().any(|v| !v.is_finite()) {
-        return Err(invalid_options(
-            "polynomials require finite values and positive degree",
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "poly()",
+            "finite values and positive degree",
         ));
     }
     let result = polynomial_expression(input, degree, raw, coefficients)?;
@@ -51,8 +54,10 @@ pub(in crate::design) fn polynomial_expression(
     coefficients: Option<&PolynomialCoefficients>,
 ) -> Result<PolynomialBasis, DeseqError> {
     if degree == 0 || (!raw && coefficients.is_none() && input.iter().any(|v| !v.is_finite())) {
-        return Err(invalid_options(
-            "orthogonal polynomials require nonmissing finite input and positive degree",
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "an orthogonal polynomial",
+            "nonmissing finite input and positive degree",
         ));
     }
     let width = degree

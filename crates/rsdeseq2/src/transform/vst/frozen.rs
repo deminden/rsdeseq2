@@ -3,6 +3,7 @@
 use super::{validate_normalized_counts_and_max, vst_local_from_dispersion_grid};
 use crate::design::expression::{self, Data, EvaluationOptions, Expression, Value};
 use crate::errors::invalid_dispersion;
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 use crate::{
@@ -36,8 +37,10 @@ pub fn frozen_local_vst_grid_from_counts(
             ));
         }
     } else if size_factors.is_none() {
-        return Err(invalid_dispersion(
-            "frozen local grid requires size or normalization factors",
+        return Err(missing_prerequisite(
+            ErrorKind::Dispersion,
+            "frozen local grid",
+            "size or normalization factors",
         ));
     }
     let mut max = 0.0_f64;
@@ -100,8 +103,10 @@ impl SavedLocalDispersionFit {
                 .chain(&polynomial)
                 .any(|v| !v.is_finite())
         {
-            return Err(invalid_dispersion(
-                "saved local fit requires aligned finite knots, values, slopes and quadratic coefficients",
+            return Err(missing_prerequisite(
+                ErrorKind::Dispersion,
+                "saved local fit",
+                "aligned finite knots, values, slopes and quadratic coefficients",
             ));
         }
         let mut order = (0..knots.len()).collect::<Vec<_>>();

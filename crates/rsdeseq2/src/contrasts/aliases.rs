@@ -2,14 +2,17 @@
 
 use crate::design::{DesignMatrix, r_like_make_name, r_like_name_candidates as candidate_names};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use std::collections::HashSet;
 
 pub(super) fn coefficient_names(design: &DesignMatrix) -> Result<&[String], DeseqError> {
-    design
-        .coefficient_names()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: "coefficient names are required to resolve named contrasts".to_string(),
-        })
+    design.coefficient_names().ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Options,
+            "named contrast resolution",
+            "coefficient names",
+        )
+    })
 }
 
 fn find_coefficient(names: &[String], wanted: &str) -> Result<usize, DeseqError> {

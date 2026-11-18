@@ -1,6 +1,7 @@
 use super::{Argument, Data, Evaluator, Expression, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 impl Value {
     pub(super) fn flattened(&self) -> Self {
@@ -141,7 +142,7 @@ impl Evaluator<'_> {
                 let a = arguments(args, &["x"])?;
                 Ok(Value::new(Data::Number {
                     values: vec![
-                        a[0].ok_or_else(|| invalid_options("length requires x"))?
+                        a[0].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "length", "x"))?
                             .len() as f64,
                     ],
                     integer: true,
@@ -149,8 +150,9 @@ impl Evaluator<'_> {
             }
             "seq_len" => {
                 let a = arguments(args, &["length.out"])?;
-                let n =
-                    dimension(a[0].ok_or_else(|| invalid_options("seq_len requires a length"))?)?;
+                let n = dimension(a[0].ok_or_else(|| {
+                    missing_prerequisite(ErrorKind::Options, "seq_len", "a length")
+                })?)?;
                 super::checked_elements(Some(n))?;
                 Ok(Value::new(Data::Number {
                     values: (1..=n).map(|i| i as f64).collect(),
@@ -160,7 +162,7 @@ impl Evaluator<'_> {
             "rep" => {
                 let a = arguments(args, &["x", "times", "length.out", "each"])?;
                 let input = a[0]
-                    .ok_or_else(|| invalid_options("rep requires x"))?
+                    .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "rep", "x"))?
                     .flattened();
                 let each = a[3].map(dimension).transpose()?.unwrap_or(1);
                 super::checked_elements(input.len().checked_mul(each))?;

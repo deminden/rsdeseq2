@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 pub(super) fn expanded_formula_design_from_state<'a>(
     state: &ExpandedFormulaDesignState<'a>,
@@ -399,23 +400,29 @@ pub(super) fn formula_design_sample_count(
     }
     if let Some(factor) = supplied_factors.first() {
         if factor.sample_levels.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "intercept-only formula requires non-empty sample metadata".to_string(),
-            });
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "intercept-only formula",
+                "non-empty sample metadata",
+            ));
         }
         return Ok(factor.sample_levels.len());
     }
     if let Some(covariate) = supplied_numeric_covariates.first() {
         if covariate.values.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "intercept-only formula requires non-empty sample metadata".to_string(),
-            });
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "intercept-only formula",
+                "non-empty sample metadata",
+            ));
         }
         return Ok(covariate.values.len());
     }
-    Err(DeseqError::InvalidOptions {
-        reason: "intercept-only formula requires supplied sample metadata".to_string(),
-    })
+    Err(missing_prerequisite(
+        ErrorKind::Options,
+        "intercept-only formula",
+        "supplied sample metadata",
+    ))
 }
 
 pub(super) fn validate_formula_used_factor_specs(

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 pub(super) fn write_cli_cooks_outputs(
     paths: &CliCooksOutputPaths,
@@ -7,10 +8,17 @@ pub(super) fn write_cli_cooks_outputs(
     analysis: &CliAnalysisOutput,
 ) -> Result<(), DeseqError> {
     if paths.cooks_distance.is_some() {
-        let cooks = analysis.cooks.as_ref().or_else(|| analysis.fit.as_ref().and_then(|fit| fit.cooks.as_ref())).ok_or_else(|| DeseqError::InvalidOptions {
-            reason: "Cook's diagnostic sidecar output requires a workflow that computes Cook's distances"
-                .to_string(),
-        })?;
+        let cooks = analysis
+            .cooks
+            .as_ref()
+            .or_else(|| analysis.fit.as_ref().and_then(|fit| fit.cooks.as_ref()))
+            .ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "Cook's diagnostic sidecar output",
+                    "a workflow that computes Cook's distances",
+                )
+            })?;
         if let Some(path) = &paths.cooks_distance {
             write_cooks_distance_matrix_tsv(path, gene_names, sample_names, cooks)?;
         }
@@ -22,15 +30,13 @@ pub(super) fn write_cli_cooks_outputs(
         || paths.candidate_replacement_counts.is_some()
         || paths.outlier_cells.is_some()
     {
-        let refit_plan =
-            analysis
-                .refit_plan
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason:
-                        "Cook's replacement sidecar output requires Cook's replacement/refit to run"
-                            .to_string(),
-                })?;
+        let refit_plan = analysis.refit_plan.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "Cook's replacement sidecar output",
+                "Cook's replacement/refit to run",
+            )
+        })?;
         if let Some(path) = &paths.replacement_metadata {
             write_cooks_replacement_metadata_tsv(path, refit_plan)?;
         }
@@ -68,15 +74,13 @@ pub(super) fn write_cli_result_sidecars(
         || paths.independent_filter_num_rej.is_some()
         || paths.independent_filter_lowess.is_some()
     {
-        let filtering =
-            results
-                .independent_filtering
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason:
-                        "independent-filtering sidecar output requires independent filtering to run"
-                            .to_string(),
-                })?;
+        let filtering = results.independent_filtering.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "independent-filtering sidecar output",
+                "independent filtering to run",
+            )
+        })?;
         if let Some(path) = &paths.independent_filter_metadata {
             write_independent_filter_metadata_tsv(path, filtering)?;
         }
@@ -88,55 +92,56 @@ pub(super) fn write_cli_result_sidecars(
         }
     }
     if let Some(path) = &paths.fit_diagnostics {
-        let fit = analysis
-            .fit
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "fit diagnostics sidecar output requires a native fit workflow".to_string(),
-            })?;
+        let fit = analysis.fit.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "fit diagnostics sidecar output",
+                "a native fit workflow",
+            )
+        })?;
         write_deseq_mcols_diagnostics_tsv(path, gene_names, &fit.deseq2_mcols_diagnostics())?;
     }
     if let Some(path) = &paths.refit_diagnostics {
-        let refit = analysis
-            .refit
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "replacement refit diagnostics sidecar output requires rows to be refit"
-                    .to_string(),
-            })?;
+        let refit = analysis.refit.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "replacement refit diagnostics sidecar output",
+                "rows to be refit",
+            )
+        })?;
         write_deseq_mcols_diagnostics_tsv(path, gene_names, &refit.deseq2_mcols_diagnostics())?;
     }
     if let Some(path) = &paths.fit_beta {
         let fit = require_cli_fit(analysis, "fit beta sidecar output")?;
-        let beta = fit
-            .beta
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "fit beta sidecar output requires GLM beta estimates".to_string(),
-            })?;
+        let beta = fit.beta.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "fit beta sidecar output",
+                "GLM beta estimates",
+            )
+        })?;
         write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(fit), beta)?;
     }
     if let Some(path) = &paths.fit_beta_se {
         let fit = require_cli_fit(analysis, "fit beta standard-error sidecar output")?;
-        let beta_se = fit
-            .beta_se
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "fit beta standard-error sidecar output requires GLM beta standard errors"
-                    .to_string(),
-            })?;
+        let beta_se = fit.beta_se.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "fit beta standard-error sidecar output",
+                "GLM beta standard errors",
+            )
+        })?;
         write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(fit), beta_se)?;
     }
     if let Some(path) = &paths.fit_beta_optim_start {
         let fit = require_cli_fit(analysis, "fit optimizer-start beta sidecar output")?;
-        let beta_optim_start =
-            fit.beta_optim_start
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason:
-                        "fit optimizer-start beta sidecar output requires GLM fallback diagnostics"
-                            .to_string(),
-                })?;
+        let beta_optim_start = fit.beta_optim_start.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "fit optimizer-start beta sidecar output",
+                "GLM fallback diagnostics",
+            )
+        })?;
         write_optional_numeric_matrix_tsv(
             path,
             gene_names,
@@ -146,13 +151,13 @@ pub(super) fn write_cli_result_sidecars(
     }
     if let Some(path) = &paths.refit_beta {
         let refit = require_cli_refit(analysis, "replacement refit beta sidecar output")?;
-        let beta = refit
-            .beta
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "replacement refit beta sidecar output requires GLM beta estimates"
-                    .to_string(),
-            })?;
+        let beta = refit.beta.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "replacement refit beta sidecar output",
+                "GLM beta estimates",
+            )
+        })?;
         write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(refit), beta)?;
     }
     if let Some(path) = &paths.refit_beta_se {
@@ -160,10 +165,12 @@ pub(super) fn write_cli_result_sidecars(
             analysis,
             "replacement refit beta standard-error sidecar output",
         )?;
-        let beta_se = refit.beta_se.as_ref().ok_or_else(|| DeseqError::InvalidOptions {
-            reason:
-                "replacement refit beta standard-error sidecar output requires GLM beta standard errors"
-                    .to_string(),
+        let beta_se = refit.beta_se.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "replacement refit beta standard-error sidecar output",
+                "GLM beta standard errors",
+            )
         })?;
         write_optional_numeric_matrix_tsv(path, gene_names, fit_coefficient_names(refit), beta_se)?;
     }
@@ -172,14 +179,13 @@ pub(super) fn write_cli_result_sidecars(
             analysis,
             "replacement refit optimizer-start beta sidecar output",
         )?;
-        let beta_optim_start =
-            refit
-                .beta_optim_start
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "replacement refit optimizer-start beta sidecar output requires GLM fallback diagnostics"
-                        .to_string(),
-                })?;
+        let beta_optim_start = refit.beta_optim_start.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "replacement refit optimizer-start beta sidecar output",
+                "GLM fallback diagnostics",
+            )
+        })?;
         write_optional_numeric_matrix_tsv(
             path,
             gene_names,

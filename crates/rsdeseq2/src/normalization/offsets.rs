@@ -1,5 +1,6 @@
 //! One base-factor/offset composition for native formula and foreign interfaces.
 use super::validate_size_factors;
+use crate::errors::missing_prerequisite;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 use crate::matrix::{MatrixView, RowMajorMatrix};
@@ -51,9 +52,11 @@ pub fn normalization_factors_with_offsets(
             }
         }
     } else if size_factors.is_none() {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: "offset composition requires base size or normalization factors".into(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Normalization,
+            "offset composition",
+            "base size or normalization factors",
+        ));
     }
     let multipliers=offsets.iter().enumerate().map(|(sample,&offset)| {
         let multiplier=offset.exp_p();

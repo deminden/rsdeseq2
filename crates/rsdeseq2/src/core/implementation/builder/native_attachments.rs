@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_parametric`] and [`DeseqBuilder::run`].
     pub(super) fn leaf_wald_glm_mu_parametric(
@@ -96,12 +97,9 @@ impl DeseqBuilder {
         coefficient: usize,
         mut fit: DeseqFit,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let dispersions = fit
-            .dispersion
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "MAP dispersions are required before Wald fitting".to_string(),
-            })?;
+        let dispersions = fit.dispersion.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "Wald fitting", "MAP dispersions")
+        })?;
         let normalized = match fit.normalization_factors.as_ref() {
             Some(normalization_factors) => {
                 normalized_counts_with_factors(counts, normalization_factors)?
@@ -137,12 +135,9 @@ impl DeseqBuilder {
         contrast_all_zero_override: Option<&[bool]>,
         mut fit: DeseqFit,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let dispersions = fit
-            .dispersion
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "MAP dispersions are required before Wald fitting".to_string(),
-            })?;
+        let dispersions = fit.dispersion.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "Wald fitting", "MAP dispersions")
+        })?;
         let normalized = match fit.normalization_factors.as_ref() {
             Some(normalization_factors) => {
                 normalized_counts_with_factors(counts, normalization_factors)?
@@ -183,12 +178,9 @@ impl DeseqBuilder {
         coefficient: usize,
         mut fit: DeseqFit,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let dispersions = fit
-            .dispersion
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "MAP dispersions are required before LRT fitting".to_string(),
-            })?;
+        let dispersions = fit.dispersion.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "LRT fitting", "MAP dispersions")
+        })?;
         let normalized = match fit.normalization_factors.as_ref() {
             Some(normalization_factors) => {
                 normalized_counts_with_factors(counts, normalization_factors)?
@@ -232,12 +224,9 @@ impl DeseqBuilder {
         contrast_all_zero_override: Option<&[bool]>,
         mut fit: DeseqFit,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
-        let dispersions = fit
-            .dispersion
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "MAP dispersions are required before LRT fitting".to_string(),
-            })?;
+        let dispersions = fit.dispersion.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "LRT fitting", "MAP dispersions")
+        })?;
         let normalized = match fit.normalization_factors.as_ref() {
             Some(normalization_factors) => {
                 normalized_counts_with_factors(counts, normalization_factors)?

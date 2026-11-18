@@ -1,5 +1,6 @@
 //! Builder map stages.
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_map_dispersions_linear_mu`] and [`DeseqBuilder::run`].
@@ -86,24 +87,23 @@ impl DeseqBuilder {
         supplied_disp_prior_var: Option<f64>,
         supplied_var_log_disp_estimates: Option<f64>,
     ) -> Result<DeseqFit, DeseqError> {
-        let disp_gene_est =
-            fit.disp_gene_est
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidDispersion {
-                    reason: "gene-wise dispersions are required before MAP fitting".to_string(),
-                })?;
-        let disp_fit = fit
-            .disp_fit
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "fitted dispersion trend is required before MAP fitting".to_string(),
-            })?;
-        let mu = fit
-            .mu
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "fitted means are required before MAP fitting".to_string(),
-            })?;
+        let disp_gene_est = fit.disp_gene_est.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Dispersion,
+                "MAP fitting",
+                "gene-wise dispersions",
+            )
+        })?;
+        let disp_fit = fit.disp_fit.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Dispersion,
+                "MAP fitting",
+                "a fitted dispersion trend",
+            )
+        })?;
+        let mu = fit.mu.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Dispersion, "MAP fitting", "fitted means")
+        })?;
         // Replacement refits reuse the original trend/prior scalars; ordinary
         // MAP fitting estimates them from the current gene-wise/trend state.
         let prior_variance = match (supplied_disp_prior_var, supplied_var_log_disp_estimates) {

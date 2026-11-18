@@ -1,5 +1,6 @@
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::matrix::try_alloc_matrix;
@@ -519,9 +520,11 @@ fn validate_replacement_inputs(
         });
     }
     if options.min_replicates < 3 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "at least 3 replicates are required for outlier replacement".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "outlier replacement",
+            "at least 3 replicates",
+        ));
     }
     if let Some(samples) = &options.which_samples
         && samples.len() != counts.n_samples()

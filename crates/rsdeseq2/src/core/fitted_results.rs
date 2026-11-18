@@ -6,6 +6,7 @@ use crate::contrasts::{
     contrast_all_zero_numeric, factor_level_contrast_from_model_frame, resolve_contrast,
 };
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::glm::{WaldContrastOutput, WaldTestOptions};
 use crate::results::DeseqResults;
 
@@ -23,15 +24,16 @@ impl DeseqFit {
         match (self.wald.is_some(), self.lrt.is_some()) {
             (true, false) => self.wald_results_contrast_request(counts, contrast, gene_names),
             (false, true) => self.lrt_results_contrast_request(counts, contrast, gene_names),
-            (true, true) => Err(DeseqError::InvalidOptions {
-                reason:
-                    "fitted-object contrast results require either Wald or LRT output, not both"
-                        .to_string(),
-            }),
-            (false, false) => Err(DeseqError::InvalidOptions {
-                reason: "fitted-object contrast results require stored Wald or LRT output"
-                    .to_string(),
-            }),
+            (true, true) => Err(missing_prerequisite(
+                ErrorKind::Options,
+                "a fitted-object contrast result",
+                "either Wald or LRT output, not both",
+            )),
+            (false, false) => Err(missing_prerequisite(
+                ErrorKind::Options,
+                "a fitted-object contrast result",
+                "stored Wald or LRT output",
+            )),
         }
     }
 
@@ -69,9 +71,7 @@ impl DeseqFit {
                 let model_frame =
                     self.model_frame
                         .as_ref()
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "character results contrast requires stored formula model-frame metadata; use wald_results_factor_level_contrast when supplying explicit sample levels".to_string(),
-                        })?;
+                        .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "character results contrast", "stored formula model-frame metadata; use wald_results_factor_level_contrast when supplying explicit sample levels"))?;
                 let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
                     .ok_or_else(|| DeseqError::InvalidOptions {
                         reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
@@ -174,20 +174,19 @@ impl DeseqFit {
     ) -> Result<DeseqResults, DeseqError> {
         validate_fit_counts_shape(self, counts, "LRT results contrast request")?;
         let fit = self.inference_view()?;
-        let lrt = self
-            .lrt
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "stored LRT output is required for LRT contrast results".to_string(),
-            })?;
+        let lrt = self.lrt.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "an LRT contrast result",
+                "stored LRT output",
+            )
+        })?;
         let numeric_contrast = match contrast {
             ResultsContrast::Character { .. } => {
                 let model_frame =
                     self.model_frame
                         .as_ref()
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "character results contrast requires stored formula model-frame metadata; use lrt_results_factor_level_contrast when supplying explicit sample levels".to_string(),
-                        })?;
+                        .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "character results contrast", "stored formula model-frame metadata; use lrt_results_factor_level_contrast when supplying explicit sample levels"))?;
                 let factor_contrast = factor_level_contrast_from_model_frame(contrast, model_frame)?
                     .ok_or_else(|| DeseqError::InvalidOptions {
                         reason: "character results contrast does not match stored formula model-frame metadata".to_string(),
@@ -232,12 +231,13 @@ impl DeseqFit {
     ) -> Result<DeseqResults, DeseqError> {
         validate_fit_counts_shape(self, counts, "LRT factor-level results contrast")?;
         let fit = self.inference_view()?;
-        let lrt = self
-            .lrt
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "stored LRT output is required for LRT contrast results".to_string(),
-            })?;
+        let lrt = self.lrt.as_ref().ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "an LRT contrast result",
+                "stored LRT output",
+            )
+        })?;
         let contrast_spec = factor_level_contrast_spec(contrast);
         let numeric = resolve_contrast(fit.model_matrix, &contrast_spec)?;
         let contrast_all_zero = contrast_all_zero_factor_levels(
@@ -263,8 +263,12 @@ impl DeseqFit {
     }
 
     fn inference_view(&self) -> Result<crate::glm::inference::GlmInferenceView<'_>, DeseqError> {
-        let missing = |field: &str| DeseqError::InvalidOptions {
-            reason: format!("stored {field} is required for fitted-object results"),
+        let missing = |field: &str| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "a fitted-object result",
+                format!("stored {field}"),
+            )
         };
         Ok(crate::glm::inference::GlmInferenceView {
             beta: self.beta.as_ref().ok_or_else(|| missing("beta matrix"))?,

@@ -1,6 +1,7 @@
 use super::{Argument, Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
 use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::numeric::math::ProfileMath;
 
 pub(super) fn supported(name: &str) -> bool {
@@ -98,8 +99,10 @@ impl Evaluator<'_> {
             "+" | "-" | "*" | "/" | "^" | "%%" | "%/%" | "&" | "|" | "<" | "<=" | ">" | ">="
             | "==" | "!=" => {
                 if args.len() != 2 {
-                    return Err(invalid_options(
-                        "binary formula operation requires two arguments",
+                    return Err(missing_prerequisite(
+                        ErrorKind::Options,
+                        "binary formula operation",
+                        "two arguments",
                     ));
                 }
                 if matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=") {

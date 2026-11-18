@@ -4,6 +4,7 @@
 //! routines do not alter fitting rank thresholds or dispatch to a frontend.
 use crate::errors::DeseqError;
 use crate::errors::invalid_options;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::{MatrixView, RowMajorMatrix};
 
 // The x87 extended-precision kernels are the only unsafe code in the core.
@@ -54,16 +55,20 @@ pub fn scale_covariates(
     let rows = input.n_rows();
     let columns = input.n_cols();
     if rows == 0 || columns == 0 || input.as_slice().iter().any(|v| !v.is_finite()) {
-        return Err(invalid_options(
-            "scaling requires nonempty finite covariates",
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "scaling",
+            "nonempty finite covariates",
         ));
     }
     for policy in [center, scale] {
         if let ScalePolicy::Supplied(values) = policy
             && (values.len() != columns || values.iter().any(|v| !v.is_finite()))
         {
-            return Err(invalid_options(
-                "scale controls require one finite value per column",
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "scale control",
+                "one finite value per column",
             ));
         }
     }
@@ -101,8 +106,10 @@ pub(super) fn scale_expression(
         if let ScalePolicy::Supplied(values) = policy
             && values.len() != columns
         {
-            return Err(invalid_options(
-                "scale controls require one value per column",
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "scale control",
+                "one value per column",
             ));
         }
     }

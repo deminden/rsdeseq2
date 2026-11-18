@@ -1,5 +1,6 @@
 use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 
 pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<Value, DeseqError> {
     let mut remove_missing = false;
@@ -16,16 +17,20 @@ pub(super) fn parallel(name: &str, args: &[(Option<String>, Value)]) -> Result<V
             if value.has_class("factor")
                 || !matches!(value.data, Data::Number { .. } | Data::Logical(_))
             {
-                return Err(invalid_options(
-                    "parallel extrema require numeric or logical vectors",
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "pmin/pmax",
+                    "numeric or logical vectors",
                 ));
             }
             inputs.push(value);
         }
     }
     if inputs.is_empty() {
-        return Err(invalid_options(
-            "parallel extrema require at least one input",
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "pmin/pmax",
+            "at least one input",
         ));
     }
     let integer = inputs.iter().all(|v| {

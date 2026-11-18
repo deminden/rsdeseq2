@@ -1,5 +1,6 @@
 use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid_options, is_na};
 use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::{design::numeric_transform::scalar_mean, errors::DeseqError};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -28,7 +29,11 @@ impl Evaluator<'_> {
                     continue;
                 }
                 if value.has_class("factor") || value.has_class("Date") {
-                    return Err(invalid_options("sum requires numeric or logical values"));
+                    return Err(missing_prerequisite(
+                        ErrorKind::Options,
+                        "sum",
+                        "numeric or logical values",
+                    ));
                 }
                 integer &= matches!(
                     value.data,
@@ -101,7 +106,11 @@ impl Evaluator<'_> {
             if name == "mean" {
                 return Ok(Value::scalar(NA_REAL));
             }
-            return Err(invalid_options("sd requires numeric covariates"));
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "sd",
+                "numeric covariates",
+            ));
         }
         let mut x = input.flattened().numeric()?;
         let remove = a[if name == "mean" { 2 } else { 1 }]

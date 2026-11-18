@@ -1,5 +1,6 @@
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::glm::beta::{fit_prior_nf_for_output, fit_prior_sf_for_output};
 use crate::glm::irls::OutputRequirements;
 use crate::glm::{IrlsOptions, NbinomGlmFit, match_weighted_upper_quantile_for_variance};
@@ -449,9 +450,11 @@ fn rlog_with_estimated_prior_and_normalization_factors_impl(
 /// regularized indicator coefficient per sample.
 pub fn rlog_sample_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> {
     if n_samples == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rlog requires at least one sample".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "rlog",
+            "at least one sample",
+        ));
     }
     let n_coefficients = n_samples + 1;
     let mut values = Vec::with_capacity(n_samples * n_coefficients);
@@ -470,9 +473,11 @@ pub fn rlog_sample_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> 
 /// Build the frozen-rlog sample-effect design: one indicator per sample.
 pub fn rlog_sample_effect_design(n_samples: usize) -> Result<DesignMatrix, DeseqError> {
     if n_samples == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rlog requires at least one sample".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "rlog",
+            "at least one sample",
+        ));
     }
     let mut values = Vec::with_capacity(n_samples * n_samples);
     for sample in 0..n_samples {
@@ -492,9 +497,11 @@ pub fn rlog_beta_prior_variance(
     sample_prior_variance: f64,
 ) -> Result<Vec<f64>, DeseqError> {
     if n_samples == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rlog requires at least one sample".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "rlog",
+            "at least one sample",
+        ));
     }
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
     let mut beta_prior_variance = Vec::with_capacity(n_samples + 1);
@@ -509,9 +516,11 @@ pub fn rlog_sample_effect_prior_variance(
     sample_prior_variance: f64,
 ) -> Result<Vec<f64>, DeseqError> {
     if n_samples == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rlog requires at least one sample".to_string(),
-        });
+        return Err(missing_prerequisite(
+            ErrorKind::Options,
+            "rlog",
+            "at least one sample",
+        ));
     }
     validate_rlog_sample_prior_variance(sample_prior_variance)?;
     Ok(std::iter::repeat_n(sample_prior_variance, n_samples).collect())

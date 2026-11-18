@@ -1,6 +1,7 @@
 use super::{Data, Evaluator, Value, invalid_options};
 use crate::design::numeric_transform::{PolynomialCoefficients, polynomial_expression};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, missing_prerequisite};
 impl Evaluator<'_> {
     pub(super) fn polynomial(&self, args: &[(Option<String>, Value)]) -> Result<Value, DeseqError> {
         // Only x precedes `...`; controls after it require exact names. A lone
@@ -25,7 +26,8 @@ impl Evaluator<'_> {
         {
             slots[0] = Some(&args[dots.remove(position)].1);
         }
-        let input = slots[0].ok_or_else(|| invalid_options("poly requires x"))?;
+        let input =
+            slots[0].ok_or_else(|| missing_prerequisite(ErrorKind::Options, "poly", "x"))?;
         let scalar_degree = dots.len() == 1 && args[dots[0]].1.len() == 1;
         let degree = if scalar_degree {
             args[dots[0]].1.scalar_number()?
@@ -83,7 +85,11 @@ impl Evaluator<'_> {
     ) -> Result<Value, DeseqError> {
         let nd = columns.len();
         if nd == 0 {
-            return Err(invalid_options("poly requires at least one column"));
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "poly",
+                "at least one column",
+            ));
         }
         let rows = columns[0].len();
         if columns.iter().any(|v| v.len() != rows) {
@@ -232,8 +238,10 @@ impl Evaluator<'_> {
         simple: bool,
     ) -> Result<Value, DeseqError> {
         if input.has_class("factor") && !input.has_class("ordered") {
-            return Err(invalid_options(
-                "poly requires numeric or ordered covariates",
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "poly",
+                "numeric or ordered covariates",
             ));
         }
         let values = input.numeric()?;
@@ -245,10 +253,9 @@ impl Evaluator<'_> {
                 let Data::List(fields) = &v.data else {
                     return Err(invalid_options("poly coefs must be a named list"));
                 };
-                let names = v
-                    .names
-                    .as_ref()
-                    .ok_or_else(|| invalid_options("poly coefs require names"))?;
+                let names = v.names.as_ref().ok_or_else(|| {
+                    missing_prerequisite(ErrorKind::Options, "poly(coefs =)", "names")
+                })?;
                 let get = |name: &str| -> Result<Vec<f64>, DeseqError> {
                     let i = names
                         .iter()

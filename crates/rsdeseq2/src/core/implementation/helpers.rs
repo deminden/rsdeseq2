@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, missing_prerequisite};
 // Validate global LRT subspaces before any expensive fitting stage.
 pub(super) fn validate_lrt_designs(
     full: &DesignMatrix,
@@ -265,12 +266,9 @@ pub(super) fn replacement_refit_plan_from_original(
     replacement_options: &CooksReplacementOptions,
     observation_weights: Option<&RowMajorMatrix<f64>>,
 ) -> Result<CooksRefitPlan, DeseqError> {
-    let original_cooks = original_fit
-        .cooks
-        .as_ref()
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: "Cook's distances are required before replacement refit".to_string(),
-        })?;
+    let original_cooks = original_fit.cooks.as_ref().ok_or_else(|| {
+        missing_prerequisite(ErrorKind::Options, "replacement refit", "Cook's distances")
+    })?;
     let normalized = match original_fit.normalization_factors.as_ref() {
         Some(normalization_factors) => {
             normalized_counts_with_factors(counts, normalization_factors)?
@@ -292,28 +290,27 @@ pub(super) fn replacement_refit_plan_from_original(
 pub(super) fn replacement_dispersion_inputs(
     original_fit: &DeseqFit,
 ) -> Result<(&DispersionTrendFit, f64, f64), DeseqError> {
-    let trend =
-        original_fit
-            .dispersion_trend
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "original dispersion function is required before replacement refit"
-                    .to_string(),
-            })?;
-    let disp_prior_var =
-        original_fit
-            .disp_prior_var
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "original dispersion prior variance is required before replacement refit"
-                    .to_string(),
-            })?;
-    let var_log_disp_estimates =
-        original_fit
-            .var_log_disp_estimates
-            .ok_or_else(|| DeseqError::InvalidDispersion {
-                reason: "original log-dispersion variance is required before replacement refit"
-                    .to_string(),
-            })?;
+    let trend = original_fit.dispersion_trend.as_ref().ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Dispersion,
+            "replacement refit",
+            "the original dispersion function",
+        )
+    })?;
+    let disp_prior_var = original_fit.disp_prior_var.ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Dispersion,
+            "replacement refit",
+            "the original dispersion prior variance",
+        )
+    })?;
+    let var_log_disp_estimates = original_fit.var_log_disp_estimates.ok_or_else(|| {
+        missing_prerequisite(
+            ErrorKind::Dispersion,
+            "replacement refit",
+            "the original log-dispersion variance",
+        )
+    })?;
     Ok((trend, disp_prior_var, var_log_disp_estimates))
 }
 
@@ -423,8 +420,12 @@ pub(super) fn apply_cooks_cutoff_for_design(
         false
     };
     let heuristic = if eligible {
-        let cooks = cooks.ok_or_else(|| DeseqError::InvalidOptions {
-            reason: "low-count filtering requires retained Cook's distances".into(),
+        let cooks = cooks.ok_or_else(|| {
+            missing_prerequisite(
+                ErrorKind::Options,
+                "low-count filtering",
+                "retained Cook's distances",
+            )
         })?;
         Some(crate::results::LowCountHeuristic::new(
             crate::matrix::CountView::from(counts),

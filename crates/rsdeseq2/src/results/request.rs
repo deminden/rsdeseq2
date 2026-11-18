@@ -5,6 +5,7 @@ use super::{
 };
 use crate::contrasts::ResultsContrast;
 use crate::errors::DeseqError;
+use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::glm::{WaldTestOptions, wald::validate_wald_options};
 use crate::independent_filtering::{
@@ -114,12 +115,9 @@ impl DeseqFit {
                 rows.genes(),
             ));
         }
-        let design = self
-            .design
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "stored design is required for a result request".into(),
-            })?;
+        let design = self.design.as_ref().ok_or_else(|| {
+            missing_prerequisite(ErrorKind::Options, "a result request", "a stored design")
+        })?;
         let mut results = match (self.wald.is_some(), self.lrt.is_some()) {
             (true, false) => self.wald_results_contrast_request_with_options(
                 counts,
@@ -136,9 +134,11 @@ impl DeseqFit {
                 });
             }
             _ => {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "result requests require exactly one stored Wald or LRT test".into(),
-                });
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    "a result request",
+                    "exactly one stored Wald or LRT test",
+                ));
             }
         };
         if let Some(plan) = plan
@@ -159,9 +159,11 @@ impl DeseqFit {
         let cutoff =
             resolve_cooks_cutoff(request.cooks, design.n_samples(), design.n_coefficients())?;
         if cutoff.is_some() && self.max_cooks.is_none() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "Cook's filtering requires retained Cook's context".into(),
-            });
+            return Err(missing_prerequisite(
+                ErrorKind::Options,
+                "Cook's filtering",
+                "retained Cook's context",
+            ));
         }
         let mut low_count = request.low_count_heuristic.unwrap_or(false);
         if cutoff.is_some()
@@ -172,12 +174,13 @@ impl DeseqFit {
         }
 
         let heuristic = if low_count && cutoff.is_some() {
-            let cooks = self
-                .cooks
-                .as_ref()
-                .ok_or_else(|| DeseqError::InvalidOptions {
-                    reason: "low-count filtering requires retained Cook's distances".into(),
-                })?;
+            let cooks = self.cooks.as_ref().ok_or_else(|| {
+                missing_prerequisite(
+                    ErrorKind::Options,
+                    "low-count filtering",
+                    "retained Cook's distances",
+                )
+            })?;
             Some(LowCountHeuristic::new(
                 crate::matrix::CountView::from(counts),
                 cooks.into(),

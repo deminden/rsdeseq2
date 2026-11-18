@@ -8,7 +8,7 @@ fn cli_rlog_rejects_incomplete_option_combinations() {
     let cases = [
         (
             vec!["--frozen-intercept", frozen.to_str().unwrap()],
-            "--rlog-prior-variance is required with --frozen-intercept",
+            "--frozen-intercept requires --rlog-prior-variance",
         ),
         (
             vec!["--rlog-prior-variance", "2.5"],

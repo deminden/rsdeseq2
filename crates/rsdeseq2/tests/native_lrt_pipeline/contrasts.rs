@@ -181,7 +181,8 @@ fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
                 domain: rsdeseq2::errors::ErrorKind::Options,
                 ..
             }
-            | DeseqError::InvalidFormula { .. })
+            | DeseqError::InvalidFormula { .. }
+            | DeseqError::MissingPrerequisite { .. })
     ));
 }
 

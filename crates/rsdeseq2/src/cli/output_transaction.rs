@@ -1,5 +1,6 @@
 //! Filesystem publication policy, separate from numerical command execution.
 use crate::errors::invalid_options;
+use crate::errors::{ErrorKind, missing_prerequisite};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -68,7 +69,7 @@ fn destination(path: &Path) -> Result<PathBuf, DeseqError> {
             .unwrap_or(Path::new("."));
         let name = path
             .file_name()
-            .ok_or_else(|| invalid_options("output requires a file name"))?;
+            .ok_or_else(|| missing_prerequisite(ErrorKind::Options, "output", "a file name"))?;
         Ok(parent.canonicalize()?.join(name))
     }
 }
