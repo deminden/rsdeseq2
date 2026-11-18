@@ -4,3 +4,7 @@
 # RSDESEQ2_NUMERIC_PROFILE still wins.
 [env]
 RSDESEQ2_NUMERIC_PROFILE = "r-host"
+
+[alias]
+# The golden harness with the `local` profile (see docs/development.md).
+golden = "run --locked --profile local -p rsdeseq2 --example golden --"

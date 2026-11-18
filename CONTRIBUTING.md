@@ -12,7 +12,7 @@ Every pull request is labelled exactly one of:
 
 - **IDENTICAL**: numerical output must not change by a single bit. Prove it
   with the golden harness:
-  `cargo run --release --locked -p rsdeseq2 --example golden -- --check`.
+  `cargo golden --check`.
 - **NUMERIC**: output may move within stated bounds. Report per-field maximum
   absolute and log10 differences against the previous commit and the R
   references, and significance flips at padj 0.05 and 0.1. Never relax a
@@ -28,7 +28,7 @@ is mechanical.
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings -A missing_docs
 cargo test --locked --workspace
-cargo run --release --locked -p rsdeseq2 --example golden -- --check
+cargo golden --check
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validation/check_module_cycles.py

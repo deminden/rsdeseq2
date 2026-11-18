@@ -53,13 +53,28 @@ versions. CI rejects drift rather than repairing source before testing.
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings \
   -A missing_docs
-cargo run --release --locked -p rsdeseq2 --example golden -- --check
+cargo golden --check
 cargo test --locked --workspace
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validation/check_module_cycles.py
 cargo deny --all-features check   # licences, advisories, bans, sources
 ```
+
+Use every core for local checks; what costs memory is optimised compilation,
+not the tests. Measured on the integration suite: running all 1,009 tests with
+10 test threads peaks at about 190 MB, while `rustc` with the release profile's
+whole-program optimisation (`lto = "thin"`, one codegen unit) peaks at about
+1.9 GB per heavy target, so `cargo test --release --workspace` compiles several
+such targets at once and can use tens of GB. Instead:
+
+- `cargo test` (debug) for tests: low compile memory, and the suite runs in
+  well under a minute on all cores;
+- `cargo golden --check` (alias for the `local` profile: release
+  optimisations without LTO, 16 codegen units, about 0.65 GB per `rustc`) for
+  the golden harness and for timing your own changes; it gives the same bits
+  as `--release`;
+- `--release` only for published binaries and the paired benchmark rule.
 
 Integration tests build as one binary, `integration`
 (`crates/rsdeseq2/tests/integration.rs`); each file in `tests/` is a module.

@@ -20,6 +20,16 @@ rust-version = "1.97.1"
 codegen-units = 1
 lto = "thin"
 
+# Local checks (golden harness, benchmarks of one's own changes) without the
+# whole-program optimisation: rustc peaks at about 1.9 GB per heavy target
+# with release LTO, so parallel release builds of every test target can use
+# tens of GB on a laptop. Floating-point semantics are the same; the golden
+# harness confirms identical output. `cargo run --profile local ...`
+[profile.local]
+inherits = "release"
+codegen-units = 16
+lto = false
+
 # Library lint policy lives in crates/rsdeseq2/src/lib.rs: unwrap/expect are
 # denied outside tests and unsafe code is denied except for the documented x87
 # kernels. missing_docs warns until the public API is fully documented.
