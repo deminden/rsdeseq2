@@ -222,15 +222,13 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                                 let curve = unsafe {
                                     input_slice(frozen_local_curve, 1998, "frozen local VST curve")?
                                 };
-                                let inverse_size_factor_mean = match &normalization_factors {
-                                Some(factors) => {
-                                    local_vst_inverse_size_factor_mean_from_normalization_factors(
-                                        factors,
-                                    )
-                                }
-                                None => local_vst_inverse_size_factor_mean(&size_factors),
-                            }
-                            .map_err(|error| error.to_string())?;
+                                let inverse_size_factor_mean = local_vst_inverse_factor_mean(
+                                    match &normalization_factors {
+                                        Some(factors) => Offsets::PerCell(factors),
+                                        None => Offsets::PerSample(&size_factors),
+                                    },
+                                )
+                                .map_err(|error| error.to_string())?;
                                 vst_local_from_dispersion_grid(
                                     &normalized,
                                     &curve[..999],
