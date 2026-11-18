@@ -73,7 +73,7 @@ testthat::test_that("dataset VST and rlog return Bioconductor transform objects"
   testthat::expect_equal(
     SummarizedExperiment::assay(full),
     SummarizedExperiment::assay(reference_full),
-    tolerance = 4e-5
+    tolerance = 1e-8
   )
   testthat::expect_equal(
     attr(regularized, "betaPriorVar"),
@@ -85,21 +85,21 @@ testthat::test_that("dataset VST and rlog return Bioconductor transform objects"
       SummarizedExperiment::assay(regularized) -
         SummarizedExperiment::assay(reference_rlog)
     )),
-    0.015
+    1e-8
   )
   testthat::expect_lt(
     max(abs(
       SummarizedExperiment::assay(local_full) -
         SummarizedExperiment::assay(reference_local_full)
     )),
-    0.005
+    1e-8
   )
   testthat::expect_lt(
     max(abs(
       SummarizedExperiment::assay(local_fast) -
         SummarizedExperiment::assay(reference_local_fast)
     )),
-    0.005
+    1e-8
   )
   for (transformed in list(fast_default, full_default, regularized_default)) {
     testthat::expect_equal(S4Vectors::metadata(transformed)$rsdeseq2Transform$fitTypeRequested, "parametric")
@@ -117,10 +117,13 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
     fixture$counts, fixture$colData, design = ~ condition
   )
 
+  # Measured on R 4.6.2 / DESeq2 1.52.0 after 6.3b: at most 1.3e-14 for the
+  # mean and parametric trends and 6.5e-10 for the locfit-based local trend;
+  # the bounds leave room for other platforms.
   tolerances <- list(
-    mean = c(full = 0.002, fast = 0.002),
-    parametric = c(full = 0.0025, fast = 0.0025),
-    local = c(full = 0.006, fast = 0.004)
+    mean = c(full = 1e-8, fast = 1e-8, rlog = 1e-8),
+    parametric = c(full = 1e-8, fast = 1e-8, rlog = 1e-8),
+    local = c(full = 1e-7, fast = 1e-7, rlog = 1e-7)
   )
   for (fit_type in names(tolerances)) {
     rust_full <- rsdeseq2::varianceStabilizingTransformation(
@@ -170,7 +173,7 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
       SummarizedExperiment::assay(rust_default_fast) -
         SummarizedExperiment::assay(reference_default_fast)
     )),
-    0.012
+    1e-8
   )
 
   rust_default_full <- rsdeseq2::varianceStabilizingTransformation(rust_dds)
@@ -183,7 +186,7 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
       SummarizedExperiment::assay(rust_default_full) -
         SummarizedExperiment::assay(reference_default_full)
     )),
-    0.01
+    1e-8
   )
 
   rust_default_rlog <- rsdeseq2::rlog(rust_dds)
@@ -196,7 +199,7 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
       SummarizedExperiment::assay(rust_default_rlog) -
         SummarizedExperiment::assay(reference_default_rlog)
     )),
-    0.03
+    1e-8
   )
 
   for (fit_type in names(tolerances)) {
@@ -205,7 +208,7 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
     if (fit_type == "mean") {
       native_fit <- rsdeseq2::DESeq(rust_dds, fitType = "mean", minReplicatesForReplace = Inf)
       reused <- rsdeseq2::rlog(native_fit, blind = FALSE, fitType = "local")
-      testthat::expect_lt(max(abs(SummarizedExperiment::assay(reused) - SummarizedExperiment::assay(reference_rlog))), 0.007)
+      testthat::expect_lt(max(abs(SummarizedExperiment::assay(reused) - SummarizedExperiment::assay(reference_rlog))), 1e-8)
       testthat::expect_equal(S4Vectors::metadata(reused)$rsdeseq2Transform$fitType, "mean")
       changed <- native_fit
       SummarizedExperiment::assay(changed, "counts")[1L, 1L] <- fixture$counts[1L, 1L] + 1L
@@ -219,7 +222,7 @@ testthat::test_that("dataset transforms retain DESeq2 parity on a large seeded f
         SummarizedExperiment::assay(rust_rlog) -
           SummarizedExperiment::assay(reference_rlog)
       )),
-      0.007
+      tolerances[[fit_type]][["rlog"]]
     )
     testthat::expect_equal(
       attr(rust_rlog, "betaPriorVar"),
