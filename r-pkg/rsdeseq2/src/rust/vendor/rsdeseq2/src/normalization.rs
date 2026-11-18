@@ -598,7 +598,7 @@ mod tests {
 /// `PerSample` lets the GLM fits read the size factors directly instead of
 /// expanding them into a genes × samples matrix first.
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum Offsets<'a> {
+pub enum Offsets<'a> {
     /// One factor per sample.
     PerSample(&'a [f64]),
     /// One factor per gene and sample.

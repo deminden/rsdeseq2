@@ -80,27 +80,30 @@ pub use crate::dispersion::{
     rough_dispersion_estimates,
 };
 pub use crate::errors::{DeseqError, ErrorKind};
+#[allow(deprecated)]
 pub use crate::glm::{
     BetaPriorGlmFit, BetaPriorNormalizationFactorWeightInput, BetaPriorRefitOptions,
     BetaPriorSizeFactorWeightInput, BetaPriorVarianceMethod, BetaPriorVarianceOptions,
     ContrastInference, ContrastProjection, ContrastZeroRule, CovarianceView,
-    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, InferenceEstimates,
+    ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit, GlmInput, InferenceEstimates,
     IrlsOptions, IrlsSolver, LrtOutput, NbinomGlmFit, NormalShrinkageRows,
     ObservationWeightOptions, ObservationWeights, OptimFallbackRows, PreparedContrastView,
     WaldAlternative, WaldContrastOutput, WaldDegreesOfFreedom, WaldOutput, WaldPvalueType,
     WaldTestOptions, average_expanded_model_coefficients, average_expanded_model_covariances,
     beta_prior_variance_to_ridge_lambda, collapse_expanded_model_fit, estimate_beta,
     estimate_beta_prior_variance, expanded_model_group_contrast,
+    fit_expanded_glms_with_estimated_beta_prior,
     fit_expanded_glms_with_estimated_beta_prior_variance,
     fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors,
     fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
     fit_expanded_glms_with_estimated_beta_prior_variance_and_weights, fit_fixed_dispersion_irls,
     fit_fixed_dispersion_irls_with_normalization_factors,
     fit_fixed_dispersion_irls_with_normalization_factors_and_weights,
-    fit_fixed_dispersion_irls_with_weights, fit_glms_with_beta_prior_variance,
-    fit_glms_with_beta_prior_variance_and_normalization_factors,
+    fit_fixed_dispersion_irls_with_weights, fit_glms_with_beta_prior,
+    fit_glms_with_beta_prior_variance, fit_glms_with_beta_prior_variance_and_normalization_factors,
     fit_glms_with_beta_prior_variance_and_normalization_factors_and_weights,
-    fit_glms_with_beta_prior_variance_and_weights, fit_glms_with_estimated_beta_prior_variance,
+    fit_glms_with_beta_prior_variance_and_weights, fit_glms_with_estimated_beta_prior,
+    fit_glms_with_estimated_beta_prior_variance,
     fit_glms_with_estimated_beta_prior_variance_and_normalization_factors,
     fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights,
     fit_glms_with_estimated_beta_prior_variance_and_weights, fit_intercept_only_fixed_dispersion,
@@ -141,7 +144,7 @@ pub use crate::math::{
 pub use crate::matrix::RowMajorMatrix;
 pub use crate::multiple_testing::{bh_adjust, bh_adjust_f64};
 pub use crate::normalization::{
-    base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
+    Offsets, base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
     estimate_size_factors, estimate_size_factors_poscounts,
     estimate_size_factors_poscounts_with_options, estimate_size_factors_ratio,
     estimate_size_factors_ratio_with_options, estimate_size_factors_with_options,
