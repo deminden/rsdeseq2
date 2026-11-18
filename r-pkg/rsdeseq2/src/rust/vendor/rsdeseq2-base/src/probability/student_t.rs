@@ -38,7 +38,7 @@ fn beta_fraction(a: f64, b: f64, x: f64, y: f64) -> Option<f64> {
     None
 }
 
-pub(crate) fn student_t_upper_tail(q: f64, df: f64) -> Option<f64> {
+pub fn student_t_upper_tail(q: f64, df: f64) -> Option<f64> {
     if !q.is_finite() || !df.is_finite() || df <= 0.0 {
         return None;
     }

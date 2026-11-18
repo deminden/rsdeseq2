@@ -27,7 +27,8 @@ impl<'a> CountView<'a> {
 
     // Fuse count validation with a caller's invariant preparation. On failure,
     // callers discard their partial local scratch; no view is returned.
-    pub(crate) fn from_doubles_with(
+    #[doc(hidden)]
+    pub fn from_doubles_with(
         values: MatrixView<'a, f64>,
         mut visit: impl FnMut(usize, u32),
     ) -> Result<Self, DeseqError> {
@@ -80,7 +81,8 @@ impl<'a> CountView<'a> {
     }
 
     #[inline]
-    pub(crate) fn at(&self, gene: usize, sample: usize) -> u32 {
+    #[doc(hidden)]
+    pub fn at(&self, gene: usize, sample: usize) -> u32 {
         match self.0 {
             Storage::Unsigned(v) => *v.at(gene, sample),
             Storage::Double(v) => *v.at(gene, sample) as u32,

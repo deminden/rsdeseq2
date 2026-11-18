@@ -1,0 +1,16 @@
+[package]
+name = "rsdeseq2-base"
+version = "0.5.0"
+edition = "2024"
+license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
+rust-version = "1.97.1"
+exclude = [".DS_Store", "**/.DS_Store"]
+
+[lib]
+name = "rsdeseq2_base"
+path = "src/lib.rs"
+
+[dependencies]
+csv = { version = "^1.4.0" }
+libm = { version = "^0.2.16" }
+thiserror = { version = "^2.0.21" }

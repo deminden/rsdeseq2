@@ -2,7 +2,7 @@
 
 // Positive nodes/weights of the 16-point Gauss-Legendre rule, generated using
 // 90-digit Legendre recurrence/Newton iteration, then rounded to f64.
-pub(crate) const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
+pub const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
     (0.9894009349916499, 0.027152459411754096),
     (0.9445750230732326, 0.062253523938647894),
     (0.8656312023878318, 0.09515851168249279),
@@ -15,7 +15,7 @@ pub(crate) const GAUSS_LEGENDRE_16: [(f64, f64); 8] = [
 
 // Integrate a nonnegative, rapidly decreasing tail in a caller-scaled
 // coordinate, using successively doubled panels and compensated summation.
-pub(crate) fn integrate_positive_tail(density: impl Fn(f64) -> f64) -> f64 {
+pub fn integrate_positive_tail(density: impl Fn(f64) -> f64) -> f64 {
     let mut integral = 0.0;
     let mut compensation = 0.0;
     let mut left = 0.0;

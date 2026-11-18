@@ -29,17 +29,17 @@ use crate::errors::DeseqError;
 
 /// A rejected value, with the reduction index that produced it when known.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct NonFinite {
-    pub(crate) value: f64,
-    pub(crate) index: Option<usize>,
+pub struct NonFinite {
+    pub value: f64,
+    pub index: Option<usize>,
 }
 
 /// Result of a checked operation that keeps the rejected value.
-pub(crate) type Checked = Result<f64, NonFinite>;
+pub type Checked = Result<f64, NonFinite>;
 
 /// Rejection of `value` without a reduction index.
 #[inline(always)]
-pub(crate) fn reject(value: f64) -> Checked {
+pub fn reject(value: f64) -> Checked {
     Err(NonFinite { value, index: None })
 }
 
@@ -54,25 +54,25 @@ fn finite(value: f64) -> Checked {
 
 /// `left + right`, finite.
 #[inline(always)]
-pub(crate) fn try_add(left: f64, right: f64) -> Checked {
+pub fn try_add(left: f64, right: f64) -> Checked {
     finite(left + right)
 }
 
 /// `left - right`, finite.
 #[inline(always)]
-pub(crate) fn try_sub(left: f64, right: f64) -> Checked {
+pub fn try_sub(left: f64, right: f64) -> Checked {
     finite(left - right)
 }
 
 /// `left * right`, finite.
 #[inline(always)]
-pub(crate) fn try_mul(left: f64, right: f64) -> Checked {
+pub fn try_mul(left: f64, right: f64) -> Checked {
     finite(left * right)
 }
 
 /// `left / right` with finite operands, a nonzero divisor and a finite quotient.
 #[inline(always)]
-pub(crate) fn try_div(left: f64, right: f64) -> Checked {
+pub fn try_div(left: f64, right: f64) -> Checked {
     let quotient = left / right;
     if left.is_finite() && right.is_finite() && right != 0.0 && quotient.is_finite() {
         Ok(quotient)
@@ -86,7 +86,7 @@ pub(crate) fn try_div(left: f64, right: f64) -> Checked {
 
 /// `left / right` when the quotient is finite; accepts `x / inf == 0`.
 #[inline(always)]
-pub(crate) fn try_div_finite_result(left: f64, right: f64) -> Checked {
+pub fn try_div_finite_result(left: f64, right: f64) -> Checked {
     finite(left / right)
 }
 
@@ -95,7 +95,7 @@ pub(crate) fn try_div_finite_result(left: f64, right: f64) -> Checked {
 /// On failure the error holds the first non-finite partial sum and the index of
 /// the element that produced it.
 #[inline]
-pub(crate) fn try_sum(values: impl IntoIterator<Item = f64>) -> Checked {
+pub fn try_sum(values: impl IntoIterator<Item = f64>) -> Checked {
     let mut sum = 0.0;
     for (index, value) in values.into_iter().enumerate() {
         sum = try_add(sum, value).map_err(|error| NonFinite {
@@ -127,7 +127,7 @@ fn max_abs(values: &[f64]) -> Checked {
 /// Dividing by the largest magnitude first keeps the running sum bounded by the
 /// element count, so only the final rescaling can overflow. All-zero and empty
 /// inputs return `0.0`.
-pub(crate) fn try_scaled_sum(values: &[f64]) -> Checked {
+pub fn try_scaled_sum(values: &[f64]) -> Checked {
     let scale = max_abs(values)?;
     if scale == 0.0 {
         return Ok(0.0);
@@ -139,7 +139,7 @@ pub(crate) fn try_scaled_sum(values: &[f64]) -> Checked {
 /// Scale-normalized mean: `((Σ values[i] / scale) / n) * scale`.
 ///
 /// All-zero and empty inputs return `0.0`.
-pub(crate) fn try_mean(values: &[f64]) -> Checked {
+pub fn try_mean(values: &[f64]) -> Checked {
     let scale = max_abs(values)?;
     if scale == 0.0 {
         return Ok(0.0);
@@ -150,46 +150,46 @@ pub(crate) fn try_mean(values: &[f64]) -> Checked {
 
 /// `left + right`, finite.
 #[inline(always)]
-pub(crate) fn add(left: f64, right: f64) -> Option<f64> {
+pub fn add(left: f64, right: f64) -> Option<f64> {
     try_add(left, right).ok()
 }
 
 /// `left - right`, finite.
 #[inline(always)]
-pub(crate) fn sub(left: f64, right: f64) -> Option<f64> {
+pub fn sub(left: f64, right: f64) -> Option<f64> {
     try_sub(left, right).ok()
 }
 
 /// `left * right`, finite.
 #[inline(always)]
-pub(crate) fn mul(left: f64, right: f64) -> Option<f64> {
+pub fn mul(left: f64, right: f64) -> Option<f64> {
     try_mul(left, right).ok()
 }
 
 /// `left / right` with finite operands, a nonzero divisor and a finite quotient.
 #[inline(always)]
-pub(crate) fn div(left: f64, right: f64) -> Option<f64> {
+pub fn div(left: f64, right: f64) -> Option<f64> {
     try_div(left, right).ok()
 }
 
 /// Sequential sum from `0.0` in input order.
 #[inline]
-pub(crate) fn sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
+pub fn sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
     try_sum(values).ok()
 }
 
 /// See [`try_scaled_sum`].
-pub(crate) fn scaled_sum(values: &[f64]) -> Option<f64> {
+pub fn scaled_sum(values: &[f64]) -> Option<f64> {
     try_scaled_sum(values).ok()
 }
 
 /// See [`try_mean`].
-pub(crate) fn mean(values: &[f64]) -> Option<f64> {
+pub fn mean(values: &[f64]) -> Option<f64> {
     try_mean(values).ok()
 }
 
 /// Conversion of checked results into [`DeseqError`].
-pub(crate) trait CheckedExt {
+pub trait CheckedExt {
     /// `NonFiniteValue` with the index recorded by the operation, if any.
     fn nonfinite(self, context: &str) -> Result<f64, DeseqError>;
 

@@ -143,13 +143,13 @@ pub fn set_numeric_profile(profile: NumericProfile) -> Result<(), DeseqError> {
 
 /// Whether the x87/OpenBLAS kernels are active.
 #[inline]
-pub(crate) fn r_linux_x86() -> bool {
+pub fn r_linux_x86() -> bool {
     cfg!(target_arch = "x86_64") && numeric_profile() == NumericProfile::RLinuxX86
 }
 
 /// Whether elementary functions come from the host C library.
 #[inline]
-pub(crate) fn host_libm() -> bool {
+pub fn host_libm() -> bool {
     numeric_profile().uses_host_libm()
 }
 

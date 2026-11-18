@@ -1,3 +1,5 @@
+//! The error type shared by every rsdeseq2 stage.
+
 use thiserror::Error;
 
 /// Error type used by the `rsdeseq2` Rust core.
@@ -112,7 +114,8 @@ impl DeseqError {
 }
 
 /// `InvalidOptions` with the reason as given.
-pub(crate) fn invalid_options(reason: impl Into<String>) -> DeseqError {
+#[doc(hidden)]
+pub fn invalid_options(reason: impl Into<String>) -> DeseqError {
     DeseqError::InvalidOptions {
         reason: reason.into(),
     }
@@ -120,8 +123,8 @@ pub(crate) fn invalid_options(reason: impl Into<String>) -> DeseqError {
 
 /// `InvalidOptions` whose reason is prefixed with the component that raised
 /// it: `"{scope}: {reason}"`.
-#[cfg_attr(not(feature = "shrinkage"), allow(dead_code))]
-pub(crate) fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display) -> DeseqError {
+#[doc(hidden)]
+pub fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display) -> DeseqError {
     DeseqError::InvalidOptions {
         reason: format!("{scope}: {reason}"),
     }
@@ -129,20 +132,23 @@ pub(crate) fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display
 
 /// An internal consistency check failed: a state that earlier validation
 /// rules out was reached. Reported as `InvalidOptions` so callers never panic.
-pub(crate) fn invariant(what: &str) -> DeseqError {
+#[doc(hidden)]
+pub fn invariant(what: &str) -> DeseqError {
     DeseqError::InvalidOptions {
         reason: format!("internal invariant violated: {what}"),
     }
 }
 
 /// `InvalidDispersion` with the reason as given.
-pub(crate) fn invalid_dispersion(reason: impl Into<String>) -> DeseqError {
+#[doc(hidden)]
+pub fn invalid_dispersion(reason: impl Into<String>) -> DeseqError {
     DeseqError::InvalidDispersion {
         reason: reason.into(),
     }
 }
 
-pub(crate) fn invalid_dimensions(
+#[doc(hidden)]
+pub fn invalid_dimensions(
     context: impl Into<String>,
     expected: usize,
     actual: usize,

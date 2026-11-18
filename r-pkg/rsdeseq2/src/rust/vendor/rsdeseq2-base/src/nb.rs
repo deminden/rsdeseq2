@@ -1,3 +1,5 @@
+//! DESeq2-parameterized negative-binomial likelihoods.
+
 use crate::numeric::math::ProfileMath;
 use crate::numeric::special::ln_gamma;
 
@@ -37,7 +39,8 @@ pub fn nbinom_log_likelihood_weighted(
 
 /// Invariant NB terms for repeated fitted means at fixed counts/dispersion.
 /// All likelihood validation and the sample reduction retain the public path.
-pub(crate) struct FixedDispersionLikelihood<'a> {
+#[doc(hidden)]
+pub struct FixedDispersionLikelihood<'a> {
     counts: &'a [u32],
     dispersion: f64,
     size: f64,
@@ -45,7 +48,8 @@ pub(crate) struct FixedDispersionLikelihood<'a> {
 }
 
 impl<'a> FixedDispersionLikelihood<'a> {
-    pub(crate) fn new(counts: &'a [u32], dispersion: f64) -> Self {
+    #[doc(hidden)]
+    pub fn new(counts: &'a [u32], dispersion: f64) -> Self {
         let size = dispersion.recip();
         let gamma_size = ln_gamma(size);
         let gamma_one = ln_gamma(1.0);
@@ -76,11 +80,8 @@ impl<'a> FixedDispersionLikelihood<'a> {
         }
     }
 
-    pub(crate) fn log_likelihood(
-        &self,
-        mu: &[f64],
-        weights: Option<&[f64]>,
-    ) -> Result<f64, DeseqError> {
+    #[doc(hidden)]
+    pub fn log_likelihood(&self, mu: &[f64], weights: Option<&[f64]>) -> Result<f64, DeseqError> {
         nbinom_log_likelihood_with_cached_gamma(
             self.counts,
             mu,

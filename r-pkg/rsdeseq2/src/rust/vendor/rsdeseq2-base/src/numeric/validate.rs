@@ -6,7 +6,7 @@ use crate::errors::DeseqError;
 ///
 /// The error is `NonFiniteValue` with the given context, index and the value.
 #[inline]
-pub(crate) fn positive_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
+pub fn positive_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
     if !value.is_finite() || value <= 0.0 {
         return Err(DeseqError::NonFiniteValue {
             context: context.to_string(),
@@ -21,11 +21,7 @@ pub(crate) fn positive_finite(value: f64, context: &str, index: usize) -> Result
 ///
 /// The error is `NonFiniteValue` with the given context, index and the value.
 #[inline]
-pub(crate) fn nonnegative_finite(
-    value: f64,
-    context: &str,
-    index: usize,
-) -> Result<(), DeseqError> {
+pub fn nonnegative_finite(value: f64, context: &str, index: usize) -> Result<(), DeseqError> {
     if !value.is_finite() || value < 0.0 {
         return Err(DeseqError::NonFiniteValue {
             context: context.to_string(),

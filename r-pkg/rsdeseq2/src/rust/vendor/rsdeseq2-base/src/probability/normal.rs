@@ -4,7 +4,7 @@ use crate::numeric::math::ProfileMath;
 // Compensate argument reduction against sqrt(2), including the low part of the
 // irrational constant. Without it, rounding q/sqrt(2) alone loses several ULPs
 // in small tails even when erfc itself is accurate.
-pub(crate) fn normal_two_sided_tail(q: f64) -> f64 {
+pub fn normal_two_sided_tail(q: f64) -> f64 {
     let q = q.abs();
     let x = q / std::f64::consts::SQRT_2;
     let tail = libm::erfc(x);
@@ -19,13 +19,13 @@ pub(crate) fn normal_two_sided_tail(q: f64) -> f64 {
     (tail - correction).clamp(0.0, 1.0)
 }
 
-pub(crate) fn normal_upper_tail(q: f64) -> f64 {
+pub fn normal_upper_tail(q: f64) -> f64 {
     let tail = 0.5 * normal_two_sided_tail(q);
     if q < 0.0 { 1.0 - tail } else { tail }
 }
 
 /// Shared inverse upper-normal tail, refined against the compensated tail.
-pub(crate) fn normal_upper_quantile(probability: f64) -> f64 {
+pub fn normal_upper_quantile(probability: f64) -> f64 {
     if !(0.0..=1.0).contains(&probability) {
         return f64::NAN;
     }

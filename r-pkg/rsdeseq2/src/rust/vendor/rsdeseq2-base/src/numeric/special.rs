@@ -43,7 +43,7 @@ const GAMMA_DK: &[f64] = &[
 ];
 
 /// Natural log of the gamma function (Pugh 2004 Lanczos approximation).
-pub(crate) fn ln_gamma(x: f64) -> f64 {
+pub fn ln_gamma(x: f64) -> f64 {
     if x < 0.5 {
         let s = GAMMA_DK
             .iter()
@@ -68,7 +68,7 @@ pub(crate) fn ln_gamma(x: f64) -> f64 {
 }
 
 /// The gamma function (Pugh 2004 Lanczos approximation).
-pub(crate) fn gamma(x: f64) -> f64 {
+pub fn gamma(x: f64) -> f64 {
     if x < 0.5 {
         let s = GAMMA_DK
             .iter()
@@ -101,7 +101,7 @@ fn within_five_ulps_of_zero(x: f64) -> bool {
 ///
 /// Panics, as `statrs::function::gamma::gamma_ur` does, unless `a` and `x`
 /// are positive and finite (NaN arguments give NaN).
-pub(crate) fn gamma_ur(a: f64, x: f64) -> f64 {
+pub fn gamma_ur(a: f64, x: f64) -> f64 {
     if a.is_nan() || x.is_nan() {
         return f64::NAN;
     }
@@ -167,7 +167,7 @@ pub(crate) fn gamma_ur(a: f64, x: f64) -> f64 {
 ///
 /// Panics, as `statrs::function::gamma::gamma_lr` does, unless `a` and `x`
 /// are positive and finite (NaN arguments give NaN).
-pub(crate) fn gamma_lr(a: f64, x: f64) -> f64 {
+pub fn gamma_lr(a: f64, x: f64) -> f64 {
     if a.is_nan() || x.is_nan() {
         return f64::NAN;
     }
@@ -253,7 +253,7 @@ pub(crate) fn gamma_lr(a: f64, x: f64) -> f64 {
 }
 
 /// The digamma function (Algorithm AS 103, Bernardo 1976).
-pub(crate) fn digamma(x: f64) -> f64 {
+pub fn digamma(x: f64) -> f64 {
     let c = 12.0;
     let d1 = -0.57721566490153286;
     let d2 = 1.6449340668482264365;
@@ -295,26 +295,26 @@ pub(crate) fn digamma(x: f64) -> f64 {
 }
 
 /// Natural log of the beta function. Panics unless `a` and `b` are positive.
-pub(crate) fn ln_beta(a: f64, b: f64) -> f64 {
+pub fn ln_beta(a: f64, b: f64) -> f64 {
     assert!(a > 0.0, "ln_beta: a must be positive");
     assert!(b > 0.0, "ln_beta: b must be positive");
     ln_gamma(a) + ln_gamma(b) - ln_gamma(a + b)
 }
 
 /// The beta function. Panics unless `a` and `b` are positive.
-pub(crate) fn beta(a: f64, b: f64) -> f64 {
+pub fn beta(a: f64, b: f64) -> f64 {
     ln_beta(a, b).exp_p()
 }
 
 /// Density of the standard normal distribution.
-pub(crate) fn standard_normal_pdf(x: f64) -> f64 {
+pub fn standard_normal_pdf(x: f64) -> f64 {
     let d = (x - 0.0) / 1.0;
     (-0.5 * d * d).exp_p() / (SQRT_2PI * 1.0)
 }
 
 /// Quantile of the standard normal distribution, as `statrs`'s
 /// `Normal::inverse_cdf`. Panics outside `[0, 1]`.
-pub(crate) fn standard_normal_inverse_cdf(p: f64) -> f64 {
+pub fn standard_normal_inverse_cdf(p: f64) -> f64 {
     assert!((0.0..=1.0).contains(&p), "x must be in [0, 1]");
     0.0 - (1.0 * f64_consts::SQRT_2 * erfc_inv(2.0 * p))
 }
@@ -382,14 +382,14 @@ fn erf_inv_impl(p: f64, q: f64, s: f64) -> f64 {
 /// A gamma distribution with shape and rate, as `statrs::distribution::Gamma`
 /// (only the parts the crate uses).
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct GammaDistribution {
+pub struct GammaDistribution {
     shape: f64,
     rate: f64,
 }
 
 impl GammaDistribution {
     /// `None` for the parameters `statrs` rejects.
-    pub(crate) fn new(shape: f64, rate: f64) -> Option<Self> {
+    pub fn new(shape: f64, rate: f64) -> Option<Self> {
         if shape.is_nan() || shape <= 0.0 || rate.is_nan() || rate <= 0.0 {
             return None;
         }
@@ -400,16 +400,16 @@ impl GammaDistribution {
     }
 
     /// The chi-squared distribution with `freedom` degrees of freedom.
-    pub(crate) fn chi_squared(freedom: f64) -> Option<Self> {
+    pub fn chi_squared(freedom: f64) -> Option<Self> {
         Self::new(freedom / 2.0, 0.5)
     }
 
     /// Degrees of freedom when this is a chi-squared distribution.
-    pub(crate) fn freedom(&self) -> f64 {
+    pub fn freedom(&self) -> f64 {
         self.shape * 2.0
     }
 
-    pub(crate) fn cdf(&self, x: f64) -> f64 {
+    pub fn cdf(&self, x: f64) -> f64 {
         if x <= 0.0 {
             0.0
         } else if x == self.shape && self.rate.is_infinite() {
@@ -423,7 +423,7 @@ impl GammaDistribution {
         }
     }
 
-    pub(crate) fn sf(&self, x: f64) -> f64 {
+    pub fn sf(&self, x: f64) -> f64 {
         if x <= 0.0 {
             1.0
         } else if x == self.shape && self.rate.is_infinite() {
@@ -468,7 +468,7 @@ impl GammaDistribution {
 
     /// Quantile by `statrs`'s safeguarded Newton iteration. Panics outside
     /// `[0, 1]`.
-    pub(crate) fn inverse_cdf(&self, p: f64) -> f64 {
+    pub fn inverse_cdf(&self, p: f64) -> f64 {
         assert!(
             (0.0..=1.0).contains(&p),
             "default inverse_cdf implementation should be provided probability on [0,1]"

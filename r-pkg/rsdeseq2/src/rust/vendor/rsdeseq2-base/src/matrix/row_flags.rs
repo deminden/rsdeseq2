@@ -26,7 +26,8 @@ impl<'a> RowFlags<'a> {
         }
         Ok(Self(Flags::Integer(values)))
     }
-    pub(crate) fn from_indices(genes: usize, rows: &'a [usize]) -> Result<Self, DeseqError> {
+    #[doc(hidden)]
+    pub fn from_indices(genes: usize, rows: &'a [usize]) -> Result<Self, DeseqError> {
         if rows.iter().any(|&row| row >= genes) || rows.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(DeseqError::InvalidOptions {
                 reason: "replacement row indices must be in range and strictly increasing".into(),
@@ -34,14 +35,17 @@ impl<'a> RowFlags<'a> {
         }
         Ok(Self(Flags::Indices { genes, rows }))
     }
-    pub(crate) fn len(self) -> usize {
+    #[doc(hidden)]
+    #[allow(clippy::len_without_is_empty)] // the gene count, not a collection length
+    pub fn len(self) -> usize {
         match self.0 {
             Flags::Boolean(v) => v.len(),
             Flags::Integer(v) => v.len(),
             Flags::Indices { genes, .. } => genes,
         }
     }
-    pub(crate) fn at(self, gene: usize) -> bool {
+    #[doc(hidden)]
+    pub fn at(self, gene: usize) -> bool {
         match self.0 {
             Flags::Boolean(v) => v[gene],
             Flags::Integer(v) => v[gene] == 1,

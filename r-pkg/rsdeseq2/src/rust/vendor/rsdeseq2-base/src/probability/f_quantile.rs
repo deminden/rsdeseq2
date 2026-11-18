@@ -24,7 +24,7 @@ fn logistic_loss(y: f64, p: f64) -> f64 {
     }
 }
 
-pub(crate) fn f_99_quantile(df1: f64, df2: f64) -> f64 {
+pub fn f_99_quantile(df1: f64, df2: f64) -> f64 {
     // Match the established qf large-df limit policy used by DESeq2. This is
     // a compatibility approximation, applied identically by both interfaces:
     // https://github.com/wch/r-source/blob/trunk/src/nmath/qf.c . The actual

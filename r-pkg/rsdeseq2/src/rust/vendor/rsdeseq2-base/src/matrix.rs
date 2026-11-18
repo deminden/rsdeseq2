@@ -1,3 +1,5 @@
+//! Count and numeric matrices, borrowed views and row flags.
+
 pub mod borrowed;
 mod count_matrix;
 mod counts;
@@ -104,8 +106,8 @@ impl<T> RowMajorMatrix<T> {
         &self.values
     }
 
-    #[cfg_attr(not(feature = "shrinkage"), allow(dead_code))]
-    pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
+    #[doc(hidden)]
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.values
     }
 
@@ -183,7 +185,8 @@ impl<T: Clone> RowMajorMatrix<T> {
 /// Overflowing sizes and failed allocations become a
 /// [`DeseqError::InvalidDimensions`] naming `context` instead of a panic or an
 /// abort, so very large inputs fail cleanly through the R bridge.
-pub(crate) fn try_alloc_matrix<T>(
+#[doc(hidden)]
+pub fn try_alloc_matrix<T>(
     rows: usize,
     columns: usize,
     context: &str,
@@ -224,7 +227,8 @@ impl RowMajorMatrix<f64> {
     }
 }
 
-pub(crate) fn normalize_index_range<R: RangeBounds<usize>>(
+#[doc(hidden)]
+pub fn normalize_index_range<R: RangeBounds<usize>>(
     range: R,
     len: usize,
     context: &str,
