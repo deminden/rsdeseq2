@@ -363,51 +363,20 @@ pub fn read_labeled_size_factors_tsv_from_reader(
 }
 
 fn read_labeled_size_factors_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() != 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "size-factor columns".to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: "size-factor record columns".to_string(),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
-        let sample = record.get(0).unwrap_or_default();
-        if sample.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "size-factor sample names must not be empty".to_string(),
-            });
-        }
-        let value = parse_finite_float_field(
-            record.get(1).unwrap_or_default(),
-            path_ref,
-            idx,
-            "size factors",
-        )?;
-        values.push(SampleNumericValue {
-            sample: sample.to_string(),
-            value,
-        });
-    }
-    if values.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "size-factor rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
+    let values = read_labelled(
+        reader,
+        "size-factor",
+        "size-factor sample names must not be empty",
+        |idx, sample, value| {
+            Ok(SampleNumericValue {
+                sample: sample.to_string(),
+                value: parse_finite_float_field(value, path_ref, idx, "size factors")?,
+            })
+        },
+    )?;
     validate_positive_finite_values(
         "size-factor input",
         &values.iter().map(|entry| entry.value).collect::<Vec<_>>(),
@@ -445,51 +414,20 @@ pub fn read_labeled_geometric_means_tsv_from_reader(
 }
 
 fn read_labeled_geometric_means_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() != 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "geometric-mean columns".to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: "geometric-mean record columns".to_string(),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
-        let gene = record.get(0).unwrap_or_default();
-        if gene.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "geometric-mean gene names must not be empty".to_string(),
-            });
-        }
-        let value = parse_finite_float_field(
-            record.get(1).unwrap_or_default(),
-            path_ref,
-            idx,
-            "geometric means",
-        )?;
-        values.push(GeneNumericValue {
-            gene: gene.to_string(),
-            value,
-        });
-    }
-    if values.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "geometric-mean rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
+    let values = read_labelled(
+        reader,
+        "geometric-mean",
+        "geometric-mean gene names must not be empty",
+        |idx, gene, value| {
+            Ok(GeneNumericValue {
+                gene: gene.to_string(),
+                value: parse_finite_float_field(value, path_ref, idx, "geometric means")?,
+            })
+        },
+    )?;
     for (idx, value) in values.iter().map(|entry| entry.value).enumerate() {
         if value < 0.0 {
             return Err(DeseqError::InvalidSizeFactors {
@@ -519,49 +457,21 @@ pub fn read_labeled_sample_numeric_tsv_from_reader(
 }
 
 fn read_labeled_sample_numeric_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
     context: &str,
 ) -> Result<Vec<SampleNumericValue>, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() != 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: format!("{context} columns"),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: format!("{context} record columns"),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
-        let sample = record.get(0).unwrap_or_default();
-        if sample.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("{context} sample names must not be empty"),
-            });
-        }
-        let value =
-            parse_finite_float_field(record.get(1).unwrap_or_default(), path_ref, idx, context)?;
-        values.push(SampleNumericValue {
-            sample: sample.to_string(),
-            value,
-        });
-    }
-    if values.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: format!("{context} rows"),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    Ok(values)
+    read_labelled(
+        reader,
+        context,
+        &format!("{context} sample names must not be empty"),
+        |idx, sample, value| {
+            Ok(SampleNumericValue {
+                sample: sample.to_string(),
+                value: parse_finite_float_field(value, path_ref, idx, context)?,
+            })
+        },
+    )
 }
 
 /// Read one finite numeric value per gene with labels preserved.
@@ -583,49 +493,21 @@ pub fn read_labeled_gene_numeric_tsv_from_reader(
 }
 
 fn read_labeled_gene_numeric_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
     context: &str,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() != 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: format!("{context} columns"),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: format!("{context} record columns"),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
-        let gene = record.get(0).unwrap_or_default();
-        if gene.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("{context} gene names must not be empty"),
-            });
-        }
-        let value =
-            parse_finite_float_field(record.get(1).unwrap_or_default(), path_ref, idx, context)?;
-        values.push(GeneNumericValue {
-            gene: gene.to_string(),
-            value,
-        });
-    }
-    if values.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: format!("{context} rows"),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    Ok(values)
+    read_labelled(
+        reader,
+        context,
+        &format!("{context} gene names must not be empty"),
+        |idx, gene, value| {
+            Ok(GeneNumericValue {
+                gene: gene.to_string(),
+                value: parse_finite_float_field(value, path_ref, idx, context)?,
+            })
+        },
+    )
 }
 
 /// Read one finite numeric Wald t degrees-of-freedom value per gene.
@@ -660,52 +542,20 @@ pub fn read_labeled_wald_t_degrees_of_freedom_tsv_from_reader(
 }
 
 fn read_labeled_wald_t_degrees_of_freedom_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
 ) -> Result<Vec<GeneNumericValue>, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() != 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "Wald t degrees-of-freedom columns".to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 2 {
-            return Err(DeseqError::InvalidDimensions {
-                context: "Wald t degrees-of-freedom record columns".to_string(),
-                expected: 2,
-                actual: record.len(),
-            });
-        }
-        let gene = record.get(0).unwrap_or_default();
-        if gene.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "Wald t degrees-of-freedom gene names must not be empty".to_string(),
-            });
-        }
-        let value = parse_finite_float_field(
-            record.get(1).unwrap_or_default(),
-            path_ref,
-            idx,
-            "Wald t degrees of freedom",
-        )?;
-        values.push(GeneNumericValue {
-            gene: gene.to_string(),
-            value,
-        });
-    }
-    if values.is_empty() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "Wald t degrees-of-freedom rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    Ok(values)
+    read_labelled(
+        reader,
+        "Wald t degrees-of-freedom",
+        "Wald t degrees-of-freedom gene names must not be empty",
+        |idx, gene, value| {
+            Ok(GeneNumericValue {
+                gene: gene.to_string(),
+                value: parse_finite_float_field(value, path_ref, idx, "Wald t degrees of freedom")?,
+            })
+        },
+    )
 }
 
 /// Read one factor level per sample for CLI factor-level contrasts.
@@ -727,46 +577,65 @@ pub fn read_sample_levels_tsv_from_reader(
 }
 
 fn read_sample_levels_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
 ) -> Result<Vec<SampleLevel>, DeseqError> {
+    read_labelled(
+        reader,
+        "sample-level",
+        "sample names must not be empty",
+        |_, sample, level| {
+            if level.is_empty() {
+                return Err(DeseqError::InvalidOptions {
+                    reason: "sample levels must not be empty".to_string(),
+                });
+            }
+            Ok(SampleLevel {
+                sample: sample.to_string(),
+                level: level.to_string(),
+            })
+        },
+    )
+}
+
+/// Read a two-column labelled table: a header, then one non-empty label and
+/// one value per row, at least one row. `cell` turns the row index, label
+/// and value text into an entry. Errors name `{what} columns`,
+/// `{what} record columns` and `{what} rows`.
+fn read_labelled<R: Read, T>(
+    mut reader: csv::Reader<R>,
+    what: &str,
+    empty_label: &str,
+    mut cell: impl FnMut(usize, &str, &str) -> Result<T, DeseqError>,
+) -> Result<Vec<T>, DeseqError> {
     let headers = reader.headers()?.clone();
     if headers.len() != 2 {
         return Err(DeseqError::InvalidDimensions {
-            context: "sample-level columns".to_string(),
+            context: format!("{what} columns"),
             expected: 2,
             actual: headers.len(),
         });
     }
     let mut values = Vec::new();
-    for record in reader.records() {
+    for (idx, record) in reader.records().enumerate() {
         let record = record?;
         if record.len() != 2 {
             return Err(DeseqError::InvalidDimensions {
-                context: "sample-level record columns".to_string(),
+                context: format!("{what} record columns"),
                 expected: 2,
                 actual: record.len(),
             });
         }
-        let sample = record.get(0).unwrap_or_default();
-        if sample.is_empty() {
+        let label = record.get(0).unwrap_or_default();
+        if label.is_empty() {
             return Err(DeseqError::InvalidOptions {
-                reason: "sample names must not be empty".to_string(),
+                reason: empty_label.to_string(),
             });
         }
-        let level = record.get(1).unwrap_or_default();
-        if level.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "sample levels must not be empty".to_string(),
-            });
-        }
-        values.push(SampleLevel {
-            sample: sample.to_string(),
-            level: level.to_string(),
-        });
+        values.push(cell(idx, label, record.get(1).unwrap_or_default())?);
     }
     if values.is_empty() {
         return Err(DeseqError::InvalidDimensions {
-            context: "sample-level rows".to_string(),
+            context: format!("{what} rows"),
             expected: 1,
             actual: 0,
         });
