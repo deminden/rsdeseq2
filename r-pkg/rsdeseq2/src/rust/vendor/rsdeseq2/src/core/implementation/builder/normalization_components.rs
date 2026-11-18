@@ -411,7 +411,7 @@ impl DeseqBuilder {
         })
     }
 
-    fn fixed_dispersion_glm_components(
+    pub(super) fn fixed_dispersion_glm_components(
         &self,
         input: FixedDispersionGlmInput<'_>,
     ) -> Result<FixedDispersionGlmOutput, DeseqError> {

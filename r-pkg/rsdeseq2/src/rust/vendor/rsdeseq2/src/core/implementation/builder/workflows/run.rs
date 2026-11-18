@@ -98,6 +98,9 @@ impl DeseqBuilder {
                 };
                 self.run_matrix(analysis, design, reduced)
             }
+            DesignInput::Formula(formula) if analysis.beta_prior => {
+                self.run_beta_prior(analysis, formula)
+            }
             DesignInput::Formula(formula) => {
                 let full = self.formula_design_for_fitting(formula)?;
                 let reduced = match analysis.test {
@@ -119,6 +122,51 @@ impl DeseqBuilder {
                 )
             }
         }
+    }
+
+    /// `DESeq(betaPrior = TRUE)`: the usual run up to MAP dispersions on the
+    /// standard design, then the expanded-model prior fit.
+    fn run_beta_prior(
+        &self,
+        analysis: &Analysis<'_>,
+        formula: &str,
+    ) -> Result<RunOutput, DeseqError> {
+        let full = self.formula_design_for_fitting(formula)?;
+        let builder = self.with_formula_offsets(analysis.counts, &full)?;
+        let design = &full.design.standard_design;
+        let mut levels = Vec::new();
+        let column = builder.resolve_column(analysis.result, design, &mut levels)?;
+        let contrast = match column {
+            Column::Coefficient(index) => {
+                let mut unit = vec![0.0; design.n_coefficients()];
+                unit[index] = 1.0;
+                unit
+            }
+            Column::Numeric(values) => values.to_vec(),
+            Column::Spec(spec) => crate::contrasts::resolve_contrast(design, &spec)?,
+            Column::FactorLevel(_) => {
+                return Err(unsupported(
+                    "a beta-prior run with a sample-level factor contrast",
+                ));
+            }
+        };
+        if contrast.len() != design.n_coefficients() {
+            return Err(DeseqError::InvalidDimensions {
+                context: "beta-prior contrast".to_string(),
+                expected: design.n_coefficients(),
+                actual: contrast.len(),
+            });
+        }
+        let map = Analysis {
+            stop_after: Stage::Map,
+            result: ResultColumn::Default,
+            beta_prior: false,
+            ..*analysis
+        };
+        let fit = builder.run_matrix(&map, design, None)?.into_fit_only()?;
+        builder
+            .wald_beta_prior(analysis.counts, &full, fit, &contrast)
+            .map(RunOutput::BetaPrior)
     }
 
     fn run_matrix(
@@ -575,6 +623,7 @@ fn shape_error(expected: &str, output: &RunOutput) -> DeseqError {
         RunOutput::Results { .. } => "a fit with results",
         RunOutput::Replacement(CooksReplacementTestOutput::Wald(_)) => "a Wald replacement output",
         RunOutput::Replacement(CooksReplacementTestOutput::Lrt(_)) => "an LRT replacement output",
+        RunOutput::BetaPrior(_) => "a beta-prior output",
     };
     DeseqError::InvalidOptions {
         reason: format!("run returned {actual} where {expected} was expected"),
@@ -664,6 +713,29 @@ fn validate_analysis(analysis: &Analysis<'_>) -> Result<(), DeseqError> {
                 expected: analysis.counts.n_genes(),
                 actual: dispersions.len(),
             });
+        }
+    }
+    if analysis.beta_prior {
+        if !matches!(analysis.design, DesignInput::Formula(_)) {
+            return Err(options_error(
+                "the beta prior needs a formula design (its factors define the expanded model)",
+            ));
+        }
+        if !matches!(analysis.test, TestRequest::Wald) {
+            return Err(options_error(
+                "the beta prior is only used by the Wald test",
+            ));
+        }
+        if !matches!(analysis.dispersion, DispersionRequest::Estimate) {
+            return Err(options_error(
+                "the beta prior needs estimated dispersions (their trend weights the prior)",
+            ));
+        }
+        if early {
+            return Err(options_error("the beta prior needs a full run"));
+        }
+        if !matches!(analysis.replacement, Replacement::Off) {
+            return Err(unsupported("Cook's replacement with the beta prior"));
         }
     }
     if early {
