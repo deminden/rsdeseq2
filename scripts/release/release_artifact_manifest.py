@@ -27,6 +27,10 @@ def source_identity():
     return subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip()
 
 
+# Workspace crates published to crates.io, in dependency order.
+PUBLISHED_CRATES = ['rsdeseq2', 'rsdeseq2-base']
+
+
 def check_files(root, files):
     for name, expected in files.items():
         if Path(name).name != name or not (root/name).is_file() or sha256(root/name) != expected:
@@ -43,8 +47,10 @@ def main():
     path = root/'validation.json'
     if args.mode == 'write':
         files = {p.name: sha256(p) for p in root.iterdir() if p.is_file() and p.name != path.name}
-        if len([p for p in files if p.endswith('.crate')]) != 1 or len([p for p in files if p.endswith('.tar.gz')]) != 1:
-            raise ValueError('Exactly one checked Rust crate and R source package are required')
+        crates = sorted(p.removesuffix('.crate').rsplit('-', 1)[0] for p in files if p.endswith('.crate'))
+        if crates != PUBLISHED_CRATES or len([p for p in files if p.endswith('.tar.gz')]) != 1:
+            raise ValueError('The checked Rust crates (' + ', '.join(PUBLISHED_CRATES)
+                             + ') and one R source package are required')
         check_files(root, files)
         data = dict(source_commit=source_identity(), trigger_sha=os.environ.get('GITHUB_SHA', source_identity()),
                     release_tag=os.environ.get('GITHUB_REF_NAME'), files=files,

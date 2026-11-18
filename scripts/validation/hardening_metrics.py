@@ -125,7 +125,8 @@ def strip_cfg_test(text: str) -> str:
 
 def production_sources() -> dict[Path, str]:
     sources = {}
-    for path in sorted((CRATE / 'src').rglob('*.rs')):
+    paths = sorted(path for crate in sorted(CRATE.parent.iterdir()) for path in (crate / 'src').rglob('*.rs'))
+    for path in paths:
         text = strip_cfg_test(strip_comments_and_strings(path.read_text()))
         if path.name == 'tests.rs' or '/tests/' in path.as_posix():
             text = ''
@@ -133,18 +134,26 @@ def production_sources() -> dict[Path, str]:
     return sources
 
 
+def crate_prefix(path: Path) -> str:
+    """'' for `rsdeseq2`, `<suffix>::` for a sibling crate such as `rsdeseq2-base`."""
+    crate = path.relative_to(CRATE.parent).parts[0]
+    return '' if crate == CRATE.name else crate.removeprefix(CRATE.name + '-') + '::'
+
+
 def top_module(path: Path) -> str:
-    rel = path.relative_to(CRATE / 'src').parts
-    name = rel[0]
-    return name[:-3] if name.endswith('.rs') else name
+    crate = CRATE.parent / path.relative_to(CRATE.parent).parts[0]
+    name = path.relative_to(crate / 'src').parts[0]
+    return crate_prefix(path) + (name[:-3] if name.endswith('.rs') else name)
 
 
 def mutual_pairs(sources: dict[Path, str]) -> list[tuple[str, str]]:
-    modules = {top_module(p) for p in sources} - {'lib', 'main'}
+    modules = {top_module(p) for p in sources}
+    modules = {m for m in modules if m.rsplit('::', 1)[-1] not in ('lib', 'main')}
     edges = defaultdict(set)
     for path, text in sources.items():
         source = top_module(path)
-        for target in CRATE_REF.findall(text):
+        for name in CRATE_REF.findall(text):
+            target = crate_prefix(path) + name
             if target in modules and target != source:
                 edges[source].add(target)
     pairs = {tuple(sorted((a, b))) for a in edges for b in edges[a] if a in edges.get(b, set())}

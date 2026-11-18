@@ -63,7 +63,7 @@ fn tail_factor(q: f64) -> f64 {
             / q
     }
 }
-pub(crate) fn normal_log_upper_tail(q: f64) -> f64 {
+pub fn normal_log_upper_tail(q: f64) -> f64 {
     if q.is_nan() {
         return q;
     }

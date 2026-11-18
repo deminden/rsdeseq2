@@ -61,6 +61,7 @@ icu_locale = { workspace = true, optional = true }
 libm.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
+rsdeseq2-base.workspace = true
 rcompat-lbfgsb.workspace = true
 rcompat-locfit.workspace = true
 serde.workspace = true

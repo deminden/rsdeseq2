@@ -4,7 +4,7 @@ use crate::numeric::math::ProfileMath;
 
 // log Gamma(a+1/2) - log Gamma(a) - (1/2)log(a), a>=32.
 // Bernoulli-polynomial gamma-ratio expansion, DLMF 5.11.13.
-pub(crate) fn log_half_gamma_ratio_correction(a: f64) -> f64 {
+pub fn log_half_gamma_ratio_correction(a: f64) -> f64 {
     let inverse = 1.0 / a;
     let square = inverse * inverse;
     inverse
@@ -17,7 +17,7 @@ pub(crate) fn log_half_gamma_ratio_correction(a: f64) -> f64 {
 
 // log Gamma(a) minus its leading Stirling expression, a>=1/2. Shift small
 // shapes using a positive atanh series, rather than subtracting large logs.
-pub(crate) fn stirling_correction(mut a: f64) -> f64 {
+pub fn stirling_correction(mut a: f64) -> f64 {
     let mut correction = 0.0;
     let mut compensation = 0.0;
     while a < 32.0 {
@@ -54,7 +54,7 @@ pub(crate) fn stirling_correction(mut a: f64) -> f64 {
 }
 
 // Stable remainder log(1+x)-x, needed in gamma and beta log densities.
-pub(crate) fn log1pmx(x: f64) -> f64 {
+pub fn log1pmx(x: f64) -> f64 {
     if x.abs() > 0.125 {
         return x.ln_1p_p() - x;
     }
@@ -71,7 +71,7 @@ pub(crate) fn log1pmx(x: f64) -> f64 {
     sum
 }
 
-pub(crate) fn large_shape_chi_square_tail(statistic: f64, df: f64) -> f64 {
+pub fn large_shape_chi_square_tail(statistic: f64, df: f64) -> f64 {
     let a = 0.5 * df;
     let x = 0.5 * statistic.max(0.0);
     if x == 0.0 {

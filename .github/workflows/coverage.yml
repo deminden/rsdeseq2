@@ -26,8 +26,9 @@ jobs:
           tool: cargo-llvm-cov
       - name: Line coverage (lib and integration tests)
         run: |
-          cargo llvm-cov --locked -p rsdeseq2 --lib --test integration --summary-only \
-            | tee coverage-summary.txt
+          cargo llvm-cov --locked --no-report -p rsdeseq2-base --lib
+          cargo llvm-cov --locked --no-report -p rsdeseq2 --lib --test integration
+          cargo llvm-cov report --summary-only | tee coverage-summary.txt
           cargo llvm-cov report --lcov --output-path lcov.info
           tail -n 1 coverage-summary.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -42,11 +43,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        files:
-          - crates/rsdeseq2/src/numeric/*.rs
-          - crates/rsdeseq2/src/multiple_testing.rs
-          - crates/rsdeseq2/src/normalization.rs
-          - crates/rsdeseq2/src/independent_filtering.rs
+        include:
+          - { crate: rsdeseq2-base, files: 'crates/rsdeseq2-base/src/numeric/*.rs', tests: '--cargo-test-arg=--lib' }
+          - { crate: rsdeseq2, files: crates/rsdeseq2/src/multiple_testing.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
+          - { crate: rsdeseq2, files: crates/rsdeseq2/src/normalization.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
+          - { crate: rsdeseq2, files: crates/rsdeseq2/src/independent_filtering.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
@@ -55,8 +56,8 @@ jobs:
           tool: cargo-mutants
       - name: Mutants in ${{ matrix.files }}
         run: >-
-          cargo mutants -d crates/rsdeseq2 -o . -f '${{ matrix.files }}' --timeout 600
-          --cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration
+          cargo mutants -d crates/${{ matrix.crate }} -o . -f '${{ matrix.files }}' --timeout 600
+          ${{ matrix.tests }}
           || true
       - name: Summary
         run: |

@@ -9,7 +9,7 @@ pub(crate) mod inference;
 mod inference_primitives;
 pub mod irls;
 pub mod lrt;
-pub mod nb;
+pub use rsdeseq2_base::nb;
 mod r_arithmetic;
 pub mod wald;
 pub mod weights;

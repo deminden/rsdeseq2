@@ -52,7 +52,8 @@ impl<'a, T> MatrixView<'a, T> {
     }
     /// View over a slice whose length is already known to be `rows * columns`,
     /// such as the storage of a [`crate::matrix::CountMatrix`].
-    pub(crate) fn from_valid_parts(
+    #[doc(hidden)]
+    pub fn from_valid_parts(
         rows: usize,
         columns: usize,
         values: &'a [T],
@@ -97,7 +98,8 @@ impl<'a, T> MatrixView<'a, T> {
         Ok(self.at(row, column))
     }
     #[inline]
-    pub(crate) fn at(&self, row: usize, column: usize) -> &'a T {
+    #[doc(hidden)]
+    pub fn at(&self, row: usize, column: usize) -> &'a T {
         debug_assert!(row < self.rows && column < self.columns);
         &self.values[match self.order {
             MatrixOrder::RowMajor => row * self.columns + column,

@@ -24,21 +24,19 @@ pub mod core;
 pub mod design;
 pub mod diagnostics;
 pub mod dispersion;
-pub mod errors;
+pub use rsdeseq2_base::errors;
 pub mod glm;
 pub mod independent_filtering;
 pub mod io;
-pub mod math;
-pub mod matrix;
+pub use rsdeseq2_base::math;
+pub use rsdeseq2_base::matrix;
 pub mod multiple_testing;
 pub mod normalization;
-pub(crate) mod numeric;
 pub use numeric::{NumericProfile, numeric_profile, set_numeric_profile};
+pub(crate) use rsdeseq2_base::numeric;
 pub mod options;
 pub mod prelude;
-// Several distributions are used only by the shrinkage engines.
-#[cfg_attr(not(feature = "shrinkage"), allow(dead_code, unused_imports))]
-mod probability;
+pub(crate) use rsdeseq2_base::probability;
 pub mod results;
 #[cfg(feature = "shrinkage")]
 pub mod shrinkage;

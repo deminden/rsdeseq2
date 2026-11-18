@@ -96,6 +96,12 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- The numeric foundation (`errors`, `math`, `matrix`, `glm::nb`, numeric
+  profiles, special functions and distributions) moved into a new
+  `rsdeseq2-base` crate. `rsdeseq2` depends on it and re-exports every public
+  path unchanged, so no user code changes; releases now publish
+  `rsdeseq2-base` before `rsdeseq2`, and the R package vendors both.
+
 - rlog now fits its sample-effect GLM with the settings DESeq2's `rlogData`
   passes to `fitNbinomGLMs` (`betaTol = 1e-4`, no optim fallback), available as
   `IrlsOptions::deseq2_rlog()`, and rank-deficient designs (every rlog design)

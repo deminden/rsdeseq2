@@ -14,7 +14,7 @@ use super::profile::host_libm;
 ///
 /// Each method mirrors the `f64` method of the same name without the `_p`
 /// suffix.
-pub(crate) trait ProfileMath: Copy {
+pub trait ProfileMath: Copy {
     fn ln_p(self) -> f64;
     fn exp_p(self) -> f64;
     fn powf_p(self, exponent: f64) -> f64;
