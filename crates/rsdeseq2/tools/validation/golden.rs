@@ -40,12 +40,13 @@ use rsdeseq2::core::{
 };
 use rsdeseq2::design::DesignMatrix;
 use rsdeseq2::glm::{
-    BetaPriorGlmFit, BetaPriorRefitOptions, LrtOutput, NbinomGlmFit, WaldOutput,
-    fit_glms_with_estimated_beta_prior_variance,
+    BetaPriorGlmFit, BetaPriorRefitOptions, GlmInput, LrtOutput, NbinomGlmFit, WaldOutput,
+    fit_glms_with_estimated_beta_prior,
 };
 use rsdeseq2::independent_filtering::IndependentFilteringOutput;
 use rsdeseq2::io::{read_count_matrix_tsv, read_design_matrix_tsv, read_size_factors_tsv};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView, RowMajorMatrix};
+use rsdeseq2::normalization::Offsets;
 use rsdeseq2::options::{FitType, SizeFactorMethod};
 use rsdeseq2::results::{DeseqResultRow, DeseqResults};
 use rsdeseq2::shrinkage::{
@@ -939,11 +940,14 @@ fn run_input_in_pool(
             .collect();
         let pick = |values: &[f64]| -> Vec<f64> { rows.iter().map(|&g| values[g]).collect() };
         let normal = counts.select_rows(&rows).and_then(|nonzero| {
-            fit_glms_with_estimated_beta_prior_variance(
-                &nonzero,
+            let dispersions = pick(dispersion);
+            fit_glms_with_estimated_beta_prior(
+                GlmInput::new(
+                    &nonzero,
+                    Offsets::PerSample(&fit.size_factors),
+                    &dispersions,
+                ),
                 design,
-                &fit.size_factors,
-                &pick(dispersion),
                 &pick(&fit.base_mean),
                 &pick(disp_fit),
                 BetaPriorRefitOptions::default(),

@@ -86,6 +86,8 @@ mod formula_term_expansion;
 mod frozen_local_vst;
 #[path = "fuzz_smoke.rs"]
 mod fuzz_smoke;
+#[path = "glm_input.rs"]
+mod glm_input;
 #[path = "glm_intercept.rs"]
 mod glm_intercept;
 #[path = "glm_irls.rs"]

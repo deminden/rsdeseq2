@@ -113,14 +113,14 @@ pub fn fit_expanded_beta_prior_wald_results(
     input: ExpandedBetaPriorWaldResultsInput<'_>,
     coefficient: usize,
 ) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
-    let fit = fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(
-        input.counts,
-        input.design,
-        BetaPriorSizeFactorWeightInput {
-            size_factors: input.size_factors,
+    let fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerSample(input.size_factors),
+            dispersions: input.dispersions,
             weights: input.weights,
         },
-        input.dispersions,
+        input.design,
         input.base_mean,
         input.disp_fit,
         input.options,
@@ -142,14 +142,14 @@ pub fn fit_expanded_beta_prior_wald_contrast_results(
     input: ExpandedBetaPriorWaldResultsInput<'_>,
     contrast: &[f64],
 ) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
-    let fit = fit_expanded_glms_with_estimated_beta_prior_variance_and_weights(
-        input.counts,
-        input.design,
-        BetaPriorSizeFactorWeightInput {
-            size_factors: input.size_factors,
+    let fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerSample(input.size_factors),
+            dispersions: input.dispersions,
             weights: input.weights,
         },
-        input.dispersions,
+        input.design,
         input.base_mean,
         input.disp_fit,
         input.options,
@@ -294,19 +294,18 @@ pub fn fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weigh
     input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
     coefficient: usize,
 ) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
-    let fit =
-        fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
-            input.counts,
-            input.design,
-            BetaPriorNormalizationFactorWeightInput {
-                normalization_factors: input.normalization_factors,
-                weights: input.weights,
-            },
-            input.dispersions,
-            input.base_mean,
-            input.disp_fit,
-            input.options,
-        )?;
+    let fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerCell(input.normalization_factors),
+            dispersions: input.dispersions,
+            weights: input.weights,
+        },
+        input.design,
+        input.base_mean,
+        input.disp_fit,
+        input.options,
+    )?;
     let results = build_wald_results_from_expanded_beta_prior_fit(
         input.base_mean,
         &fit,
@@ -322,19 +321,18 @@ pub fn fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_
     input: ExpandedBetaPriorWaldNormalizedResultsInput<'_>,
     contrast: &[f64],
 ) -> Result<ExpandedBetaPriorWaldResults, DeseqError> {
-    let fit =
-        fit_expanded_glms_with_estimated_beta_prior_variance_and_normalization_factors_and_weights(
-            input.counts,
-            input.design,
-            BetaPriorNormalizationFactorWeightInput {
-                normalization_factors: input.normalization_factors,
-                weights: input.weights,
-            },
-            input.dispersions,
-            input.base_mean,
-            input.disp_fit,
-            input.options,
-        )?;
+    let fit = fit_expanded_glms_with_estimated_beta_prior(
+        GlmInput {
+            counts: input.counts,
+            offsets: Offsets::PerCell(input.normalization_factors),
+            dispersions: input.dispersions,
+            weights: input.weights,
+        },
+        input.design,
+        input.base_mean,
+        input.disp_fit,
+        input.options,
+    )?;
     let results = build_wald_contrast_results_from_expanded_beta_prior_fit(
         input.base_mean,
         &fit,

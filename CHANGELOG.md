@@ -7,6 +7,12 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `Offsets` (per-sample size factors or a per-cell normalization-factor
+  matrix) is now public, with `GlmInput` (counts, offsets, dispersions,
+  optional weights) and three beta-prior fits that take it:
+  `fit_glms_with_beta_prior`, `fit_glms_with_estimated_beta_prior` and
+  `fit_expanded_glms_with_estimated_beta_prior`.
+
 - `DispersionFitInput` with `line_search_dispersion` and
   `grid_search_dispersion`: one input struct (counts, means, optional design,
   prior and weights) for a single gene's dispersion fit, in place of twelve
@@ -131,6 +137,13 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- The twelve `fit_glms_with_beta_prior_variance*`,
+  `fit_glms_with_estimated_beta_prior_variance*` and
+  `fit_expanded_glms_with_estimated_beta_prior_variance*` variants: use the
+  three `GlmInput` functions above; the size-factor or normalization-factor
+  and weights suffixes become `Offsets` and `GlmInput::weights`. Output is
+  unchanged; removal in 0.7.0.
 
 - The twelve `fit_dispersion_{line_search,grid}{,_with_prior,_with_prior_and_weights}`
   and `_no_cr` variants: use `line_search_dispersion` or
