@@ -2,6 +2,7 @@ use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDisp
 use crate::errors::DeseqError;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
+use crate::normalization::Offsets;
 use crate::numeric::checked::{self, CheckedExt};
 
 // Fast-VST row selection and aligned subsets.
@@ -179,7 +180,7 @@ fn vst_local_with_integral(
 ///
 /// This is DESeq2's `mean(1 / sizeFactors)` term used in the local VST
 /// variance curve.
-pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, DeseqError> {
+fn local_vst_inverse_size_factor_mean_impl(size_factors: &[f64]) -> Result<f64, DeseqError> {
     if size_factors.is_empty() {
         return Err(DeseqError::InvalidDimensions {
             context: "local VST size factors".to_string(),
@@ -204,7 +205,7 @@ pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, D
 /// This mirrors DESeq2's approximation for the local VST branch when
 /// normalization factors are present:
 /// `sf = exp(colMeans(log(normalizationFactors)))`, then `mean(1 / sf)`.
-pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
+fn local_vst_inverse_size_factor_mean_from_normalization_factors_impl(
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<f64, DeseqError> {
     let mut log_col_sums = vec![0.0; normalization_factors.n_cols()];
@@ -272,7 +273,7 @@ pub fn vst_with_dispersion_trend(
 /// and ordinary sample size factors. The local branch computes its
 /// `mean(1 / sizeFactors)` variance term internally; parametric and mean
 /// branches ignore the size factors after validating them.
-pub fn vst_with_dispersion_trend_and_size_factors(
+fn vst_with_dispersion_trend_and_size_factors_impl(
     normalized_counts: &RowMajorMatrix<f64>,
     trend_fit: &DispersionTrendFit,
     size_factors: &[f64],
@@ -284,7 +285,7 @@ pub fn vst_with_dispersion_trend_and_size_factors(
             actual: size_factors.len(),
         });
     }
-    let inverse_size_factor_mean = local_vst_inverse_size_factor_mean(size_factors)?;
+    let inverse_size_factor_mean = local_vst_inverse_size_factor_mean_impl(size_factors)?;
     vst_with_dispersion_trend(normalized_counts, trend_fit, inverse_size_factor_mean)
 }
 
@@ -293,7 +294,7 @@ pub fn vst_with_dispersion_trend_and_size_factors(
 /// This mirrors DESeq2's local-VST normalization-factor approximation by
 /// deriving column geometric mean size factors and using `mean(1 / sf)`.
 /// Parametric and mean branches ignore the derived value.
-pub fn vst_with_dispersion_trend_and_normalization_factors(
+fn vst_with_dispersion_trend_and_normalization_factors_impl(
     normalized_counts: &RowMajorMatrix<f64>,
     trend_fit: &DispersionTrendFit,
     normalization_factors: &RowMajorMatrix<f64>,
@@ -308,7 +309,7 @@ pub fn vst_with_dispersion_trend_and_normalization_factors(
         });
     }
     let inverse_size_factor_mean =
-        local_vst_inverse_size_factor_mean_from_normalization_factors(normalization_factors)?;
+        local_vst_inverse_size_factor_mean_from_normalization_factors_impl(normalization_factors)?;
     vst_with_dispersion_trend(normalized_counts, trend_fit, inverse_size_factor_mean)
 }
 
@@ -563,6 +564,99 @@ fn finite_value(value: f64, index: Option<usize>, context: &str) -> Result<f64, 
             value,
         })
     }
+}
+
+/// DESeq2's `mean(1 / sizeFactors)` term for the local VST variance curve.
+///
+/// With normalization factors DESeq2 first derives per-sample size factors
+/// as column geometric means, `exp(colMeans(log(normalizationFactors)))`.
+pub fn local_vst_inverse_factor_mean(offsets: Offsets<'_>) -> Result<f64, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => local_vst_inverse_size_factor_mean_impl(size_factors),
+        Offsets::PerCell(normalization_factors) => {
+            local_vst_inverse_size_factor_mean_from_normalization_factors_impl(
+                normalization_factors,
+            )
+        }
+    }
+}
+
+/// Apply VST with an already-fitted dispersion trend, deriving the local
+/// branch's `mean(1 / sizeFactors)` term from the offsets. Parametric and
+/// mean branches only validate the offsets.
+pub fn vst_with_dispersion_trend_and_offsets(
+    normalized_counts: &RowMajorMatrix<f64>,
+    trend_fit: &DispersionTrendFit,
+    offsets: Offsets<'_>,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    match offsets {
+        Offsets::PerSample(size_factors) => vst_with_dispersion_trend_and_size_factors_impl(
+            normalized_counts,
+            trend_fit,
+            size_factors,
+        ),
+        Offsets::PerCell(normalization_factors) => {
+            vst_with_dispersion_trend_and_normalization_factors_impl(
+                normalized_counts,
+                trend_fit,
+                normalization_factors,
+            )
+        }
+    }
+}
+
+/// Deprecated form of [`local_vst_inverse_factor_mean`] with size factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use local_vst_inverse_factor_mean(Offsets::PerSample(size_factors))"
+)]
+pub fn local_vst_inverse_size_factor_mean(size_factors: &[f64]) -> Result<f64, DeseqError> {
+    local_vst_inverse_factor_mean(Offsets::PerSample(size_factors))
+}
+
+/// Deprecated form of [`local_vst_inverse_factor_mean`] with normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use local_vst_inverse_factor_mean(Offsets::PerCell(normalization_factors))"
+)]
+pub fn local_vst_inverse_size_factor_mean_from_normalization_factors(
+    normalization_factors: &RowMajorMatrix<f64>,
+) -> Result<f64, DeseqError> {
+    local_vst_inverse_factor_mean(Offsets::PerCell(normalization_factors))
+}
+
+/// Deprecated form of [`vst_with_dispersion_trend_and_offsets`] with size factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use vst_with_dispersion_trend_and_offsets(.., Offsets::PerSample(size_factors))"
+)]
+pub fn vst_with_dispersion_trend_and_size_factors(
+    normalized_counts: &RowMajorMatrix<f64>,
+    trend_fit: &DispersionTrendFit,
+    size_factors: &[f64],
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    vst_with_dispersion_trend_and_offsets(
+        normalized_counts,
+        trend_fit,
+        Offsets::PerSample(size_factors),
+    )
+}
+
+/// Deprecated form of [`vst_with_dispersion_trend_and_offsets`] with normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use vst_with_dispersion_trend_and_offsets(.., Offsets::PerCell(normalization_factors))"
+)]
+pub fn vst_with_dispersion_trend_and_normalization_factors(
+    normalized_counts: &RowMajorMatrix<f64>,
+    trend_fit: &DispersionTrendFit,
+    normalization_factors: &RowMajorMatrix<f64>,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    vst_with_dispersion_trend_and_offsets(
+        normalized_counts,
+        trend_fit,
+        Offsets::PerCell(normalization_factors),
+    )
 }
 
 #[cfg(test)]

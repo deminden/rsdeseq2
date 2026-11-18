@@ -17,14 +17,15 @@ pub use rlog::{
     rlog_with_estimated_prior_and_size_factors, rlog_with_normalization_factors,
     rlog_with_size_factors,
 };
+#[allow(deprecated)]
 pub use vst::{
     FastVstSubset, FastVstSubsetMetadata, FrozenLocalDispersion, SavedLocalDispersionFit,
     fast_vst_eligible_count, fast_vst_subset, fast_vst_subset_indices, fast_vst_subset_matrix_rows,
     fast_vst_subset_normalized_counts, frozen_local_vst_grid_from_counts,
-    local_vst_inverse_size_factor_mean,
+    local_vst_inverse_factor_mean, local_vst_inverse_size_factor_mean,
     local_vst_inverse_size_factor_mean_from_normalization_factors, vst, vst_frozen_local,
     vst_local, vst_local_from_dispersion_grid, vst_mean, vst_mean_value, vst_parametric,
     vst_parametric_value, vst_with_dispersion_trend,
-    vst_with_dispersion_trend_and_normalization_factors,
+    vst_with_dispersion_trend_and_normalization_factors, vst_with_dispersion_trend_and_offsets,
     vst_with_dispersion_trend_and_size_factors,
 };

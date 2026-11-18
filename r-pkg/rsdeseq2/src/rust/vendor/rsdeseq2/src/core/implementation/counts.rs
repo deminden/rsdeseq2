@@ -53,8 +53,7 @@ pub(super) use crate::transform::{
     FastVstSubset, RlogMetadata, RlogOffsetMode, RlogOutput,
     fast_vst_eligible_count as count_fast_vst_eligible_rows,
     fast_vst_subset as build_fast_vst_subset, norm_transform, rlog_frozen,
-    rlog_with_estimated_prior, vst_with_dispersion_trend_and_normalization_factors,
-    vst_with_dispersion_trend_and_size_factors,
+    rlog_with_estimated_prior, vst_with_dispersion_trend_and_offsets,
 };
 
 /// DESeq2's default number of genes used to fit the fast `vst()` trend.
