@@ -79,6 +79,35 @@ pub fn estimate_size_factors_poscounts_with_options(
     estimate_from_log_geo_means(counts, &log_geo_means, control_genes, incoming_geo_means)
 }
 
+/// Estimate size factors the way `estimateSizeFactors(dds, type = ...)` and
+/// `DESeq(dds, sfType = ...)` do, rather than `estimateSizeFactorsForMatrix`.
+///
+/// The two differ only for `poscounts` without supplied geometric means:
+/// the `DESeqDataSet` method computes the non-zero geometric means itself and
+/// passes them in, so its size factors are rescaled to a geometric mean of 1,
+/// while the matrix function's are not. Supplied geometric means are used as
+/// given (DESeq2's method would replace them for `poscounts`).
+pub fn estimate_size_factors_for_dataset(
+    counts: &CountMatrix,
+    method: SizeFactorMethod,
+    geo_means: Option<&[f64]>,
+    control_genes: Option<&[usize]>,
+) -> Result<Vec<f64>, DeseqError> {
+    match (method, geo_means) {
+        (SizeFactorMethod::PosCounts, None) => {
+            // geoMeanNZ, then log(geoMeans) as estimateSizeFactorsForMatrix
+            // takes it: exp and log are applied as in R.
+            let geo_means = poscounts_log_geo_means(counts)?
+                .into_iter()
+                .map(f64::exp)
+                .collect::<Vec<_>>();
+            let log_geo_means = supplied_log_geo_means(counts, &geo_means)?;
+            estimate_from_log_geo_means(counts, &log_geo_means, control_genes, true)
+        }
+        _ => estimate_size_factors_with_options(counts, method, geo_means, control_genes),
+    }
+}
+
 /// Divide counts by sample-specific size factors.
 pub fn normalized_counts(
     counts: &CountMatrix,

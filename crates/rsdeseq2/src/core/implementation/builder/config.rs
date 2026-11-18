@@ -451,7 +451,7 @@ impl DeseqBuilder {
                 .transpose()?;
             let size_factors = match &self.size_factor_options.supplied_size_factors {
                 Some(values) => values.clone(),
-                None => estimate_size_factors_with_options(
+                None => estimate_size_factors_for_dataset(
                     counts,
                     self.size_factor_options.method,
                     self.size_factor_options.geo_means.as_deref(),

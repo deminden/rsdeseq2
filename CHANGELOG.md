@@ -142,6 +142,14 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Fixed
 
+- `poscounts` size factors in the pipeline (`DeseqBuilder`, `DeseqBuilder::run`,
+  the CLI beta-prior paths) now match `DESeq(dds, sfType = "poscounts")`: the
+  `DESeqDataSet` method passes its own non-zero geometric means and so
+  rescales the size factors to a geometric mean of 1, which the builder did
+  not do. `estimate_size_factors_for_dataset` exposes that rule; the
+  matrix-level `estimate_size_factors_poscounts*` functions still match
+  `estimateSizeFactorsForMatrix` and are unchanged.
+
 - A formula containing a call to an unknown function, such as `~ q(age)` or
   `~ f() + condition`, recursed until the stack overflowed and aborted the
   process (CLI or R session). It now returns the usual "formula variable ...

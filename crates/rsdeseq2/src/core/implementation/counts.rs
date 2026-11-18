@@ -38,7 +38,7 @@ pub(super) use crate::independent_filtering::{
 pub(super) use crate::matrix::RowMajorMatrix;
 pub(super) use crate::normalization::{
     Offsets, base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
-    estimate_size_factors_with_options, normalized_counts, normalized_counts_with_factors,
+    estimate_size_factors_for_dataset, normalized_counts, normalized_counts_with_factors,
     validate_normalization_factors,
 };
 pub(super) use crate::options::{

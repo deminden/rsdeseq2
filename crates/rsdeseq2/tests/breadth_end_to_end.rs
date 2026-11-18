@@ -179,7 +179,6 @@ fn three_vs_three_matches_deseq2_defaults() {
 }
 
 #[test]
-#[ignore = "DESeq()-level poscounts size factors are rescaled to geometric mean 1; fixed in the next commit"]
 fn sparse_poscounts_matches_deseq2_defaults() {
     check_case(
         "sparse",

@@ -145,7 +145,7 @@ pub use crate::matrix::RowMajorMatrix;
 pub use crate::multiple_testing::{bh_adjust, bh_adjust_f64};
 pub use crate::normalization::{
     Offsets, base_mean, base_mean_with_weights, base_variance, base_variance_with_weights,
-    estimate_size_factors, estimate_size_factors_poscounts,
+    estimate_size_factors, estimate_size_factors_for_dataset, estimate_size_factors_poscounts,
     estimate_size_factors_poscounts_with_options, estimate_size_factors_ratio,
     estimate_size_factors_ratio_with_options, estimate_size_factors_with_options,
     normalization_factors_from_size_factors, normalization_factors_with_offsets, normalized_counts,
