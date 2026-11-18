@@ -2,16 +2,22 @@
 use super::{ERROR_SCOPE, Error};
 use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug)]
+/// mixSQP controls of the sequential quadratic solver.
 pub struct MixtureSqpOptions {
     /// Use ashr/mixSQP's EM floors and direction-based active-set transitions.
     /// The general convex fitter retains its full-KKT target-coordinate policy.
     pub ashr_compatibility: bool,
+    /// Tolerance of the active-set quadratic subproblem.
     pub active_tolerance: f64,
     /// None retains the established native direction policy.
     pub search_direction_threshold: Option<f64>,
+    /// Armijo sufficient-decrease constant of the line search.
     pub sufficient_decrease: f64,
+    /// Step-size reduction factor of the line search.
     pub step_reduction: f64,
+    /// Smallest step tried by the line search.
     pub minimum_step: f64,
+    /// Ridge added to the Hessian, relative to its scale.
     pub ridge_multiplier: f64,
     /// None (or zero) retains full-matrix fitting. Positive values request a
     /// deterministic truncated SVD, retaining at least two singular directions.

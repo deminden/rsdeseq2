@@ -6,6 +6,7 @@ use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::numeric::math::ProfileMath;
 #[derive(Clone, Copy, Debug)]
+/// Controls of the primal-dual interior-point weight fitter.
 pub struct InteriorPointOptions {
     /// Upper bound on the normalized convex dual gap. A mass-scaled
     /// accuracy target may tighten it to preserve log-likelihood precision.

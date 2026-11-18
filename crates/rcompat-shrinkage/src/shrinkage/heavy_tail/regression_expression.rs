@@ -9,6 +9,8 @@ use crate::{
     matrix::MatrixView,
 };
 #[derive(Clone, Debug)]
+/// A user log-likelihood from the supported subset of R expressions,
+/// evaluated without R.
 pub struct RestrictedRegressionLikelihood {
     arguments: Vec<String>,
     expression: Expression,
@@ -423,6 +425,7 @@ impl RestrictedRegressionLikelihood {
             }
         }
     }
+    /// Evaluate the log-likelihood for observations `y`.
     pub fn evaluate(
         &self,
         y: &[f64],

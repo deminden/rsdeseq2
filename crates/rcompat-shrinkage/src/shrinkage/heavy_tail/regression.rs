@@ -15,15 +15,22 @@ use nalgebra::DMatrix;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb_with_gradient};
 use std::{cell::RefCell, sync::Arc};
 #[derive(Clone, Debug)]
+/// Observation likelihood of a general `apeglm` regression.
 pub enum RegressionLikelihood {
+    /// Negative binomial with per-row dispersion parameters.
     NegativeBinomial,
+    /// Beta-binomial with per-row overdispersion parameters.
     BetaBinomial,
+    /// A user likelihood from the restricted R expression subset.
     Restricted(Arc<RestrictedRegressionLikelihood>),
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Optimizer for the MAP search (R's `optim` method).
 pub enum RegressionOptimizer {
     #[default]
+    /// `method = "BFGS"`.
     Bfgs,
+    /// `method = "L-BFGS-B"`.
     Lbfgsb,
     /// Retain an unused/unsupported optimizer until a method actually needs it.
     Unsupported,
@@ -63,36 +70,58 @@ impl RegressionOptimizer {
     }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Which `apeglm` method (`method =`) the fit reproduces.
 pub enum RegressionMethod {
     #[default]
+    /// `"general"`: a supplied log-likelihood.
     General,
+    /// `"nbinomR"`.
     NegativeBinomialR,
+    /// `"betabinR"`.
     BetaBinomialR,
+    /// `"betabinCR"`.
     BetaBinomialCR,
+    /// `"betabinC"`.
     BetaBinomialC,
+    /// `"betabinC*"` (random restarts).
     BetaBinomialCStar,
 }
 #[derive(Clone, Copy, Debug)]
+/// Borrowed data for a general regression posterior batch.
 pub struct RegressionPosteriorInput<'a> {
+    /// Row-by-sample observations.
     pub observations: MatrixView<'a, f64>,
+    /// Sample-by-coefficient design matrix.
     pub design: MatrixView<'a, f64>,
+    /// Likelihood parameters (dispersions, sizes), when the likelihood needs them.
     pub parameters: Option<MatrixView<'a, f64>>,
+    /// Linear-predictor offsets.
     pub offsets: PosteriorOffsets<'a>,
+    /// Optional observation weights.
     pub weights: Option<MatrixView<'a, f64>>,
+    /// MLE estimates for prior adaptation.
     pub mle: Option<CoefficientMle<'a>>,
 }
 #[derive(Clone, Debug)]
+/// Options of a general regression posterior fit.
 pub struct RegressionPosteriorOptions {
     /// Shared scale, coefficient, threshold, adaptation and Laplace controls.
     pub posterior: NegativeBinomialPosteriorOptions,
+    /// The observation likelihood.
     pub likelihood: RegressionLikelihood,
     /// The shrunken prior is dt(beta/scale,df,ncp), as in the reference method.
     pub prior_df: f64,
+    /// Non-centrality of the t prior.
     pub prior_noncentrality: f64,
+    /// Prior mean of the nuisance (intercept-type) coefficients.
     pub nuisance_mean: f64,
+    /// The MAP optimizer.
     pub optimizer: RegressionOptimizer,
+    /// The `apeglm` method reproduced.
     pub method: RegressionMethod,
+    /// Use the log link (otherwise identity).
     pub log_link: bool,
+    /// Coefficient bounds for L-BFGS-B.
     pub bounds: (f64, f64),
 }
 impl Default for RegressionPosteriorOptions {
@@ -110,6 +139,7 @@ impl Default for RegressionPosteriorOptions {
         }
     }
 }
+/// Fit `apeglm`-style posteriors for a general regression likelihood.
 pub fn fit_regression_posterior(
     input: RegressionPosteriorInput<'_>,
     options: &RegressionPosteriorOptions,

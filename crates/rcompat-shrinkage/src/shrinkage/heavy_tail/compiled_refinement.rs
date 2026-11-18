@@ -8,15 +8,20 @@ use crate::Error;
 use crate::errors::scoped_invalid_options;
 
 #[derive(Clone, Debug, Default)]
+/// Optimizer of the compiled refinement step (R's `optim` method name).
 pub enum NegativeBinomialRefinementMethod {
     #[default]
+    /// `"BFGS"`.
     Bfgs,
+    /// `"L-BFGS-B"`.
     Lbfgsb,
     /// An unrecognized method is irrelevant when the prefit is already valid.
     Unsupported(String),
 }
 #[derive(Clone, Debug)]
+/// Controls of the compiled negative-binomial refinement step.
 pub struct NegativeBinomialRefinement {
+    /// Optimizer method.
     pub method: NegativeBinomialRefinementMethod,
     /// Malformed bounds are rejected only if bounded refinement runs.
     /// Missing vector entries and non-finite endpoints denote absent bounds.

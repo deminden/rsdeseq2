@@ -9,17 +9,25 @@ use crate::Error;
 /// Original result population, retained separately from forwarded fitting data.
 #[derive(Clone, Copy, Debug)]
 pub struct AdaptiveShrinkageQuery<'a> {
+    /// Original estimates (log2 fold changes).
     pub estimates: &'a [f64],
+    /// Their standard errors.
     pub standard_errors: &'a [f64],
+    /// Threshold for threshold s-values (0 for ordinary s-values).
     pub lfc_threshold: f64,
+    /// Whether to compute s-values.
     pub svalues: bool,
 }
 /// Numerical fields ready for either frontend's result-table presentation.
 #[derive(Clone, Debug)]
 pub struct AdaptiveShrinkageResult {
+    /// The fitted shrinkage.
     pub fit: LocationShrinkage,
+    /// Posterior means.
     pub posterior_mean: Vec<f64>,
+    /// Posterior standard deviations.
     pub posterior_sd: Vec<f64>,
+    /// s-values, if requested.
     pub svalues: Option<Vec<f64>>,
 }
 /// Fit on the supplied data and present the original result population. A

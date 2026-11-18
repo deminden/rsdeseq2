@@ -9,6 +9,7 @@ use crate::Error;
 /// Search bounds, specified on the original estimate scale, before alpha scaling.
 #[derive(Clone, Copy, Debug)]
 pub enum PriorModeSearch {
+    /// The range of the observations.
     ObservationRange,
     /// Expand the data range to include one additional coordinate.
     ExpandedObservationRange(f64),
@@ -18,10 +19,15 @@ pub enum PriorModeSearch {
 /// Profile maximum and numerical work, with warnings in evaluation order.
 #[derive(Clone, Debug)]
 pub struct LocationModeEstimate {
+    /// The estimated prior mode.
     pub mode: f64,
+    /// Profile log likelihood at the mode.
     pub log_likelihood: f64,
+    /// Profile evaluations.
     pub evaluations: usize,
+    /// The search interval used.
     pub bounds: (f64, f64),
+    /// Warnings in evaluation order.
     pub warnings: Vec<String>,
 }
 

@@ -11,9 +11,11 @@ use std::sync::{
 #[derive(Clone, Debug, Default)]
 pub struct PosteriorCancellation(Arc<AtomicBool>);
 impl PosteriorCancellation {
+    /// Request cancellation; running fits stop at their next check.
     pub fn cancel(&self) {
         self.0.store(true, Ordering::Relaxed);
     }
+    /// Whether cancellation was requested.
     pub fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
@@ -24,6 +26,7 @@ impl PosteriorCancellation {
 pub struct PosteriorWorkControl {
     /// Maximum grid likelihood evaluations across the batch; None is unlimited.
     pub max_grid_evaluations: Option<usize>,
+    /// Cancellation source shared with the caller.
     pub cancellation: PosteriorCancellation,
     interrupt: Option<(std::thread::ThreadId, fn() -> bool)>,
 }

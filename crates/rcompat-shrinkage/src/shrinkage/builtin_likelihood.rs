@@ -48,6 +48,7 @@ impl BuiltinLocationLikelihood {
             vec![]
         }
     }
+    /// ashr's `lik_pois`: Poisson counts `y` with exposure `scale`.
     pub fn poisson(y: Vec<f64>, scale: Vec<f64>, link: super::PoissonLink) -> Result<Self, Error> {
         Ok(Self {
             parameters: Arc::new(Parameters::Count(
@@ -57,6 +58,7 @@ impl BuiltinLocationLikelihood {
             capture_recycling_warning: false,
         })
     }
+    /// ashr's `lik_binom`: binomial counts `y` out of `trials`.
     pub fn binomial(
         y: Vec<f64>,
         trials: Vec<f64>,
@@ -121,6 +123,7 @@ impl BuiltinLocationLikelihood {
     ) -> Result<Self, Error> {
         super::normal_mixture_captures::import(weights, scales, scales_are_matrix)
     }
+    /// ashr's `lik_normalmix`: errors from a normal mixture shared by all observations.
     pub fn normal_mixture(weights: Vec<f64>, scales: Vec<f64>) -> Result<Self, Error> {
         let matrix = MatrixView::new(1, scales.len(), &scales, MatrixOrder::RowMajor)?;
         Self::normal_mixture_by_observation(weights, matrix)
@@ -188,6 +191,7 @@ impl BuiltinLocationLikelihood {
             capture_recycling_warning: false,
         })
     }
+    /// ashr's name of the likelihood (`"normal"`, `"pois"`, ...).
     pub fn name(&self) -> &'static str {
         match self.parameters.as_ref() {
             Parameters::Count(c) => c.name(),
@@ -213,6 +217,7 @@ impl BuiltinLocationLikelihood {
         }
         Ok(())
     }
+    /// The likelihood of observation `row` out of `n`.
     pub fn for_observation(&self, row: usize, n: usize) -> Result<Self, Error> {
         self.validate_observations(n)?;
         if row >= n {
@@ -250,6 +255,7 @@ impl BuiltinLocationLikelihood {
             .map(|(&w, &s)| w * f(s))
             .sum()
     }
+    /// Log CDF of the error distribution at `x`.
     pub fn log_cdf(&self, x: f64) -> f64 {
         match self.parameters.as_ref() {
             Parameters::Count(c) => c.log_cdf(x, self.row),
@@ -273,6 +279,7 @@ impl BuiltinLocationLikelihood {
             }
         }
     }
+    /// Log density of the error distribution at `x`.
     pub fn log_density(&self, x: f64) -> f64 {
         match self.parameters.as_ref() {
             Parameters::Count(c) => c.log_density(x, self.row),
@@ -296,6 +303,7 @@ impl BuiltinLocationLikelihood {
             }
         }
     }
+    /// Moment of the given order of the error distribution truncated to `[a, b]`.
     pub fn truncated_moment(&self, a: f64, b: f64, order: u8) -> f64 {
         if a.is_nan() || b.is_nan() || a > b {
             return if super::location_missing::is_na(a) || super::location_missing::is_na(b) {

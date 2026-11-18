@@ -8,10 +8,15 @@ use nalgebra::{DMatrix, DVector};
 /// R package's optimizer-specific control list.
 #[derive(Clone, Copy, Debug)]
 pub struct MixtureFitOptions {
+    /// Maximum outer iterations.
     pub max_iterations: usize,
+    /// Convergence tolerance on the dual (KKT) residual.
     pub gradient_tolerance: f64,
+    /// EM iterations run before the convex solver, for a warm start.
     pub em_iterations: usize,
+    /// Maximum active-set iterations per quadratic subproblem.
     pub active_iterations: usize,
+    /// Weights below this are set to zero.
     pub zero_threshold: f64,
     /// Added to row-normalized component mixtures, including Dirichlet
     /// pseudo-observations. Zero fits the unregularized likelihood; ashr's
@@ -20,7 +25,9 @@ pub struct MixtureFitOptions {
     /// Original mixSQP checks dual residuals only on positive coordinates.
     /// Keep false for the general convex fitter's stronger full KKT check.
     pub positive_coordinate_convergence: bool,
+    /// The weight-fitting algorithm.
     pub optimizer: MixtureOptimizer,
+    /// mixSQP controls for the sequential quadratic solver.
     pub sqp: MixtureSqpOptions,
 }
 impl Default for MixtureFitOptions {
@@ -42,17 +49,27 @@ impl Default for MixtureFitOptions {
 /// Normalized mixture proportions and explicit numerical convergence diagnostics.
 #[derive(Clone, Debug)]
 pub struct MixtureFit {
+    /// Fitted mixture weights, summing to one.
     pub weights: Vec<f64>,
+    /// Log likelihood at the weights.
     pub log_likelihood: f64,
+    /// Log likelihood plus the Dirichlet penalty.
     pub penalized_log_likelihood: f64,
+    /// Whether the convergence test passed.
     pub converged: bool,
     /// Convex dual/KKT residual, or last fixed-point residual for EM.
     pub dual_residual: f64,
+    /// Sum of the optimizer's unnormalized weights.
     pub optimizer_weight_sum: f64,
+    /// Objective evaluations.
     pub function_evaluations: usize,
+    /// The optimizer's status message.
     pub message: String,
+    /// Iterations, when the optimizer reports them.
     pub iterations: Option<usize>,
+    /// Variational Dirichlet posterior parameters (variational EM only).
     pub posterior_concentrations: Option<Vec<f64>>,
+    /// The optimizer's own objective value, when it differs from the likelihood.
     pub optimizer_objective: Option<f64>,
 }
 
@@ -81,17 +98,25 @@ pub use squarem::{PolynomialExtrapolation, SquaremOptions};
 #[derive(Clone, Copy, Debug, Default)]
 pub enum MixtureOptimizer {
     #[default]
+    /// mixSQP-style sequential quadratic programming (the default).
     SequentialQuadratic,
+    /// EM accelerated by SQUAREM (ashr's `mixEM`).
     Em(SquaremOptions),
+    /// Weighted EM (ashr's `w_mixEM`).
     WeightedEm(SquaremOptions),
+    /// Variational Bayes EM (ashr's `mixVBEM`).
     VariationalEm(SquaremOptions),
+    /// ashr's compiled EM (`cxxMixSquarem`).
     CxxEm(SquaremOptions),
+    /// Interior-point method (ashr's `mixIP`).
     InteriorPoint(InteriorPointOptions),
 }
 impl MixtureOptimizer {
+    /// Whether this is the variational EM.
     pub fn is_variational(self) -> bool {
         matches!(self, Self::VariationalEm(_))
     }
+    /// Whether this is the sequential quadratic solver.
     pub fn is_sqp(self) -> bool {
         matches!(self, Self::SequentialQuadratic)
     }

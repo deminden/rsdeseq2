@@ -23,7 +23,9 @@ enum Uniform {
 /// Portable uniform families available with Inversion normal starts.
 #[derive(Clone, Copy, Debug)]
 pub enum PosteriorUniformKind {
+    /// R's `"Mersenne-Twister"`.
     MersenneTwister,
+    /// R's `"L'Ecuyer-CMRG"`.
     LecuyerCmrg,
 }
 /// Serializable native RNG for the supported R Inversion-normal states.
@@ -178,6 +180,7 @@ impl PosteriorRng {
         let seed = (mix ^ mix.rotate_left(29)) as i32;
         Self::from_seed(if seed == i32::MIN { 0 } else { seed }).unwrap()
     }
+    /// The state as R's `.Random.seed`.
     pub fn r_seed(&self) -> Vec<i32> {
         let mut out = vec![self.header];
         match &self.uniform {
@@ -189,9 +192,11 @@ impl PosteriorRng {
         }
         out
     }
+    /// Whether any number has been drawn.
     pub fn has_drawn(&self) -> bool {
         self.draws != 0
     }
+    /// Next uniform on (0, 1), as R's `unif_rand()`.
     pub fn uniform(&mut self) -> f64 {
         self.draws = self.draws.saturating_add(1);
         match &mut self.uniform {
@@ -242,6 +247,7 @@ impl PosteriorRng {
         let q = normal_upper_quantile(tail);
         (if p < 0.5 { -q } else { q }) * 0.5
     }
+    /// A random start vector of `coefficients` coordinates.
     pub fn start_vector(&mut self, coefficients: usize) -> Vec<f64> {
         (0..coefficients).map(|_| self.start_coordinate()).collect()
     }

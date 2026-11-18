@@ -11,8 +11,11 @@ use crate::Error;
 /// fitted alpha/t model can still answer the wrapper's original normal queries.
 #[derive(Clone, Debug)]
 pub struct LocationCdfOptions {
+    /// Observation likelihood.
     pub likelihood: LocationLikelihood,
+    /// ashr's `alpha`.
     pub alpha: f64,
+    /// CDF cutoffs.
     pub thresholds: Vec<f64>,
 }
 impl Default for LocationCdfOptions {

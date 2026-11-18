@@ -1,3 +1,5 @@
+//! Criterion benchmarks of whole pipelines on a synthetic 2,048 x 16 fixture.
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use rsdeseq2::prelude::*;
 use std::hint::black_box;

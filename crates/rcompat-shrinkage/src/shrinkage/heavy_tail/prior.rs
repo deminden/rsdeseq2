@@ -8,7 +8,9 @@ use crate::Error;
 pub struct CauchyCoefficientPrior {
     /// Zero-based coefficient indices with Gaussian rather than Cauchy priors.
     pub nuisance: Vec<usize>,
+    /// Scale of the Cauchy prior on the shrunken coefficients.
     pub scale: f64,
+    /// Standard deviation of the Gaussian nuisance priors.
     pub nuisance_scale: f64,
     /// Empirical variance, when adapted from coefficient MLEs and SEs.
     pub adapted_variance: Option<f64>,

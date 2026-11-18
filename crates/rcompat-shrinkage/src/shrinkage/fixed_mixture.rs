@@ -9,15 +9,21 @@ use crate::Error;
 /// Uniform components may explicitly select a Student-t likelihood.
 #[derive(Clone, Debug)]
 pub enum FixedMixture {
+    /// Normal components.
     Normal(NormalMixture),
+    /// Uniform components.
     Uniform(UniformMixture),
+    /// Truncated-normal components.
     TruncatedNormal(TruncatedNormalMixture),
 }
 /// A conditioned fixed mixture, retaining its component-specific tail semantics.
 #[derive(Clone, Debug)]
 pub enum FixedMixturePosterior {
+    /// Posterior of a normal mixture.
     Normal(NormalMixturePosterior),
+    /// Posterior of a uniform mixture.
     Uniform(UniformMixturePosterior),
+    /// Posterior of a truncated-normal mixture.
     TruncatedNormal(TruncatedNormalMixturePosterior),
 }
 impl FixedMixture {

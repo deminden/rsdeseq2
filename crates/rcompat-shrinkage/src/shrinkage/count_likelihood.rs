@@ -6,13 +6,19 @@ use super::{beta_normalization::log_regularized_beta, gamma_probability};
 use crate::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Link of a Poisson likelihood's rate.
 pub enum PoissonLink {
+    /// Rate = scale × effect.
     Identity,
+    /// Rate = scale × exp(effect).
     Log,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Link of a binomial likelihood's probability.
 pub enum BinomialLink {
+    /// Probability = effect.
     Identity,
+    /// Probability = logistic(effect).
     Logit,
 }
 #[derive(Clone, Debug)]

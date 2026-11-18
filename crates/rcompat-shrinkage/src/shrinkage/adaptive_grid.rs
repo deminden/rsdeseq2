@@ -14,41 +14,60 @@ use crate::{
 /// Component grid families accepted by the normal-likelihood shrinkage engine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MixtureFamily {
+    /// Zero-mean (or mode-centred) normal components (`mixcompdist = "normal"`).
     Normal,
+    /// Symmetric uniform components (`"uniform"`).
     Uniform,
+    /// Uniform components on either side of the mode (`"halfuniform"`).
     HalfUniform,
+    /// Uniform components above the mode (`"+uniform"`).
     PositiveUniform,
+    /// Uniform components below the mode (`"-uniform"`).
     NegativeUniform,
+    /// Truncated-normal components on either side of the mode (`"halfnormal"`).
     HalfNormal,
 }
 /// Dirichlet specification for a generated grid. Parameters below one require
 /// a variational method and are outside this convex weight-fitting operation.
 #[derive(Clone, Debug)]
 pub enum MixturePriorPenalty {
+    /// No penalty (all Dirichlet parameters one).
     Uniform,
     /// Dirichlet 1/K parameters for variational inference.
     Unit,
+    /// ashr's `nullbiased` prior: the given weight on the null component.
     NullBiased(f64),
+    /// Explicit Dirichlet parameters, one per component.
     Parameters(Vec<f64>),
 }
 /// Original ashr method shorthand, distinct from individual grid controls.
 #[derive(Clone, Copy, Debug)]
 pub enum AdaptiveMethod {
+    /// `method = "fdr"`: point mass at the mode, null-biased prior.
     Fdr,
+    /// `method = "shrink"`: no point mass, uniform prior.
     Shrink,
 }
 /// Preparation controls. Observation-scale transformations belong to the caller.
 #[derive(Clone, Debug)]
 pub struct MixtureGridOptions {
+    /// Component family.
     pub family: MixtureFamily,
+    /// Supplied component scales; `None` chooses the automatic geometric grid.
     pub scales: Option<Vec<f64>>,
+    /// Include a point mass at the mode.
     pub point_mass: bool,
+    /// Ratio between successive automatic scales (ashr's `gridmult`).
     pub grid_multiplier: f64,
+    /// Centre of the components.
     pub mode: f64,
+    /// Support limits for uniform components.
     pub range: (f64, f64),
+    /// Dirichlet penalty on the mixture weights.
     pub penalty: MixturePriorPenalty,
     /// Source EM initialization, before asymmetric component expansion.
     pub concentrated_initialization: bool,
+    /// Whether the penalty is for variational Bayes fitting.
     pub variational_prior: bool,
 }
 impl Default for MixtureGridOptions {
@@ -69,27 +88,42 @@ impl Default for MixtureGridOptions {
 /// Component parameters retain their generated order for result metadata.
 #[derive(Clone, Debug)]
 pub enum MixtureComponents {
+    /// Normal components.
     Normal {
+        /// Component means.
         means: Vec<f64>,
+        /// Component standard deviations.
         sds: Vec<f64>,
     },
+    /// Uniform components.
     Uniform {
+        /// Lower bounds.
         lower: Vec<f64>,
+        /// Upper bounds.
         upper: Vec<f64>,
     },
+    /// Truncated-normal components.
     TruncatedNormal {
+        /// Means of the untruncated normals.
         means: Vec<f64>,
+        /// Standard deviations of the untruncated normals.
         sds: Vec<f64>,
+        /// Lower truncation points.
         lower: Vec<f64>,
+        /// Upper truncation points.
         upper: Vec<f64>,
     },
 }
 /// Prepared grid, initial probabilities, penalty and explicit warning messages.
 #[derive(Clone, Debug)]
 pub struct MixtureGrid {
+    /// The components in generated order.
     pub components: MixtureComponents,
+    /// Initial mixture weights.
     pub initial_weights: Vec<f64>,
+    /// Dirichlet penalty parameters.
     pub dirichlet: Vec<f64>,
+    /// Warnings to show the user.
     pub warnings: Vec<String>,
 }
 
@@ -369,6 +403,7 @@ impl MixtureGrid {
     ) -> Result<Self, Error> {
         Self::from_supplied_with_policy(components, weights, penalty, false)
     }
+    /// Like [`Self::from_supplied`], for variational Bayes fitting.
     pub fn from_supplied_variational(
         components: MixtureComponents,
         weights: Vec<f64>,

@@ -4,24 +4,36 @@ use super::ERROR_SCOPE;
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Polynomial extrapolation scheme of higher-order SQUAREM.
 pub enum PolynomialExtrapolation {
     #[default]
+    /// Reduced-rank extrapolation.
     ReducedRank,
+    /// Minimal-polynomial extrapolation.
     MinimalPolynomial,
 }
 #[derive(Clone, Copy, Debug)]
+/// SQUAREM acceleration controls (as in the R `SQUAREM` package).
 pub struct SquaremOptions {
     /// None selects min(1e-7, 0.1/n), the source observation-count rule.
     pub tolerance: Option<f64>,
+    /// Maximum fixed-point evaluations.
     pub max_evaluations: usize,
+    /// Step-length scheme (1, 2 or 3).
     pub method: u8,
+    /// Smallest extrapolation step.
     pub minimum_step: f64,
+    /// Largest initial extrapolation step.
     pub maximum_step: f64,
+    /// Factor by which the maximum step grows.
     pub step_multiplier: f64,
+    /// Allowed objective increase before falling back to a plain EM step.
     pub objective_increase: f64,
     /// Retained for source control transport; both K=1 policies ignore it.
     pub square: bool,
+    /// Extrapolation order.
     pub polynomial_order: usize,
+    /// Higher-order extrapolation scheme.
     pub polynomial_method: PolynomialExtrapolation,
 }
 impl Default for SquaremOptions {

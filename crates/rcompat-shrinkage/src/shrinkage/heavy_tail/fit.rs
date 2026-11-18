@@ -15,10 +15,13 @@ use crate::{
 /// MLE scale supplied for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
 pub enum CoefficientScale {
+    /// Natural-log units.
     Natural,
+    /// Log2 units (DESeq2's fold changes).
     Log2,
 }
 impl CoefficientScale {
+    /// Convert a value on this scale to natural-log units.
     pub fn to_natural(self, value: f64) -> f64 {
         match self {
             Self::Natural => value,
@@ -29,43 +32,66 @@ impl CoefficientScale {
 /// Coefficient estimates and SEs for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
 pub struct CoefficientMle<'a> {
+    /// MLE estimates, one per row.
     pub estimates: &'a [f64],
+    /// Their standard errors.
     pub standard_errors: &'a [f64],
+    /// The scale of both.
     pub scale: CoefficientScale,
 }
 /// Log offsets or normalization values; scale conversion stays in the core.
 #[derive(Clone, Copy, Debug, Default)]
 pub enum PosteriorOffsets<'a> {
     #[default]
+    /// No offsets.
     None,
+    /// Row-by-sample offsets on the natural-log scale.
     Log(MatrixView<'a, f64>),
+    /// Row-by-sample normalization factors (log taken internally).
     Factors(MatrixView<'a, f64>),
+    /// Per-sample size factors.
     SizeFactors(&'a [f64]),
 }
 /// Borrowed primitive data for a negative-binomial posterior batch.
 #[derive(Clone, Copy, Debug)]
 pub struct NegativeBinomialPosteriorInput<'a> {
+    /// Row-by-sample counts.
     pub counts: MatrixView<'a, f64>,
+    /// Sample-by-coefficient design matrix.
     pub design: MatrixView<'a, f64>,
+    /// One negative-binomial dispersion per row.
     pub dispersions: &'a [f64],
+    /// Offsets of the linear predictor.
     pub offsets: PosteriorOffsets<'a>,
+    /// Optional row-by-sample observation weights.
     pub weights: Option<MatrixView<'a, f64>>,
+    /// MLE estimates used to adapt the prior scale, as `apeglm` does with `mle`.
     pub mle: Option<CoefficientMle<'a>>,
 }
 #[derive(Clone, Debug)]
+/// Options of an `apeglm`-style negative-binomial posterior fit.
 pub struct NegativeBinomialPosteriorOptions {
+    /// The Cauchy coefficient prior (scale adapted when `mle` is supplied).
     pub prior: CauchyCoefficientPrior,
+    /// Coefficient whose sign and threshold probabilities are reported.
     pub coefficient: Option<usize>,
     /// Positive magnitude in natural log units; None omits FSOS calculations.
     pub threshold: Option<f64>,
+    /// Flip the sign convention of the reported coefficient, as `apeglm` does.
     pub flip_sign: bool,
+    /// Multiplier applied to the reported coefficient.
     pub multiplier: f64,
+    /// Return MAP modes only, without Laplace standard deviations.
     pub map_only: bool,
+    /// Restart from the opposite sign and flag rows whose modes disagree.
     pub check_opposite_start: bool,
     /// Compiled CR zero-row policy; MAP-only methods ignore this flag.
     pub log_link: bool,
+    /// Refinement of the MAP by the compiled (Newton-type) step.
     pub refinement: super::compiled_refinement::NegativeBinomialRefinement,
+    /// Finite-difference step for the numerical Hessian.
     pub hessian_step: f64,
+    /// Which posterior summaries to compute.
     pub analysis: super::analysis::PosteriorAnalysisOptions,
 }
 impl Default for NegativeBinomialPosteriorOptions {
@@ -88,36 +114,53 @@ impl Default for NegativeBinomialPosteriorOptions {
 /// Per-row native convergence, separate from posterior-validity decisions.
 #[derive(Clone, Debug)]
 pub struct PosteriorMapDiagnostic {
+    /// Optimizer convergence code (0 = converged), when the row was fitted.
     pub convergence: Option<i32>,
+    /// Objective evaluations.
     pub function_evaluations: usize,
+    /// Whether the opposite-sign restart reached a different mode.
     pub opposite_start_disagrees: bool,
+    /// Whether the Laplace approximation at the mode is valid.
     pub laplace_valid: bool,
 }
 #[derive(Clone, Debug)]
+/// Output of a negative-binomial posterior batch.
 pub struct NegativeBinomialPosterior {
     /// Coefficient owning probability summaries; only the fitter sets this identity.
     summary_coefficient: Option<usize>,
     /// Row-major modes and SDs in natural log coefficient units.
     pub mode: RowMajorMatrix<f64>,
+    /// Row-major Laplace posterior standard deviations (absent for MAP-only fits).
     pub standard_deviation: Option<RowMajorMatrix<f64>>,
+    /// Per-row false sign rate of the reported coefficient.
     pub false_sign_rate: Option<Vec<Option<f64>>>,
+    /// s-values from the false sign rates.
     pub sign_svalues: Option<Vec<Option<f64>>>,
+    /// Per-row false-sign-or-small rate against the threshold.
     pub false_sign_or_small_rate: Option<Vec<Option<f64>>>,
+    /// s-values from the false-sign-or-small rates.
     pub threshold_svalues: Option<Vec<Option<f64>>>,
+    /// The prior actually used.
     pub prior: CauchyCoefficientPrior,
+    /// Per-row optimizer diagnostics.
     pub diagnostics: Vec<PosteriorMapDiagnostic>,
     /// Native fitting warnings in batch/phase order, for frontend presentation.
     pub warnings: Vec<String>,
     /// Advanced random-start state, absent on deterministic fitting routes.
     pub random_state: Option<Vec<i32>>,
+    /// Additional posterior summaries.
     pub analysis: super::analysis::PosteriorAnalysis,
 }
 /// Numerical columns for frontend presentation, with no frontend arithmetic.
 #[derive(Clone, Debug)]
 pub struct PosteriorCoefficientSummary {
+    /// Posterior modes.
     pub mode: Vec<f64>,
+    /// Posterior standard deviations.
     pub standard_deviation: Vec<Option<f64>>,
+    /// Sign s-values.
     pub sign_svalues: Option<Vec<Option<f64>>>,
+    /// Threshold s-values.
     pub threshold_svalues: Option<Vec<Option<f64>>>,
 }
 impl NegativeBinomialPosterior {
@@ -176,6 +219,7 @@ impl NegativeBinomialPosterior {
 
     // Invariant: `coefficient` is checked against the mode shape above.
     #[allow(clippy::unwrap_used, clippy::expect_used)]
+    /// Mode, SD and s-value columns of one coefficient.
     pub fn coefficient_summary(
         &self,
         coefficient: usize,
@@ -248,6 +292,8 @@ fn refine(
     super::compiled_refinement::optimize(row, start, &options.refinement)
 }
 
+/// Fit `apeglm`-style negative-binomial posteriors (MAP with a Cauchy
+/// prior, Laplace standard deviations, false sign rates) for a batch of rows.
 pub fn fit_negative_binomial_posterior(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,

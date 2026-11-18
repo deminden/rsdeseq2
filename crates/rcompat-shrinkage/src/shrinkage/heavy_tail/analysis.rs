@@ -3,19 +3,30 @@ use super::{grid, prior::ERROR_SCOPE, regression::RegressionLikelihood};
 use crate::errors::scoped_invalid_options;
 use crate::{Error, matrix::RowMajorMatrix, probability::normal_upper_quantile};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// How credible intervals are computed.
 pub enum PosteriorIntervalKind {
     #[default]
+    /// From the Laplace (normal) approximation.
     Laplace,
+    /// Highest-density interval on a posterior grid.
     HighestDensity,
+    /// Equal-tailed interval on a posterior grid.
     EqualTail,
 }
 #[derive(Clone, Debug)]
+/// Credible-interval controls.
 pub struct PosteriorIntervalOptions {
+    /// Interval type.
     pub kind: PosteriorIntervalKind,
+    /// Credible level, for example 0.95.
     pub level: f64,
+    /// Grid cells per side for grid intervals.
     pub grid_intervals: usize,
+    /// Grid half-width in posterior standard deviations.
     pub grid_standard_deviations: f64,
+    /// Integration points per nuisance coefficient.
     pub nuisance_points: usize,
+    /// Nuisance integration half-width in standard deviations.
     pub nuisance_standard_deviations: f64,
 }
 impl Default for PosteriorIntervalOptions {
@@ -31,9 +42,11 @@ impl Default for PosteriorIntervalOptions {
     }
 }
 #[derive(Clone, Debug, Default)]
+/// Optional posterior summaries.
 pub struct PosteriorAnalysisOptions {
     /// Batch-wide resource controls; numerical grid policy is unchanged.
     pub work: super::work::PosteriorWorkControl,
+    /// Credible intervals, if wanted.
     pub interval: Option<PosteriorIntervalOptions>,
     /// Coefficients by contrasts, in natural coefficient units.
     pub contrasts: Option<RowMajorMatrix<f64>>,
@@ -43,18 +56,27 @@ pub struct PosteriorAnalysisOptions {
     pub grid_likelihood: Option<RegressionLikelihood>,
 }
 #[derive(Clone, Debug)]
+/// Diagnostics of one row's posterior grid.
 pub struct PosteriorGridDiagnostic {
+    /// Whether the grid density decreases away from the mode.
     pub monotone: bool,
+    /// Probability mass estimated beyond the left end.
     pub outside_left: Option<f64>,
+    /// Probability mass estimated beyond the right end.
     pub outside_right: Option<f64>,
+    /// Likelihood evaluations.
     pub evaluations: usize,
 }
 #[derive(Clone, Debug)]
+/// Optional posterior summaries.
 pub struct PosteriorAnalysis {
     /// Lower and upper bounds, in natural coefficient units.
     pub intervals: Option<RowMajorMatrix<f64>>,
+    /// Posterior modes of the requested contrasts.
     pub contrast_mode: Option<RowMajorMatrix<f64>>,
+    /// Their Laplace standard deviations.
     pub contrast_standard_deviation: Option<RowMajorMatrix<f64>>,
+    /// Per-row grid diagnostics, when a grid was used.
     pub grid_diagnostics: Vec<Option<PosteriorGridDiagnostic>>,
 }
 impl PosteriorAnalysisOptions {

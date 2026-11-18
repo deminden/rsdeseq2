@@ -10,8 +10,11 @@ use std::sync::Arc;
 /// Location-scale observation likelihood, independent of the calling frontend.
 #[derive(Clone, Debug)]
 pub enum LocationLikelihood {
+    /// Normal errors (ashr's default).
     Normal,
+    /// Student's t errors with the given degrees of freedom.
     StudentT(f64),
+    /// One of ashr's built-in likelihoods.
     Builtin(super::BuiltinLocationLikelihood),
     /// Validated elementwise expressions and captured scalar primitives.
     Restricted(Arc<RestrictedLikelihood>),

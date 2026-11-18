@@ -14,13 +14,21 @@ use crate::Error;
 /// configuration; it is distinct from the original ashr function's defaults.
 #[derive(Clone, Debug)]
 pub struct LocationShrinkageOptions {
+    /// Prior grid controls.
     pub grid: MixtureGridOptions,
+    /// A supplied prior (ashr's `g`), used instead of generating a grid.
     pub supplied_grid: Option<MixtureGrid>,
+    /// Keep the supplied prior's weights (ashr's `fixg`).
     pub fixed_prior: bool,
+    /// Observation likelihood.
     pub likelihood: LocationLikelihood,
+    /// ashr's `alpha`: the effects are scaled by SE^alpha.
     pub alpha: f64,
+    /// Components with fitted weight below this are pruned from the reported prior.
     pub prune_threshold: f64,
+    /// Per-observation weights in the prior fit.
     pub observation_weights: Option<Vec<f64>>,
+    /// Mixture-weight optimizer controls.
     pub fit_options: MixtureFitOptions,
     /// Raw posterior CDF cutoffs, evaluated with the unpruned fitted prior.
     pub thresholds: Vec<f64>,
@@ -55,20 +63,33 @@ impl Default for LocationShrinkageOptions {
 /// retain their floating-point missing values rather than being rounded in R.
 #[derive(Clone, Debug)]
 pub struct LocationShrinkage {
+    /// The fitted prior grid.
     pub fitted_grid: MixtureGrid,
+    /// Its fitted weights.
     pub fitted_weights: Vec<f64>,
+    /// Optimizer output (absent for a fixed prior).
     pub fit: Option<MixtureFit>,
+    /// Posterior means.
     pub posterior_mean: Vec<f64>,
+    /// Posterior standard deviations.
     pub posterior_sd: Vec<f64>,
+    /// Posterior probabilities of a negative effect.
     pub negative_probability: Vec<f64>,
+    /// Posterior probabilities of a positive effect.
     pub positive_probability: Vec<f64>,
+    /// Local false discovery rates.
     pub local_false_discovery_rate: Vec<f64>,
+    /// Local false sign rates.
     pub local_false_sign_rate: Vec<f64>,
+    /// s-values.
     pub svalues: Vec<f64>,
+    /// q-values.
     pub qvalues: Vec<f64>,
     /// Observation-major raw posterior CDF values, in requested cutoff order.
     pub cdf: Vec<f64>,
+    /// Log likelihood of the fitted prior.
     pub log_likelihood: f64,
+    /// Warnings to show the user.
     pub warnings: Vec<String>,
 }
 

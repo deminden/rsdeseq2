@@ -1,3 +1,6 @@
+//! Compare rsdeseq2 MAP dispersions with an R fixture directory
+//! (default: `results/fixtures/se_covariance_hard_real_2026-06-05`).
+
 use std::collections::HashMap;
 use std::env;
 use std::fs;
