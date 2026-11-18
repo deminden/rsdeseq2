@@ -1,4 +1,5 @@
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "uniform-mixture posterior";
 use super::LocationLikelihood;
 use crate::math::elementary::language_exp;
@@ -74,7 +75,7 @@ impl UniformMixture {
         Ok(Self {
             likelihood: LocationLikelihood::Normal,
             cdf_reversed: None,
-            log_weights: weights.into_iter().map(f64::ln).collect(),
+            log_weights: weights.into_iter().map(f64::ln_p).collect(),
             lower,
             upper,
         })
@@ -180,7 +181,7 @@ impl UniformMixture {
                 if a == b {
                     let q = (estimate - a) / standard_error;
                     let density = likelihood.log_density(q);
-                    return density - standard_error.ln();
+                    return density - standard_error.ln_p();
                 }
                 let left = likelihood.log_cdf((estimate - a) / standard_error);
                 let right = likelihood.log_cdf((estimate - b) / standard_error);
@@ -190,7 +191,7 @@ impl UniformMixture {
                     (left, right)
                 };
                 // Preserve the established orientation and ordinary subtraction semantics.
-                left + (1.0 - language_exp(right - left)).ln() - (b - a).ln()
+                left + (1.0 - language_exp(right - left)).ln_p() - (b - a).ln_p()
             })
             .collect())
     }

@@ -1,4 +1,5 @@
 use super::{column_sum, invalid_options, polynomial_qr, scalar_mean};
+use crate::numeric::math::ProfileMath;
 use crate::{errors::DeseqError, matrix::RowMajorMatrix};
 
 /// Recurrence metadata for evaluating the same polynomial basis on new values.
@@ -176,7 +177,7 @@ fn power(x: f64, exponent: usize) -> f64 {
         0 => 1.0,
         1 => x,
         2 => x * x,
-        _ => x.powf(exponent as f64),
+        _ => x.powf_p(exponent as f64),
     }
 }
 fn finish(

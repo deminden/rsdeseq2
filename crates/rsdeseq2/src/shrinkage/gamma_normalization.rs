@@ -4,6 +4,7 @@
 //! This standalone Rust implementation is used only by posterior components;
 //! it neither calls R nor changes the existing GLM probability kernels.
 #![allow(clippy::excessive_precision)]
+use crate::numeric::math::ProfileMath;
 const COEFFICIENTS: [f64; 22] = [
     0.00857119559098933,
     0.004415381324841007,
@@ -69,5 +70,5 @@ pub(super) fn gamma_positive(x: f64) -> f64 {
                             + square
                                 * (-1.0 / 1680.0
                                     + square * (1.0 / 1188.0 - square * (691.0 / 360360.0))))));
-    ((x - 0.5).mul_add(x.ln(), -x) + 0.9189385332046728 + correction).exp()
+    ((x - 0.5).mul_add(x.ln_p(), -x) + 0.9189385332046728 + correction).exp_p()
 }

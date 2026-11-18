@@ -1,4 +1,5 @@
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 pub(super) const ERROR_SCOPE: &str = "mixture prior fit";
 use crate::{DeseqError, errors::invalid_dimensions, matrix::MatrixView};
 use nalgebra::{DMatrix, DVector};
@@ -129,7 +130,7 @@ impl Problem {
                 // the final accepted point is validated separately.
                 return (1e100, vec![-1e100; self.components]);
             }
-            objective -= (a / self.mass) * marginal.ln();
+            objective -= (a / self.mass) * marginal.ln_p();
             for (gradient, &likelihood) in gradient.iter_mut().zip(row) {
                 *gradient -= if ashr {
                     ((a / self.mass) / marginal) * likelihood
@@ -140,7 +141,7 @@ impl Problem {
         }
         for ((&count, &w), gradient) in self.prior_counts.iter().zip(weights).zip(&mut gradient) {
             if count != 0.0 {
-                objective -= (count / self.mass) * (w + self.offset).ln();
+                objective -= (count / self.mass) * (w + self.offset).ln_p();
                 if !ashr {
                     *gradient -= (count / self.mass) / (w + self.offset);
                 }
@@ -161,7 +162,7 @@ impl Problem {
             .filter(|((_, a), _)| **a > 0.0)
             .map(|((row, a), max)| {
                 let marginal = row.iter().zip(weights).map(|(l, w)| l * w).sum::<f64>();
-                a * (max + marginal.ln())
+                a * (max + marginal.ln_p())
             })
             .sum()
     }
@@ -281,10 +282,13 @@ pub fn fit_mixture_proportions(
             ));
         }
         row_maxima.push(if weight == 0.0 { 0.0 } else { max });
-        likelihoods.extend(
-            row.into_iter()
-                .map(|l| if weight == 0.0 { 0.0 } else { (l - max).exp() }),
-        );
+        likelihoods.extend(row.into_iter().map(|l| {
+            if weight == 0.0 {
+                0.0
+            } else {
+                (l - max).exp_p()
+            }
+        }));
     }
     let mut start = if let Some(initial) = initial_weights {
         if initial.len() != k {
@@ -378,7 +382,7 @@ pub fn fit_mixture_proportions(
             .iter()
             .zip(&weights)
             .filter(|(count, _)| **count > 0.0)
-            .map(|(count, w)| count * w.ln())
+            .map(|(count, w)| count * w.ln_p())
             .sum::<f64>();
     if !objective.is_finite()
         || !log_likelihood.is_finite()

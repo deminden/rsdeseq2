@@ -2,6 +2,7 @@
 use super::beta_normalization::{beta_positive as beta, regularized_beta};
 #[cfg(test)]
 use super::gamma_normalization::gamma_positive;
+use crate::numeric::math::ProfileMath;
 use crate::probability::student_t_upper_tail;
 
 pub(super) fn cdf(q: f64, df: f64) -> f64 {
@@ -24,9 +25,9 @@ fn log_series_normalization(a: f64) -> f64 {
     let normalizer = if a + b < 170.0 {
         (1.0 / libm::tgamma(a + b)) * libm::tgamma(a) * libm::tgamma(b)
     } else {
-        statrs::function::beta::beta(a, b)
+        crate::numeric::special::beta(a, b)
     };
-    (1.0 / (a * normalizer)).ln()
+    (1.0 / (a * normalizer)).ln_p()
 }
 pub(super) fn log_cdf(q: f64, df: f64) -> f64 {
     if q == 0.0 {
@@ -48,26 +49,26 @@ pub(super) fn log_cdf(q: f64, df: f64) -> f64 {
                 break;
             }
         }
-        a * x.ln() + log_series_normalization(a) + (a * remainder).ln_1p()
+        a * x.ln_p() + log_series_normalization(a) + (a * remainder).ln_1p_p()
     } else {
-        (2.0 * cdf(-q.abs(), df)).ln()
+        (2.0 * cdf(-q.abs(), df)).ln_p()
     };
     if q < 0.0 {
         log_beta_probability - std::f64::consts::LN_2
     } else {
-        (-0.5 * log_beta_probability.exp()).ln_1p()
+        (-0.5 * log_beta_probability.exp_p()).ln_1p_p()
     }
 }
 pub(super) fn log_density(q: f64, df: f64) -> f64 {
     let ratio = q * q / df;
     let log_ratio = if ratio.is_finite() {
-        ratio.ln_1p()
+        ratio.ln_1p_p()
     } else {
-        2.0 * q.abs().ln() - df.ln()
+        2.0 * q.abs().ln_p() - df.ln_p()
     };
     libm::lgamma((df + 1.0) / 2.0)
         - libm::lgamma(df / 2.0)
-        - 0.5 * (df.ln() + std::f64::consts::PI.ln())
+        - 0.5 * (df.ln_p() + std::f64::consts::PI.ln_p())
         - ((df + 1.0) / 2.0) * log_ratio
 }
 fn integral(q: f64, df: f64, order: i32) -> f64 {
@@ -86,7 +87,7 @@ fn integral(q: f64, df: f64, order: i32) -> f64 {
     }
 }
 fn one_sided_moment(q: f64, df: f64, order: i32) -> f64 {
-    (df.powf(0.5 * f64::from(order)) * integral(q, df, order)) / integral(q, df, 0)
+    (df.powf_p(0.5 * f64::from(order)) * integral(q, df, order)) / integral(q, df, 0)
 }
 pub(super) fn truncated_moment(mut a: f64, mut b: f64, df: f64, order: i32) -> f64 {
     let reflect = a > 0.0 && b > 0.0;

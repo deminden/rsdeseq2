@@ -4,6 +4,7 @@ use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::Offsets;
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 
 // Fast-VST row selection and aligned subsets.
 mod frozen;
@@ -145,7 +146,7 @@ fn vst_local_with_integral(
             reason: "local VST integral must increase across scaling quantiles".to_string(),
         });
     }
-    let log_delta = checked::try_sub(h2.log2(), h1.log2())
+    let log_delta = checked::try_sub(h2.log2_p(), h1.log2_p())
         .nonfinite_at("local VST scaling log delta", Some(0))?;
     let integral_delta = checked::try_sub(int_h2, int_h1)
         .nonfinite_at("local VST scaling integral delta", Some(0))?;
@@ -153,8 +154,8 @@ fn vst_local_with_integral(
         .nonfinite_at("local VST scaling eta", Some(0))?;
     let eta_integral =
         checked::try_mul(eta, int_h1).nonfinite_at("local VST scaling eta integral", Some(0))?;
-    let xi =
-        checked::try_sub(h1.log2(), eta_integral).nonfinite_at("local VST scaling xi", Some(0))?;
+    let xi = checked::try_sub(h1.log2_p(), eta_integral)
+        .nonfinite_at("local VST scaling xi", Some(0))?;
     let values = normalized_counts
         .as_slice()
         .iter()
@@ -221,7 +222,7 @@ fn local_vst_inverse_size_factor_mean_from_normalization_factors_impl(
             }
             checked_add_assign(
                 &mut log_col_sums[sample],
-                factor.ln(),
+                factor.ln_p(),
                 row * normalization_factors.n_cols() + sample,
                 "local VST normalization-factor log column sum",
             )?;
@@ -234,7 +235,7 @@ fn local_vst_inverse_size_factor_mean_from_normalization_factors_impl(
             "local VST normalization-factor log column mean",
             Some(sample),
         )?;
-        let column_geometric_mean = log_mean.exp();
+        let column_geometric_mean = log_mean.exp_p();
         if !column_geometric_mean.is_finite() || column_geometric_mean <= 0.0 {
             return Err(DeseqError::NonFiniteValue {
                 context: "local VST normalization-factor geometric mean".to_string(),
@@ -343,18 +344,18 @@ pub fn vst_mean_value(
         .nonfinite_at("mean VST dispersion count", Some(index))
     {
         Ok(value) => value,
-        Err(_) => return Ok(normalized_count.log2()),
+        Err(_) => return Ok(normalized_count.log2_p()),
     };
     if dispersion_count.is_infinite() {
-        return Ok(normalized_count.log2());
+        return Ok(normalized_count.log2_p());
     }
     let transformed_numerator = checked::try_sub(
         checked::try_mul(2.0, dispersion_count.sqrt().asinh())
             .nonfinite_at("mean VST numerator", Some(index))?,
-        mean_dispersion.ln(),
+        mean_dispersion.ln_p(),
     )
     .nonfinite_at("mean VST numerator", Some(index))?;
-    let transformed_numerator = checked::try_sub(transformed_numerator, 4.0_f64.ln())
+    let transformed_numerator = checked::try_sub(transformed_numerator, 4.0_f64.ln_p())
         .nonfinite_at("mean VST numerator", Some(index))?;
     finite_value(
         checked::try_div_finite_result(transformed_numerator, std::f64::consts::LN_2)
@@ -378,10 +379,10 @@ pub fn vst_parametric_value(
         .nonfinite_at("parametric VST alpha count", Some(index))
     {
         Ok(value) => value,
-        Err(_) => return Ok(normalized_count.log2()),
+        Err(_) => return Ok(normalized_count.log2_p()),
     };
     if alpha_count.is_infinite() {
-        return Ok(normalized_count.log2());
+        return Ok(normalized_count.log2_p());
     }
     let root_term = checked::try_add(1.0, extra)
         .nonfinite_at("parametric VST root term", Some(index))
@@ -392,11 +393,11 @@ pub fn vst_parametric_value(
     let numerator_root = checked::try_add(alpha_count.sqrt(), root_term.sqrt())
         .nonfinite_at("parametric VST numerator root", Some(index))?;
     let numerator = checked::try_sub(
-        checked::try_mul(2.0, numerator_root.ln())
+        checked::try_mul(2.0, numerator_root.ln_p())
             .nonfinite_at("parametric VST numerator", Some(index))?,
         checked::try_mul(4.0, alpha)
             .nonfinite_at("parametric VST denominator", Some(index))?
-            .ln(),
+            .ln_p(),
     )
     .nonfinite_at("parametric VST numerator", Some(index))?;
     finite_value(

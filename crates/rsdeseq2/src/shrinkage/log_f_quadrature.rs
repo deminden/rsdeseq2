@@ -1,6 +1,7 @@
 //! Fifteen-point Gauss-Kronrod integration of infinite log-F moment intervals.
 //! Nodes/weights are mathematical quadrature constants; the QUADPACK reference
 //! is <https://www.netlib.org/quadpack/dqk15i.f> . No R routine is called or linked.
+use crate::numeric::math::ProfileMath;
 const NODES: [f64; 8] = [
     0.9914553711208126,
     0.9491079123427585,
@@ -68,7 +69,7 @@ fn panel(f: &impl Fn(f64) -> f64, a: f64, b: f64) -> Option<Panel> {
     absolute *= half;
     let mut error = ((k - g) * half).abs();
     if ascending != 0.0 && error != 0.0 {
-        error = ascending * (200.0 * error / ascending).powf(1.5).min(1.0);
+        error = ascending * (200.0 * error / ascending).powf_p(1.5).min(1.0);
     }
     error = error.max(50.0 * f64::EPSILON * absolute);
     Some(Panel { a, b, value, error })
@@ -120,7 +121,7 @@ mod tests {
             };
             assert!((p.value - truth).abs() < 5e-15);
         }
-        let value = integrate_infinite(|x| (-x).exp(), 0.0, f64::INFINITY).unwrap();
+        let value = integrate_infinite(|x| (-x).exp_p(), 0.0, f64::INFINITY).unwrap();
         assert!((value - 1.0).abs() < 1e-4);
         assert!(integrate_infinite(|_| f64::NAN, 0.0, f64::INFINITY).is_none());
     }

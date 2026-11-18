@@ -1,17 +1,18 @@
 //! Log-F probabilities and native truncated first moments.
 use super::{beta_normalization::log_regularized_beta, expression_quadrature::integrate};
+use crate::numeric::math::ProfileMath;
 fn softplus(x: f64) -> f64 {
     if x > 0.0 {
-        x + (-x).exp().ln_1p()
+        x + (-x).exp_p().ln_1p_p()
     } else {
-        x.exp().ln_1p()
+        x.exp_p().ln_1p_p()
     }
 }
 pub(super) fn log_cdf(x: f64, d1: f64, d2: f64) -> f64 {
     if x.is_nan() {
         return f64::NAN;
     }
-    let f = x.exp();
+    let f = x.exp_p();
     if f == 0.0 {
         return f64::NEG_INFINITY;
     }
@@ -33,13 +34,14 @@ pub(super) fn log_cdf(x: f64, d1: f64, d2: f64) -> f64 {
     if d1.is_infinite() {
         return super::gamma_probability::log_gamma_probability(d2 / 2.0, (d2 / 2.0) / f, false);
     }
-    let z = (d1 / d2).ln() + x;
+    let z = (d1 / d2).ln_p() + x;
     // Use the smaller logistic coordinate to retain representable complements.
     if z <= 0.0 {
-        log_regularized_beta(d1 / 2.0, d2 / 2.0, z.exp() / (1.0 + z.exp()))
+        log_regularized_beta(d1 / 2.0, d2 / 2.0, z.exp_p() / (1.0 + z.exp_p()))
     } else {
-        let log_tail = log_regularized_beta(d2 / 2.0, d1 / 2.0, (-z).exp() / (1.0 + (-z).exp()));
-        (-log_tail.exp()).ln_1p()
+        let log_tail =
+            log_regularized_beta(d2 / 2.0, d1 / 2.0, (-z).exp_p() / (1.0 + (-z).exp_p()));
+        (-log_tail.exp_p()).ln_1p_p()
     }
 }
 pub(super) fn log_density(x: f64, d1: f64, d2: f64) -> f64 {
@@ -49,7 +51,7 @@ pub(super) fn log_density(x: f64, d1: f64, d2: f64) -> f64 {
     if x == f64::INFINITY {
         return f64::NAN;
     }
-    let f = x.exp();
+    let f = x.exp_p();
     if d1.is_infinite() && d2.is_infinite() {
         return if f == 1.0 {
             f64::INFINITY
@@ -78,30 +80,30 @@ pub(super) fn log_density(x: f64, d1: f64, d2: f64) -> f64 {
         if a >= 1e5 {
             return super::large_shape::gamma_log_density(f, a, a) + x;
         }
-        return a * a.ln() - statrs::function::gamma::ln_gamma(a) + a * x - a * f;
+        return a * a.ln_p() - crate::numeric::special::ln_gamma(a) + a * x - a * f;
     }
     if d1.is_infinite() {
         let b = d2 / 2.0;
         if b >= 1e5 {
             return super::large_shape::gamma_log_density(1.0 / f, b, b) - x;
         }
-        return b * b.ln() - statrs::function::gamma::ln_gamma(b) - b * x - b / f;
+        return b * b.ln_p() - crate::numeric::special::ln_gamma(b) - b * x - b / f;
     }
     let a = d1 / 2.0;
     let b = d2 / 2.0;
-    let z = (d1 / d2).ln() + x;
+    let z = (d1 / d2).ln_p() + x;
     if super::large_shape::beta_large(a, b) {
         return super::large_shape::beta_logit_density(a, b, x);
     }
     if a.max(b) >= 1e5 {
         let numerator = if z > 0.0 {
-            -b * z - (a + b) * (-z).exp().ln_1p()
+            -b * z - (a + b) * (-z).exp_p().ln_1p_p()
         } else {
-            a * z - (a + b) * z.exp().ln_1p()
+            a * z - (a + b) * z.exp_p().ln_1p_p()
         };
         return numerator - super::large_shape::log_beta(a, b);
     }
-    a * z - (a + b) * softplus(z) - statrs::function::beta::ln_beta(a, b)
+    a * z - (a + b) * softplus(z) - crate::numeric::special::ln_beta(a, b)
 }
 pub(super) fn truncated_mean(a: f64, b: f64, d1: f64, d2: f64) -> f64 {
     if a == b {
@@ -112,34 +114,34 @@ pub(super) fn truncated_mean(a: f64, b: f64, d1: f64, d2: f64) -> f64 {
     }
     let cdf = |x: f64| {
         if d1.is_infinite() && !d2.is_infinite() {
-            super::gamma_probability::gamma_probability(d2 / 2.0, (d2 / 2.0) / x.exp(), false)
+            super::gamma_probability::gamma_probability(d2 / 2.0, (d2 / 2.0) / x.exp_p(), false)
         } else if d2.is_infinite() && !d1.is_infinite() {
-            super::gamma_probability::gamma_probability(d1 / 2.0, (d1 / 2.0) * x.exp(), true)
+            super::gamma_probability::gamma_probability(d1 / 2.0, (d1 / 2.0) * x.exp_p(), true)
         } else if d1.is_finite() && d2.is_finite() {
-            let numerator = d1 * x.exp();
+            let numerator = d1 * x.exp_p();
             if numerator > d2 {
-                let tail = log_regularized_beta(d2 / 2.0, d1 / 2.0, d2 / (d2 + numerator)).exp();
+                let tail = log_regularized_beta(d2 / 2.0, d1 / 2.0, d2 / (d2 + numerator)).exp_p();
                 // The ordinary beta complement uses two subtractions. Its
                 // rounding is observable when a moment subtracts nearby CDFs.
                 (0.5 - tail) + 0.5
             } else {
-                log_regularized_beta(d1 / 2.0, d2 / 2.0, numerator / (d2 + numerator)).exp()
+                log_regularized_beta(d1 / 2.0, d2 / 2.0, numerator / (d2 + numerator)).exp_p()
             }
         } else {
-            log_cdf(x, d1, d2).exp()
+            log_cdf(x, d1, d2).exp_p()
         }
     };
     let probability = cdf(b) - cdf(a);
     if probability > 0.0 {
         let density = |x: f64| {
-            let f = x.exp();
+            let f = x.exp_p();
             if f.is_infinite()
                 || (d1.is_infinite() && f > 0.0 && f * f == 0.0)
                 || (f == 0.0 && d1 < 2.0)
             {
                 f64::NAN
             } else {
-                log_density(x, d1, d2).exp()
+                log_density(x, d1, d2).exp_p()
             }
         };
         let integrand = |x: f64| x * (density(x) / probability);
@@ -158,8 +160,8 @@ pub(super) fn truncated_mean(a: f64, b: f64, d1: f64, d2: f64) -> f64 {
     // The source retries a scaled numerator/denominator before midpoint fallback.
     let scale = log_density(a, d1, d2).min(log_density(b, d1, d2));
     if scale.is_finite() {
-        let numerator = integrate(|x| x * (log_density(x, d1, d2) - scale).exp(), a, b);
-        let denominator = integrate(|x| (log_density(x, d1, d2) - scale).exp(), a, b);
+        let numerator = integrate(|x| x * (log_density(x, d1, d2) - scale).exp_p(), a, b);
+        let denominator = integrate(|x| (log_density(x, d1, d2) - scale).exp_p(), a, b);
         if let (Some(n), Some(d)) = (numerator, denominator)
             && d > 0.0
         {

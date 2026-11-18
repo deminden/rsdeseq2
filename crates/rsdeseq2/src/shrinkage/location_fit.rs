@@ -1,5 +1,6 @@
 //! Shared location preprocessing and likelihood-only mixture fitting.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "location shrinkage";
 use super::{
     LocationLikelihood, LocationShrinkageOptions, MixtureComponents, MixtureFit, MixtureGrid,
@@ -65,9 +66,9 @@ pub(super) fn fit_location(
                 "standard errors must be nonnegative",
             ));
         }
-        let factor = s.powf(options.alpha);
+        let factor = s.powf_p(options.alpha);
         let value = estimate / factor;
-        let error = s.powf(1.0 - options.alpha);
+        let error = s.powf_p(1.0 - options.alpha);
         if !value.is_nan() && !error.is_nan() && error != 0.0 && error != f64::INFINITY {
             if !value.is_finite() || !error.is_finite() {
                 return Err(scoped_invalid_options(

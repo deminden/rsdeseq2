@@ -30,8 +30,10 @@
 //! adding a public field to `DeseqFit` or the result types fails to compile here
 //! until the harness hashes it.
 //!
-//! The manifest is committed per numeric profile and target, because platform
-//! arithmetic is selected at compile time today (see docs/linux_numerical_parity.md).
+//! The `portable` profile has one manifest for every target, because its
+//! arithmetic does not depend on the host. The R profiles reproduce the host's
+//! R build, so their manifests are committed per target
+//! (see docs/linux_numerical_parity.md).
 
 use rsdeseq2::cooks::{CooksRefitPlan, CooksReplacementOptions, CooksReplacementOutput};
 use rsdeseq2::core::{
@@ -1035,22 +1037,30 @@ fn profile() -> &'static str {
 }
 
 fn manifest_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tools/validation/golden")
-        .join(format!(
+    let name = if rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::Portable {
+        format!("{}.tsv", profile())
+    } else {
+        format!(
             "{}.{}-{}.tsv",
             profile(),
             std::env::consts::ARCH,
             std::env::consts::OS
-        ))
+        )
+    };
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tools/validation/golden")
+        .join(name)
 }
 
 fn render(entries: &CaseResult) -> String {
+    let target = if rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::Portable {
+        "any".to_string()
+    } else {
+        format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+    };
     let mut text = format!(
-        "{MANIFEST_HEADER}\n# profile: {}\n# target: {}-{}\n# columns: input, workflow, threads, field, sha256\n",
+        "{MANIFEST_HEADER}\n# profile: {}\n# target: {target}\n# columns: input, workflow, threads, field, sha256\n",
         profile(),
-        std::env::consts::ARCH,
-        std::env::consts::OS
     );
     for (key, hash) in entries {
         text.push_str(key);

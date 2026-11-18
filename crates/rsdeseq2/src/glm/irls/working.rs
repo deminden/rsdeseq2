@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 // Working weights and responses.
 
 pub(super) fn working_weights(
@@ -93,7 +94,7 @@ pub(super) fn working_response_into(
                 validate_positive_finite(mu, "mu", sample)?;
                 validate_positive_finite(factor, "normalization factor", sample)?;
                 let normalized_mean = match log_nf {
-                    Some(values) => checked::try_add(mu.ln(), -values[sample]),
+                    Some(values) => checked::try_add(mu.ln_p(), -values[sample]),
                     None => stable_log_normalized_mean(mu, factor),
                 };
                 let log_normalized_mu = normalized_mean
@@ -118,5 +119,5 @@ pub(super) fn stable_log_normalized_mean(mu: f64, factor: f64) -> checked::Check
             return checked::reject(value);
         }
     }
-    checked::try_add(mu.ln(), -factor.ln())
+    checked::try_add(mu.ln_p(), -factor.ln_p())
 }

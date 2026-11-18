@@ -1,6 +1,7 @@
 //! Student t tails with stable small and large shape evaluation.
 use super::gamma::{log_half_gamma_ratio_correction, stirling_correction};
 use super::quadrature::integrate_positive_tail;
+use crate::numeric::math::ProfileMath;
 
 // Modified Lentz evaluation of the incomplete-beta continued fraction,
 // DLMF 8.17(v): https://dlmf.nist.gov/8.17.v . Both complementary arguments
@@ -51,28 +52,28 @@ pub(crate) fn student_t_upper_tail(q: f64, df: f64) -> Option<f64> {
     let square = q * q;
     let ratio = square / df;
     let log_ratio = if ratio > 0.0 && ratio.is_finite() {
-        ratio.ln()
+        ratio.ln_p()
     } else {
-        2.0 * q.abs().ln() - df.ln()
+        2.0 * q.abs().ln_p() - df.ln_p()
     };
     let log_one_plus_ratio = if ratio.is_finite() && ratio > 0.0 {
         let square_error = q.mul_add(q, -square);
         let ratio_error = ((-ratio).mul_add(df, square) + square_error) / df;
-        ratio.ln_1p() + ratio_error / (1.0 + ratio)
+        ratio.ln_1p_p() + ratio_error / (1.0 + ratio)
     } else if log_ratio > 0.0 {
-        log_ratio + (-log_ratio).exp().ln_1p()
+        log_ratio + (-log_ratio).exp_p().ln_1p_p()
     } else {
-        log_ratio.exp().ln_1p()
+        log_ratio.exp_p().ln_1p_p()
     };
     if df >= 64.0 {
         let tail = large_df_t_positive_tail(q.abs(), df, log_one_plus_ratio);
         return Some(if q < 0.0 { 1.0 - tail } else { tail }.clamp(0.0, 1.0));
     }
-    let x = (-log_one_plus_ratio).exp();
+    let x = (-log_one_plus_ratio).exp_p();
     let y = if ratio.is_finite() && ratio > 0.0 {
         ratio / (1.0 + ratio)
     } else {
-        -(-log_one_plus_ratio).exp_m1()
+        -(-log_one_plus_ratio).exp_m1_p()
     };
     let log_beta = if a.fract() == 0.0 && a <= 10.0 {
         // B(m,1/2) = 2 product(k/(k+1/2)). These integer products
@@ -83,11 +84,11 @@ pub(crate) fn student_t_upper_tail(q: f64, df: f64) -> Option<f64> {
             numerator *= (2 * k) as f64;
             denominator *= (2 * k + 1) as f64;
         }
-        (numerator / denominator).ln()
+        (numerator / denominator).ln_p()
     } else if a >= 0.5 {
-        let correction = a.mul_add((0.5 / a).ln_1p(), -0.5) + stirling_correction(a + 0.5)
+        let correction = a.mul_add((0.5 / a).ln_1p_p(), -0.5) + stirling_correction(a + 0.5)
             - stirling_correction(a);
-        0.5723649429247001 - 0.5 * a.ln() - correction
+        0.5723649429247001 - 0.5 * a.ln_p() - correction
     } else {
         libm::lgamma(a) + libm::lgamma(0.5) - libm::lgamma(a + 0.5)
     };
@@ -105,13 +106,13 @@ pub(crate) fn student_t_upper_tail(q: f64, df: f64) -> Option<f64> {
             compensation = (next - sum) - delta;
             sum = next;
             if term <= sum * (0.25 * f64::EPSILON) {
-                let tail = 0.5 * ((-a * log_one_plus_ratio - log_beta).exp() / a) * sum;
+                let tail = 0.5 * ((-a * log_one_plus_ratio - log_beta).exp_p() / a) * sum;
                 return Some(if q < 0.0 { 1.0 - tail } else { tail }.clamp(0.0, 1.0));
             }
         }
         return None;
     }
-    let front = (-a * log_one_plus_ratio + 0.5 * y.ln() - log_beta).exp();
+    let front = (-a * log_one_plus_ratio + 0.5 * y.ln_p() - log_beta).exp_p();
     let tail = if x < (a + 1.0) / (a + 2.5) {
         0.5 * front * beta_fraction(a, 0.5, x, y)? / a
     } else {
@@ -133,17 +134,17 @@ fn large_df_t_positive_tail(q: f64, df: f64, log_one_plus_ratio: f64) -> f64 {
     };
     let exponent = log_half_gamma_ratio_correction(0.5 * df)
         - (0.5 * df + 0.5) * log_one_plus_ratio
-        - rate.ln();
+        - rate.ln_p();
     if exponent < -760.0 || !exponent.is_finite() {
         return 0.0;
     }
     let density_ratio = |s: f64| {
         let u = s / rate;
         let shift = ((u / df) * (2.0 * q + u)) / (1.0 + ratio);
-        (-(0.5 * df + 0.5) * shift.ln_1p()).exp()
+        (-(0.5 * df + 0.5) * shift.ln_1p_p()).exp_p()
     };
     let integral = integrate_positive_tail(density_ratio);
     // For df>=64 the omitted relative tail beyond s=128 is below 1e-29
     // even in the limiting power-law regime; no large gamma values are formed.
-    (0.3989422804014327 * integral) * exponent.exp()
+    (0.3989422804014327 * integral) * exponent.exp_p()
 }

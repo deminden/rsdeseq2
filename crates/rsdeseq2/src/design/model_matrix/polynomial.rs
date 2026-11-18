@@ -3,6 +3,7 @@
 //! This is separate from fitting rank checks: changing the order/number of
 //! applied reflections changes the basis even when its span is unchanged.
 use super::super::numeric_transform::{column_sum, polynomial_qr};
+use crate::numeric::math::ProfileMath;
 pub(super) fn contrasts(n: usize) -> Vec<f64> {
     let center = (n as f64 + 1.0) / 2.0;
     let columns = (0..n)
@@ -14,7 +15,7 @@ pub(super) fn contrasts(n: usize) -> Vec<f64> {
                         0 => 1.0,
                         1 => x,
                         2 => x * x,
-                        _ => x.powf(degree as f64),
+                        _ => x.powf_p(degree as f64),
                     }
                 })
                 .collect::<Vec<_>>()

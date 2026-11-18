@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 // Per-gene IRLS iterations and scratch reuse.
 
 pub(super) fn fit_fixed_dispersion_irls_row(
@@ -24,7 +25,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
     let log_nf: &[f64] = match input.shared_log_offsets {
         Some(shared) => shared,
         None => {
-            owned_log_nf = nf.iter().copied().map(f64::ln).collect::<Vec<_>>();
+            owned_log_nf = nf.iter().copied().map(f64::ln_p).collect::<Vec<_>>();
             &owned_log_nf
         }
     };

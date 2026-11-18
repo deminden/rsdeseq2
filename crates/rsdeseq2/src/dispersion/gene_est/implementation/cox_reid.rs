@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 // Fixed design products for the unweighted optimizer path. Products are
 // checked at their original evaluation point, after the mean/weight checks.
 pub(super) type PreparedCoxReidDesign = crate::design::SharedDesignProducts;
@@ -111,7 +112,7 @@ pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
             reason: "log dispersion must be finite".to_string(),
         });
     }
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "dispersion must be finite and positive".to_string(),
@@ -134,7 +135,7 @@ pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
             actual: 0,
         });
     }
-    Ok(-0.5 * determinant.ln())
+    Ok(-0.5 * determinant.ln_p())
 }
 
 pub(super) struct CoxReidDesignMatrices {
@@ -488,7 +489,7 @@ pub(super) fn cox_reid_adjustment_derivative_weighted_with_threshold_prepared(
     weight_threshold: f64,
     prepared: Option<&PreparedCoxReidDesign>,
 ) -> Result<f64, DeseqError> {
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     let matrices = cox_reid_weighted_design_matrices_prepared(
         design,
         mu,
@@ -568,7 +569,7 @@ pub(super) fn cox_reid_adjustment_second_derivative_weighted_with_threshold_prep
     weight_threshold: f64,
     prepared: Option<&PreparedCoxReidDesign>,
 ) -> Result<f64, DeseqError> {
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     let matrices = cox_reid_weighted_design_matrices_prepared(
         design,
         mu,

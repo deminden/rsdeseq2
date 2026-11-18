@@ -1,5 +1,6 @@
 use crate::errors::DeseqError;
 use crate::matrix::RowMajorMatrix;
+use crate::numeric::math::ProfileMath;
 
 /// Apply DESeq2's `normTransform` to normalized counts.
 ///
@@ -32,5 +33,5 @@ pub fn norm_transform_value(normalized_count: f64, index: usize) -> Result<f64, 
             value: normalized_count,
         });
     }
-    Ok(normalized_count.ln_1p() / std::f64::consts::LN_2)
+    Ok(normalized_count.ln_1p_p() / std::f64::consts::LN_2)
 }

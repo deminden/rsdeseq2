@@ -6,7 +6,8 @@
 
 #![allow(clippy::excessive_precision)]
 
-use statrs::function::gamma::ln_gamma;
+use crate::numeric::math::ProfileMath;
+use crate::numeric::special::ln_gamma;
 const LS: f64 = 0.9189385332046727;
 const L2: f64 = 1.8378770664093453;
 const IE: [f64; 16] = [
@@ -75,9 +76,9 @@ pub(super) fn nbinom_log(y: u32, mu: f64, disp: f64) -> f64 {
     let size = disp.recip();
     if x == 0. {
         let p = if size < mu {
-            (size / (size + mu)).ln()
+            (size / (size + mu)).ln_p()
         } else {
-            (-mu / (size + mu)).ln_1p()
+            (-mu / (size + mu)).ln_1p_p()
         };
         return size * p;
     }
@@ -89,16 +90,16 @@ pub(super) fn nbinom_log(y: u32, mu: f64, disp: f64) -> f64 {
         - se(x)
         - bd(size, total * p)
         - bd(x, total * q)
-        - 0.5 * (L2 + size.ln() + (-size / total).ln_1p());
+        - 0.5 * (L2 + size.ln_p() + (-size / total).ln_1p_p());
     b + if x < size {
-        (-x / total).ln_1p()
+        (-x / total).ln_1p_p()
     } else {
-        (size / total).ln()
+        (size / total).ln_p()
     }
 }
 pub(super) fn normal_log(x: f64, precision: f64) -> f64 {
     let s = precision.recip().sqrt();
-    -s.ln() - LS - 0.5 * (x / s).powi(2)
+    -s.ln_p() - LS - 0.5 * (x / s).powi(2)
 }
 fn bd(x: f64, m: f64) -> f64 {
     if (x - m).abs() < 0.1 * (x + m) {
@@ -118,9 +119,9 @@ fn bd(x: f64, m: f64) -> f64 {
         return 2. * s;
     }
     if x > m {
-        x * ((x / m).ln() - 1.) + m
+        x * ((x / m).ln_p() - 1.) + m
     } else {
-        x * (x / m).ln() + m - x
+        x * (x / m).ln_p() + m - x
     }
 }
 fn se(x: f64) -> f64 {
@@ -166,7 +167,7 @@ fn se(x: f64) -> f64 {
     i * p
 }
 fn direct(x: f64) -> f64 {
-    let l = x.ln();
+    let l = x.ln_p();
     if x >= 1. {
         return ln_gamma(x) + x * (1. - l) + 0.5 * (l - L2);
     }

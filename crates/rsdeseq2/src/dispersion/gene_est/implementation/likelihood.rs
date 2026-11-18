@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 /// DESeq2's alpha-dependent NB log-likelihood kernel.
 ///
 /// Terms independent of alpha are omitted, matching the objective used inside
@@ -35,7 +36,7 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
             reason: "log dispersion must be finite".to_string(),
         });
     }
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "dispersion must be finite and positive".to_string(),
@@ -58,8 +59,8 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         };
         let term = log_gamma_y
             - log_gamma_inv_alpha
-            - y * mu_plus_inv_alpha.ln()
-            - inv_alpha * (1.0 + mu_alpha).ln();
+            - y * mu_plus_inv_alpha.ln_p()
+            - inv_alpha * (1.0 + mu_alpha).ln_p();
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "dispersion objective likelihood term".to_string(),
@@ -88,9 +89,9 @@ pub(super) fn dispersion_lgamma(x: f64) -> f64 {
 pub(super) fn stirling_lgamma_positive(x: f64) -> f64 {
     const LN_SQRT_2PI: f64 = 0.918_938_533_204_672_7;
     if x > 1.0e17 {
-        return x * (x.ln() - 1.0);
+        return x * (x.ln_p() - 1.0);
     }
-    let base = LN_SQRT_2PI + (x - 0.5) * x.ln() - x;
+    let base = LN_SQRT_2PI + (x - 0.5) * x.ln_p() - x;
     if x > 4_934_720.0 {
         base
     } else {
@@ -127,7 +128,7 @@ pub(super) fn dispersion_digamma(x: f64) -> f64 {
     if x <= 0.0 || !x.is_finite() {
         return digamma(x);
     }
-    let xln = x.ln();
+    let xln = x.ln_p();
     if x * xln > 1.0 / (2.0 * f64::EPSILON) {
         return xln;
     }
@@ -168,7 +169,7 @@ pub(super) fn dispersion_digamma(x: f64) -> f64 {
         let lower = x as i32;
         let increment = f64::from(xmin - lower);
         let shifted = x + increment;
-        (shifted, shifted.ln(), increment as i32)
+        (shifted, shifted.ln_p(), increment as i32)
     } else {
         (x, xln, 0)
     };
@@ -233,7 +234,7 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
             reason: "log dispersion must be finite".to_string(),
         });
     }
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "dispersion must be finite and positive".to_string(),
@@ -308,7 +309,7 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
             reason: "log dispersion must be finite".to_string(),
         });
     }
-    let alpha = log_alpha.exp();
+    let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
         return Err(DeseqError::InvalidDispersion {
             reason: "dispersion must be finite and positive".to_string(),

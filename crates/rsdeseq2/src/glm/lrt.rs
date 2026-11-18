@@ -1,5 +1,6 @@
 use crate::numeric::checked;
-use statrs::distribution::{ChiSquared, ContinuousCDF};
+use crate::numeric::math::ProfileMath;
+use crate::numeric::special::GammaDistribution;
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::{LrtOutput, NbinomGlmFit};
@@ -40,8 +41,12 @@ pub fn lrt_test(full: &NbinomGlmFit, reduced: &NbinomGlmFit) -> Result<LrtOutput
 
     let degrees_of_freedom = full.beta.n_cols() - reduced.beta.n_cols();
     let distribution =
-        ChiSquared::new(degrees_of_freedom as f64).map_err(|error| DeseqError::InvalidOptions {
-            reason: format!("invalid LRT chi-square distribution: {error}"),
+        GammaDistribution::chi_squared(degrees_of_freedom as f64).ok_or_else(|| {
+            DeseqError::InvalidOptions {
+                reason: format!(
+                    "invalid LRT chi-square distribution: {degrees_of_freedom} degrees of freedom"
+                ),
+            }
         })?;
     let mut deviance = Vec::with_capacity(full.log_like.len());
     let mut pvalue = Vec::with_capacity(full.log_like.len());
@@ -75,9 +80,9 @@ fn lrt_deviance_statistic(full_log_like: f64, reduced_log_like: f64) -> Option<f
     statistic.is_finite().then_some(statistic)
 }
 
-fn lrt_pvalue(distribution: &ChiSquared, statistic: f64) -> Option<f64> {
+fn lrt_pvalue(distribution: &GammaDistribution, statistic: f64) -> Option<f64> {
     let pvalue = if distribution.freedom() == 2.0 {
-        (-0.5 * statistic.max(0.0)).exp()
+        (-0.5 * statistic.max(0.0)).exp_p()
     } else if distribution.freedom() >= 64.0 {
         crate::probability::large_shape_chi_square_tail(statistic, distribution.freedom())
     } else {
@@ -102,7 +107,7 @@ pub fn lrt_pvalues_from_statistics(
             degrees_of_freedom.len(),
         ));
     }
-    let mut cached: Option<(f64, ChiSquared)> = None;
+    let mut cached: Option<(f64, GammaDistribution)> = None;
     let mut pvalues = Vec::with_capacity(statistics.len());
     for (gene, &statistic) in statistics.iter().enumerate() {
         let df = degrees_of_freedom[if degrees_of_freedom.len() == 1 {
@@ -115,9 +120,10 @@ pub fn lrt_pvalues_from_statistics(
             continue;
         }
         if cached.as_ref().is_none_or(|(previous, _)| *previous != df) {
-            let distribution = ChiSquared::new(df).map_err(|error| DeseqError::InvalidOptions {
-                reason: format!("invalid LRT chi-square distribution: {error}"),
-            })?;
+            let distribution =
+                GammaDistribution::chi_squared(df).ok_or_else(|| DeseqError::InvalidOptions {
+                    reason: format!("invalid LRT chi-square distribution: {df} degrees of freedom"),
+                })?;
             cached = Some((df, distribution));
         }
         if let Some((_, distribution)) = cached.as_ref() {

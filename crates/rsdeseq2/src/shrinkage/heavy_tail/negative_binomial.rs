@@ -1,6 +1,7 @@
 //! Negative-binomial log-link likelihood and finite-gradient Laplace curvature.
 use super::prior::CauchyCoefficientPrior;
 use crate::matrix::MatrixView;
+use crate::numeric::math::ProfileMath;
 use nalgebra::DMatrix;
 pub(super) struct Row<'a> {
     pub design: MatrixView<'a, f64>,
@@ -14,7 +15,7 @@ impl Row<'_> {
     pub fn objective_gradient(&self, beta: &[f64]) -> (f64, Vec<f64>) {
         let mut gradient = vec![0.0; beta.len()];
         let mut value = self.prior.contribution(beta, &mut gradient);
-        let log_size = self.size.ln();
+        let log_size = self.size.ln_p();
         for (i, &y) in self.counts.iter().enumerate() {
             let linear = beta
                 .iter()
@@ -26,12 +27,12 @@ impl Row<'_> {
             // log(size+exp(eta)) and its logistic derivative without overflow.
             let (log_sum, probability) = if centered > 0.0 {
                 (
-                    eta + (-centered).exp().ln_1p(),
-                    1.0 / (1.0 + (-centered).exp()),
+                    eta + (-centered).exp_p().ln_1p_p(),
+                    1.0 / (1.0 + (-centered).exp_p()),
                 )
             } else {
-                let e = centered.exp();
-                (log_size + e.ln_1p(), e / (1.0 + e))
+                let e = centered.exp_p();
+                (log_size + e.ln_1p_p(), e / (1.0 + e))
             };
             let weight = self.weights[i];
             value += weight * ((self.size + y) * log_sum - y * linear);

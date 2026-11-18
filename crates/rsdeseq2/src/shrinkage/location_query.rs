@@ -1,5 +1,6 @@
 //! Independent queries of a fitted mixture, including original-input thresholds.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "location CDF query";
 use super::{
     LocationLikelihood, MixtureComponents, MixtureGrid,
@@ -57,8 +58,8 @@ pub fn location_cdf_batch(
                 "SEs must be nonnegative",
             ));
         }
-        x.push(estimate / s.powf(options.alpha));
-        se.push(s.powf(1.0 - options.alpha));
+        x.push(estimate / s.powf_p(options.alpha));
+        se.push(s.powf_p(1.0 - options.alpha));
     }
     let prior = grid
         .prior_with_likelihood(weights, &options.likelihood)?

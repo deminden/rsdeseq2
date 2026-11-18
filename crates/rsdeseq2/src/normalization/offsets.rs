@@ -2,6 +2,7 @@
 use super::validate_size_factors;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::{MatrixView, RowMajorMatrix};
+use crate::numeric::math::ProfileMath;
 
 /// Compose effective normalization factors as `base * exp(offset)`.
 ///
@@ -54,7 +55,7 @@ pub fn normalization_factors_with_offsets(
         });
     }
     let multipliers=offsets.iter().enumerate().map(|(sample,&offset)| {
-        let multiplier=offset.exp();
+        let multiplier=offset.exp_p();
         if offset.is_finite() && multiplier.is_finite() && multiplier>0.0 { Ok(multiplier) }
         else { Err(DeseqError::InvalidOptions {reason:format!("formula offset exponentiated to non-finite or non-positive factor at sample {sample}")}) }
     }).collect::<Result<Vec<_>,_>>()?;

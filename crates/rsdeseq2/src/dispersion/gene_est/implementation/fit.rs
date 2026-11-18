@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 /// Combine rough and moments estimates using DESeq2's bounded start shape.
 pub fn initial_dispersion_estimates(
     rough_disp: &[f64],
@@ -102,7 +103,7 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
                     weight_threshold: options.weight_threshold,
                     prepared_cox: None,
                 },
-                dispersion.ln(),
+                dispersion.ln_p(),
             )?;
             Ok(GeneDispersionFitDiagnostics {
                 estimate: dispersion,
@@ -406,8 +407,8 @@ pub fn line_search_dispersion(
         });
     }
 
-    let min_log_alpha = (options.min_disp / 10.0).ln();
-    let mut log_alpha = initial_dispersion.max(options.min_disp).ln();
+    let min_log_alpha = (options.min_disp / 10.0).ln_p();
+    let mut log_alpha = initial_dispersion.max(options.min_disp).ln_p();
     let prepared_cox = prepare_unweighted_cox_reid_design(design, weights, options.use_cox_reid);
     let objective = DispersionObjectiveInput {
         counts,
@@ -491,7 +492,7 @@ pub fn line_search_dispersion(
         }
     }
 
-    let dispersion = log_alpha.exp().clamp(options.min_disp, max_disp);
+    let dispersion = log_alpha.exp_p().clamp(options.min_disp, max_disp);
     let last_dlp = dispersion_log_posterior_derivative_objective(objective, log_alpha)?;
     let last_d2lp = dispersion_log_posterior_second_derivative_objective(objective, log_alpha)?;
     Ok(DispersionLineSearchOutput {
@@ -763,8 +764,8 @@ pub fn grid_search_dispersion(input: DispersionFitInput<'_>) -> Result<(f64, usi
         weight_threshold: options.weight_threshold,
         prepared_cox: prepared_cox.as_deref(),
     };
-    let min_log = options.min_disp.ln();
-    let max_log = max_disp.ln();
+    let min_log = options.min_disp.ln_p();
+    let max_log = max_disp.ln_p();
     let coarse = linspace(min_log, max_log, options.grid_points)?;
     let (best_log, _) = best_log_alpha(objective, &coarse)?;
     let delta =
@@ -776,7 +777,7 @@ pub fn grid_search_dispersion(input: DispersionFitInput<'_>) -> Result<(f64, usi
     let fine = linspace(fine_lower, fine_upper, options.grid_points)?;
     let (best_fine_log, _) = best_log_alpha(objective, &fine)?;
     Ok((
-        best_fine_log.exp().clamp(options.min_disp, max_disp),
+        best_fine_log.exp_p().clamp(options.min_disp, max_disp),
         options.grid_points * 2,
     ))
 }

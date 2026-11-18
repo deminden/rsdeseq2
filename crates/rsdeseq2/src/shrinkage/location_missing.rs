@@ -1,6 +1,7 @@
 //! Excluded-row raw CDF/likelihood semantics, distinct from summary fallback.
 use super::{MixtureComponents, truncated_standard::log_phi};
 use crate::math::elementary::language_exp;
+use crate::numeric::math::ProfileMath;
 
 pub(super) const NA: f64 = f64::from_bits(0x7ff0_0000_0000_07a2);
 pub(super) fn is_na(x: f64) -> bool {
@@ -19,7 +20,7 @@ pub(super) fn log_marginal(likelihoods: &[f64], weights: &[f64]) -> f64 {
         .zip(weights)
         .map(|(l, w)| w * language_exp(l - max))
         .sum();
-    sum.ln() + max
+    sum.ln_p() + max
 }
 pub(super) fn excluded(
     components: &MixtureComponents,
@@ -88,7 +89,7 @@ pub(super) fn excluded(
             let ll = means
                 .iter()
                 .zip(sds)
-                .map(|(&m, &s)| log_phi((x - m) / s) - s.ln())
+                .map(|(&m, &s)| log_phi((x - m) / s) - s.ln_p())
                 .collect::<Vec<_>>();
             (
                 thresholds
@@ -111,7 +112,7 @@ pub(super) fn excluded(
                 .zip(upper)
                 .map(|(&a, &b)| {
                     if a < x && x < b {
-                        -(b - a).ln()
+                        -(b - a).ln_p()
                     } else {
                         f64::NEG_INFINITY
                     }
@@ -124,7 +125,7 @@ pub(super) fn excluded(
             let log_weights = ll
                 .iter()
                 .zip(weights)
-                .map(|(l, w)| l + w.ln())
+                .map(|(l, w)| l + w.ln_p())
                 .collect::<Vec<_>>();
             let max = log_weights
                 .iter()

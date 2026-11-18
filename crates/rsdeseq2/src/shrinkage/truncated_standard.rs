@@ -1,4 +1,5 @@
 //! Standard truncated-normal moments with finite-arithmetic boundary bounds.
+use crate::numeric::math::ProfileMath;
 use crate::{math::elementary::language_exp, math::normal_log_cdf};
 
 pub(super) fn log_phi(x: f64) -> f64 {
@@ -21,7 +22,7 @@ fn log_difference(larger: f64, smaller: f64) -> f64 {
     if larger == f64::NEG_INFINITY {
         return f64::NEG_INFINITY;
     }
-    larger + (1.0 - language_exp(smaller - larger)).ln()
+    larger + (1.0 - language_exp(smaller - larger)).ln_p()
 }
 pub(super) fn truncated_mean(mut a: f64, mut b: f64) -> f64 {
     let flipped = (a > 0.0 && b > 0.0) || b > a.abs();

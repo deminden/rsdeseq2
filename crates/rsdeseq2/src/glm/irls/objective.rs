@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 // Optimizer objectives, gradients and Hessians.
 
 pub(super) fn beta_log2_value_gradient(
@@ -59,7 +60,7 @@ pub(super) fn beta_log2_objective_gradient_hessian(
             }
             eta = next_eta;
         }
-        let mu = input.nf[sample] * 2.0_f64.powf(eta);
+        let mu = input.nf[sample] * 2.0_f64.powf_p(eta);
         if !mu.is_finite() || mu <= 0.0 {
             return Ok(beta_optim_penalty(p));
         }
@@ -177,9 +178,9 @@ pub(super) fn beta_log2_nb_objective_term(count: u32, mu: f64, dispersion: f64) 
     }
     let size_plus_mu = checked::add(size, mu)?;
     let count_plus_size = checked::add(count, size)?;
-    let first = checked::mul(count_plus_size, size_plus_mu.ln())?;
-    let second = checked::mul(size, size.ln())?;
-    let third = checked::mul(count, mu.ln())?;
+    let first = checked::mul(count_plus_size, size_plus_mu.ln_p())?;
+    let second = checked::mul(size, size.ln_p())?;
+    let third = checked::mul(count, mu.ln_p())?;
     checked::add(checked::add(first, -second)?, -third)
 }
 
@@ -204,7 +205,7 @@ pub(super) fn beta_log2_r_objective(
         for (col, b) in beta.iter().copied().enumerate() {
             eta = input.x[(sample, col)].mul_add(b, eta)
         }
-        let mu = input.nf[sample] * 2.0_f64.powf(eta);
+        let mu = input.nf[sample] * 2.0_f64.powf_p(eta);
         if !mu.is_finite() || mu <= 0.0 {
             return Ok(1e300);
         }

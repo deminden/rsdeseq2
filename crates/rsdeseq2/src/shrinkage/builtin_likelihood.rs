@@ -1,5 +1,6 @@
 //! Primitive, shared built-in likelihood parameters with explicit row selection.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "built-in likelihood";
 use super::{
     location_missing::NA,
@@ -271,10 +272,10 @@ impl BuiltinLocationLikelihood {
                             1.0
                         }
                     } else {
-                        crate::math::normal_log_cdf(x / s).exp()
+                        crate::math::normal_log_cdf(x / s).exp_p()
                     }
                 })
-                .ln(),
+                .ln_p(),
             Parameters::LogF { first, second } => {
                 log_f::log_cdf(x, self.df(first), self.df(second))
             }
@@ -294,10 +295,10 @@ impl BuiltinLocationLikelihood {
                             0.0
                         }
                     } else {
-                        (log_phi(x / s) - s.ln()).exp()
+                        (log_phi(x / s) - s.ln_p()).exp_p()
                     }
                 })
-                .ln(),
+                .ln_p(),
             Parameters::LogF { first, second } => {
                 log_f::log_density(x, self.df(first), self.df(second))
             }

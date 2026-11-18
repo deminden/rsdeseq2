@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::math::ProfileMath;
 // Starting coefficients and stable fitted means.
 
 pub(super) fn initial_beta(
@@ -54,7 +55,7 @@ pub(super) fn initial_beta_for_rule(
                 total += count / factor;
             }
             let mut beta = DVector::from_element(x.ncols(), 0.0);
-            beta[intercept] = (total / y.len() as f64).ln();
+            beta[intercept] = (total / y.len() as f64).ln_p();
             Ok(beta)
         }
     }
@@ -72,7 +73,7 @@ pub(super) fn initial_beta_impl(
         .zip(nf.iter().copied())
         .map(|(count, factor)| {
             validate_positive_finite(factor, "normalization factor", 0)?;
-            Ok((count / factor + 0.1).ln())
+            Ok((count / factor + 0.1).ln_p())
         })
         .collect::<Result<Vec<_>, DeseqError>>()?;
     let xty = x.transpose() * DVector::from_vec(response);
@@ -114,7 +115,7 @@ pub(super) fn fitted_mu_log2_unfloored(
             validate_positive_finite(nf[sample], "normalization factor", sample)?;
             let eta = checked_row_dot_slice(x, sample, beta)
                 .nonfinite_at("optim fallback linear predictor", Some(sample))?;
-            let mu = nf[sample] * 2.0_f64.powf(eta);
+            let mu = nf[sample] * 2.0_f64.powf_p(eta);
             if !mu.is_finite() || mu <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "optim fallback fitted mean".to_string(),
@@ -258,14 +259,14 @@ pub(super) fn finite_scaled_exp_with_log(
     if !eta.is_finite() {
         return checked::reject(eta);
     }
-    let log_mu = log_factor.unwrap_or_else(|| factor.ln()) + eta;
-    if log_mu >= f64::MAX.ln() {
+    let log_mu = log_factor.unwrap_or_else(|| factor.ln_p()) + eta;
+    if log_mu >= f64::MAX.ln_p() {
         return Ok(f64::MAX);
     }
-    if log_mu <= f64::MIN_POSITIVE.ln() {
+    if log_mu <= f64::MIN_POSITIVE.ln_p() {
         return Ok(f64::MIN_POSITIVE);
     }
-    let mu = log_mu.exp();
+    let mu = log_mu.exp_p();
     if mu.is_finite() && mu > 0.0 {
         Ok(mu)
     } else {

@@ -1,0 +1,6 @@
+# Tests and tools in this repository compare against R references produced on
+# the host, so cargo runs them with the R profile of the host. The library and
+# installed binaries default to the portable profile; an explicitly set
+# RSDESEQ2_NUMERIC_PROFILE still wins.
+[env]
+RSDESEQ2_NUMERIC_PROFILE = "r-host"

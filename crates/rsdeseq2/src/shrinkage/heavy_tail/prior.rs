@@ -1,5 +1,6 @@
 //! Heavy-tailed coefficient prior and empirical variance adaptation.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 pub(super) const ERROR_SCOPE: &str = "heavy-tailed shrinkage";
 use crate::DeseqError;
 /// Independent Cauchy priors, with selected Gaussian nuisance coefficients.
@@ -53,7 +54,7 @@ impl CauchyCoefficientPrior {
                     b * b / (2.0 * nuisance2)
                 } else {
                     *g += (2.0 * b) / (scale2 + b * b);
-                    (b * b / scale2).ln_1p()
+                    (b * b / scale2).ln_1p_p()
                 }
             })
             .sum()

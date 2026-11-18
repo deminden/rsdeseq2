@@ -45,14 +45,22 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   agree to the last bit. Its dispersion differs by 2.6e-5 on the log scale and
   its p-value by 3.7e-6; no significance call changes.
 
-- `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`: the
-  platform-specific R arithmetic (x87 extended reductions and the OpenBLAS
-  Haswell dot schedule used by R on Linux x86_64) is now chosen at run time
-  instead of at compile time. The default still follows the host, so output is
-  unchanged; `RSDESEQ2_NUMERIC_PROFILE=portable|r-linux-x86_64` overrides it,
-  and the R profile can now run on any x86_64 host. Transcendental functions
-  still use the host libm, so `Portable` on Linux does not reproduce R on
-  macOS bit for bit in formula transforms that call `log10`, `expm1`, `pow`.
+- `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`, with
+  three profiles chosen at run time:
+  - `portable` (the library default): pure-Rust elementary and special
+    functions and fixed-order reductions, so the same input gives the same
+    bits on every OS and architecture. One golden manifest covers all targets.
+  - `r-linux-x86_64`: R on Linux x86_64 (x87 extended reductions, the OpenBLAS
+    Haswell dot schedule, glibc libm); available on any x86_64 host.
+  - `r-macos`: R on macOS (host libm); available on macOS only.
+  `RSDESEQ2_NUMERIC_PROFILE` selects one by name, and `r-host` picks the R
+  profile for the current host. The R package selects `r-host` unless the
+  variable is set, so its output is unchanged. Library users who relied on the
+  old host-dependent default should set `RSDESEQ2_NUMERIC_PROFILE=r-host`;
+  On full GTEx (56,200 genes, two contrasts, parametric and local trends)
+  `portable` differs from `r-linux-x86_64` by at most 1.9e-4 relative in
+  p-values and 1.2e-4 in dispersions, with no significance call changing at
+  padj 0.01, 0.05 or 0.1; VST values differ by at most 1e-15 relative.
 
 - `_from_reader` forms of the TSV readers that open their own file:
   `read_count_matrix_tsv`, `read_labeled_design_matrix_tsv`,

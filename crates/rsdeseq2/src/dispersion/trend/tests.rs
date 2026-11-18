@@ -7,6 +7,7 @@ use super::parametric::{
     robust_parametric_trend_rows, weighted_gamma_identity_least_squares,
 };
 use crate::numeric::checked::{self, CheckedExt};
+use crate::numeric::math::ProfileMath;
 use approx::assert_relative_eq;
 
 #[test]
@@ -24,7 +25,7 @@ fn gamma_deviance_keeps_near_perfect_fit_precision() {
     let good = [true; 4];
 
     let deviance = gamma_deviance(&means, &disps, &good, trend).unwrap();
-    let expected = means.len() as f64 * 2.0 * (relative_delta - relative_delta.ln_1p());
+    let expected = means.len() as f64 * 2.0 * (relative_delta - relative_delta.ln_1p_p());
 
     assert!(deviance.is_finite());
     assert!(deviance > 0.0);
@@ -221,7 +222,7 @@ fn parametric_coefficient_change_matches_log_squared_update() {
     };
 
     let observed = parametric_coefficient_change(old, new).unwrap();
-    let expected = 2.0 * 2.0_f64.ln().powi(2);
+    let expected = 2.0 * 2.0_f64.ln_p().powi(2);
 
     assert_relative_eq!(observed, expected, epsilon = 1e-15);
 }

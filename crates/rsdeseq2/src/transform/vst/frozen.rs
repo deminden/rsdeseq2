@@ -3,6 +3,7 @@
 use super::{validate_normalized_counts_and_max, vst_local_from_dispersion_grid};
 use crate::design::expression::{self, Data, EvaluationOptions, Expression, Value};
 use crate::errors::invalid_dispersion;
+use crate::numeric::math::ProfileMath;
 use crate::{
     errors::DeseqError,
     matrix::{CountView, MatrixView, RowMajorMatrix},
@@ -12,7 +13,7 @@ fn grid_from_max(max: f64) -> Vec<f64> {
     let end = max.asinh();
     let delta = end / 999.0;
     (1..1000)
-        .map(|i| (if i == 999 { end } else { i as f64 * delta }).sinh())
+        .map(|i| (if i == 999 { end } else { i as f64 * delta }).sinh_p())
         .collect()
 }
 
@@ -124,7 +125,7 @@ impl SavedLocalDispersionFit {
                         "saved local fit means must be finite and positive",
                     ));
                 }
-                let x = mean.ln();
+                let x = mean.ln_p();
                 let upper = self.knots.partition_point(|k| *k <= x);
                 let residual = if upper == 0 || upper == self.knots.len() {
                     let i = if upper == 0 { 0 } else { upper - 1 };
@@ -143,7 +144,7 @@ impl SavedLocalDispersionFit {
                 let global = self.polynomial[1]
                     + dx * self.polynomial[2]
                     + (dx * dx / 2.0) * self.polynomial[3];
-                let prediction = (residual + global).exp();
+                let prediction = (residual + global).exp_p();
                 if !prediction.is_finite() || prediction <= 0.0 {
                     return Err(invalid_dispersion(
                         "saved local fit produced a non-finite or non-positive dispersion",

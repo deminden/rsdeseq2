@@ -1,12 +1,13 @@
 //! Elementary expression semantics shared by formula and posterior calculations.
 
+use crate::numeric::math::ProfileMath;
 // The expression-level exponential rounds its first-order expansion near zero.
 // Internal distribution kernels retain their ordinary mathematical exp calls.
 pub(crate) fn language_exp(x: f64) -> f64 {
     if x.abs() <= f64::EPSILON.sqrt() {
         1.0 + x
     } else {
-        x.exp()
+        x.exp_p()
     }
 }
 
@@ -18,7 +19,7 @@ pub(crate) fn language_log1p(x: f64) -> f64 {
     } else if x.abs() <= f64::EPSILON {
         x
     } else {
-        x.ln_1p()
+        x.ln_1p_p()
     }
 }
 pub(crate) fn language_expm1(x: f64) -> f64 {
@@ -27,6 +28,6 @@ pub(crate) fn language_expm1(x: f64) -> f64 {
     } else if x.abs() <= f64::EPSILON {
         x
     } else {
-        x.exp_m1()
+        x.exp_m1_p()
     }
 }

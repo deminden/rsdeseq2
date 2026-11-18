@@ -1,5 +1,6 @@
 //! Count-likelihood kernels expressed as gamma/beta integrals. No R callbacks.
 use crate::errors::scoped_invalid_options;
+use crate::numeric::math::ProfileMath;
 const ERROR_SCOPE: &str = "count likelihood";
 use super::{beta_normalization::log_regularized_beta, gamma_probability};
 use crate::DeseqError;
@@ -37,9 +38,9 @@ fn vector(v: &[f64], positive: bool) -> bool {
 }
 fn beta_cdf(x: f64, a: f64, b: f64) -> f64 {
     if x > (a + 1.0) / (a + b + 2.0) {
-        (0.5 - log_regularized_beta(b, a, 1.0 - x).exp()) + 0.5
+        (0.5 - log_regularized_beta(b, a, 1.0 - x).exp_p()) + 0.5
     } else {
-        log_regularized_beta(a, b, x).exp()
+        log_regularized_beta(a, b, x).exp_p()
     }
 }
 fn gamma_density(x: f64, a: f64, rate: f64) -> f64 {
@@ -53,7 +54,7 @@ fn gamma_density(x: f64, a: f64, rate: f64) -> f64 {
         return if a < 1.0 {
             f64::INFINITY
         } else if a == 1.0 {
-            rate.ln()
+            rate.ln_p()
         } else {
             f64::NEG_INFINITY
         };
@@ -61,7 +62,7 @@ fn gamma_density(x: f64, a: f64, rate: f64) -> f64 {
     if a >= 1e5 {
         return super::large_shape::gamma_log_density(x, a, rate);
     }
-    a * rate.ln() + (a - 1.0) * x.ln() - rate * x - statrs::function::gamma::ln_gamma(a)
+    a * rate.ln_p() + (a - 1.0) * x.ln_p() - rate * x - crate::numeric::special::ln_gamma(a)
 }
 fn beta_density(x: f64, a: f64, b: f64) -> f64 {
     if x.is_nan() {
@@ -74,7 +75,7 @@ fn beta_density(x: f64, a: f64, b: f64) -> f64 {
         return if a < 1.0 {
             f64::INFINITY
         } else if a == 1.0 {
-            b.ln()
+            b.ln_p()
         } else {
             f64::NEG_INFINITY
         };
@@ -83,7 +84,7 @@ fn beta_density(x: f64, a: f64, b: f64) -> f64 {
         return if b < 1.0 {
             f64::INFINITY
         } else if b == 1.0 {
-            a.ln()
+            a.ln_p()
         } else {
             f64::NEG_INFINITY
         };
@@ -94,9 +95,9 @@ fn beta_density(x: f64, a: f64, b: f64) -> f64 {
     let normalization = if a.max(b) >= 1e5 {
         super::large_shape::log_beta(a, b)
     } else {
-        statrs::function::beta::ln_beta(a, b)
+        crate::numeric::special::ln_beta(a, b)
     };
-    (a - 1.0) * x.ln() + (b - 1.0) * (-x).ln_1p() - normalization
+    (a - 1.0) * x.ln_p() + (b - 1.0) * (-x).ln_1p_p() - normalization
 }
 // Source zero-mass intervals select the denser endpoint (right on a tie).
 fn moment(
@@ -176,7 +177,7 @@ impl CountLikelihood {
                 for i in 0..n {
                     let v = at(y, i) / at(scale, i);
                     let v = if *link == PoissonLink::Log {
-                        (v + 0.01).ln()
+                        (v + 0.01).ln_p()
                     } else {
                         v
                     };
@@ -199,7 +200,7 @@ impl CountLikelihood {
                 let mut hi = f64::NEG_INFINITY;
                 for i in 0..n {
                     let p = (at(y, i) + 0.01) / (at(trials, i) + 0.02);
-                    let v = (p / (1.0 - p)).ln();
+                    let v = (p / (1.0 - p)).ln_p();
                     lo = lo.min(v);
                     hi = hi.max(v);
                 }
@@ -276,8 +277,8 @@ impl CountLikelihood {
                 let y = at(y, row);
                 let scale = at(scale, row);
                 let (x, a, normalization) = match link {
-                    PoissonLink::Identity => (x.abs(), y + 1.0, scale.ln()),
-                    PoissonLink::Log => ((-x).exp(), y + 1e-5, (y + 1e-5).ln()),
+                    PoissonLink::Identity => (x.abs(), y + 1.0, scale.ln_p()),
+                    PoissonLink::Log => ((-x).exp_p(), y + 1e-5, (y + 1e-5).ln_p()),
                 };
                 gamma_probability::log_gamma_probability(a, x * scale, true) - normalization
             }
@@ -285,11 +286,16 @@ impl CountLikelihood {
                 let y = at(y, row);
                 let n = at(trials, row);
                 let (x, a, b, normalization) = match link {
-                    BinomialLink::Identity => (x.abs(), y + 1.0, n - y + 1.0, -(n + 1.0).ln()),
+                    BinomialLink::Identity => (x.abs(), y + 1.0, n - y + 1.0, -(n + 1.0).ln_p()),
                     BinomialLink::Logit => {
                         let a = y + 1e-5;
                         let n = n + 2e-5;
-                        (1.0 / (1.0 + (-x).exp()), a, n - a, (n / (a * (n - a))).ln())
+                        (
+                            1.0 / (1.0 + (-x).exp_p()),
+                            a,
+                            n - a,
+                            (n / (a * (n - a))).ln_p(),
+                        )
                     }
                 };
                 log_regularized_beta(a, b, x) + normalization
@@ -302,8 +308,10 @@ impl CountLikelihood {
                 let y = at(y, row);
                 let r = at(scale, row);
                 match link {
-                    PoissonLink::Identity => gamma_density(x.abs(), y + 1.0, r) - r.ln(),
-                    PoissonLink::Log => gamma_density((-x).exp(), y + 1e-5, r) - (y + 1e-5).ln(),
+                    PoissonLink::Identity => gamma_density(x.abs(), y + 1.0, r) - r.ln_p(),
+                    PoissonLink::Log => {
+                        gamma_density((-x).exp_p(), y + 1e-5, r) - (y + 1e-5).ln_p()
+                    }
                 }
             }
             Self::Binomial { y, trials, link } => {
@@ -311,12 +319,13 @@ impl CountLikelihood {
                 let n = at(trials, row);
                 match link {
                     BinomialLink::Identity => {
-                        beta_density(x.abs(), y + 1.0, n - y + 1.0) - (n + 1.0).ln()
+                        beta_density(x.abs(), y + 1.0, n - y + 1.0) - (n + 1.0).ln_p()
                     }
                     BinomialLink::Logit => {
                         let a = y + 1e-5;
                         let n = n + 2e-5;
-                        beta_density(1.0 / (1.0 + (-x).exp()), a, n - a) + (n / (a * (n - a))).ln()
+                        beta_density(1.0 / (1.0 + (-x).exp_p()), a, n - a)
+                            + (n / (a * (n - a))).ln_p()
                     }
                 }
             }
@@ -329,7 +338,7 @@ impl CountLikelihood {
                 let r = at(scale, row);
                 let (a, b, shape) = match link {
                     PoissonLink::Identity => (-b, -a, y + 1.0),
-                    PoissonLink::Log => ((-b).exp(), (-a).exp(), y + 1e-5),
+                    PoissonLink::Log => ((-b).exp_p(), (-a).exp_p(), y + 1e-5),
                 };
                 let factor = if order == 1 {
                     shape / r
@@ -353,8 +362,8 @@ impl CountLikelihood {
                     BinomialLink::Logit => {
                         let alpha = y + 1e-5;
                         (
-                            1.0 / (1.0 + (-b).exp()),
-                            1.0 / (1.0 + (-a).exp()),
+                            1.0 / (1.0 + (-b).exp_p()),
+                            1.0 / (1.0 + (-a).exp_p()),
                             alpha,
                             (n + 2e-5) - alpha,
                         )

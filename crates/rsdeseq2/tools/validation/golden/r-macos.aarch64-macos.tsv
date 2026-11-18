@@ -1,5 +1,5 @@
 # rsdeseq2 golden manifest v1
-# profile: portable
+# profile: r-macos
 # target: aarch64-macos
 # columns: input, workflow, threads, field, sha256
 gtex_auto_dispersion	lrt_local	1	fit.all_zero	e73bc4796e98e1c882bb651a7974ccca94b7c5bb36d4564cf940c1a770910ebe
