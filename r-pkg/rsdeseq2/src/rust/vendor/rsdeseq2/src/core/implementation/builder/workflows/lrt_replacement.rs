@@ -96,7 +96,7 @@ impl DeseqBuilder {
 
         let coefficient = default_results_coefficient(full_design)?;
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_with_cooks_replacement(
+            .leaf_lrt_glm_mu_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,
@@ -128,7 +128,7 @@ impl DeseqBuilder {
 
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_with_cooks_replacement(
+            .leaf_lrt_glm_mu_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,
@@ -159,7 +159,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_contrast_with_cooks_replacement(
+            .leaf_lrt_glm_mu_contrast_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,
@@ -190,7 +190,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+            .leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,
@@ -221,7 +221,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+            .leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
                 counts,
                 full_design,
                 reduced_design,

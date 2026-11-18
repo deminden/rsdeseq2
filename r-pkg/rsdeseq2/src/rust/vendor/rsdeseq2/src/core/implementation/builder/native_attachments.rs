@@ -1,29 +1,23 @@
 use super::*;
 impl DeseqBuilder {
-    /// Run the parametric GLM-mu native dispersion path and then a Wald test.
-    ///
-    /// This compatibility-named entry point keeps parametric behavior even if
-    /// the builder's `fit_type` is set to another value.
-    pub fn fit_wald_glm_mu_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
         coefficient: usize,
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
-            return pool.install(|| self.fit_wald_glm_mu_parametric(counts, design, coefficient));
+            return pool.install(|| self.leaf_wald_glm_mu_parametric(counts, design, coefficient));
         }
 
         validate_pipeline_wald_coefficient(design, coefficient)?;
-        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
         self.attach_native_wald(counts, design, coefficient, fit)
     }
 
-    /// Run the parametric GLM-mu native Wald path for a numeric contrast.
-    ///
-    /// This compatibility-named entry point keeps parametric behavior even if
-    /// the builder's `fit_type` is set to another value.
-    pub fn fit_wald_glm_mu_contrast_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_contrast_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -31,15 +25,15 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool
-                .install(|| self.fit_wald_glm_mu_contrast_parametric(counts, design, contrast));
+                .install(|| self.leaf_wald_glm_mu_contrast_parametric(counts, design, contrast));
         }
 
-        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
         self.attach_native_wald_contrast(counts, design, contrast, None, fit)
     }
 
-    /// Run the parametric GLM-mu native Wald path for a named primitive contrast.
-    pub fn fit_wald_glm_mu_contrast_spec_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_contrast_spec_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -47,13 +41,13 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_contrast_spec_parametric(counts, design, contrast)
+                self.leaf_wald_glm_mu_contrast_spec_parametric(counts, design, contrast)
             });
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
         let (fit, mut results) =
-            self.fit_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
+            self.leaf_wald_glm_mu_contrast_parametric(counts, design, &numeric_contrast)?;
         results.set_resolved_contrast_metadata(
             contrast.result_name(),
             contrast.comparison(),
@@ -62,8 +56,8 @@ impl DeseqBuilder {
         Ok((fit, results))
     }
 
-    /// Run the parametric GLM-mu native Wald path for a factor-level contrast.
-    pub fn fit_wald_glm_mu_factor_level_contrast_parametric(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast_parametric`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_factor_level_contrast_parametric(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -71,7 +65,7 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, DeseqResults), DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast)
+                self.leaf_wald_glm_mu_factor_level_contrast_parametric(counts, design, contrast)
             });
         }
 
@@ -95,7 +89,7 @@ impl DeseqBuilder {
             contrast.numerator,
             contrast.denominator,
         )?;
-        let fit = self.fit_map_dispersions_glm_mu_parametric(counts, design)?;
+        let fit = self.leaf_map_dispersions_glm_mu_parametric(counts, design)?;
         let (fit, mut results) = self.attach_native_wald_contrast(
             counts,
             design,

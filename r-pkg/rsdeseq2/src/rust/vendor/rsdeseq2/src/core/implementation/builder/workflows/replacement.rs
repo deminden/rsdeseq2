@@ -25,7 +25,7 @@ impl DeseqBuilder {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
                 self.with_automatic_dispersion_means()
-                    .fit_wald_glm_mu_with_cooks_replacement(
+                    .leaf_wald_glm_mu_with_cooks_replacement(
                         counts,
                         design,
                         coefficient,
@@ -88,7 +88,7 @@ impl DeseqBuilder {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
                 self.with_automatic_dispersion_means()
-                    .fit_wald_glm_mu_with_cooks_replacement(
+                    .leaf_wald_glm_mu_with_cooks_replacement(
                         counts,
                         design,
                         coefficient,
@@ -295,7 +295,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_contrast_with_cooks_replacement(
+                .leaf_wald_glm_mu_contrast_with_cooks_replacement(
                     counts,
                     design,
                     contrast,
@@ -372,7 +372,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                .leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(
                     counts,
                     design,
                     contrast,
@@ -622,7 +622,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                .leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
                     counts,
                     design,
                     contrast,

@@ -1,16 +1,7 @@
 use super::*;
 impl DeseqBuilder {
-    /// Run the current GLM-mu native Wald path with limited Cook's replacement refit.
-    ///
-    /// This is an explicitly scoped analogue of the `replaceOutliers` /
-    /// `refitWithoutOutliers` part of DESeq2 for the currently implemented
-    /// native GLM-mu Wald branch. It preserves the original size factors,
-    /// builds replacement counts from original Cook's distances, reruns the
-    /// implemented GLM-mu dispersion/MAP/Wald path on replacement counts, and
-    /// merges only rows marked for refit. Beta priors are applied by the
-    /// results-level beta-prior functions; Bioconductor object slots are
-    /// outside the Rust API.
-    pub fn fit_wald_glm_mu_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -19,7 +10,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_with_cooks_replacement(
+                self.leaf_wald_glm_mu_with_cooks_replacement(
                     counts,
                     design,
                     coefficient,
@@ -34,7 +25,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_wald_glm_mu(counts, design, coefficient)?;
+            raw_builder.leaf_wald_glm_mu(counts, design, coefficient)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             design,
@@ -98,13 +89,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run the current GLM-mu native Wald contrast path with limited Cook's replacement refit.
-    ///
-    /// This mirrors [`Self::fit_wald_glm_mu_with_cooks_replacement`] for
-    /// primitive numeric contrasts: original and replacement-count refits both
-    /// use the native GLM-mu contrast path, then only rows marked by the
-    /// replacement plan are merged into the final result table.
-    pub fn fit_wald_glm_mu_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -113,7 +99,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+                self.leaf_wald_glm_mu_contrast_with_cooks_replacement(
                     counts,
                     design,
                     contrast,
@@ -127,7 +113,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_wald_glm_mu_contrast(counts, design, contrast)?;
+            raw_builder.leaf_wald_glm_mu_contrast(counts, design, contrast)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             design,
@@ -192,8 +178,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run native GLM-mu Wald replacement refit for a named primitive contrast specification.
-    pub fn fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -202,7 +188,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_contrast_spec_with_cooks_replacement(
+                self.leaf_wald_glm_mu_contrast_spec_with_cooks_replacement(
                     counts,
                     design,
                     contrast,
@@ -212,7 +198,7 @@ impl DeseqBuilder {
         }
 
         let numeric_contrast = resolve_contrast(design, contrast)?;
-        let mut output = self.fit_wald_glm_mu_contrast_with_cooks_replacement(
+        let mut output = self.leaf_wald_glm_mu_contrast_with_cooks_replacement(
             counts,
             design,
             &numeric_contrast,
@@ -227,8 +213,8 @@ impl DeseqBuilder {
         Ok(output)
     }
 
-    /// Run native GLM-mu Wald replacement refit for a caller-supplied factor-level contrast.
-    pub fn fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         design: &DesignMatrix,
@@ -237,7 +223,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementWaldOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
+                self.leaf_wald_glm_mu_factor_level_contrast_with_cooks_replacement(
                     counts,
                     design,
                     contrast,
@@ -265,7 +251,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_wald_glm_mu_factor_level_contrast(counts, design, contrast)?;
+            raw_builder.leaf_wald_glm_mu_factor_level_contrast(counts, design, contrast)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             design,
@@ -358,16 +344,8 @@ impl DeseqBuilder {
         Ok(output)
     }
 
-    /// Run the current GLM-mu native LRT path with limited Cook's replacement refit.
-    ///
-    /// This mirrors the scoped Wald replacement-refit path for the implemented
-    /// native GLM-mu LRT branch: first fit on original counts with Cook's
-    /// filtering disabled, replace eligible Cook's outlier counts, rerun the
-    /// native GLM-mu dispersion/MAP/LRT path on replacement counts with the
-    /// original size factors, and merge only rows marked by the refit plan.
-    /// Broader DESeq2 behavior for contrasts, beta priors, and Bioconductor
-    /// object metadata remains future work.
-    pub fn fit_lrt_glm_mu_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_lrt_glm_mu_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,
@@ -377,7 +355,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_lrt_glm_mu_with_cooks_replacement(
+                self.leaf_lrt_glm_mu_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -392,7 +370,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_lrt_glm_mu(counts, full_design, reduced_design, coefficient)?;
+            raw_builder.leaf_lrt_glm_mu(counts, full_design, reduced_design, coefficient)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             full_design,
@@ -457,8 +435,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run the current GLM-mu native LRT contrast path with limited Cook's replacement refit.
-    pub fn fit_lrt_glm_mu_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_lrt_glm_mu_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,
@@ -468,7 +446,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+                self.leaf_lrt_glm_mu_contrast_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -483,7 +461,7 @@ impl DeseqBuilder {
             .disable_cooks_cutoff()
             .disable_independent_filtering();
         let (original_fit, original_results) =
-            raw_builder.fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)?;
+            raw_builder.leaf_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)?;
         let refit_plan = replacement_refit_plan_from_original(
             counts,
             full_design,
@@ -549,8 +527,8 @@ impl DeseqBuilder {
         })
     }
 
-    /// Run native GLM-mu LRT replacement refit for a caller-supplied factor-level contrast.
-    pub fn fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,
@@ -560,7 +538,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
+                self.leaf_lrt_glm_mu_factor_level_contrast_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -588,7 +566,7 @@ impl DeseqBuilder {
             .clone()
             .disable_cooks_cutoff()
             .disable_independent_filtering();
-        let (original_fit, original_results) = raw_builder.fit_lrt_glm_mu_factor_level_contrast(
+        let (original_fit, original_results) = raw_builder.leaf_lrt_glm_mu_factor_level_contrast(
             counts,
             full_design,
             reduced_design,
@@ -687,8 +665,8 @@ impl DeseqBuilder {
         Ok(output)
     }
 
-    /// Run native GLM-mu LRT replacement refit for a named primitive contrast specification.
-    pub fn fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+    /// Leaf workflow behind [`DeseqBuilder::fit_lrt_glm_mu_contrast_spec_with_cooks_replacement`] and [`DeseqBuilder::run`].
+    pub(super) fn leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
         &self,
         counts: &CountMatrix,
         full_design: &DesignMatrix,
@@ -698,7 +676,7 @@ impl DeseqBuilder {
     ) -> Result<CooksReplacementLrtOutput, DeseqError> {
         if let Some(pool) = self.execution_context.pool_for_entry(self.threads)? {
             return pool.install(|| {
-                self.fit_lrt_glm_mu_contrast_spec_with_cooks_replacement(
+                self.leaf_lrt_glm_mu_contrast_spec_with_cooks_replacement(
                     counts,
                     full_design,
                     reduced_design,
@@ -709,7 +687,7 @@ impl DeseqBuilder {
         }
 
         let numeric_contrast = resolve_contrast(full_design, contrast)?;
-        let mut output = self.fit_lrt_glm_mu_contrast_with_cooks_replacement(
+        let mut output = self.leaf_lrt_glm_mu_contrast_with_cooks_replacement(
             counts,
             full_design,
             reduced_design,

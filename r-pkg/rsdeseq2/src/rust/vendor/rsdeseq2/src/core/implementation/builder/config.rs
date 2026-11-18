@@ -590,7 +590,7 @@ pub(super) mod execution_control_tests {
                 .build()
                 .unwrap();
             let _ = ambient
-                .install(|| builder.fit_fixed_dispersion_wald(&counts, &design, &[0.1; 3], 1))
+                .install(|| builder.leaf_fixed_dispersion_wald(&counts, &design, &[0.1; 3], 1))
                 .unwrap();
             assert_eq!(*observed.lock().unwrap(), [workers]);
             let cloned = builder.clone();
@@ -661,12 +661,12 @@ pub(super) mod execution_control_tests {
                             // A normal analysis error must not poison or strand the pool.
                             let invalid =
                                 CountMatrix::from_row_major_u32(1, 2, vec![1, 2]).unwrap();
-                            assert!(builder.fit_size_factors_and_base_means(&invalid).is_err());
+                            assert!(builder.leaf_size_factors_and_base_means(&invalid).is_err());
                             assert_eq!(rayon::current_num_threads(), workers);
                         })
                         .unwrap();
                     let counts = CountMatrix::from_row_major_u32(1, 8, vec![10; 8]).unwrap();
-                    assert!(builder.fit_size_factors_and_base_means(&counts).is_ok());
+                    assert!(builder.leaf_size_factors_and_base_means(&counts).is_ok());
                     drop(builder);
                     assert!(weak.upgrade().is_none());
                 });
@@ -707,7 +707,7 @@ pub(super) mod execution_control_tests {
                 .unwrap();
             ambient.install(|| {
                 let replacement = builder
-                    .fit_fixed_dispersion_wald_with_cooks_replacement(
+                    .leaf_fixed_dispersion_wald_with_cooks_replacement(
                         &counts,
                         &design,
                         &[0.1; 3],

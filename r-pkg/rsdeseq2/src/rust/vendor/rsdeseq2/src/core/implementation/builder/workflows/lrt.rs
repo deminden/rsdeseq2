@@ -56,7 +56,7 @@ impl DeseqBuilder {
         }
 
         let coefficient = default_results_coefficient(full_design)?;
-        self.with_automatic_dispersion_means().fit_lrt_glm_mu(
+        self.with_automatic_dispersion_means().leaf_lrt_glm_mu(
             counts,
             full_design,
             reduced_design,
@@ -109,7 +109,7 @@ impl DeseqBuilder {
         }
 
         let coefficient = resolve_coefficient_index(full_design, coefficient_name)?;
-        self.with_automatic_dispersion_means().fit_lrt_glm_mu(
+        self.with_automatic_dispersion_means().leaf_lrt_glm_mu(
             counts,
             full_design,
             reduced_design,
@@ -208,7 +208,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
+            .leaf_lrt_glm_mu_contrast(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the currently implemented top-level LRT workflow and report a numeric contrast.
@@ -249,7 +249,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
+            .leaf_lrt_glm_mu_contrast_spec(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the currently implemented top-level LRT workflow for a caller-supplied factor-level contrast.
@@ -272,7 +272,7 @@ impl DeseqBuilder {
         }
 
         self.with_automatic_dispersion_means()
-            .fit_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
+            .leaf_lrt_glm_mu_factor_level_contrast(counts, full_design, reduced_design, contrast)
     }
 
     /// Run the top-level LRT workflow for a DESeq2 `results(contrast=...)` request.

@@ -43,7 +43,7 @@ impl DeseqBuilder {
         subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
         subset_builder.normalization_factors = subset.normalization_factors.clone();
         subset_builder.observation_weights = subset.observation_weights.clone();
-        let fit = subset_builder.fit_dispersion_trend_glm_mu(&subset.counts, design)?;
+        let fit = subset_builder.leaf_dispersion_trend_glm_mu(&subset.counts, design)?;
         Ok((fit, subset))
     }
 
@@ -168,7 +168,7 @@ impl DeseqBuilder {
             });
         }
 
-        let trend_fit = self.fit_dispersion_trend_glm_mu(counts, design)?;
+        let trend_fit = self.leaf_dispersion_trend_glm_mu(counts, design)?;
         let transformed = trend_fit.variance_stabilizing_transform(counts)?;
         Ok(VstGlmMuOutput {
             transformed,

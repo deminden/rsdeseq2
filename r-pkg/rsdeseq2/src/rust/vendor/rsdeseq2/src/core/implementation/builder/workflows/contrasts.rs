@@ -26,7 +26,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_contrast(counts, design, contrast),
+                .leaf_wald_glm_mu_contrast(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
                 self.with_automatic_dispersion_means()
@@ -64,7 +64,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_contrast_spec(counts, design, contrast),
+                .leaf_wald_glm_mu_contrast_spec(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
                 self.with_automatic_dispersion_means()
@@ -209,7 +209,7 @@ impl DeseqBuilder {
         match self.test {
             TestType::Wald => self
                 .with_automatic_dispersion_means()
-                .fit_wald_glm_mu_factor_level_contrast(counts, design, contrast),
+                .leaf_wald_glm_mu_factor_level_contrast(counts, design, contrast),
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
                 self.with_automatic_dispersion_means()

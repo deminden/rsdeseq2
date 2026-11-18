@@ -49,7 +49,7 @@ impl DeseqBuilder {
             TestType::Wald => {
                 let coefficient = default_results_coefficient(design)?;
                 self.with_automatic_dispersion_means()
-                    .fit_wald_glm_mu(counts, design, coefficient)
+                    .leaf_wald_glm_mu(counts, design, coefficient)
             }
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
@@ -94,7 +94,7 @@ impl DeseqBuilder {
             TestType::Wald => {
                 let coefficient = resolve_coefficient_index(design, coefficient_name)?;
                 self.with_automatic_dispersion_means()
-                    .fit_wald_glm_mu(counts, design, coefficient)
+                    .leaf_wald_glm_mu(counts, design, coefficient)
             }
             TestType::Lrt => {
                 let reduced_design = self.reduced_design_for_top_level_lrt()?;
