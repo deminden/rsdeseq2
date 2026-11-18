@@ -201,4 +201,116 @@ fn deprecated_beta_prior_fits_all_run() {
     for (tag, value) in fits {
         record(tag, value);
     }
+    let rlog_counts = CountMatrix::from_row_major_u32(
+        3,
+        6,
+        vec![
+            10, 14, 12, 30, 35, 28, 5, 3, 6, 4, 7, 5, 200, 180, 220, 90, 100, 85,
+        ],
+    )
+    .unwrap();
+    let rlog_factors =
+        RowMajorMatrix::from_row_major(3, 6, (0..18).map(|i| 0.7 + 0.03 * f64::from(i)).collect())
+            .unwrap();
+    let rlog_disp = [0.1, 0.2, 0.05];
+    let intercept = [4.0, 2.2, 7.1];
+    let rlog_irls = IrlsOptions::deseq2_rlog();
+    #[allow(deprecated)]
+    let rlogs = [
+        (
+            "rlog/sf",
+            s(rlog_with_size_factors(
+                &rlog_counts,
+                &size_factors,
+                &rlog_disp,
+                0.7,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog/nf",
+            s(rlog_with_normalization_factors(
+                &rlog_counts,
+                &rlog_factors,
+                &rlog_disp,
+                0.7,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_fit/sf",
+            s(rlog_fit_with_size_factors(
+                &rlog_counts,
+                &size_factors,
+                &rlog_disp,
+                0.7,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_fit/nf",
+            s(rlog_fit_with_normalization_factors(
+                &rlog_counts,
+                &rlog_factors,
+                &rlog_disp,
+                0.7,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_frozen/sf",
+            s(rlog_frozen_with_size_factors(
+                &rlog_counts,
+                &size_factors,
+                &rlog_disp,
+                0.7,
+                &intercept,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_frozen/nf",
+            s(rlog_frozen_with_normalization_factors(
+                &rlog_counts,
+                &rlog_factors,
+                &rlog_disp,
+                0.7,
+                &intercept,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_prior/sf",
+            s(rlog_with_estimated_prior_and_size_factors(
+                &rlog_counts,
+                &size_factors,
+                &base_mean[..3],
+                &disp_fit[..3],
+                &rlog_disp,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+        (
+            "rlog_prior/nf",
+            s(rlog_with_estimated_prior_and_normalization_factors(
+                &rlog_counts,
+                &rlog_factors,
+                &base_mean[..3],
+                &disp_fit[..3],
+                &rlog_disp,
+                rlog_irls.clone(),
+            )
+            .map(|f| format!("{f:?}"))),
+        ),
+    ];
+    for (tag, value) in rlogs {
+        record(tag, value);
+    }
 }

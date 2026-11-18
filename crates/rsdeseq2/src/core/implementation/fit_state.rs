@@ -151,6 +151,15 @@ pub struct DeseqBuilder {
 }
 
 impl DeseqFit {
+    /// The fit's normalization offsets: its normalization factors when it has
+    /// them, its size factors otherwise.
+    pub(super) fn offsets(&self) -> Offsets<'_> {
+        match &self.normalization_factors {
+            Some(factors) => Offsets::PerCell(factors),
+            None => Offsets::PerSample(&self.size_factors),
+        }
+    }
+
     /// Reconstruct DESeq2-style normalized counts for the count matrix used to create this fit.
     pub fn normalized_counts(
         &self,
@@ -281,51 +290,37 @@ impl DeseqFit {
             let compact_base_mean = compact_f64_values(&self.base_mean, &nonzero_rows)?;
             let compact_disp_fit = compact_f64_values(disp_fit, &nonzero_rows)?;
             let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
-            let compact_output = match &self.normalization_factors {
-                Some(factors) => {
-                    let compact_factors = compact_matrix_rows(factors, &nonzero_rows)?;
-                    rlog_with_estimated_prior_and_normalization_factors(
-                        &compact_counts,
-                        &compact_factors,
-                        &compact_base_mean,
-                        &compact_disp_fit,
-                        &compact_dispersions,
-                        options,
-                    )?
-                }
-                None => rlog_with_estimated_prior_and_size_factors(
-                    &compact_counts,
-                    &self.size_factors,
-                    &compact_base_mean,
-                    &compact_disp_fit,
-                    &compact_dispersions,
-                    options,
-                )?,
+            let compact_factors = self
+                .normalization_factors
+                .as_ref()
+                .map(|factors| compact_matrix_rows(factors, &nonzero_rows))
+                .transpose()?;
+            let offsets = match &compact_factors {
+                Some(factors) => Offsets::PerCell(factors),
+                None => Offsets::PerSample(&self.size_factors),
             };
+            let compact_output = rlog_with_estimated_prior(
+                &compact_counts,
+                offsets,
+                &compact_base_mean,
+                &compact_disp_fit,
+                &compact_dispersions,
+                options,
+            )?;
             return expand_rlog_output_with_all_zero_rows(
                 compact_output,
                 &self.all_zero,
                 counts.n_samples(),
             );
         }
-        match &self.normalization_factors {
-            Some(factors) => rlog_with_estimated_prior_and_normalization_factors(
-                counts,
-                factors,
-                &self.base_mean,
-                disp_fit,
-                dispersions,
-                options,
-            ),
-            None => rlog_with_estimated_prior_and_size_factors(
-                counts,
-                &self.size_factors,
-                &self.base_mean,
-                disp_fit,
-                dispersions,
-                options,
-            ),
-        }
+        rlog_with_estimated_prior(
+            counts,
+            self.offsets(),
+            &self.base_mean,
+            disp_fit,
+            dispersions,
+            options,
+        )
     }
 
     /// Short alias for [`DeseqFit::regularized_log_transform`].
@@ -402,27 +397,23 @@ impl DeseqFit {
             let compact_counts = compact_counts(counts, &nonzero_rows)?;
             let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
             let compact_intercept = compact_f64_values(frozen_intercept, &nonzero_rows)?;
-            let compact_output = match &self.normalization_factors {
-                Some(factors) => {
-                    let compact_factors = compact_matrix_rows(factors, &nonzero_rows)?;
-                    rlog_frozen_with_normalization_factors(
-                        &compact_counts,
-                        &compact_factors,
-                        &compact_dispersions,
-                        sample_prior_variance,
-                        &compact_intercept,
-                        options,
-                    )?
-                }
-                None => rlog_frozen_with_size_factors(
-                    &compact_counts,
-                    &self.size_factors,
-                    &compact_dispersions,
-                    sample_prior_variance,
-                    &compact_intercept,
-                    options,
-                )?,
+            let compact_factors = self
+                .normalization_factors
+                .as_ref()
+                .map(|factors| compact_matrix_rows(factors, &nonzero_rows))
+                .transpose()?;
+            let offsets = match &compact_factors {
+                Some(factors) => Offsets::PerCell(factors),
+                None => Offsets::PerSample(&self.size_factors),
             };
+            let compact_output = rlog_frozen(
+                &compact_counts,
+                offsets,
+                &compact_dispersions,
+                sample_prior_variance,
+                &compact_intercept,
+                options,
+            )?;
             return expand_frozen_rlog_output_with_all_zero_rows(
                 compact_output,
                 &self.all_zero,
@@ -430,24 +421,14 @@ impl DeseqFit {
                 frozen_intercept,
             );
         }
-        match &self.normalization_factors {
-            Some(factors) => rlog_frozen_with_normalization_factors(
-                counts,
-                factors,
-                dispersions,
-                sample_prior_variance,
-                frozen_intercept,
-                options,
-            ),
-            None => rlog_frozen_with_size_factors(
-                counts,
-                &self.size_factors,
-                dispersions,
-                sample_prior_variance,
-                frozen_intercept,
-                options,
-            ),
-        }
+        rlog_frozen(
+            counts,
+            self.offsets(),
+            dispersions,
+            sample_prior_variance,
+            frozen_intercept,
+            options,
+        )
     }
 
     /// Short alias for [`DeseqFit::regularized_log_transform_with_frozen_intercept`].

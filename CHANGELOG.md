@@ -7,6 +7,9 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Added
 
+- `rlog_transform`, `rlog_fit`, `rlog_frozen` and `rlog_with_estimated_prior`
+  take `Offsets` (size factors or normalization factors).
+
 - `fit_fixed_dispersion_glm(GlmInput, design, options)` and
   `fit_intercept_only_glm(GlmInput)`: the fixed-dispersion IRLS fit and the
   intercept-only closed form with size-factor or normalization-factor
@@ -142,6 +145,10 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   is not present" error. Found by the formula fuzz target.
 
 ### Deprecated
+
+- The eight `rlog_*_with_size_factors` / `rlog_*_with_normalization_factors`
+  functions (including `rlog_with_estimated_prior_and_*`): use the four
+  `Offsets` forms above. Output is unchanged; removal in 0.7.0.
 
 - `fit_fixed_dispersion_irls{,_with_weights,_with_normalization_factors,_with_normalization_factors_and_weights}`
   and `fit_intercept_only_fixed_dispersion{,_with_weights,_with_normalization_factors}`:
