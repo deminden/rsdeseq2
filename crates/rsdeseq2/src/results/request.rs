@@ -5,6 +5,7 @@ use super::{
 };
 use crate::contrasts::ResultsContrast;
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::glm::{WaldTestOptions, wald::validate_wald_options};
 use crate::independent_filtering::{
     IndependentFilteringOptions, apply_independent_filtering, validate_alpha, validate_theta,
@@ -41,9 +42,11 @@ impl ResultRequest {
         if let CooksCutoff::Threshold(value) = cooks
             && (!value.is_finite() || value < 0.0)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: "Cook's threshold must be finite and non-negative".into(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                "Cook's threshold",
+                Requirement::FiniteAndNonNegative,
+            ));
         }
         Ok(Self {
             contrast,

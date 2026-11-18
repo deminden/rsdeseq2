@@ -5,6 +5,7 @@ use super::mean::{MeanDispersionTrendOptions, fit_mean_dispersion_trend};
 use super::model::DispersionTrendFit;
 use super::parametric::{ParametricDispersionTrendOptions, fit_parametric_dispersion_trend};
 use crate::errors::{DeseqError, ErrorKind, invalid_dimensions};
+use crate::errors::{Requirement, invalid_parameter};
 use crate::options::FitType;
 
 /// DESeq2's parametric trend row-selection rule.
@@ -109,9 +110,11 @@ fn validate_trend_selection_inputs(
         ));
     }
     if !min_disp.is_finite() || min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "min_disp",
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

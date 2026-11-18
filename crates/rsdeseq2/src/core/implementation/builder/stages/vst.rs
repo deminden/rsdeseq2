@@ -1,5 +1,6 @@
 //! Builder vst stages.
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 impl DeseqBuilder {
     /// Fit the selected GLM-mu dispersion trend on a fast-VST subset.
@@ -20,9 +21,11 @@ impl DeseqBuilder {
     ) -> Result<(DeseqFit, FastVstSubset), DeseqError> {
         self.in_pool(|| {
             if nsub == 0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "fast VST subset size must be positive".to_string(),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    "fast VST subset size",
+                    Requirement::Positive,
+                ));
             }
             design.validate_full_rank("fast VST GLM-mu dispersion trend")?;
             let stages = self.normalization_stages_for_design(counts, design)?;
@@ -130,9 +133,11 @@ impl DeseqBuilder {
     ) -> Result<VstGlmMuOutput, DeseqError> {
         self.in_pool(|| {
             if nsub == 0 {
-                return Err(DeseqError::InvalidOptions {
-                    reason: "automatic VST subset size must be positive".to_string(),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    "automatic VST subset size",
+                    Requirement::Positive,
+                ));
             }
             let stages = self.normalization_stages_for_design(counts, design)?;
             let selection_means = base_mean(&stages.normalized)?;

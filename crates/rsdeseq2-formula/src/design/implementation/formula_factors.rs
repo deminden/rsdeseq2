@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 pub(super) fn expand_formula_factor_transform_terms(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -129,12 +130,10 @@ pub(super) fn formula_factor_identity_transform_term(
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     let arguments = split_formula_transform_arguments(expression)?;
     if arguments.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{}({expression})' must provide a factor",
-                transform.label
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{}({expression})' must provide a factor",
+            transform.label
+        )));
     }
     let mut factor_text = None;
     let mut levels = None;
@@ -186,12 +185,10 @@ pub(super) fn formula_factor_identity_transform_term(
                 }
                 _ => {}
             }
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula transform '{}({expression})' has unsupported argument '{argument}'",
-                    transform.label
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula transform '{}({expression})' has unsupported argument '{argument}'",
+                transform.label
+            )));
         }
         match positional_idx {
             0 if factor_text.is_none() => {
@@ -221,20 +218,16 @@ pub(super) fn formula_factor_identity_transform_term(
             }
             _ => {}
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{}({expression})' has unsupported argument '{argument}'",
-                transform.label
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{}({expression})' has unsupported argument '{argument}'",
+            transform.label
+        )));
     }
     let Some(factor_text) = factor_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{}({expression})' must provide a factor",
-                transform.label
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{}({expression})' must provide a factor",
+            transform.label
+        )));
     };
     let factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
     let mut arguments = vec![(Some("x"), factor.primitive.clone())];
@@ -274,11 +267,9 @@ pub(super) fn formula_relevel_transform_term(
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     let arguments = split_formula_transform_arguments(expression)?;
     if arguments.len() < 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'relevel({expression})' must provide factor and ref"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'relevel({expression})' must provide factor and ref"
+        )));
     }
     let mut factor_text = None;
     let mut reference = None;
@@ -310,11 +301,9 @@ pub(super) fn formula_relevel_transform_term(
                     continue;
                 }
                 _ => {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!(
-                            "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
-                        ),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
+                    )));
                 }
             }
         }
@@ -333,21 +322,19 @@ pub(super) fn formula_relevel_transform_term(
             }
             _ => {}
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'relevel({expression})' has unsupported argument '{argument}'"
+        )));
     }
     let Some(factor_text) = factor_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'relevel({expression})' must provide a factor"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'relevel({expression})' must provide a factor"
+        )));
     };
     let Some(reference) = reference else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'relevel({expression})' must provide ref"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'relevel({expression})' must provide ref"
+        )));
     };
     let factor = formula_factor_argument_covariate(factor_text.trim(), factors)?;
     let reference = resolve_formula_factor_reference_alias(&factor, &reference)?;
@@ -421,11 +408,9 @@ pub(super) fn formula_factor_argument_covariate(
         };
         return formula_factor_transform_term(transform, inner.trim(), factors);
     }
-    Err(DeseqError::InvalidOptions {
-        reason: format!(
-            "formula factor expression '{expression}' is not a supported factor column or transform"
-        ),
-    })
+    Err(invalid_formula(format!(
+        "formula factor expression '{expression}' is not a supported factor column or transform"
+    )))
 }
 
 pub(super) fn formula_transform_inner_expression(
@@ -449,9 +434,9 @@ pub(super) fn find_formula_factor<'a>(
         [factor] => return Ok(*factor),
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula factor '{factor_name}' appears more than once"),
-            });
+            return Err(invalid_formula(format!(
+                "formula factor '{factor_name}' appears more than once"
+            )));
         }
     }
 
@@ -465,15 +450,11 @@ pub(super) fn find_formula_factor<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [factor] => Ok(*factor),
-        [] => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula factor '{factor_name}' is not present in supplied design metadata"
-            ),
-        }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula factor '{factor_name}' resolves ambiguously after R-style cleanup"
-            ),
-        }),
+        [] => Err(invalid_formula(format!(
+            "formula factor '{factor_name}' is not present in supplied design metadata"
+        ))),
+        _ => Err(invalid_formula(format!(
+            "formula factor '{factor_name}' resolves ambiguously after R-style cleanup"
+        ))),
     }
 }

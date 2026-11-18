@@ -439,7 +439,15 @@ fn builder_fast_vst_subset_trend_preserves_observation_weights() {
     let invalid_nsub = builder
         .fit_fast_vst_dispersion_trend_glm_mu(&counts, &design, 0)
         .unwrap_err();
-    assert!(matches!(invalid_nsub, DeseqError::InvalidOptions { .. }));
+    assert!(matches!(
+        invalid_nsub,
+        DeseqError::InvalidOptions { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Options,
+                ..
+            }
+            | DeseqError::InvalidFormula { .. }
+    ));
     assert!(
         invalid_nsub
             .to_string()

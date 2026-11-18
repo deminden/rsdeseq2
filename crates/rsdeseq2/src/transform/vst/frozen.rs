@@ -3,6 +3,7 @@
 use super::{validate_normalized_counts_and_max, vst_local_from_dispersion_grid};
 use crate::design::expression::{self, Data, EvaluationOptions, Expression, Value};
 use crate::errors::invalid_dispersion;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 use crate::{
     errors::DeseqError,
@@ -49,14 +50,18 @@ pub fn frozen_local_vst_grid_from_counts(
                     [sample]
             };
             if !factor.is_finite() || factor <= 0.0 {
-                return Err(invalid_dispersion(
-                    "frozen local normalization factors must be finite and positive",
+                return Err(invalid_parameter(
+                    ErrorKind::Dispersion,
+                    "frozen local normalization factors",
+                    Requirement::FiniteAndPositive,
                 ));
             }
             let normalized = f64::from(counts.at(gene, sample)) / factor;
             if !normalized.is_finite() {
-                return Err(invalid_dispersion(
-                    "frozen local normalized counts must be finite",
+                return Err(invalid_parameter(
+                    ErrorKind::Dispersion,
+                    "frozen local normalized counts",
+                    Requirement::Finite,
                 ));
             }
             max = max.max(normalized);
@@ -121,8 +126,10 @@ impl SavedLocalDispersionFit {
             .iter()
             .map(|mean| {
                 if !mean.is_finite() || *mean <= 0.0 {
-                    return Err(invalid_dispersion(
-                        "saved local fit means must be finite and positive",
+                    return Err(invalid_parameter(
+                        ErrorKind::Dispersion,
+                        "saved local fit means",
+                        Requirement::FiniteAndPositive,
                     ));
                 }
                 let x = mean.ln_p();

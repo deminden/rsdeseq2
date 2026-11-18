@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Numeric scaling transforms and their options.
 
 pub(super) fn formula_numeric_scale_term(
@@ -67,11 +68,9 @@ pub(super) fn formula_numeric_scale_term(
                     continue;
                 }
                 _ => {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!(
-                            "formula transform 'scale({expression})' has unsupported argument '{argument}'"
-                        ),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula transform 'scale({expression})' has unsupported argument '{argument}'"
+                    )));
                 }
             }
         }
@@ -95,18 +94,14 @@ pub(super) fn formula_numeric_scale_term(
             }
             _ => {}
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'scale({expression})' has unsupported argument '{argument}'"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'scale({expression})' has unsupported argument '{argument}'"
+        )));
     }
     let Some(numeric_text) = numeric_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'scale({expression})' must provide a numeric covariate"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'scale({expression})' must provide a numeric covariate"
+        )));
     };
     let numeric_name = formula_variable_name(numeric_text.trim())?;
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
@@ -157,17 +152,13 @@ pub(super) fn parse_formula_scale_option(
         _ => {
             let parsed = value
                 .parse::<f64>()
-                .map_err(|_| DeseqError::InvalidOptions {
-                    reason: format!(
+                .map_err(|_| invalid_formula(format!(
                         "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite number"
-                    ),
-                })?;
+                    )))?;
             if !parsed.is_finite() || (argument == "scale" && parsed == 0.0) {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite non-zero scale"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula transform 'scale({expression})' argument '{argument}' must be TRUE, FALSE, or a finite non-zero scale"
+                )));
             }
             Ok(FormulaScaleOption::Explicit(parsed))
         }

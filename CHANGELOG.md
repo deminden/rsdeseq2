@@ -96,6 +96,19 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
 
 ### Changed
 
+- Errors are more structured; every message is unchanged. Out-of-domain
+  parameters ("*x* must be finite and positive", and the other phrases in
+  `Requirement`) are `DeseqError::InvalidParameter { domain, parameter,
+  requirement }` (92 sites), formula parse and evaluation errors are
+  `InvalidFormula` (203 sites), missing coefficients are
+  `CoefficientNotFound { candidates, .. }`, and internal invariant failures
+  are `Internal`. They were `InvalidOptions`, `InvalidDispersion`,
+  `InvalidSizeFactors` or `InvalidCounts` before, so code that matches those
+  variants for these cases should match the new variants or `kind()` instead.
+  `kind()` is unchanged except for formula errors (`ErrorKind::Formula`) and
+  invariants (`ErrorKind::Internal`). Design note:
+  `docs/design/structured-errors.md`.
+
 - The numeric foundation (`errors`, `math`, `matrix`, `glm::nb`, numeric
   profiles, special functions and distributions) moved into a new
   `rsdeseq2-base` crate, formula evaluation and design matrices

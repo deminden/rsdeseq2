@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Complete workflows preserve term and matrix-valued variable order while the
 // expanded compatibility APIs retain their established explicit column layout.
 
@@ -84,9 +85,7 @@ pub(super) fn formula_fitting_design<'a>(
                         .iter()
                         .position(|level| level == v)
                         .and_then(|i| i32::try_from(i + 1).ok())
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "formula factor code is outside levels".into(),
-                        })
+                        .ok_or_else(|| invalid_formula("formula factor code is outside levels"))
                 })
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -174,8 +173,10 @@ pub(super) fn formula_fitting_design<'a>(
             .iter()
             .position(|g| g.columns.iter().any(|c| c.name == name))
             .map(|i| positions[used_factors.len() + i])
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("formula variable '{name}' is absent from fitting plan"),
+            .ok_or_else(|| {
+                invalid_formula(format!(
+                    "formula variable '{name}' is absent from fitting plan"
+                ))
             })
     };
     let resolve = |names: &[&str]| -> Result<Vec<usize>, DeseqError> {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // The string parser translates its validated arguments and retains its public
 // labels. Numerical execution uses the same evaluator as the primitive bridge.
 pub(super) fn formula_numeric_value(values: &[f64]) -> super::super::expression::Value {
@@ -55,9 +56,7 @@ pub(super) fn formula_evaluate_expression(
             collation: "C".into(),
         },
     )
-    .map_err(|error| DeseqError::InvalidOptions {
-        reason: format!("formula transform '{context}': {error}"),
-    })
+    .map_err(|error| invalid_formula(format!("formula transform '{context}': {error}")))
 }
 
 pub(super) fn formula_value_numbers(
@@ -66,9 +65,9 @@ pub(super) fn formula_value_numbers(
 ) -> Result<Vec<f64>, DeseqError> {
     use super::super::expression::Data;
     let Data::Number { values, .. } = result.data else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform '{context}' must produce numeric values"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{context}' must produce numeric values"
+        )));
     };
     formula_finite_values(values, context)
 }
@@ -78,11 +77,9 @@ pub(super) fn formula_finite_values(
     context: &str,
 ) -> Result<Vec<f64>, DeseqError> {
     if let Some(sample) = values.iter().position(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform '{context}' produced non-finite value at sample {sample}"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform '{context}' produced non-finite value at sample {sample}"
+        )));
     }
     Ok(values)
 }

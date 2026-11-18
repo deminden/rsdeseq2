@@ -86,14 +86,26 @@ fn normalization_factors_validate_dimensions_and_positive_values() {
     assert!(matches!(
         normalized_counts_with_factors(&counts, &zero_factor).unwrap_err(),
         DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Normalization,
+                ..
+            }
     ));
     assert!(matches!(
         normalized_counts_with_factors(&counts, &negative_factor).unwrap_err(),
         DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Normalization,
+                ..
+            }
     ));
     assert!(matches!(
         normalized_counts_with_factors(&counts, &nan_factor).unwrap_err(),
         DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Normalization,
+                ..
+            }
     ));
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 pub(super) fn best_log_alpha(
     objective: DispersionObjectiveInput<'_>,
@@ -194,9 +195,11 @@ pub(super) fn validate_gene_est_options(
     options: GeneWiseDispersionOptions,
 ) -> Result<(), DeseqError> {
     if !options.min_disp.is_finite() || options.min_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "min_disp must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "min_disp",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if (options.min_disp / 10.0).ln_p() <= -30.0 {
         return Err(DeseqError::InvalidDispersion {
@@ -218,14 +221,18 @@ pub(super) fn validate_gene_est_options(
         });
     }
     if !options.kappa_0.is_finite() || options.kappa_0 <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "kappa_0 must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "kappa_0",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !options.disp_tol.is_finite() || options.disp_tol <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "disp_tol must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "disp_tol",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if options.maxit == 0 {
         return Err(DeseqError::InvalidDimensions {
@@ -247,9 +254,11 @@ pub(super) fn validate_gene_est_options(
 
 pub(super) fn validate_weight_threshold(value: f64, context: &str) -> Result<(), DeseqError> {
     if !value.is_finite() || value < 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{context} must be finite and non-negative"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            context,
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     Ok(())
 }
@@ -257,14 +266,18 @@ pub(super) fn validate_weight_threshold(value: f64, context: &str) -> Result<(),
 pub(super) fn validate_dispersion_prior(prior: Option<DispersionPrior>) -> Result<(), DeseqError> {
     if let Some(prior) = prior {
         if !prior.log_mean.is_finite() {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "dispersion prior log_mean must be finite".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "dispersion prior log_mean",
+                Requirement::Finite,
+            ));
         }
         if !prior.variance.is_finite() || prior.variance <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "dispersion prior variance must be finite and positive".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "dispersion prior variance",
+                Requirement::FiniteAndPositive,
+            ));
         }
     }
     Ok(())

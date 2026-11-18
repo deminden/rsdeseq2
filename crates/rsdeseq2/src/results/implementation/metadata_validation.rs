@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 pub(super) fn numeric_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
 where
     F: Fn(&DeseqResultRow) -> Option<f64>,
@@ -161,9 +162,11 @@ pub(super) fn validate_lrt_output(lrt: &LrtOutput, n_genes: usize) -> Result<(),
         ));
     }
     if lrt.degrees_of_freedom == 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "LRT degrees of freedom must be positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "LRT degrees of freedom",
+            Requirement::Positive,
+        ));
     }
     validate_optional_finite(&lrt.deviance, "LRT statistic")?;
     validate_optional_probability(&lrt.pvalue, "LRT p-value")?;
@@ -212,9 +215,11 @@ pub(super) fn validate_optional_probability(
         if let Some(value) = value
             && (!value.is_finite() || !(0.0..=1.0).contains(&value))
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("{context} at index {idx} must be finite and within [0, 1]"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("{context} at index {idx}"),
+                Requirement::FiniteInUnitInterval,
+            ));
         }
     }
     Ok(())

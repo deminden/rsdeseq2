@@ -1,6 +1,7 @@
 //! Borrowed Cook's masking without table construction or p-value adjustment.
 use super::ReplacementRows;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::{CountView, MatrixView};
 
 /// Borrowed two-group low-count heuristic inputs in either storage order.
@@ -234,11 +235,11 @@ impl<'a> CooksPolicy<'a> {
             if let Some(p) = pvalue
                 && (!p.is_finite() || !(0.0..=1.0).contains(&p))
             {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "result p-value at index {gene} must be finite and within [0, 1]"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    format!("result p-value at index {gene}"),
+                    Requirement::FiniteInUnitInterval,
+                ));
             }
             result.pvalue.push(pvalue);
             result.outlier.push(outlier);

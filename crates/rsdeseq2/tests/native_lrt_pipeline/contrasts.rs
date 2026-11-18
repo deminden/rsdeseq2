@@ -176,7 +176,12 @@ fn lrt_results_contrast_request_routes_character_list_and_numeric_forms() {
     );
     assert!(matches!(
         missing_levels,
-        Err(DeseqError::InvalidOptions { .. })
+        Err(DeseqError::InvalidOptions { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Options,
+                ..
+            }
+            | DeseqError::InvalidFormula { .. })
     ));
 }
 

@@ -1,6 +1,7 @@
 //! One base-factor/offset composition for native formula and foreign interfaces.
 use super::validate_size_factors;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 use crate::matrix::{MatrixView, RowMajorMatrix};
 use crate::numeric::math::ProfileMath;
 
@@ -42,11 +43,11 @@ pub fn normalization_factors_with_offsets(
         }
         for (index, &value) in nf.as_slice().iter().enumerate() {
             if !value.is_finite() || value <= 0.0 {
-                return Err(DeseqError::InvalidSizeFactors {
-                    reason: format!(
-                        "normalization factor at index {index} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Normalization,
+                    format!("normalization factor at index {index}"),
+                    Requirement::FiniteAndPositive,
+                ));
             }
         }
     } else if size_factors.is_none() {
@@ -57,7 +58,7 @@ pub fn normalization_factors_with_offsets(
     let multipliers=offsets.iter().enumerate().map(|(sample,&offset)| {
         let multiplier=offset.exp_p();
         if offset.is_finite() && multiplier.is_finite() && multiplier>0.0 { Ok(multiplier) }
-        else { Err(DeseqError::InvalidOptions {reason:format!("formula offset exponentiated to non-finite or non-positive factor at sample {sample}")}) }
+        else { Err(invalid_formula(format!("formula offset exponentiated to non-finite or non-positive factor at sample {sample}"))) }
     }).collect::<Result<Vec<_>,_>>()?;
     let mut values = Vec::with_capacity(length);
     for gene in 0..genes {
@@ -70,11 +71,11 @@ pub fn normalization_factors_with_offsets(
             };
             let value = base * multiplier;
             if !value.is_finite() || value <= 0.0 {
-                return Err(DeseqError::InvalidSizeFactors {
-                    reason: format!(
-                        "effective normalization factor at gene {gene}, sample {sample} must be finite and positive"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Normalization,
+                    format!("effective normalization factor at gene {gene}, sample {sample}"),
+                    Requirement::FiniteAndPositive,
+                ));
             }
             values.push(value);
         }

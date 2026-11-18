@@ -6,6 +6,7 @@ use super::numerics::{
 };
 use super::selection::{parametric_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
 
@@ -103,15 +104,18 @@ impl ParametricDispersionTrend {
 
     fn validate_fit(&self) -> Result<(), DeseqError> {
         if !self.asympt_disp.is_finite() || self.asympt_disp <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "asymptotic dispersion coefficient must be finite and positive".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "asymptotic dispersion coefficient",
+                Requirement::FiniteAndPositive,
+            ));
         }
         if !self.extra_pois.is_finite() || self.extra_pois <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "extra-Poisson dispersion coefficient must be finite and positive"
-                    .to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "extra-Poisson dispersion coefficient",
+                Requirement::FiniteAndPositive,
+            ));
         }
         Ok(())
     }
@@ -511,14 +515,18 @@ fn validate_parametric_trend_inputs(
         "parametric dispersion trend rows",
     )?;
     if !options.initial_asympt_disp.is_finite() || options.initial_asympt_disp <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "initial asymptotic dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "initial asymptotic dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !options.initial_extra_pois.is_finite() || options.initial_extra_pois <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "initial extra-Poisson dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "initial extra-Poisson dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !options.min_residual.is_finite()
         || !options.max_residual.is_finite()
@@ -530,15 +538,18 @@ fn validate_parametric_trend_inputs(
         });
     }
     if !options.coefficient_tol.is_finite() || options.coefficient_tol <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "parametric trend coefficient tolerance must be finite and positive"
-                .to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "parametric trend coefficient tolerance",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if !options.glm_tol.is_finite() || options.glm_tol <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "parametric trend GLM tolerance must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "parametric trend GLM tolerance",
+            Requirement::FiniteAndPositive,
+        ));
     }
     if options.max_outer_iter == 0 {
         return Err(DeseqError::InvalidDimensions {

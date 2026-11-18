@@ -1,5 +1,6 @@
 use super::{Data, Evaluator, Value, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 use std::cmp::Ordering;
 impl Evaluator<'_> {
     pub(super) fn comparison(
@@ -44,7 +45,7 @@ impl Evaluator<'_> {
             left
         };
         if template.dimensions.is_some() && template.len() != n {
-            return Err(invalid_options("formula vector is longer than its matrix"));
+            return Err(invalid_formula("formula vector is longer than its matrix"));
         }
         let equal = matches!(name, "==" | "!=");
         let levels = |v: &Value| {

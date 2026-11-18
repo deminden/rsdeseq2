@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 pub(super) fn validate_additive_factor_specs(
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<(), DeseqError> {
@@ -47,9 +48,11 @@ pub(super) fn additive_design_sample_count(
         });
     };
     if covariate.values.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "numeric covariate values must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "numeric covariate values",
+            Requirement::NonEmpty,
+        ));
     }
     Ok(covariate.values.len())
 }
@@ -60,9 +63,11 @@ pub(super) fn validate_numeric_covariate_specs(
 ) -> Result<(), DeseqError> {
     for (idx, covariate) in numeric_covariates.iter().enumerate() {
         if covariate.name.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("numeric covariate {idx} name must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("numeric covariate {idx} name"),
+                Requirement::NonEmpty,
+            ));
         }
         if covariate.values.len() != n_samples {
             return Err(invalid_dimensions(
@@ -101,9 +106,11 @@ pub(super) fn resolve_interaction_indices(
     let mut indices = Vec::with_capacity(interactions.len());
     for (idx, interaction) in interactions.iter().enumerate() {
         if interaction.left_factor.is_empty() || interaction.right_factor.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("interaction {idx} factor names must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("interaction {idx} factor names"),
+                Requirement::NonEmpty,
+            ));
         }
         if interaction.left_factor == interaction.right_factor {
             return Err(DeseqError::InvalidOptions {
@@ -141,9 +148,11 @@ pub(super) fn resolve_factor_numeric_interaction_indices(
     let mut indices = Vec::with_capacity(interactions.len());
     for (idx, interaction) in interactions.iter().enumerate() {
         if interaction.factor.is_empty() || interaction.numeric.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("factor-numeric interaction {idx} names must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("factor-numeric interaction {idx} names"),
+                Requirement::NonEmpty,
+            ));
         }
         let factor_idx = factor_index(factors, interaction.factor)?;
         let numeric_idx = numeric_index(numeric_covariates, interaction.numeric)?;
@@ -168,9 +177,11 @@ pub(super) fn resolve_numeric_interaction_indices(
     let mut indices = Vec::with_capacity(interactions.len());
     for (idx, interaction) in interactions.iter().enumerate() {
         if interaction.left_numeric.is_empty() || interaction.right_numeric.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("numeric interaction {idx} covariate names must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("numeric interaction {idx} covariate names"),
+                Requirement::NonEmpty,
+            ));
         }
         if interaction.left_numeric == interaction.right_numeric {
             return Err(DeseqError::InvalidOptions {
@@ -246,22 +257,28 @@ pub(super) fn validate_factor_design_inputs<S: AsRef<str>>(
     reference: &str,
 ) -> Result<(), DeseqError> {
     if factor.is_empty() || reference.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "factor and reference level must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "factor and reference level",
+            Requirement::NonEmpty,
+        ));
     }
     if sample_levels.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "sample levels must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "sample levels",
+            Requirement::NonEmpty,
+        ));
     }
     let mut has_reference = false;
     for (idx, level) in sample_levels.iter().enumerate() {
         let level = level.as_ref();
         if level.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("sample level {idx} must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("sample level {idx}"),
+                Requirement::NonEmpty,
+            ));
         }
         has_reference |= level == reference;
     }
@@ -284,26 +301,34 @@ pub(super) fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
         return Ok(());
     };
     if factor.is_empty() || reference.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "factor and reference level must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "factor and reference level",
+            Requirement::NonEmpty,
+        ));
     }
     if sample_levels.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "sample levels must be non-empty".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "sample levels",
+            Requirement::NonEmpty,
+        ));
     }
     if levels.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("factor '{factor}' declared levels must be non-empty"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            format!("factor '{factor}' declared levels"),
+            Requirement::NonEmpty,
+        ));
     }
     let mut has_reference = false;
     for (idx, level) in levels.iter().enumerate() {
         if level.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("factor '{factor}' declared level {idx} must be non-empty"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("factor '{factor}' declared level {idx}"),
+                Requirement::NonEmpty,
+            ));
         }
         if levels[..idx].iter().any(|previous| previous == level) {
             return Err(DeseqError::InvalidOptions {

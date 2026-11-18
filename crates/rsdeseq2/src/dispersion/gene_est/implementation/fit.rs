@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 /// Combine rough and moments estimates using DESeq2's bounded start shape.
 pub fn initial_dispersion_estimates(
@@ -402,9 +403,11 @@ pub fn line_search_dispersion(
     let max_disp = max_dispersion(options, n_samples);
     validate_dispersion_bounds(options.min_disp, max_disp)?;
     if !initial_dispersion.is_finite() || initial_dispersion <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "initial dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "initial dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
 
     let min_log_alpha = (options.min_disp / 10.0).ln_p();

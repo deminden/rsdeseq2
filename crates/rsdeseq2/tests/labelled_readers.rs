@@ -80,7 +80,11 @@ fn labelled_readers_keep_their_value_rules() {
     let geometric = read_labeled_geometric_means_tsv_from_reader(&b"g\tv\nx\t-1\n"[..]);
     assert!(matches!(
         geometric,
-        Err(DeseqError::InvalidSizeFactors { .. })
+        Err(DeseqError::InvalidSizeFactors { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Normalization,
+                ..
+            })
     ));
     let levels = read_sample_levels_tsv_from_reader(&b"s\tl\nx\t\n"[..]).unwrap_err();
     assert!(

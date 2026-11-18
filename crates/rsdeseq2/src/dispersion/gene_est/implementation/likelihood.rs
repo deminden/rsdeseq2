@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 /// DESeq2's alpha-dependent NB log-likelihood kernel.
 ///
@@ -32,15 +33,19 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
     }
     validate_observation_weight_slice(weights, counts.len(), "dispersion objective weights")?;
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     let inv_alpha = alpha.recip();
     let log_gamma_inv_alpha = dispersion_lgamma(inv_alpha);
@@ -230,15 +235,19 @@ pub fn dispersion_nb_log_likelihood_kernel_derivative_weighted(
         "dispersion objective derivative weights",
     )?;
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     let inv_alpha = alpha.recip();
     let digamma_inv_alpha = dispersion_digamma(inv_alpha);
@@ -305,15 +314,19 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         "dispersion objective second derivative weights",
     )?;
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     let inv_alpha = alpha.recip();
     let inv_alpha_squared = inv_alpha * inv_alpha;

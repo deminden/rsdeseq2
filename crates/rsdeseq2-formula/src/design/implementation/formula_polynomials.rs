@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Polynomial transform argument handling.
 
 pub(super) fn formula_numeric_poly_term(
@@ -7,11 +8,9 @@ pub(super) fn formula_numeric_poly_term(
 ) -> Result<FormulaNumericTransformExpansion, DeseqError> {
     let arguments = split_formula_transform_arguments(expression)?;
     if arguments.len() < 2 {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'poly({expression})' must provide numeric and degree"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'poly({expression})' must provide numeric and degree"
+        )));
     }
     let mut numeric_text = None;
     let mut degree_text = None;
@@ -84,11 +83,9 @@ pub(super) fn formula_numeric_poly_term(
                     continue;
                 }
                 _ => {
-                    return Err(DeseqError::InvalidOptions {
-                        reason: format!(
-                            "formula transform 'poly({expression})' has unsupported argument '{argument}'"
-                        ),
-                    });
+                    return Err(invalid_formula(format!(
+                        "formula transform 'poly({expression})' has unsupported argument '{argument}'"
+                    )));
                 }
             }
         }
@@ -109,34 +106,30 @@ pub(super) fn formula_numeric_poly_term(
             positional_idx += 1;
             continue;
         }
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'poly({expression})' has unsupported argument '{argument}'"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'poly({expression})' has unsupported argument '{argument}'"
+        )));
     }
     let Some(degree_text) = degree_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula transform 'poly({expression})' must provide a degree"),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'poly({expression})' must provide a degree"
+        )));
     };
     let Some(numeric_text) = numeric_text else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula transform 'poly({expression})' must provide a numeric covariate"
-            ),
-        });
+        return Err(invalid_formula(format!(
+            "formula transform 'poly({expression})' must provide a numeric covariate"
+        )));
     };
     let numeric_name = formula_variable_name(numeric_text.trim())?;
-    let degree = degree_text
-        .parse::<i32>()
-        .map_err(|_| DeseqError::InvalidOptions {
-            reason: format!("formula polynomial degree '{degree_text}' must be an integer"),
-        })?;
+    let degree = degree_text.parse::<i32>().map_err(|_| {
+        invalid_formula(format!(
+            "formula polynomial degree '{degree_text}' must be an integer"
+        ))
+    })?;
     if !(1..=16).contains(&degree) {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula polynomial degrees must be integers from 1 through 16".to_string(),
-        });
+        return Err(invalid_formula(
+            "formula polynomial degrees must be integers from 1 through 16",
+        ));
     }
     let covariate = find_formula_numeric_covariate(numeric_name, numeric_covariates)?;
     let numeric_name = covariate.name;

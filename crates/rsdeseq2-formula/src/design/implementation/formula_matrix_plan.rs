@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Translate the compatibility parser's column order and labels into the shared
 // model-matrix product plan. No factor indicators/products are calculated here.
 pub(super) fn formula_expanded_matrix_values(
@@ -24,8 +25,8 @@ pub(super) fn formula_expanded_matrix_values(
                         .iter()
                         .position(|level| sample == level)
                         .and_then(|i| i32::try_from(i + 1).ok())
-                        .ok_or_else(|| DeseqError::InvalidOptions {
-                            reason: "formula factor code is outside declared levels".into(),
+                        .ok_or_else(|| {
+                            invalid_formula("formula factor code is outside declared levels")
                         })
                 })
                 .collect::<Result<Vec<_>, _>>()
@@ -52,13 +53,15 @@ pub(super) fn formula_expanded_matrix_values(
         let i = factors
             .iter()
             .position(|f| f.factor == name)
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("formula factor '{name}' is absent from the matrix plan"),
+            .ok_or_else(|| {
+                invalid_formula(format!(
+                    "formula factor '{name}' is absent from the matrix plan"
+                ))
             })?;
         let column = levels[i].iter().position(|v| v == level).ok_or_else(|| {
-            DeseqError::InvalidOptions {
-                reason: format!("formula factor level '{level}' is absent from the matrix plan"),
-            }
+            invalid_formula(format!(
+                "formula factor level '{level}' is absent from the matrix plan"
+            ))
         })?;
         Ok(ColumnPiece {
             variable: i,
@@ -68,9 +71,9 @@ pub(super) fn formula_expanded_matrix_values(
     };
     let numeric_piece = |name: &str| -> Result<ColumnPiece, DeseqError> {
         let i = numeric.iter().position(|v| v.name == name).ok_or_else(|| {
-            DeseqError::InvalidOptions {
-                reason: format!("formula numeric '{name}' is absent from the matrix plan"),
-            }
+            invalid_formula(format!(
+                "formula numeric '{name}' is absent from the matrix plan"
+            ))
         })?;
         Ok(ColumnPiece {
             variable: factors.len() + i,
@@ -134,9 +137,9 @@ pub(super) fn formula_expanded_matrix_values(
         }
     }
     if pieces.len() != names.len() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula names and matrix plan columns differ".into(),
-        });
+        return Err(invalid_formula(
+            "formula names and matrix plan columns differ",
+        ));
     }
     let columns = pieces
         .into_iter()

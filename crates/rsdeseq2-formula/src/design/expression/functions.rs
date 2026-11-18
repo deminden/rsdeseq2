@@ -1,5 +1,6 @@
 use super::{Argument, Data, Evaluator, Value, arguments, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 use crate::numeric::math::ProfileMath;
 
 pub(super) fn supported(name: &str) -> bool {
@@ -78,7 +79,7 @@ impl Evaluator<'_> {
             "(" | "I" | "offset" => {
                 let a = arguments(args, &["x"])?;
                 let mut x = a[0]
-                    .ok_or_else(|| invalid_options("formula function requires x"))?
+                    .ok_or_else(|| invalid_formula("formula function requires x"))?
                     .clone();
                 if name == "I" {
                     let mut classes = vec![Some("AsIs".into())];
@@ -130,7 +131,7 @@ impl Evaluator<'_> {
             vec!["x"]
         };
         let a = arguments(args, &formals)?;
-        let input = a[0].ok_or_else(|| invalid_options("formula transform requires x"))?;
+        let input = a[0].ok_or_else(|| invalid_formula("formula transform requires x"))?;
         if name == "as.character" {
             return self.characters(input);
         }

@@ -1,5 +1,6 @@
 use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::math::rank::matrix_rank;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked;
@@ -236,14 +237,18 @@ fn weighted_design_values(weights: &[f64], design: &DesignMatrix) -> Result<Vec<
 
 fn validate_weight_options(options: ObservationWeightOptions) -> Result<(), DeseqError> {
     if !options.weight_threshold.is_finite() || options.weight_threshold < 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "weight threshold must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "weight threshold",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     if !options.rank_tolerance.is_finite() || options.rank_tolerance < 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "rank tolerance must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "rank tolerance",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     Ok(())
 }

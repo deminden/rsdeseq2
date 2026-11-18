@@ -3,6 +3,7 @@
 use super::numerics::validate_positive_mean;
 use super::selection::{local_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 use rcompat_locfit::{Kernel, LocalFit, LocalRegressionConfig, PredictionMethod};
 
@@ -144,9 +145,11 @@ impl LocalDispersionTrend {
 
     fn validate_fit(&self) -> Result<(), DeseqError> {
         if !self.min_disp.is_finite() || self.min_disp <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "minimum dispersion must be finite and positive".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "minimum dispersion",
+                Requirement::FiniteAndPositive,
+            ));
         }
         validate_local_trend_shape(self.span, self.degree)?;
         if self.log_means.is_empty() && (!self.log_disps.is_empty() || !self.weights.is_empty()) {
@@ -297,9 +300,11 @@ fn validate_local_trend_fit_rows(
 
 fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {
     if xs.iter().any(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local dispersion trend log means must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "local dispersion trend log means",
+            Requirement::Finite,
+        ));
     }
     if xs.windows(2).any(|window| window[0] > window[1]) {
         return Err(DeseqError::InvalidDispersion {
@@ -311,9 +316,11 @@ fn validate_sorted_local_means(xs: &[f64]) -> Result<(), DeseqError> {
 
 fn validate_local_trend_values(ys: &[f64]) -> Result<(), DeseqError> {
     if ys.iter().any(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local dispersion trend log dispersions must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "local dispersion trend log dispersions",
+            Requirement::Finite,
+        ));
     }
     Ok(())
 }
@@ -323,9 +330,11 @@ fn validate_local_trend_weights(weights: &[f64]) -> Result<(), DeseqError> {
         .iter()
         .any(|value| !value.is_finite() || *value <= 0.0)
     {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "local dispersion trend weights must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "local dispersion trend weights",
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

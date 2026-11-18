@@ -4,6 +4,7 @@ use crate::dispersion::gene_est::{
     grid_search_dispersion, line_search_dispersion,
 };
 use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::numeric::checked::{self, CheckedExt};
@@ -353,9 +354,11 @@ fn validate_map_inputs(
     }
     validate_positive_scalar(input.disp_prior_var, "dispersion prior variance")?;
     if !input.var_log_disp_estimates.is_finite() || input.var_log_disp_estimates < 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "var_log_disp_estimates must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "var_log_disp_estimates",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     validate_map_options(options, input.counts.n_samples())?;
     for gene in 0..input.counts.n_genes() {
@@ -394,9 +397,11 @@ fn validate_map_options(options: MapDispersionOptions, n_samples: usize) -> Resu
     }
     validate_positive_scalar(options.outlier_sd, "MAP outlier_sd")?;
     if !options.weight_threshold.is_finite() || options.weight_threshold < 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "MAP weight_threshold must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "MAP weight_threshold",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     validate_positive_scalar(options.kappa_0, "MAP kappa_0")?;
     validate_positive_scalar(options.disp_tol, "MAP disp_tol")?;
@@ -423,9 +428,11 @@ fn validate_positive_fit_dispersion(value: f64) -> Result<(), DeseqError> {
 
 fn validate_positive_scalar(value: f64, name: &str) -> Result<(), DeseqError> {
     if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("{name} must be finite and positive"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            name,
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }

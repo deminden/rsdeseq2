@@ -68,6 +68,96 @@ pub enum DeseqError {
     /// Floating-point parsing error in an input table.
     #[error("failed to parse floating-point value '{value}' in {context}")]
     ParseFloat { context: String, value: String },
+
+    /// A named parameter is outside its domain, for example a tolerance that
+    /// must be finite and positive.
+    #[error("{}: {parameter} must be {requirement}", domain_prefix(*domain))]
+    InvalidParameter {
+        /// Which input family the parameter belongs to: `Options`,
+        /// `Dispersion`, `Normalization` or `Counts`. It is also
+        /// [`DeseqError::kind`].
+        domain: ErrorKind,
+        /// The parameter as the message names it.
+        parameter: String,
+        /// The condition it failed.
+        requirement: Requirement,
+    },
+
+    /// A design formula could not be parsed or evaluated.
+    #[error("invalid options: {reason}")]
+    InvalidFormula {
+        /// What is wrong with the formula.
+        reason: String,
+    },
+
+    /// A requested coefficient is not among the fit's coefficient names.
+    #[error("invalid options: {reason}")]
+    CoefficientNotFound {
+        /// The full message.
+        reason: String,
+        /// The names that were looked for, in search order.
+        candidates: Vec<String>,
+    },
+
+    /// An internal consistency check failed: a state that earlier validation
+    /// rules out was reached. This is a bug; please report it.
+    #[error("invalid options: internal invariant violated: {what}")]
+    Internal {
+        /// The violated condition.
+        what: String,
+    },
+}
+
+/// The condition an [`DeseqError::InvalidParameter`] failed. `Display` gives
+/// the phrase used in the message.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum Requirement {
+    /// "finite"
+    Finite,
+    /// "positive"
+    Positive,
+    /// "non-negative"
+    NonNegative,
+    /// "finite and positive"
+    FiniteAndPositive,
+    /// "finite and non-negative"
+    FiniteAndNonNegative,
+    /// "finite and within [0, 1]"
+    FiniteInUnitInterval,
+    /// "non-empty"
+    NonEmpty,
+}
+
+impl Requirement {
+    /// The phrase used in messages.
+    pub fn phrase(self) -> &'static str {
+        match self {
+            Self::Finite => "finite",
+            Self::Positive => "positive",
+            Self::NonNegative => "non-negative",
+            Self::FiniteAndPositive => "finite and positive",
+            Self::FiniteAndNonNegative => "finite and non-negative",
+            Self::FiniteInUnitInterval => "finite and within [0, 1]",
+            Self::NonEmpty => "non-empty",
+        }
+    }
+}
+
+impl std::fmt::Display for Requirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.phrase())
+    }
+}
+
+/// The message prefix of the free-text variant for `domain`.
+fn domain_prefix(domain: ErrorKind) -> &'static str {
+    match domain {
+        ErrorKind::Dispersion => "invalid dispersion",
+        ErrorKind::Normalization => "invalid size factors",
+        ErrorKind::Counts => "invalid counts",
+        _ => "invalid options",
+    }
 }
 
 /// Coarse classification of a [`DeseqError`], stable across message changes.
@@ -92,6 +182,10 @@ pub enum ErrorKind {
     Io,
     /// An input table could not be parsed.
     Parse,
+    /// A design formula could not be parsed or evaluated.
+    Formula,
+    /// An internal consistency check failed (a bug).
+    Internal,
 }
 
 impl DeseqError {
@@ -109,6 +203,10 @@ impl DeseqError {
             Self::UnsupportedFeature { .. } => ErrorKind::Unsupported,
             Self::Io(_) => ErrorKind::Io,
             Self::Csv(_) | Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
+            Self::InvalidParameter { domain, .. } => *domain,
+            Self::InvalidFormula { .. } => ErrorKind::Formula,
+            Self::CoefficientNotFound { .. } => ErrorKind::Options,
+            Self::Internal { .. } => ErrorKind::Internal,
         }
     }
 }
@@ -134,8 +232,28 @@ pub fn scoped_invalid_options(scope: &str, reason: impl std::fmt::Display) -> De
 /// rules out was reached. Reported as `InvalidOptions` so callers never panic.
 #[doc(hidden)]
 pub fn invariant(what: &str) -> DeseqError {
-    DeseqError::InvalidOptions {
-        reason: format!("internal invariant violated: {what}"),
+    DeseqError::Internal { what: what.into() }
+}
+
+/// `InvalidParameter` in `domain`.
+#[doc(hidden)]
+pub fn invalid_parameter(
+    domain: ErrorKind,
+    parameter: impl Into<String>,
+    requirement: Requirement,
+) -> DeseqError {
+    DeseqError::InvalidParameter {
+        domain,
+        parameter: parameter.into(),
+        requirement,
+    }
+}
+
+/// `InvalidFormula` with the reason as given.
+#[doc(hidden)]
+pub fn invalid_formula(reason: impl Into<String>) -> DeseqError {
+    DeseqError::InvalidFormula {
+        reason: reason.into(),
     }
 }
 
@@ -169,13 +287,56 @@ mod tests {
         assert_eq!(invalid_dimensions("x", 1, 2).kind(), ErrorKind::Shape);
         assert_eq!(invalid_options("x").kind(), ErrorKind::Options);
         assert_eq!(invalid_dispersion("x").kind(), ErrorKind::Dispersion);
-        assert_eq!(invariant("x").kind(), ErrorKind::Options);
+        assert_eq!(invariant("x").kind(), ErrorKind::Internal);
+        assert_eq!(invalid_formula("x").kind(), ErrorKind::Formula);
+        assert_eq!(
+            invalid_parameter(ErrorKind::Dispersion, "x", Requirement::Finite).kind(),
+            ErrorKind::Dispersion
+        );
         assert_eq!(
             DeseqError::NoUsableGenesForSizeFactors.kind(),
             ErrorKind::Normalization
         );
         let io = DeseqError::from(std::io::Error::other("x"));
         assert_eq!(io.kind(), ErrorKind::Io);
+    }
+
+    #[test]
+    fn structured_variants_keep_the_free_text_messages() {
+        let free = |domain, reason: String| match domain {
+            ErrorKind::Dispersion => DeseqError::InvalidDispersion { reason },
+            ErrorKind::Normalization => DeseqError::InvalidSizeFactors { reason },
+            ErrorKind::Counts => DeseqError::InvalidCounts { reason },
+            _ => DeseqError::InvalidOptions { reason },
+        };
+        for domain in [
+            ErrorKind::Options,
+            ErrorKind::Dispersion,
+            ErrorKind::Normalization,
+            ErrorKind::Counts,
+        ] {
+            for requirement in [
+                Requirement::Finite,
+                Requirement::Positive,
+                Requirement::NonNegative,
+                Requirement::FiniteAndPositive,
+                Requirement::FiniteAndNonNegative,
+                Requirement::FiniteInUnitInterval,
+                Requirement::NonEmpty,
+            ] {
+                let structured = invalid_parameter(domain, "gene 3 tolerance", requirement);
+                let reason = format!("gene 3 tolerance must be {}", requirement.phrase());
+                assert_eq!(structured.to_string(), free(domain, reason).to_string());
+            }
+        }
+        assert_eq!(
+            invalid_formula("formula is empty").to_string(),
+            invalid_options("formula is empty").to_string()
+        );
+        assert_eq!(
+            invariant("x").to_string(),
+            invalid_options("internal invariant violated: x").to_string()
+        );
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! DESeq2-parameterized negative-binomial likelihoods.
 
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 use crate::numeric::special::ln_gamma;
 
@@ -155,11 +156,11 @@ fn nbinom_log_likelihood_with_cached_gamma(
                 let weight = weights[idx];
                 validate_weight(weight, Some(idx))?;
                 checked_weighted_log_likelihood_term(weight, term).ok_or_else(|| {
-                    DeseqError::InvalidDispersion {
-                        reason: format!(
-                            "negative-binomial weighted log-likelihood term at sample {idx} must be finite"
-                        ),
-                    }
+                    invalid_parameter(
+                        ErrorKind::Dispersion,
+                        format!("negative-binomial weighted log-likelihood term at sample {idx}"),
+                        Requirement::Finite,
+                    )
                 })?
             }
             None => term,

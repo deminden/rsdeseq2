@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 impl Default for DeseqBuilder {
     fn default() -> Self {
         Self::new()
@@ -194,13 +195,9 @@ impl DeseqBuilder {
         formula: &str,
     ) -> Result<ExpandedAdditiveFactorDesign, DeseqError> {
         self.in_pool(|| {
-            let model_frame =
-                self.model_frame
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "formula design construction requires builder model-frame metadata"
-                            .to_string(),
-                    })?;
+            let model_frame = self.model_frame.as_ref().ok_or_else(|| {
+                invalid_formula("formula design construction requires builder model-frame metadata")
+            })?;
             expanded_formula_design_from_model_frame(formula, model_frame)
         })
     }
@@ -211,13 +208,9 @@ impl DeseqBuilder {
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
         self.in_pool(|| {
-            let model_frame =
-                self.model_frame
-                    .as_ref()
-                    .ok_or_else(|| DeseqError::InvalidOptions {
-                        reason: "formula design construction requires builder model-frame metadata"
-                            .to_string(),
-                    })?;
+            let model_frame = self.model_frame.as_ref().ok_or_else(|| {
+                invalid_formula("formula design construction requires builder model-frame metadata")
+            })?;
             expanded_formula_design_with_offsets_from_model_frame(formula, model_frame)
         })
     }
@@ -398,12 +391,9 @@ impl DeseqBuilder {
         &self,
         formula: &str,
     ) -> Result<ExpandedFormulaDesignWithOffsets, DeseqError> {
-        let frame = self
-            .model_frame
-            .as_ref()
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: "formula design construction requires builder model-frame metadata".into(),
-            })?;
+        let frame = self.model_frame.as_ref().ok_or_else(|| {
+            invalid_formula("formula design construction requires builder model-frame metadata")
+        })?;
         crate::design::formula_design_for_fitting_from_model_frame(formula, frame)
     }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Factor operations and recoding execute in the shared expression engine.
 // This adapter translates labels and the compatibility API's reference metadata.
 pub(super) fn formula_text_value(values: &[String]) -> super::super::expression::Value {
@@ -14,14 +15,12 @@ pub(super) fn formula_factor_result(
 ) -> Result<FormulaDerivedFactorCovariate, DeseqError> {
     let levels = primitive
         .attribute("levels")
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("formula factor '{name}' has no levels"),
-        })?
+        .ok_or_else(|| invalid_formula(format!("formula factor '{name}' has no levels")))?
         .text()?
         .into_iter()
         .map(|v| {
-            v.ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!("formula factor '{name}' contains a missing level"),
+            v.ok_or_else(|| {
+                invalid_formula(format!("formula factor '{name}' contains a missing level"))
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -32,11 +31,9 @@ pub(super) fn formula_factor_result(
         .map(|(i, code)| {
             if !code.is_finite() || code.fract() != 0.0 || code < 1.0 || code > levels.len() as f64
             {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula factor '{name}' has a missing or invalid level at sample {i}"
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula factor '{name}' has a missing or invalid level at sample {i}"
+                )));
             }
             Ok(levels[code as usize - 1].clone())
         })
@@ -44,8 +41,10 @@ pub(super) fn formula_factor_result(
     let reference = preferred_reference
         .filter(|r| levels.iter().any(|v| v == *r))
         .or_else(|| levels.first().map(String::as_str))
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!("formula factor '{name}' requires at least one level"),
+        .ok_or_else(|| {
+            invalid_formula(format!(
+                "formula factor '{name}' requires at least one level"
+            ))
         })?
         .to_string();
     validate_factor_design_inputs_with_levels(&name, &sample_levels, &reference, Some(&levels))?;

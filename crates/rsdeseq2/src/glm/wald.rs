@@ -1,3 +1,4 @@
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::checked;
 use crate::numeric::special::standard_normal_pdf;
 use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
@@ -333,9 +334,11 @@ pub(super) fn valid_t_df(df: f64) -> Option<f64> {
 
 pub(crate) fn validate_wald_options(options: &WaldTestOptions) -> Result<(), DeseqError> {
     if !options.lfc_threshold.is_finite() || options.lfc_threshold < 0.0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "Wald LFC threshold must be finite and non-negative".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Options,
+            "Wald LFC threshold",
+            Requirement::FiniteAndNonNegative,
+        ));
     }
     if options.alternative == WaldAlternative::LessAbs && options.lfc_threshold == 0.0 {
         return Err(DeseqError::UnsupportedFeature {

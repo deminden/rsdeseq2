@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
 // Fixed design products for the unweighted optimizer path. Products are
 // checked at their original evaluation point, after the mean/weight checks.
@@ -108,15 +109,19 @@ pub(super) fn cox_reid_adjustment_weighted_with_threshold_prepared(
     }
     validate_observation_weight_slice(weights, mu.len(), "Cox-Reid weights")?;
     if !log_alpha.is_finite() {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "log dispersion must be finite".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "log dispersion",
+            Requirement::Finite,
+        ));
     }
     let alpha = log_alpha.exp_p();
     if !alpha.is_finite() || alpha <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     let matrices = cox_reid_weighted_design_matrices_prepared(
         design,
@@ -207,9 +212,11 @@ pub(super) fn cox_reid_design_matrices_impl<
         ));
     }
     if !alpha.is_finite() || alpha <= 0.0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "dispersion must be finite and positive".to_string(),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Dispersion,
+            "dispersion",
+            Requirement::FiniteAndPositive,
+        ));
     }
     validate_observation_weight_slice(weights, mu.len(), "Cox-Reid weights")?;
     validate_weight_threshold(weight_threshold, "Cox-Reid weight threshold")?;

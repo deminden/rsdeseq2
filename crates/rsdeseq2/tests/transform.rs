@@ -1053,7 +1053,12 @@ fn vst_local_rejects_overflowed_variance_curve() {
     let err = vst_local(&huge, &trend, 1.0).unwrap_err();
     assert!(matches!(
         err,
-        DeseqError::NonFiniteValue { .. } | DeseqError::InvalidDispersion { .. }
+        DeseqError::NonFiniteValue { .. }
+            | DeseqError::InvalidDispersion { .. }
+            | DeseqError::InvalidParameter {
+                domain: rsdeseq2::errors::ErrorKind::Dispersion,
+                ..
+            }
     ));
 }
 

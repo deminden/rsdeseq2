@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 pub(super) fn parse_count_field(field: &str, path: &Path) -> Result<u32, DeseqError> {
     if let Ok(value) = field.parse::<u32>() {
         return Ok(value);
@@ -564,9 +565,11 @@ pub(super) fn validate_positive_finite_values(
 ) -> Result<(), DeseqError> {
     for (idx, value) in values.iter().copied().enumerate() {
         if !value.is_finite() || value <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("{context} value at index {idx} must be finite and positive"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Normalization,
+                format!("{context} value at index {idx}"),
+                Requirement::FiniteAndPositive,
+            ));
         }
     }
     Ok(())

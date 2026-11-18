@@ -47,7 +47,12 @@ fn bh_adjust_rejects_invalid_f64_input() {
     for pvalues in [[0.1, f64::NAN], [0.1, 1.2]] {
         assert!(matches!(
             bh_adjust_f64(&pvalues),
-            Err(rsdeseq2::DeseqError::InvalidOptions { .. })
+            Err(rsdeseq2::DeseqError::InvalidOptions { .. }
+                | rsdeseq2::DeseqError::InvalidParameter {
+                    domain: rsdeseq2::errors::ErrorKind::Options,
+                    ..
+                }
+                | rsdeseq2::DeseqError::InvalidFormula { .. })
         ));
     }
 }

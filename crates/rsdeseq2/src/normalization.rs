@@ -1,3 +1,4 @@
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
@@ -220,9 +221,11 @@ pub(crate) fn validate_normalization_factor_value(
     index: usize,
 ) -> Result<(), DeseqError> {
     if !value.is_finite() || value <= 0.0 {
-        return Err(DeseqError::InvalidSizeFactors {
-            reason: format!("normalization factor at index {index} must be finite and positive"),
-        });
+        return Err(invalid_parameter(
+            ErrorKind::Normalization,
+            format!("normalization factor at index {index}"),
+            Requirement::FiniteAndPositive,
+        ));
     }
     Ok(())
 }
@@ -595,9 +598,11 @@ pub(crate) fn validate_size_factors(
 pub(crate) fn validate_size_factor_values(size_factors: &[f64]) -> Result<(), DeseqError> {
     for (idx, value) in size_factors.iter().copied().enumerate() {
         if !value.is_finite() || value <= 0.0 {
-            return Err(DeseqError::InvalidSizeFactors {
-                reason: format!("size factor at sample {idx} must be finite and positive"),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Normalization,
+                format!("size factor at sample {idx}"),
+                Requirement::FiniteAndPositive,
+            ));
         }
     }
     Ok(())

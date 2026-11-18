@@ -3,6 +3,7 @@
 use super::numerics::{stable_midpoint, validate_positive_mean};
 use super::selection::{mean_trend_use_for_fit, mean_trend_use_for_mean, validate_trend_fit_rows};
 use crate::errors::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Options for DESeq2-style mean dispersion trend fitting.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -59,9 +60,11 @@ impl MeanDispersionTrend {
 
     fn validate_fit(&self) -> Result<(), DeseqError> {
         if !self.mean_disp.is_finite() || self.mean_disp <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "mean dispersion trend value must be finite and positive".to_string(),
-            });
+            return Err(invalid_parameter(
+                ErrorKind::Dispersion,
+                "mean dispersion trend value",
+                Requirement::FiniteAndPositive,
+            ));
         }
         Ok(())
     }

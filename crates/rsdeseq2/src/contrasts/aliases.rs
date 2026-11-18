@@ -16,8 +16,9 @@ fn find_coefficient(names: &[String], wanted: &str) -> Result<usize, DeseqError>
     names
         .iter()
         .position(|name| name == wanted)
-        .ok_or_else(|| DeseqError::InvalidOptions {
+        .ok_or_else(|| DeseqError::CoefficientNotFound {
             reason: format!("coefficient '{wanted}' is not present in coefficient names"),
+            candidates: vec![wanted.to_string()],
         })
 }
 
@@ -41,10 +42,11 @@ pub(super) fn resolve_coefficient_name(
         })
         .collect::<HashSet<_>>();
     match matches.len() {
-        0 => Err(DeseqError::InvalidOptions {
+        0 => Err(DeseqError::CoefficientNotFound {
             reason: format!(
                 "coefficient '{wanted}' is not present in coefficient names or R-cleaned aliases"
             ),
+            candidates: vec![wanted.to_string()],
         }),
         1 => matches
             .iter()
@@ -186,11 +188,12 @@ pub(super) fn find_first_coefficient(
         })
         .collect::<HashSet<_>>();
     match matches.len() {
-        0 => Err(DeseqError::InvalidOptions {
+        0 => Err(DeseqError::CoefficientNotFound {
             reason: format!(
                 "none of the candidate coefficients are present: {}",
                 candidates.join(", ")
             ),
+            candidates: candidates.to_vec(),
         }),
         1 => matches
             .iter()
@@ -212,11 +215,7 @@ pub(super) fn find_optional_coefficient(
 ) -> Result<Option<usize>, DeseqError> {
     match find_first_coefficient(names, candidates) {
         Ok(index) => Ok(Some(index)),
-        Err(DeseqError::InvalidOptions { reason })
-            if reason.starts_with("none of the candidate coefficients are present") =>
-        {
-            Ok(None)
-        }
+        Err(DeseqError::CoefficientNotFound { .. }) => Ok(None),
         Err(err) => Err(err),
     }
 }

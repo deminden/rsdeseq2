@@ -1,5 +1,6 @@
 use super::{Data, Value, invalid_options};
 use crate::errors::DeseqError;
+use crate::errors::invalid_formula;
 use crate::numeric::math::ProfileMath;
 
 pub(super) fn power(x: f64, y: f64) -> f64 {
@@ -108,7 +109,7 @@ pub(super) fn binary(name: &str, left: &Value, right: &Value) -> Result<Value, D
         left
     };
     if template.dimensions.is_some() && template.len() != n {
-        return Err(invalid_options("formula vector is longer than its matrix"));
+        return Err(invalid_formula("formula vector is longer than its matrix"));
     }
     let logical = matches!(name, "<" | "<=" | ">" | ">=" | "==" | "!=" | "&" | "|");
     let mut result = template.clone();

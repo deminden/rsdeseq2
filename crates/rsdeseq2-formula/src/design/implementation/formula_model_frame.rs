@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Model-frame construction, validation and alias resolution.
 
 pub(super) fn validate_formula_factor_name_collisions(
@@ -7,12 +8,10 @@ pub(super) fn validate_formula_factor_name_collisions(
     for (idx, factor) in factors.iter().enumerate() {
         for previous in &factors[..idx] {
             if previous.factor == factor.factor {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' appears more than once",
-                        factor.factor
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' appears more than once",
+                    factor.factor
+                )));
             }
             let previous_aliases = r_like_name_candidates(previous.factor);
             let current_aliases = r_like_name_candidates(factor.factor);
@@ -20,12 +19,10 @@ pub(super) fn validate_formula_factor_name_collisions(
                 .iter()
                 .any(|previous_alias| current_aliases.contains(previous_alias))
             {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' resolves ambiguously after R-style cleanup",
-                        factor.factor
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' resolves ambiguously after R-style cleanup",
+                    factor.factor
+                )));
             }
         }
     }
@@ -38,12 +35,10 @@ pub(super) fn validate_formula_numeric_covariate_name_collisions(
     for (idx, covariate) in numeric_covariates.iter().enumerate() {
         for previous in &numeric_covariates[..idx] {
             if previous.name == covariate.name {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' appears more than once",
-                        covariate.name
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' appears more than once",
+                    covariate.name
+                )));
             }
             let previous_aliases = r_like_name_candidates(previous.name);
             let current_aliases = r_like_name_candidates(covariate.name);
@@ -51,12 +46,10 @@ pub(super) fn validate_formula_numeric_covariate_name_collisions(
                 .iter()
                 .any(|previous_alias| current_aliases.contains(previous_alias))
             {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' resolves ambiguously after R-style cleanup",
-                        covariate.name
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' resolves ambiguously after R-style cleanup",
+                    covariate.name
+                )));
             }
         }
     }
@@ -70,12 +63,10 @@ pub(super) fn validate_formula_factor_numeric_name_collisions(
     for factor in factors {
         for covariate in numeric_covariates {
             if factor.factor == covariate.name {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' appears more than once",
-                        factor.factor
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' appears more than once",
+                    factor.factor
+                )));
             }
             let factor_aliases = r_like_name_candidates(factor.factor);
             let covariate_aliases = r_like_name_candidates(covariate.name);
@@ -83,12 +74,10 @@ pub(super) fn validate_formula_factor_numeric_name_collisions(
                 .iter()
                 .any(|factor_alias| covariate_aliases.contains(factor_alias))
             {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "formula variable '{}' resolves ambiguously after R-style cleanup",
-                        covariate.name
-                    ),
-                });
+                return Err(invalid_formula(format!(
+                    "formula variable '{}' resolves ambiguously after R-style cleanup",
+                    covariate.name
+                )));
             }
         }
     }
@@ -206,9 +195,10 @@ pub(super) fn validate_formula_model_frame(
             .iter()
             .any(|previous| previous.name == factor.name)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula factor '{}' appears more than once", factor.name),
-            });
+            return Err(invalid_formula(format!(
+                "formula factor '{}' appears more than once",
+                factor.name
+            )));
         }
         if factor.sample_levels.len() != n_samples {
             return Err(invalid_dimensions(
@@ -231,24 +221,20 @@ pub(super) fn validate_formula_model_frame(
             .iter()
             .any(|previous| previous.name == covariate.name)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula numeric covariate '{}' appears more than once",
-                    covariate.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula numeric covariate '{}' appears more than once",
+                covariate.name
+            )));
         }
         if model_frame
             .factors
             .iter()
             .any(|factor| factor.name == covariate.name)
         {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula column '{}' cannot be both a factor and numeric covariate",
-                    covariate.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula column '{}' cannot be both a factor and numeric covariate",
+                covariate.name
+            )));
         }
         if model_frame.factors.iter().any(|factor| {
             let factor_aliases = r_like_name_candidates(&factor.name);
@@ -257,12 +243,10 @@ pub(super) fn validate_formula_model_frame(
                 .iter()
                 .any(|factor_alias| covariate_aliases.contains(factor_alias))
         }) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula column '{}' resolves ambiguously after R-style cleanup",
-                    covariate.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula column '{}' resolves ambiguously after R-style cleanup",
+                covariate.name
+            )));
         }
         if covariate.values.len() != n_samples {
             return Err(invalid_dimensions(
@@ -272,12 +256,10 @@ pub(super) fn validate_formula_model_frame(
             ));
         }
         if !covariate.values.iter().all(|value| value.is_finite()) {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula numeric covariate '{}' contains non-finite values",
-                    covariate.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula numeric covariate '{}' contains non-finite values",
+                covariate.name
+            )));
         }
     }
     Ok(())
@@ -294,11 +276,11 @@ pub(super) fn formula_model_frame_factor_reference(
         .as_deref()
         .and_then(|levels| levels.first().map(String::as_str))
         .or_else(|| factor.sample_levels.first().map(String::as_str))
-        .ok_or_else(|| DeseqError::InvalidOptions {
-            reason: format!(
+        .ok_or_else(|| {
+            invalid_formula(format!(
                 "formula factor '{}' requires at least one sample level",
                 factor.name
-            ),
+            ))
         })
 }
 
@@ -343,11 +325,9 @@ pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
         [level] => return Ok(*level),
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula factor '{factor_name}' reference level '{requested}' appears more than once"
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula factor '{factor_name}' reference level '{requested}' appears more than once"
+            )));
         }
     }
 
@@ -362,16 +342,12 @@ pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [level] => Ok(*level),
-        [] => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula factor '{factor_name}' does not contain reference level '{requested}'"
-            ),
-        }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "formula factor '{factor_name}' reference level '{requested}' resolves ambiguously after R-style cleanup"
-            ),
-        }),
+        [] => Err(invalid_formula(format!(
+            "formula factor '{factor_name}' does not contain reference level '{requested}'"
+        ))),
+        _ => Err(invalid_formula(format!(
+            "formula factor '{factor_name}' reference level '{requested}' resolves ambiguously after R-style cleanup"
+        ))),
     }
 }
 
@@ -380,27 +356,23 @@ pub(super) fn formula_model_frame_sample_count(
 ) -> Result<usize, DeseqError> {
     if let Some(factor) = model_frame.factors.first() {
         if factor.sample_levels.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula factor '{}' requires at least one sample level",
-                    factor.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula factor '{}' requires at least one sample level",
+                factor.name
+            )));
         }
         return Ok(factor.sample_levels.len());
     }
     if let Some(covariate) = model_frame.numeric_covariates.first() {
         if covariate.values.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "formula numeric covariate '{}' requires at least one sample value",
-                    covariate.name
-                ),
-            });
+            return Err(invalid_formula(format!(
+                "formula numeric covariate '{}' requires at least one sample value",
+                covariate.name
+            )));
         }
         return Ok(covariate.values.len());
     }
-    Err(DeseqError::InvalidOptions {
-        reason: "formula model frame requires at least one column".to_string(),
-    })
+    Err(invalid_formula(
+        "formula model frame requires at least one column",
+    ))
 }

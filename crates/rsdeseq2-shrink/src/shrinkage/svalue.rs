@@ -1,4 +1,5 @@
 use crate::DeseqError;
+use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 
 /// Average ordered local error rates and restore input order (s-values).
 ///
@@ -11,11 +12,11 @@ pub fn svalues(rates: &[Option<f64>]) -> Result<Vec<Option<f64>>, DeseqError> {
     for (index, rate) in rates.iter().copied().enumerate() {
         if let Some(rate) = rate {
             if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
-                return Err(DeseqError::InvalidOptions {
-                    reason: format!(
-                        "local error rate at index {index} must be finite and within [0, 1]"
-                    ),
-                });
+                return Err(invalid_parameter(
+                    ErrorKind::Options,
+                    format!("local error rate at index {index}"),
+                    Requirement::FiniteInUnitInterval,
+                ));
             }
             order.push((index, rate));
         }

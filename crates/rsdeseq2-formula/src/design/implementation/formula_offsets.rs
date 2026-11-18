@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::invalid_formula;
 // Formula right-hand sides and offset extraction.
 
 pub(super) struct FormulaOffsets {
@@ -9,15 +10,13 @@ pub(super) struct FormulaOffsets {
 pub(super) fn formula_rhs(formula: &str) -> Result<&str, DeseqError> {
     let trimmed = formula.trim();
     let Some(rhs) = trimmed.strip_prefix('~') else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula '{formula}' must start with '~'"),
-        });
+        return Err(invalid_formula(format!(
+            "formula '{formula}' must start with '~'"
+        )));
     };
     let rhs = rhs.trim();
     if rhs.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula right-hand side must be non-empty".to_string(),
-        });
+        return Err(invalid_formula("formula right-hand side must be non-empty"));
     }
     Ok(rhs)
 }
@@ -104,9 +103,7 @@ pub(super) fn extract_formula_offset_term(
         return Ok(());
     };
     if sign < 0 {
-        return Err(DeseqError::InvalidOptions {
-            reason: "formula offset terms cannot be subtracted".to_string(),
-        });
+        return Err(invalid_formula("formula offset terms cannot be subtracted"));
     }
     let key = formula_offset_key(term)?;
     if offsets.seen.contains(&key) {
@@ -124,9 +121,9 @@ pub(super) fn extract_formula_offset_term(
         ));
     }
     if let Some(idx) = offset_values.iter().position(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula offset '{term}' is non-finite at sample {idx}"),
-        });
+        return Err(invalid_formula(format!(
+            "formula offset '{term}' is non-finite at sample {idx}"
+        )));
     }
     let values = [formula_numeric_value(&offset_values)];
     let base = formula_numeric_value(&offsets.values);
@@ -138,9 +135,9 @@ pub(super) fn extract_formula_offset_term(
         ));
     };
     if let Some(idx) = values.iter().position(|value| !value.is_finite()) {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula offsets sum to a non-finite value at sample {idx}"),
-        });
+        return Err(invalid_formula(format!(
+            "formula offsets sum to a non-finite value at sample {idx}"
+        )));
     }
     offsets.values = values;
 
@@ -170,11 +167,9 @@ pub(super) fn formula_offset_values(
         let covariate = numeric_covariates
             .iter()
             .find(|candidate| candidate.name == offset_name)
-            .ok_or_else(|| DeseqError::InvalidOptions {
-                reason: format!(
+            .ok_or_else(|| invalid_formula(format!(
                     "formula offset numeric covariate '{offset_name}' is not present in supplied design metadata"
-                ),
-            })?;
+                )))?;
         return Ok(Some(covariate.values.to_vec()));
     }
     for transform in FORMULA_NUMERIC_TRANSFORMS {
@@ -184,39 +179,37 @@ pub(super) fn formula_offset_values(
         let (_replacement, transformed_covariates) =
             formula_numeric_transform_term(transform, inner.trim(), factors, numeric_covariates)?;
         let [(_name, values)] = transformed_covariates.as_slice() else {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("formula offset term '{term}' must produce one numeric vector"),
-            });
+            return Err(invalid_formula(format!(
+                "formula offset term '{term}' must produce one numeric vector"
+            )));
         };
         return Ok(Some(values.clone()));
     }
-    Err(DeseqError::InvalidOptions {
-        reason: format!(
-            "formula offset expression '{expression}' is not a supported numeric covariate or transform"
-        ),
-    })
+    Err(invalid_formula(format!(
+        "formula offset expression '{expression}' is not a supported numeric covariate or transform"
+    )))
 }
 
 pub(super) fn formula_offset_expression(term: &str) -> Result<Option<&str>, DeseqError> {
     let term = term.trim();
     let Some(after_open) = formula_call_after_open(term, 0, "offset") else {
         if term == "offset" {
-            return Err(DeseqError::InvalidOptions {
-                reason: "formula offset term 'offset' must be offset(numeric)".to_string(),
-            });
+            return Err(invalid_formula(
+                "formula offset term 'offset' must be offset(numeric)",
+            ));
         }
         return Ok(None);
     };
     let Some(inner) = term[after_open..].strip_suffix(')') else {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula offset term '{term}' must be offset(numeric)"),
-        });
+        return Err(invalid_formula(format!(
+            "formula offset term '{term}' must be offset(numeric)"
+        )));
     };
     let expression = inner.trim();
     if expression.is_empty() {
-        return Err(DeseqError::InvalidOptions {
-            reason: format!("formula offset term '{term}' must be offset(numeric)"),
-        });
+        return Err(invalid_formula(format!(
+            "formula offset term '{term}' must be offset(numeric)"
+        )));
     }
     Ok(Some(expression))
 }
