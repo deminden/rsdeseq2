@@ -12,7 +12,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
-use crate::glm::fallback::{OptimFallbackRows, optim_fallback_rows, record_optim_fallback_row};
+use crate::glm::fallback::requires_optim_fallback;
 use crate::glm::nb::{
     FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
 };
@@ -405,12 +405,17 @@ pub(crate) fn fit_offsets_irls_for_output(
     // The sizes are checked above; these report a failed allocation as an
     // error instead of aborting.
     let mut beta_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
+    beta_values.resize(n_beta, 0.0);
     let mut beta_var_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
+    beta_var_values.resize(n_beta, f64::NAN);
     let mut beta_optim_start_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
     beta_optim_start_values.resize(n_beta, f64::NAN);
     let mut beta_covariance_values = try_alloc_matrix(n_covariance, 1, "IRLS output")?;
+    beta_covariance_values.resize(n_covariance, f64::NAN);
     let mut mu_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
+    mu_values.resize(n_means, 0.0);
     let mut hat_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
+    hat_values.resize(n_means, f64::NAN);
     let mut beta_iter = Vec::with_capacity(counts.n_genes());
     let mut beta_converged = Vec::with_capacity(counts.n_genes());
     let mut beta_optim_iter = vec![f64::NAN; counts.n_genes()];
@@ -418,19 +423,28 @@ pub(crate) fn fit_offsets_irls_for_output(
     let mut beta_optim_objective = vec![f64::NAN; counts.n_genes()];
     let mut beta_optim_gradient_norm = vec![f64::NAN; counts.n_genes()];
 
-    // Bound temporary output storage, retaining each gene's arithmetic and order.
-    let row_bytes = covariance_columns
-        .saturating_add(2 * p)
-        .saturating_add(2 * counts.n_samples())
-        .saturating_mul(std::mem::size_of::<f64>())
-        .saturating_add(std::mem::size_of::<Result<IrlsRowOutput, DeseqError>>());
-    let batch_rows = (8 * 1024 * 1024 / row_bytes.max(1)).clamp(1, 2048);
-    let mut transient_fallback = OptimFallbackRows::default();
-    for first in (0..counts.n_genes()).step_by(batch_rows) {
-        let last = first.saturating_add(batch_rows).min(counts.n_genes());
-        let row_outputs = (first..last)
-            .into_par_iter()
-            .map_init(IrlsScratch::default, |scratch, gene| {
+    let samples = counts.n_samples();
+    let covariance_rows = if requirements.covariance() {
+        rayon::iter::Either::Left(
+            beta_covariance_values
+                .par_chunks_mut(covariance_columns)
+                .map(Some),
+        )
+    } else {
+        rayon::iter::Either::Right((0..counts.n_genes()).into_par_iter().map(|_| None))
+    };
+    let row_statuses = (
+        beta_values.par_chunks_mut(p),
+        beta_var_values.par_chunks_mut(p),
+        covariance_rows,
+        mu_values.par_chunks_mut(samples),
+        hat_values.par_chunks_mut(samples),
+    )
+        .into_par_iter()
+        .enumerate()
+        .map_init(
+            IrlsScratch::default,
+            |scratch, (gene, (beta, beta_se, covariance, mu, hat))| {
                 fit_fixed_dispersion_irls_row(
                     scratch,
                     IrlsRowInput {
@@ -446,65 +460,37 @@ pub(crate) fn fit_offsets_irls_for_output(
                         ridge_lambda: &ridge_lambda,
                         options: &options,
                     },
+                    IrlsRowOutput {
+                        beta,
+                        beta_se,
+                        covariance,
+                        mu,
+                        hat,
+                    },
                 )
-            })
-            .collect::<Vec<_>>();
-        // Indexed collection plus ordered extraction reports the lowest failed gene.
-        for (offset, row) in row_outputs.into_iter().enumerate() {
-            let row = row?;
-            if !requirements.covariance() {
-                record_optim_fallback_row(
-                    &mut transient_fallback,
-                    first + offset,
-                    row.converged,
-                    &row.beta,
-                    &row.beta_covariance,
-                    options.use_optim,
-                    options.force_optim,
-                );
-            }
-            beta_values.extend(row.beta);
-            beta_var_values.extend(row.beta_se);
-            if requirements.covariance() {
-                beta_covariance_values.extend(row.beta_covariance);
-            }
-            mu_values.extend(row.mu);
-            hat_values.extend(row.hat);
-            beta_iter.push(row.iter);
-            beta_converged.push(row.converged);
+            },
+        )
+        .collect::<Vec<_>>();
+    // Indexed collection and ordered extraction report the lowest failed gene.
+    let mut fallback_rows = Vec::new();
+    for (gene, status) in row_statuses.into_iter().enumerate() {
+        let status = status?;
+        beta_iter.push(status.iter);
+        beta_converged.push(status.converged);
+        if status.refit {
+            fallback_rows.push(gene);
         }
     }
 
-    let (mut beta_values, mut beta_covariance_values, fallback_rows) = if requirements.covariance()
-    {
-        let beta_for_routing = RowMajorMatrix::from_row_major(counts.n_genes(), p, beta_values)?;
-        let covariance_for_routing =
-            RowMajorMatrix::from_row_major(counts.n_genes(), p * p, beta_covariance_values)?;
-        let rows = optim_fallback_rows(
-            &beta_converged,
-            &beta_for_routing,
-            &covariance_for_routing,
-            options.use_optim,
-            options.force_optim,
-        )?;
-        (
-            beta_for_routing.into_values(),
-            covariance_for_routing.into_values(),
-            rows,
-        )
-    } else {
-        (beta_values, beta_covariance_values, transient_fallback)
-    };
     let mut optim_log_like = vec![None; counts.n_genes()];
-    if !fallback_rows.rows.is_empty() {
+    if !fallback_rows.is_empty() {
         refit_optim_fallback_rows(
-            &fallback_rows.rows,
+            &fallback_rows,
             &mut beta_values,
             &mut beta_var_values,
             &mut beta_optim_start_values,
             &mut beta_covariance_values,
             &mut mu_values,
-            &mut hat_values,
             &mut beta_converged,
             &mut optim_log_like,
             &mut beta_optim_iter,
@@ -599,14 +585,18 @@ struct IrlsRowInput<'a> {
     options: &'a IrlsOptions,
 }
 
-struct IrlsRowOutput {
-    beta: Vec<f64>,
-    beta_se: Vec<f64>,
-    beta_covariance: Vec<f64>,
-    mu: Vec<f64>,
-    hat: Vec<f64>,
+struct IrlsRowOutput<'a> {
+    beta: &'a mut [f64],
+    beta_se: &'a mut [f64],
+    covariance: Option<&'a mut [f64]>,
+    mu: &'a mut [f64],
+    hat: &'a mut [f64],
+}
+
+struct IrlsRowStatus {
     iter: usize,
     converged: bool,
+    refit: bool,
 }
 
 // Per-gene IRLS iterations and scratch reuse.

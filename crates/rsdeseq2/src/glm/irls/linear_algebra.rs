@@ -55,7 +55,55 @@ pub(super) fn covariance_and_hat_diagonal(
     x: &DMatrix<f64>,
     w: &[f64],
     ridge_lambda: &[f64],
-) -> Option<(Vec<f64>, Vec<f64>)> {
+    hat: &mut [f64],
+) -> Option<Vec<f64>> {
+    let (inverse, beta_covariance) = covariance_with_inverse(x, w, ridge_lambda)?;
+    visit_hat_diagonal(x, w, &inverse, |sample, value| hat[sample] = value)?;
+    Some(beta_covariance)
+}
+
+fn visit_hat_diagonal(
+    x: &DMatrix<f64>,
+    w: &[f64],
+    inverse: &DMatrix<f64>,
+    mut use_value: impl FnMut(usize, f64),
+) -> Option<()> {
+    let mut active = Vec::with_capacity(x.ncols());
+    for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
+        let mut value = 0.0;
+        if !weight.is_finite() {
+            return None;
+        }
+        fill_active_design_columns(x, sample, &mut active);
+        for (left, left_value) in active.iter().copied() {
+            for (right, right_value) in active.iter().copied() {
+                value = checked::add(
+                    value,
+                    checked_product4(left_value, weight, right_value, inverse[(right, left)])?,
+                )?;
+            }
+        }
+        use_value(sample, value);
+    }
+    Some(())
+}
+
+// Optim fallback preserves the original IRLS hat diagonal.
+pub(super) fn fallback_covariance(
+    x: &DMatrix<f64>,
+    w: &[f64],
+    ridge_lambda: &[f64],
+) -> Option<Vec<f64>> {
+    let (inverse, covariance) = covariance_with_inverse(x, w, ridge_lambda)?;
+    visit_hat_diagonal(x, w, &inverse, |_, _| {})?;
+    Some(covariance)
+}
+
+fn covariance_with_inverse(
+    x: &DMatrix<f64>,
+    w: &[f64],
+    ridge_lambda: &[f64],
+) -> Option<(DMatrix<f64>, Vec<f64>)> {
     let xtwx = xtwx_without_ridge(x, w)?;
     let mut xtwx_ridge = xtwx.clone();
     for diagonal in 0..x.ncols() {
@@ -74,25 +122,7 @@ pub(super) fn covariance_and_hat_diagonal(
             beta_covariance.push(value);
         }
     }
-    let mut hat = Vec::with_capacity(x.nrows());
-    let mut active = Vec::with_capacity(x.ncols());
-    for (sample, &weight) in w.iter().enumerate().take(x.nrows()) {
-        let mut value = 0.0;
-        if !weight.is_finite() {
-            return None;
-        }
-        fill_active_design_columns(x, sample, &mut active);
-        for (left, left_value) in active.iter().copied() {
-            for (right, right_value) in active.iter().copied() {
-                value = checked::add(
-                    value,
-                    checked_product4(left_value, weight, right_value, inverse[(right, left)])?,
-                )?;
-            }
-        }
-        hat.push(value);
-    }
-    Some((beta_covariance, hat))
+    Some((inverse, beta_covariance))
 }
 
 pub(super) fn xtwx_and_xtwz(

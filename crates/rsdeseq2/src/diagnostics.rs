@@ -246,6 +246,34 @@ fn logical_diagnostic_column(name: &'static str, values: &[bool]) -> Deseq2Mcols
 }
 
 impl DeseqFit {
+    /// Number of fitted rows with a non-finite coefficient covariance.
+    ///
+    /// This is available after a fit that retains covariance. Rows skipped by
+    /// the model, including all-zero counts and weight failures, are excluded.
+    #[must_use]
+    pub fn nonfinite_covariance_rows(&self) -> Option<usize> {
+        let covariance = self.beta_covariance.as_ref()?;
+        let columns = covariance.n_cols();
+        if columns == 0 || covariance.n_rows() != self.all_zero.len() {
+            return None;
+        }
+        Some(
+            covariance
+                .as_slice()
+                .chunks_exact(columns)
+                .enumerate()
+                .filter(|(gene, row)| {
+                    !self.all_zero[*gene]
+                        && !self
+                            .weights_fail
+                            .as_ref()
+                            .is_some_and(|flags| flags.get(*gene).copied().unwrap_or(false))
+                        && row.iter().any(|value| !value.is_finite())
+                })
+                .count(),
+        )
+    }
+
     /// Return a DESeq2-metadata-shaped diagnostic view.
     ///
     /// For LRT fits, beta convergence is exposed as `fullBetaConv` and

@@ -54,6 +54,27 @@ fn deseq2_mcols_diagnostics_are_empty_before_glm_stages() {
 }
 
 #[test]
+fn covariance_diagnostic_counts_only_rows_that_were_fitted() {
+    let counts =
+        CountMatrix::from_row_major_u32(4, 3, vec![10, 12, 14, 20, 22, 24, 0, 0, 0, 30, 32, 34])
+            .unwrap();
+    let mut fit = DeseqBuilder::new()
+        .fit_size_factors_and_base_means(&counts)
+        .unwrap();
+    assert_eq!(fit.nonfinite_covariance_rows(), None);
+    fit.weights_fail = Some(vec![false, false, false, true]);
+    fit.beta_covariance = Some(
+        rsdeseq2::matrix::RowMajorMatrix::from_row_major(
+            4,
+            1,
+            vec![1.0, f64::NAN, f64::NAN, f64::NAN],
+        )
+        .unwrap(),
+    );
+    assert_eq!(fit.nonfinite_covariance_rows(), Some(1));
+}
+
+#[test]
 fn deseq2_mcols_diagnostics_include_gene_wise_dispersion_iterations() {
     let counts =
         CountMatrix::from_row_major_u32(2, 4, vec![10, 10, 20, 20, 10, 30, 10, 30]).unwrap();

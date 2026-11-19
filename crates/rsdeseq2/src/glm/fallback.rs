@@ -45,8 +45,7 @@ pub fn optim_fallback_rows(
     Ok(output)
 }
 
-// Both retained and transient covariance paths use this exact routing policy.
-pub(crate) fn record_optim_fallback_row(
+fn record_optim_fallback_row(
     output: &mut OptimFallbackRows,
     gene: usize,
     converged: bool,
@@ -67,9 +66,35 @@ pub(crate) fn record_optim_fallback_row(
     if !converged {
         output.non_converged_rows.push(gene);
     }
-    if force_optim || !stable || !variance_positive || (use_optim && !converged) {
+    if should_refit(converged, stable, variance_positive, use_optim, force_optim) {
         output.rows.push(gene);
     }
+}
+
+pub(super) fn requires_optim_fallback(
+    converged: bool,
+    beta: &[f64],
+    covariance: &[f64],
+    use_optim: bool,
+    force_optim: bool,
+) -> bool {
+    should_refit(
+        converged,
+        row_values_finite(beta),
+        covariance_diagonal_positive(covariance, beta.len()),
+        use_optim,
+        force_optim,
+    )
+}
+
+fn should_refit(
+    converged: bool,
+    stable: bool,
+    variance_positive: bool,
+    use_optim: bool,
+    force_optim: bool,
+) -> bool {
+    force_optim || !stable || !variance_positive || (use_optim && !converged)
 }
 
 fn validate_fallback_inputs(

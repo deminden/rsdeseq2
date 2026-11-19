@@ -9,7 +9,6 @@ pub(super) fn refit_optim_fallback_rows(
     beta_optim_start_values: &mut [f64],
     beta_covariance_values: &mut [f64],
     mu_values: &mut [f64],
-    _hat_values: &mut [f64],
     beta_converged: &mut [bool],
     optim_log_like: &mut [Option<f64>],
     beta_optim_iter: &mut [f64],
@@ -63,9 +62,7 @@ pub(super) fn refit_optim_fallback_rows(
             .map(|value| value.max(input.options.min_mu))
             .collect::<Vec<_>>();
         let w = working_weights(&mu_for_inference, dispersion, weight_row)?;
-        let Some((beta_covariance, _hat_diag)) =
-            covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
-        else {
+        let Some(beta_covariance) = fallback_covariance(input.x, &w, input.ridge_lambda) else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "optim fallback covariance is singular".to_string(),
             });
