@@ -94,12 +94,15 @@ def main() -> int:
 
     dirs = contrast_dirs(args.fixture_root)
     verify_hashes(dirs, args.reference_hashes)
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    env['RAYON_NUM_THREADS'] = str(args.threads)
     tools = {'candidate': args.binary.resolve()}
     if args.baseline_binary:
         tools['baseline'] = args.baseline_binary.resolve()
+    binary_hashes = {name: sha256(path) for name, path in tools.items()}
+    if binary_hashes.get('baseline') == binary_hashes['candidate']:
+        parser.error('candidate and baseline binaries are byte-identical')
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env['RAYON_NUM_THREADS'] = str(args.threads)
 
     rows = []
     for index, d in enumerate(dirs):
@@ -131,7 +134,7 @@ def main() -> int:
         per_contrast = {d.name: statistics.median(float(r['elapsed_s']) for r in mine if r['contrast'] == d.name)
                         for d in dirs}
         summary[name] = dict(
-            binary_sha256=sha256(tools[name]),
+            binary_sha256=binary_hashes[name],
             summed_median_s=round(sum(per_contrast.values()), 4),
             max_peak_rss_mib=max(float(r['peak_rss_mib']) for r in mine),
             median_peak_rss_mib=statistics.median(float(r['peak_rss_mib']) for r in mine),
