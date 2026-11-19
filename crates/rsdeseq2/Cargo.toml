@@ -94,3 +94,7 @@ required-features = ["shrinkage"]
 name = "evaluate_r_interface"
 path = "tools/validation/evaluate_r_interface.rs"
 required-features = ["formula", "shrinkage"]
+
+[[example]]
+name = "benchmark_replacement_rlog"
+path = "tools/validation/benchmark_replacement_rlog.rs"

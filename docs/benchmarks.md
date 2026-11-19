@@ -74,3 +74,23 @@ Rust-only stages must not be compared with mismatched process scopes.
 
 Keep raw case measurements and provenance with the current report. Do not
 present a saved binary's timings as a new measurement of another source version.
+
+## Cook's replacement and rlog prior
+
+The deterministic scale probe covers 20,000 genes × 100 samples and 60,000
+genes × 800 samples. Build once, then measure the binary directly to exclude
+compilation and Cargo startup. This example uses the macOS resource wrapper.
+
+```sh
+cargo build --locked --profile local -p rsdeseq2 --example benchmark_replacement_rlog
+for shape in 20k 60k; do
+  for workers in 1 2 4 8; do
+    RSDESEQ2_NUMERIC_PROFILE=r-host /usr/bin/time -l \
+      target/local/examples/benchmark_replacement_rlog "$shape" "$workers"
+  done
+done
+```
+
+Each row reports genes, samples, worker count, replacement and prior elapsed
+seconds, the first replacement candidate and the prior's IEEE-754 bits.
+On Linux use `/usr/bin/time -v` for peak RSS.
