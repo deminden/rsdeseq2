@@ -84,7 +84,9 @@ jobs:
           toolchain: nightly
           components: miri
       - name: Check matrix views and checked arithmetic under Miri
-        run: cargo miri test --locked -p rcompat-numeric --lib -- matrix::tests:: numeric::checked::tests:: numeric::validate::tests::
+        run: >-
+          cargo miri test --locked -p rcompat-numeric --lib --
+          matrix::tests:: numeric::checked::tests:: numeric::validate::tests::
 
   audit:
     runs-on: ubuntu-latest
