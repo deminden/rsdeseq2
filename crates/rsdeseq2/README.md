@@ -14,10 +14,10 @@ Requires **Rust 1.97.1 or newer**.
 
 ```sh
 # Embed the library.
-cargo add rsdeseq2@0.5.0
+cargo add rsdeseq2@0.6.0
 
 # Install the CLI.
-cargo install rsdeseq2 --version 0.5.0 --locked
+cargo install rsdeseq2 --version 0.6.0 --locked
 ```
 
 For source installation from a repository checkout:
@@ -77,9 +77,10 @@ fn main() -> Result<(), DeseqError> {
         ],
     )?;
 
-    let fit = DeseqBuilder::new()
+    let output = DeseqBuilder::new()
         .size_factor_method(SizeFactorMethod::Ratio)
-        .fit_size_factors_and_base_means(&counts)?;
+        .run(&Analysis::without_design(&counts))?;
+    let fit = output.fit();
 
     println!("{:?}", fit.size_factors);
     println!("{:?}", fit.base_mean);

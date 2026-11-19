@@ -1,9 +1,9 @@
 # Changelog
 
 Public API and user-visible behaviour changes. Release notes for published
-versions live in [docs/releases](docs/releases/0.5.0.md).
+versions live in [docs/releases](docs/releases/).
 
-## Unreleased
+## 0.6.0
 
 ### Added
 
@@ -42,8 +42,8 @@ versions live in [docs/releases](docs/releases/0.5.0.md).
   size factors only), the test, fixed or estimated dispersions, the mean
   model, the reported column (`ResultColumn`), Cook's replacement, an early
   `Stage` and an optional trend type. Invalid combinations are rejected before
-  any work. Every existing `fit*` method gives bit-identical output to its
-  `run` request; those methods will be deprecated in 0.6.0.
+  any work. The deprecated builder workflows preserve their output and
+  include migration guidance in the Rust API documentation.
 
 - End-to-end parity test against `DESeq()` + `results()` defaults on a
   3,745-gene GTEx kidney-cortex panel (size factors, parametric dispersion

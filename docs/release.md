@@ -1,11 +1,8 @@
 # Release preparation
 
-The current source version is **0.5.0**. [Release notes](releases/0.5.0.md)
-describe its behavior and [source CI](testing-parity.md#ci-status) records the
-independent validation. The tag-triggered workflow validates the release source
-and binds published artifacts to its commit. Check [crates.io](https://crates.io/crates/rsdeseq2/0.5.0)
-and [GitHub assets](https://github.com/deminden/rsdeseq2/releases/tag/v0.5.0)
-for publication availability.
+The source is staged for **0.6.0**. The [release notes](releases/0.6.0.md)
+describe its behavior and the remaining validation. The tag-triggered workflow
+validates the release source and binds published artifacts to its commit.
 
 ## Local source checks
 
@@ -21,7 +18,7 @@ cargo test --locked --workspace
 cargo +1.97.1 check --locked --workspace --all-targets
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-cargo package --locked -p rsdeseq2
+cargo package --locked --workspace
 ```
 
 Run the R package check, exact interface checks and full GTEx replay from
@@ -54,7 +51,7 @@ workflow. The previous release records its DESeq2 version and package
 check results as artifacts. Each binary target
 also runs its release-profile numerical/CLI panel.
 
-CI uploads the R source tarball it checked and the verified crate archive with
+CI uploads the R source tarball it checked and the verified crate archives with
 a manifest binding their hashes to the revision. Publishing verifies that
 manifest and tag/version agreement. Crate publication stages version-pinned
 README links and requires repackaging to reproduce the checked archive bytes.
@@ -72,9 +69,9 @@ To inspect the documentation locally, use a fresh ignored staging directory:
 ```sh
 mkdir -p results/release-docs
 cp LICENSE THIRD_PARTY_NOTICES.md results/release-docs/
-python3 scripts/release/prepare_release_docs.py --tag v0.5.0 binary \
+python3 scripts/release/prepare_release_docs.py --tag v0.6.0 binary \
   --directory results/release-docs --target x86_64-unknown-linux-gnu
-python3 scripts/release/prepare_release_docs.py --tag v0.5.0 notes \
+python3 scripts/release/prepare_release_docs.py --tag v0.6.0 notes \
   --output results/release-docs/release-notes.md
 ```
 
