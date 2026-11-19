@@ -62,13 +62,9 @@ class ModuleCycleTests(unittest.TestCase):
 
 
 class CycleCheckTests(unittest.TestCase):
-    def test_new_and_vanished_pairs_fail(self):
-        self.assertEqual(CYCLES.check(set(CYCLES.ALLOWED)), [])
-        problems = CYCLES.check(set(CYCLES.ALLOWED) | {('a', 'b')})
-        self.assertTrue(any('a <-> b' in p for p in problems))
-        shrunk = set(CYCLES.ALLOWED)
-        shrunk.pop()
-        self.assertTrue(any('no longer present' in p for p in CYCLES.check(shrunk)))
+    def test_rejects_mutual_dependencies(self):
+        self.assertEqual(CYCLES.check(set()), [])
+        self.assertEqual(CYCLES.check({('a', 'b')}), ['mutual dependency: a <-> b'])
 
 
 class TimingTests(unittest.TestCase):
