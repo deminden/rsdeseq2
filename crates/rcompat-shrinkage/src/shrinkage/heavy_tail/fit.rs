@@ -317,15 +317,33 @@ type RegressionRequest<'a, 'config> = Option<(
     &'config super::regression::RegressionPosteriorOptions,
 )>;
 
-struct PreparedBatch {
-    prior: CauchyCoefficientPrior,
-    analysis: super::analysis::PosteriorAnalysis,
-    size_offsets: Option<Vec<f64>>,
+enum PreparedOffsets<'a> {
+    None,
+    Log(MatrixView<'a, f64>),
+    Factors(MatrixView<'a, f64>),
+    LogSizeFactors(Vec<f64>),
 }
 
-impl PreparedBatch {
+impl PreparedOffsets<'_> {
+    fn log_offset(&self, gene: usize, sample: usize) -> f64 {
+        match self {
+            Self::None => 0.0,
+            Self::Log(matrix) => *matrix.at(gene, sample),
+            Self::Factors(matrix) => matrix.at(gene, sample).ln_p(),
+            Self::LogSizeFactors(offsets) => offsets[sample],
+        }
+    }
+}
+
+struct PreparedBatch<'a> {
+    prior: CauchyCoefficientPrior,
+    analysis: super::analysis::PosteriorAnalysis,
+    offsets: PreparedOffsets<'a>,
+}
+
+impl<'a> PreparedBatch<'a> {
     fn new(
-        input: &NegativeBinomialPosteriorInput<'_>,
+        input: &NegativeBinomialPosteriorInput<'a>,
         options: &NegativeBinomialPosteriorOptions,
         regression: RegressionRequest<'_, '_>,
     ) -> Result<Self, Error> {
@@ -361,7 +379,7 @@ impl PreparedBatch {
                 "finite nonnegative weights must match counts shape",
             ));
         }
-        let size_offsets = match input.offsets {
+        let offsets = match input.offsets {
             PosteriorOffsets::SizeFactors(s) => {
                 if s.len() != n || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
                     return Err(scoped_invalid_options(
@@ -369,7 +387,7 @@ impl PreparedBatch {
                         "positive sample-aligned size factors are required",
                     ));
                 }
-                Some(s.iter().map(|v| v.ln_p()).collect::<Vec<_>>())
+                PreparedOffsets::LogSizeFactors(s.iter().map(|v| v.ln_p()).collect())
             }
             PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m) => {
                 let factors = matches!(input.offsets, PosteriorOffsets::Factors(_));
@@ -384,9 +402,13 @@ impl PreparedBatch {
                         "finite log offsets or positive normalization factors must match counts",
                     ));
                 }
-                None
+                if factors {
+                    PreparedOffsets::Factors(m)
+                } else {
+                    PreparedOffsets::Log(m)
+                }
             }
-            PosteriorOffsets::None => None,
+            PosteriorOffsets::None => PreparedOffsets::None,
         };
         if options.coefficient.is_some_and(|c| c >= p)
             || !options.multiplier.is_finite()
@@ -454,26 +476,79 @@ impl PreparedBatch {
         Ok(Self {
             prior,
             analysis,
-            size_offsets,
+            offsets,
         })
     }
+}
 
-    fn log_offset(
-        &self,
-        offsets: PosteriorOffsets<'_>,
-        gene: usize,
-        sample: usize,
-    ) -> Result<f64, Error> {
-        Ok(match offsets {
-            PosteriorOffsets::None => 0.0,
-            PosteriorOffsets::Log(matrix) => *matrix.at(gene, sample),
-            PosteriorOffsets::Factors(matrix) => matrix.at(gene, sample).ln_p(),
-            PosteriorOffsets::SizeFactors(_) => self
-                .size_offsets
-                .as_ref()
-                .ok_or_else(|| crate::errors::invariant("validated sample size offsets"))?[sample],
-        })
+struct LaplaceFit {
+    optimization: rcompat_lbfgsb::OptimResult,
+    covariance: Option<nalgebra::DMatrix<f64>>,
+}
+
+fn invert_finite_hessian(hessian: nalgebra::DMatrix<f64>) -> Option<nalgebra::DMatrix<f64>> {
+    if hessian.iter().all(|v| v.is_finite()) {
+        hessian.try_inverse()
+    } else {
+        None
     }
+}
+
+fn fit_laplace(
+    row: &Row<'_>,
+    options: &NegativeBinomialPosteriorOptions,
+    regression: RegressionRequest<'_, '_>,
+    general: Option<&super::regression::GeneralRow<'_>>,
+    beta_binomial: Option<&super::beta_binomial::Row<'_>>,
+    mut result: rcompat_lbfgsb::OptimResult,
+    refined: bool,
+) -> Result<LaplaceFit, Error> {
+    let hessian = if let Some(general) = general {
+        general.hessian(&result.par, options.hessian_step)
+    } else if let Some(beta_binomial) = beta_binomial {
+        let (_, config) = regression
+            .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
+        let hessian = beta_binomial.hessian(&result.par, options.hessian_step);
+        let invalid_covariance = hessian
+            .clone()
+            .try_inverse()
+            .is_none_or(|m| m.diagonal().iter().any(|v| !v.is_finite() || *v <= 0.0));
+        if config.method == super::regression::RegressionMethod::BetaBinomialCR
+            && (result.convergence != 0 || invalid_covariance)
+        {
+            result = beta_binomial.optimize(result.par, config)?;
+            beta_binomial.hessian(&result.par, options.hessian_step)
+        } else {
+            hessian
+        }
+    } else {
+        row.hessian(&result.par, options.hessian_step)
+    };
+    if let Some(error) = general.and_then(|row| row.take_error()) {
+        return Err(error);
+    }
+    let mut covariance = invert_finite_hessian(hessian);
+    // Compiled prefits with nonpositive variance use the deferred refinement controls.
+    if regression.is_none()
+        && !refined
+        && covariance
+            .as_ref()
+            .is_some_and(|m| m.diagonal().iter().any(|v| *v <= 0.0))
+    {
+        result = refine(row, result.par, options)?;
+        covariance = invert_finite_hessian(row.hessian(&result.par, options.hessian_step));
+    }
+    if regression.is_some() && covariance.is_none() {
+        return Err(scoped_invalid_options(
+            ERROR_SCOPE,
+            "general posterior Hessian is singular or nonfinite",
+        ));
+    }
+    Ok(LaplaceFit {
+        optimization: result,
+        covariance: covariance
+            .filter(|matrix| matrix.diagonal().iter().all(|v| v.is_finite() && *v > 0.0)),
+    })
 }
 
 pub(super) fn fit_batch(
@@ -544,8 +619,8 @@ pub(super) fn fit_batch(
                 .map(|i| input.weights.map(|m| *m.at(gene, i)).unwrap_or(1.0))
                 .collect(),
             offsets: (0..n)
-                .map(|sample| prepared.log_offset(input.offsets, gene, sample))
-                .collect::<Result<Vec<_>, _>>()?,
+                .map(|sample| prepared.offsets.log_offset(gene, sample))
+                .collect(),
             size: 1.0 / dispersion,
             prior,
         };
@@ -656,63 +731,17 @@ pub(super) fn fit_batch(
         }
         let mut laplace_valid = false;
         if let Some(sd) = &mut sd {
-            let h = if let Some(general) = &general {
-                general.hessian(&result.par, options.hessian_step)
-            } else if let Some(beta_binomial) = &beta_binomial {
-                let (_, config) = regression
-                    .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
-                let h = beta_binomial.hessian(&result.par, options.hessian_step);
-                let invalid_covariance = h
-                    .clone()
-                    .try_inverse()
-                    .is_none_or(|m| m.diagonal().iter().any(|v| !v.is_finite() || *v <= 0.0));
-                if config.method == super::regression::RegressionMethod::BetaBinomialCR
-                    && (result.convergence != 0 || invalid_covariance)
-                {
-                    result = beta_binomial.optimize(result.par, config)?;
-                    beta_binomial.hessian(&result.par, options.hessian_step)
-                } else {
-                    h
-                }
-            } else {
-                row.hessian(&result.par, options.hessian_step)
-            };
-            if let Some(e) = general.as_ref().and_then(|g| g.take_error()) {
-                return Err(e);
-            }
-            let mut covariance = if h.iter().all(|v| v.is_finite()) {
-                h.try_inverse()
-            } else {
-                None
-            };
-            // A successful compiled prefit can still have a nonpositive variance.
-            // The reference then uses the same deferred refinement controls.
-            if regression.is_none()
-                && !refined
-                && covariance
-                    .as_ref()
-                    .is_some_and(|m| m.diagonal().iter().any(|v| *v <= 0.0))
-            {
-                result = refine(&row, result.par, options)?;
-                let h = row.hessian(&result.par, options.hessian_step);
-                covariance = if h.iter().all(|v| v.is_finite()) {
-                    h.try_inverse()
-                } else {
-                    None
-                };
-            }
-            if regression.is_some() && covariance.is_none() {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "general posterior Hessian is singular or nonfinite",
-                ));
-            }
-            if let Some(covariance) = covariance
-                && covariance
-                    .diagonal()
-                    .iter()
-                    .all(|v| v.is_finite() && *v > 0.0)
-            {
+            let laplace = fit_laplace(
+                &row,
+                options,
+                regression,
+                general.as_ref(),
+                beta_binomial.as_ref(),
+                result,
+                refined,
+            )?;
+            result = laplace.optimization;
+            if let Some(covariance) = laplace.covariance {
                 laplace_valid = true;
                 for j in 0..p {
                     sd.as_mut_slice()[gene * p + j] = covariance[(j, j)].sqrt();
