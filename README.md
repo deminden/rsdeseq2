@@ -151,9 +151,9 @@ describes complete schemas, contrasts and outputs.
 | R integration | Matrix/list and `DESeqDataSet` workflows; formula evaluation is **experimental**; selected Bioconductor result objects |
 
 **Experimental:** `ashr`- and `apeglm`-style shrinkage and R-style formula
-evaluation match their independent references, but they are not yet covered
-by property tests and fuzzing (hardening tasks 7.2 and 7.3). Expect fixes in
-these areas before the API is declared stable.
+evaluation have independent reference tests. The formula parser and its
+transport also have fuzz targets. Stability will require broader property
+testing and validation on independent datasets.
 
 Full Bioconductor object semantics, `glmGamPoi`, plotting and custom formula
 functions are outside scope. Method-specific restrictions are maintained in

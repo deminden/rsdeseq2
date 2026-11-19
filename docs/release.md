@@ -41,7 +41,7 @@ R package checks retain the documented compiled-symbol warning for Rust runtime
 
 ## CI and artifact binding
 
-Branch pushes run Rust/Python, both R lanes and five release-profile platform
+Branch pushes run Rust/Python, three R lanes and five release-profile platform
 panels. The Parity workflow supplies the full GTEx replay. These jobs do not
 publish releases. Windows and Intel macOS generate independent R uniform-CDF
 references; pinned Linux R regenerates formula/SQP references and runs actual
@@ -49,8 +49,9 @@ interruption and C ASan/UBSan plus Rust ASan checks.
 
 When publication is explicitly requested, the matching version tag triggers
 `.github/workflows/release.yml`. Through `validate-release.yml` it requires
-Rust/Python, pinned R, full GTEx and the minimum compiler check. Current R is
-advisory in that workflow; its actual result remains visible. Each binary target
+Rust/Python, pinned R, full GTEx and the minimum compiler check. Current R and the previous Bioconductor release are advisory in that
+workflow. The previous release records its DESeq2 version and package
+check results as artifacts. Each binary target
 also runs its release-profile numerical/CLI panel.
 
 CI uploads the R source tarball it checked and the verified crate archive with

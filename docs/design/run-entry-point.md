@@ -125,3 +125,19 @@ two fast-VST trend helpers, which stay outside `run` and will be renamed in
 2. Deprecated in 0.6.0 and all removed in 0.7.0, leaving one entry point.
 3. Stopping early is `Analysis::stop_after: Stage`; the staged methods become
    deprecated wrappers too.
+
+## Candidate public surface for 1.0
+
+| Area | Entry points and data types |
+| --- | --- |
+| Workflow | `DeseqBuilder::run`, `Analysis` and its input selectors, `RunOutput`, `DeseqFit` and `ResultRequest` for queries on existing fits |
+| Data | Count and design matrices, labeled input readers, observations and offsets, result tables and diagnostics |
+| Standalone stages | Canonical request types for normalization, dispersion, GLM, transformations and supported shrinkage |
+| Configuration | `DeseqError` and its classifications, `NumericProfile`, work cancellation and thread settings |
+
+Keep the current compatibility exports through 0.6.0. During the 0.7.0
+migration, remove the deprecated analysis wrappers and narrow the remaining
+convenience exports as part of the public API review. Document the accepted
+exports in the crate's prelude before treating the table as a stability
+commitment. Keep ashr, apeglm and formula evaluation experimental until their
+coverage meets the supported contract.

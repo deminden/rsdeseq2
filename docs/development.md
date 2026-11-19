@@ -28,8 +28,9 @@ interfaces must share the same numerical engine and return identical values.
 
 Builder workflows and stages have private modules under
 `core/implementation/builder/`. Formula parsing/evaluation, contrasts,
-dispersion trends and CLI execution have focused private modules. Some
-bridge/GLM helpers use `include!` files to preserve scope and operation order.
+dispersion trends and CLI execution have focused private modules. Statistical
+primitives and stage modules have one-way dependencies, verified by
+`scripts/validation/check_module_cycles.py`.
 The R results adapter uses `R/results.R` and `R/results-*.R`; function definitions
 must remain independent of collation order.
 
@@ -80,9 +81,9 @@ Integration tests build as one binary, `integration`
 Add a new test file to that list, and run one file's tests with
 `cargo test -p rsdeseq2 --test integration <file>::`.
 
-Fuzz targets for the TSV readers, formula parsing and fixed-dispersion fits
-live in [`fuzz/`](../fuzz/README.md); their bodies also run on stable in
-`tests/fuzz_smoke.rs`.
+The [fuzz targets](../fuzz/README.md) cover TSV readers, formula parsing and
+transport, fixed-dispersion fits, R seed handling, CLI parsing, and output
+publication. Stable tests exercise the same target bodies.
 
 [Contributing](../CONTRIBUTING.md) summarises the IDENTICAL/NUMERIC rules and
 the pull-request template.

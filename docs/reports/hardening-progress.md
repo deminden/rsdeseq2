@@ -97,25 +97,35 @@ its original commit and reproduces the checked-in fixture byte for byte.
 
 | Area | Remaining work |
 | --- | --- |
-| Performance | Direct writes into final IRLS output buffers, reusable QR decomposition workspace, and measurements before accepting a solver change |
-| Independent references | An informational comparison against an older DESeq2 version |
-| Architecture | The two documented mutual module pairs, further posterior fit decomposition, and the agreed 1.0 public surface |
-| Validation | Additional fuzz targets named in the review, full platform checks, and the policy for fetching full-size reference tables |
-| Release | Align package versions and verify the release artifacts before publishing 0.6.0 |
+| Performance | Assess a reusable QR implementation that preserves arithmetic order |
+| Independent references | Run the informational R 4.5 and Bioconductor 3.22 lane in hosted CI |
+| Architecture | Review the [candidate 1.0 public surface](../design/run-entry-point.md#candidate-public-surface-for-10) before narrowing exports |
+| Validation | Run the five hosted platform panels and choose an immutable host for the full-size reference tables |
+| Release | Align package versions and verify the release artifacts when preparing 0.6.0 |
+
+IRLS now writes directly into preallocated output matrices. Its covariance
+diagnostic excludes skipped genes. The two remaining circular dependencies
+were removed while keeping existing `glm::nb` and `independent_filtering`
+imports available. The transaction fuzzer covers staging, paths that alias,
+incomplete outputs and failure at each rename. The posterior fit separates
+offset validation, optimization and Laplace covariance construction. The
+in-place QR trial changed 2,236 macOS golden fields and stayed outside the
+development branch.
 
 ### Local verification and benchmark
 
-- Rust workspace tests: 1,216 passed, including the explicitly run
+- Rust workspace tests: 1,220 passed, including the explicitly run
   56,200-gene GTEx replay that the default suite skips. Both macOS and portable
   golden checks matched 8,032 fields. The installed R package passed 2,874
   expectations without skips on R 4.6.2 and DESeq2 1.52.0.
-- The first paired benchmark used identical executables because the builds
-  shared a target directory. The benchmark now rejects identical inputs.
-  A replacement measurement used separate build directories. In one
-  four-worker pass over eleven GTEx contrasts, the candidate took 35.29 s
-  versus 37.92 s for its baseline, with byte-identical result TSVs. Peak RSS
-  was 265.81 versus 264.38 MiB. Other checks ran concurrently, so this pass
-  is preliminary.
+- On macOS arm64, one paired four-worker run over eleven full GTEx
+  contrasts took 19.42 s versus 20.91 s for the baseline from `09fe127`.
+  The separate executables used the portable profile and produced
+  byte-identical result TSVs. Throughput increased 7.65% and peak RSS was
+  258.23 versus 261.67 MiB. This is a single pass.
+- The configured macOS arm64 release panel passed 115 tests. The installed
+  R package check above ran on the same numerical implementation before
+  the posterior preparation/Laplace extraction.
 - The synthetic Cook's replacement/rlog prior probe ran at 20,000 × 100 and
   60,000 × 800 with 1, 2, 4 and 8 workers. At 60,000 × 800, the eight-worker
   run took 0.142 s for replacement and 1.416 s for rlog prior estimation.
