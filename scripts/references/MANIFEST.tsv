@@ -16,7 +16,7 @@ gtex_end_to_end/*	scripts/references/generate_gtex_end_to_end_reference.R
 gtex_v8_real_wald/compact/*	scripts/references/generate_gtex_compact_fixture.py	calls generate_gtex_compact_reference.R
 gtex_v8_real_wald/*	scripts/references/generate_gtex_real_wald_fixture.py	calls generate_gtex_real_wald_reference.R
 pasilla_holdout/*	scripts/references/generate_pasilla_validation.py	calls generate_pasilla_reference.R
-rank_r462.tsv	-	frozen by hand from R 4.6.2 qr() rank decisions; no generator committed
+rank_r462.tsv	scripts/references/generate_scaled_rank_reference.R	R 4.6.2 qr() decisions in original and scaled units
 rank_reference_r462.json	scripts/references/generate_rank_reference.R	
 formula_elementary_boundaries_r462.json	scripts/references/generate_elementary_expression_reference.R	
 fixed_prior_controls_r462.json	scripts/references/generate_fixed_prior_control_reference.R	
