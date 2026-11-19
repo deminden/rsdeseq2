@@ -2,6 +2,7 @@
 import csv
 import json
 import math
+import os
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -130,6 +131,20 @@ class TimingIntegrityTests(unittest.TestCase):
 
 
 class CompactFixtureTests(unittest.TestCase):
+    def test_compact_tables_match_the_selection_manifest(self):
+        directory = ROOT/'crates/rsdeseq2/tests/data/gtex_v8_real_wald/compact'
+        counts = compact.read(directory/'counts.tsv')
+        reference = compact.read(directory/'reference_results.tsv')
+        manifest = json.loads((directory/'selection.json').read_text())
+        genes = [row['gene'] for row in manifest['genes']]
+        self.assertEqual([row['gene'] for row in counts], genes)
+        self.assertEqual([row['gene'] for row in reference], genes)
+        self.assertEqual(len(genes), 512)
+        self.assertEqual(len(counts[0])-1, 61)
+        self.assertTrue(any(row['dispersion']=='NA' for row in reference))
+        self.assertTrue(any(float(row['pvalue'])>.9 for row in reference if row['pvalue']!='NA'))
+
+    @unittest.skipUnless(os.environ.get('RSDESEQ2_FULL_GTEX') == '1', 'full GTEx gate')
     def test_panel_is_reproducible_and_retains_extremes_and_missingness(self):
         directory=ROOT/'crates/rsdeseq2/tests/data/gtex_v8_real_wald'
         counts=compact.read(directory/'counts.tsv');reference=compact.read(directory/'reference_results.tsv')

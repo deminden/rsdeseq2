@@ -65,12 +65,11 @@ Ordinary tests fit a fixed-dispersion panel of **512 genes × all 61 samples**,
 selected from count/reference tails, quantiles, missingness and deterministic
 background coverage. It checks all six result fields and both directions of
 missingness. Full-cohort size factors and final dispersions are supplied; the
-subset's BH-adjusted p-values are recomputed for that subset. A separate default
-test estimates normalization over all genes.
+subset's BH-adjusted p-values are recomputed for that subset.
 
-The one opt-in full replay remains necessary for all-gene coverage. The compact
-panel does not replace native dispersion, weighted, local-fit or optimizer tests.
-Full counts are also retained for offline contrast generation. See the
+The opt-in full replay covers all genes and independently checks their
+normalization. Restore the frozen full tables by SHA-256 from Git before
+running the full replay or generating new contrasts. See the
 [fixture description](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md).
 
 ```sh

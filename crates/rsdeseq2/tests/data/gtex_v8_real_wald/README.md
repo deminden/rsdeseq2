@@ -13,7 +13,7 @@ versions, source URLs, the upstream matrix hash and dimensions.
 ## Routine checks
 
 ```bash
-cargo test -p rsdeseq2 --test gtex_real_wald_parity
+cargo test -p rsdeseq2 --test integration gtex_real_wald_parity::
 ```
 
 The routine Wald fit uses the **512-gene × 61-sample** panel in `compact/`.
@@ -27,7 +27,7 @@ Subsetting changes estimated normalization and the multiple-testing family.
 The panel therefore **supplies the original full-cohort size factors and final
 dispersions**, and freezes new subset adjusted p-values from R's
 `stats::p.adjust(method="BH")`. It does not estimate these from the small panel.
-A separate routine check still estimates size factors from all 56,200 genes.
+The full replay independently checks size factors across all 56,200 genes.
 
 Both replay sizes check all six result fields, exact gene/sample alignment,
 finite values and matching missingness. Absolute error bounds are unchanged:
@@ -38,13 +38,16 @@ column, so its BH oracle is calculated independently from the R p-values.
 ## Full replay
 
 ```bash
-cargo test -p rsdeseq2 --test gtex_real_wald_parity full_gtex_wald \
+python3 scripts/references/stage_gtex_full_fixture.py --fetch
+cargo test -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ \
   -- --ignored --nocapture
 ```
 
-This explicit slow test fits every original gene and estimates normalization.
-The manual Parity workflow runs it. Full data are also retained for the eleven
-biological/random contrast benchmarks; their generation is documented in
+These checks fit every original gene and estimate normalization. The
+Parity workflow restores the full count and result tables from a pinned Git
+revision and verifies their SHA-256 hashes against the compact manifest. Run
+the same staging command before generating the eleven benchmark contrasts.
+Contrast generation is documented in
 `docs/reports/gtex-native-wald-benchmark.md`. The compact fixed-dispersion test does not
 replace native dispersion, optimizer, weighted, local-fit or full-contrast gates.
 

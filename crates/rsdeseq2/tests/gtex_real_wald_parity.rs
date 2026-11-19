@@ -334,6 +334,7 @@ fn reference_padj(reference: &Tsv) -> Vec<Option<f64>> {
 }
 
 #[test]
+#[ignore = "requires staging the full GTEx fixture"]
 fn full_gtex_normalization_matches_deseq2_without_fitting_glms() {
     let counts = rsdeseq2::io::read_count_matrix_tsv(fixture_dir().join("counts.tsv")).unwrap();
     assert_eq!((counts.n_genes(), counts.n_samples()), (56200, 61));

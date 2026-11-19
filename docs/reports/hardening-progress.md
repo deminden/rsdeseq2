@@ -97,10 +97,9 @@ its original commit and reproduces the checked-in fixture byte for byte.
 
 | Area | Remaining work |
 | --- | --- |
-| Performance | Assess a reusable QR implementation that preserves arithmetic order |
 | Independent references | Run the informational R 4.5 and Bioconductor 3.22 lane in hosted CI |
 | Architecture | Review the [candidate 1.0 public surface](../design/run-entry-point.md#candidate-public-surface-for-10) before narrowing exports |
-| Validation | Run the five hosted platform panels and choose an immutable host for the full-size reference tables |
+| Validation | Run the five hosted platform panels, including pinned full-table restoration from a shallow checkout |
 | Release | Align package versions and verify the release artifacts when preparing 0.6.0 |
 
 IRLS now writes directly into preallocated output matrices. Its covariance
@@ -109,8 +108,13 @@ were removed while keeping existing `glm::nb` and `independent_filtering`
 imports available. The transaction fuzzer covers staging, paths that alias,
 incomplete outputs and failure at each rename. The posterior fit separates
 offset validation, optimization and Laplace covariance construction. The
-in-place QR trial changed 2,236 macOS golden fields and stayed outside the
-development branch.
+in-place QR trial changed 2,236 macOS golden fields. A scratch-buffer QR trial
+matched both golden profiles and full GTEx output but achieved only 0.914× the
+existing throughput. The branch retains the existing QR solver.
+
+The Parity workflow restores the two large GTEx tables from a pinned Git
+commit and verifies their SHA-256 hashes against the compact fixture manifest.
+Routine tests use the tracked compact panel.
 
 ### Local verification and benchmark
 
