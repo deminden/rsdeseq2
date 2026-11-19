@@ -9,7 +9,10 @@ them on every pull request.
 | --- | --- |
 | `tsv_readers` | first byte selects the count, design, sample-value or sample-level reader; the rest is the file |
 | `formula` | UTF-8 formula against a fixed six-sample model frame |
+| `formula_wire` | arbitrary bytes following the formula transport header; valid inputs round-trip |
 | `fixed_dispersion_wald` | first byte sets the dispersion; then little-endian `u32` counts for four samples in two groups |
+| `r_seed` | little-endian R RNG state words, including valid seed round trips |
+| `cli_args` | NUL-separated arguments and a selector for the subcommand |
 
 ```sh
 cargo install cargo-fuzz --locked

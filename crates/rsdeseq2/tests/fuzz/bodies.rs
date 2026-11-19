@@ -87,10 +87,71 @@ pub fn fixed_dispersion_wald(data: &[u8]) {
     )
     .expect("fixed design");
     let dispersion = 1e-8 + f64::from(dispersion_byte) / 16.0;
-    let _ = DeseqBuilder::new().fit_fixed_dispersion_wald(
-        &matrix,
-        &design,
-        &vec![dispersion; genes],
-        1,
+    let _ = DeseqBuilder::new().run(
+        &Analysis::new(&matrix, &design)
+            .fixed_dispersion(&vec![dispersion; genes])
+            .result(ResultColumn::Coefficient(1)),
     );
+}
+
+/// Decode arbitrary formula transport bytes, then validate a canonical round trip.
+pub fn formula_wire(data: &[u8]) {
+    use rsdeseq2::design::expression::wire;
+    let mut bytes = b"RFX2".to_vec();
+    bytes.extend_from_slice(data);
+    if let Ok(value) = wire::decode(&bytes) {
+        let encoded = wire::encode(&value).expect("validated value can be encoded");
+        let decoded = wire::decode(&encoded).expect("encoded value can be decoded");
+        assert_eq!(wire::encode(&decoded).unwrap(), encoded);
+    }
+}
+
+/// Parse byte-derived R seed words using an optional supported RNG header.
+pub fn r_seed(data: &[u8]) {
+    use rsdeseq2::shrinkage::PosteriorRng;
+    let Some((&header, state)) = data.split_first() else {
+        return;
+    };
+    let mut seed = match header % 3 {
+        0 => vec![10403],
+        1 => vec![10407],
+        _ => Vec::new(),
+    };
+    seed.extend(
+        state
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .copied()
+            .map(i32::from_le_bytes),
+    );
+    if let Ok(mut original) = PosteriorRng::from_r_seed(&seed) {
+        let mut restored =
+            PosteriorRng::from_r_seed(&original.r_seed()).expect("generated state is restorable");
+        assert_eq!(original.uniform().to_bits(), restored.uniform().to_bits());
+    }
+}
+
+/// Parse argument sets without dispatching a command or touching the filesystem.
+pub fn cli_args(data: &[u8]) {
+    use clap::Parser;
+    let Ok(text) = std::str::from_utf8(data) else {
+        return;
+    };
+    let mut fields = text.split('\0');
+    let Some(selector) = fields.next() else {
+        return;
+    };
+    let mut argv = vec!["rsdeseq2"];
+    let command = match selector.bytes().next().unwrap_or(0) % 6 {
+        0 => Some("wald"),
+        1 => Some("lrt"),
+        2 => Some("rlog"),
+        3 => Some("size-factors"),
+        4 => Some("normalized-counts"),
+        _ => None,
+    };
+    argv.extend(command);
+    argv.extend(fields);
+    drop(rsdeseq2::cli::Cli::try_parse_from(argv));
 }

@@ -80,6 +80,17 @@ proptest! {
     }
 
     #[test]
+    fn formula_wire_survives_random_bytes(data in prop::collection::vec(any::<u8>(), 0..512)) {
+        fuzz_bodies::formula_wire(&data);
+    }
+
+    #[test]
+    fn seed_and_cli_parsers_survive_random_bytes(data in prop::collection::vec(any::<u8>(), 0..2600)) {
+        fuzz_bodies::r_seed(&data);
+        fuzz_bodies::cli_args(&data);
+    }
+
+    #[test]
     fn fits_survive_random_counts(data in prop::collection::vec(any::<u8>(), 0..300)) {
         fuzz_bodies::fixed_dispersion_wald(&data);
     }

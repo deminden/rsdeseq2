@@ -12,8 +12,9 @@ cargo-fuzz = true
 [workspace]
 
 [dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
 libfuzzer-sys = "0.4"
-rsdeseq2 = { path = "../crates/rsdeseq2", default-features = false, features = ["formula"] }
+rsdeseq2 = { path = "../crates/rsdeseq2", default-features = false, features = ["cli", "formula", "shrinkage"] }
 
 [[bin]]
 name = "tsv_readers"
@@ -32,6 +33,27 @@ bench = false
 [[bin]]
 name = "fixed_dispersion_wald"
 path = "fuzz_targets/fixed_dispersion_wald.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula_wire"
+path = "fuzz_targets/formula_wire.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "r_seed"
+path = "fuzz_targets/r_seed.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cli_args"
+path = "fuzz_targets/cli_args.rs"
 test = false
 doc = false
 bench = false
