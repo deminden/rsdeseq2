@@ -14,7 +14,7 @@ cargo-fuzz = true
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 libfuzzer-sys = "0.4"
-rsdeseq2 = { path = "../crates/rsdeseq2", default-features = false, features = ["cli", "formula", "shrinkage"] }
+rsdeseq2 = { path = "../crates/rsdeseq2", default-features = false, features = ["fuzzing", "formula", "shrinkage"] }
 
 [[bin]]
 name = "tsv_readers"
@@ -54,6 +54,13 @@ bench = false
 [[bin]]
 name = "cli_args"
 path = "fuzz_targets/cli_args.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "output_transaction"
+path = "fuzz_targets/output_transaction.rs"
 test = false
 doc = false
 bench = false

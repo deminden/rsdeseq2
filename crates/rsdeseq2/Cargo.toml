@@ -46,6 +46,8 @@ harness = false
 default = ["cli", "formula", "shrinkage"]
 # Command-line interface: the `rsdeseq2` binary and `rsdeseq2::cli`.
 cli = ["dep:clap", "dep:sha2", "dep:same-file"]
+# Internal target hooks for the separate cargo-fuzz workspace.
+fuzzing = ["cli"]
 # Locale-aware (ICU) collation for formula factor levels and string
 # comparisons. Without it, formula evaluation supports only "C" collation.
 formula = ["rcompat-formula/icu"]

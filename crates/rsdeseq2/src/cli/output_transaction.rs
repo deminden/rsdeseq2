@@ -285,9 +285,105 @@ impl OutputTransaction {
     }
 }
 
+/// Exercise preflight, staging, and publication inside a temporary directory.
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn fuzz_output_transaction(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let [first, second, flags, ..] = data else {
+        return Ok(());
+    };
+    let root = unique_temporary(&std::env::temp_dir(), true)?;
+    let mut input = root.0.join("input.tsv");
+    fs::write(&input, "input data")?;
+    fs::create_dir(root.0.join("nested"))?;
+    let names = [
+        "first.tsv",
+        "First.tsv",
+        "second.tsv",
+        "second.tsv.complete.json",
+        "input.tsv",
+        "nested",
+        "nested/result.tsv",
+        "nested/../first.tsv",
+        "missing/result.tsv",
+        "café.tsv",
+        "cafe\u{301}.tsv",
+    ];
+    let mut first = root.0.join(names[*first as usize % names.len()]);
+    let mut second = root.0.join(names[*second as usize % names.len()]);
+    let result = OutputTransaction::prepare(&[&mut input], &mut [&mut first, &mut second]);
+    if let Ok(transaction) = result {
+        let marker = transaction.marker.destination.clone();
+        let output_paths = transaction
+            .files
+            .iter()
+            .map(|file| file.destination.clone())
+            .collect::<Vec<_>>();
+        fs::write(&first, "first new output")?;
+        let complete = flags & 1 == 0;
+        if complete {
+            fs::write(&second, "second new output")?;
+        }
+        let failure_at = match (flags >> 1) & 3 {
+            0 => None,
+            index => Some(usize::from(index - 1)),
+        };
+        let result = transaction.publish_with(|index, from, to| {
+            if failure_at == Some(index) {
+                Err(std::io::Error::other("injected rename failure"))
+            } else {
+                fs::rename(from, to)
+            }
+        });
+        let published = complete && failure_at.is_none();
+        assert_eq!(result.is_ok(), published);
+        assert_eq!(marker.exists(), published);
+        assert!(!first.exists() && !second.exists());
+        if published {
+            let manifest: serde_json::Value = serde_json::from_reader(File::open(marker)?)?;
+            for (index, (path, bytes)) in output_paths
+                .iter()
+                .zip([
+                    b"first new output".as_slice(),
+                    b"second new output".as_slice(),
+                ])
+                .enumerate()
+            {
+                assert_eq!(fs::read(path)?, bytes);
+                assert_eq!(manifest["files"][index]["bytes"], bytes.len());
+                let hash: String = Sha256::digest(bytes)
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect();
+                assert_eq!(manifest["files"][index]["sha256"], hash);
+            }
+        }
+    }
+    assert_eq!(fs::read(&input)?, b"input data");
+    for parent in [&root.0, &root.0.join("nested")] {
+        for entry in fs::read_dir(parent)? {
+            assert!(
+                !entry?
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".rsdeseq2-")
+            );
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn publication_recipes_preserve_inputs_and_cleanup() {
+        for (first, second) in [(0, 2), (4, 2), (3, 2), (0, 7), (0, 8), (9, 10)] {
+            for flags in 0..8 {
+                fuzz_output_transaction(&[first, second, flags]).unwrap();
+            }
+        }
+    }
 
     #[test]
     fn publication_failure_invalidates_the_marker_and_cleans_temporary_files() {

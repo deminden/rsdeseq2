@@ -7,3 +7,7 @@ mod implementation;
 mod output_transaction;
 
 pub use implementation::*;
+
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub use output_transaction::fuzz_output_transaction;
