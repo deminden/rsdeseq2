@@ -27,8 +27,9 @@ pub use rcompat_formula::design;
 pub mod diagnostics;
 pub mod dispersion;
 pub mod errors;
-pub mod glm;
 /// DESeq2's independent filtering on the mean of normalized counts.
+mod filtering;
+pub mod glm;
 pub mod independent_filtering;
 pub mod io;
 pub mod math;

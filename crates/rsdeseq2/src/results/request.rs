@@ -7,10 +7,11 @@ use crate::contrasts::ResultsContrast;
 use crate::errors::DeseqError;
 use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
-use crate::glm::{WaldTestOptions, wald::validate_wald_options};
-use crate::independent_filtering::{
-    IndependentFilteringOptions, apply_independent_filtering, validate_alpha, validate_theta,
+use crate::filtering::{
+    IndependentFilteringOptions, IndependentFilteringOutput, evaluate_independent_filtering,
+    validate_alpha, validate_theta,
 };
+use crate::glm::{WaldTestOptions, wald::validate_wald_options};
 use crate::options::CooksCutoff;
 use crate::{core::DeseqFit, matrix::CountMatrix};
 
@@ -208,4 +209,38 @@ impl DeseqFit {
         apply_independent_filtering(&mut results, &request.filtering)?;
         Ok(results)
     }
+}
+
+/// Apply DESeq2-style independent filtering to result rows.
+///
+/// The current Rust path uses `baseMean` as the filter statistic, matching the
+/// default DESeq2 `results()` behavior. The threshold selection follows the
+/// DESeq2 logic around `filtered_p` and rejection counts, with an
+/// R-`lowess`-shaped fit for the smoothed rejection curve.
+pub fn apply_independent_filtering(
+    results: &mut DeseqResults,
+    options: &IndependentFilteringOptions,
+) -> Result<IndependentFilteringOutput, DeseqError> {
+    let filter = results
+        .rows
+        .iter()
+        .map(|row| row.base_mean)
+        .collect::<Vec<_>>();
+    let pvalues = results
+        .rows
+        .iter()
+        .map(|row| row.pvalue)
+        .collect::<Vec<_>>();
+    let evaluated = evaluate_independent_filtering(&filter, &pvalues, options)?;
+    for ((row, adjusted), filtered) in results
+        .rows
+        .iter_mut()
+        .zip(evaluated.padj)
+        .zip(evaluated.filtered)
+    {
+        row.padj = adjusted;
+        row.filtered = filtered;
+    }
+    results.independent_filtering = Some(evaluated.metadata.clone());
+    Ok(evaluated.metadata)
 }

@@ -2,6 +2,7 @@
 
 /// DESeq2-parameterized negative-binomial likelihood helpers.
 pub mod distributions;
+pub(crate) mod nb;
 #[doc(hidden)]
 pub use rcompat_numeric::math::elementary;
 // `median` names both the module and the function.

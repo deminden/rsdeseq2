@@ -1,8 +1,8 @@
-use crate::errors::DeseqError;
-use crate::glm::nb::{
+use super::nb::{
     nbinom_log_likelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
     nbinom_log_pmf, nbinom_negative_twice_log_likelihood,
 };
+use crate::errors::DeseqError;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 

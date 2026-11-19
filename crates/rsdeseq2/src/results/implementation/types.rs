@@ -11,6 +11,7 @@ pub(super) use crate::design::{
     expanded_formula_design_with_offsets_from_model_frame,
 };
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
+pub(super) use crate::filtering::IndependentFilteringOutput;
 pub(super) use crate::glm::inference::GlmInferenceView;
 pub(super) use crate::glm::{
     BetaPriorRefitOptions, ExpandedModelBetaPriorDesignInput, ExpandedModelBetaPriorGlmFit,
@@ -18,7 +19,6 @@ pub(super) use crate::glm::{
     WaldTestOptions, collapse_expanded_model_fit, fit_expanded_glms_with_estimated_beta_prior,
     wald_test_coefficient, wald_test_contrast,
 };
-pub(super) use crate::independent_filtering::IndependentFilteringOutput;
 pub(super) use crate::matrix::CountMatrix;
 pub(super) use crate::matrix::RowMajorMatrix;
 pub(super) use crate::multiple_testing::bh_adjust;

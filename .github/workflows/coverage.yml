@@ -47,7 +47,7 @@ jobs:
           - { crate: rcompat-numeric, files: 'crates/rcompat-numeric/src/numeric/*.rs', tests: '--cargo-test-arg=--lib' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/multiple_testing.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/normalization.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
-          - { crate: rsdeseq2, files: crates/rsdeseq2/src/independent_filtering.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
+          - { crate: rsdeseq2, files: crates/rsdeseq2/src/filtering.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable

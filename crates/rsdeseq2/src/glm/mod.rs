@@ -14,7 +14,10 @@ mod inference_primitives;
 pub mod irls;
 /// Likelihood-ratio tests between full and reduced fits.
 pub mod lrt;
-pub mod nb;
+/// DESeq2-parameterized negative-binomial likelihoods.
+pub mod nb {
+    pub use crate::math::nb::*;
+}
 mod r_arithmetic;
 /// Wald tests for coefficients and numeric contrasts.
 pub mod wald;
