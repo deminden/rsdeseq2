@@ -48,6 +48,8 @@ jobs:
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/multiple_testing.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/normalization.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
           - { crate: rsdeseq2, files: crates/rsdeseq2/src/filtering.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
+          - { crate: rsdeseq2, files: 'crates/rsdeseq2/src/glm/irls/*.rs', tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
+          - { crate: rsdeseq2, files: crates/rsdeseq2/src/dispersion/map.rs, tests: '--cargo-test-arg=--lib --cargo-test-arg=--test --cargo-test-arg=integration' }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
@@ -69,3 +71,28 @@ jobs:
         with:
           name: mutants-${{ strategy.job-index }}-${{ github.sha }}
           path: mutants.out
+
+
+  miri:
+    runs-on: ubuntu-latest
+    env:
+      RSDESEQ2_NUMERIC_PROFILE: portable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: nightly
+          components: miri
+      - name: Check matrix views and checked arithmetic under Miri
+        run: cargo miri test --locked -p rcompat-numeric --lib -- matrix::tests:: numeric::checked::tests:: numeric::validate::tests::
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
+        with:
+          tool: cargo-audit
+      - name: Check locked dependencies against RustSec
+        run: cargo audit --file Cargo.lock
