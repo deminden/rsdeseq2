@@ -255,7 +255,8 @@ pub fn gamma_lr(a: f64, x: f64) -> f64 {
 /// The digamma function (Algorithm AS 103, Bernardo 1976).
 pub fn digamma(x: f64) -> f64 {
     let c = 12.0;
-    let d1 = -0.57721566490153286;
+    // Preserve the AS 103 coefficient bits on the supported MSRV.
+    let d1 = f64::from_bits(0xbfe2_788c_fc6f_b619);
     let d2 = 1.6449340668482264365;
     let s = 1e-6;
     let s3 = 1.0 / 12.0;
