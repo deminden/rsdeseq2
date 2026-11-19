@@ -75,7 +75,8 @@ running the full replay or generating new contrasts. See the
 ```sh
 cargo test --locked --workspace
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_wald \
+python3 scripts/references/stage_gtex_full_fixture.py --fetch
+cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ \
   -- --ignored --nocapture
 ```
 
