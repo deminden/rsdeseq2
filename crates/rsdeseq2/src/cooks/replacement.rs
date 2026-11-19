@@ -36,54 +36,57 @@ pub fn replace_outlier_counts(
         None => samples_for_cooks(model_matrix, options.min_replicates)?,
     };
 
-    let mut candidate_values =
-        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's replacement")?;
-    for gene in 0..counts.n_genes() {
-        let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
-        let scale_row = match normalization_factors {
-            Some(factors) => factors.row(gene)?,
-            None => size_factors,
-        };
-        for (sample, scale) in scale_row.iter().copied().enumerate() {
-            let scaled_mean = checked::try_mul(trim_mean, scale).nonfinite_at(
-                "replacement scaled mean",
-                Some(gene * counts.n_samples() + sample),
-            )?;
-            candidate_values.push(replacement_count_from_scaled_mean(scaled_mean)?);
-        }
-    }
+    let genes = counts.n_genes();
+    let samples = counts.n_samples();
+    let mut candidate_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
+    let mut outlier_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
+    let mut replaced_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
+    candidate_values.resize(counts.as_slice().len(), 0);
+    outlier_values.resize(counts.as_slice().len(), false);
+    replaced_values.extend_from_slice(counts.as_slice());
 
-    let mut outlier_values =
-        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's replacement")?;
-    let mut replace = Vec::with_capacity(counts.n_genes());
-    let mut replaced_values = counts.as_slice().to_vec();
-    for gene in 0..counts.n_genes() {
-        let cooks_row = cooks.row(gene)?;
-        let mut row_has_outlier = false;
-        let mut row_has_missing = false;
-        for sample in 0..counts.n_samples() {
-            let cook = cooks_row[sample];
-            let is_outlier = cook.is_finite() && cook > options.cooks_cutoff;
-            if !cook.is_finite() {
-                row_has_missing = true;
-            }
-            if is_outlier {
-                row_has_outlier = true;
-                if replaceable_samples[sample] {
-                    let idx = gene * counts.n_samples() + sample;
-                    replaced_values[idx] = candidate_values[idx];
+    let replace = candidate_values
+        .par_chunks_mut(samples)
+        .zip(outlier_values.par_chunks_mut(samples))
+        .zip(replaced_values.par_chunks_mut(samples))
+        .enumerate()
+        .map(|(gene, ((candidate, outlier), replaced))| {
+            let trim_mean = r_trimmed_mean(normalized_counts.row(gene)?.to_vec(), options.trim);
+            let scales = match normalization_factors {
+                Some(factors) => factors.row(gene)?,
+                None => size_factors,
+            };
+            let cooks_row = cooks.row(gene)?;
+            let mut has_outlier = false;
+            let mut has_missing = false;
+            for sample in 0..samples {
+                let scaled_mean = checked::try_mul(trim_mean, scales[sample])
+                    .nonfinite_at("replacement scaled mean", Some(gene * samples + sample))?;
+                candidate[sample] = replacement_count_from_scaled_mean(scaled_mean)?;
+
+                let cook = cooks_row[sample];
+                let finite = cook.is_finite();
+                outlier[sample] = finite && cook > options.cooks_cutoff;
+                has_outlier |= outlier[sample];
+                has_missing |= !finite;
+                if outlier[sample] && replaceable_samples[sample] {
+                    replaced[sample] = candidate[sample];
                 }
             }
-            outlier_values.push(is_outlier);
-        }
-        replace.push(if row_has_outlier {
-            Some(true)
-        } else if row_has_missing {
-            None
-        } else {
-            Some(false)
-        });
-    }
+            Ok(if has_outlier {
+                Some(true)
+            } else if has_missing {
+                None
+            } else {
+                Some(false)
+            })
+        })
+        .collect::<Vec<_>>();
+    // Collect in row order so concurrent failures report the same first gene
+    // and sample as the serial implementation.
+    let replace = replace
+        .into_iter()
+        .collect::<Result<Vec<_>, DeseqError>>()?;
 
     Ok(CooksReplacementOutput {
         replaced_counts: count_matrix_like(counts, replaced_values)?,

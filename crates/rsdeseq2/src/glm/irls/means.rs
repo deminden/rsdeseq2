@@ -135,18 +135,8 @@ pub(super) fn fitted_mu_impl(
     nf: &[f64],
     min_mu: Option<f64>,
 ) -> Result<Vec<f64>, DeseqError> {
-    fitted_mu_impl_with_logs(x, beta, nf, min_mu, None)
-}
-
-pub(super) fn fitted_mu_impl_with_logs(
-    x: &DMatrix<f64>,
-    beta: &DVector<f64>,
-    nf: &[f64],
-    min_mu: Option<f64>,
-    log_nf: Option<&[f64]>,
-) -> Result<Vec<f64>, DeseqError> {
     let mut output = Vec::with_capacity(x.nrows());
-    fitted_mu_into(x, beta, nf, min_mu, log_nf, &mut output)?;
+    fitted_mu_into(x, beta, nf, min_mu, None, &mut output)?;
     Ok(output)
 }
 

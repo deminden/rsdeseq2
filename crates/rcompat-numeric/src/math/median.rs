@@ -20,17 +20,14 @@ pub fn median(values: &[f64]) -> Result<f64, Error> {
         }
         sorted.push(value);
     }
-    sorted.sort_by(f64::total_cmp);
-    let mid = sorted.len() / 2;
-    if sorted.len() % 2 == 1 {
-        Ok(sorted[mid])
-    } else {
-        midpoint(sorted[mid - 1], sorted[mid]).ok_or_else(|| Error::NonFiniteValue {
+    let (lower, upper) = middle_values(&mut sorted);
+    lower
+        .map_or(Some(upper), |left| midpoint(left, upper))
+        .ok_or_else(|| Error::NonFiniteValue {
             context: "median midpoint".to_string(),
             index: None,
-            value: sorted[mid - 1],
+            value: lower.unwrap_or(upper),
         })
-    }
 }
 
 /// Median after dropping non-finite values. Returns `None` if no values remain.
@@ -43,13 +40,22 @@ pub fn median_finite(values: &[f64]) -> Option<f64> {
     if sorted.is_empty() {
         return None;
     }
-    sorted.sort_by(f64::total_cmp);
-    let mid = sorted.len() / 2;
-    if sorted.len() % 2 == 1 {
-        Some(sorted[mid])
+    let (lower, upper) = middle_values(&mut sorted);
+    lower.map_or(Some(upper), |left| midpoint(left, upper))
+}
+
+// Select the upper midpoint, then find the lower one in the left partition.
+// total_cmp preserves ordering of signed zero just like the former sort.
+fn middle_values(values: &mut [f64]) -> (Option<f64>, f64) {
+    let mid = values.len() / 2;
+    let even = values.len().is_multiple_of(2);
+    let (left, upper, _) = values.select_nth_unstable_by(mid, f64::total_cmp);
+    let lower = if even {
+        left.iter().copied().max_by(f64::total_cmp)
     } else {
-        midpoint(sorted[mid - 1], sorted[mid])
-    }
+        None
+    };
+    (lower, *upper)
 }
 
 fn midpoint(left: f64, right: f64) -> Option<f64> {

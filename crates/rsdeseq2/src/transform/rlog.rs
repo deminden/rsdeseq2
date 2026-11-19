@@ -9,6 +9,7 @@ use crate::matrix::RowMajorMatrix;
 use crate::matrix::try_alloc_matrix;
 use crate::normalization::{Offsets, normalized_counts, normalized_counts_with_factors};
 use crate::numeric::math::ProfileMath;
+use rayon::prelude::*;
 
 /// Wide log2-scale prior variance used for the rlog intercept.
 ///
@@ -274,9 +275,13 @@ pub fn estimate_rlog_sample_prior_variance_with_quantile(
             disp_fit.len(),
         ));
     }
-    let mut log_fold_changes = Vec::with_capacity(normalized_counts.len());
-    let mut weights = Vec::with_capacity(normalized_counts.len());
-    for gene in 0..normalized_counts.n_rows() {
+    let genes = normalized_counts.n_rows();
+    let samples = normalized_counts.n_cols();
+    let mut log_fold_changes = try_alloc_matrix(genes, samples, "rlog prior log fold changes")?;
+    let mut weights = try_alloc_matrix(genes, samples, "rlog prior weights")?;
+    log_fold_changes.resize(normalized_counts.len(), 0.0);
+    weights.resize(normalized_counts.len(), 0.0);
+    let fill_row = |gene: usize, changes: &mut [f64], weights: &mut [f64]| {
         let mean = base_mean[gene];
         let dispersion = disp_fit[gene];
         if !mean.is_finite() || mean <= 0.0 {
@@ -301,22 +306,35 @@ pub fn estimate_rlog_sample_prior_variance_with_quantile(
         }
         let weight = 1.0 / variance;
         let mean_log = (mean + 0.5).log2_p();
-        for sample in 0..normalized_counts.n_cols() {
-            let value = normalized_counts
-                .get(gene, sample)
-                .copied()
-                .unwrap_or(f64::NAN);
+        for (sample, &value) in normalized_counts.row(gene)?.iter().enumerate() {
             if !value.is_finite() || value < 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "rlog normalized count".to_string(),
-                    index: Some(gene * normalized_counts.n_cols() + sample),
+                    index: Some(gene * samples + sample),
                     value,
                 });
             }
-            log_fold_changes.push((value + 0.5).log2_p() - mean_log);
-            weights.push(weight);
+            changes[sample] = (value + 0.5).log2_p() - mean_log;
+            weights[sample] = weight;
         }
+        Ok(())
+    };
+    if samples == 0 {
+        for gene in 0..genes {
+            fill_row(gene, &mut [], &mut [])?;
+        }
+    } else {
+        let rows = log_fold_changes
+            .par_chunks_mut(samples)
+            .zip(weights.par_chunks_mut(samples))
+            .enumerate()
+            .map(|(gene, (changes, weights))| fill_row(gene, changes, weights))
+            .collect::<Vec<_>>();
+        // Report the first row error in the same order as the serial loop.
+        rows.into_iter().collect::<Result<(), DeseqError>>()?;
     }
+    // The quantile still sees flattened row-major data, including tied values.
+
     match_weighted_upper_quantile_for_variance(&log_fold_changes, &weights, upper_quantile)
 }
 

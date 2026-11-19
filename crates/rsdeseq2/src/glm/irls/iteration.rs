@@ -2,7 +2,17 @@ use super::*;
 use crate::numeric::math::ProfileMath;
 // Per-gene IRLS iterations and scratch reuse.
 
+#[derive(Default)]
+pub(super) struct IrlsScratch {
+    counts: Vec<f64>,
+    log_offsets: Vec<f64>,
+    fitted_means: Vec<f64>,
+    weights: Vec<f64>,
+    response: Vec<f64>,
+}
+
 pub(super) fn fit_fixed_dispersion_irls_row(
+    scratch: &mut IrlsScratch,
     input: IrlsRowInput<'_>,
 ) -> Result<IrlsRowOutput, DeseqError> {
     let gene = input.gene;
@@ -12,43 +22,49 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             reason: format!("gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"),
         });
     }
-    let y = input
-        .counts
-        .row(gene)?
-        .iter()
-        .copied()
-        .map(f64::from)
-        .collect::<Vec<_>>();
+    let IrlsScratch {
+        counts: y,
+        log_offsets,
+        fitted_means: mu,
+        weights: w,
+        response: z,
+    } = scratch;
+    let count_row = input.counts.row(gene)?;
+    y.clear();
+    y.extend(count_row.iter().copied().map(f64::from));
     let nf = input.normalization_factors.row(gene)?;
-    // Size factors share one log row across genes; per-cell factors need their own.
-    let owned_log_nf;
-    let log_nf: &[f64] = match input.shared_log_offsets {
+    let log_nf = match input.shared_log_offsets {
         Some(shared) => shared,
         None => {
-            owned_log_nf = nf.iter().copied().map(f64::ln_p).collect::<Vec<_>>();
-            &owned_log_nf
+            log_offsets.clear();
+            log_offsets.extend(nf.iter().copied().map(f64::ln_p));
+            log_offsets.as_slice()
         }
     };
     let weight_row = input.weights.map(|matrix| matrix.row(gene)).transpose()?;
     let dispersion = input.dispersions[gene];
     let mut beta =
-        initial_beta_for_rule(input.x, &y, nf, Some(input.initial_lu), input.initial_beta)?;
-    let mut mu =
-        fitted_mu_impl_with_logs(input.x, &beta, nf, Some(input.options.min_mu), Some(log_nf))?;
-    let likelihood = FixedDispersionLikelihood::new(input.counts.row(gene)?, dispersion);
+        initial_beta_for_rule(input.x, y, nf, Some(input.initial_lu), input.initial_beta)?;
+    fitted_mu_into(
+        input.x,
+        &beta,
+        nf,
+        Some(input.options.min_mu),
+        Some(log_nf),
+        mu,
+    )?;
+    let likelihood = FixedDispersionLikelihood::new(count_row, dispersion);
     let mut dev_old = 0.0;
     let mut dev = 0.0;
     let mut iter = 0_usize;
     let mut converged = false;
 
-    let mut w = Vec::with_capacity(mu.len());
-    let mut z = Vec::with_capacity(mu.len());
     for t in 0..input.options.maxit {
         iter += 1;
-        working_weights_into(&mu, dispersion, weight_row, &mut w)?;
-        working_response_into(&mu, nf, &y, Some(log_nf), &mut z)?;
+        working_weights_into(mu, dispersion, weight_row, w)?;
+        working_response_into(mu, nf, y, Some(log_nf), z)?;
         let Some(next_beta) =
-            solve_weighted_least_squares(input.x, &w, &z, input.ridge_lambda, input.options.solver)
+            solve_weighted_least_squares(input.x, w, z, input.ridge_lambda, input.options.solver)
         else {
             iter = input.options.maxit;
             break;
@@ -67,9 +83,9 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             nf,
             Some(input.options.min_mu),
             Some(log_nf),
-            &mut mu,
+            mu,
         )?;
-        dev = -2.0 * likelihood.log_likelihood(&mu, weight_row)?;
+        dev = -2.0 * likelihood.log_likelihood(mu, weight_row)?;
         let Some(conv_test) = irls_deviance_convergence_stat(dev, dev_old) else {
             iter = input.options.maxit;
             break;
@@ -91,9 +107,9 @@ pub(super) fn fit_fixed_dispersion_irls_row(
         converged: false,
     };
 
-    let w = working_weights(&mu, dispersion, weight_row)?;
+    working_weights_into(mu, dispersion, weight_row, w)?;
     let Some((beta_covariance, hat_diag)) =
-        covariance_and_hat_diagonal(input.x, &w, input.ridge_lambda)
+        covariance_and_hat_diagonal(input.x, w, input.ridge_lambda)
     else {
         row.iter = input.options.maxit;
         row.beta_se.extend(std::iter::repeat_n(f64::NAN, p));
@@ -105,11 +121,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             row.beta
                 .push(checked_log2_scale(value, col, "IRLS beta log2 scale")?);
         }
-        row.mu.extend(
-            fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(log_nf))?
-                .iter()
-                .copied(),
-        );
+        fitted_mu_into(input.x, &beta, nf, None, Some(log_nf), &mut row.mu)?;
         return Ok(row);
     };
 
@@ -132,11 +144,7 @@ pub(super) fn fit_fixed_dispersion_irls_row(
             "IRLS beta covariance log2 scale",
         )?);
     }
-    row.mu.extend(
-        fitted_mu_impl_with_logs(input.x, &beta, nf, None, Some(log_nf))?
-            .iter()
-            .copied(),
-    );
+    fitted_mu_into(input.x, &beta, nf, None, Some(log_nf), &mut row.mu)?;
     row.hat.extend(hat_diag);
     row.converged = converged && row.iter < input.options.maxit;
     let _ = dev;

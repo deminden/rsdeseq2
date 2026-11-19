@@ -430,20 +430,23 @@ pub(crate) fn fit_offsets_irls_for_output(
         let last = first.saturating_add(batch_rows).min(counts.n_genes());
         let row_outputs = (first..last)
             .into_par_iter()
-            .map(|gene| {
-                fit_fixed_dispersion_irls_row(IrlsRowInput {
-                    gene,
-                    shared_log_offsets: shared_log_offsets.as_deref(),
-                    counts,
-                    x: &x,
-                    initial_lu: &initial_lu,
-                    initial_beta,
-                    normalization_factors,
-                    dispersions,
-                    weights,
-                    ridge_lambda: &ridge_lambda,
-                    options: &options,
-                })
+            .map_init(IrlsScratch::default, |scratch, gene| {
+                fit_fixed_dispersion_irls_row(
+                    scratch,
+                    IrlsRowInput {
+                        gene,
+                        shared_log_offsets: shared_log_offsets.as_deref(),
+                        counts,
+                        x: &x,
+                        initial_lu: &initial_lu,
+                        initial_beta,
+                        normalization_factors,
+                        dispersions,
+                        weights,
+                        ridge_lambda: &ridge_lambda,
+                        options: &options,
+                    },
+                )
             })
             .collect::<Vec<_>>();
         // Indexed collection plus ordered extraction reports the lowest failed gene.
