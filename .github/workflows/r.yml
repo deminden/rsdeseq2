@@ -10,7 +10,7 @@ on:
 jobs:
   r:
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.lane == 'current' }}
+    continue-on-error: ${{ matrix.lane != 'reference' }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +19,9 @@ jobs:
             r-version: '4.6.2'
           - lane: current
             r-version: release
+          - lane: previous-bioc
+            r-version: '4.5.3'
+            bioc-version: '3.22'
     env:
       R_LIBS_USER: ${{ github.workspace }}/.r-library-${{ matrix.lane }}
       MAKEFLAGS: -j2
@@ -58,11 +61,28 @@ jobs:
         with:
           path: ${{ env.R_LIBS_USER }}
           key: r-reference-${{ runner.os }}-${{ runner.arch }}-4.6.2-${{ hashFiles('config/r-reference/r-reference-sources-2026-10-29.tsv', 'config/r-reference/r-reference-environment-2026-10-29.json', 'scripts/environment/install_locked_r_packages.R', 'scripts/environment/install_r_reference.py') }}
-      - name: Install current compatibility dependencies
-        if: matrix.lane == 'current'
-        run: Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("testthat", "ashr", "BiocManager")); BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)'
+      - name: Install compatibility dependencies
+        if: matrix.lane != 'reference'
+        env:
+          BIOC_VERSION: ${{ matrix.bioc-version }}
+        run: |
+          Rscript --vanilla -e '
+            options(repos = c(CRAN = "https://cloud.r-project.org"))
+            install.packages(c("testthat", "ashr", "BiocManager"))
+            version <- Sys.getenv("BIOC_VERSION")
+            if (nzchar(version)) BiocManager::install(version = version, ask = FALSE, update = FALSE)
+            BiocManager::install(c("DESeq2", "apeglm"), ask = FALSE, update = FALSE)
+          '
       - name: Record environment
-        run: Rscript -e 'print(sessionInfo())' > R-reference-session.txt
+        run: |
+          Rscript --vanilla -e 'print(sessionInfo()); print(packageVersion("DESeq2"))' | tee R-reference-session.txt
+      - name: Save earlier Bioconductor comparison
+        if: always() && matrix.lane == 'previous-bioc' && hashFiles('R-reference-session.txt') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: r-previous-bioc-environment-${{ github.sha }}
+          path: R-reference-session.txt
+          if-no-files-found: error
       - name: Independently regenerate Linux formula references
         if: matrix.lane == 'reference'
         run: python scripts/validation/check_linux_formula_references.py --output-dir regenerated-formula-references
@@ -103,6 +123,15 @@ jobs:
         env:
           RSDESEQ2_R_SOURCE: ${{ steps.r-source.outputs.archive }}
         run: R CMD check --no-manual --no-build-vignettes "$RSDESEQ2_R_SOURCE"
+      - name: Save earlier Bioconductor check results
+        if: always() && matrix.lane == 'previous-bioc' && hashFiles('rsdeseq2.Rcheck/00check.log') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: r-previous-bioc-check-${{ github.sha }}
+          path: |
+            rsdeseq2.Rcheck/00check.log
+            rsdeseq2.Rcheck/tests/testthat.Rout*
+          if-no-files-found: error
       - name: Fail on skipped or failing R tests
         if: matrix.lane == 'reference'
         run: Rscript --vanilla scripts/validation/check_no_skipped_r_tests.R rsdeseq2.Rcheck r-pkg/rsdeseq2/tests/testthat

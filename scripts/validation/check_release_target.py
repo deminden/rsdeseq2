@@ -22,9 +22,8 @@ def main():
     parser.add_argument('--target', required=True)
     args = parser.parse_args()
     command = ['cargo', 'test', '--release', '--locked', '-p', 'rsdeseq2',
-               '--target', args.target]
-    for name in RELEASE_TESTS:
-        command.extend(['--test', name])
+               '--target', args.target, '--test', 'integration', '--']
+    command.extend(f'{name}::' for name in RELEASE_TESTS)
     subprocess.run(command, cwd=ROOT, check=True)
 
 
