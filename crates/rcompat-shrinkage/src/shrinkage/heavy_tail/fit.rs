@@ -312,138 +312,181 @@ pub fn fit_negative_binomial_posterior_with_rng(
     options.check_opposite_start = false;
     fit_batch(input, &options, None, Some(rng))
 }
-// Invariant: offset and regression parameters are built for every row before fitting.
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+type RegressionRequest<'a, 'config> = Option<(
+    Option<MatrixView<'a, f64>>,
+    &'config super::regression::RegressionPosteriorOptions,
+)>;
+
+struct PreparedBatch {
+    prior: CauchyCoefficientPrior,
+    analysis: super::analysis::PosteriorAnalysis,
+    size_offsets: Option<Vec<f64>>,
+}
+
+impl PreparedBatch {
+    fn new(
+        input: &NegativeBinomialPosteriorInput<'_>,
+        options: &NegativeBinomialPosteriorOptions,
+        regression: RegressionRequest<'_, '_>,
+    ) -> Result<Self, Error> {
+        let g = input.counts.n_rows();
+        let n = input.counts.n_cols();
+        let p = input.design.n_cols();
+        if g == 0 || n == 0 || p == 0 || input.design.n_rows() != n || input.dispersions.len() != g
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "nonempty counts, sample-aligned design and gene-aligned dispersions are required",
+            ));
+        }
+        if input.design.as_slice().iter().any(|v| !v.is_finite())
+            || input
+                .counts
+                .as_slice()
+                .iter()
+                .any(|v| !v.is_finite() || (regression.is_none() && *v < 0.0))
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "counts must be finite nonnegative numbers and design must be finite",
+            ));
+        }
+        if let Some(m) = input.weights
+            && (m.n_rows() != g
+                || m.n_cols() != n
+                || m.as_slice().iter().any(|v| !v.is_finite() || *v < 0.0))
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "finite nonnegative weights must match counts shape",
+            ));
+        }
+        let size_offsets = match input.offsets {
+            PosteriorOffsets::SizeFactors(s) => {
+                if s.len() != n || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "positive sample-aligned size factors are required",
+                    ));
+                }
+                Some(s.iter().map(|v| v.ln_p()).collect::<Vec<_>>())
+            }
+            PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m) => {
+                let factors = matches!(input.offsets, PosteriorOffsets::Factors(_));
+                if m.n_rows() != g
+                    || m.n_cols() != n
+                    || m.as_slice()
+                        .iter()
+                        .any(|v| !v.is_finite() || (factors && *v <= 0.0))
+                {
+                    return Err(scoped_invalid_options(
+                        ERROR_SCOPE,
+                        "finite log offsets or positive normalization factors must match counts",
+                    ));
+                }
+                None
+            }
+            PosteriorOffsets::None => None,
+        };
+        if options.coefficient.is_some_and(|c| c >= p)
+            || !options.multiplier.is_finite()
+            || options.multiplier <= 0.0
+            || !options.hessian_step.is_finite()
+            || options.hessian_step <= 0.0
+            || options
+                .threshold
+                .is_some_and(|t| !t.is_finite() || (options.flip_sign && t <= 0.0))
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "invalid coefficient, multiplier, Hessian step or threshold",
+            ));
+        }
+        options.analysis.validate(
+            g,
+            p,
+            options.coefficient,
+            options.threshold,
+            options.map_only,
+        )?;
+        if !options.map_only
+            && options.analysis.parameter_standard_errors.is_some()
+            && regression.is_some_and(|(parameters, _)| parameters.is_none_or(|m| m.n_cols() != 1))
+        {
+            return Err(scoped_invalid_options(
+                ERROR_SCOPE,
+                "parameter uncertainty requires a scalar likelihood parameter",
+            ));
+        }
+        let analysis = super::analysis::PosteriorAnalysis::new(
+            &options.analysis,
+            g,
+            options.coefficient,
+            options.map_only,
+        )?;
+        let mut prior = options.prior.clone();
+        if let Some(mle) = input.mle {
+            let coefficient = options.coefficient.ok_or_else(|| {
+                scoped_invalid_options(ERROR_SCOPE, "MLE prior adaptation requires a coefficient")
+            })?;
+            if mle.estimates.len() != g || mle.standard_errors.len() != g {
+                return Err(scoped_invalid_options(
+                    ERROR_SCOPE,
+                    "MLE population must match count rows",
+                ));
+            }
+            let factor = match mle.scale {
+                CoefficientScale::Natural => 1.0,
+                CoefficientScale::Log2 => std::f64::consts::LN_2,
+            };
+            let x = mle.estimates.iter().map(|v| v * factor).collect::<Vec<_>>();
+            let s = mle
+                .standard_errors
+                .iter()
+                .map(|v| v * factor)
+                .collect::<Vec<_>>();
+            let variance = estimate_cauchy_prior_variance(&x, &s)?;
+            prior.scale = (options.multiplier * variance.sqrt()).min(1.0);
+            prior.adapted_variance = Some(variance);
+            prior.nuisance = (0..p).filter(|&j| j != coefficient).collect();
+        }
+        prior.validate(p)?;
+        Ok(Self {
+            prior,
+            analysis,
+            size_offsets,
+        })
+    }
+
+    fn log_offset(
+        &self,
+        offsets: PosteriorOffsets<'_>,
+        gene: usize,
+        sample: usize,
+    ) -> Result<f64, Error> {
+        Ok(match offsets {
+            PosteriorOffsets::None => 0.0,
+            PosteriorOffsets::Log(matrix) => *matrix.at(gene, sample),
+            PosteriorOffsets::Factors(matrix) => matrix.at(gene, sample).ln_p(),
+            PosteriorOffsets::SizeFactors(_) => self
+                .size_offsets
+                .as_ref()
+                .ok_or_else(|| crate::errors::invariant("validated sample size offsets"))?[sample],
+        })
+    }
+}
+
 pub(super) fn fit_batch(
     input: NegativeBinomialPosteriorInput<'_>,
     options: &NegativeBinomialPosteriorOptions,
-    regression: Option<(
-        Option<MatrixView<'_, f64>>,
-        &super::regression::RegressionPosteriorOptions,
-    )>,
+    regression: RegressionRequest<'_, '_>,
     mut random: Option<&mut super::random::PosteriorRng>,
 ) -> Result<NegativeBinomialPosterior, Error> {
+    let mut prepared = PreparedBatch::new(&input, options, regression)?;
+    let prior = &prepared.prior;
     let g = input.counts.n_rows();
     let n = input.counts.n_cols();
     let p = input.design.n_cols();
-    if g == 0 || n == 0 || p == 0 || input.design.n_rows() != n || input.dispersions.len() != g {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "nonempty counts, sample-aligned design and gene-aligned dispersions are required",
-        ));
-    }
-    if input.design.as_slice().iter().any(|v| !v.is_finite())
-        || input
-            .counts
-            .as_slice()
-            .iter()
-            .any(|v| !v.is_finite() || (regression.is_none() && *v < 0.0))
-    {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "counts must be finite nonnegative numbers and design must be finite",
-        ));
-    }
-    if let Some(m) = input.weights
-        && (m.n_rows() != g
-            || m.n_cols() != n
-            || m.as_slice().iter().any(|v| !v.is_finite() || *v < 0.0))
-    {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "finite nonnegative weights must match counts shape",
-        ));
-    }
-    let size_offsets = match input.offsets {
-        PosteriorOffsets::SizeFactors(s) => {
-            if s.len() != n || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "positive sample-aligned size factors are required",
-                ));
-            }
-            Some(s.iter().map(|v| v.ln_p()).collect::<Vec<_>>())
-        }
-        PosteriorOffsets::Log(m) | PosteriorOffsets::Factors(m) => {
-            let factors = matches!(input.offsets, PosteriorOffsets::Factors(_));
-            if m.n_rows() != g
-                || m.n_cols() != n
-                || m.as_slice()
-                    .iter()
-                    .any(|v| !v.is_finite() || (factors && *v <= 0.0))
-            {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "finite log offsets or positive normalization factors must match counts",
-                ));
-            }
-            None
-        }
-        PosteriorOffsets::None => None,
-    };
-    if options.coefficient.is_some_and(|c| c >= p)
-        || !options.multiplier.is_finite()
-        || options.multiplier <= 0.0
-        || !options.hessian_step.is_finite()
-        || options.hessian_step <= 0.0
-        || options
-            .threshold
-            .is_some_and(|t| !t.is_finite() || (options.flip_sign && t <= 0.0))
-    {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "invalid coefficient, multiplier, Hessian step or threshold",
-        ));
-    }
-    options.analysis.validate(
-        g,
-        p,
-        options.coefficient,
-        options.threshold,
-        options.map_only,
-    )?;
-    if !options.map_only
-        && options.analysis.parameter_standard_errors.is_some()
-        && regression.is_some_and(|(parameters, _)| parameters.is_none_or(|m| m.n_cols() != 1))
-    {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "parameter uncertainty requires a scalar likelihood parameter",
-        ));
-    }
-    let mut analysis = super::analysis::PosteriorAnalysis::new(
-        &options.analysis,
-        g,
-        options.coefficient,
-        options.map_only,
-    )?;
-    let mut prior = options.prior.clone();
-    if let Some(mle) = input.mle {
-        let coefficient = options.coefficient.ok_or_else(|| {
-            scoped_invalid_options(ERROR_SCOPE, "MLE prior adaptation requires a coefficient")
-        })?;
-        if mle.estimates.len() != g || mle.standard_errors.len() != g {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "MLE population must match count rows",
-            ));
-        }
-        let factor = match mle.scale {
-            CoefficientScale::Natural => 1.0,
-            CoefficientScale::Log2 => std::f64::consts::LN_2,
-        };
-        let x = mle.estimates.iter().map(|v| v * factor).collect::<Vec<_>>();
-        let s = mle
-            .standard_errors
-            .iter()
-            .map(|v| v * factor)
-            .collect::<Vec<_>>();
-        let variance = estimate_cauchy_prior_variance(&x, &s)?;
-        prior.scale = (options.multiplier * variance.sqrt()).min(1.0);
-        prior.adapted_variance = Some(variance);
-        prior.nuisance = (0..p).filter(|&j| j != coefficient).collect();
-    }
-    prior.validate(p)?;
     let na = super::super::location_missing::NA;
     let mut modes = RowMajorMatrix::from_elem(g, p, na)?.into_values();
     let mut sd = if options.map_only {
@@ -501,15 +544,10 @@ pub(super) fn fit_batch(
                 .map(|i| input.weights.map(|m| *m.at(gene, i)).unwrap_or(1.0))
                 .collect(),
             offsets: (0..n)
-                .map(|i| match input.offsets {
-                    PosteriorOffsets::None => 0.0,
-                    PosteriorOffsets::Log(m) => *m.at(gene, i),
-                    PosteriorOffsets::Factors(m) => m.at(gene, i).ln_p(),
-                    PosteriorOffsets::SizeFactors(_) => size_offsets.as_ref().unwrap()[i],
-                })
-                .collect(),
+                .map(|sample| prepared.log_offset(input.offsets, gene, sample))
+                .collect::<Result<Vec<_>, _>>()?,
             size: 1.0 / dispersion,
-            prior: &prior,
+            prior,
         };
         let initial = shared_initial.clone().unwrap_or_else(|| {
             (0..p)
@@ -524,7 +562,7 @@ pub(super) fn fit_batch(
                 parameters: parameters.map(|m| (0..m.n_cols()).map(|j| *m.at(gene, j)).collect()),
                 weights: &row.weights,
                 offsets: &row.offsets,
-                prior: &prior,
+                prior,
                 options: config,
                 error: std::cell::RefCell::new(None),
             });
@@ -536,11 +574,16 @@ pub(super) fn fit_batch(
                 )
             })
             .map(|(parameters, _)| {
-                let parameters = parameters.unwrap();
-                (0..parameters.n_cols())
-                    .map(|j| *parameters.at(gene, j))
-                    .collect::<Vec<_>>()
-            });
+                let parameters = parameters.ok_or_else(|| {
+                    crate::errors::invariant("validated beta-binomial parameters")
+                })?;
+                Ok::<_, Error>(
+                    (0..parameters.n_cols())
+                        .map(|j| *parameters.at(gene, j))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .transpose()?;
         let beta_binomial = beta_parameters
             .as_ref()
             .map(|parameters| super::beta_binomial::Row {
@@ -549,7 +592,7 @@ pub(super) fn fit_batch(
                 trials: &parameters[1..],
                 weights: &row.weights,
                 concentration: parameters[0],
-                prior: &prior,
+                prior,
             });
         let mut result = if let Some(general) = &general {
             general.optimize(
@@ -714,7 +757,7 @@ pub(super) fn fit_batch(
                         &options.analysis,
                     );
                     let mut grid_evaluations = 0usize;
-                    if let Some(summary) = analysis.row(
+                    if let Some(summary) = prepared.analysis.row(
                         super::analysis::AnalysisRow {
                             gene,
                             mode: &result.par,
@@ -768,8 +811,8 @@ pub(super) fn fit_batch(
         sign_svalues,
         false_sign_or_small_rate: fsos,
         threshold_svalues,
-        prior,
-        analysis,
+        prior: prepared.prior,
+        analysis: prepared.analysis,
         diagnostics,
         warnings,
         random_state: random.as_ref().map(|rng| rng.r_seed()),
