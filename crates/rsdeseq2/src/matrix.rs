@@ -1,6 +1,6 @@
 //! Count and numeric matrices, borrowed views and row flags.
 
-use nalgebra::DMatrix;
+use nalgebra::{DMatrix, DVector};
 
 use crate::errors::DeseqError;
 
@@ -23,6 +23,21 @@ pub(crate) fn try_zero_dmatrix(
     let mut values = try_alloc_matrix(rows, columns, context)?;
     values.resize(rows * columns, 0.0);
     Ok(DMatrix::from_vec(rows, columns, values))
+}
+
+/// Allocate and fill a vector through the shared matrix allocator.
+pub(crate) fn try_filled_vec<T: Clone>(
+    len: usize,
+    value: T,
+    context: &str,
+) -> Result<Vec<T>, DeseqError> {
+    let mut values = try_alloc_matrix(len, 1, context)?;
+    values.resize(len, value);
+    Ok(values)
+}
+
+pub(crate) fn try_zero_dvector(len: usize, context: &str) -> Result<DVector<f64>, DeseqError> {
+    Ok(DVector::from_vec(try_filled_vec(len, 0.0, context)?))
 }
 
 /// Copy validated row-major storage into a fallibly allocated column-major matrix.

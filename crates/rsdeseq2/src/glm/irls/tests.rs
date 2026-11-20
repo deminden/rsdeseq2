@@ -62,7 +62,7 @@ fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
         let diagonal = [first_pivot, 3.0, 4.0, 5.0];
         let mut response = DVector::from_vec(vec![-0.0, -0.0, -6.0, 0.0]);
         let expected = upper.clone().lu().solve(&response);
-        let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response);
+        let solved = solve_qr_triangle(&upper, &diagonal, &mut triangular, &mut response).unwrap();
 
         assert_eq!(solved, expected.is_some());
         if let Some(expected) = expected {
@@ -192,7 +192,10 @@ fn unretained_covariance_checks_positive_diagonals_without_building_the_matrix()
         Some(1.0),
         false,
     );
-    assert!(matches!(fitted, Some(FitCovariance::PositiveDiagonal)));
+    assert!(matches!(
+        fitted.unwrap(),
+        Some(FitCovariance::PositiveDiagonal)
+    ));
 
     let mut product = DMatrix::identity(2, 2);
     let mut inverse = DMatrix::identity(2, 2);
@@ -596,7 +599,7 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
     let x = DMatrix::from_row_slice(1, 1, &[f64::MAX]);
     let mut beta = DVector::from_element(1, 1.0);
     assert!(
-        solve_weighted_least_squares(
+        !solve_weighted_least_squares(
             &mut LeastSquaresScratch::default(),
             &x,
             &[2.0],
@@ -605,14 +608,14 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
             IrlsSolver::NormalEquations,
             &mut beta,
         )
-        .is_none()
+        .unwrap()
     );
     assert_eq!(beta[0], 1.0);
     assert!(xtwx_without_ridge(&x, &[2.0]).is_none());
 
     let unit_x = DMatrix::from_row_slice(1, 1, &[1.0]);
     assert!(
-        solve_weighted_least_squares_qr(
+        !solve_weighted_least_squares_qr(
             &mut QrScratch::default(),
             &unit_x,
             &[4.0],
@@ -620,9 +623,69 @@ fn weighted_least_squares_helpers_reject_nonfinite_accumulation() {
             &[0.0],
             &mut beta,
         )
-        .is_none()
+        .unwrap()
     );
     assert_eq!(beta[0], 1.0);
+}
+
+#[test]
+fn oversized_solver_workspace_errors_allow_retry() {
+    // Zero rows allow an oversized coefficient count without allocating the input.
+    let oversized = DMatrix::from_vec(0, usize::MAX, Vec::new());
+    let design = DMatrix::from_element(1, 1, 1.0);
+    let mut scratch = LeastSquaresScratch::default();
+    let mut beta = DVector::from_element(1, -3.0);
+
+    for (solver, allocation) in [
+        (
+            IrlsSolver::Qr,
+            "IRLS QR augmented design allocation overflow",
+        ),
+        (
+            IrlsSolver::NormalEquations,
+            "IRLS normal equations crossproduct allocation overflow",
+        ),
+    ] {
+        assert!(matches!(
+            solve_weighted_least_squares(
+                &mut scratch,
+                &oversized,
+                &[],
+                &[],
+                &[],
+                solver,
+                &mut beta
+            ),
+            Err(DeseqError::InvalidDimensions { context, actual: usize::MAX, .. })
+                if context == allocation
+        ));
+        assert_eq!(beta[0], -3.0);
+        assert!(
+            solve_weighted_least_squares(
+                &mut scratch,
+                &design,
+                &[1.0],
+                &[-3.0],
+                &[0.0],
+                solver,
+                &mut beta
+            )
+            .unwrap()
+        );
+        assert_eq!(beta[0], -3.0);
+    }
+
+    let mut scratch = CovarianceScratch::default();
+    assert!(matches!(
+        covariance_and_hat_diagonal(&mut scratch, &oversized, &[], &[], None, None, true),
+        Err(DeseqError::InvalidDimensions { context, actual: usize::MAX, .. })
+            if context == "IRLS covariance crossproduct allocation overflow"
+    ));
+    assert!(matches!(
+        covariance_and_hat_diagonal(&mut scratch, &design, &[1.0], &[0.0], None, None, true)
+            .unwrap(),
+        Some(FitCovariance::Full(matrix)) if matrix[(0, 0)] == 1.0
+    ));
 }
 
 #[test]
@@ -651,7 +714,7 @@ fn reusable_normal_equations_match_pivoted_lu_after_a_failed_solve() {
                 IrlsSolver::NormalEquations,
                 &mut beta,
             )
-            .is_some(),
+            .unwrap(),
             succeeds
         );
         for (value, expected) in beta.iter().zip(expected.iter()) {

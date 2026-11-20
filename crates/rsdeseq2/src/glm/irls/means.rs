@@ -8,8 +8,9 @@ pub(super) fn initial_beta(
     y: &[f64],
     nf: &[f64],
 ) -> Result<DVector<f64>, DeseqError> {
-    let mut beta = DVector::zeros(x.ncols());
-    InitialBeta::least_squares(x)?.initialize(y, nf, &mut Vec::new(), &mut beta)?;
+    let mut beta = try_zero_dvector(x.ncols(), "IRLS starting coefficients")?;
+    let mut response = try_alloc_matrix(y.len(), 1, "IRLS starting response")?;
+    InitialBeta::least_squares(x)?.initialize(y, nf, &mut response, &mut beta)?;
     Ok(beta)
 }
 

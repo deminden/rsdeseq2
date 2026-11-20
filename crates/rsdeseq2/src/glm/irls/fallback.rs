@@ -73,7 +73,8 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
             None,
             input.max_design,
             !beta_covariance_values.is_empty(),
-        ) else {
+        )?
+        else {
             return Err(DeseqError::UnsupportedFeature {
                 feature: "optim fallback covariance is singular".to_string(),
             });

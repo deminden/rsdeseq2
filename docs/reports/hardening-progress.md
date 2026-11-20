@@ -887,6 +887,23 @@ regression checks every fitted mean bit against the original multiplication
 on nalgebra's wide matrix path. Both the macOS host R and portable golden
 manifests matched all 8,032 fields at one and four workers.
 
+### Solver workspace allocation
+
+IRLS reserves its per-gene status buffer and worker scratch through the
+shared allocator. QR, normal equations and covariance calculations propagate
+allocation errors separately from singular or nonfinite calculations.
+Worker scratch is initialized at the first fitted row and reused.
+Cox-Reid uses checked crossproduct and derivative buffers. If its optional
+design cache cannot reserve memory, it uses the existing streaming path.
+The IRLS optimizer penalty reuses the gradient and Hessian buffers.
+
+The 164 focused Rust tests and workspace Clippy passed. The oversized
+workspace regression covers QR, normal equations and covariance and checks
+that each workspace can complete a valid solve after the error. Both
+numeric profiles matched their 8,032-field golden manifest. Scratch
+allocated internally by nalgebra's wide covariance inverse remains a
+separate performance and allocation-hardening item.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

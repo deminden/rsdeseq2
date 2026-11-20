@@ -20,7 +20,10 @@ use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
-use crate::matrix::{try_alloc_matrix, try_dmatrix_from_row_major, try_zero_dmatrix};
+use crate::matrix::{
+    try_alloc_matrix, try_dmatrix_from_row_major, try_filled_vec, try_zero_dmatrix,
+    try_zero_dvector,
+};
 use crate::normalization::Offsets;
 
 /// Internal retention policy for the same fitted model and fallback rules.
@@ -469,7 +472,9 @@ fn fit_irls_rows<const SELECTED: bool>(
     let initial_beta = InitialBeta::for_design(design, &x)?;
     let shared_log_offsets = match rows.input.offsets {
         Offsets::PerSample(factors) => {
-            Some(factors.iter().copied().map(f64::ln_p).collect::<Vec<_>>())
+            let mut values = try_alloc_matrix(samples, 1, "IRLS shared log offsets")?;
+            values.extend(factors.iter().copied().map(f64::ln_p));
+            Some(values)
         }
         Offsets::PerCell(_) => None,
     };
@@ -504,12 +509,14 @@ fn fit_irls_rows<const SELECTED: bool>(
     } else {
         Vec::new()
     };
-    let mut beta_iter = Vec::with_capacity(genes);
-    let mut beta_converged = Vec::with_capacity(genes);
-    let mut beta_optim_iter = vec![f64::NAN; genes];
-    let mut beta_optim_start_objective = vec![f64::NAN; genes];
-    let mut beta_optim_objective = vec![f64::NAN; genes];
-    let mut beta_optim_gradient_norm = vec![f64::NAN; genes];
+    let mut beta_iter = try_alloc_matrix(genes, 1, "IRLS iteration counts")?;
+    let mut beta_converged = try_alloc_matrix(genes, 1, "IRLS convergence flags")?;
+    let mut beta_optim_iter = try_filled_vec(genes, f64::NAN, "IRLS refit iteration counts")?;
+    let mut beta_optim_start_objective =
+        try_filled_vec(genes, f64::NAN, "IRLS refit starting objectives")?;
+    let mut beta_optim_objective = try_filled_vec(genes, f64::NAN, "IRLS refit objectives")?;
+    let mut beta_optim_gradient_norm =
+        try_filled_vec(genes, f64::NAN, "IRLS refit gradient norms")?;
 
     let covariance_rows = if inference {
         rayon::iter::Either::Left(
@@ -530,7 +537,8 @@ fn fit_irls_rows<const SELECTED: bool>(
     } else {
         rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
     };
-    let row_statuses = (
+    let mut row_statuses = try_alloc_matrix(genes, 1, "IRLS gene status")?;
+    (
         beta_values.par_chunks_mut(p),
         beta_se_rows,
         covariance_rows,
@@ -540,7 +548,7 @@ fn fit_irls_rows<const SELECTED: bool>(
         .into_par_iter()
         .enumerate()
         .map_init(
-            IrlsScratch::default,
+            || None,
             |scratch, (gene, (beta, beta_se, covariance, mu, hat))| {
                 fit_fixed_dispersion_irls_row(
                     scratch,
@@ -564,7 +572,7 @@ fn fit_irls_rows<const SELECTED: bool>(
                 )
             },
         )
-        .collect::<Vec<_>>();
+        .collect_into_vec(&mut row_statuses);
     // Indexed collection and ordered extraction report the lowest failed gene.
     let mut fallback_rows = Vec::new();
     for (gene, status) in row_statuses.into_iter().enumerate() {
@@ -576,7 +584,7 @@ fn fit_irls_rows<const SELECTED: bool>(
         }
     }
 
-    let mut optim_log_like = vec![None; genes];
+    let mut optim_log_like = try_filled_vec(genes, None, "IRLS refit log likelihoods")?;
     if !fallback_rows.is_empty() {
         refit_optim_fallback_rows(
             &fallback_rows,

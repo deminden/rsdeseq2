@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::matrix::{try_alloc_matrix, try_zero_dmatrix};
 use crate::numeric::math::ProfileMath;
 // Fixed design products for the unweighted optimizer path. Products are
 // checked at their original evaluation point, after the mean/weight checks.
@@ -27,9 +28,10 @@ pub(super) fn prepare_cox_reid_products(design: &DesignMatrix) -> Option<Prepare
     if capacity > 1_000_000 {
         return None;
     }
-    let mut offsets = Vec::with_capacity(design.n_samples() + 1);
-    let mut products = Vec::with_capacity(capacity);
-    let mut active = Vec::with_capacity(p);
+    let mut offsets =
+        try_alloc_matrix(design.n_samples() + 1, 1, "Cox-Reid design cache offsets").ok()?;
+    let mut products = try_alloc_matrix(capacity, 1, "Cox-Reid design cache products").ok()?;
+    let mut active = try_alloc_matrix(p, 1, "Cox-Reid design cache active columns").ok()?;
     for sample in 0..design.n_samples() {
         offsets.push(products.len());
         let row = design.matrix().row(sample).ok()?;
@@ -149,6 +151,22 @@ pub(super) struct CoxReidDesignMatrices {
     d2_xtwx: Option<DMatrix<f64>>,
 }
 
+impl CoxReidDesignMatrices {
+    fn new<const DERIVATIVE: bool, const SECOND_DERIVATIVE: bool>(
+        columns: usize,
+    ) -> Result<Self, DeseqError> {
+        Ok(Self {
+            xtwx: try_zero_dmatrix(columns, columns, "Cox-Reid crossproduct")?,
+            d_xtwx: DERIVATIVE
+                .then(|| try_zero_dmatrix(columns, columns, "Cox-Reid derivative"))
+                .transpose()?,
+            d2_xtwx: SECOND_DERIVATIVE
+                .then(|| try_zero_dmatrix(columns, columns, "Cox-Reid second derivative"))
+                .transpose()?,
+        })
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) enum CoxReidMatrixOrder {
     Value,
@@ -240,10 +258,13 @@ pub(super) fn cox_reid_design_matrices_impl<
     // Weighted Cox-Reid drops samples below threshold, then drops columns that
     // are zero on the retained sample subset before building determinant terms.
     let p = selected_columns.len();
-    let mut xtwx = DMatrix::<f64>::zeros(p, p);
-    let mut d_xtwx = DERIVATIVE.then(|| DMatrix::<f64>::zeros(p, p));
-    let mut d2_xtwx = SECOND_DERIVATIVE.then(|| DMatrix::<f64>::zeros(p, p));
-    let mut active_columns = Vec::with_capacity(p);
+    let mut matrices = CoxReidDesignMatrices::new::<DERIVATIVE, SECOND_DERIVATIVE>(p)?;
+    let CoxReidDesignMatrices {
+        xtwx,
+        d_xtwx,
+        d2_xtwx,
+    } = &mut matrices;
+    let mut active_columns = try_alloc_matrix(p, 1, "Cox-Reid active columns")?;
     for sample in selected_samples {
         let mu = mu[sample];
         validate_positive_mu(mu, sample)?;
@@ -274,7 +295,7 @@ pub(super) fn cox_reid_design_matrices_impl<
                     "Cox-Reid weighted design xtwx",
                 )?;
 
-                if let Some(d_xtwx) = &mut d_xtwx {
+                if let Some(d_xtwx) = d_xtwx {
                     checked_matrix_add_assign(
                         &mut d_xtwx[(left_idx, right_idx)],
                         checked::try_mul(x_product, weight_terms.d_weight)
@@ -283,7 +304,7 @@ pub(super) fn cox_reid_design_matrices_impl<
                         "Cox-Reid weighted design derivative",
                     )?;
                 }
-                if let Some(d2_xtwx) = &mut d2_xtwx {
+                if let Some(d2_xtwx) = d2_xtwx {
                     checked_matrix_add_assign(
                         &mut d2_xtwx[(left_idx, right_idx)],
                         checked::try_mul(x_product, weight_terms.d2_weight).nonfinite_at(
@@ -301,19 +322,15 @@ pub(super) fn cox_reid_design_matrices_impl<
     for left in 0..p {
         for right in (left + 1)..p {
             xtwx[(right, left)] = xtwx[(left, right)];
-            if let Some(matrix) = &mut d_xtwx {
+            if let Some(matrix) = d_xtwx {
                 matrix[(right, left)] = matrix[(left, right)];
             }
-            if let Some(matrix) = &mut d2_xtwx {
+            if let Some(matrix) = d2_xtwx {
                 matrix[(right, left)] = matrix[(left, right)];
             }
         }
     }
-    Ok(CoxReidDesignMatrices {
-        xtwx,
-        d_xtwx,
-        d2_xtwx,
-    })
+    Ok(matrices)
 }
 
 pub(super) fn cox_reid_prepared_design_matrices<
@@ -334,9 +351,12 @@ pub(super) fn cox_reid_prepared_design_matrices<
             actual: 0,
         });
     }
-    let mut xtwx = DMatrix::<f64>::zeros(p, p);
-    let mut d_xtwx = DERIVATIVE.then(|| DMatrix::<f64>::zeros(p, p));
-    let mut d2_xtwx = SECOND_DERIVATIVE.then(|| DMatrix::<f64>::zeros(p, p));
+    let mut matrices = CoxReidDesignMatrices::new::<DERIVATIVE, SECOND_DERIVATIVE>(p)?;
+    let CoxReidDesignMatrices {
+        xtwx,
+        d_xtwx,
+        d2_xtwx,
+    } = &mut matrices;
     for (sample, &mu) in mu.iter().enumerate() {
         validate_positive_mu(mu, sample)?;
         let products = &prepared.products[prepared.offsets[sample]..prepared.offsets[sample + 1]];
@@ -361,7 +381,7 @@ pub(super) fn cox_reid_prepared_design_matrices<
                 "Cox-Reid weighted design xtwx",
             )?;
 
-            if let Some(d_xtwx) = &mut d_xtwx {
+            if let Some(d_xtwx) = d_xtwx {
                 checked_matrix_add_assign(
                     &mut d_xtwx[(left_idx, right_idx)],
                     checked::try_mul(x_product, weight_terms.d_weight)
@@ -370,7 +390,7 @@ pub(super) fn cox_reid_prepared_design_matrices<
                     "Cox-Reid weighted design derivative",
                 )?;
             }
-            if let Some(d2_xtwx) = &mut d2_xtwx {
+            if let Some(d2_xtwx) = d2_xtwx {
                 checked_matrix_add_assign(
                     &mut d2_xtwx[(left_idx, right_idx)],
                     checked::try_mul(x_product, weight_terms.d2_weight)
@@ -385,19 +405,15 @@ pub(super) fn cox_reid_prepared_design_matrices<
     for left in 0..p {
         for right in (left + 1)..p {
             xtwx[(right, left)] = xtwx[(left, right)];
-            if let Some(matrix) = &mut d_xtwx {
+            if let Some(matrix) = d_xtwx {
                 matrix[(right, left)] = matrix[(left, right)];
             }
-            if let Some(matrix) = &mut d2_xtwx {
+            if let Some(matrix) = d2_xtwx {
                 matrix[(right, left)] = matrix[(left, right)];
             }
         }
     }
-    Ok(CoxReidDesignMatrices {
-        xtwx,
-        d_xtwx,
-        d2_xtwx,
-    })
+    Ok(matrices)
 }
 
 pub(super) fn cox_reid_sample_indices(

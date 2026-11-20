@@ -26,7 +26,7 @@ pub(super) fn solve_weighted_least_squares(
     ridge_lambda: &[f64],
     solver: IrlsSolver,
     beta: &mut DVector<f64>,
-) -> Option<()> {
+) -> Result<bool, DeseqError> {
     match solver {
         IrlsSolver::NormalEquations => scratch.normal.solve(x, w, z, ridge_lambda, beta),
         IrlsSolver::Qr => {
@@ -42,66 +42,45 @@ pub(super) fn solve_weighted_least_squares_qr(
     z: &[f64],
     ridge_lambda: &[f64],
     beta: &mut DVector<f64>,
-) -> Option<()> {
+) -> Result<bool, DeseqError> {
     use nalgebra::{
         ComplexField, Unit, geometry::Reflection, linalg::householder::clear_column_unchecked,
     };
 
     let n = x.nrows();
     let p = x.ncols();
-    let m = n + p;
+    let m = n
+        .checked_add(p)
+        .ok_or_else(|| invalid_dimensions("IRLS QR augmented rows", usize::MAX - p, n))?;
     // Preserve the R-host reduction order for narrow GLM designs.
     let column_basis = p <= 4 && crate::numeric_profile() != crate::NumericProfile::Portable;
     if scratch.augmented_design.shape() != (m, p) {
-        scratch.augmented_design = DMatrix::zeros(m, p);
-        scratch.augmented_response = DVector::zeros(m);
-        scratch.sqrt_weights.resize(n, 0.0);
-        scratch.diagonal.resize(p, 0.0);
-        if column_basis {
-            scratch.basis_column = DVector::zeros(m);
-        }
-        scratch.triangular = DMatrix::zeros(p, p);
-        scratch.coefficients = DVector::zeros(p);
+        *scratch = QrScratch {
+            augmented_design: try_zero_dmatrix(m, p, "IRLS QR augmented design")?,
+            augmented_response: try_zero_dvector(m, "IRLS QR augmented response")?,
+            sqrt_weights: try_filled_vec(n, 0.0, "IRLS QR square root weights")?,
+            diagonal: try_filled_vec(p, 0.0, "IRLS QR diagonal")?,
+            basis_column: if column_basis {
+                try_zero_dvector(m, "IRLS QR basis column")?
+            } else {
+                DVector::default()
+            },
+            triangular: try_zero_dmatrix(p, p, "IRLS QR triangular matrix")?,
+            coefficients: try_zero_dvector(p, "IRLS QR coefficients")?,
+        };
     }
-
+    if fill_augmented_qr_system(scratch, x, w, z, ridge_lambda).is_none() {
+        return Ok(false);
+    }
     let QrScratch {
         augmented_design,
         augmented_response,
-        sqrt_weights,
         diagonal,
         basis_column,
         triangular,
         coefficients,
+        ..
     } = scratch;
-
-    for (row, sqrt_weight) in sqrt_weights.iter_mut().enumerate() {
-        *sqrt_weight = w[row].sqrt();
-        if !sqrt_weight.is_finite() {
-            return None;
-        }
-        augmented_response[row] = checked::mul(z[row], *sqrt_weight)?;
-    }
-
-    for (col, (mut column, original)) in augmented_design
-        .column_iter_mut()
-        .zip(x.column_iter())
-        .enumerate()
-    {
-        let column = column.as_mut_slice();
-        for ((target, design_value), sqrt_weight) in column[..n]
-            .iter_mut()
-            .zip(original.as_slice())
-            .zip(&*sqrt_weights)
-        {
-            *target = checked::mul(*design_value, *sqrt_weight)?;
-        }
-        let sqrt_ridge = ridge_lambda[col].sqrt();
-        if !sqrt_ridge.is_finite() {
-            return None;
-        }
-        column[n..].fill(0.0);
-        column[n + col] = sqrt_ridge;
-    }
 
     for (col, signed_norm) in diagonal.iter_mut().enumerate() {
         *signed_norm = clear_column_unchecked(augmented_design, col, 0, None);
@@ -141,10 +120,56 @@ pub(super) fn solve_weighted_least_squares_qr(
         }
         coefficients.copy_from(&augmented_response.rows(0, p));
     }
-    if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients) {
-        return None;
+    if !solve_qr_triangle(augmented_design, diagonal, triangular, coefficients)? {
+        return Ok(false);
     }
     std::mem::swap(coefficients, beta);
+    Ok(true)
+}
+
+fn fill_augmented_qr_system(
+    scratch: &mut QrScratch,
+    x: &DMatrix<f64>,
+    w: &[f64],
+    z: &[f64],
+    ridge_lambda: &[f64],
+) -> Option<()> {
+    let n = x.nrows();
+    let QrScratch {
+        augmented_design,
+        augmented_response,
+        sqrt_weights,
+        ..
+    } = scratch;
+    for (row, sqrt_weight) in sqrt_weights.iter_mut().enumerate() {
+        *sqrt_weight = w[row].sqrt();
+        if !sqrt_weight.is_finite() {
+            return None;
+        }
+        augmented_response[row] = checked::mul(z[row], *sqrt_weight)?;
+    }
+
+    for (col, (mut column, original)) in augmented_design
+        .column_iter_mut()
+        .zip(x.column_iter())
+        .enumerate()
+    {
+        let column = column.as_mut_slice();
+        for ((target, design_value), sqrt_weight) in column[..n]
+            .iter_mut()
+            .zip(original.as_slice())
+            .zip(&*sqrt_weights)
+        {
+            *target = checked::mul(*design_value, *sqrt_weight)?;
+        }
+        let sqrt_ridge = ridge_lambda[col].sqrt();
+        if !sqrt_ridge.is_finite() {
+            return None;
+        }
+        column[n..].fill(0.0);
+        column[n + col] = sqrt_ridge;
+    }
+
     Some(())
 }
 
@@ -153,7 +178,7 @@ pub(super) fn solve_qr_triangle(
     diagonal: &[f64],
     triangular: &mut DMatrix<f64>,
     coefficients: &mut DVector<f64>,
-) -> bool {
+) -> Result<bool, DeseqError> {
     let p = diagonal.len();
     let mut regular = true;
     for col in 0..p {
@@ -181,15 +206,18 @@ pub(super) fn solve_qr_triangle(
         let needs_lower_solve = coefficients
             .iter()
             .any(|value| !value.is_finite() || value.to_bits() == (-0.0_f64).to_bits());
-        (!needs_lower_solve || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
-            && triangular.solve_upper_triangular_mut(coefficients)
+        Ok((!needs_lower_solve
+            || triangular.solve_lower_triangular_with_diag_mut(coefficients, 1.0))
+            && triangular.solve_upper_triangular_mut(coefficients))
     } else {
         for col in 0..p {
             for row in 0..col {
                 triangular[(row, col)] = augmented_design[(row, col)];
             }
         }
-        triangular.clone().lu().solve_mut(coefficients)
+        let mut values = try_alloc_matrix(p, p, "IRLS QR LU fallback matrix")?;
+        values.extend_from_slice(triangular.as_slice());
+        Ok(DMatrix::from_vec(p, p, values).lu().solve_mut(coefficients))
     }
 }
 
@@ -215,13 +243,16 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
     hat: Option<&mut [f64]>,
     max_design: Option<f64>,
     retain_covariance: bool,
-) -> Option<FitCovariance<'a>> {
+) -> Result<Option<FitCovariance<'a>>, DeseqError> {
     let p = x.ncols();
     if scratch.crossproduct.shape() != (p, p) {
-        scratch.crossproduct = DMatrix::zeros(p, p);
-        scratch.inverse = DMatrix::zeros(p, p);
-        scratch.product = DMatrix::zeros(p, p);
-        scratch.active = Vec::with_capacity(p);
+        *scratch = CovarianceScratch {
+            crossproduct: try_zero_dmatrix(p, p, "IRLS covariance crossproduct")?,
+            inverse: try_zero_dmatrix(p, p, "IRLS covariance inverse")?,
+            product: try_zero_dmatrix(p, p, "IRLS covariance intermediate")?,
+            active: try_alloc_matrix(p, 1, "IRLS covariance active columns")?,
+            ..CovarianceScratch::default()
+        };
     } else {
         scratch.crossproduct.fill(0.0);
     }
@@ -232,14 +263,10 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
         covariance,
         active,
     } = scratch;
-    fill_xtwx(x, w, crossproduct, active)?;
-    inverse.copy_from(crossproduct);
-    for diagonal in 0..p {
-        inverse[(diagonal, diagonal)] =
-            checked::add(inverse[(diagonal, diagonal)], ridge_lambda[diagonal])?;
-    }
-    if !inverse.try_inverse_mut() {
-        return None;
+    if fill_xtwx(x, w, crossproduct, active).is_none()
+        || invert_regularized_crossproduct(crossproduct, ridge_lambda, inverse).is_none()
+    {
+        return Ok(None);
     }
     let max_inverse = if !retain_covariance || hat.is_none() {
         finite_abs_max(inverse.as_slice())
@@ -253,20 +280,32 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
         FitCovariance::PositiveDiagonal
     } else {
         if covariance.shape() != (p, p) {
-            *covariance = DMatrix::zeros(p, p);
+            *covariance = try_zero_dmatrix(p, p, "IRLS covariance")?;
         }
         covariance.gemm(1.0, product, inverse, 0.0);
         if !covariance.iter().all(|value| value.is_finite()) {
-            return None;
+            return Ok(None);
         }
         FitCovariance::Full(covariance)
     };
-    if let Some(hat) = hat {
-        visit_hat_diagonal(x, w, inverse, active, |sample, value| hat[sample] = value)?;
+    let valid_hat = if let Some(hat) = hat {
+        visit_hat_diagonal(x, w, inverse, active, |sample, value| hat[sample] = value)
     } else {
-        validate_unretained_hat(x, w, inverse, max_design, max_inverse, active)?;
+        validate_unretained_hat(x, w, inverse, max_design, max_inverse, active)
+    };
+    Ok(valid_hat.map(|()| fitted))
+}
+
+fn invert_regularized_crossproduct(
+    crossproduct: &DMatrix<f64>,
+    ridge_lambda: &[f64],
+    inverse: &mut DMatrix<f64>,
+) -> Option<()> {
+    inverse.copy_from(crossproduct);
+    for (diagonal, &ridge) in ridge_lambda.iter().enumerate() {
+        inverse[(diagonal, diagonal)] = checked::add(inverse[(diagonal, diagonal)], ridge)?;
     }
-    Some(fitted)
+    inverse.try_inverse_mut().then_some(())
 }
 
 pub(super) fn covariance_diagonal_is_positive(
@@ -367,22 +406,25 @@ impl NormalEquationsScratch {
         z: &[f64],
         ridge_lambda: &[f64],
         beta: &mut DVector<f64>,
-    ) -> Option<()> {
+    ) -> Result<bool, DeseqError> {
         let p = x.ncols();
         if self.crossproduct.shape() != (p, p) {
-            self.crossproduct = DMatrix::zeros(p, p);
-            self.response = DVector::zeros(p);
-            self.active = Vec::with_capacity(p);
+            *self = Self {
+                crossproduct: try_zero_dmatrix(p, p, "IRLS normal equations crossproduct")?,
+                response: try_zero_dvector(p, "IRLS normal equations response")?,
+                active: try_alloc_matrix(p, 1, "IRLS normal equations active columns")?,
+            };
         } else {
             self.crossproduct.fill(0.0);
             self.response.fill(0.0);
         }
-        fill_normal_equations(x, w, z, ridge_lambda, self)?;
-        if !solve_lu_in_place(&mut self.crossproduct, &mut self.response) {
-            return None;
+        if fill_normal_equations(x, w, z, ridge_lambda, self).is_none()
+            || !solve_lu_in_place(&mut self.crossproduct, &mut self.response)
+        {
+            return Ok(false);
         }
         std::mem::swap(&mut self.response, beta);
-        Some(())
+        Ok(true)
     }
 }
 
