@@ -1907,6 +1907,25 @@ an actual SIGINT. R 4.6.2 also matched the standalone Rust results for 33
 formula fits, 54 native formulas, eight mixture fits, ten uniform profiles,
 ten adaptive batches and 26 estimated-mode batches.
 
+### Native platform verification preparation
+
+The offline `a0808b2` R source archive cross-linked against the official
+Windows x64 R 4.6.2 headers and `R.dll`. The installer matched CRAN's
+published checksum. On Linux arm64, Rust 1.96.0 and UCRT LLVM-MinGW built
+the Rust archive and all 14 C translation units using R's Windows makefiles.
+The PE32+ DLL exported `R_init_rsdeseq2` alone and imported R and UCRT.
+Its import table contained neither `msvcrt.dll` nor `libunwind.dll`.
+
+The Intel macOS release integration executable linked as Mach-O x86_64
+from `6d91c11`, which changes only this report relative to `a0808b2`.
+The Apple Silicon host rejected the executable at process launch.
+
+A local verification packet contains the exact checked revision and the
+offline R archive. All 1,240 tracked files matched the release acceptance
+manifest on extraction. The packet includes the existing native platform
+and Windows R check commands. Native Intel macOS and Windows x64 runs remain
+open.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
