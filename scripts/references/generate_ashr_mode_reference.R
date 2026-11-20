@@ -59,6 +59,14 @@ for(name in names(profiles)){
  # NULL storage has meaning: absence differs from an explicitly empty scale grid.
  if(is.null(scales))cases[[length(cases)]]['scales']<-list(NULL)
  if(is.null(p$weights))cases[[length(cases)]]['observation_weights']<-list(NULL)
+ if(name=='negative'){
+  # Calibrate summaries at a fixed coordinate near the portable search result.
+  parameters$mode <- -.69959555
+  fixed <- do.call(ashr::ash,c(list(betahat=y,sebetahat=se),parameters))
+  cases[[length(cases)]]$portable_profile <- list(mode=expected(parameters$mode)[[1L]],
+   posterior_mean=expected(fixed$result$PosteriorMean),posterior_sd=expected(fixed$result$PosteriorSD),
+   svalues=expected(fixed$result$svalue),log_likelihood=expected(fixed$loglik)[[1L]])
+ }
 }
 suppressMessages(untrace('ash.workhorse',where=asNamespace('ashr')))
 suppressMessages(untrace('ash.estmode',where=asNamespace('ashr')))

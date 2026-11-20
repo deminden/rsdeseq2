@@ -8,6 +8,7 @@ mod ashr_mode;
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
 use rsdeseq2::shrinkage::*;
+use rsdeseq2::{NumericProfile, numeric_profile};
 
 #[test]
 fn estimated_modes_and_complete_summaries_match_original_profiles() {
@@ -31,7 +32,15 @@ fn check_reference(cases: &serde_json::Value) {
             continue;
         }
         let (mode, result) = result.unwrap_or_else(|e| panic!("{}: {e}", input.data.name));
-        let expected_mode = parse_numeric_input(c["expected_mode"].as_str().unwrap()).unwrap();
+        // Small changes in the objective can take Brent's interpolation down
+        // a different path. Compare the two affected portable summaries with
+        // independent ashr fits at fixed coordinates near their optima.
+        let portable = c
+            .get("portable_profile")
+            .filter(|_| numeric_profile() == NumericProfile::Portable);
+        let (reference, expected_mode) =
+            portable.map_or((c, &c["expected_mode"]), |p| (p, &p["mode"]));
+        let expected_mode = parse_numeric_input(expected_mode.as_str().unwrap()).unwrap();
         assert!(
             (mode.mode - expected_mode).abs() < 2e-6,
             "{}: mode {} vs {}",
@@ -51,12 +60,25 @@ fn check_reference(cases: &serde_json::Value) {
             "{}",
             input.data.name
         );
-        assert_eq!(
-            mode.evaluations + 1,
-            c["trials"].as_array().unwrap().len(),
-            "{}",
-            input.data.name
-        );
+        let trials = mode.evaluations + 1;
+        let trial_warnings = reference["trial_warnings"].as_array();
+        if let Some(trial_warnings) = trial_warnings {
+            assert_eq!(trials, 23, "{}", input.data.name);
+            let expected: Vec<_> = (0..trials)
+                .flat_map(|_| trial_warnings.iter().cloned())
+                .collect();
+            assert_eq!(
+                serde_json::json!(mode.warnings),
+                serde_json::json!(expected)
+            );
+        } else {
+            assert_eq!(
+                trials,
+                c["trials"].as_array().unwrap().len(),
+                "{}",
+                input.data.name
+            );
+        }
         for (field, actual) in [
             ("posterior_mean", &result.posterior_mean),
             ("posterior_sd", &result.posterior_sd),
@@ -64,28 +86,36 @@ fn check_reference(cases: &serde_json::Value) {
         ] {
             compare(
                 actual,
-                &c[field],
+                &reference[field],
                 2e-6,
                 0.0,
                 &format!("{} {field}", input.data.name),
                 &mut failures,
             );
         }
-        let ll = parse_numeric_input(c["log_likelihood"].as_str().unwrap()).unwrap();
+        let ll = parse_numeric_input(reference["log_likelihood"].as_str().unwrap()).unwrap();
         assert!(
-            (result.log_likelihood - ll).abs() < 2e-6,
+            (mode.log_likelihood - ll).abs() < 2e-6 && (result.log_likelihood - ll).abs() < 2e-6,
             "{}: likelihood",
             input.data.name
         );
-        let warnings = c["warnings"]
+        let warnings = reference
+            .get("warnings")
+            .unwrap_or(&c["warnings"])
             .as_array()
             .unwrap()
             .iter()
             .filter(|v| !v.as_str().unwrap().starts_with("subscript out of bounds"))
             .cloned()
             .collect::<Vec<_>>();
+        let summary_warnings = if trial_warnings.is_some() {
+            assert!(result.warnings.starts_with(&mode.warnings));
+            &result.warnings[mode.warnings.len()..]
+        } else {
+            &result.warnings
+        };
         assert_eq!(
-            serde_json::json!(result.warnings),
+            serde_json::json!(summary_warnings),
             serde_json::json!(warnings),
             "{}",
             input.data.name

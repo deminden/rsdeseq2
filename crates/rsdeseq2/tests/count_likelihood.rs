@@ -1,11 +1,12 @@
 //! Original built-in likelihood kernels, complete workflows and analytical checks.
-use crate::support::json_fixture;
 use crate::support::posterior as support;
+use crate::support::{json_fixture, matches_within_ulps};
 use support::*;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
 use rsdeseq2::shrinkage::BuiltinLocationLikelihood;
+use rsdeseq2::{NumericProfile, numeric_profile};
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/ashr_mode.rs"]
 mod ashr_mode;
@@ -65,18 +66,27 @@ fn count_mode_bounds_searches_and_complete_summaries_match_original() {
             &format!("{} mode", input.data.name),
             &mut failures,
         );
-        let bounds = c["search_bounds"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| parse_numeric_input(v.as_str().unwrap()).unwrap().to_bits())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            [mode.bounds.0.to_bits(), mode.bounds.1.to_bits()],
-            bounds.as_slice(),
-            "{}",
-            input.data.name
-        );
+        let bounds = c["search_bounds"].as_array().unwrap();
+        assert_eq!(bounds.len(), 2, "{}", input.data.name);
+        for (index, (actual, expected)) in [mode.bounds.0, mode.bounds.1]
+            .into_iter()
+            .zip(bounds)
+            .enumerate()
+        {
+            // The lower log-Poisson bound is log(0.01), which can round
+            // differently between the portable and host math libraries.
+            let ulps = u64::from(
+                index == 0
+                    && numeric_profile() == NumericProfile::Portable
+                    && input.data.name.starts_with("pois_log_rows_"),
+            );
+            let expected = parse_numeric_input(expected.as_str().unwrap()).unwrap();
+            assert!(
+                matches_within_ulps(actual, expected, ulps),
+                "{} bound {index}: {actual} != {expected}",
+                input.data.name
+            );
+        }
         assert_eq!(
             mode.evaluations + 1,
             c["trials"].as_array().unwrap().len(),

@@ -45,7 +45,8 @@ def main():
     )
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
-         'adaptive_result::', 'bounded_posterior::', 'location_shrinkage::',
+         'adaptive_result::', 'ashr_mode::', 'bounded_posterior::',
+         'count_likelihood::', 'location_shrinkage::',
          'beta_prior_run::', 'gtex_end_to_end::',
          'numeric_transform::', 'formula_expression::', 'formula_fitting::',
          'native_formula::', 'model_matrix::'],

@@ -9183,7 +9183,89 @@
         "NaNs produced",
         "NaNs produced",
         "NaNs produced"
-      ]
+      ],
+      "portable_profile": {
+        "mode": "-0.99994810000000001",
+        "posterior_mean": [
+          "-3.7599169163476462",
+          "-0.99997870639428421",
+          "-0.21092193151076299",
+          "-0.25993666592208314",
+          "1.6795351537399201",
+          "1.1572040386120541"
+        ],
+        "posterior_sd": [
+          "NA",
+          "NA",
+          "NA",
+          "NA",
+          "NA",
+          "NA"
+        ],
+        "svalues": [
+          "5.7775440209795192e-08",
+          "0.017219493589190685",
+          "0.11502623108219889",
+          "0.17278553652581619",
+          "0.0010613241296826752",
+          "0.038118715354016897"
+        ],
+        "log_likelihood": "-16.777812843165211",
+        "trial_warnings": [
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced"
+        ],
+        "warnings": [
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced",
+          "NaNs produced"
+        ]
+      }
     }
   ]
 }

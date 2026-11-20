@@ -1843,8 +1843,30 @@ both adaptive-query and complete-location replays in the portable profile.
 The targeted macOS arm64 checks passed 16 tests in each profile, and both
 golden manifests matched all 8,032 fields. The five affected tests also
 passed in both profiles on Linux arm64 and Linux x86_64 under QEMU 10.0.13.
-Shrinkage Clippy passed. Three portable mode-search comparisons from the
-preceding audit remain open.
+Shrinkage Clippy passed.
+
+### Portable estimated-mode conformance
+
+The negative-uniform and restricted-Laplace mode searches reached locations
+within `2.58e-6` and `2.23e-5` of the original ashr search locations. A
+same-coordinate probe agreed across profiles to `2.85e-14` and `3.56e-15`
+in log likelihood. Original ashr independently supplied the reference
+summaries at fixed coordinates near the two portable results. The R-host
+fixtures retained their search coordinates, trial counts, warning sequences
+and summary values. For the restricted likelihood, the portable fixture
+checks four warnings per likelihood trial and all 46 final summary warnings.
+
+The three log-Poisson cases permit one ULP at the portable lower bound
+`log(0.01)`. Each upper bound, other case and R-host comparison retains exact
+bound checks. The portable release panel now includes both mode panels.
+
+The batched macOS arm64 integration audit passed 1,032 tests in each profile,
+with two full-data tests left to their separate release check. The nine mode
+and count tests passed in both profiles on Linux arm64 and emulated Linux
+x86_64. The updated Intel macOS integration executable linked. Windows x64
+libraries and binaries type-checked, and its integration target requires
+Windows SDK headers unavailable on this host. Native Intel macOS and Windows
+x64 runtime results remain open.
 
 ## Review plan verification for 0.6.0
 

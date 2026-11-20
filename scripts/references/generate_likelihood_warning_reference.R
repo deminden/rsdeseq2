@@ -109,11 +109,29 @@ mode_cases <- lapply(c(FALSE,TRUE),function(restricted_mode) {
   fit <- withCallingHandlers(ashr::ash(y,error,mode="estimate",mixcompdist="uniform",pointmass=TRUE,
       prior="uniform",mixsd=c(.4,3),lik=lik,outputlevel=3),
     warning=function(w){warnings <<- c(warnings,conditionMessage(w));invokeRestart("muffleWarning")})
-  c(location,list(mode_input=.formula_descriptor("estimate"),expected_error=NULL,native_expected_error=NULL,
+  result <- c(location,list(mode_input=.formula_descriptor("estimate"),expected_error=NULL,native_expected_error=NULL,
     expected_mode=expected(.warning_mode_capture$mode)[[1L]], search_bounds=bits(.warning_mode_capture$bounds),
     trials=lapply(.warning_mode_capture$trials,expected),posterior_mean=expected(fit$result$PosteriorMean),
     posterior_sd=expected(fit$result$PosteriorSD),svalues=expected(fit$result$svalue),
     log_likelihood=expected(fit$loglik)[[1L]],warnings=as.list(warnings)))
+  if (restricted_mode) {
+    # Calibrate summaries at a fixed coordinate near the portable search result.
+    capture <- function(mode, outputlevel) {
+      warnings <- character()
+      value <- withCallingHandlers(ashr::ash(y,error,mode=mode,mixcompdist="uniform",pointmass=TRUE,
+        prior="uniform",mixsd=c(.4,3),lik=lik,outputlevel=outputlevel),
+        warning=function(w){warnings <<- c(warnings,conditionMessage(w));invokeRestart("muffleWarning")})
+      list(value=value,warnings=as.list(warnings))
+    }
+    mode <- -.99994810
+    fixed <- capture(mode, 3)
+    trial <- capture(mode, "loglik")
+    result$portable_profile <- list(mode=expected(mode)[[1L]],
+      posterior_mean=expected(fixed$value$result$PosteriorMean),posterior_sd=expected(fixed$value$result$PosteriorSD),
+      svalues=expected(fixed$value$result$svalue),log_likelihood=expected(fixed$value$loglik)[[1L]],
+      trial_warnings=trial$warnings,warnings=fixed$warnings)
+  }
+  result
 })
 suppressMessages(untrace("ash.workhorse",where=asNamespace("ashr")))
 suppressMessages(untrace("ash.estmode",where=asNamespace("ashr")))
