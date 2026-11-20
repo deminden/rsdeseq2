@@ -223,3 +223,21 @@ The local instrumented suite measured 86.66% line coverage for the rsdeseq2
 crate with nightly Rust and cargo-llvm-cov 0.9.1. All nine matrix and checked
 arithmetic tests selected by CI also passed under Miri with the portable
 profile.
+
+The integer `sum()` follow-up at `2ef9ff1` passed 1,222 workspace tests on
+macOS arm64 and Linux arm64. The formula panel also passed on emulated
+Linux x86_64. Six integer-promotion and missing-value cases matched the
+original R result types and bits through both arm64 R wrappers. Linux
+arm64 passed 130 release-panel tests. macOS arm64 and Linux arm64 each
+passed the two 56,200-gene GTEx replay tests and matched their host and
+portable golden hashes.
+
+The archives built from `fa2b7b1` include that follow-up. All four Rust
+archives built offline and reproduced byte for byte. The R archive passed
+2,874 expectations with zero failures and zero skips on macOS R 4.5.3,
+macOS R 4.6.2 and Linux arm64 R 4.6.2. The R 4.6.2 checks recorded the
+compiled-symbol warning and two vendoring notes. The R 4.5.3 check
+recorded both vendoring notes.
+
+The rebuilt macOS CLI passed all 130 GTEx precision gates under `r-host`.
+The portable run passed 107 per-contrast and all nine global gates.
