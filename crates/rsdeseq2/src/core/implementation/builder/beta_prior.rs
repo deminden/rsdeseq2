@@ -20,8 +20,8 @@ use super::*;
 use crate::all_zero::nonzero_gene_indices;
 use crate::design::ExpandedFormulaDesignWithOffsets;
 use crate::errors::{ErrorKind, invalid_options, invariant, missing_prerequisite};
-use crate::glm::{GlmInput, estimate_beta_prior_variance, fit_glms_with_beta_prior};
-use crate::normalization::Offsets;
+use crate::glm::beta::fit_glms_with_beta_prior_rows;
+use crate::glm::estimate_beta_prior_variance;
 
 /// How the standard and expanded designs of a formula relate.
 pub(super) struct ExpandedPriorPlan {
@@ -243,14 +243,14 @@ impl DeseqBuilder {
         let design = &formula.design.standard_design;
         let expanded_design = &formula.design.expanded_design;
         let plan = ExpandedPriorPlan::new(formula)?;
-        let dispersions = fit.dispersion.clone().ok_or_else(|| {
+        let dispersions = fit.dispersion.as_deref().ok_or_else(|| {
             missing_prerequisite(
                 ErrorKind::Dispersion,
                 "beta prior fitting",
                 "MAP dispersions",
             )
         })?;
-        let disp_fit = fit.disp_fit.clone().ok_or_else(|| {
+        let disp_fit = fit.disp_fit.as_deref().ok_or_else(|| {
             missing_prerequisite(
                 ErrorKind::Dispersion,
                 "beta prior fitting",
@@ -264,7 +264,7 @@ impl DeseqBuilder {
             normalization_factors: fit.normalization_factors.as_ref(),
             observation_weights: fit.observation_weights.as_ref(),
             all_zero: &fit.all_zero,
-            dispersions: &dispersions,
+            dispersions,
         };
         let FixedDispersionGlmOutput {
             glm_fit: mle,
@@ -277,40 +277,25 @@ impl DeseqBuilder {
             .ok_or_else(|| invalid_options("beta prior: the expanded design has no column names"))?
             .to_vec();
         let prior =
-            plan.prior_variance(&mle.beta, &rows, &fit.base_mean, &disp_fit, &expanded_names)?;
+            plan.prior_variance(&mle.beta, &rows, &fit.base_mean, disp_fit, &expanded_names)?;
 
         // The MAP refit on the expanded design, on the rows that are not all zero.
         let expanded_fit = if rows.is_empty() {
             all_zero_glm_fit(counts, expanded_design)?
         } else {
-            let compact = compact_counts(counts, &rows)?;
-            let compact_dispersions: Vec<f64> = rows.iter().map(|&row| dispersions[row]).collect();
-            let normalization_factors = fit
-                .normalization_factors
-                .as_ref()
-                .map(|factors| compact_matrix_rows(factors, &rows))
-                .transpose()?;
-            let weights = fit
-                .observation_weights
-                .as_ref()
-                .map(|weights| compact_matrix_rows(weights, &rows))
-                .transpose()?;
-            let offsets = match &normalization_factors {
-                Some(factors) => Offsets::PerCell(factors),
-                None => Offsets::PerSample(&fit.size_factors),
-            };
-            let compact_fit = fit_glms_with_beta_prior(
-                GlmInput {
-                    counts: &compact,
-                    offsets,
-                    dispersions: &compact_dispersions,
-                    weights: weights.as_ref(),
-                },
+            let selected = (rows.len() != counts.n_genes()).then_some(rows.as_slice());
+            let fitted = fit_glms_with_beta_prior_rows(
+                input.glm_input(),
                 expanded_design,
                 &prior,
                 self.irls_options.clone(),
+                selected,
             )?;
-            expand_glm_fit(compact_fit, &fit.all_zero)?
+            if selected.is_some() {
+                expand_glm_fit(fitted, &fit.all_zero)?
+            } else {
+                fitted
+            }
         };
 
         let contrast = plan.expanded_contrast(standard_contrast, expanded_design.n_coefficients());

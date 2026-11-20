@@ -1,5 +1,7 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::glm::beta::fit_intercept_only_glm_rows;
+use crate::glm::irls::fit_selected_irls;
 use crate::matrix::try_alloc_matrix;
 // Validate global LRT subspaces before any expensive fitting stage.
 pub(super) fn validate_lrt_designs(
@@ -135,54 +137,29 @@ pub(super) fn is_intercept_only_design(design: &DesignMatrix) -> bool {
 }
 
 pub(super) fn fit_fixed_dispersion_model(
-    counts: &CountMatrix,
+    input: GlmInput<'_>,
     design: &DesignMatrix,
-    size_factors: &[f64],
-    normalization_factors: Option<&RowMajorMatrix<f64>>,
-    weights: Option<&RowMajorMatrix<f64>>,
-    dispersions: &[f64],
+    all_zero: &[bool],
+    nonzero: &[usize],
     irls_options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    if is_intercept_only_design(design)
+    if nonzero.is_empty() {
+        return all_zero_glm_fit(input.counts, design);
+    }
+    let selected = (nonzero.len() != input.counts.n_genes()).then_some(nonzero);
+    let fit = if is_intercept_only_design(design)
         && irls_options.uses_intercept_shortcut_for_coefficients(design.n_coefficients())?
     {
-        match normalization_factors {
-            Some(factors) => fit_intercept_only_glm(GlmInput {
-                counts,
-                offsets: Offsets::PerCell(factors),
-                dispersions,
-                weights,
-            }),
-            None => fit_intercept_only_glm(GlmInput {
-                counts,
-                offsets: Offsets::PerSample(size_factors),
-                dispersions,
-                weights,
-            }),
-        }
+        fit_intercept_only_glm_rows(input, selected)?
+    } else if let Some(genes) = selected {
+        fit_selected_irls(input, design, irls_options, genes)?
     } else {
-        match normalization_factors {
-            Some(factors) => fit_fixed_dispersion_glm(
-                GlmInput {
-                    counts,
-                    offsets: Offsets::PerCell(factors),
-                    dispersions,
-                    weights,
-                },
-                design,
-                irls_options,
-            ),
-            None => fit_fixed_dispersion_glm(
-                GlmInput {
-                    counts,
-                    offsets: Offsets::PerSample(size_factors),
-                    dispersions,
-                    weights,
-                },
-                design,
-                irls_options,
-            ),
-        }
+        fit_fixed_dispersion_glm(input, design, irls_options)?
+    };
+    if selected.is_some() {
+        expand_glm_fit(fit, all_zero)
+    } else {
+        Ok(fit)
     }
 }
 

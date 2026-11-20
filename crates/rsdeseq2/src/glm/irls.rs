@@ -14,7 +14,7 @@ use crate::glm::NbinomGlmFit;
 use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
 use crate::glm::fallback::requires_optim_fallback;
 use crate::glm::nb::{
-    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_weighted,
+    FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_selected_rows,
 };
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
@@ -414,6 +414,27 @@ pub(crate) fn fit_selected_irls_means(
     options: IrlsOptions,
     genes: &[usize],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    fit_selected_irls_output(input, design, options, genes, OutputRequirements::Means)
+        .and_then(IrlsOutput::into_matrix)
+}
+
+pub(crate) fn fit_selected_irls(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+    genes: &[usize],
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_selected_irls_output(input, design, options, genes, OutputRequirements::Inference)
+        .and_then(IrlsOutput::into_inference)
+}
+
+fn fit_selected_irls_output(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+    genes: &[usize],
+    requirements: OutputRequirements,
+) -> Result<IrlsOutput, DeseqError> {
     if let Offsets::PerSample(factors) = input.offsets {
         validate_size_factor_offsets(input.counts, factors)?;
     }
@@ -424,9 +445,8 @@ pub(crate) fn fit_selected_irls_means(
         },
         design,
         options,
-        OutputRequirements::Means,
+        requirements,
     )
-    .and_then(IrlsOutput::into_matrix)
 }
 
 #[derive(Clone, Copy)]
@@ -611,16 +631,13 @@ fn fit_irls_rows<const SELECTED: bool>(
     let beta = RowMajorMatrix::from_row_major(genes, p, beta_values)?;
     let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
     let mut log_like = if SELECTED {
-        let mut result = Vec::with_capacity(genes);
-        for (gene, &source_gene) in rows.selection.iter().enumerate() {
-            result.push(nbinom_log_likelihood_weighted(
-                rows.input.counts.row(source_gene)?,
-                mu.row(gene)?,
-                rows.input.dispersions[source_gene],
-                rows.weights(source_gene)?,
-            )?);
-        }
-        result
+        nbinom_log_likelihood_selected_rows(
+            rows.input.counts,
+            &mu,
+            rows.input.dispersions,
+            rows.input.weights,
+            rows.selection,
+        )?
     } else {
         nbinom_log_likelihood_matrix(
             rows.input.counts,

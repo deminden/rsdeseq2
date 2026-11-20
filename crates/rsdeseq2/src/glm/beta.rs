@@ -11,7 +11,7 @@ use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{
     IrlsOptions, fit_fixed_dispersion_glm, fit_irls, validate_size_factor_offsets,
 };
-use crate::glm::nb::nbinom_log_likelihood_matrix;
+use crate::glm::nb::{nbinom_log_likelihood_matrix, nbinom_log_likelihood_selected_rows};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::Offsets;

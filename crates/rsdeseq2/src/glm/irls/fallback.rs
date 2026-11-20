@@ -1,4 +1,5 @@
 use super::*;
+use crate::glm::nb::nbinom_log_likelihood_weighted;
 // Bounded-optimizer fallback, starting values and acceptance checks.
 
 #[allow(clippy::too_many_arguments)]

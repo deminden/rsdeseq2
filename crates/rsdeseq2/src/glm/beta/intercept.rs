@@ -47,7 +47,14 @@ pub fn fit_intercept_only_fixed_dispersion_with_weights(
 /// `fitNbinomGLMs` intercept shortcut) with size-factor or
 /// normalization-factor offsets and optional observation weights.
 pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, DeseqError> {
-    validate_intercept_fit_inputs(input)?;
+    fit_intercept_only_glm_rows(input, None)
+}
+
+pub(crate) fn fit_intercept_only_glm_rows(
+    input: GlmInput<'_>,
+    genes: Option<&[usize]>,
+) -> Result<NbinomGlmFit, DeseqError> {
+    validate_intercept_fit_inputs(input, genes)?;
     let GlmInput {
         counts,
         offsets,
@@ -55,35 +62,35 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
         weights,
     } = input;
 
-    let mut normalized_row = Vec::with_capacity(counts.n_samples());
+    let n_genes = genes.map_or(counts.n_genes(), <[usize]>::len);
+    let n_samples = counts.n_samples();
+    let mut normalized_row = try_alloc_matrix(n_samples, 1, "intercept normalized row")?;
+    let mut working_weights = try_alloc_matrix(n_samples, 1, "intercept working weights")?;
     let mut weighted_values = Vec::new();
-    let mut beta_values = Vec::with_capacity(counts.n_genes());
-    let mut mu_values =
-        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
-    let mut hat_values =
-        try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
-    let mut beta_se_values = Vec::with_capacity(counts.n_genes());
-    let mut beta_covariance_values = Vec::with_capacity(counts.n_genes());
+    let mut beta_values = try_alloc_matrix(n_genes, 1, "intercept coefficients")?;
+    let mut mu_values = try_alloc_matrix(n_genes, counts.n_samples(), "intercept-only fit")?;
+    let mut hat_values = try_alloc_matrix(n_genes, counts.n_samples(), "intercept-only fit")?;
+    let mut beta_se_values = try_alloc_matrix(n_genes, 1, "intercept standard errors")?;
+    let mut beta_covariance_values = try_alloc_matrix(n_genes, 1, "intercept covariance")?;
 
-    for (gene, dispersion) in dispersions.iter().copied().enumerate() {
-        let factor_row = offsets.row(gene)?;
+    for gene in 0..n_genes {
+        let source_gene = genes.map_or(gene, |rows| rows[gene]);
+        let dispersion = dispersions[source_gene];
+        let factor_row = offsets.row(source_gene)?;
         normalized_row.clear();
         normalized_row.extend(
             counts
-                .row_values(gene)
+                .row_values(source_gene)
                 .iter()
                 .zip(factor_row)
                 .map(|(&count, &factor)| f64::from(count) / factor),
         );
-        let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
+        let weight_row = weights.map(|matrix| matrix.row(source_gene)).transpose()?;
         let mean_normalized = match weight_row {
             Some(weights) => weighted_mean(&normalized_row, weights, gene, &mut weighted_values)?,
             None => {
-                if counts.is_all_zero_gene(gene)? {
-                    return Err(DeseqError::AllZeroGene {
-                        gene,
-                        source_gene: gene,
-                    });
+                if counts.is_all_zero_gene(source_gene)? {
+                    return Err(DeseqError::AllZeroGene { gene, source_gene });
                 }
                 checked::try_mean(&normalized_row).map_err(|failure| {
                     intercept_value_error(
@@ -128,7 +135,7 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
 
         let mu_start = gene * counts.n_samples();
         let mu_row = &mu_values[mu_start..mu_start + counts.n_samples()];
-        let working_weights = intercept_working_weights(mu_row, dispersion, weight_row)?;
+        fill_intercept_working_weights(mu_row, dispersion, weight_row, &mut working_weights)?;
         let xtwx = checked::try_sum(working_weights.iter().copied()).map_err(|failure| {
             intercept_value_error(
                 ErrorKind::Dispersion,
@@ -162,7 +169,7 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
         }
         beta_se_values.push(checked_intercept_beta_se(sigma, gene)?);
         beta_covariance_values.push(checked_intercept_beta_covariance(sigma, gene)?);
-        for (sample, value) in working_weights.into_iter().enumerate() {
+        for (sample, value) in working_weights.iter().copied().enumerate() {
             let hat =
                 checked::try_mul(value, sigma).map_err(|failure| DeseqError::InvalidGeneValue {
                     domain: ErrorKind::Dispersion,
@@ -178,14 +185,17 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
         }
     }
 
-    let beta = RowMajorMatrix::from_row_major(counts.n_genes(), 1, beta_values)?;
-    let beta_se = RowMajorMatrix::from_row_major(counts.n_genes(), 1, beta_se_values)?;
-    let beta_covariance =
-        RowMajorMatrix::from_row_major(counts.n_genes(), 1, beta_covariance_values)?;
-    let mu = RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), mu_values)?;
-    let hat_diagonal =
-        RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), hat_values)?;
-    let log_like = nbinom_log_likelihood_matrix(counts, &mu, dispersions, weights)?;
+    let beta = RowMajorMatrix::from_row_major(n_genes, 1, beta_values)?;
+    let beta_se = RowMajorMatrix::from_row_major(n_genes, 1, beta_se_values)?;
+    let beta_covariance = RowMajorMatrix::from_row_major(n_genes, 1, beta_covariance_values)?;
+    let mu = RowMajorMatrix::from_row_major(n_genes, counts.n_samples(), mu_values)?;
+    let hat_diagonal = RowMajorMatrix::from_row_major(n_genes, counts.n_samples(), hat_values)?;
+    let log_like = match genes {
+        Some(genes) => {
+            nbinom_log_likelihood_selected_rows(counts, &mu, dispersions, weights, genes)?
+        }
+        None => nbinom_log_likelihood_matrix(counts, &mu, dispersions, weights)?,
+    };
     let model_matrix = DesignMatrix::from_row_major(
         counts.n_samples(),
         1,
@@ -195,17 +205,17 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
 
     Ok(NbinomGlmFit {
         log_like,
-        beta_converged: vec![true; counts.n_genes()],
+        beta_converged: vec![true; n_genes],
         beta,
         beta_se,
-        beta_optim_start: RowMajorMatrix::from_elem(counts.n_genes(), 1, f64::NAN)?,
+        beta_optim_start: RowMajorMatrix::from_elem(n_genes, 1, f64::NAN)?,
         beta_covariance: Some(beta_covariance),
         mu,
-        beta_iter: vec![1; counts.n_genes()],
-        beta_optim_iter: vec![f64::NAN; counts.n_genes()],
-        beta_optim_start_objective: vec![f64::NAN; counts.n_genes()],
-        beta_optim_objective: vec![f64::NAN; counts.n_genes()],
-        beta_optim_gradient_norm: vec![f64::NAN; counts.n_genes()],
+        beta_iter: vec![1; n_genes],
+        beta_optim_iter: vec![f64::NAN; n_genes],
+        beta_optim_start_objective: vec![f64::NAN; n_genes],
+        beta_optim_objective: vec![f64::NAN; n_genes],
+        beta_optim_gradient_norm: vec![f64::NAN; n_genes],
         model_matrix,
         n_terms: 1,
         hat_diagonal,
@@ -309,13 +319,25 @@ pub(super) fn weighted_mean(
         .map_err(|failure| invalid_mean(None, failure.value))
 }
 
+#[cfg(test)]
 pub(super) fn intercept_working_weights(
     mu: &[f64],
     dispersion: f64,
     weights: Option<&[f64]>,
 ) -> Result<Vec<f64>, DeseqError> {
+    let mut out = Vec::new();
+    fill_intercept_working_weights(mu, dispersion, weights, &mut out)?;
+    Ok(out)
+}
+
+fn fill_intercept_working_weights(
+    mu: &[f64],
+    dispersion: f64,
+    weights: Option<&[f64]>,
+    out: &mut Vec<f64>,
+) -> Result<(), DeseqError> {
     validate_positive_finite(dispersion, "dispersion", 0)?;
-    let mut out = Vec::with_capacity(mu.len());
+    out.clear();
     for (sample, value) in mu.iter().copied().enumerate() {
         validate_positive_finite(value, "mu", sample)?;
         let working_weight = checked_mean_dispersion_working_weight(
@@ -334,5 +356,5 @@ pub(super) fn intercept_working_weights(
             None => working_weight,
         });
     }
-    Ok(out)
+    Ok(())
 }

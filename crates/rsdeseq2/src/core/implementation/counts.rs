@@ -28,9 +28,9 @@ pub(super) use crate::dispersion::{
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
 pub(super) use crate::glm::{
     GlmInput, IrlsOptions, LrtOutput, NbinomGlmFit, ObservationWeightOptions, WaldAlternative,
-    WaldContrastOutput, WaldOutput, WaldTestOptions, fit_fixed_dispersion_glm,
-    fit_intercept_only_glm, lrt_test, preprocess_observation_weights_with_options,
-    wald_test_coefficient_with_options, wald_test_contrast_with_options,
+    WaldContrastOutput, WaldOutput, WaldTestOptions, fit_fixed_dispersion_glm, lrt_test,
+    preprocess_observation_weights_with_options, wald_test_coefficient_with_options,
+    wald_test_contrast_with_options,
 };
 pub(super) use crate::independent_filtering::{
     IndependentFilteringOptions, apply_independent_filtering,

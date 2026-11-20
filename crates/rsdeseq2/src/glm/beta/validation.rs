@@ -1,7 +1,10 @@
 use super::*;
 // Fit and normalization-factor validation.
 
-pub(super) fn validate_intercept_fit_inputs(input: GlmInput<'_>) -> Result<(), DeseqError> {
+pub(super) fn validate_intercept_fit_inputs(
+    input: GlmInput<'_>,
+    genes: Option<&[usize]>,
+) -> Result<(), DeseqError> {
     let GlmInput {
         counts,
         offsets,
@@ -29,8 +32,17 @@ pub(super) fn validate_intercept_fit_inputs(input: GlmInput<'_>) -> Result<(), D
             dispersions.len(),
         ));
     }
-    for (idx, dispersion) in dispersions.iter().copied().enumerate() {
-        validate_positive_finite(dispersion, "dispersion", idx)?;
+    let n_genes = genes.map_or(counts.n_genes(), <[usize]>::len);
+    let source_genes = || (0..n_genes).map(|gene| genes.map_or(gene, |rows| rows[gene]));
+    for (gene, source_gene) in source_genes().enumerate() {
+        let dispersion = *dispersions.get(source_gene).ok_or_else(|| {
+            invalid_dimensions(
+                "intercept gene index",
+                counts.n_genes(),
+                source_gene.saturating_add(1),
+            )
+        })?;
+        validate_positive_finite(dispersion, "dispersion", gene)?;
     }
     if let Some(weights) = weights {
         if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
@@ -40,12 +52,36 @@ pub(super) fn validate_intercept_fit_inputs(input: GlmInput<'_>) -> Result<(), D
                 actual: weights.len(),
             });
         }
-        weights.validate_finite("weights")?;
+        validate_intercept_finite_rows(weights, "weights", genes)?;
     }
     if let Offsets::PerCell(factors) = offsets {
-        factors.validate_finite("normalization factors")?;
-        for (index, &factor) in factors.as_slice().iter().enumerate() {
-            validate_positive_finite(factor, "normalization factor", index % counts.n_samples())?;
+        validate_intercept_finite_rows(factors, "normalization factors", genes)?;
+        for source_gene in source_genes() {
+            for (sample, &factor) in factors.row(source_gene)?.iter().enumerate() {
+                validate_positive_finite(factor, "normalization factor", sample)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_intercept_finite_rows(
+    matrix: &RowMajorMatrix<f64>,
+    context: &str,
+    genes: Option<&[usize]>,
+) -> Result<(), DeseqError> {
+    let Some(genes) = genes else {
+        return matrix.validate_finite(context);
+    };
+    for (gene, &source_gene) in genes.iter().enumerate() {
+        for (sample, &value) in matrix.row(source_gene)?.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(DeseqError::NonFiniteValue {
+                    context: context.into(),
+                    index: Some(gene * matrix.n_cols() + sample),
+                    value,
+                });
+            }
         }
     }
     Ok(())

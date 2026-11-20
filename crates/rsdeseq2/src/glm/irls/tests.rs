@@ -269,11 +269,11 @@ fn unretained_covariance_checks_positive_diagonals_without_building_the_matrix()
 }
 
 #[test]
-fn selected_irls_means_match_compacted_rows_with_offsets_and_weights() {
+fn selected_glm_fits_match_compacted_rows_with_offsets_and_weights() {
     let first = [4, 7, 5, 11, 13, 9];
     let last = [1, 0, 2, 90, 105, 87];
     let counts = CountMatrix::from_row_major_u32(3, 6, [first, [0; 6], last].concat()).unwrap();
-    let compact_counts = CountMatrix::from_row_major_u32(2, 6, [first, last].concat()).unwrap();
+    let compact_counts = CountMatrix::from_row_major_u32(2, 6, [last, first].concat()).unwrap();
     let design = DesignMatrix::from_row_major(
         6,
         2,
@@ -289,12 +289,12 @@ fn selected_irls_means_match_compacted_rows_with_offsets_and_weights() {
         RowMajorMatrix::from_row_major(3, 6, [factors, [f64::NAN; 6], other_factors].concat())
             .unwrap();
     let compact_factors =
-        RowMajorMatrix::from_row_major(2, 6, [factors, other_factors].concat()).unwrap();
+        RowMajorMatrix::from_row_major(2, 6, [other_factors, factors].concat()).unwrap();
     let weights =
         RowMajorMatrix::from_row_major(3, 6, [weights_first, [f64::NAN; 6], weights_last].concat())
             .unwrap();
     let compact_weights =
-        RowMajorMatrix::from_row_major(2, 6, [weights_first, weights_last].concat()).unwrap();
+        RowMajorMatrix::from_row_major(2, 6, [weights_last, weights_first].concat()).unwrap();
     let options = IrlsOptions {
         force_optim: true,
         ..IrlsOptions::default()
@@ -323,35 +323,44 @@ fn selected_irls_means_match_compacted_rows_with_offsets_and_weights() {
             Offsets::PerCell(&compact_factors),
         ),
     ] {
-        let compact = fit_fixed_dispersion_glm(
-            GlmInput::new(&compact_counts, compact_offsets, &[0.1, 0.3]).weights(&compact_weights),
-            &design,
-            options.clone(),
-        )
-        .unwrap();
-        let selected = fit_selected_irls_means(
-            GlmInput::new(&counts, selected_offsets, &[0.1, f64::NAN, 0.3]).weights(&weights),
-            &design,
-            options.clone(),
-            &[2, 0],
-        )
-        .unwrap();
-        for (row, source) in [1, 0].into_iter().enumerate() {
-            assert_eq!(
-                selected
-                    .row(row)
-                    .unwrap()
+        let compact_input =
+            GlmInput::new(&compact_counts, compact_offsets, &[0.3, 0.1]).weights(&compact_weights);
+        let selected_input =
+            GlmInput::new(&counts, selected_offsets, &[0.1, f64::NAN, 0.3]).weights(&weights);
+        let genes = &[2, 0];
+        let compact = fit_fixed_dispersion_glm(compact_input, &design, options.clone()).unwrap();
+        let selected = fit_selected_irls(selected_input, &design, options.clone(), genes).unwrap();
+        let means =
+            fit_selected_irls_means(selected_input, &design, options.clone(), genes).unwrap();
+        assert_eq!(means, compact.mu);
+
+        let selected_intercept =
+            crate::glm::beta::fit_intercept_only_glm_rows(selected_input, Some(genes)).unwrap();
+        let compact_intercept = fit_intercept_only_glm(compact_input).unwrap();
+
+        for (selected, compact) in [(selected, compact), (selected_intercept, compact_intercept)] {
+            let matrix_bits = |matrix: &RowMajorMatrix<f64>| {
+                matrix
+                    .as_slice()
                     .iter()
-                    .map(|v| v.to_bits())
-                    .collect::<Vec<_>>(),
-                compact
-                    .mu
-                    .row(source)
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.to_bits())
-                    .collect::<Vec<_>>(),
-            );
+                    .map(|x| x.to_bits())
+                    .collect::<Vec<_>>()
+            };
+            for (actual, expected) in [
+                (&selected.beta, &compact.beta),
+                (&selected.beta_se, &compact.beta_se),
+                (&selected.mu, &compact.mu),
+                (&selected.hat_diagonal, &compact.hat_diagonal),
+                (
+                    selected.beta_covariance.as_ref().unwrap(),
+                    compact.beta_covariance.as_ref().unwrap(),
+                ),
+            ] {
+                assert_eq!(matrix_bits(actual), matrix_bits(expected));
+            }
+            assert_eq!(selected.log_like, compact.log_like);
+            assert_eq!(selected.beta_iter, compact.beta_iter);
+            assert_eq!(selected.beta_converged, compact.beta_converged);
         }
     }
 }

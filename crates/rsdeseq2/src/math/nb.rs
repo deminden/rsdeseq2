@@ -1,7 +1,7 @@
 //! DESeq2-parameterized negative-binomial likelihoods.
 
 use crate::errors::{DeseqError, NegativeBinomialStage, invalid_dimensions};
-use crate::matrix::{CountMatrix, RowMajorMatrix};
+use crate::matrix::{CountMatrix, RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::checked;
 use crate::numeric::math::ProfileMath;
 use crate::numeric::special::ln_gamma;
@@ -239,6 +239,30 @@ pub fn nbinom_log_likelihood_matrix(
         )?);
     }
     Ok(out)
+}
+
+/// Log likelihoods for selected source rows, indexed in compact fit order.
+pub(crate) fn nbinom_log_likelihood_selected_rows(
+    counts: &CountMatrix,
+    mu: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    genes: &[usize],
+) -> Result<Vec<f64>, DeseqError> {
+    let mut result = try_alloc_matrix(genes.len(), 1, "selected NB log likelihoods")?;
+    for (gene, &source_gene) in genes.iter().enumerate() {
+        let count_row = counts.row(source_gene)?;
+        let weight_row = weights.map(|matrix| matrix.row(source_gene)).transpose()?;
+        result.push(nbinom_log_likelihood_with_cached_gamma(
+            count_row,
+            mu.row(gene)?,
+            dispersions[source_gene],
+            weight_row,
+            Some(gene),
+            None,
+        )?);
+    }
+    Ok(result)
 }
 
 fn nbinom_log_pmf_unchecked(count: u32, mu: f64, dispersion: f64) -> f64 {

@@ -1253,3 +1253,24 @@ R 4.6.2, Rust 1.96.0 and parallel Make. The install log showed the requested
 job limit and build order, and the native install smoke test passed. Local
 shell checks exercised both generated recipes, the personal toolchain
 fallback, missing and outdated tools, and metadata version mismatches.
+
+### Borrowed rows in fixed-dispersion inference
+
+The Wald, LRT and expanded beta-prior workflows borrow counts, offsets,
+dispersion values and weights from the original dataset. Mixed all-zero
+or weight-failed inputs pass the same selected row indices to the fit and
+likelihood calculation. Fits with every row active return the original
+output buffers directly. The intercept shortcut reuses its working-weight
+buffer across genes.
+
+The 49 GLM unit tests and 268 pipeline and results integration tests passed
+under each macOS numeric profile. Both optimized golden checks matched all
+8,032 fields at one and four workers. The host R profile also passed the
+three standalone beta-prior workflow cases and the compact fixed-dispersion
+GTEx reference; the compact GTEx reference passed under the portable profile.
+
+The additional `many_samples` beta-prior comparison exceeded the
+`1e-9` threshold under the portable profile. The maximum relative gap
+was `3.007726454745714e-7` in the p-value for `gene0140`, with zero
+missingness differences or significance flips. The same command on
+`dfe9e1c` reproduced the exact gap.

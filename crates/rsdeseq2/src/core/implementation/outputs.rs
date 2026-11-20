@@ -83,6 +83,19 @@ pub(super) struct FixedDispersionGlmInput<'a> {
     pub(super) dispersions: &'a [f64],
 }
 
+impl<'a> FixedDispersionGlmInput<'a> {
+    pub(super) fn glm_input(self) -> GlmInput<'a> {
+        GlmInput {
+            counts: self.counts,
+            offsets: self
+                .normalization_factors
+                .map_or(Offsets::PerSample(self.size_factors), Offsets::PerCell),
+            dispersions: self.dispersions,
+            weights: self.observation_weights,
+        }
+    }
+}
+
 pub(super) struct FixedDispersionGlmOutput {
     pub(super) glm_fit: NbinomGlmFit,
     pub(super) expanded_dispersions: Vec<f64>,

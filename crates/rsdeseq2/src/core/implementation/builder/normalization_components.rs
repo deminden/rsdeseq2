@@ -316,49 +316,31 @@ impl DeseqBuilder {
         input: LrtPipelineInput<'_>,
     ) -> Result<LrtPipelineOutput, DeseqError> {
         validate_lrt_pipeline_input(&input)?;
-        let nonzero_gene_indices = nonzero_gene_indices(input.all_zero);
-        let (full_fit, reduced_fit) = if nonzero_gene_indices.is_empty() {
-            (
-                all_zero_glm_fit(input.counts, input.full_design)?,
-                all_zero_glm_fit(input.counts, input.reduced_design)?,
-            )
-        } else {
-            let compact_counts = compact_counts(input.counts, &nonzero_gene_indices)?;
-            let compact_dispersions = nonzero_gene_indices
-                .iter()
-                .map(|gene| input.dispersions[*gene])
-                .collect::<Vec<_>>();
-            let compact_normalization_factors = input
-                .normalization_factors
-                .map(|factors| compact_matrix_rows(factors, &nonzero_gene_indices))
-                .transpose()?;
-            let compact_weights = input
-                .observation_weights
-                .map(|weights| compact_matrix_rows(weights, &nonzero_gene_indices))
-                .transpose()?;
-            let compact_full_fit = fit_fixed_dispersion_model(
-                &compact_counts,
-                input.full_design,
-                input.size_factors,
-                compact_normalization_factors.as_ref(),
-                compact_weights.as_ref(),
-                &compact_dispersions,
-                self.irls_options.clone(),
-            )?;
-            let compact_reduced_fit = fit_fixed_dispersion_model(
-                &compact_counts,
-                input.reduced_design,
-                input.size_factors,
-                compact_normalization_factors.as_ref(),
-                compact_weights.as_ref(),
-                &compact_dispersions,
-                self.irls_options.clone(),
-            )?;
-            (
-                expand_glm_fit(compact_full_fit, input.all_zero)?,
-                expand_glm_fit(compact_reduced_fit, input.all_zero)?,
-            )
-        };
+        let nonzero = nonzero_gene_indices(input.all_zero);
+        let glm_input = FixedDispersionGlmInput {
+            counts: input.counts,
+            design: input.full_design,
+            size_factors: input.size_factors,
+            normalization_factors: input.normalization_factors,
+            observation_weights: input.observation_weights,
+            all_zero: input.all_zero,
+            dispersions: input.dispersions,
+        }
+        .glm_input();
+        let full_fit = fit_fixed_dispersion_model(
+            glm_input,
+            input.full_design,
+            input.all_zero,
+            &nonzero,
+            self.irls_options.clone(),
+        )?;
+        let reduced_fit = fit_fixed_dispersion_model(
+            glm_input,
+            input.reduced_design,
+            input.all_zero,
+            &nonzero,
+            self.irls_options.clone(),
+        )?;
 
         let expanded_dispersions =
             mask_all_zero_values_with_nan_rows(input.dispersions, input.all_zero)?;
@@ -424,34 +406,14 @@ impl DeseqBuilder {
             ));
         }
 
-        let nonzero_gene_indices = nonzero_gene_indices(input.all_zero);
-        let glm_fit = if nonzero_gene_indices.is_empty() {
-            all_zero_glm_fit(input.counts, input.design)?
-        } else {
-            let compact_counts = compact_counts(input.counts, &nonzero_gene_indices)?;
-            let compact_dispersions = nonzero_gene_indices
-                .iter()
-                .map(|gene| input.dispersions[*gene])
-                .collect::<Vec<_>>();
-            let compact_normalization_factors = input
-                .normalization_factors
-                .map(|factors| compact_matrix_rows(factors, &nonzero_gene_indices))
-                .transpose()?;
-            let compact_weights = input
-                .observation_weights
-                .map(|weights| compact_matrix_rows(weights, &nonzero_gene_indices))
-                .transpose()?;
-            let compact_fit = fit_fixed_dispersion_model(
-                &compact_counts,
-                input.design,
-                input.size_factors,
-                compact_normalization_factors.as_ref(),
-                compact_weights.as_ref(),
-                &compact_dispersions,
-                self.irls_options.clone(),
-            )?;
-            expand_glm_fit(compact_fit, input.all_zero)?
-        };
+        let nonzero = nonzero_gene_indices(input.all_zero);
+        let glm_fit = fit_fixed_dispersion_model(
+            input.glm_input(),
+            input.design,
+            input.all_zero,
+            &nonzero,
+            self.irls_options.clone(),
+        )?;
         let expanded_dispersions =
             mask_all_zero_values_with_nan_rows(input.dispersions, input.all_zero)?;
         Ok(FixedDispersionGlmOutput {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::glm::irls::fit_selected_irls;
 // Fixed and estimated beta-prior fitting workflows.
 
 /// Counts, normalization offsets, dispersions and optional observation
@@ -44,12 +45,25 @@ pub fn fit_glms_with_beta_prior(
     beta_prior_variance: &[f64],
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
+    fit_glms_with_beta_prior_rows(input, design, beta_prior_variance, options, None)
+}
+
+pub(crate) fn fit_glms_with_beta_prior_rows(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    beta_prior_variance: &[f64],
+    options: IrlsOptions,
+    genes: Option<&[usize]>,
+) -> Result<NbinomGlmFit, DeseqError> {
     // Preserve the validation order of the weighted size-factor fit.
     if let (Offsets::PerSample(size_factors), Some(_)) = (input.offsets, input.weights) {
         validate_size_factor_offsets(input.counts, size_factors)?;
     }
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-    fit_fixed_dispersion_glm(input, design, options)
+    match genes {
+        Some(genes) => fit_selected_irls(input, design, options, genes),
+        None => fit_fixed_dispersion_glm(input, design, options),
+    }
 }
 
 /// Run an MLE fixed-dispersion fit, estimate the beta prior variance
