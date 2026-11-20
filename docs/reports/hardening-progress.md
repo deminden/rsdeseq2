@@ -428,11 +428,37 @@ The R source archive passed 2,874 expectations with zero skips in each
 of the three local R environments and recorded the same R-version
 package-check warning and notes as `39af7c0`.
 
-The opt-in normal-equations solver uses an owned LU factorization in
-production. A detached trial reused its workspace and matched the
+At this checkpoint the opt-in normal-equations solver used an owned
+LU factorization. A detached trial reused its workspace and matched the
 existing coefficients across 64 solves
 with zero warmed allocation calls. The existing solver made 320 calls
 in that probe.
+
+### Reusable IRLS normal-equations workspace
+
+In `42075c0`, the opt-in solver reuses its crossproduct matrix, response
+and active-column buffer across iterations. Row pivots permute the
+response in place. A regression test matched the previous pivoted LU
+bits across a successful solve, a singular solve and a successful
+retry with the same buffers. The integrated allocation probe measured
+zero calls across 64 warmed solves. The previous solver made 320 calls
+on the same inputs.
+
+The public normal-equations fit matched the independent DESeq2
+high-dispersion covariance fixture in both profiles on macOS arm64,
+Linux arm64 and emulated Linux x86_64. The two-profile GTEx validation
+matched all 44 archived result and diagnostic TSVs from `3ef6e9c` byte
+for byte. All four Cargo archives built offline and reproduced byte
+for byte. The R archive passed 2,874 expectations with zero skips in
+each local R environment, with the existing package-check notes and
+R 4.6.2 compiled-symbol warning.
+
+Four formulations of the small-shape dispersion likelihood grouped
+the Stirling log terms before cancellation. The most accurate trial
+reduced the median error from four binary64 ulps to one and the maximum
+from 1,692 to 67 across 200 cases checked at 80-digit precision. Every
+formulation introduced new failures when replayed through the two
+blocked fits. These formulations stay in the experiment worktree.
 
 ### Mutation workflow verification
 
