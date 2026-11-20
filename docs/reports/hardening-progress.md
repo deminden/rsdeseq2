@@ -1186,6 +1186,21 @@ checks and retained one compiled-code warning for the Rust runtime's
 check. The same archive installed offline on R 4.5.3 and passed all
 80 selected native-boundary and row-preparation expectations.
 
+### Windows x64 R library cross-link
+
+The Windows package build selects Rust's UCRT target and uses LLVM-MinGW
+for C compilation and linkage. Rtools provides the build utilities. The
+linker resolves the Windows imports required by the Rust static library
+and links the unwind library statically. The DLL exports
+`R_init_rsdeseq2` for routine registration.
+
+The generated Windows makefile built the offline Rust archive with
+Rust 1.96.0 and linked all 14 C translation units against CRAN's R 4.5.3
+headers and DLL on Linux arm64. The check used R's own Windows
+`Makeconf` and `winshlib.mk`. The x86-64 DLL imported R and UCRT and
+had no `libunwind.dll` or `msvcrt.dll` import. Native Windows
+installation and runtime checks remain open.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

@@ -254,3 +254,8 @@ installation. In a git checkout its configure step copies the core from
 carries that copy and an XZ-compressed archive of the third-party crates and
 Cargo checksums. Configure extracts the archive and uses the included Cargo
 configuration to build offline.
+
+On Windows x64, add the UCRT LLVM-MinGW `bin` directory to `PATH` alongside
+the Rtools build utilities. Select a Rust toolchain with the
+`x86_64-pc-windows-gnullvm` standard library. A native Rust toolchain for that
+target can also build the host procedural macros with LLVM-MinGW.

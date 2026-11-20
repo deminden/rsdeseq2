@@ -1,11 +1,12 @@
-# Windows currently requires a Rust GNU toolchain compatible with the Rtools
-# linker. Build the Rust static library before linking the R .Call adapter.
-RUST_BACKEND = rust/target/release/librsdeseq2_r.a
+# Match the UCRT used by Windows R. Rtools still supplies the build utilities.
+RUST_TARGET = @RUST_TARGET@
+RUST_BACKEND = rust/target/$(RUST_TARGET)/release/librsdeseq2_r.a
+override CC = x86_64-w64-mingw32-clang
 
 all: $(SHLIB)
 
 $(RUST_BACKEND): FORCE
-	cd rust && cargo build --release --locked @CARGO_OFFLINE@
+	+cd rust && cargo build --release --locked --target $(RUST_TARGET) @CARGO_OFFLINE@
 
 FORCE:
 .PHONY: FORCE
@@ -23,4 +24,6 @@ inference_statistics.o: $(RUST_BACKEND) validation.h inference_statistics.h
 result_policy.o: $(RUST_BACKEND) validation.h result_policy.h
 result_filtering.o: $(RUST_BACKEND) validation.h result_filtering.h
 
-PKG_LIBS = $(RUST_BACKEND)
+# Link the unwind runtime statically and include Rust's Windows system imports.
+PKG_LIBS = $(RUST_BACKEND) -Wl,-Bstatic -lunwind -Wl,-Bdynamic \
+    -lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp -lsynchronization

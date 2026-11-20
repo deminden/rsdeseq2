@@ -34,8 +34,22 @@ if [ -f "$package_root/src/rust/vendor-crates.tar.xz" ]; then
   (cd "$package_root/src/rust" && tar -xf vendor-crates.tar.xz)
 fi
 if [ "${1:-}" = "--windows" ]; then
-  sed "s|@CARGO_OFFLINE@|$cargo_offline|g" "$package_root/src/Makevars.win.in" \
-    > "$package_root/src/Makevars.win"
+  rust_target=x86_64-pc-windows-gnullvm
+  if ! command -v x86_64-w64-mingw32-clang >/dev/null 2>&1; then
+    echo "rsdeseq2 configure: add the UCRT LLVM-MinGW bin directory to PATH" >&2
+    exit 1
+  fi
+  if ! printf '#include <_mingw.h>\n#ifndef _UCRT\n#error UCRT required\n#endif\n' |
+    x86_64-w64-mingw32-clang -x c -fsyntax-only -; then
+    echo "rsdeseq2 configure: use the UCRT build of LLVM-MinGW" >&2
+    exit 1
+  fi
+  if ! rust_libdir=$(rustc --print target-libdir --target "$rust_target") || [ ! -d "$rust_libdir" ]; then
+    echo "rsdeseq2 configure: install the Rust standard library for $rust_target" >&2
+    exit 1
+  fi
+  sed -e "s|@CARGO_OFFLINE@|$cargo_offline|g" -e "s|@RUST_TARGET@|$rust_target|g" \
+    "$package_root/src/Makevars.win.in" > "$package_root/src/Makevars.win"
   echo "rsdeseq2 configure: enabled the Rust core static library."
   exit 0
 fi
