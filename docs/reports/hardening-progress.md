@@ -163,9 +163,9 @@ Original Linux arm64 R 4.6.2 with ICU 74.2 and OpenBLAS 0.3.26 independently
 regenerated all seven formula panels exactly. The installed R package and
 standalone Rust agreed with those references on 191 expression cases, 54
 native formulas, and 60 standard and expanded factor cases. The independent
-uniform posterior checks passed their original bounds. The R formula-related
-testthat subset ran 849 expectations with zero failures. Its ordered-factor
-fitting test requires DESeq2, which was absent from that Linux arm64 R library.
+uniform posterior checks passed their original bounds. After restoring all
+82 pinned package versions, the Linux arm64 R package passed the full suite
+of 2,874 expectations with zero failures and zero skips.
 
 The macOS host R profile passed all 121 per-contrast and nine global GTEx
 precision gates with the frozen references. A separate portable run passed
