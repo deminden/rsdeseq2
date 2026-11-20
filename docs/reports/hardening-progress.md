@@ -1691,6 +1691,31 @@ against `c9aa13d` reduced median peak RSS from 303.33 to 239.22 MiB.
 Median elapsed time inside the native call fell from 68 to 25 ms.
 All six matrix hashes matched.
 
+### EM likelihood buffers
+
+The EM fit reserves its likelihood and row-maximum buffers through the shared
+allocator. It normalizes each row in its final buffer, then compacts any
+discarded components in place. The weighted route borrows observation
+weights. Variational EM reuses one marginal buffer for its objective
+evaluations, including when SQUAREM uses polynomial extrapolation.
+
+Five alternating-order pairs per case compared the portable profile on
+macOS arm64 with `3724fed`. Each case used 20,000 observations and 100
+components. The sparse case retained 25 components and the variational
+case allowed eight fixed-point evaluations.
+
+| Case | Median elapsed ms | Allocation and reallocation calls | Median peak RSS MiB |
+| --- | ---: | ---: | ---: |
+| Dense weighted EM | 14.54 → 11.92 | 20,034 → 16 | 50.02 → 32.89 |
+| Column-major sparse weighted EM | 10.54 → 10.11 | 20,032 → 14 | 38.58 → 32.89 |
+| Variational EM | 81.36 → 76.11 | 20,069 → 50 | 50.03 → 33.25 |
+
+The weighted cases measured setup and objective evaluation with a zero
+iteration budget. Every pair matched the bits of weights, likelihoods
+and optimizer diagnostics. Each arithmetic profile passed 18 focused
+integration checks and matched all 8,032 golden fields. Three mixture unit
+tests, shrinkage library Clippy and the module dependency check also passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

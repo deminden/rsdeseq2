@@ -63,7 +63,7 @@ pub(super) fn run(
     o: SquaremOptions,
     tolerance: f64,
     update: impl Fn(&[f64]) -> Result<Vec<f64>, Error>,
-    objective: impl Fn(&[f64]) -> f64,
+    mut objective: impl FnMut(&[f64]) -> f64,
 ) -> Result<Iteration, Error> {
     let k = o.polynomial_order;
     if k > initial.len() {

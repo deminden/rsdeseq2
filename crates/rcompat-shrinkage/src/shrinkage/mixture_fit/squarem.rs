@@ -97,7 +97,7 @@ pub(super) fn run(
     tolerance: f64,
     compiled: bool,
     update: impl Fn(&[f64]) -> Result<Vec<f64>, Error>,
-    objective: impl Fn(&[f64]) -> f64,
+    mut objective: impl FnMut(&[f64]) -> f64,
 ) -> Result<Iteration, Error> {
     options.validate()?;
     if !compiled && options.polynomial_order > 1 {

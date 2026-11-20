@@ -278,7 +278,8 @@ fn em_methods_have_independent_categorical_and_dirichlet_solutions() {
         },
     };
     let n = f64::NEG_INFINITY;
-    let ll = [0.0, n, 0.0, n, 0.0, n, n, 0.0];
+    let row_major = [0.0, n, n, 0.0, n, n, 0.0, n, n, n, n, 0.0];
+    let column_major = [0.0, 0.0, 0.0, n, n, n, n, n, n, n, n, 0.0];
     let o = SquaremOptions::default();
     for (method, weights, prior, expected) in [
         (M::Em(o), None, [2.0, 3.0], [4.0 / 7.0, 3.0 / 7.0]),
@@ -296,29 +297,37 @@ fn em_methods_have_independent_categorical_and_dirichlet_solutions() {
             [3.2 / 4.6, 1.4 / 4.6],
         ),
     ] {
-        let f = fit_mixture_proportions(
-            MatrixView::new(4, 2, &ll, MatrixOrder::RowMajor).unwrap(),
-            weights.as_ref().map(|v| &v[..]),
-            &prior,
-            None,
-            MixtureFitOptions {
-                optimizer: method,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        assert!(f.converged);
-        for (a, b) in f.weights.iter().zip(expected) {
-            assert!(
-                (a - b).abs() < 1e-14,
-                "{method:?}: {:?} expected {expected:?}",
-                f.weights
-            );
-        }
-        if method.is_variational() {
-            let post = f.posterior_concentrations.unwrap();
-            assert!((post[0] - 3.2).abs() < 1e-14);
-            assert!((post[1] - 1.4).abs() < 1e-14);
+        let prior = [prior[0], 1.0, prior[1]];
+        let expected = [expected[0], 0.0, expected[1]];
+        for (order, values) in [
+            (MatrixOrder::RowMajor, &row_major),
+            (MatrixOrder::ColumnMajor, &column_major),
+        ] {
+            let f = fit_mixture_proportions(
+                MatrixView::new(4, 3, values, order).unwrap(),
+                weights.as_ref().map(|v| &v[..]),
+                &prior,
+                None,
+                MixtureFitOptions {
+                    optimizer: method,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            assert!(f.converged);
+            for (a, b) in f.weights.iter().zip(expected) {
+                assert!(
+                    (a - b).abs() < 1e-14,
+                    "{method:?} {order:?}: {:?} expected {expected:?}",
+                    f.weights
+                );
+            }
+            if method.is_variational() {
+                let post = f.posterior_concentrations.unwrap();
+                assert!((post[0] - 3.2).abs() < 1e-14);
+                assert_eq!(post[1], 0.0);
+                assert!((post[2] - 1.4).abs() < 1e-14);
+            }
         }
     }
 }

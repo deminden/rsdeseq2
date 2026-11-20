@@ -2,10 +2,11 @@
 //! Equations are likelihood responsibilities and the Dirichlet ELBO, not an
 //! execution bridge or translation of foreign package source.
 use super::{ERROR_SCOPE, MixtureFit, MixtureOptimizer, invalid_mixture_value, squarem};
+use crate::Error;
 use crate::errors::{CalculationLocation, scoped_invalid_options};
+use crate::matrix::{MatrixView, try_alloc_matrix};
 use crate::numeric::math::ProfileMath;
 use crate::probability::digamma_positive;
-use crate::{Error, matrix::MatrixView};
 use libm::lgamma as ln_gamma;
 // Extrapolated coordinates may cross zero before the stabilizing update.
 // The source fixed-point map continues digamma across noninteger negatives;
@@ -20,11 +21,11 @@ fn digamma(x: f64) -> f64 {
     let angle = std::f64::consts::PI * x.rem_euclid(1.0);
     digamma_positive(1.0 - x) - std::f64::consts::PI * angle.cos_p() / angle.sin_p()
 }
-struct Problem {
+struct Problem<'a> {
     likelihood: Vec<f64>,
     row_maxima: Vec<f64>,
     prior: Vec<f64>,
-    weights: Vec<f64>,
+    weights: &'a [f64],
     k: usize,
     variational: bool,
     compiled: bool,
@@ -36,7 +37,7 @@ fn normalize(mut v: Vec<f64>) -> Vec<f64> {
     }
     v
 }
-impl Problem {
+impl Problem<'_> {
     fn effective(&self, state: &[f64]) -> Vec<f64> {
         if self.variational {
             let total = digamma(state.iter().sum());
@@ -59,7 +60,7 @@ impl Problem {
         }
         let pi = self.effective(state);
         let mut counts = vec![0.0; self.k];
-        for (row, &weight) in self.likelihood.chunks_exact(self.k).zip(&self.weights) {
+        for (row, &weight) in self.likelihood.chunks_exact(self.k).zip(self.weights) {
             let marginal = row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>();
             if !marginal.is_finite() || marginal <= 0.0 {
                 return Err(scoped_invalid_options(
@@ -94,7 +95,7 @@ impl Problem {
     fn log_likelihood(&self, pi: &[f64]) -> f64 {
         self.likelihood
             .chunks_exact(self.k)
-            .zip(&self.weights)
+            .zip(self.weights)
             .zip(&self.row_maxima)
             .map(|((row, w), max)| {
                 if *w == 0.0 {
@@ -113,13 +114,13 @@ impl Problem {
             .map(|(a, p)| (a - 1.0) * p.ln_p())
             .sum()
     }
-    fn objective(&self, state: &[f64]) -> f64 {
+    fn objective(&self, state: &[f64], marginals: &mut [f64]) -> f64 {
         let pi = self.effective(state);
         if !self.variational {
             return -(self
                 .likelihood
                 .chunks_exact(self.k)
-                .zip(&self.weights)
+                .zip(self.weights)
                 .map(|(row, w)| {
                     if *w == 0.0 {
                         0.0
@@ -132,11 +133,12 @@ impl Problem {
         }
         let mut energy = 0.0;
         let mut entropy = 0.0;
-        let marginals = self
-            .likelihood
-            .chunks_exact(self.k)
-            .map(|row| row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>())
-            .collect::<Vec<_>>();
+        for (marginal, row) in marginals
+            .iter_mut()
+            .zip(self.likelihood.chunks_exact(self.k))
+        {
+            *marginal = row.iter().zip(&pi).map(|(l, p)| l * p).sum::<f64>();
+        }
         for (j, &p) in pi.iter().enumerate() {
             for (i, &marginal) in marginals.iter().enumerate() {
                 let l = self.likelihood[i * self.k + j];
@@ -224,7 +226,15 @@ pub(super) fn fit(
             DIRICHLET,
         ));
     }
-    let weights = weights.map(<[f64]>::to_vec).unwrap_or_else(|| vec![1.0; n]);
+    let default_weights;
+    let weights = if let Some(weights) = weights {
+        weights
+    } else {
+        let mut values = try_alloc_matrix(n, 1, "EM observation weights")?;
+        values.resize(n, 1.0);
+        default_weights = values;
+        &default_weights
+    };
     const WEIGHTS: &str =
         "EM observation weights must be finite nonnegative and row aligned with positive total";
     validate_input_length("EM observation weights", n, weights.len(), WEIGHTS)?;
@@ -258,12 +268,12 @@ pub(super) fn fit(
             WEIGHTS,
         ));
     }
-    let mut likelihood = Vec::with_capacity(n * k);
-    let mut row_maxima = Vec::with_capacity(n);
+    let mut likelihood = try_alloc_matrix(n, k, "EM likelihood matrix")?;
+    let mut row_maxima = try_alloc_matrix(n, 1, "EM likelihood row maxima")?;
     for i in 0..n {
-        let row = (0..k)
-            .map(|j| *log_likelihoods.at(i, j))
-            .collect::<Vec<_>>();
+        let start = likelihood.len();
+        likelihood.extend((0..k).map(|j| *log_likelihoods.at(i, j)));
+        let row = &mut likelihood[start..];
         if let Some((component, &value)) = row
             .iter()
             .enumerate()
@@ -289,7 +299,9 @@ pub(super) fn fit(
             ));
         }
         row_maxima.push(max);
-        likelihood.extend(row.iter().map(|v| (v - max).exp_p()));
+        for value in row {
+            *value = (*value - max).exp_p();
+        }
     }
     let mut initial = initial
         .map(<[f64]>::to_vec)
@@ -332,16 +344,20 @@ pub(super) fn fit(
             "no nonzero likelihood components",
         ));
     }
-    let matrix = (0..n)
-        .flat_map(|i| {
-            keep.iter().map({
-                let likelihood = &likelihood;
-                move |&j| likelihood[i * k + j]
-            })
-        })
-        .collect();
+    if keep.len() != k {
+        // The retained columns are in input order. Each destination is at
+        // or before its source, so compaction can reuse the likelihood buffer.
+        let mut destination = 0;
+        for row in 0..n {
+            for &column in &keep {
+                likelihood[destination] = likelihood[row * k + column];
+                destination += 1;
+            }
+        }
+        likelihood.truncate(destination);
+    }
     let problem = Problem {
-        likelihood: matrix,
+        likelihood,
         row_maxima,
         weights,
         prior: keep.iter().map(|&j| prior[j]).collect(),
@@ -367,13 +383,18 @@ pub(super) fn fit(
             residual: 0.0,
         }
     } else {
+        let mut marginals = Vec::new();
+        if variational {
+            marginals = try_alloc_matrix(n, 1, "variational EM marginals")?;
+            marginals.resize(n, 0.0);
+        }
         squarem::run(
             start,
             controls,
             controls.tolerance.unwrap_or((0.1 / n as f64).min(1e-7)),
             compiled,
             |p| problem.update(p),
-            |p| problem.objective(p),
+            |p| problem.objective(p, &mut marginals),
         )?
     };
     let sum = iteration.state.iter().sum::<f64>();
@@ -382,10 +403,16 @@ pub(super) fn fit(
     for (&j, &v) in keep.iter().zip(&active) {
         weights[j] = v;
     }
-    let mut concentrations = vec![0.0; k];
-    for (&j, &v) in keep.iter().zip(&iteration.state) {
-        concentrations[j] = v;
-    }
+    let posterior_concentrations = if variational && !shortcut {
+        let mut concentrations = try_alloc_matrix(k, 1, "variational EM concentrations")?;
+        concentrations.resize(k, 0.0);
+        for (&j, &v) in keep.iter().zip(&iteration.state) {
+            concentrations[j] = v;
+        }
+        Some(concentrations)
+    } else {
+        None
+    };
     let ll = problem.log_likelihood(&active);
     let pll = ll + problem.penalty(&active);
     if !ll.is_finite() || !pll.is_finite() {
@@ -417,7 +444,7 @@ pub(super) fn fit(
             "squared EM evaluation budget exhausted".into()
         },
         iterations: (!shortcut).then_some(iteration.iterations),
-        posterior_concentrations: (variational && !shortcut).then_some(concentrations),
+        posterior_concentrations,
         optimizer_objective: (!shortcut).then_some(iteration.objective),
     })
 }
