@@ -170,9 +170,16 @@ The macOS host R profile passed all 121 per-contrast and nine global GTEx
 precision gates with the frozen references. A separate portable run passed
 107 of 121 per-contrast gates and all nine global gates. The portable
 significance check reported zero flips at adjusted p-value thresholds 0.05
-and 0.1, and all top-100, top-500 and top-2,000 sets matched. The paired
-four-worker timing pass ran alongside other builds and cannot establish
-a throughput change.
+and 0.1, and all top-100, top-500 and top-2,000 sets matched.
+
+The initial paired trials had variable wall times under concurrent load.
+`41d7509` restored contiguous validation and likelihood evaluation for
+full IRLS fits while retaining borrowed rows for dispersion refits. In one
+paired four-worker pass against `1522aac`, the final build took 31.26 s
+versus 33.00 s across eleven contrasts. That is 1.056× throughput, with
+byte-identical result TSVs. Maximum peak RSS was 264.0 MiB versus 263.5
+MiB. Both 8,032-field golden checks and the full 56,200-gene replay passed
+after this change.
 
 The macOS R 4.5.3 and 4.6.2 packages each passed 2,874 testthat expectations
 with zero failures and zero skips, and the SIGINT check confirmed that the
