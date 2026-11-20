@@ -66,14 +66,16 @@ A missing or changed reference fails rather than triggering regeneration.
 
 ```sh
 cargo build --release --locked -p rsdeseq2
-python3 scripts/validation/check_gtex_dispersion_improvement.py \
+RSDESEQ2_NUMERIC_PROFILE=r-host python3 scripts/validation/check_gtex_dispersion_improvement.py \
   --workers 1 --output-dir results/checks/gtex
 ```
 
 This runs 121 per-contrast and nine global precision gates, including finite/NA
 patterns and gene coverage. The committed gate baseline is
 [data/gtex_dispersion_improvement.tsv](data/gtex_dispersion_improvement.tsv).
-Keep its values unchanged during candidate validation.
+Keep its values unchanged during candidate validation. The baseline measures
+the host R profile. Keep the profile, binary hash and build revision with the
+results. The source manifest records the workspace observed during validation.
 
 Accepted timing additionally requires the reviewed native result/diagnostic
 exports. Pass their directory explicitly:
