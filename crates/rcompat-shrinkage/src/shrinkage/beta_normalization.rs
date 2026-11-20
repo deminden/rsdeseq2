@@ -1,8 +1,16 @@
 //! Ordinary beta normalization for conditioned posterior moments.
 //! Exact endpoint checks retain representable complements close to one.
 use super::gamma_normalization::gamma_positive;
-use crate::numeric::math::ProfileMath;
+use crate::numeric::{NumericProfile, math::ProfileMath, numeric_profile};
 pub(super) fn beta_positive(a: f64, b: f64) -> f64 {
+    if numeric_profile() == NumericProfile::Portable {
+        if b == 1.0 && a > 0.0 {
+            return 1.0 / a;
+        }
+        if a == 1.0 && b > 0.0 {
+            return 1.0 / b;
+        }
+    }
     if a + b < 170.0 {
         (1.0 / gamma_positive(a + b)) * gamma_positive(a) * gamma_positive(b)
     } else {

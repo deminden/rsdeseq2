@@ -2,7 +2,10 @@ use crate::support as common;
 use crate::support::formula_reference;
 use common::{r_number as number, r_numbers as numbers};
 use rsdeseq2::shrinkage::{FixedMixture, TruncatedNormalMixture, UniformMixture};
+use rsdeseq2::{NumericProfile, numeric_profile};
 use serde::Deserialize;
+use std::collections::BTreeMap;
+
 #[derive(Deserialize)]
 struct References {
     source: Source,
@@ -30,6 +33,29 @@ struct Case {
     posterior_sd: Vec<String>,
     cdf: Vec<String>,
 }
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FixtureKind {
+    Uniform,
+    TruncatedNormal,
+    StudentT,
+}
+
+#[derive(Deserialize)]
+struct MathematicalReference {
+    cases: BTreeMap<String, Vec<MathematicalRow>>,
+}
+
+#[derive(Deserialize)]
+struct MathematicalRow {
+    estimate: String,
+    standard_error: String,
+    log_likelihoods: Vec<String>,
+    posterior_weights: Vec<String>,
+    posterior_mean: String,
+    posterior_sd: String,
+    cdf: Vec<String>,
+}
 fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: &mut Vec<String>) {
     if (b.is_nan() && a.is_nan()) || a == b {
         return;
@@ -41,6 +67,27 @@ fn close(a: f64, b: f64, absolute: f64, relative: f64, context: &str, failures: 
 }
 #[test]
 fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
+    check_bounded_fixtures(&[
+        (
+            FixtureKind::Uniform,
+            formula_reference!("uniform_posterior_r462"),
+        ),
+        (
+            FixtureKind::TruncatedNormal,
+            include_str!("data/truncated_posterior_r462.json"),
+        ),
+    ]);
+}
+
+#[test]
+fn student_uniform_mixtures_match_independent_posterior_references() {
+    check_bounded_fixtures(&[(
+        FixtureKind::StudentT,
+        include_str!("data/student_uniform_posterior_r462.json"),
+    )]);
+}
+
+fn check_bounded_fixtures(fixtures: &[(FixtureKind, &str)]) {
     let mut failures = vec![];
     #[derive(Deserialize)]
     struct CdfReference {
@@ -52,27 +99,36 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
         threshold: String,
         cdf: String,
     }
-    let calibration = std::env::var_os("RSDESEQ2_UNIFORM_CDF_REFERENCE").map(|path| {
-        csv::ReaderBuilder::new()
-            .delimiter(b'\t')
-            .from_path(path)
-            .unwrap()
-            .deserialize::<CdfReference>()
-            .map(|r| {
-                let row = r.unwrap();
-                ((row.case.clone(), row.row, row.cutoff), row)
-            })
-            .collect::<std::collections::BTreeMap<_, _>>()
+    let calibration = fixtures
+        .iter()
+        .any(|(kind, _)| *kind == FixtureKind::Uniform)
+        .then(|| std::env::var_os("RSDESEQ2_UNIFORM_CDF_REFERENCE"))
+        .flatten()
+        .map(|path| {
+            csv::ReaderBuilder::new()
+                .delimiter(b'\t')
+                .from_path(path)
+                .unwrap()
+                .deserialize::<CdfReference>()
+                .map(|r| {
+                    let row = r.unwrap();
+                    ((row.case.clone(), row.row, row.cutoff), row)
+                })
+                .collect::<BTreeMap<_, _>>()
+        });
+    let mathematical = (numeric_profile() == NumericProfile::Portable
+        && fixtures
+            .iter()
+            .any(|(kind, _)| *kind == FixtureKind::StudentT))
+    .then(|| {
+        serde_json::from_str::<MathematicalReference>(include_str!(
+            "data/student_uniform_mathematical.json"
+        ))
+        .unwrap()
     });
     let mut calibrated = 0usize;
-    for (fixture_index, fixture) in [
-        formula_reference!("uniform_posterior_r462"),
-        include_str!("data/truncated_posterior_r462.json"),
-        include_str!("data/student_uniform_posterior_r462.json"),
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    let mut mathematical_cases = 0usize;
+    for &(kind, fixture) in fixtures {
         let r: References = serde_json::from_str(fixture).unwrap();
         if let Some(probe) = r.source.dnorm_probe {
             assert_eq!(probe.len(), 1);
@@ -85,6 +141,13 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
             );
         }
         for c in r.cases {
+            let mathematical_rows = mathematical
+                .as_ref()
+                .map(|reference| &reference.cases[&c.name]);
+            if let Some(rows) = mathematical_rows {
+                assert_eq!(rows.len(), c.estimates.len());
+                mathematical_cases += 1;
+            }
             let prior = if let Some(means) = &c.means {
                 FixedMixture::TruncatedNormal(
                     TruncatedNormalMixture::new(
@@ -115,13 +178,26 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                 .enumerate()
             {
                 let context = format!("{} row{i} x{estimate} se{se}", c.name);
-                let expected_mean = number(&c.posterior_mean[i]);
-                let expected_sd = number(&c.posterior_sd[i]);
+                let mathematical_row = mathematical_rows.map(|rows| &rows[i]);
+                let (expected_mean, expected_sd) = if let Some(row) = mathematical_row {
+                    assert_eq!(number(&row.estimate).to_bits(), estimate.to_bits());
+                    assert_eq!(number(&row.standard_error).to_bits(), se.to_bits());
+                    assert_eq!(row.log_likelihoods.len(), c.weights.len());
+                    assert_eq!(row.posterior_weights.len(), c.weights.len());
+                    assert_eq!(row.cdf.len(), thresholds.len());
+                    (number(&row.posterior_mean), number(&row.posterior_sd))
+                } else {
+                    (number(&c.posterior_mean[i]), number(&c.posterior_sd[i]))
+                };
                 let likelihood = prior.log_likelihoods(estimate, se).unwrap();
                 for (j, &a) in likelihood.iter().enumerate() {
+                    let expected = mathematical_row.map_or_else(
+                        || &c.log_likelihoods[i * c.weights.len() + j],
+                        |row| &row.log_likelihoods[j],
+                    );
                     close(
                         a,
-                        number(&c.log_likelihoods[i * c.weights.len() + j]),
+                        number(expected),
                         1e-8,
                         1e-12,
                         &format!("{context} likelihood{j}"),
@@ -146,9 +222,13 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     &mut failures,
                 );
                 for (j, &a) in p.weights().iter().enumerate() {
+                    let expected = mathematical_row.map_or_else(
+                        || &c.posterior_weights[i * c.weights.len() + j],
+                        |row| &row.posterior_weights[j],
+                    );
                     close(
                         a,
-                        number(&c.posterior_weights[i * c.weights.len() + j]),
+                        number(expected),
                         2e-8,
                         0.,
                         &format!("{context} weight{j}"),
@@ -156,7 +236,9 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
                     );
                 }
                 for (j, &threshold) in thresholds.iter().enumerate() {
-                    let expected = if fixture_index == 0 {
+                    let expected = if let Some(row) = mathematical_row {
+                        Some(number(&row.cdf[j]))
+                    } else if kind == FixtureKind::Uniform {
                         calibration.as_ref().map(|rows| {
                             let row = &rows[&(c.name.clone(), i, j)];
                             assert_eq!(number(&row.estimate).to_bits(), estimate.to_bits());
@@ -187,6 +269,9 @@ fn bounded_mixture_likelihoods_posteriors_and_cdfs_match_independent_ashr() {
             rows.len(),
             "every independently generated CDF must be checked"
         );
+    }
+    if let Some(reference) = mathematical {
+        assert_eq!(mathematical_cases, reference.cases.len());
     }
     assert!(
         failures.is_empty(),

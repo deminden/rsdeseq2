@@ -25,6 +25,7 @@ crates/rsdeseq2/tests/data/likelihood_warnings_r462.json	scripts/references/gene
 crates/rsdeseq2/tests/data/sqp_controls_r462.json	scripts/references/generate_sqp_control_reference.R	cargo test --locked -p rsdeseq2 --test integration sqp_controls::	-
 crates/rcompat-shrinkage/tests/data/student_beta_mathematical.json	scripts/references/generate_beta_mathematical_reference.py	cargo test --locked -p rcompat-shrinkage --lib	-
 crates/rsdeseq2/tests/data/student_uniform_posterior_r462.json	scripts/references/generate_student_uniform_reference.R	cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	-
+crates/rsdeseq2/tests/data/student_uniform_mathematical.json	scripts/references/generate_student_uniform_mathematical_reference.py	RSDESEQ2_NUMERIC_PROFILE=portable cargo test --locked -p rsdeseq2 --test integration bounded_posterior::student_uniform_	Likelihoods, moments and CDFs from independently integrated Student-t densities.
 crates/rsdeseq2/tests/data/inference_r462.tsv*	scripts/references/generate_inference_reference.R	cargo test --locked -p rsdeseq2 --test integration inference_primitives::	the .session.txt is written alongside
 crates/rsdeseq2/tests/data/adaptive_result_r462*.json	scripts/references/generate_adaptive_result_reference.R	cargo test --locked -p rsdeseq2 --test integration adaptive_result::	-
 crates/rsdeseq2/tests/data/ashr_advanced_optimizer_r462*.json	scripts/references/generate_ashr_advanced_optimizer_reference.R	cargo test --locked -p rsdeseq2 --test integration advanced_ashr_optimizers::	-

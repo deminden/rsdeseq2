@@ -104,8 +104,8 @@ reintroducing R calls; it does not replace numerical or complete-workflow tests.
   normals import/write back state. Other R RNG configurations are rejected;
   there is no R random-generation fallback. See [state and failure behavior](r-wrapper.md#random-starts-and-interruption).
 - **Execution:** reusable local worker pools serve fitting, refits and transforms.
-  `strict`, `fast` and `diagnostic` currently select the same numerical algorithm.
-  Public forwarding methods remain available. CLI publication uses staged
+  The R package selects the host R numeric profile. Public forwarding methods
+  remain available. CLI publication uses staged
   outputs and a completion manifest; its failure/alias tests are separate from
   statistical correctness.
 

@@ -1,6 +1,8 @@
 """Every test-data file is listed in scripts/references/MANIFEST.tsv."""
 
 import fnmatch
+import hashlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -61,6 +63,14 @@ class ReferenceManifestTest(unittest.TestCase):
         for name, contents in fixture_contents():
             with self.subTest(fixture=name):
                 self.assertEqual((UNIT_DATA / name).read_text(), contents)
+
+    def test_student_posterior_reference_uses_the_current_inputs(self):
+        source = DATA / "student_uniform_posterior_r462.json"
+        fixture = json.loads((DATA / "student_uniform_mathematical.json").read_text())
+        self.assertEqual(fixture["source"]["inputs"], source.name)
+        self.assertEqual(
+            fixture["source"]["input_sha256"], hashlib.sha256(source.read_bytes()).hexdigest(),
+        )
 
 
 if __name__ == "__main__":

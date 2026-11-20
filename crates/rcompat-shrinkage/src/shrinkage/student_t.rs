@@ -2,7 +2,7 @@
 use super::beta_normalization::{beta_positive as beta, regularized_beta};
 #[cfg(test)]
 use super::gamma_normalization::gamma_positive;
-use crate::numeric::math::ProfileMath;
+use crate::numeric::{NumericProfile, math::ProfileMath, numeric_profile};
 use crate::probability::student_t_upper_tail;
 
 pub(super) fn cdf(q: f64, df: f64) -> f64 {
@@ -71,6 +71,84 @@ pub(super) fn log_density(q: f64, df: f64) -> f64 {
         - 0.5 * (df.ln_p() + std::f64::consts::PI.ln_p())
         - ((df + 1.0) / 2.0) * log_ratio
 }
+
+pub(super) fn log_interval_mass(mut a: f64, mut b: f64, df: f64) -> f64 {
+    if a >= 0.0 {
+        (a, b) = (-b, -a);
+    }
+    let upper = log_cdf(b, df);
+    let lower = log_cdf(a, df);
+    upper + (-(lower - upper).exp_m1_p()).ln_p()
+}
+
+pub(super) struct NarrowInterval {
+    log_density: f64,
+    left_weight: f64,
+    right_weight: f64,
+    total: f64,
+}
+
+impl NarrowInterval {
+    pub(super) fn new(a: f64, b: f64, estimate: f64, se: f64, df: f64) -> Option<Self> {
+        let width = (b - a) / se;
+        let root_df = df.sqrt();
+        // Bound variation on the standardized interval before using Simpson's
+        // rule. The bounds cover the maximum log-density slope and the
+        // scale on which that slope changes.
+        if width * (root_df + 1.0 / root_df) > 2e-3 || width > 1e-3 * root_df {
+            return None;
+        }
+        let lower = log_density((a - estimate) / se, df);
+        let center = log_density((a.midpoint(b) - estimate) / se, df);
+        let upper = log_density((b - estimate) / se, df);
+        if !center.is_finite() {
+            return None;
+        }
+        let left_weight = (lower - center).exp_p();
+        let right_weight = (upper - center).exp_p();
+        let total = left_weight + 4.0 + right_weight;
+        Some(Self {
+            log_density: center + (total / 6.0).ln_p(),
+            left_weight,
+            right_weight,
+            total,
+        })
+    }
+
+    pub(super) fn log_density(&self, se: f64) -> f64 {
+        self.log_density - se.ln_p()
+    }
+
+    pub(super) fn moments(&self, a: f64, b: f64) -> (f64, f64) {
+        let half = (b - a) / 2.0;
+        let center = a.midpoint(b);
+        let centered_mean = half * ((self.right_weight - self.left_weight) / self.total);
+        let centered_second = half * (half * ((self.right_weight + self.left_weight) / self.total));
+        (
+            center + centered_mean,
+            center * (center + 2.0 * centered_mean) + centered_second,
+        )
+    }
+}
+
+pub(super) fn log_average_density(a: f64, b: f64, estimate: f64, se: f64, df: f64) -> f64 {
+    if let Some(interval) = NarrowInterval::new(a, b, estimate, se, df) {
+        return interval.log_density(se);
+    }
+    log_interval_mass((a - estimate) / se, (b - estimate) / se, df) - (b - a).ln_p()
+}
+
+pub(super) fn interval_cdf(a: f64, t: f64, b: f64, estimate: f64, se: f64, df: f64) -> f64 {
+    if t == a {
+        return 0.0;
+    }
+    let partial = log_average_density(a, t, estimate, se, df);
+    let full = log_average_density(a, b, estimate, se, df);
+    (partial - full + ((t - a).ln_p() - (b - a).ln_p()))
+        .exp_p()
+        .clamp(0.0, 1.0)
+}
+
 fn integral(q: f64, df: f64, order: i32) -> f64 {
     let a = 0.5 * (df - f64::from(order));
     let b = 0.5 * f64::from(order + 1);
@@ -89,7 +167,38 @@ fn integral(q: f64, df: f64, order: i32) -> f64 {
 fn one_sided_moment(q: f64, df: f64, order: i32) -> f64 {
     (df.powf_p(0.5 * f64::from(order)) * integral(q, df, order)) / integral(q, df, 0)
 }
+
+fn same_tail_moment(a: f64, b: f64, df: f64, order: i32) -> Option<f64> {
+    if !a.is_finite() || !b.is_finite() || a >= b || df <= f64::from(order) || (a < 0.0 && b > 0.0)
+    {
+        return None;
+    }
+    let lower = a.abs().min(b.abs());
+    let upper = a.abs().max(b.abs());
+    let mass = integral(lower, df, 0) - integral(upper, df, 0);
+    if !mass.is_finite() || mass <= 0.0 {
+        return None;
+    }
+    // Subtract moments measured from the same outer tail. Computing them
+    // from the opposite tail can round both integrals to the full moment.
+    let moment = df.powf_p(0.5 * f64::from(order))
+        * ((integral(lower, df, order) - integral(upper, df, order)) / mass);
+    if !moment.is_finite() || moment < lower.powi(order) || moment > upper.powi(order) {
+        return None;
+    }
+    Some(if b <= 0.0 && order % 2 != 0 {
+        -moment
+    } else {
+        moment
+    })
+}
+
 pub(super) fn truncated_moment(mut a: f64, mut b: f64, df: f64, order: i32) -> f64 {
+    if numeric_profile() == NumericProfile::Portable
+        && let Some(moment) = same_tail_moment(a, b, df, order)
+    {
+        return moment;
+    }
     let reflect = a > 0.0 && b > 0.0;
     if reflect {
         (a, b) = (-b, -a);
@@ -112,6 +221,11 @@ pub(super) fn truncated_moment(mut a: f64, mut b: f64, df: f64, order: i32) -> f
 mod normalization_tests {
     use super::*;
     use serde::Deserialize;
+
+    const R_REFERENCE: &str = include_str!("../../tests/data/student_component_leaves_r462.json");
+    const MATHEMATICAL_REFERENCE: &str =
+        include_str!("../../tests/data/student_beta_mathematical.json");
+
     #[derive(Deserialize)]
     struct Reference {
         gamma_arguments: Vec<String>,
@@ -123,7 +237,6 @@ mod normalization_tests {
         a: String,
         b: String,
         p: String,
-        #[serde(default)]
         beta: String,
         regularized: String,
     }
@@ -146,13 +259,27 @@ mod normalization_tests {
         }
     }
     #[test]
-    fn component_normalization_matches_independent_original_leaves() {
-        let r: Reference = serde_json::from_str(include_str!(
-            "../../tests/data/student_component_leaves_r462.json"
-        ))
-        .unwrap();
+    fn component_normalization_matches_the_profile_reference() {
+        let original: Reference = serde_json::from_str(R_REFERENCE).unwrap();
+        let mathematical;
+        let reference = if numeric_profile() == NumericProfile::Portable {
+            mathematical = serde_json::from_str::<Reference>(MATHEMATICAL_REFERENCE).unwrap();
+            &mathematical
+        } else {
+            &original
+        };
         let mut failures = vec![];
-        for (x, y) in r.gamma_arguments.iter().zip(&r.gamma_values) {
+        assert_eq!(
+            reference.gamma_arguments.len(),
+            reference.gamma_values.len()
+        );
+        assert!(!reference.gamma_arguments.is_empty());
+        assert!(!reference.cases.is_empty());
+        for (x, y) in reference
+            .gamma_arguments
+            .iter()
+            .zip(&reference.gamma_values)
+        {
             let x = number(x);
             close(
                 gamma_positive(x),
@@ -161,21 +288,23 @@ mod normalization_tests {
                 &mut failures,
             );
         }
-        for c in r.cases {
+        for c in &reference.cases {
             let a = number(&c.a);
             let b = number(&c.b);
-            let p = number(&c.p);
             close(
                 beta(a, b),
                 number(&c.beta),
                 format!("B({a},{b})"),
                 &mut failures,
             );
+        }
+        for c in original.cases {
             // The original pbeta differs from independent 90-digit truth by
             // up to 274 ULP in this panel. Preserve relative source parity,
             // and check tight probability accuracy against that truth below.
             let original = number(&c.regularized);
-            assert!((regularized_beta(a, b, p) - original).abs() <= 1e-13 * original.abs());
+            let actual = regularized_beta(number(&c.a), number(&c.b), number(&c.p));
+            assert!((actual - original).abs() <= 1e-13 * original.abs());
         }
         assert!(
             failures.is_empty(),
@@ -186,14 +315,8 @@ mod normalization_tests {
     }
     #[test]
     fn beta_probabilities_match_independent_mathematical_reference() {
-        #[derive(Deserialize)]
-        struct MathematicalReference {
-            cases: Vec<Case>,
-        }
-        let reference: MathematicalReference = serde_json::from_str(include_str!(
-            "../../tests/data/student_beta_mathematical.json"
-        ))
-        .unwrap();
+        let reference: Reference = serde_json::from_str(MATHEMATICAL_REFERENCE).unwrap();
+        assert!(!reference.cases.is_empty());
         let mut failures = vec![];
         for c in reference.cases {
             let a = number(&c.a);

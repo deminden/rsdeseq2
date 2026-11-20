@@ -1,10 +1,11 @@
-//! Positive Gamma normalization from Fullerton's public-domain SLATEC series.
+//! Positive Gamma normalization for posterior components.
+//! The R profiles use Fullerton's public-domain SLATEC series.
 //! Tables: <https://netlib.org/slatec/fnlib/dgamma.f> . The SLATEC guide states
 //! public-domain distribution: <https://netlib.org/slatec/guide> (section 4).
 //! This standalone Rust implementation is used only by posterior components;
 //! it neither calls R nor changes the existing GLM probability kernels.
 #![allow(clippy::excessive_precision)]
-use crate::numeric::math::ProfileMath;
+use crate::numeric::{NumericProfile, math::ProfileMath, numeric_profile};
 const COEFFICIENTS: [f64; 22] = [
     0.00857119559098933,
     0.004415381324841007,
@@ -43,6 +44,9 @@ fn chebyshev(x: f64) -> f64 {
 pub(super) fn gamma_positive(x: f64) -> f64 {
     if x.is_nan() || x <= 0.0 {
         return f64::NAN;
+    }
+    if numeric_profile() == NumericProfile::Portable {
+        return libm::tgamma(x);
     }
     if x <= 10.0 {
         let integer = x.trunc() as usize;

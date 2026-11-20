@@ -30,14 +30,20 @@ def main():
     linux_arm64 = args.target == 'aarch64-unknown-linux-gnu'
     tests = RELEASE_TESTS + LINUX_ARM64_FORMULA_TESTS if linux_arm64 else RELEASE_TESTS
     host_env = {**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'r-host'}
+    portable_env = {**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'portable'}
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
          *(f'{name}::' for name in tests)],
         cwd=ROOT, check=True, env=host_env,
     )
     subprocess.run(
+        ['cargo', 'test', *build, '--test', 'integration', '--',
+         'bounded_posterior::student_uniform_'],
+        cwd=ROOT, check=True, env=portable_env,
+    )
+    subprocess.run(
         ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
-        cwd=ROOT, check=True, env={**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'portable'},
+        cwd=ROOT, check=True, env=portable_env,
     )
     if linux_arm64:
         subprocess.run(

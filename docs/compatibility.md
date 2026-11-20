@@ -1,6 +1,6 @@
 # Compatibility
 
-This guide describes version 0.5.0. The Rust library, CLI and R package share
+This guide describes version 0.6.0. The Rust library, CLI and R package share
 one numerical engine. R translates inputs and constructs objects; it does not
 calculate statistics or provide a fallback numerical implementation.
 
@@ -60,9 +60,16 @@ field-specific absolute/relative bounds. Exact equality between standalone
 and R-wrapped execution is checked separately. This does not imply bitwise
 equality to original DESeq2 for every dataset.
 
-`strict`, `fast` and `diagnostic` currently use the same numerical algorithm.
-Worker-count invariance is tested. Platform-specific reference arithmetic is
-documented in [numerical parity](linux_numerical_parity.md).
+The CLI and Rust library default to the portable profile. The R package
+selects the host R profile. Worker-count invariance is tested.
+See [numerical parity](linux_numerical_parity.md) for platform-specific
+reference arithmetic.
+
+Portable Student-t uniform mixtures evaluate interval probabilities in the
+outer tail and use local density integration for narrow intervals. Their
+likelihoods, posterior probabilities and available moments are checked against
+independent high-precision integration. The host R profiles follow the
+original ashr calculation.
 
 Optimizer trajectories, dispersion line-search boundaries and local smoothing
 can amplify small floating-point differences. Exact optimizer replay alone does

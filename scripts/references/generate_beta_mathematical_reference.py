@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Independent 90-digit beta CDFs for the rational/half-integer leaf panel.
+"""Independent 90-digit normalizers and beta CDFs for the Student-t leaf panel.
 
-Only a, b and p input bits are read from the R panel. Native candidate code and
-R output values do not enter the reference calculation. An exact rational beta
-normalizer and an integrated binomial series provide a different algorithm
-from the candidate's continued fraction.
+Only the input bits are read from the R panel. Gamma uses the integrated
+exponential series and positive recurrence. Beta uses an exact rational
+normalizer and the integrated binomial series.
 """
 import argparse
 from decimal import Decimal, localcontext
@@ -34,6 +33,30 @@ def rational_beta(a, b):
             value *= Fraction(2 * k, 2 * k + 1)
         return value if b == Fraction(1, 2) else value / (2 * a + 1)
     raise ValueError('This oracle supports only its rational beta shape family')
+
+
+def gamma(x):
+    # Reduce to 0 < x <= 1. The integral from 256 to infinity is at most
+    # exp(-256) there. Leave 111 digits for cancellation in the series.
+    with localcontext() as context:
+        context.prec = 240
+        scale = Decimal(1)
+        while x > 1:
+            x -= 1
+            scale *= x
+        cutoff = Decimal(256)
+        coefficient = Decimal(1)
+        total = 1 / x
+        for n in range(1, 2049):
+            coefficient *= -cutoff / n
+            term = coefficient / (x + n)
+            total += term
+            if n > cutoff and abs(term) < Decimal('1e-115'):
+                break
+        else:
+            raise ArithmeticError('Independent Gamma integral did not converge')
+        result = scale * cutoff ** x * total
+    return +result
 
 
 def cdf(a, b, x):
@@ -74,18 +97,22 @@ def main():
     cases = []
     with localcontext() as context:
         context.prec = 90
+        arguments = source['gamma_arguments']
+        gamma_values = [format(float(gamma(Decimal.from_float(number(x)))), '.17g')
+                        for x in arguments]
         for case in source['cases']:
             a, b, x = (Decimal.from_float(number(case[k])) for k in ('a', 'b', 'p'))
             value = cdf(a, b, x)
             cases.append({k: case[k] for k in ('a', 'b', 'p')} | {
+                'beta': format(float(rational_beta(a, b)), '.17g'),
                 'regularized': format(float(value), '.17g'),
                 'decimal': str(value),
             })
     args.output.write_text(json.dumps({'source': {
         'precision_decimal_digits': 90,
-        'algorithm': 'exact rational beta and integrated binomial series',
+        'algorithm': 'integrated exponential series, exact rational beta and integrated binomial series',
         'inputs': args.input.name,
-    }, 'cases': cases}, indent=2) + '\n')
+    }, 'gamma_arguments': arguments, 'gamma_values': gamma_values, 'cases': cases}, indent=2) + '\n')
 
 
 if __name__ == '__main__':

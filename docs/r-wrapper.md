@@ -247,7 +247,7 @@ implemented fields rather than every Bioconductor convention.
 ## Execution and installation
 
 `nproc` controls reusable local worker pools for fitting, replacement and transforms.
-`strict`, `fast` and `diagnostic` currently select the same numerical algorithm.
+The package selects the host R numeric profile by default.
 The R package statically links the Rust core and requires Cargo for source
 installation. In a git checkout its configure step copies the core from
 `crates/`; the source package built by `scripts/release/build_r_source.sh`
