@@ -96,6 +96,22 @@ class ParityIntegrityTests(unittest.TestCase):
         for factor in (0,-1,math.inf,math.nan):
             with self.assertRaises(ValueError):parity.global_maxima(rows,factor)
 
+    def test_source_manifest_covers_shared_workspace_crates(self):
+        root = Path(self.temp.name)
+        files = ('Cargo.toml', 'Cargo.lock', 'crates/rsdeseq2/Cargo.toml',
+                 'crates/rsdeseq2/src/lib.rs', 'crates/rcompat-numeric/Cargo.toml',
+                 'crates/rcompat-numeric/src/numeric/checked.rs')
+        for name in files:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+        before = {row['path']: row['sha256'] for row in parity.source_hashes(root)}
+        self.assertEqual(set(before), set(files))
+        shared = files[-1]
+        (root / shared).write_text('changed')
+        after = {row['path']: row['sha256'] for row in parity.source_hashes(root)}
+        self.assertEqual([name for name in files if before[name] != after[name]], [shared])
+
     def test_hash_manifest_is_required_and_exact(self):
         actual=[dict(contrast='c',file='f',sha256='abc')]
         path=Path(self.temp.name)/'hashes.tsv'

@@ -160,6 +160,16 @@ def sha256(path):
             digest.update(block)
     return digest.hexdigest()
 
+def source_hashes(root):
+    """Hash the workspace manifests and the source of each local Rust crate."""
+    paths = [root / 'Cargo.toml', root / 'Cargo.lock']
+    for manifest in (root / 'crates').glob('*/Cargo.toml'):
+        paths.append(manifest)
+        paths.extend((manifest.parent / 'src').rglob('*.rs'))
+    return [dict(path=str(path.relative_to(root)), sha256=sha256(path))
+            for path in sorted(paths)]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture-root', type=Path, default=ROOT/'results/benchmarks/gtex_mode_contrasts')
@@ -193,13 +203,16 @@ def main():
             frozen_hashes.append(dict(contrast=d.name, file=name, sha256=sha256(path)))
 
     verify_reference_hashes(args.reference_hashes, frozen_hashes)
+    binary = args.binary.resolve()
+    binary_hash = sha256(binary)
+    sources = source_hashes(ROOT)
 
     def run(d):
         out = args.output_dir/d.name
         out.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env['RAYON_NUM_THREADS'] = '4'
-        subprocess.run([str(args.binary.resolve()),'wald','--counts',str(d/'counts.tsv'),
+        subprocess.run([str(binary),'wald','--counts',str(d/'counts.tsv'),
             '--design',str(d/'design_matrix.tsv'),'--output',str(out/'results.tsv'),
             '--fit-diagnostics-output',str(out/'diagnostics.tsv'),
             '--disable-cooks-cutoff','--disable-independent-filtering'],check=True,env=env)
@@ -235,10 +248,11 @@ def main():
         d=next(d for d in contrasts if d.name == row['contrast'])
         if sha256(d/row['file']) != row['sha256']:
             raise ValueError('a frozen input or reference changed during the comparison')
+    if sha256(binary) != binary_hash or source_hashes(ROOT) != sources:
+        raise ValueError('the executable or workspace source changed during the comparison')
     write_rows(args.output_dir/'reference_sha256.tsv',frozen_hashes)
-    (args.output_dir/'binary_sha256.txt').write_text(sha256(args.binary)+'\n')
-    source_paths = sorted((ROOT/'crates/rsdeseq2/src').rglob('*.rs')) + [ROOT/'Cargo.toml',ROOT/'Cargo.lock']
-    write_rows(args.output_dir/'source_sha256.tsv',[dict(path=str(p.relative_to(ROOT)),sha256=sha256(p)) for p in source_paths])
+    (args.output_dir/'binary_sha256.txt').write_text(binary_hash+'\n')
+    write_rows(args.output_dir/'source_sha256.tsv', sources)
     failures=[r for r in rows if not r['passed']]
     for row in failures:
         print('FAILED',row['contrast'],row['category'],row['column'],row['reduction_factor'])
