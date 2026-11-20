@@ -4,16 +4,29 @@
 //! convergence probe retaining the previous score, and an iteration budget
 //! counted by accepted gradient updates, including the initial gradient.
 //! These policies are independently exercised by the saturated BB profiles.
-use nalgebra::{DMatrix, DVector};
+use super::try_dense_matrix;
+use crate::{Error, matrix::try_alloc_matrix};
+use nalgebra::{DMatrix, DVector, DVectorView};
 use rcompat_lbfgsb::{OptimCounts, OptimResult};
 pub(super) fn minimize(
     mut evaluate: impl FnMut(&[f64]) -> (f64, Vec<f64>),
     mut x: Vec<f64>,
-) -> OptimResult {
+) -> Result<OptimResult, Error> {
     let p = x.len();
     let (mut value, mut gradient) = evaluate(&x);
     let mut count = 1;
-    let mut inverse = DMatrix::identity(p, p);
+    let mut inverse = try_dense_matrix(p, p, "posterior BFGS metric", |i, j| {
+        if i == j { 1.0 } else { 0.0 }
+    })?;
+    let workspace = |context| -> Result<DVector<f64>, Error> {
+        let mut values = try_alloc_matrix(p, 1, context)?;
+        values.resize(p, 0.0);
+        Ok(DVector::from_vec(values))
+    };
+    let mut direction = workspace("posterior BFGS direction")?;
+    let mut s = workspace("posterior BFGS step")?;
+    let mut y = workspace("posterior BFGS gradient change")?;
+    let mut hy = workspace("posterior BFGS metric product")?;
     let mut fresh = true;
     let mut metric_age = 0;
     let mut convergence = 0;
@@ -21,17 +34,18 @@ pub(super) fn minimize(
     let mut accepted_gradients = 1;
     while accepted_gradients < 100 {
         if metric_age > 2 * p {
-            inverse = DMatrix::identity(p, p);
+            inverse.fill_with_identity();
             fresh = true;
             metric_age = 0;
         }
-        let g = DVector::from_column_slice(&gradient);
-        let mut direction = -&inverse * &g;
+        let g = DVectorView::from_slice(&gradient, p);
+        direction.gemv(-1.0, &inverse, &g, 0.0);
         let mut slope = direction.dot(&g);
         if !slope.is_finite() || slope >= 0.0 {
-            inverse.fill(0.0);
-            inverse.set_diagonal(&DVector::from_element(p, 1.0));
-            direction = -&g;
+            inverse.fill_with_identity();
+            for (d, &value) in direction.iter_mut().zip(g.iter()) {
+                *d = -value;
+            }
             slope = -g.dot(&g);
             fresh = true;
             metric_age = 0;
@@ -64,22 +78,26 @@ pub(super) fn minimize(
                 message = "BFGS no representable descent step";
                 break;
             }
-            inverse = DMatrix::identity(p, p);
+            inverse.fill_with_identity();
             fresh = true;
             metric_age = 0;
             continue;
         };
         let small =
             (value - next_value).abs() <= f64::EPSILON.sqrt() * (value.abs() + f64::EPSILON.sqrt());
-        let s = DVector::from_iterator(p, next.iter().zip(&x).map(|(a, b)| a - b));
-        let y = DVector::from_iterator(p, next_gradient.iter().zip(&gradient).map(|(a, b)| a - b));
+        for (step, (&a, &b)) in s.iter_mut().zip(next.iter().zip(&x)) {
+            *step = a - b;
+        }
+        for (change, (&a, &b)) in y.iter_mut().zip(next_gradient.iter().zip(&gradient)) {
+            *change = a - b;
+        }
         x = next;
         value = next_value;
         if small {
             if fresh {
                 break;
             }
-            inverse = DMatrix::identity(p, p);
+            inverse.fill_with_identity();
             fresh = true;
             metric_age = 0;
             continue;
@@ -89,13 +107,12 @@ pub(super) fn minimize(
         metric_age += 1;
         let curvature = s.dot(&y);
         if curvature > 0.0 && curvature.is_finite() {
-            let hy = &inverse * &y;
+            inverse.mul_to(&y, &mut hy);
             let ratio = (1.0 + y.dot(&hy) / curvature) / curvature;
-            inverse += ratio * (&s * s.transpose())
-                - (&s * hy.transpose() + &hy * s.transpose()) / curvature;
+            update_inverse_metric(&mut inverse, &s, &hy, ratio, curvature);
             fresh = false;
         } else {
-            inverse = DMatrix::identity(p, p);
+            inverse.fill_with_identity();
             fresh = true;
             metric_age = 0;
         }
@@ -104,7 +121,7 @@ pub(super) fn minimize(
             message = "BFGS iteration limit";
         }
     }
-    OptimResult {
+    Ok(OptimResult {
         par: x,
         value,
         counts: OptimCounts {
@@ -113,5 +130,43 @@ pub(super) fn minimize(
         },
         convergence,
         message: message.into(),
+    })
+}
+
+fn update_inverse_metric(
+    inverse: &mut DMatrix<f64>,
+    s: &DVector<f64>,
+    hy: &DVector<f64>,
+    ratio: f64,
+    curvature: f64,
+) {
+    for (j, mut column) in inverse.column_iter_mut().enumerate() {
+        for (i, entry) in column.iter_mut().enumerate() {
+            let outer = s[i] * s[j];
+            let mixed = s[i] * hy[j] + hy[i] * s[j];
+            *entry += ratio * outer - mixed / curvature;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bfgs_metric_update_matches_the_rank_two_expression() {
+        let s = DVector::from_vec(vec![2.0 / 7.0, -0.0, -3.0 / 7.0, 4.0 / 7.0, 0.0, 1.0]);
+        let hy = DVector::from_vec(vec![-0.0, -0.4, 0.0, 0.3, 5.0, -6.0]);
+        let mut metric = DMatrix::identity(s.len(), s.len());
+        let ratio = 0.53;
+        let curvature = 0.27;
+        let expected = &metric
+            + (ratio * (&s * s.transpose())
+                - (&s * hy.transpose() + &hy * s.transpose()) / curvature);
+
+        update_inverse_metric(&mut metric, &s, &hy, ratio, curvature);
+        for (actual, reference) in metric.iter().zip(expected.iter()) {
+            assert_eq!(actual.to_bits(), reference.to_bits());
+        }
     }
 }

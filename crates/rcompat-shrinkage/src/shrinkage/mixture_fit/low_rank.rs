@@ -1,5 +1,5 @@
 //! Optional deterministic spectral approximation of the augmented likelihood.
-use super::{ERROR_SCOPE, Problem, try_mixture_matrix};
+use super::{ERROR_SCOPE, Problem, try_dense_matrix};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::matrix::try_alloc_matrix;
@@ -27,7 +27,7 @@ impl Problem {
         if dimension <= 2 {
             return Ok(None);
         }
-        let mut matrix = try_mixture_matrix(rows, k, "mixture augmented likelihood", |_, _| 0.0)?;
+        let mut matrix = try_dense_matrix(rows, k, "mixture augmented likelihood", |_, _| 0.0)?;
         let mut weights = try_alloc_matrix(rows, 1, "mixture augmented weights")?;
         for (j, &count) in self.prior_counts.iter().enumerate() {
             if count > 0.0 {

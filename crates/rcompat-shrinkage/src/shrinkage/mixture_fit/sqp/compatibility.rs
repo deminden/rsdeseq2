@@ -1,7 +1,7 @@
 //! Direction-based active-set and floored EM policy used by original mixSQP.
 //! Algorithm reference: mixsqp 0.3-54, Kim/Carbonetto/Stephens/Anitescu (MIT).
 //! See MIXSQP-LICENSE for the original copyright and permission notice.
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, Problem, try_mixture_matrix};
+use super::{DMatrix, DVector, ERROR_SCOPE, Error, Problem, try_dense_matrix};
 use crate::errors::scoped_invalid_options;
 use crate::shrinkage::MixtureSqpOptions;
 
@@ -117,7 +117,7 @@ pub(super) fn quadratic(
             }
         }
         let n = indices.len();
-        let reduced = try_mixture_matrix(n, n, "mixture SQP active Hessian", |i, j| {
+        let reduced = try_dense_matrix(n, n, "mixture SQP active Hessian", |i, j| {
             h[(indices[i], indices[j])]
         })?;
         let current = DVector::from_iterator(indices.len(), indices.iter().map(|&i| y[i]));
@@ -186,19 +186,18 @@ fn search_direction(
         if ridge * ridge_multiplier > 1e15 {
             break;
         }
-        let mut corrected =
-            try_mixture_matrix(n, n, "mixture SQP ridge Hessian", |i, j| h[(i, j)])?;
+        let mut corrected = try_dense_matrix(n, n, "mixture SQP ridge Hessian", |i, j| h[(i, j)])?;
         for i in 0..n {
             corrected[(i, i)] += ridge;
         }
-        let factors = try_mixture_matrix(n, n, "mixture SQP Cholesky", |i, j| corrected[(i, j)])?;
+        let factors = try_dense_matrix(n, n, "mixture SQP Cholesky", |i, j| corrected[(i, j)])?;
         if let Some(cholesky) = factors.cholesky() {
             let norm = |m: &DMatrix<f64>| {
                 m.column_iter()
                     .map(|c| c.iter().map(|x| x.abs()).sum::<f64>())
                     .fold(0.0_f64, f64::max)
             };
-            let mut inverse = try_mixture_matrix(n, n, "mixture SQP Hessian inverse", |i, j| {
+            let mut inverse = try_dense_matrix(n, n, "mixture SQP Hessian inverse", |i, j| {
                 if i == j { 1.0 } else { 0.0 }
             })?;
             cholesky.solve_mut(&mut inverse);

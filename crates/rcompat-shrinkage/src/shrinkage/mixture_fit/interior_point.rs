@@ -1,7 +1,7 @@
 //! Native log-barrier path following for the convex mixture problem.
 //! Scaled Newton equations avoid inverse-square weight conditioning. The
 //! accepted SQP path is neither called nor changed by this solver.
-use super::{DVector, ERROR_SCOPE, Problem, invalid_mixture_value, try_mixture_matrix};
+use super::{DVector, ERROR_SCOPE, Problem, invalid_mixture_value, try_dense_matrix};
 use crate::Error;
 use crate::errors::scoped_invalid_options;
 use crate::numeric::math::ProfileMath;
@@ -85,8 +85,7 @@ impl Problem {
 
             evaluations += 1;
             let (f, g) = self.objective_gradient(&x);
-            let mut scaled =
-                try_mixture_matrix(k, k, "mixture interior-point Hessian", |_, _| 0.0)?;
+            let mut scaled = try_dense_matrix(k, k, "mixture interior-point Hessian", |_, _| 0.0)?;
             self.hessian_into(&x, &mut scaled);
             for (j, &column_scale) in x.iter().enumerate() {
                 for (entry, &row_scale) in scaled.column_mut(j).iter_mut().zip(&x) {

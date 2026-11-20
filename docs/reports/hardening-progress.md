@@ -926,6 +926,21 @@ Each numeric profile passed three mixture unit tests and 15 targeted
 integration tests, including the SQP and advanced optimizer references.
 Workspace Clippy passed and both golden manifests matched all 8,032 fields.
 
+### Posterior and polynomial workspaces
+
+The negative-binomial, beta-binomial and general posterior fits share the
+finite-difference Hessian calculation and reuse the perturbed coefficient
+buffer. Laplace inversion reserves its wide output through the shared
+allocator. Compiled beta-binomial fits reuse the first inverse when the
+refinement check accepts it. BFGS updates the inverse metric in place and
+reuses the metric and vectors across iterations. Polynomial extrapolation
+returns allocation errors through the fitter and keeps its existing recovery
+from a singular coefficient solve.
+
+Each profile passed 22 focused tests and workspace Clippy passed. The BFGS
+unit test compares the in-place rank-two update against the previous matrix
+expression bit for bit.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

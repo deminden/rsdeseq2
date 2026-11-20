@@ -103,28 +103,8 @@ impl Row<'_> {
         }
         (value, gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> DMatrix<f64> {
-        let p = beta.len();
-        let mut out = DMatrix::zeros(p, p);
-        for j in 0..p {
-            let mut plus = beta.to_vec();
-            let mut minus = beta.to_vec();
-            plus[j] += step;
-            minus[j] -= step;
-            let gp = self.objective_gradient(&plus, false).1;
-            let gm = self.objective_gradient(&minus, false).1;
-            for i in 0..p {
-                out[(i, j)] = (gp[i] - gm[i]) / (2.0 * step);
-            }
-        }
-        for j in 0..p {
-            for i in 0..j {
-                let mean = (out[(i, j)] + out[(j, i)]) / 2.0;
-                out[(i, j)] = mean;
-                out[(j, i)] = mean;
-            }
-        }
-        out
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+        super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x, false).1)
     }
     pub fn optimize(
         &self,
@@ -137,7 +117,7 @@ impl Row<'_> {
             (value + constant, gradient)
         };
         match options.optimizer {
-            RegressionOptimizer::Bfgs => Ok(super::bfgs::minimize(f, start)),
+            RegressionOptimizer::Bfgs => super::bfgs::minimize(f, start),
             RegressionOptimizer::Lbfgsb => {
                 let p = start.len();
                 let bounds = Bounds::new(vec![options.bounds.0; p], vec![options.bounds.1; p])

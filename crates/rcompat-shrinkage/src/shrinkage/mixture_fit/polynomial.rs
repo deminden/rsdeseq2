@@ -4,10 +4,11 @@
 use super::{
     ERROR_SCOPE,
     squarem::{Iteration, PolynomialExtrapolation, SquaremOptions},
+    try_dense_matrix,
 };
-use crate::Error;
 use crate::errors::scoped_invalid_options;
-use nalgebra::{DMatrix, DVector};
+use crate::{Error, matrix::try_alloc_matrix};
+use nalgebra::DVector;
 fn norm(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
         .zip(b)
@@ -15,25 +16,33 @@ fn norm(a: &[f64], b: &[f64]) -> f64 {
         .sum::<f64>()
         .sqrt()
 }
-fn coefficients(states: &[Vec<f64>], o: SquaremOptions) -> Option<Vec<f64>> {
+fn coefficients(states: &[Vec<f64>], o: SquaremOptions) -> Result<Option<Vec<f64>>, Error> {
     let k = o.polynomial_order;
     let p = states[0].len();
-    let u = DMatrix::from_fn(p, k + 1, |i, j| states[j + 1][i] - states[j][i]);
+    let u = try_dense_matrix(p, k + 1, "mixture polynomial state differences", |i, j| {
+        states[j + 1][i] - states[j][i]
+    })?;
     let mut c = match o.polynomial_method {
         PolynomialExtrapolation::ReducedRank => {
-            let gram = u.transpose() * &u;
-            gram.col_piv_qr()
-                .solve(&DVector::from_element(k + 1, 1.0))?
-                .as_slice()
-                .to_vec()
+            let transpose =
+                try_dense_matrix(k + 1, p, "mixture polynomial transpose", |i, j| u[(j, i)])?;
+            let mut gram =
+                try_dense_matrix(k + 1, k + 1, "mixture polynomial Gram matrix", |_, _| 0.0)?;
+            transpose.mul_to(&u, &mut gram);
+            let Some(solution) = gram.col_piv_qr().solve(&DVector::from_element(k + 1, 1.0)) else {
+                return Ok(None);
+            };
+            solution.as_slice().to_vec()
         }
         PolynomialExtrapolation::MinimalPolynomial => {
-            let a = u.columns(0, k).into_owned();
+            let a = try_dense_matrix(p, k, "mixture polynomial QR design", |i, j| u[(i, j)])?;
             let b = -u.column(k).into_owned();
             let qr = a.col_piv_qr();
             let mut rhs = qr.q().transpose() * b;
             let r = qr.r();
-            r.solve_upper_triangular_mut(&mut rhs).then_some(())?;
+            if !r.solve_upper_triangular_mut(&mut rhs) {
+                return Ok(None);
+            }
             qr.p().inv_permute_rows(&mut rhs);
             let mut c = rhs.as_slice().to_vec();
             c.push(1.0);
@@ -42,12 +51,12 @@ fn coefficients(states: &[Vec<f64>], o: SquaremOptions) -> Option<Vec<f64>> {
     };
     let total = c.iter().sum::<f64>();
     if !total.is_finite() || total.abs() < 1e-7 || c.iter().any(|v| !v.is_finite()) {
-        return None;
+        return Ok(None);
     }
     for v in &mut c {
         *v /= total;
     }
-    Some(c)
+    Ok(Some(c))
 }
 pub(super) fn run(
     initial: Vec<f64>,
@@ -77,7 +86,7 @@ pub(super) fn run(
     let mut iterations = 0;
     while calls < o.max_evaluations && residual > tolerance {
         iterations += 1;
-        let mut states = Vec::with_capacity(capacity);
+        let mut states = try_alloc_matrix(capacity, 1, "mixture polynomial states")?;
         states.push(state);
         for _ in 0..=k {
             states.push(update(
@@ -88,7 +97,7 @@ pub(super) fn run(
             calls += 1;
         }
         let mut fallback_residual = norm(&states[k + 1], &states[k]);
-        let Some(c) = coefficients(&states, o) else {
+        let Some(c) = coefficients(&states, o)? else {
             state = states
                 .pop()
                 .ok_or_else(|| crate::errors::invariant("value present"))?;
@@ -96,7 +105,9 @@ pub(super) fn run(
             iterations += 1;
             continue;
         };
-        let mut proposal = vec![0.0; states[0].len()];
+        let p = states[0].len();
+        let mut proposal = try_alloc_matrix(p, 1, "mixture polynomial proposal")?;
+        proposal.resize(p, 0.0);
         if o.square {
             for _ in 1..k {
                 states.push(update(

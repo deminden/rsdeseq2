@@ -11,6 +11,7 @@ use crate::{
     probability::normal_upper_tail,
     shrinkage::svalues,
 };
+use nalgebra::{DMatrix, Matrix4, linalg::try_invert_to};
 
 /// MLE scale supplied for empirical prior adaptation.
 #[derive(Clone, Copy, Debug)]
@@ -546,15 +547,41 @@ impl<'a> PreparedBatch<'a> {
 
 struct LaplaceFit {
     optimization: rcompat_lbfgsb::OptimResult,
-    covariance: Option<nalgebra::DMatrix<f64>>,
+    covariance: Option<DMatrix<f64>>,
 }
 
-fn invert_finite_hessian(hessian: nalgebra::DMatrix<f64>) -> Option<nalgebra::DMatrix<f64>> {
-    if hessian.iter().all(|v| v.is_finite()) {
-        hessian.try_inverse()
-    } else {
-        None
+fn invert_hessian(mut hessian: DMatrix<f64>) -> Result<Option<DMatrix<f64>>, Error> {
+    let p = hessian.nrows();
+    match p {
+        0..=3 => Ok(hessian.try_inverse_mut().then_some(hessian)),
+        4 => {
+            let mut small = Matrix4::from_column_slice(hessian.as_slice());
+            if !small.try_inverse_mut() {
+                return Ok(None);
+            }
+            hessian.as_mut_slice().copy_from_slice(small.as_slice());
+            Ok(Some(hessian))
+        }
+        _ => {
+            let mut inverse = super::try_dense_matrix(p, p, "posterior covariance", |_, _| 0.0)?;
+            Ok(try_invert_to(hessian, &mut inverse).then_some(inverse))
+        }
     }
+}
+
+fn invert_finite_hessian(hessian: DMatrix<f64>) -> Result<Option<DMatrix<f64>>, Error> {
+    if hessian.iter().all(|v| v.is_finite()) {
+        invert_hessian(hessian)
+    } else {
+        Ok(None)
+    }
+}
+
+fn has_valid_covariance_diagonal(matrix: &DMatrix<f64>) -> bool {
+    (0..matrix.nrows()).all(|i| {
+        let variance = matrix[(i, i)];
+        variance.is_finite() && variance > 0.0
+    })
 }
 
 fn fit_laplace(
@@ -566,40 +593,47 @@ fn fit_laplace(
     mut result: rcompat_lbfgsb::OptimResult,
     refined: bool,
 ) -> Result<LaplaceFit, Error> {
-    let hessian = if let Some(general) = general {
-        general.hessian(&result.par, options.hessian_step)
+    let mut covariance = if let Some(general) = general {
+        let hessian = general.hessian(&result.par, options.hessian_step)?;
+        if let Some(error) = general.take_error() {
+            return Err(error);
+        }
+        invert_finite_hessian(hessian)?
     } else if let Some(beta_binomial) = beta_binomial {
         let (_, config) = regression
             .ok_or_else(|| crate::errors::invariant("regression likelihood configured"))?;
-        let hessian = beta_binomial.hessian(&result.par, options.hessian_step);
-        let invalid_covariance = hessian
-            .clone()
-            .try_inverse()
-            .is_none_or(|m| m.diagonal().iter().any(|v| !v.is_finite() || *v <= 0.0));
-        if config.method == super::regression::RegressionMethod::BetaBinomialCR
-            && (result.convergence != 0 || invalid_covariance)
+        let hessian = beta_binomial.hessian(&result.par, options.hessian_step)?;
+        let compiled_refinement =
+            config.method == super::regression::RegressionMethod::BetaBinomialCR;
+        let finite = hessian.iter().all(|v| v.is_finite());
+        // The compiled policy tests the inverse's diagonal before discarding
+        // nonfinite Hessians. Keep that retry decision and reuse a valid inverse.
+        let inverse = if compiled_refinement || finite {
+            invert_hessian(hessian)?
+        } else {
+            None
+        };
+        if compiled_refinement
+            && (result.convergence != 0
+                || !inverse.as_ref().is_some_and(has_valid_covariance_diagonal))
         {
             result = beta_binomial.optimize(result.par, config)?;
-            beta_binomial.hessian(&result.par, options.hessian_step)
+            invert_finite_hessian(beta_binomial.hessian(&result.par, options.hessian_step)?)?
         } else {
-            hessian
+            inverse.filter(|_| finite)
         }
     } else {
-        row.hessian(&result.par, options.hessian_step)
+        invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?
     };
-    if let Some(error) = general.and_then(|row| row.take_error()) {
-        return Err(error);
-    }
-    let mut covariance = invert_finite_hessian(hessian);
     // Compiled prefits with nonpositive variance use the deferred refinement controls.
     if regression.is_none()
         && !refined
         && covariance
             .as_ref()
-            .is_some_and(|m| m.diagonal().iter().any(|v| *v <= 0.0))
+            .is_some_and(|m| (0..m.nrows()).any(|i| m[(i, i)] <= 0.0))
     {
         result = refine(row, result.par, options)?;
-        covariance = invert_finite_hessian(row.hessian(&result.par, options.hessian_step));
+        covariance = invert_finite_hessian(row.hessian(&result.par, options.hessian_step)?)?;
     }
     if regression.is_some() && covariance.is_none() {
         return Err(scoped_invalid_options(
@@ -609,8 +643,7 @@ fn fit_laplace(
     }
     Ok(LaplaceFit {
         optimization: result,
-        covariance: covariance
-            .filter(|matrix| matrix.diagonal().iter().all(|v| v.is_finite() && *v > 0.0)),
+        covariance: covariance.filter(has_valid_covariance_diagonal),
     })
 }
 

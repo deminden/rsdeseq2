@@ -1,4 +1,8 @@
 //! Standalone heavy-tailed negative-binomial posterior fitting.
+use super::try_dense_matrix;
+use crate::{Error, matrix::try_alloc_matrix};
+use nalgebra::DMatrix;
+
 mod analysis;
 mod beta_binomial;
 mod bfgs;
@@ -39,3 +43,32 @@ pub use compiled_refinement::{NegativeBinomialRefinement, NegativeBinomialRefine
 
 mod work;
 pub use work::{PosteriorCancellation, PosteriorWorkControl};
+
+fn finite_difference_hessian(
+    beta: &[f64],
+    step: f64,
+    gradient: impl Fn(&[f64]) -> Vec<f64>,
+) -> Result<DMatrix<f64>, Error> {
+    let p = beta.len();
+    let mut hessian = try_dense_matrix(p, p, "posterior Hessian", |_, _| 0.0)?;
+    let mut perturbed = try_alloc_matrix(p, 1, "posterior Hessian coefficients")?;
+    perturbed.extend_from_slice(beta);
+    for j in 0..p {
+        perturbed[j] = beta[j] + step;
+        let plus = gradient(&perturbed);
+        perturbed[j] = beta[j] - step;
+        let minus = gradient(&perturbed);
+        perturbed[j] = beta[j];
+        for i in 0..p {
+            hessian[(i, j)] = (plus[i] - minus[i]) / (2.0 * step);
+        }
+    }
+    for j in 0..p {
+        for i in 0..j {
+            let mean = (hessian[(i, j)] + hessian[(j, i)]) / 2.0;
+            hessian[(i, j)] = mean;
+            hessian[(j, i)] = mean;
+        }
+    }
+    Ok(hessian)
+}

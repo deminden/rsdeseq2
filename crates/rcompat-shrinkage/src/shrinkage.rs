@@ -2,6 +2,9 @@
 //!
 //! Default R shrinkage routes share these implementations. Advanced optional
 //! methods remain under development; see the documented migration scope.
+use crate::{Error, matrix::try_alloc_matrix};
+use nalgebra::DMatrix;
+
 mod adaptive_grid;
 mod adaptive_output;
 mod adaptive_result;
@@ -98,3 +101,16 @@ pub use count_likelihood::{BinomialLink, PoissonLink};
 pub use heavy_tail::{NegativeBinomialRefinement, NegativeBinomialRefinementMethod};
 
 pub use heavy_tail::{PosteriorCancellation, PosteriorWorkControl};
+
+fn try_dense_matrix(
+    rows: usize,
+    columns: usize,
+    context: &str,
+    mut entry: impl FnMut(usize, usize) -> f64,
+) -> Result<DMatrix<f64>, Error> {
+    let mut values = try_alloc_matrix(rows, columns, context)?;
+    for column in 0..columns {
+        values.extend((0..rows).map(|row| entry(row, column)));
+    }
+    Ok(DMatrix::from_vec(rows, columns, values))
+}

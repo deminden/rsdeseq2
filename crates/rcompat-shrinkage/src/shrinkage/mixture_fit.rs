@@ -1,3 +1,4 @@
+use super::try_dense_matrix;
 use crate::errors::{CalculationLocation, ErrorKind, invalid_calculation, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 pub(super) const ERROR_SCOPE: &str = "mixture prior fit";
@@ -7,19 +8,6 @@ use crate::{
     matrix::{MatrixView, try_alloc_matrix},
 };
 use nalgebra::{DMatrix, DVector};
-
-fn try_mixture_matrix(
-    rows: usize,
-    columns: usize,
-    context: &str,
-    mut entry: impl FnMut(usize, usize) -> f64,
-) -> Result<DMatrix<f64>, Error> {
-    let mut values = try_alloc_matrix(rows, columns, context)?;
-    for column in 0..columns {
-        values.extend((0..rows).map(|row| entry(row, column)));
-    }
-    Ok(DMatrix::from_vec(rows, columns, values))
-}
 
 fn invalid_mixture_value(
     operation: &'static str,

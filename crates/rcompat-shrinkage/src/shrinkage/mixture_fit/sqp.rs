@@ -1,4 +1,4 @@
-use super::{DMatrix, DVector, ERROR_SCOPE, Error, MixtureFitOptions, Problem, try_mixture_matrix};
+use super::{DMatrix, DVector, ERROR_SCOPE, Error, MixtureFitOptions, Problem, try_dense_matrix};
 use crate::errors::scoped_invalid_options;
 mod compatibility;
 
@@ -111,7 +111,7 @@ impl Problem {
             }
             if hessian.nrows() == 0 {
                 let k = self.components;
-                hessian = try_mixture_matrix(k, k, "mixture SQP Hessian", |_, _| 0.0)?;
+                hessian = try_dense_matrix(k, k, "mixture SQP Hessian", |_, _| 0.0)?;
             }
             if options.sqp.ashr_compatibility {
                 self.ashr_hessian_into(&weights, &mut hessian);
@@ -240,7 +240,7 @@ fn nonnegative_quadratic(
             continue;
         }
         let n = indices.len();
-        let mut reduced = try_mixture_matrix(n, n, "mixture SQP active Hessian", |i, j| {
+        let mut reduced = try_dense_matrix(n, n, "mixture SQP active Hessian", |i, j| {
             h[(indices[i], indices[j])]
         })?;
         let rhs = DVector::from_iterator(indices.len(), indices.iter().map(|&i| -c[i]));
@@ -248,7 +248,7 @@ fn nonnegative_quadratic(
         let mut ridge = 0.0;
         let mut solved = None;
         for _ in 0..20 {
-            let factors = try_mixture_matrix(n, n, "mixture SQP Cholesky", |i, j| reduced[(i, j)])?;
+            let factors = try_dense_matrix(n, n, "mixture SQP Cholesky", |i, j| reduced[(i, j)])?;
             if let Some(cholesky) = factors.cholesky() {
                 solved = Some(cholesky.solve(&rhs));
                 break;

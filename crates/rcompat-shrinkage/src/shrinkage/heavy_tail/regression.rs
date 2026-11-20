@@ -477,33 +477,13 @@ impl GeneralRow<'_> {
             .collect();
         (self.value(beta), gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> DMatrix<f64> {
-        let p = beta.len();
-        let mut h = DMatrix::zeros(p, p);
-        for j in 0..p {
-            let mut plus = beta.to_vec();
-            let mut minus = beta.to_vec();
-            plus[j] += step;
-            minus[j] -= step;
-            let gp = self.objective_gradient(&plus).1;
-            let gm = self.objective_gradient(&minus).1;
-            for i in 0..p {
-                h[(i, j)] = (gp[i] - gm[i]) / (2.0 * step);
-            }
-        }
-        for j in 0..p {
-            for i in 0..j {
-                let mean = (h[(i, j)] + h[(j, i)]) / 2.0;
-                h[(i, j)] = mean;
-                h[(j, i)] = mean;
-            }
-        }
-        h
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+        super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x).1)
     }
     pub fn optimize(&self, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResult, Error> {
         let result = match self.options.optimizer {
             RegressionOptimizer::Bfgs => {
-                super::bfgs::minimize(|x| self.objective_gradient(x), start)
+                super::bfgs::minimize(|x| self.objective_gradient(x), start)?
             }
             RegressionOptimizer::Lbfgsb => {
                 let p = start.len();
@@ -545,7 +525,7 @@ pub(super) fn optimize_nb_r(
         (v + constant, g)
     };
     match options.optimizer {
-        RegressionOptimizer::Bfgs => Ok(super::bfgs::minimize(f, start)),
+        RegressionOptimizer::Bfgs => super::bfgs::minimize(f, start),
         RegressionOptimizer::Lbfgsb => {
             let p = start.len();
             let bounds = Bounds::new(vec![options.bounds.0; p], vec![options.bounds.1; p])

@@ -1,7 +1,7 @@
 //! Negative-binomial log-link likelihood and finite-gradient Laplace curvature.
 use super::prior::CauchyCoefficientPrior;
-use crate::matrix::MatrixView;
 use crate::numeric::math::ProfileMath;
+use crate::{Error, matrix::MatrixView};
 use nalgebra::DMatrix;
 pub(super) struct Row<'a> {
     pub design: MatrixView<'a, f64>,
@@ -43,27 +43,7 @@ impl Row<'_> {
         }
         (value, gradient)
     }
-    pub fn hessian(&self, beta: &[f64], step: f64) -> DMatrix<f64> {
-        let p = beta.len();
-        let mut h = DMatrix::zeros(p, p);
-        for j in 0..p {
-            let mut plus = beta.to_vec();
-            let mut minus = beta.to_vec();
-            plus[j] += step;
-            minus[j] -= step;
-            let gplus = self.objective_gradient(&plus).1;
-            let gminus = self.objective_gradient(&minus).1;
-            for i in 0..p {
-                h[(i, j)] = (gplus[i] - gminus[i]) / (2.0 * step);
-            }
-        }
-        for j in 0..p {
-            for i in 0..j {
-                let a = (h[(i, j)] + h[(j, i)]) / 2.0;
-                h[(i, j)] = a;
-                h[(j, i)] = a;
-            }
-        }
-        h
+    pub fn hessian(&self, beta: &[f64], step: f64) -> Result<DMatrix<f64>, Error> {
+        super::finite_difference_hessian(beta, step, |x| self.objective_gradient(x).1)
     }
 }

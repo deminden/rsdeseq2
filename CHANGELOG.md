@@ -123,6 +123,9 @@ versions live in [docs/releases](docs/releases/).
   and dense SQP workspaces. SQP reuses its main Hessian, and the interior
   point solver scales its Hessian in place.
 
+- Posterior Hessians and polynomial extrapolation use checked dense
+  allocation. The BFGS fit reuses its metric and vector workspaces.
+
 - Size-factor estimation filters unusable geometric means once, reuses one
   log-ratio buffer across samples and selects the median in place.
 
