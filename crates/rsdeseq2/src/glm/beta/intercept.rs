@@ -46,59 +46,15 @@ pub fn fit_intercept_only_fixed_dispersion_with_weights(
 /// `fitNbinomGLMs` intercept shortcut) with size-factor or
 /// normalization-factor offsets and optional observation weights.
 pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, DeseqError> {
-    match input.offsets {
-        Offsets::PerSample(size_factors) => {
-            validate_fit_inputs(input.counts, size_factors, input.dispersions, input.weights)?;
-            let normalization_factors =
-                normalization_factors_from_size_factors(input.counts, size_factors)?;
-            intercept_only_with_factor_matrix(
-                input.counts,
-                &normalization_factors,
-                input.dispersions,
-                input.weights,
-            )
-        }
-        Offsets::PerCell(normalization_factors) => intercept_only_with_factor_matrix(
-            input.counts,
-            normalization_factors,
-            input.dispersions,
-            input.weights,
-        ),
-    }
-}
-
-/// Fit DESeq2's intercept-only fixed-dispersion shortcut with normalization factors.
-///
-/// DESeq2's low-level code reconstructs `mu` as
-/// `normalizationFactors * 2^betaMatrix`; this function exposes that matrix
-/// form directly for future support of gene/sample normalization factors.
-#[deprecated(
-    since = "0.6.0",
-    note = "use fit_intercept_only_glm with Offsets::PerCell and GlmInput::weights"
-)]
-pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
-    counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
-) -> Result<NbinomGlmFit, DeseqError> {
-    fit_intercept_only_glm(GlmInput {
+    validate_intercept_fit_inputs(input)?;
+    let GlmInput {
         counts,
-        offsets: Offsets::PerCell(normalization_factors),
+        offsets,
         dispersions,
         weights,
-    })
-}
+    } = input;
 
-fn intercept_only_with_factor_matrix(
-    counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
-) -> Result<NbinomGlmFit, DeseqError> {
-    validate_nf_fit_inputs(counts, normalization_factors, dispersions, weights)?;
-
-    let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
+    let mut normalized_row = Vec::with_capacity(counts.n_samples());
     let mut beta_values = Vec::with_capacity(counts.n_genes());
     let mut mu_values =
         try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
@@ -108,10 +64,18 @@ fn intercept_only_with_factor_matrix(
     let mut beta_covariance_values = Vec::with_capacity(counts.n_genes());
 
     for (gene, dispersion) in dispersions.iter().copied().enumerate() {
-        let normalized_row = normalized.row(gene)?;
+        let factor_row = offsets.row(gene)?;
+        normalized_row.clear();
+        normalized_row.extend(
+            counts
+                .row_values(gene)
+                .iter()
+                .zip(factor_row)
+                .map(|(&count, &factor)| f64::from(count) / factor),
+        );
         let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
         let mean_normalized = match weight_row {
-            Some(weights) => weighted_mean(normalized_row, weights, gene)?,
+            Some(weights) => weighted_mean(&normalized_row, weights, gene)?,
             None => {
                 if counts.is_all_zero_gene(gene)? {
                     return Err(DeseqError::InvalidCounts {
@@ -120,7 +84,7 @@ fn intercept_only_with_factor_matrix(
                         ),
                     });
                 }
-                checked::mean(normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
+                checked::mean(&normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
                     reason: format!("gene {gene} has non-finite normalized intercept mean"),
                 })?
             }
@@ -134,7 +98,7 @@ fn intercept_only_with_factor_matrix(
         let beta_log2 = mean_normalized.log2_p();
         beta_values.push(beta_log2);
 
-        for factor in normalization_factors.row(gene)? {
+        for factor in factor_row {
             let mu = *factor * 2.0_f64.powf_p(beta_log2);
             if !mu.is_finite() || mu <= 0.0 {
                 return Err(DeseqError::InvalidCounts {
@@ -211,25 +175,27 @@ fn intercept_only_with_factor_matrix(
     })
 }
 
-pub(super) fn normalized_counts_with_factors(
+/// Fit DESeq2's intercept-only fixed-dispersion shortcut with normalization factors.
+///
+/// DESeq2's low-level code reconstructs `mu` as
+/// `normalizationFactors * 2^betaMatrix`; this function exposes that matrix
+/// form directly for future support of gene/sample normalization factors.
+#[deprecated(
+    since = "0.6.0",
+    note = "use fit_intercept_only_glm with Offsets::PerCell and GlmInput::weights"
+)]
+pub fn fit_intercept_only_fixed_dispersion_with_normalization_factors(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
-    for gene in 0..counts.n_genes() {
-        let count_row = counts.row(gene)?;
-        let factor_row = normalization_factors.row(gene)?;
-        for (sample, (count, factor)) in count_row
-            .iter()
-            .copied()
-            .zip(factor_row.iter().copied())
-            .enumerate()
-        {
-            validate_positive_finite(factor, "normalization factor", sample)?;
-            values.push(f64::from(count) / factor);
-        }
-    }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+) -> Result<NbinomGlmFit, DeseqError> {
+    fit_intercept_only_glm(GlmInput {
+        counts,
+        offsets: Offsets::PerCell(normalization_factors),
+        dispersions,
+        weights,
+    })
 }
 
 pub(super) fn weighted_mean(

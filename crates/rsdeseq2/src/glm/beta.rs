@@ -9,7 +9,7 @@ use crate::design::DesignMatrix;
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::glm::NbinomGlmFit;
 use crate::glm::irls::{
-    IrlsOptions, fit_fixed_dispersion_glm, fit_irls, normalization_factors_from_size_factors,
+    IrlsOptions, fit_fixed_dispersion_glm, fit_irls, validate_size_factor_offsets,
 };
 use crate::glm::nb::nbinom_log_likelihood_matrix;
 use crate::matrix::CountMatrix;

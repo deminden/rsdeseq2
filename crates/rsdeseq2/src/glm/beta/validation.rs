@@ -1,40 +1,26 @@
 use super::*;
 // Fit and normalization-factor validation.
 
-pub(super) fn validate_fit_inputs(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
-) -> Result<(), DeseqError> {
-    if size_factors.len() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "size factors",
-            counts.n_samples(),
-            size_factors.len(),
-        ));
-    }
-    for (idx, factor) in size_factors.iter().copied().enumerate() {
-        validate_positive_finite(factor, "size factor", idx)?;
-    }
-    let normalization_factors = normalization_factors_from_size_factors(counts, size_factors)?;
-    validate_nf_fit_inputs(counts, &normalization_factors, dispersions, weights)
-}
-
-pub(super) fn validate_nf_fit_inputs(
-    counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
-) -> Result<(), DeseqError> {
-    if normalization_factors.n_rows() != counts.n_genes()
-        || normalization_factors.n_cols() != counts.n_samples()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "normalization factors".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: normalization_factors.len(),
-        });
+pub(super) fn validate_intercept_fit_inputs(input: GlmInput<'_>) -> Result<(), DeseqError> {
+    let GlmInput {
+        counts,
+        offsets,
+        dispersions,
+        weights,
+    } = input;
+    match offsets {
+        Offsets::PerSample(factors) => {
+            validate_size_factor_offsets(counts, factors)?;
+        }
+        Offsets::PerCell(factors) => {
+            if factors.n_rows() != counts.n_genes() || factors.n_cols() != counts.n_samples() {
+                return Err(DeseqError::InvalidDimensions {
+                    context: "normalization factors".to_string(),
+                    expected: counts.n_genes() * counts.n_samples(),
+                    actual: factors.len(),
+                });
+            }
+        }
     }
     if dispersions.len() != counts.n_genes() {
         return Err(invalid_dimensions(
@@ -56,6 +42,11 @@ pub(super) fn validate_nf_fit_inputs(
         }
         weights.validate_finite("weights")?;
     }
-    normalization_factors.validate_finite("normalization factors")?;
+    if let Offsets::PerCell(factors) = offsets {
+        factors.validate_finite("normalization factors")?;
+        for (index, &factor) in factors.as_slice().iter().enumerate() {
+            validate_positive_finite(factor, "normalization factor", index % counts.n_samples())?;
+        }
+    }
     Ok(())
 }

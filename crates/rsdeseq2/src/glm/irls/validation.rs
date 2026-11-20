@@ -1,32 +1,7 @@
 use super::*;
-use crate::matrix::try_alloc_matrix;
 // Input validation, normalization factors and output scaling.
 
-/// Size factors repeated per gene, rejecting non-positive values as
-/// `NonFiniteValue` (shared by the IRLS and beta-prior fits).
-pub(in crate::glm) fn normalization_factors_from_size_factors(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    if size_factors.len() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "size factors",
-            counts.n_samples(),
-            size_factors.len(),
-        ));
-    }
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "IRLS offsets")?;
-    for _ in 0..counts.n_genes() {
-        for (idx, factor) in size_factors.iter().copied().enumerate() {
-            validate_positive_finite(factor, "size factor", idx)?;
-            values.push(factor);
-        }
-    }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
-}
-
-/// The checks `normalization_factors_from_size_factors` applied before the
-/// IRLS fit, without building the matrix.
+/// Validate the sample factors for a shared IRLS offset.
 pub(in crate::glm) fn validate_size_factor_offsets(
     counts: &CountMatrix,
     size_factors: &[f64],

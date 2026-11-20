@@ -1,5 +1,4 @@
 use super::*;
-use std::borrow::Cow;
 // Fixed and estimated beta-prior fitting workflows.
 
 /// Counts, normalization offsets, dispersions and optional observation
@@ -35,17 +34,6 @@ impl<'a> GlmInput<'a> {
         self.weights = Some(weights);
         self
     }
-
-    /// Normalization factors for the paths that need a gene x sample matrix:
-    /// borrowed when given, expanded from size factors otherwise.
-    fn normalization_factor_matrix(&self) -> Result<Cow<'a, RowMajorMatrix<f64>>, DeseqError> {
-        Ok(match self.offsets {
-            Offsets::PerCell(factors) => Cow::Borrowed(factors),
-            Offsets::PerSample(size_factors) => Cow::Owned(
-                normalization_factors_from_size_factors(self.counts, size_factors)?,
-            ),
-        })
-    }
 }
 
 /// Refit a fixed-dispersion GLM with a supplied DESeq2-style beta prior
@@ -56,30 +44,12 @@ pub fn fit_glms_with_beta_prior(
     beta_prior_variance: &[f64],
     options: IrlsOptions,
 ) -> Result<NbinomGlmFit, DeseqError> {
-    if let (Offsets::PerSample(size_factors), None) = (input.offsets, input.weights) {
-        let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-        return fit_fixed_dispersion_glm(
-            GlmInput::new(
-                input.counts,
-                Offsets::PerSample(size_factors),
-                input.dispersions,
-            ),
-            design,
-            options,
-        );
+    // Preserve the validation order of the weighted size-factor fit.
+    if let (Offsets::PerSample(size_factors), Some(_)) = (input.offsets, input.weights) {
+        validate_size_factor_offsets(input.counts, size_factors)?;
     }
-    let normalization_factors = input.normalization_factor_matrix()?;
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-    fit_fixed_dispersion_glm(
-        GlmInput {
-            counts: input.counts,
-            offsets: Offsets::PerCell(&normalization_factors),
-            dispersions: input.dispersions,
-            weights: input.weights,
-        },
-        design,
-        options,
-    )
+    fit_fixed_dispersion_glm(input, design, options)
 }
 
 /// Run an MLE fixed-dispersion fit, estimate the beta prior variance
@@ -91,62 +61,18 @@ pub fn fit_glms_with_estimated_beta_prior(
     disp_fit: &[f64],
     options: BetaPriorRefitOptions,
 ) -> Result<BetaPriorGlmFit, DeseqError> {
-    let size_factors = match (input.offsets, input.weights) {
+    let fit_options = options.fit_options;
+    let mle_fit = match (input.offsets, input.weights) {
         // Unweighted size factors keep DESeq2's intercept-only shortcut.
-        (Offsets::PerSample(size_factors), None) => size_factors,
-        _ => {
-            let normalization_factors = input.normalization_factor_matrix()?;
-            let input = GlmInput {
-                offsets: Offsets::PerCell(&normalization_factors),
-                ..input
-            };
-            return estimated_prior_with_factor_matrix(input, design, base_mean, disp_fit, options);
-        }
+        (Offsets::PerSample(size_factors), None) => fit_irls(
+            input.counts,
+            design,
+            size_factors,
+            input.dispersions,
+            fit_options.clone(),
+        )?,
+        _ => fit_fixed_dispersion_glm(input, design, fit_options.clone())?,
     };
-    let fit_options = options.fit_options;
-    let mle_fit = fit_irls(
-        input.counts,
-        design,
-        size_factors,
-        input.dispersions,
-        fit_options.clone(),
-    )?;
-    let beta_prior_variance = estimate_beta_prior_variance(
-        &mle_fit.beta,
-        base_mean,
-        disp_fit,
-        design.coefficient_names(),
-        options.variance_options,
-    )?;
-    let prior_fit = fit_glms_with_beta_prior(input, design, &beta_prior_variance, fit_options)?;
-    Ok(BetaPriorGlmFit {
-        mle_fit,
-        prior_fit,
-        beta_prior_variance,
-    })
-}
-
-fn estimated_prior_with_factor_matrix(
-    input: GlmInput<'_>,
-    design: &DesignMatrix,
-    base_mean: &[f64],
-    disp_fit: &[f64],
-    options: BetaPriorRefitOptions,
-) -> Result<BetaPriorGlmFit, DeseqError> {
-    let Offsets::PerCell(normalization_factors) = input.offsets else {
-        unreachable!("called with a normalization-factor matrix");
-    };
-    let fit_options = options.fit_options;
-    let mle_fit = fit_fixed_dispersion_glm(
-        GlmInput {
-            counts: input.counts,
-            offsets: Offsets::PerCell(normalization_factors),
-            dispersions: input.dispersions,
-            weights: input.weights,
-        },
-        design,
-        fit_options.clone(),
-    )?;
     let beta_prior_variance = estimate_beta_prior_variance(
         &mle_fit.beta,
         base_mean,
@@ -171,17 +97,50 @@ pub fn fit_expanded_glms_with_estimated_beta_prior(
     disp_fit: &[f64],
     options: BetaPriorRefitOptions,
 ) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
-    let normalization_factors = input.normalization_factor_matrix()?;
-    expanded_with_factor_matrix(
-        input.counts,
-        design,
-        &normalization_factors,
-        input.dispersions,
-        input.weights,
+    if let Offsets::PerSample(size_factors) = input.offsets {
+        validate_size_factor_offsets(input.counts, size_factors)?;
+    }
+    validate_expanded_coefficient_groups(
+        design.expanded_design.n_coefficients(),
+        design.coefficient_groups,
+        "expanded beta-prior coefficient groups",
+    )?;
+    if design.coefficient_groups.len() != design.standard_design.n_coefficients() {
+        return Err(invalid_dimensions(
+            "expanded beta-prior collapsed coefficient groups",
+            design.standard_design.n_coefficients(),
+            design.coefficient_groups.len(),
+        ));
+    }
+
+    let fit_options = options.fit_options;
+    let expanded_mle_fit =
+        fit_fixed_dispersion_glm(input, design.expanded_design, fit_options.clone())?;
+    let beta_prior_variance = estimate_beta_prior_variance(
+        &expanded_mle_fit.beta,
         base_mean,
         disp_fit,
-        options,
-    )
+        design.expanded_design.coefficient_names(),
+        options.variance_options,
+    )?;
+    let expanded_prior_fit = fit_glms_with_beta_prior(
+        input,
+        design.expanded_design,
+        &beta_prior_variance,
+        fit_options,
+    )?;
+    let prior_fit = collapse_expanded_model_fit(
+        &expanded_prior_fit,
+        design.standard_design,
+        design.coefficient_groups,
+    )?;
+
+    Ok(ExpandedModelBetaPriorGlmFit {
+        expanded_mle_fit,
+        expanded_prior_fit,
+        prior_fit,
+        beta_prior_variance,
+    })
 }
 
 /// Refit a fixed-dispersion GLM with supplied DESeq2-style beta prior variance.
@@ -528,71 +487,4 @@ pub(crate) fn fit_prior_nf_for_output(
         options,
         requirements,
     )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn expanded_with_factor_matrix(
-    counts: &CountMatrix,
-    design: ExpandedModelBetaPriorDesignInput<'_>,
-    normalization_factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    weights: Option<&RowMajorMatrix<f64>>,
-    base_mean: &[f64],
-    disp_fit: &[f64],
-    options: BetaPriorRefitOptions,
-) -> Result<ExpandedModelBetaPriorGlmFit, DeseqError> {
-    validate_expanded_coefficient_groups(
-        design.expanded_design.n_coefficients(),
-        design.coefficient_groups,
-        "expanded beta-prior coefficient groups",
-    )?;
-    if design.coefficient_groups.len() != design.standard_design.n_coefficients() {
-        return Err(invalid_dimensions(
-            "expanded beta-prior collapsed coefficient groups",
-            design.standard_design.n_coefficients(),
-            design.coefficient_groups.len(),
-        ));
-    }
-
-    let fit_options = options.fit_options;
-    let expanded_mle_fit = fit_fixed_dispersion_glm(
-        GlmInput {
-            counts,
-            offsets: Offsets::PerCell(normalization_factors),
-            dispersions,
-            weights,
-        },
-        design.expanded_design,
-        fit_options.clone(),
-    )?;
-    let beta_prior_variance = estimate_beta_prior_variance(
-        &expanded_mle_fit.beta,
-        base_mean,
-        disp_fit,
-        design.expanded_design.coefficient_names(),
-        options.variance_options,
-    )?;
-    let expanded_prior_fit = fit_glms_with_beta_prior(
-        GlmInput {
-            counts,
-            offsets: Offsets::PerCell(normalization_factors),
-            dispersions,
-            weights,
-        },
-        design.expanded_design,
-        &beta_prior_variance,
-        fit_options,
-    )?;
-    let prior_fit = collapse_expanded_model_fit(
-        &expanded_prior_fit,
-        design.standard_design,
-        design.coefficient_groups,
-    )?;
-
-    Ok(ExpandedModelBetaPriorGlmFit {
-        expanded_mle_fit,
-        expanded_prior_fit,
-        prior_fit,
-        beta_prior_variance,
-    })
 }

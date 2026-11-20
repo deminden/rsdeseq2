@@ -165,41 +165,6 @@ fn rlog_fit_with_size_factors_for_output(
     )
 }
 
-/// Fit an rlog transform using caller-supplied frozen intercepts and size factors.
-///
-/// The supplied intercepts are treated as gene-specific log2 offsets. Only the
-/// sample-effect coefficients are fit, using the shared sample prior variance,
-/// and the output is assembled as `frozen_intercept_i + sample_effect_ij`.
-fn rlog_frozen_with_size_factors_impl(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-    dispersions: &[f64],
-    sample_prior_variance: f64,
-    frozen_intercept: &[f64],
-    options: IrlsOptions,
-) -> Result<RlogOutput, DeseqError> {
-    if size_factors.len() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "rlog size factors",
-            counts.n_samples(),
-            size_factors.len(),
-        ));
-    }
-    let normalization_factors = rlog_normalization_factors_from_size_factors(counts, size_factors)?;
-    rlog_frozen_with_normalization_factors_impl(
-        counts,
-        &normalization_factors,
-        dispersions,
-        sample_prior_variance,
-        frozen_intercept,
-        options,
-    )
-    .map(|mut output| {
-        output.offset_mode = RlogOffsetMode::SizeFactors;
-        output
-    })
-}
-
 /// Estimate the rlog sample prior from normalized counts and fit with size factors.
 ///
 /// This keeps the caller in control of dispersion inputs while avoiding a
@@ -400,45 +365,6 @@ fn rlog_fit_with_normalization_factors_for_output(
         options,
         requirements,
     )
-}
-
-/// Fit an rlog transform using caller-supplied frozen intercepts and normalization factors.
-fn rlog_frozen_with_normalization_factors_impl(
-    counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    sample_prior_variance: f64,
-    frozen_intercept: &[f64],
-    options: IrlsOptions,
-) -> Result<RlogOutput, DeseqError> {
-    validate_rlog_frozen_inputs(
-        counts,
-        normalization_factors,
-        dispersions,
-        sample_prior_variance,
-        frozen_intercept,
-    )?;
-    let design = rlog_sample_effect_design(counts.n_samples())?;
-    let beta_prior_variance =
-        rlog_sample_effect_prior_variance(counts.n_samples(), sample_prior_variance)?;
-    let frozen_factors =
-        rlog_frozen_normalization_factors(normalization_factors, frozen_intercept)?;
-    let fit = fit_prior_nf_for_output(
-        counts,
-        &design,
-        &frozen_factors,
-        dispersions,
-        &beta_prior_variance,
-        options,
-        OutputRequirements::Transform,
-    )?;
-    let transformed = rlog_transform_from_sample_effect_fit(&fit.into_matrix()?, frozen_intercept)?;
-    Ok(RlogOutput {
-        transformed,
-        intercept: frozen_intercept.to_vec(),
-        sample_prior_variance,
-        offset_mode: RlogOffsetMode::NormalizationFactors,
-    })
 }
 
 /// Estimate the rlog sample prior and fit with gene/sample normalization factors.
@@ -671,25 +597,49 @@ fn validate_rlog_sample_prior_variance(sample_prior_variance: f64) -> Result<(),
 
 fn validate_rlog_frozen_inputs(
     counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
+    offsets: Offsets<'_>,
     dispersions: &[f64],
     sample_prior_variance: f64,
     frozen_intercept: &[f64],
-) -> Result<(), DeseqError> {
-    if normalization_factors.n_rows() != counts.n_genes() {
-        return Err(invalid_dimensions(
-            "rlog normalization factor rows",
-            counts.n_genes(),
-            normalization_factors.n_rows(),
-        ));
-    }
-    if normalization_factors.n_cols() != counts.n_samples() {
-        return Err(invalid_dimensions(
-            "rlog normalization factor columns",
-            counts.n_samples(),
-            normalization_factors.n_cols(),
-        ));
-    }
+) -> Result<RlogOffsetMode, DeseqError> {
+    let offset_mode = match offsets {
+        Offsets::PerSample(factors) => {
+            if factors.len() != counts.n_samples() {
+                return Err(invalid_dimensions(
+                    "rlog size factors",
+                    counts.n_samples(),
+                    factors.len(),
+                ));
+            }
+            for (sample, &value) in factors.iter().enumerate() {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(DeseqError::NonFiniteValue {
+                        context: "rlog size factor".to_string(),
+                        index: Some(sample),
+                        value,
+                    });
+                }
+            }
+            RlogOffsetMode::SizeFactors
+        }
+        Offsets::PerCell(factors) => {
+            if factors.n_rows() != counts.n_genes() {
+                return Err(invalid_dimensions(
+                    "rlog normalization factor rows",
+                    counts.n_genes(),
+                    factors.n_rows(),
+                ));
+            }
+            if factors.n_cols() != counts.n_samples() {
+                return Err(invalid_dimensions(
+                    "rlog normalization factor columns",
+                    counts.n_samples(),
+                    factors.n_cols(),
+                ));
+            }
+            RlogOffsetMode::NormalizationFactors
+        }
+    };
     if dispersions.len() != counts.n_genes() {
         return Err(invalid_dimensions(
             "rlog dispersions",
@@ -714,45 +664,23 @@ fn validate_rlog_frozen_inputs(
             });
         }
     }
-    Ok(())
-}
-
-fn rlog_normalization_factors_from_size_factors(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "rlog output")?;
-    for _gene in 0..counts.n_genes() {
-        for (sample, size_factor) in size_factors.iter().enumerate() {
-            if !size_factor.is_finite() || *size_factor <= 0.0 {
-                return Err(DeseqError::NonFiniteValue {
-                    context: "rlog size factor".to_string(),
-                    index: Some(sample),
-                    value: *size_factor,
-                });
-            }
-            values.push(*size_factor);
-        }
-    }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
+    Ok(offset_mode)
 }
 
 fn rlog_frozen_normalization_factors(
-    normalization_factors: &RowMajorMatrix<f64>,
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
     frozen_intercept: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = Vec::with_capacity(normalization_factors.len());
+    let samples = counts.n_samples();
+    let mut values = try_alloc_matrix(counts.n_genes(), samples, "rlog frozen factors")?;
     for (gene, intercept) in frozen_intercept.iter().enumerate() {
         let intercept_factor = checked_intercept_factor(*intercept, gene)?;
-        for sample in 0..normalization_factors.n_cols() {
-            let base_factor = normalization_factors
-                .get(gene, sample)
-                .copied()
-                .unwrap_or(f64::NAN);
+        for (sample, &base_factor) in offsets.row(gene)?.iter().enumerate() {
             if !base_factor.is_finite() || base_factor <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "rlog normalization factor".to_string(),
-                    index: Some(gene * normalization_factors.n_cols() + sample),
+                    index: Some(gene * samples + sample),
                     value: base_factor,
                 });
             }
@@ -760,18 +688,14 @@ fn rlog_frozen_normalization_factors(
             if !factor.is_finite() || factor <= 0.0 {
                 return Err(DeseqError::NonFiniteValue {
                     context: "rlog frozen normalization factor".to_string(),
-                    index: Some(gene * normalization_factors.n_cols() + sample),
+                    index: Some(gene * samples + sample),
                     value: factor,
                 });
             }
             values.push(factor);
         }
     }
-    RowMajorMatrix::from_row_major(
-        normalization_factors.n_rows(),
-        normalization_factors.n_cols(),
-        values,
-    )
+    RowMajorMatrix::from_row_major(counts.n_genes(), samples, values)
 }
 
 fn checked_intercept_factor(intercept: f64, gene: usize) -> Result<f64, DeseqError> {
@@ -940,24 +864,33 @@ pub fn rlog_frozen(
     frozen_intercept: &[f64],
     options: IrlsOptions,
 ) -> Result<RlogOutput, DeseqError> {
-    match offsets {
-        Offsets::PerSample(size_factors) => rlog_frozen_with_size_factors_impl(
-            counts,
-            size_factors,
-            dispersions,
-            sample_prior_variance,
-            frozen_intercept,
-            options,
-        ),
-        Offsets::PerCell(normalization_factors) => rlog_frozen_with_normalization_factors_impl(
-            counts,
-            normalization_factors,
-            dispersions,
-            sample_prior_variance,
-            frozen_intercept,
-            options,
-        ),
-    }
+    let offset_mode = validate_rlog_frozen_inputs(
+        counts,
+        offsets,
+        dispersions,
+        sample_prior_variance,
+        frozen_intercept,
+    )?;
+    let design = rlog_sample_effect_design(counts.n_samples())?;
+    let beta_prior_variance =
+        rlog_sample_effect_prior_variance(counts.n_samples(), sample_prior_variance)?;
+    let frozen_factors = rlog_frozen_normalization_factors(counts, offsets, frozen_intercept)?;
+    let fit = fit_prior_nf_for_output(
+        counts,
+        &design,
+        &frozen_factors,
+        dispersions,
+        &beta_prior_variance,
+        options,
+        OutputRequirements::Transform,
+    )?;
+    let transformed = rlog_transform_from_sample_effect_fit(&fit.into_matrix()?, frozen_intercept)?;
+    Ok(RlogOutput {
+        transformed,
+        intercept: frozen_intercept.to_vec(),
+        sample_prior_variance,
+        offset_mode,
+    })
 }
 
 /// Deprecated form of [`rlog_frozen`] with `Offsets::PerSample`.
