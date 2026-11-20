@@ -1274,3 +1274,31 @@ The additional `many_samples` beta-prior comparison exceeded the
 was `3.007726454745714e-7` in the p-value for `gene0140`, with zero
 missingness differences or significance flips. The same command on
 `dfe9e1c` reproduced the exact gap.
+
+### Portable MAP stopping on the beta-prior reference
+
+For `gene0140`, the portable MAP line search accepted an estimated gain of
+`1.93e-11` after its rounded objective had declined. One objective ulp
+was `2.91e-11`. The recovered step kept the same score sign and shifted
+the fitted dispersion to `0.16218280510633146`. In R 4.6.2 with DESeq2
+1.52.0, the trace stayed at `0.16218277997255204` from iterations 9 to 34.
+Iteration 35 moved it to `0.16218277997255501`.
+
+After an accepted step, the portable profile retains that point when a
+later recovered gain falls below both the convergence tolerance and one
+objective ulp and the original proposal keeps the score sign. Proposals
+that cross zero can still use the existing shorter-step recovery. The
+500-sample beta-prior panel's maximum relative error fell from
+`3.008e-7` to `1.484e-12`. Release validation now runs the frozen
+beta-prior cases under the portable profile.
+
+The portable CLI passed all 121 per-contrast and nine global precision
+gates on SHA-verified GTEx references. The eleven contrasts had zero
+significance flips at adjusted p-value cutoffs 0.05 and 0.1 and complete
+top-set overlap. The portable golden manifest updates 86 fields from
+the compact GTEx Wald and LRT workflows with normalization factors.
+All 8,032 host R fields matched the existing macOS manifest.
+On macOS, 77 focused tests passed in each profile, along with Clippy
+and the locked Rust 1.96.0 library check.
+The revised portable manifest and all three beta-prior tests also passed
+on Linux arm64 and Linux x86_64 under QEMU 10.0.13.

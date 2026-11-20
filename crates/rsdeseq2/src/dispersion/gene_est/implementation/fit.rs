@@ -484,6 +484,19 @@ pub fn line_search_dispersion(
         } else {
             (rounded_acceptance, None)
         };
+        // Below one objective ulp, keep the last accepted point when
+        // the original proposal leaves the score on the same side of zero.
+        if iter_accept > 0
+            && let Some((_, gain)) = recovered
+            && gain < options.disp_tol
+            && gain <= lp.abs().next_up() - lp.abs()
+            && let Ok(end_slope) =
+                dispersion_log_posterior_derivative_objective(objective, proposed_log_alpha)
+            && end_slope != 0.0
+            && dlp.is_sign_positive() == end_slope.is_sign_positive()
+        {
+            break;
+        }
         if let Some((point, _)) = recovered
             && point != proposed_log_alpha
         {
