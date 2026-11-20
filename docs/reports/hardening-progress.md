@@ -520,6 +520,25 @@ integration tests and 10 portable-profile integration tests. The next
 milestone includes the combined release and performance checks for
 these two commits.
 
+### Preliminary dispersion mean replay
+
+An independent R 4.6.1 and DESeq2 1.52.0 replay reproduced the frozen
+gene-wise estimates for the rows with the largest trend influence.
+For `ENSG00000268892.1`, Rust also reproduced the dispersion within
+`1.1e-14` when it received DESeq2's preliminary fitted means. The
+largest difference in those means was `4.21e-4` in the blocked
+condition and `5.20e-3` in blocked split 01. The R-compatible optimizer
+reduced both differences below `7.2e-8` in the fixed-input replay.
+
+A trial used the compatible optimizer for preliminary fits and checked
+short MAP steps against the integrated score. The trial cleared both
+open fitted-dispersion comparisons. Eight other portable comparisons
+and seven host comparisons failed the full panel. All nine global gates
+passed in each profile. Replaying two of the borderline convergence
+decisions in DESeq2 with the trial's own inputs also changed the stopping
+steps from the frozen output. The trial and replay inputs were archived
+locally, and the optimizer policy was restored.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
