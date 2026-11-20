@@ -2,7 +2,7 @@
 use super::{input_slice, output_slice, run_backend};
 use rsdeseq2::glm::NormalShrinkageRows;
 use rsdeseq2::matrix::{CountRows, CountView, MatrixOrder, MatrixView};
-use rsdeseq2::normalization::normalization_factors_with_offsets;
+use rsdeseq2::normalization::visit_offset_factors_column_major;
 use rsdeseq2::results::RowFlags;
 
 unsafe fn counts<'a>(
@@ -145,18 +145,15 @@ pub unsafe extern "C" fn rsdeseq2_r_offset_factors(
             Some(unsafe { counts(genes, samples, nf)? })
         };
         // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-        let result = normalization_factors_with_offsets(genes, samples, sf, nf, unsafe {
-            input_slice(offsets, samples, "formula offsets")?
-        })
-        .map_err(|e| e.to_string())?;
+        let offsets = unsafe { input_slice(offsets, samples, "formula offsets")? };
+        let length = genes
+            .checked_mul(samples)
+            .ok_or("normalization offset shape overflow")?;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        let out = unsafe { output_slice(output, result.len(), "effective factors")? };
-        for sample in 0..samples {
-            for gene in 0..genes {
-                out[gene + sample * genes]
-                    .write(*result.get(gene, sample).ok_or("missing effective factor")?);
-            }
-        }
-        Ok(())
+        let out = unsafe { output_slice(output, length, "effective factors")? };
+        visit_offset_factors_column_major(genes, samples, sf, nf, offsets, |index, value| {
+            out[index].write(value);
+        })
+        .map_err(|error| error.to_string())
     })
 }

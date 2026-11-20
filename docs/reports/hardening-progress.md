@@ -1130,6 +1130,19 @@ run. Standalone Rust checksums matched in both numeric profiles. The
 5.3% difference for the medium portable ratio case was 0.1% over 12
 additional alternating runs.
 
+### Direct formula-offset output in R
+
+Formula offset composition shares factor validation and offset
+multipliers between the owned Rust matrix and the direct R output.
+Sample-specific products are computed once per sample. The R path
+writes the effective factors in column order and preserves the first
+logical row error when multiple products fail.
+
+The focused Rust tests and 277 R 4.6.2 expectations passed. Paired
+60,000-gene × 128-sample runs matched byte for byte with sample factors
+and per-cell factors, and both used about 58 MiB less peak RSS.
+The small-case comparison matched all five diagnostics exactly.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

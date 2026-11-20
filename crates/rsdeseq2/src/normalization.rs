@@ -4,6 +4,8 @@ use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
 mod offsets;
 pub use offsets::normalization_factors_with_offsets;
+#[doc(hidden)]
+pub use offsets::visit_offset_factors_column_major;
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::math::median::median_in_place;

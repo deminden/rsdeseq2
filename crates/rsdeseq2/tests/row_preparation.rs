@@ -78,6 +78,23 @@ fn base_factor_offset_products_match_independent_r_bits_in_both_layouts() {
         }
     }
 }
+
+#[test]
+fn streamed_offset_products_report_first_logical_failure() {
+    use rsdeseq2::normalization::visit_offset_factors_column_major;
+
+    let values = [1.0, f64::MAX, f64::MAX, 1.0];
+    let factors = MatrixView::new(2, 2, &values, MatrixOrder::ColumnMajor).unwrap();
+    let error =
+        visit_offset_factors_column_major(2, 2, None, Some(factors), &[2.0, 2.0], |_, _| {})
+            .unwrap_err();
+    assert!(matches!(
+        error,
+        DeseqError::InvalidParameter { parameter, .. }
+            if parameter == "effective normalization factor at gene 0, sample 1"
+    ));
+}
+
 #[test]
 fn shrink_rows_preserve_raw_zero_and_fitted_exclusion_semantics_across_layouts() {
     let r = json_fixture!("row_preparation_r462.json", Reference);
