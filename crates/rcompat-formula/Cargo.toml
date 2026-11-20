@@ -22,3 +22,4 @@ icu = ["dep:icu_collator", "dep:icu_locale"]
 icu_collator = { workspace = true, optional = true }
 icu_locale = { workspace = true, optional = true }
 rcompat-numeric.workspace = true
+rustc_apfloat = "0.2.3"

@@ -54,15 +54,17 @@ versions live in [docs/releases](docs/releases/).
   its p-value by 3.7e-6; no significance call changes.
 
 - `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`, with
-  four profiles chosen at run time:
+  five profiles chosen at run time:
   - `portable` (the library default): pure-Rust elementary and special
     functions and fixed-order reductions, so the same input gives the same
     bits on every OS and architecture. One golden manifest covers all targets.
   - `r-linux-x86_64`: R on Linux x86_64 (x87 extended reductions, the OpenBLAS
     Haswell dot schedule, glibc libm); available on any x86_64 host.
+  - `r-linux-arm64` uses binary128 scalar reductions, the OpenBLAS ARMV8
+    dot schedule and glibc libm.
   - `r-macos` uses the macOS system math library.
   - `r-binary64` uses binary64 reductions and the host math library.
-    It is the R profile on Linux arm64 and Windows.
+    Windows uses it as its host R profile.
   `RSDESEQ2_NUMERIC_PROFILE` selects a profile by name. The R package defaults
   to `r-host`, which selects the applicable R profile for the current host.
   Library users can select that same behavior with `RSDESEQ2_NUMERIC_PROFILE=r-host`.

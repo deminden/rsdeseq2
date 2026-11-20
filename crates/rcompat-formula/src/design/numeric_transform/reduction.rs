@@ -7,9 +7,29 @@
 pub(super) fn dot(x: &[f64], y: &[f64]) -> f64 {
     if crate::numeric::profile::r_linux_x86() {
         dot_reference_haswell(x, y)
+    } else if crate::numeric::profile::r_linux_arm64() {
+        dot_reference_armv8(x, y)
     } else {
         dot_binary64(x, y)
     }
+}
+// The contiguous ARMV8 ddot multiplies and adds separately in each
+// pair of lanes, then fuses the scalar tail into the horizontal sum.
+fn dot_reference_armv8(x: &[f64], y: &[f64]) -> f64 {
+    let mut even = 0.0;
+    let mut odd = 0.0;
+    let end = x.len() / 4 * 4;
+    for start in (0..end).step_by(4) {
+        even += x[start] * y[start];
+        odd += x[start + 1] * y[start + 1];
+        even += x[start + 2] * y[start + 2];
+        odd += x[start + 3] * y[start + 3];
+    }
+    let mut total = even + odd;
+    for i in end..x.len() {
+        total = x[i].mul_add(y[i], total);
+    }
+    total
 }
 fn dot_binary64(x: &[f64], y: &[f64]) -> f64 {
     let blocks = x.len() / 32;

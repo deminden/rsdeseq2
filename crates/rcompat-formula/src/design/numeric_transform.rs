@@ -6,6 +6,9 @@ use crate::errors::Error;
 use crate::errors::invalid_options;
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::matrix::{MatrixView, RowMajorMatrix};
+use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
+
+pub(in crate::design) mod binary128;
 
 // The x87 extended-precision kernels are the only unsafe code in the core.
 // Elsewhere a binary64 stand-in keeps the R-profile branches compiling; that
@@ -126,7 +129,10 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|row| *input.at(row, column))
                     .filter(|v| !v.is_nan());
-                if crate::numeric::profile::r_linux_x86() {
+                if r_linux_arm64() {
+                    let count = present.clone().count();
+                    binary128::column_mean(present, count)
+                } else if r_linux_x86() {
                     let count = present.clone().count();
                     let mut total = extended::sum(present);
                     total.divide(count as f64);
@@ -153,8 +159,8 @@ pub(super) fn scale_expression(
                 let present = (0..rows)
                     .map(|r| values[r * columns + column])
                     .filter(|v| !v.is_nan());
-                if crate::numeric::profile::r_linux_x86() {
-                    (extended::sum(present.clone().map(|x| x * x)).value()
+                if r_linux_arm64() || r_linux_x86() {
+                    (column_sum(present.clone().map(|x| x * x))
                         / present.count().saturating_sub(1).max(1) as f64)
                         .sqrt()
                 } else {
@@ -198,13 +204,13 @@ pub fn integer_covariate(value: f64) -> Result<f64, Error> {
     Ok((integer as i32) as f64)
 }
 
-// Scalar mean used by polynomial construction. Binary64 reduction and the
-// correction/overflow fallback are explicit and shared across all frontends.
 /// R's `mean()` for doubles under the active numeric profile (two-pass,
-/// extended precision under `r-linux-x86_64`).
+/// extended precision under the Linux R profiles).
 #[doc(hidden)]
 pub fn scalar_mean(values: &[f64]) -> f64 {
-    if crate::numeric::profile::r_linux_x86() {
+    if r_linux_arm64() {
+        binary128::mean(values)
+    } else if r_linux_x86() {
         extended::mean(values)
     } else {
         scalar_mean_binary64(values)
@@ -231,7 +237,9 @@ fn scalar_mean_binary64(values: &[f64]) -> f64 {
 }
 
 pub(super) fn column_sum(values: impl Iterator<Item = f64>) -> f64 {
-    if crate::numeric::profile::r_linux_x86() {
+    if r_linux_arm64() {
+        binary128::sum_as_double(values)
+    } else if r_linux_x86() {
         extended::sum(values).value()
     } else {
         values.sum()

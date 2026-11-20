@@ -146,25 +146,27 @@ compact-position weight rule. The optimized CLI and its `1522aac` baseline
 produced byte-identical result and fit-diagnostic TSVs for eleven full GTEx
 contrasts under the portable profile.
 
-`dcabfa5` adds the host binary64 profile so that the R wrapper uses system
-math functions on Linux arm64 and Windows. The standalone defaults remain
-portable. Each release-target check now runs the host R numerical panel
-and the portable golden manifest.
+The R wrapper selects the system math library on supported hosts. Linux arm64
+uses binary128 scalar reductions and the OpenBLAS ARMV8 dot-product order.
+Each release target runs the host R numerical panel and the portable golden
+manifest. Linux arm64 also runs its exact formula panel and its host R
+manifest.
 
 | Target | Local results |
 | --- | --- |
 | macOS arm64 | 114 release-panel tests passed. The workspace suite, both 8,032-field golden checks and the separate 56,200-gene GTEx replay passed. |
-| Linux arm64 | 114 release-panel tests, the portable manifest and both full GTEx replay tests passed in Ubuntu 24.04. A locally built R 4.6.2 reproduced the exact formula offsets and passed the independent 6,500-CDF check at the existing bounds. |
+| Linux arm64 | 1,221 workspace tests, 129 release-panel tests, both 8,032-field golden checks and both full GTEx replay tests passed in Ubuntu 24.04. |
 | Linux x86_64 | 114 release-panel tests, both golden manifests and both full GTEx replay tests passed in Ubuntu 24.04 under QEMU 10.0.13. |
 | macOS x86_64 | The locked workspace and all targets cross-compiled on macOS arm64. The runtime panel is pending. |
-| Windows x86_64 | The runtime panel is pending. |
+| Windows x86_64 | The locked workspace libraries and binaries cross-checked on macOS arm64. The test build requires a Windows SDK and the runtime panel is pending. |
 
-The wider Linux arm64 workspace run passed 1,215 tests with four failures
-and two opt-in cases. All four failures compare exact formula values against
-the macOS reference, including elementary-function rounding and high-degree
-polynomials. Fresh arm64 R with ICU and OpenBLAS reproduces the offsets
-exactly. Its 113-bit long double and BLAS implementation produce different
-last-bit reductions and polynomial matrices. This larger suite remains open.
+Original Linux arm64 R 4.6.2 with ICU 74.2 and OpenBLAS 0.3.26 independently
+regenerated all seven formula panels exactly. The installed R package and
+standalone Rust agreed with those references on 191 expression cases, 54
+native formulas, and 60 standard and expanded factor cases. The independent
+uniform posterior checks passed their original bounds. The R formula-related
+testthat subset ran 849 expectations with zero failures. Its ordered-factor
+fitting test requires DESeq2, which was absent from that Linux arm64 R library.
 
 The macOS host R profile passed all 121 per-contrast and nine global GTEx
 precision gates with the frozen references. A separate portable run passed

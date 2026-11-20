@@ -55,7 +55,8 @@ Refactoring that must not change results is checked with the
 one SHA-256 per output field over raw `f64` bits, for four inputs and the main
 workflows at 1 and 4 threads. Rust CI runs both the host R and portable profiles on Linux x86_64.
 Each release target runs the portable hash check alongside the host R
-numerical and CLI panels.
+numerical and CLI panels. Linux arm64 also runs the exact formula panels
+and checks its host R output hashes.
 
 ```sh
 cargo run --release --locked -p rsdeseq2 --example golden -- --check

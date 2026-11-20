@@ -3,38 +3,36 @@
 The standalone engine and R wrapper use the same Rust arithmetic. Independent
 references reflect the original R environment on each affected platform; R is
 never a production numerical backend. `r-host` selects the R arithmetic for
-the executing host. Linux x86_64 and macOS have specialized profiles. Linux
-arm64 and Windows use `r-binary64` with the system math library.
+the executing host. Linux x86_64, Linux arm64 and macOS have specialized
+profiles. Windows uses `r-binary64` with the system math library.
 The portable profile uses the same Rust math library on every target.
 See the [validation record](testing-parity.md#ci-status) for checked revisions.
 
 ## Linux formulas
 
-Linux x86_64 uses R 4.6.2 and OpenBLAS 0.3.26 with one thread and
-`OPENBLAS_CORETYPE=Haswell`. Pinning the kernel prevents hosted CPU changes from
-silently selecting a different original-R oracle. The Rust scalar implementation
-of the reduction schedule requires no AVX CPU.
+The Linux references use R 4.6.2 and one OpenBLAS 0.3.26 thread. Linux
+x86_64 pins `OPENBLAS_CORETYPE=Haswell` and uses 80-bit x87 scalar reductions.
+Linux arm64 pins `OPENBLAS_CORETYPE=ARMV8` and uses 128-bit scalar reductions
+with a 113-bit significand. These settings keep the original R reference
+independent of the machine's automatic kernel selection.
 
-R's Linux means, finite per-argument/column sums and BLAS norms use extended
-accumulation. Rust implements these reductions directly and retains the extended
-result until the corresponding binary64 conversion. Polynomial QR uses the
-reference kernel's reduction order and fused operations. General fitting/rank
-policies remain separate from this formula arithmetic.
+The Rust kernels follow the reference reduction order through the binary64
+conversion. Polynomial QR follows the target dot product, norm and fused
+operation schedules. The Rust Haswell implementation also runs on x86_64
+CPUs without AVX.
 
-On the matching Linux x86_64 reference environment:
+Run the regeneration check on a matching Linux R installation. For arm64:
 
 ```sh
 python3 scripts/validation/check_linux_formula_references.py \
-  --rscript Rscript --output-dir results/checks/linux-formula-reference
+  --arch aarch64 --rscript Rscript --output-dir results/checks/linux-arm64-formula-reference
 ```
 
-This independently regenerates all seven formula panels with original R and
-compares every non-provenance field with the frozen Linux snapshots: inputs,
-output bits, attributes, order and rejection decisions. The complete fitting
-panel checks R term/matrix order without column remapping. macOS snapshots stay
-unchanged. Metadata displays library basenames rather than installation paths.
-The elementary-function boundary fixture is portable and uses its common name;
-required platform-specific snapshots do not silently fall back when absent.
+Use `--arch x86_64` with the x86_64 R installation. The check regenerates
+all seven formula panels with original R and compares every non-provenance
+field with the snapshots, including input and output bits, attributes, column
+order and rejection decisions. The elementary-function boundary fixture
+uses its common name on all targets.
 
 ## Bounded posterior density
 

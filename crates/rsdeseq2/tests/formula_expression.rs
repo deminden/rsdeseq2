@@ -78,18 +78,22 @@ fn extended_builtin_arguments_and_matrix_polynomials_match_r() {
 #[test]
 fn sum_preserves_r_missing_precedence_across_nan_orders() {
     let na = f64::from_bits(0x7ff0_0000_0000_07a2);
-    let linux_x86 = rsdeseq2::numeric_profile() == rsdeseq2::NumericProfile::RLinuxX86;
-    let generated_nan = if linux_x86 {
-        0xfff8_0000_0000_0000
-    } else {
-        f64::NAN.to_bits()
+    let profile = rsdeseq2::numeric_profile();
+    let linux = matches!(
+        profile,
+        rsdeseq2::NumericProfile::RLinuxX86 | rsdeseq2::NumericProfile::RLinuxArm64
+    );
+    let generated_nan = match profile {
+        rsdeseq2::NumericProfile::RLinuxX86 => 0xfff8_0000_0000_0000,
+        rsdeseq2::NumericProfile::RLinuxArm64 => 0x7fff_ffff_ffff_ffff,
+        _ => f64::NAN.to_bits(),
     };
     let options = EvaluationOptions::default();
     for (values, expected) in [
         (vec![na, f64::NAN], 0x7ff8_0000_0000_07a2),
         (
             vec![f64::NAN, na],
-            if linux_x86 {
+            if linux {
                 f64::NAN.to_bits()
             } else {
                 0x7ff8_0000_0000_07a2
@@ -97,7 +101,7 @@ fn sum_preserves_r_missing_precedence_across_nan_orders() {
         ),
         (
             vec![f64::INFINITY, f64::NEG_INFINITY, na],
-            if linux_x86 {
+            if linux {
                 generated_nan
             } else {
                 0x7ff8_0000_0000_07a2
@@ -159,6 +163,46 @@ fn mean_preserves_r_missing_and_nan_order() {
         assert_eq!(values[0].to_bits(), expected);
     }
 }
+#[test]
+fn linux_arm64_scalar_reductions_follow_r_overflow_and_nan_bits() {
+    if rsdeseq2::numeric_profile() != rsdeseq2::NumericProfile::RLinuxArm64 {
+        return;
+    }
+    let literal = |values| Expression::Literal(Value::numbers(values));
+    let options = EvaluationOptions::default();
+    let na = f64::from_bits(0x7ff0_0000_0000_07a2);
+    // Original R 4.6.2 on Linux arm64, with a 113-bit long double.
+    for (name, inputs, expected) in [
+        (
+            "sum",
+            vec![literal(vec![f64::MAX, 2.0_f64.powi(961)])],
+            f64::INFINITY,
+        ),
+        ("sum", vec![literal(vec![1e308, 1e308, -1e308])], 1e308),
+        ("mean", vec![literal(vec![1e308, 1e308])], 1e308),
+        (
+            "sum",
+            vec![
+                literal(vec![f64::INFINITY]),
+                literal(vec![f64::NEG_INFINITY]),
+                literal(vec![na]),
+            ],
+            f64::NAN,
+        ),
+        (
+            "mean",
+            vec![literal(vec![f64::INFINITY, f64::NEG_INFINITY, na])],
+            f64::from_bits(0x7fff_ffff_ffff_ffff),
+        ),
+    ] {
+        let result = evaluate(&call(name, inputs), &[], &options).unwrap();
+        let Data::Number { values, .. } = result.data else {
+            panic!("{name} must return a number");
+        };
+        assert_eq!(values[0].to_bits(), expected.to_bits());
+    }
+}
+
 fn compare_reference(contents: &str) {
     let reference: Json = serde_json::from_str(contents).unwrap();
     let variables = reference["variables"]

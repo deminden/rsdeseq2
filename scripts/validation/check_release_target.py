@@ -16,6 +16,10 @@ RELEASE_TESTS = (
     'bounded_posterior', 'sqp_controls', 'heavy_tail', 'posterior_analysis',
     'formula_fitting',
 )
+LINUX_ARM64_FORMULA_TESTS = (
+    'formula_expression', 'model_matrix', 'native_factor', 'native_formula',
+    'numeric_transform',
+)
 
 
 def main():
@@ -23,15 +27,23 @@ def main():
     parser.add_argument('--target', required=True)
     args = parser.parse_args()
     build = ['--release', '--locked', '-p', 'rsdeseq2', '--target', args.target]
+    linux_arm64 = args.target == 'aarch64-unknown-linux-gnu'
+    tests = RELEASE_TESTS + LINUX_ARM64_FORMULA_TESTS if linux_arm64 else RELEASE_TESTS
+    host_env = {**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'r-host'}
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
-         *(f'{name}::' for name in RELEASE_TESTS)],
-        cwd=ROOT, check=True, env={**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'r-host'},
+         *(f'{name}::' for name in tests)],
+        cwd=ROOT, check=True, env=host_env,
     )
     subprocess.run(
         ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
         cwd=ROOT, check=True, env={**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'portable'},
     )
+    if linux_arm64:
+        subprocess.run(
+            ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
+            cwd=ROOT, check=True, env=host_env,
+        )
 
 
 if __name__ == '__main__':

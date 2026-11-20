@@ -929,6 +929,7 @@ dependencies = [
  "icu_collator",
  "icu_locale",
  "rcompat-numeric",
+ "rustc_apfloat",
 ]
 
 [[package]]
@@ -1019,6 +1020,16 @@ dependencies = [
  "sha2",
  "statrs",
  "thiserror",
+]
+
+[[package]]
+name = "rustc_apfloat"
+version = "0.2.3+llvm-462a31f5a5ab"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "486c2179b4796f65bfe2ee33679acf0927ac83ecf583ad6c91c3b4570911b9ad"
+dependencies = [
+ "bitflags",
+ "smallvec",
 ]
 
 [[package]]

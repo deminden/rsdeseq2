@@ -1,6 +1,7 @@
 use super::{Data, Evaluator, NA_REAL, Value, arguments, invalid_options, is_na};
 use crate::errors::invalid_formula;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
 use crate::{design::numeric_transform::scalar_mean, errors::Error};
 impl Evaluator<'_> {
     pub(super) fn summary(
@@ -21,6 +22,8 @@ impl Evaluator<'_> {
                 .map(|(_, v)| v.bool_scalar())
                 .transpose()?
                 .unwrap_or(false);
+            let linux_arm64 = r_linux_arm64();
+            let linux_x86 = r_linux_x86();
             let mut integer = true;
             let mut total = 0.0_f64;
             let mut missing = false;
@@ -40,7 +43,13 @@ impl Evaluator<'_> {
                     Data::Number { integer: true, .. } | Data::Logical(_) | Data::Null
                 );
                 let input = value.flattened().numeric()?;
-                let input = if crate::numeric::profile::r_linux_x86()
+                let input = if linux_arm64 {
+                    // R rounds each variadic argument's binary128 subtotal
+                    // before adding it to the final binary64 result.
+                    vec![crate::design::numeric_transform::binary128::sum_argument(
+                        input.into_iter().filter(|value| !remove || !value.is_nan()),
+                    )]
+                } else if linux_x86
                     && input
                         .iter()
                         .filter(|value| !remove || !value.is_nan())
@@ -55,7 +64,7 @@ impl Evaluator<'_> {
                     input
                 };
                 for v in input {
-                    if !remove || !v.is_nan() {
+                    if linux_arm64 || !remove || !v.is_nan() {
                         missing |= is_na(v);
                         if !total.is_nan() {
                             if v.is_nan() {
@@ -67,7 +76,7 @@ impl Evaluator<'_> {
                                 if total.is_nan() {
                                     // R's accumulator yields a negative NaN
                                     // for Inf + -Inf on x86 Linux.
-                                    total = if crate::numeric::profile::r_linux_x86() {
+                                    total = if linux_x86 {
                                         f64::from_bits(0xfff8_0000_0000_0000)
                                     } else {
                                         f64::NAN
@@ -80,9 +89,9 @@ impl Evaluator<'_> {
             }
             if integer && total.is_nan() {
                 total = NA_REAL;
-            } else if missing && !crate::numeric::profile::r_linux_x86() {
-                // Apple's R gives NA precedence over an earlier NaN. On x86
-                // Linux, R preserves the accumulator's first NaN instead.
+            } else if missing && !(linux_x86 || linux_arm64) {
+                // Apple's R gives NA precedence over an earlier NaN. The Linux
+                // R profiles preserve the accumulator's first NaN.
                 total = f64::from_bits(0x7ff8_0000_0000_07a2);
             } else if total <= i32::MIN as f64 || total > i32::MAX as f64 {
                 integer = false;
