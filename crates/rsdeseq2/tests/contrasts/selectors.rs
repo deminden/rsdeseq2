@@ -195,19 +195,19 @@ fn coefficient_name_contrast_rejects_ambiguous_component_cleaned_interaction_ali
     )
     .unwrap();
 
-    let err = resolve_contrast(
-        &design,
-        &ContrastSpec::coefficient_name("cell.type_B.cell_vs_T.cell:dose.value_plus_1"),
-    )
-    .unwrap_err();
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("ambiguously"));
-    assert!(
-        resolve_coefficient_index(&design, "cell.type_B.cell_vs_T.cell:dose.value_plus_1")
-            .unwrap_err()
-            .to_string()
-            .contains("ambiguously")
-    );
+    let name = "cell.type_B.cell_vs_T.cell:dose.value_plus_1";
+    let errors = [
+        resolve_contrast(&design, &ContrastSpec::coefficient_name(name)).unwrap_err(),
+        resolve_coefficient_index(&design, name).unwrap_err(),
+    ];
+    for error in errors {
+        assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
+        std::assert_matches!(
+            error,
+            DeseqError::AmbiguousCoefficient { candidates, matches, .. }
+                if candidates == [name] && matches == design.coefficient_names().unwrap()[1..]
+        );
+    }
 }
 
 #[test]
@@ -441,7 +441,12 @@ fn list_contrast_rejects_ambiguous_component_cleaned_interaction_aliases() {
 
     let err = resolve_contrast(&design, &contrast).unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("ambiguously"));
+    std::assert_matches!(
+        err,
+        DeseqError::AmbiguousCoefficient { candidates, matches, .. }
+            if candidates == ["cell.type_B.cell_vs_T.cell:dose.value_plus_1"]
+                && matches == design.coefficient_names().unwrap()[1..]
+    );
 }
 
 #[test]

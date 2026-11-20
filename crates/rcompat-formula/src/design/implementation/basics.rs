@@ -535,20 +535,12 @@ impl DesignMatrix {
         if rank == self.n_coefficients() {
             return Ok(());
         }
-        let zero_columns = self.zero_columns(tolerance);
-        let reason = if zero_columns.is_empty() {
-            format!(
-                "{context} model matrix is not full rank: rank {rank}, columns {}",
-                self.n_coefficients()
-            )
-        } else {
-            format!(
-                "{context} model matrix is not full rank: rank {rank}, columns {}; zero columns: {}",
-                self.n_coefficients(),
-                zero_columns.join(", ")
-            )
-        };
-        Err(Error::InvalidOptions { reason })
+        Err(Error::DesignRankDeficient {
+            context: context.into(),
+            rank,
+            columns: self.n_coefficients(),
+            zero_columns: self.zero_columns(tolerance),
+        })
     }
 
     fn zero_columns(&self, tolerance: f64) -> Vec<String> {

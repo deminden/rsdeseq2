@@ -28,15 +28,17 @@ pub(super) fn validate_lrt_designs(
         .ok_or_else(|| DeseqError::InvalidOptions {
             reason: "LRT combined design dimensions overflow".into(),
         })?;
-    let mut values = Vec::new();
+    let mut values = try_alloc_matrix(full.n_samples(), columns, "LRT combined design")?;
     for row in 0..full.n_samples() {
         values.extend_from_slice(full.matrix().row(row)?);
         values.extend_from_slice(reduced.matrix().row(row)?);
     }
     let combined = DesignMatrix::from_row_major(full.n_samples(), columns, values, None)?;
-    if combined.rank()? != full.n_coefficients() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "LRT reduced design must be nested in the full design column space".into(),
+    let combined_rank = combined.rank()?;
+    if combined_rank != full.n_coefficients() {
+        return Err(DeseqError::LrtDesignNotNested {
+            full_rank: full.n_coefficients(),
+            combined_rank,
         });
     }
     Ok(())

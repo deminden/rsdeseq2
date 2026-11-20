@@ -61,7 +61,11 @@ fn contrast_all_zero_numeric_rejects_overflowed_design_score() {
     let err = contrast_all_zero_numeric(&counts, &design, &[1.0, -1.0]).unwrap_err();
 
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Numeric);
-    assert!(err.to_string().contains("contrastAllZero design score"));
+    std::assert_matches!(
+        err,
+        DeseqError::NonFiniteValue { context, index: Some(0), value: f64::INFINITY }
+            if context == "contrastAllZero design score"
+    );
 }
 
 #[test]

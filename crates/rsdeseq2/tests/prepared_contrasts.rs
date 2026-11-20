@@ -118,16 +118,18 @@ fn prepared_shapes_and_primitive_context_are_validated_without_fabricated_fit_st
         None,
     )
     .unwrap();
-    assert!(
+    std::assert_matches!(
         context
             .evaluate(
                 &[-1., 1.],
                 Some(&WaldTestOptions::normal()),
                 ContrastZeroRule::Numeric
             )
-            .unwrap_err()
-            .to_string()
-            .contains("modelMatrix")
+            .unwrap_err(),
+        rsdeseq2::DeseqError::MissingPrerequisite { domain, operation, prerequisite }
+            if domain == rsdeseq2::errors::ErrorKind::Options
+                && operation == "numeric contrast all-zero handling"
+                && prerequisite == "modelMatrix"
     );
     assert!(
         context

@@ -63,7 +63,11 @@ fn dispersion_trends_report_generic_mean_validation_context() {
         local.evaluate(0.0).unwrap_err(),
     ] {
         assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Numeric);
-        assert!(err.to_string().contains("dispersion trend mean"));
+        std::assert_matches!(
+            err,
+            DeseqError::NonFiniteValue { context, index: None, value: 0.0 }
+                if context == "dispersion trend mean"
+        );
     }
 }
 
@@ -130,23 +134,18 @@ fn trend_selection_helpers_report_helper_specific_dimension_contexts() {
     let mean_fit = mean_trend_use_for_fit(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
     let mean_value = mean_trend_use_for_mean(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
 
-    assert!(
-        parametric
-            .to_string()
-            .contains("parametric dispersion trend rows")
-    );
-    assert_eq!(local.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(local.to_string().contains("local dispersion trend rows"));
-    assert!(
-        mean_fit
-            .to_string()
-            .contains("mean dispersion trend fit rows")
-    );
-    assert!(
-        mean_value
-            .to_string()
-            .contains("mean dispersion trend rows")
-    );
+    for (error, operation) in [
+        (parametric, "parametric dispersion trend rows"),
+        (local, "local dispersion trend rows"),
+        (mean_fit, "mean dispersion trend fit rows"),
+        (mean_value, "mean dispersion trend rows"),
+    ] {
+        std::assert_matches!(
+            error,
+            DeseqError::InvalidDimensions { context, expected: 2, actual: 1 }
+                if context == operation
+        );
+    }
 }
 
 #[test]
@@ -382,7 +381,14 @@ fn mean_trend_reports_trend_specific_invalid_fit_context() {
         .unwrap_err();
 
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
-    assert!(err.to_string().contains("mean dispersion trend value"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidParameter {
+            domain: ErrorKind::Dispersion,
+            parameter,
+            requirement: rsdeseq2::errors::Requirement::FiniteAndPositive,
+        } if parameter == "mean dispersion trend value"
+    );
 }
 
 #[test]
@@ -755,7 +761,11 @@ fn mean_trend_use_for_fit_matches_deseq2_viability_threshold() {
 
     let err = mean_trend_use_for_fit(&[10.0, 20.0], &[0.1], 1e-8).unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("mean dispersion trend fit rows"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 2, actual: 1 }
+            if context == "mean dispersion trend fit rows"
+    );
 }
 
 #[test]

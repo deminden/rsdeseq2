@@ -92,6 +92,20 @@ exact phrase. `domain` is an `ErrorKind` limited to `Options`, `Dispersion`,
 
 `kind()` is `domain`, as before.
 
+## Design, contrast and GLM diagnostics
+
+| Variant | Fields | Kind |
+| --- | --- | --- |
+| `DesignRankDeficient` | Validation context, rank, column count and zero-column labels | `Options` |
+| `LrtDesignNotNested` | Full design rank and combined rank | `Options` |
+| `AmbiguousCoefficient` | Requested names or levels and matching columns in model-matrix order | `Options` |
+| `AllZeroGene` | Zero-based fit row and original count-matrix row | `Counts` |
+| `InvalidGeneValue` | Operation, zero-based gene and optional sample, rejected value | Original domain |
+
+These variants preserve the messages of the errors they replace. An intercept
+fit reports the sample for a rejected per-sample calculation. A failed
+gene-wide reduction can have no sample.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

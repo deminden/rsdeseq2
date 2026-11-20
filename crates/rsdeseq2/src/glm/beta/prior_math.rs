@@ -1,3 +1,4 @@
+use super::intercept::intercept_value_error;
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 // Prior input checks, stable arithmetic and quantiles.
@@ -86,31 +87,33 @@ pub(super) fn checked_square(value: f64) -> Option<f64> {
 }
 
 pub(super) fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
-    let se = sigma.sqrt();
-    let Some(value) = checked::mul(std::f64::consts::LOG2_E, se) else {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("gene {gene} has non-finite intercept beta standard error"),
-        });
-    };
-    Ok(value)
+    checked::try_mul(std::f64::consts::LOG2_E, sigma.sqrt()).map_err(|failure| {
+        intercept_value_error(
+            ErrorKind::Dispersion,
+            gene,
+            None,
+            "intercept beta standard error",
+            "non-finite",
+            failure.value,
+        )
+    })
 }
 
 pub(super) fn checked_intercept_beta_covariance(
     sigma: f64,
     gene: usize,
 ) -> Result<f64, DeseqError> {
-    let log2_e = std::f64::consts::LOG2_E;
-    let Some(log2_e_squared) = checked::mul(log2_e, log2_e) else {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "non-finite log2 covariance scaling factor".to_string(),
-        });
-    };
-    let Some(value) = checked::mul(log2_e_squared, sigma) else {
-        return Err(DeseqError::InvalidDispersion {
-            reason: format!("gene {gene} has non-finite intercept beta covariance"),
-        });
-    };
-    Ok(value)
+    const LOG2_E_SQUARED: f64 = std::f64::consts::LOG2_E * std::f64::consts::LOG2_E;
+    checked::try_mul(LOG2_E_SQUARED, sigma).map_err(|failure| {
+        intercept_value_error(
+            ErrorKind::Dispersion,
+            gene,
+            None,
+            "intercept beta covariance",
+            "non-finite",
+            failure.value,
+        )
+    })
 }
 
 pub(super) fn validate_upper_quantile(upper_quantile: f64) -> Result<(), DeseqError> {

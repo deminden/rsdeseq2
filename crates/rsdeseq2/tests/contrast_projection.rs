@@ -118,7 +118,11 @@ fn borrowed_estimates_reject_shape_aliases_and_missing_context() {
     let wrong_se =
         InferenceEstimates::new(matrix(2, 3, &beta), Some(matrix(3, 2, &beta)), None).unwrap_err();
     assert_eq!(wrong_se.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(wrong_se.to_string().contains("betaSE rows"));
+    std::assert_matches!(
+        wrong_se,
+        DeseqError::InvalidDimensions { context, expected: 2, actual: 3 }
+            if context == "Wald betaSE rows"
+    );
     let covariance = [1.; 8];
     let wrong_cov = InferenceEstimates::new(
         matrix(2, 3, &beta),
@@ -127,17 +131,20 @@ fn borrowed_estimates_reject_shape_aliases_and_missing_context() {
     )
     .unwrap_err();
     assert_eq!(wrong_cov.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(wrong_cov.to_string().contains("covariance coefficients"));
+    std::assert_matches!(
+        wrong_cov,
+        DeseqError::InvalidDimensions { context, expected: 3, actual: 2 }
+            if context == "beta covariance coefficients"
+    );
     let view =
         InferenceEstimates::new(matrix(2, 3, &beta), Some(matrix(2, 3, &beta)), None).unwrap();
     assert!(view.project_contrast(&[1., 0.]).is_err());
     assert!(view.project_contrast(&[0.; 3]).is_err());
     assert!(view.project_contrast(&[1., f64::INFINITY, 0.]).is_err());
-    assert!(
-        view.project_contrast(&[1., -1., 0.])
-            .unwrap_err()
-            .to_string()
-            .contains("betaCovariance")
+    std::assert_matches!(
+        view.project_contrast(&[1., -1., 0.]).unwrap_err(),
+        DeseqError::UnsupportedFeature { feature }
+            if feature == "betaCovariance (beta covariance matrices) is required for multi-coefficient or numeric contrast SEs"
     );
     assert!(
         wald_test_contrast_from_estimates(

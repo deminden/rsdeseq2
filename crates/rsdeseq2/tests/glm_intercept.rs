@@ -1,6 +1,8 @@
 use approx::assert_relative_eq;
+use rsdeseq2::errors::ErrorKind;
 use rsdeseq2::glm::nb::nbinom_log_likelihood;
 use rsdeseq2::prelude::*;
+use std::assert_matches;
 
 #[test]
 fn intercept_only_unweighted_fit_matches_deseq2_shortcut_formulas() {
@@ -116,8 +118,14 @@ fn intercept_only_weighted_fit_keeps_large_finite_normalized_mean() {
 fn intercept_only_fit_rejects_all_zero_rows() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![0, 0, 0]).unwrap();
     let err = fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0, 1.0], &[0.1]).unwrap_err();
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
-    assert!(err.to_string().contains("all zero"));
+    assert_eq!(err.kind(), ErrorKind::Counts);
+    assert_matches!(
+        err,
+        DeseqError::AllZeroGene {
+            gene: 0,
+            source_gene: 0
+        }
+    );
 }
 
 #[test]
@@ -153,9 +161,16 @@ fn intercept_only_fit_rejects_nonfinite_normalized_mean() {
     )
     .unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("non-finite normalized intercept mean")
+    assert_matches!(
+        err,
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Counts,
+            operation: "normalized intercept mean",
+            gene: 0,
+            sample: Some(0),
+            value: f64::INFINITY,
+            ..
+        }
     );
 }
 
@@ -172,8 +187,17 @@ fn intercept_only_fit_rejects_nonfinite_reconstructed_mu() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
-    assert!(err.to_string().contains("non-finite fitted intercept mean"));
+    assert_matches!(
+        err,
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Counts,
+            operation: "fitted intercept mean",
+            gene: 0,
+            sample: Some(1),
+            value: f64::INFINITY,
+            ..
+        }
+    );
 }
 
 #[test]
@@ -182,8 +206,15 @@ fn intercept_only_fit_rejects_nonfinite_output_covariance() {
 
     let err = fit_intercept_only_fixed_dispersion(&counts, &[1.0, 1.0], &[f64::MAX]).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("non-finite intercept beta covariance")
+    assert_matches!(
+        err,
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Dispersion,
+            operation: "intercept beta covariance",
+            gene: 0,
+            sample: None,
+            value: f64::INFINITY,
+            ..
+        }
     );
 }

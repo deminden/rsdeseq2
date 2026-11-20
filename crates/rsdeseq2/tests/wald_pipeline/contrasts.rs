@@ -421,9 +421,12 @@ fn fixed_dispersion_wald_results_character_contrast_requires_sample_levels() {
         )
         .unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("requires sample levels for contrastAllZero")
+    std::assert_matches!(
+        err,
+        DeseqError::MissingPrerequisite { domain, operation, prerequisite }
+            if domain == ErrorKind::Options
+                && operation == "character results contrast"
+                && prerequisite == "sample levels for contrastAllZero"
     );
 }
 

@@ -235,6 +235,20 @@ fn selected_irls_means_match_compacted_rows_with_offsets_and_weights() {
         force_optim: true,
         ..IrlsOptions::default()
     };
+    let all_zero = fit_selected_irls_means(
+        GlmInput::new(&counts, Offsets::PerSample(&factors), &[0.1, 0.2, 0.3]),
+        &design,
+        options.clone(),
+        &[1, 2],
+    )
+    .unwrap_err();
+    std::assert_matches!(
+        all_zero,
+        DeseqError::AllZeroGene {
+            gene: 0,
+            source_gene: 1
+        }
+    );
 
     // Reverse the selected rows. The fit must return compact output in request
     // order while drawing every input field from the same source row.

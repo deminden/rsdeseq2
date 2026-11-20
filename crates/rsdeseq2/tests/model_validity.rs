@@ -1,4 +1,6 @@
+use rsdeseq2::DeseqError;
 use rsdeseq2::prelude::{CountMatrix, DeseqBuilder, DesignMatrix};
+use std::assert_matches;
 
 #[test]
 fn default_rank_is_invariant_to_covariate_units() {
@@ -78,5 +80,11 @@ fn non_nested_lrt_fails_before_dispersion_estimation() {
         .fit_lrt_with_results(&counts, &full, &reduced)
         .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("nested"), "{err}");
+    assert_matches!(
+        err,
+        DeseqError::LrtDesignNotNested {
+            full_rank: 2,
+            combined_rank: 3
+        }
+    );
 }

@@ -116,7 +116,11 @@ fn design_matrix_detects_dependent_columns() {
     assert!(!design.is_full_rank().unwrap());
     let error = design.validate_full_rank("test").unwrap_err();
     assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(error.to_string().contains("not full rank"));
+    assert_matches!(
+        error,
+        DeseqError::DesignRankDeficient { context, rank: 1, columns: 2, zero_columns }
+            if context == "test" && zero_columns.is_empty()
+    );
 }
 
 #[test]
@@ -134,9 +138,15 @@ fn design_matrix_reports_zero_columns_in_full_rank_error() {
     .unwrap();
 
     let error = design.validate_full_rank("test").unwrap_err();
-    let message = error.to_string();
-    assert!(message.contains("not full rank"));
-    assert!(message.contains("empty_group"));
+    assert_eq!(
+        error.to_string(),
+        "invalid options: test model matrix is not full rank: rank 1, columns 2; zero columns: empty_group"
+    );
+    assert_matches!(
+        error,
+        DeseqError::DesignRankDeficient { context, rank: 1, columns: 2, zero_columns }
+            if context == "test" && zero_columns == ["empty_group"]
+    );
 }
 
 #[test]
@@ -154,10 +164,11 @@ fn original_design_full_rank_error_reports_unnamed_zero_column_index() {
     .unwrap();
 
     let error = design.validate_full_rank("test").unwrap_err();
-    let message = error.to_string();
-
-    assert!(message.contains("not full rank"));
-    assert!(message.contains("zero columns: 1"));
+    assert_matches!(
+        error,
+        DeseqError::DesignRankDeficient { context, rank: 1, columns: 2, zero_columns }
+            if context == "test" && zero_columns == ["1"]
+    );
 }
 
 #[test]

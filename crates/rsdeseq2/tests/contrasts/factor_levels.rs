@@ -251,7 +251,11 @@ fn factor_level_contrast_rejects_ambiguous_shared_reference_names() {
     let err =
         resolve_contrast(&design, &ContrastSpec::factor_level("condition", "C", "B")).unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("resolves ambiguously"));
+    std::assert_matches!(
+        err,
+        DeseqError::AmbiguousCoefficient { candidates, matches, .. }
+            if candidates == ["C", "B"] && matches == design.coefficient_names().unwrap()[1..]
+    );
 }
 
 #[test]
@@ -274,7 +278,12 @@ fn factor_level_contrast_rejects_ambiguous_candidate_name_aliases() {
     )
     .unwrap_err();
     assert_eq!(treatment_err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(treatment_err.to_string().contains("ambiguously"));
+    std::assert_matches!(
+        treatment_err,
+        DeseqError::AmbiguousCoefficient { candidates, matches, .. }
+            if candidates.iter().any(|name| name == "condition_B.1_vs_A.1")
+                && matches == treatment_design.coefficient_names().unwrap()[1..]
+    );
 
     let expanded_design = DesignMatrix::from_row_major(
         4,
@@ -294,7 +303,12 @@ fn factor_level_contrast_rejects_ambiguous_candidate_name_aliases() {
     )
     .unwrap_err();
     assert_eq!(expanded_err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(expanded_err.to_string().contains("ambiguously"));
+    std::assert_matches!(
+        expanded_err,
+        DeseqError::AmbiguousCoefficient { candidates, matches, .. }
+            if candidates.iter().any(|name| name == "conditionB.1")
+                && matches == ["conditionB.1", "conditionB.1"]
+    );
 }
 
 #[test]
@@ -317,7 +331,11 @@ fn factor_level_contrast_rejects_ambiguous_formula_factor_transform_aliases() {
     )
     .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("ambiguously"));
+    std::assert_matches!(
+        err,
+        DeseqError::AmbiguousCoefficient { matches, .. }
+            if matches == design.coefficient_names().unwrap()[1..]
+    );
 }
 
 #[test]

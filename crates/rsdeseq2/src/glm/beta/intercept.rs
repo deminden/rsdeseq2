@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::ErrorKind;
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::math::ProfileMath;
 // Intercept-only fits, normalization and working weights.
@@ -79,32 +80,48 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
             Some(weights) => weighted_mean(&normalized_row, weights, gene, &mut weighted_values)?,
             None => {
                 if counts.is_all_zero_gene(gene)? {
-                    return Err(DeseqError::InvalidCounts {
-                        reason: format!(
-                            "gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"
-                        ),
+                    return Err(DeseqError::AllZeroGene {
+                        gene,
+                        source_gene: gene,
                     });
                 }
-                checked::mean(&normalized_row).ok_or_else(|| DeseqError::InvalidCounts {
-                    reason: format!("gene {gene} has non-finite normalized intercept mean"),
+                checked::try_mean(&normalized_row).map_err(|failure| {
+                    intercept_value_error(
+                        ErrorKind::Counts,
+                        gene,
+                        failure.index,
+                        "normalized intercept mean",
+                        "non-finite",
+                        failure.value,
+                    )
                 })?
             }
         };
         if !mean_normalized.is_finite() || mean_normalized <= 0.0 {
-            return Err(DeseqError::InvalidCounts {
-                reason: format!("gene {gene} has non-positive normalized intercept mean"),
-            });
+            return Err(intercept_value_error(
+                ErrorKind::Counts,
+                gene,
+                None,
+                "normalized intercept mean",
+                "non-positive",
+                mean_normalized,
+            ));
         }
 
         let beta_log2 = mean_normalized.log2_p();
         beta_values.push(beta_log2);
 
-        for factor in factor_row {
+        for (sample, factor) in factor_row.iter().enumerate() {
             let mu = *factor * 2.0_f64.powf_p(beta_log2);
             if !mu.is_finite() || mu <= 0.0 {
-                return Err(DeseqError::InvalidCounts {
-                    reason: format!("gene {gene} has non-finite fitted intercept mean"),
-                });
+                return Err(intercept_value_error(
+                    ErrorKind::Counts,
+                    gene,
+                    Some(sample),
+                    "fitted intercept mean",
+                    "non-finite",
+                    mu,
+                ));
             }
             mu_values.push(mu);
         }
@@ -112,32 +129,51 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
         let mu_start = gene * counts.n_samples();
         let mu_row = &mu_values[mu_start..mu_start + counts.n_samples()];
         let working_weights = intercept_working_weights(mu_row, dispersion, weight_row)?;
-        let xtwx = checked::sum(working_weights.iter().copied()).ok_or_else(|| {
-            DeseqError::InvalidDispersion {
-                reason: format!("gene {gene} has non-finite intercept information"),
-            }
+        let xtwx = checked::try_sum(working_weights.iter().copied()).map_err(|failure| {
+            intercept_value_error(
+                ErrorKind::Dispersion,
+                gene,
+                failure.index,
+                "intercept information",
+                "non-finite",
+                failure.value,
+            )
         })?;
         if !xtwx.is_finite() || xtwx <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: format!("gene {gene} has non-positive intercept information"),
-            });
+            return Err(intercept_value_error(
+                ErrorKind::Dispersion,
+                gene,
+                None,
+                "intercept information",
+                "non-positive",
+                xtwx,
+            ));
         }
         let sigma = xtwx.recip();
         if !sigma.is_finite() {
-            return Err(DeseqError::InvalidDispersion {
-                reason: format!("gene {gene} has non-finite intercept covariance"),
-            });
+            return Err(intercept_value_error(
+                ErrorKind::Dispersion,
+                gene,
+                None,
+                "intercept covariance",
+                "non-finite",
+                sigma,
+            ));
         }
         beta_se_values.push(checked_intercept_beta_se(sigma, gene)?);
         beta_covariance_values.push(checked_intercept_beta_covariance(sigma, gene)?);
         for (sample, value) in working_weights.into_iter().enumerate() {
-            let Some(hat) = checked::mul(value, sigma) else {
-                return Err(DeseqError::InvalidDispersion {
+            let hat =
+                checked::try_mul(value, sigma).map_err(|failure| DeseqError::InvalidGeneValue {
+                    domain: ErrorKind::Dispersion,
+                    operation: "intercept hat diagonal",
+                    gene,
+                    sample: Some(sample),
+                    value: failure.value,
                     reason: format!(
                         "gene {gene} sample {sample} has non-finite intercept hat diagonal"
                     ),
-                });
-            };
+                })?;
             hat_values.push(hat);
         }
     }
@@ -176,6 +212,24 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
     })
 }
 
+pub(super) fn intercept_value_error(
+    domain: ErrorKind,
+    gene: usize,
+    sample: Option<usize>,
+    operation: &'static str,
+    issue: &str,
+    value: f64,
+) -> DeseqError {
+    DeseqError::InvalidGeneValue {
+        domain,
+        operation,
+        gene,
+        sample,
+        value,
+        reason: format!("gene {gene} has {issue} {operation}"),
+    }
+}
+
 /// Fit DESeq2's intercept-only fixed-dispersion shortcut with normalization factors.
 ///
 /// DESeq2's low-level code reconstructs `mu` as
@@ -206,6 +260,16 @@ pub(super) fn weighted_mean(
     weighted_values: &mut Vec<f64>,
 ) -> Result<f64, DeseqError> {
     weighted_values.clear();
+    let invalid_mean = |sample, value| {
+        intercept_value_error(
+            ErrorKind::Counts,
+            gene,
+            sample,
+            "weighted normalized mean",
+            "non-finite",
+            value,
+        )
+    };
     for (sample, (value, weight)) in values
         .iter()
         .copied()
@@ -213,41 +277,36 @@ pub(super) fn weighted_mean(
         .enumerate()
     {
         validate_nonnegative_finite(weight, "weight", sample)?;
-        let Some(value_term) = checked::mul(weight, value) else {
-            return Err(DeseqError::InvalidCounts {
-                reason: format!("gene {gene} has non-finite weighted normalized mean"),
-            });
-        };
+        let value_term = checked::try_mul(weight, value)
+            .map_err(|failure| invalid_mean(Some(sample), failure.value))?;
         weighted_values.push(value_term);
     }
-    let Some(numerator_mean) = checked::mean(weighted_values) else {
-        return Err(DeseqError::InvalidCounts {
-            reason: format!("gene {gene} has non-finite weighted normalized mean"),
-        });
-    };
-    let Some(denominator) = checked::scaled_sum(weights) else {
-        return Err(DeseqError::InvalidCounts {
-            reason: format!("gene {gene} has non-finite total weight"),
-        });
-    };
-    if !denominator.is_finite() {
-        return Err(DeseqError::InvalidCounts {
-            reason: format!("gene {gene} has non-finite total weight"),
-        });
-    }
-    if denominator <= 0.0 {
-        return Err(DeseqError::InvalidCounts {
-            reason: format!("gene {gene} has zero total weight"),
-        });
-    }
-    let mean_scale = checked::div(weighted_values.len() as f64, denominator).ok_or_else(|| {
-        DeseqError::InvalidCounts {
-            reason: format!("gene {gene} has non-finite weighted normalized mean"),
-        }
+    let numerator_mean = checked::try_mean(weighted_values)
+        .map_err(|failure| invalid_mean(failure.index, failure.value))?;
+    let denominator = checked::try_scaled_sum(weights).map_err(|failure| {
+        intercept_value_error(
+            ErrorKind::Counts,
+            gene,
+            failure.index,
+            "total weight",
+            "non-finite",
+            failure.value,
+        )
     })?;
-    checked::mul(numerator_mean, mean_scale).ok_or_else(|| DeseqError::InvalidCounts {
-        reason: format!("gene {gene} has non-finite weighted normalized mean"),
-    })
+    if denominator <= 0.0 {
+        return Err(intercept_value_error(
+            ErrorKind::Counts,
+            gene,
+            None,
+            "total weight",
+            "zero",
+            denominator,
+        ));
+    }
+    let mean_scale = checked::try_div(weighted_values.len() as f64, denominator)
+        .map_err(|failure| invalid_mean(None, failure.value))?;
+    checked::try_mul(numerator_mean, mean_scale)
+        .map_err(|failure| invalid_mean(None, failure.value))
 }
 
 pub(super) fn intercept_working_weights(

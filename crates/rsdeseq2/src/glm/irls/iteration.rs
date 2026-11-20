@@ -23,9 +23,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     let source_gene = input.rows.source(gene);
     let count_row = input.rows.input.counts.row(source_gene)?;
     if count_row.iter().all(|&count| count == 0) {
-        return Err(DeseqError::InvalidCounts {
-            reason: format!("gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows"),
-        });
+        return Err(DeseqError::AllZeroGene { gene, source_gene });
     }
     let IrlsScratch {
         counts: y,

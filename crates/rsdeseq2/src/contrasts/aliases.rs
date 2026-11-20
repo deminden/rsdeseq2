@@ -56,8 +56,10 @@ pub(super) fn resolve_coefficient_name(
             .next()
             .copied()
             .ok_or_else(|| crate::errors::invariant("one coefficient alias match")),
-        _ => Err(DeseqError::InvalidOptions {
+        _ => Err(DeseqError::AmbiguousCoefficient {
             reason: format!("coefficient '{wanted}' resolves ambiguously after R-style cleanup"),
+            candidates: vec![wanted.into()],
+            matches: matched_coefficients(names, &matches),
         }),
     }
 }
@@ -203,13 +205,24 @@ pub(super) fn find_first_coefficient(
             .next()
             .copied()
             .ok_or_else(|| crate::errors::invariant("one coefficient alias match")),
-        _ => Err(DeseqError::InvalidOptions {
+        _ => Err(DeseqError::AmbiguousCoefficient {
             reason: format!(
                 "candidate coefficients resolve ambiguously after R-style cleanup: {}",
                 candidates.join(", ")
             ),
+            candidates: candidates.to_vec(),
+            matches: matched_coefficients(names, &matches),
         }),
     }
+}
+
+fn matched_coefficients(names: &[String], matches: &HashSet<usize>) -> Vec<String> {
+    names
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| matches.contains(index))
+        .map(|(_, name)| name.clone())
+        .collect()
 }
 
 pub(super) fn find_optional_coefficient(
@@ -255,10 +268,17 @@ pub(super) fn find_shared_reference_standard_coefficients(
     match shared.as_slice() {
         [] => Ok(None),
         [(numerator_index, denominator_index)] => Ok(Some((*numerator_index, *denominator_index))),
-        _ => Err(DeseqError::InvalidOptions {
+        _ => Err(DeseqError::AmbiguousCoefficient {
             reason: format!(
                 "factor-level contrast {factor}: {numerator} vs {denominator} resolves ambiguously through shared-reference coefficient names"
             ),
+            candidates: vec![numerator.into(), denominator.into()],
+            matches: names
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| shared.iter().any(|(a, b)| a == index || b == index))
+                .map(|(_, name)| name.clone())
+                .collect(),
         }),
     }
 }

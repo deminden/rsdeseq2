@@ -120,7 +120,11 @@ fn supplied_geo_means_length_is_validated() {
     let err = estimate_size_factors_ratio_with_options(&counts, Some(&[1.0, 2.0, 3.0]), None)
         .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("geometric means"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 4, actual: 3 }
+            if context == "geometric means"
+    );
 }
 
 #[test]
@@ -146,7 +150,11 @@ fn control_gene_indices_are_validated() {
     let counts = CountMatrix::from_row_major_u32(2, 3, vec![2, 4, 8, 4, 8, 16]).unwrap();
     let err = estimate_size_factors_ratio_with_options(&counts, None, Some(&[2])).unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("control gene index"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 1, actual: 2 }
+            if context == "control gene index"
+    );
 }
 
 #[test]
@@ -168,7 +176,11 @@ fn builder_validates_control_gene_mask_length() {
         .fit_size_factors_and_base_means(&counts)
         .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Shape);
-    assert!(err.to_string().contains("control gene mask"));
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidDimensions { context, expected: 2, actual: 1 }
+            if context == "control gene mask"
+    );
 }
 
 #[test]

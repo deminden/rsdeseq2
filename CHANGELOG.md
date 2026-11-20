@@ -133,6 +133,13 @@ versions live in [docs/releases](docs/releases/).
   invariants (`ErrorKind::Internal`). Design note:
   `docs/design/structured-errors.md`.
 
+- Rank-deficient and non-nested LRT designs now report their computed ranks
+  in structured errors. Ambiguous coefficient requests retain their
+  candidates and matches. All-zero GLM rows report fit and source indices,
+  and intercept-fit arithmetic errors carry the rejected value and its
+  gene and sample when available. Existing messages and error kinds are
+  preserved for these cases.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

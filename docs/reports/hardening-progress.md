@@ -753,6 +753,23 @@ expectations with zero skips on both R 4.5.3 and R 4.6.2. Both checks
 retained the two vendoring notes, and R 4.6.2 also retained the
 compiled-symbol warning.
 
+### Structured design and GLM diagnostics
+
+Rank validation reports the computed rank, column count and zero-column
+labels. LRT nesting failures expose the full and combined ranks. Ambiguous
+coefficient resolution retains the requested names and matching columns in
+model-matrix order. All-zero GLM errors retain both fit and source rows,
+including selected fits. Intercept arithmetic errors retain the rejected
+value and the gene and sample when available. These cases retain their
+existing messages and coarse error kinds.
+
+Two targeted integration runs passed 150 and 100 checks respectively.
+Workspace Clippy passed for all targets. The selected-row unit test passed
+and verifies that fit and source indices can differ. The Rust assertions
+in the affected validation paths now inspect structured fields. The
+remaining text-only diagnostics and their Rust assertions are still under
+migration.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

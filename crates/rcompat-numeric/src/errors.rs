@@ -27,6 +27,32 @@ pub enum Error {
         reason: String,
     },
 
+    /// A fixed-dispersion GLM received an all-zero count row.
+    #[error("invalid counts: gene {gene} is all zero; DESeq2 GLM fitting excludes allZero rows")]
+    AllZeroGene {
+        /// Row in the fit, after any row selection.
+        gene: usize,
+        /// Row in the count matrix supplied to the fit.
+        source_gene: usize,
+    },
+
+    /// A gene-level calculation produced a value outside its domain.
+    #[error("{}: {reason}", domain_prefix(*domain))]
+    InvalidGeneValue {
+        /// The existing classification of the failing stage.
+        domain: ErrorKind,
+        /// The calculation that failed.
+        operation: &'static str,
+        /// Row in the input to the stage.
+        gene: usize,
+        /// Sample involved in the calculation, when known.
+        sample: Option<usize>,
+        /// The value the stage rejected.
+        value: f64,
+        /// The diagnostic presented to the caller.
+        reason: String,
+    },
+
     /// Size factors failed validation or could not be estimated.
     #[error("invalid size factors: {reason}")]
     InvalidSizeFactors {
@@ -145,6 +171,42 @@ pub enum Error {
         candidates: Vec<String>,
     },
 
+    /// A coefficient request admits more than one match.
+    #[error("invalid options: {reason}")]
+    AmbiguousCoefficient {
+        /// The full message.
+        reason: String,
+        /// The coefficient names or levels requested, in search order.
+        candidates: Vec<String>,
+        /// The matching coefficients in model-matrix column order.
+        matches: Vec<String>,
+    },
+
+    /// The model matrix has dependent or zero columns.
+    #[error(
+        "invalid options: {context} model matrix is not full rank: rank {rank}, columns {columns}{}",
+        zero_columns_suffix(zero_columns)
+    )]
+    DesignRankDeficient {
+        /// The model or fitting stage that requires full rank.
+        context: String,
+        /// The computed rank.
+        rank: usize,
+        /// The number of columns in the design.
+        columns: usize,
+        /// Names or zero-based positions of columns found to be zero.
+        zero_columns: Vec<String>,
+    },
+
+    /// The reduced LRT design contains directions outside the full design.
+    #[error("invalid options: LRT reduced design must be nested in the full design column space")]
+    LrtDesignNotNested {
+        /// Rank of the full design.
+        full_rank: usize,
+        /// Rank of the full and reduced designs combined.
+        combined_rank: usize,
+    },
+
     /// An internal consistency check failed: a state that earlier validation
     /// rules out was reached. This is a bug; please report it.
     #[error("invalid options: internal invariant violated: {what}")]
@@ -152,6 +214,14 @@ pub enum Error {
         /// The violated condition.
         what: String,
     },
+}
+
+fn zero_columns_suffix(columns: &[String]) -> String {
+    if columns.is_empty() {
+        String::new()
+    } else {
+        format!("; zero columns: {}", columns.join(", "))
+    }
 }
 
 /// The condition an [`Error::InvalidParameter`] failed. `Display` gives
@@ -239,7 +309,7 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         match self {
             Self::InvalidDimensions { .. } => ErrorKind::Shape,
-            Self::InvalidCounts { .. } => ErrorKind::Counts,
+            Self::InvalidCounts { .. } | Self::AllZeroGene { .. } => ErrorKind::Counts,
             Self::InvalidSizeFactors { .. } | Self::NoUsableGenesForSizeFactors => {
                 ErrorKind::Normalization
             }
@@ -251,11 +321,14 @@ impl Error {
             #[cfg(feature = "csv")]
             Self::Csv(_) => ErrorKind::Parse,
             Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
-            Self::InvalidParameter { domain, .. } | Self::MissingPrerequisite { domain, .. } => {
-                *domain
-            }
+            Self::InvalidParameter { domain, .. }
+            | Self::MissingPrerequisite { domain, .. }
+            | Self::InvalidGeneValue { domain, .. } => *domain,
             Self::InvalidFormula { .. } => ErrorKind::Formula,
-            Self::CoefficientNotFound { .. } => ErrorKind::Options,
+            Self::CoefficientNotFound { .. }
+            | Self::AmbiguousCoefficient { .. }
+            | Self::DesignRankDeficient { .. }
+            | Self::LrtDesignNotNested { .. } => ErrorKind::Options,
             Self::Internal { .. } => ErrorKind::Internal,
         }
     }

@@ -689,7 +689,13 @@ fn irls_rejects_all_zero_rows() {
     )
     .unwrap_err();
     assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Counts);
-    assert!(err.to_string().contains("all zero"));
+    std::assert_matches!(
+        err,
+        DeseqError::AllZeroGene {
+            gene: 0,
+            source_gene: 0
+        }
+    );
 }
 
 #[test]
@@ -722,11 +728,9 @@ fn ordered_batches_report_the_lowest_failed_gene_at_one_and_four_workers() {
                     )
                 })
                 .unwrap_err();
-            assert!(
-                error
-                    .to_string()
-                    .contains(&format!("gene {early} is all zero")),
-                "{error}"
+            std::assert_matches!(
+                error,
+                DeseqError::AllZeroGene { gene, source_gene } if (gene, source_gene) == (early, early)
             );
         }
     }
