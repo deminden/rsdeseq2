@@ -9,6 +9,23 @@ use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 use std::assert_matches;
 
 #[test]
+fn model_matrix_materialization_checks_output_capacity() {
+    let max_cells = isize::MAX as usize / size_of::<f64>();
+    let plan = ModelMatrixPlan::new(max_cells + 1, &[], &[], true).unwrap();
+    assert_matches!(
+        plan.try_values(),
+        Err(DeseqError::InvalidDimensions { context, expected, actual })
+            if context == "model matrix values allocation overflow"
+                && expected == max_cells
+                && actual == max_cells + 1
+    );
+
+    let no_columns = ModelMatrixPlan::new(usize::MAX, &[], &[], false).unwrap();
+    assert!(no_columns.try_values().unwrap().is_empty());
+    assert_eq!(no_columns.column_major_values().next(), None);
+}
+
+#[test]
 fn formula_term_assembly_matches_independent_r_in_both_storage_orders() {
     let r: serde_json::Value =
         serde_json::from_str(formula_reference!("model_matrix_r462")).unwrap();

@@ -264,13 +264,13 @@ pub(super) fn formula_ordered_design(
     let standard_design = DesignMatrix::from_row_major(
         samples,
         standard.n_cols(),
-        standard.values(),
+        standard.try_values()?,
         Some(standard_names),
     )?;
     let expanded_design = DesignMatrix::from_row_major(
         samples,
         expanded.n_cols(),
-        expanded.values(),
+        expanded.try_values()?,
         Some(expanded_names),
     )?;
     Ok(formula_design_output(

@@ -1671,6 +1671,26 @@ Both profiles passed on macOS arm64, on Linux arm64 and on Linux x86_64
 under QEMU 10.0.13. Portable formula transforms are now part of the
 release panel on every target.
 
+### Checked model matrix materialization
+
+Formula fitting and expanded designs reserve their output buffers through the
+shared matrix allocator. The fallible `ModelMatrixPlan::try_values` reports
+impossible capacities before materialization. A zero-column plan returns an
+empty buffer immediately. The R bridge visits model cells in column-major
+order and writes them directly into R's matrix buffer.
+
+The focused macOS arm64 integration runs passed 80 R-host and 78 portable
+tests. Both profiles matched all 8,032 golden fields. Two exact-bit R
+formula and model-matrix comparisons also fail under the portable profile
+on the unmodified Linux arm64 baseline. The R-host run includes both
+comparisons. An offline R 4.6.2 install with Rust 1.96.0 passed eight
+targeted tests and 867 expectations with zero skips or failures.
+
+Three alternating-order pairs for a 65,536 × 128 native R model matrix
+against `c9aa13d` reduced median peak RSS from 303.33 to 239.22 MiB.
+Median elapsed time inside the native call fell from 68 to 25 ms.
+All six matrix hashes matched.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

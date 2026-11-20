@@ -1,6 +1,7 @@
 use super::*;
 use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
+use crate::matrix::try_alloc_matrix;
 pub(super) fn expanded_formula_design_from_state<'a>(
     state: &ExpandedFormulaDesignState<'a>,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -184,7 +185,11 @@ pub(super) fn expanded_formula_design_from_state<'a>(
     }
     validate_unique_coefficient_names(&standard_names, "standard formula design")?;
 
-    let mut standard_values = Vec::with_capacity(n_samples * standard_expanded_names.len());
+    let mut standard_values = try_alloc_matrix(
+        n_samples,
+        standard_expanded_names.len(),
+        "standard formula design",
+    )?;
     for sample in 0..n_samples {
         for expanded_name in &standard_expanded_names {
             let col = expanded_names
@@ -751,10 +756,13 @@ where
             }
             FormulaVariableRef::Numeric(_) => vec![None],
         };
-        let mut next = Vec::with_capacity(grids.len() * choices.len());
+        let mut next =
+            try_alloc_matrix(grids.len(), choices.len(), "formula interaction level grid")?;
         for prefix in &grids {
             for choice in &choices {
-                let mut row = prefix.clone();
+                let mut row =
+                    try_alloc_matrix(1, prefix.len() + 1, "formula interaction level row")?;
+                row.extend_from_slice(prefix);
                 row.push(*choice);
                 next.push(row);
             }

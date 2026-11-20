@@ -268,11 +268,8 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_fill(
                         .ok_or("model output overflow")?,
                     "model matrix",
                 )?;
-                let values = plan.values();
-                for column in 0..n_columns {
-                    for sample in 0..samples {
-                        out[sample + column * samples].write(values[sample * n_columns + column]);
-                    }
+                for (slot, value) in out.iter_mut().zip(plan.column_major_values()) {
+                    slot.write(value);
                 }
                 let out = output_slice(assignments, n_columns, "model assignments")?;
                 for (out, &value) in out.iter_mut().zip(plan.assignments()) {

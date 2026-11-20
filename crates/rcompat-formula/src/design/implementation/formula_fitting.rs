@@ -317,13 +317,13 @@ pub(super) fn formula_fitting_design<'a>(
         DesignMatrix::from_row_major(
             samples,
             expanded.n_cols(),
-            expanded.values(),
+            expanded.try_values()?,
             Some(expanded_names),
         )?,
         DesignMatrix::from_row_major(
             samples,
             standard.n_cols(),
-            standard.values(),
+            standard.try_values()?,
             Some(standard_names),
         )?,
         groups,

@@ -5,7 +5,7 @@
 use crate::errors::Error;
 use crate::errors::invalid_options;
 use crate::errors::{ErrorKind, ModelMatrixResponseProblem, missing_prerequisite};
-use crate::matrix::MatrixView;
+use crate::matrix::{MatrixView, try_alloc_matrix};
 
 mod contrasts;
 mod polynomial;
@@ -353,10 +353,12 @@ impl<'a> ModelMatrixPlan<'a> {
                 samples
                     .checked_mul(count)
                     .ok_or_else(|| invalid_options("model matrix shape overflow"))?;
-                let mut next = Vec::with_capacity(count);
+                let mut next = try_alloc_matrix(1, count, "model matrix interaction columns")?;
                 for column in 0..width {
                     for previous in &combinations {
-                        let mut pieces = previous.clone();
+                        let mut pieces =
+                            try_alloc_matrix(1, previous.len() + 1, "model matrix column pieces")?;
+                        pieces.extend_from_slice(previous);
                         pieces.push(Piece {
                             variable: index,
                             column,
@@ -421,31 +423,57 @@ impl<'a> ModelMatrixPlan<'a> {
     }
     /// Materialize in row-major order, retaining multiplication order and
     /// signed-zero behavior within each interaction.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the output buffer cannot be allocated. Use
+    /// [`Self::try_values`] to handle allocation errors.
     pub fn values(&self) -> Vec<f64> {
-        let mut values = Vec::with_capacity(self.samples * self.n_cols());
-        for sample in 0..self.samples {
-            for pieces in &self.columns {
-                let mut value = None;
-                for piece in pieces {
-                    let next = match &self.variables[piece.variable].data {
-                        VariableData::Numeric(matrix) => *matrix.at(sample, piece.column),
-                        VariableData::Factor {
-                            codes, contrasted, ..
-                        } => {
-                            let level = codes[sample] as usize - 1;
-                            if piece.full {
-                                (level == piece.column) as u8 as f64
-                            } else {
-                                contrasted.value(level, piece.column)
-                            }
-                        }
-                    };
-                    value = Some(value.map_or(next, |previous: f64| previous * next));
-                }
-                values.push(value.unwrap_or(1.0));
+        self.try_values().unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    /// Materialize in row-major order with a checked output allocation.
+    pub fn try_values(&self) -> Result<Vec<f64>, Error> {
+        let mut values = try_alloc_matrix(self.samples, self.n_cols(), "model matrix values")?;
+        if !self.columns.is_empty() {
+            for sample in 0..self.samples {
+                values.extend(
+                    self.columns
+                        .iter()
+                        .map(|pieces| self.value_at(sample, pieces)),
+                );
             }
         }
-        values
+        Ok(values)
+    }
+
+    /// Visit cells in column-major order for a caller with an output buffer.
+    #[doc(hidden)]
+    pub fn column_major_values(&self) -> impl Iterator<Item = f64> + '_ {
+        self.columns.iter().flat_map(move |pieces| {
+            (0..self.samples).map(move |sample| self.value_at(sample, pieces))
+        })
+    }
+
+    fn value_at(&self, sample: usize, pieces: &[Piece]) -> f64 {
+        let mut value = None;
+        for piece in pieces {
+            let next = match &self.variables[piece.variable].data {
+                VariableData::Numeric(matrix) => *matrix.at(sample, piece.column),
+                VariableData::Factor {
+                    codes, contrasted, ..
+                } => {
+                    let level = codes[sample] as usize - 1;
+                    if piece.full {
+                        (level == piece.column) as u8 as f64
+                    } else {
+                        contrasted.value(level, piece.column)
+                    }
+                }
+            };
+            value = Some(value.map_or(next, |previous: f64| previous * next));
+        }
+        value.unwrap_or(1.0)
     }
 }
 fn numeric_suffixes(columns: usize, names: Option<&[String]>) -> Result<Vec<String>, Error> {

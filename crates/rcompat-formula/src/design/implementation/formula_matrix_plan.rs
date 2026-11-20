@@ -165,5 +165,5 @@ pub(super) fn formula_expanded_matrix_values(
             }
         })
         .collect();
-    Ok(ModelMatrixPlan::from_columns(samples, &variables, columns)?.values())
+    ModelMatrixPlan::from_columns(samples, &variables, columns)?.try_values()
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::matrix::try_alloc_matrix;
 /// Build a primitive expanded one-factor design and matching standard design.
 ///
 /// The expanded matrix has columns `Intercept`, then one indicator per factor
@@ -22,7 +23,8 @@ pub fn expanded_factor_design<S: AsRef<str>>(
             .iter()
             .map(|level| expanded_factor_coefficient_name(factor, level)),
     );
-    let mut expanded_values = Vec::with_capacity(n_samples * expanded_names.len());
+    let mut expanded_values =
+        try_alloc_matrix(n_samples, expanded_names.len(), "expanded factor design")?;
     for level in sample_levels {
         let level = level.as_ref();
         expanded_values.push(1.0);
@@ -48,7 +50,8 @@ pub fn expanded_factor_design<S: AsRef<str>>(
             .iter()
             .map(|level| standard_factor_coefficient_name(factor, level, reference)),
     );
-    let mut standard_values = Vec::with_capacity(n_samples * standard_names.len());
+    let mut standard_values =
+        try_alloc_matrix(n_samples, standard_names.len(), "standard factor design")?;
     for level in sample_levels {
         let level = level.as_ref();
         standard_values.push(1.0);
@@ -207,7 +210,8 @@ pub fn expanded_additive_design_with_all_interactions(
         ));
     }
     validate_unique_coefficient_names(&expanded_names, "expanded additive design")?;
-    let mut expanded_values = Vec::with_capacity(n_samples * expanded_names.len());
+    let mut expanded_values =
+        try_alloc_matrix(n_samples, expanded_names.len(), "expanded additive design")?;
     for sample in 0..n_samples {
         expanded_values.push(1.0);
         for (factor, levels) in factors.iter().zip(&factor_levels) {
@@ -316,7 +320,8 @@ pub fn expanded_additive_design_with_all_interactions(
         ));
     }
     validate_unique_coefficient_names(&standard_names, "standard additive design")?;
-    let mut standard_values = Vec::with_capacity(n_samples * standard_names.len());
+    let mut standard_values =
+        try_alloc_matrix(n_samples, standard_names.len(), "standard additive design")?;
     for sample in 0..n_samples {
         standard_values.push(1.0);
         for (factor, levels) in factors.iter().zip(&factor_levels) {
