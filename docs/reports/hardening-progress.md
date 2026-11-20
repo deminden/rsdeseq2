@@ -1143,6 +1143,27 @@ The focused Rust tests and 277 R 4.6.2 expectations passed. Paired
 and per-cell factors, and both used about 58 MiB less peak RSS.
 The small-case comparison matched all five diagnostics exactly.
 
+### Batched R bridge and normalization verification
+
+On macOS arm64, source commit `b6da6e8` passed 1,247 Rust unit and
+integration tests and one doctest. Both separately selected GTEx tests
+passed for all 56,200 genes in each numeric profile, using the
+SHA-256-verified full fixtures. Both golden manifests matched all
+8,032 fields at one and four workers. Workspace formatting, Clippy and
+the locked all-targets check with Rust 1.96.0 passed.
+
+One source archive built from the committed files installed offline
+with Rust 1.96.0 in R 4.5.3 with DESeq2 1.50.2 and R 4.6.2 with
+DESeq2 1.52.0. Its SHA-256 was
+`e8ce1d3d23a719b3120ce3378311c87209d9ef12ef448eeb3c653e568873b435`.
+Each installation passed all 2,874 expectations without skips or
+failures and completed a fresh native fit after SIGINT cancellation.
+Both shared libraries exported only the R initialization symbol.
+
+The archive build still warns about long filenames in vendored
+dependencies. The hosted release matrix and native Intel macOS and
+Windows runtime results remain open.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
