@@ -151,10 +151,9 @@ impl Row<'_> {
                 )
                 .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))
             }
-            RegressionOptimizer::Unsupported => Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "unsupported posterior optimizer; use BFGS or L-BFGS-B",
-            )),
+            RegressionOptimizer::Unsupported => Err(Error::PosteriorOptimizerUnsupported {
+                refinement_method: None,
+            }),
         }
     }
     pub fn prefit(&self, start: Vec<f64>) -> Result<OptimResult, Error> {

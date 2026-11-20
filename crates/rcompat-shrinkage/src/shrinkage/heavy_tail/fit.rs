@@ -3,7 +3,7 @@ use super::{
     negative_binomial::Row,
     prior::{CauchyCoefficientPrior, ERROR_SCOPE, estimate_cauchy_prior_variance},
 };
-use crate::errors::scoped_invalid_options;
+use crate::errors::{PosteriorArray, PosteriorArrayAxis, scoped_invalid_options};
 use crate::numeric::math::ProfileMath;
 use crate::{
     Error,
@@ -170,49 +170,92 @@ impl NegativeBinomialPosterior {
     }
 
     fn validate_summary_shapes(&self) -> Result<(), Error> {
+        const SUMMARY_SHAPE: &str = "posterior summary arrays have inconsistent shapes";
         let genes = self.mode.n_rows();
         let columns = self.mode.n_cols();
-        if self
-            .standard_deviation
-            .as_ref()
-            .is_some_and(|m| m.n_rows() != genes || m.n_cols() != columns)
-            || self.diagnostics.len() != genes
-            || [
-                &self.false_sign_rate,
-                &self.sign_svalues,
-                &self.false_sign_or_small_rate,
-                &self.threshold_svalues,
-            ]
-            .iter()
-            .any(|v| v.as_ref().is_some_and(|v| v.len() != genes))
-            || self
-                .analysis
-                .intervals
-                .as_ref()
-                .is_some_and(|m| m.n_rows() != genes || m.n_cols() != 2)
-            || [
+        for (array, matrix, expected_columns) in [
+            (
+                PosteriorArray::StandardDeviation,
+                &self.standard_deviation,
+                Some(columns),
+            ),
+            (PosteriorArray::Intervals, &self.analysis.intervals, Some(2)),
+            (
+                PosteriorArray::ContrastMode,
                 &self.analysis.contrast_mode,
+                None,
+            ),
+            (
+                PosteriorArray::ContrastStandardDeviation,
                 &self.analysis.contrast_standard_deviation,
-            ]
-            .iter()
-            .any(|m| m.as_ref().is_some_and(|m| m.n_rows() != genes))
-            || (!self.analysis.grid_diagnostics.is_empty()
-                && self.analysis.grid_diagnostics.len() != genes)
-        {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "posterior summary arrays have inconsistent shapes",
-            ));
+                None,
+            ),
+        ] {
+            if let Some(matrix) = matrix {
+                validate_posterior_dimension(
+                    array,
+                    PosteriorArrayAxis::Rows,
+                    genes,
+                    matrix.n_rows(),
+                    SUMMARY_SHAPE,
+                )?;
+                if let Some(expected) = expected_columns {
+                    validate_posterior_dimension(
+                        array,
+                        PosteriorArrayAxis::Columns,
+                        expected,
+                        matrix.n_cols(),
+                        SUMMARY_SHAPE,
+                    )?;
+                }
+            }
+        }
+        validate_posterior_dimension(
+            PosteriorArray::Diagnostics,
+            PosteriorArrayAxis::Rows,
+            genes,
+            self.diagnostics.len(),
+            SUMMARY_SHAPE,
+        )?;
+        for (array, values) in [
+            (PosteriorArray::FalseSignRate, &self.false_sign_rate),
+            (PosteriorArray::SignSvalues, &self.sign_svalues),
+            (
+                PosteriorArray::FalseSignOrSmallRate,
+                &self.false_sign_or_small_rate,
+            ),
+            (PosteriorArray::ThresholdSvalues, &self.threshold_svalues),
+        ] {
+            if let Some(values) = values {
+                validate_posterior_dimension(
+                    array,
+                    PosteriorArrayAxis::Rows,
+                    genes,
+                    values.len(),
+                    SUMMARY_SHAPE,
+                )?;
+            }
+        }
+        if !self.analysis.grid_diagnostics.is_empty() {
+            validate_posterior_dimension(
+                PosteriorArray::GridDiagnostics,
+                PosteriorArrayAxis::Rows,
+                genes,
+                self.analysis.grid_diagnostics.len(),
+                SUMMARY_SHAPE,
+            )?;
         }
         if let (Some(mode), Some(sd)) = (
             &self.analysis.contrast_mode,
             &self.analysis.contrast_standard_deviation,
-        ) && mode.n_cols() != sd.n_cols()
-        {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
+        ) {
+            validate_posterior_dimension(
+                PosteriorArray::ContrastStandardDeviation,
+                PosteriorArrayAxis::Columns,
+                mode.n_cols(),
+                sd.n_cols(),
                 "posterior contrast arrays have inconsistent shapes",
-            ));
+            )?;
         }
         Ok(())
     }
@@ -235,10 +278,10 @@ impl NegativeBinomialPosterior {
         if (self.sign_svalues.is_some() || self.threshold_svalues.is_some())
             && self.summary_coefficient != Some(coefficient)
         {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "requested coefficient differs from the fitted probability summary coefficient",
-            ));
+            return Err(Error::PosteriorSummaryCoefficientMismatch {
+                requested: coefficient,
+                fitted: self.summary_coefficient,
+            });
         }
         let factor = match scale {
             CoefficientScale::Natural => 1.0,
@@ -263,6 +306,26 @@ impl NegativeBinomialPosterior {
         })
     }
 }
+
+fn validate_posterior_dimension(
+    array: PosteriorArray,
+    axis: PosteriorArrayAxis,
+    expected: usize,
+    actual: usize,
+    reason: &'static str,
+) -> Result<(), Error> {
+    if actual != expected {
+        return Err(Error::PosteriorShapeMismatch {
+            array,
+            axis,
+            expected,
+            actual,
+            reason,
+        });
+    }
+    Ok(())
+}
+
 fn optimize(row: &Row<'_>, start: Vec<f64>) -> Result<rcompat_lbfgsb::OptimResult, Error> {
     let p = start.len();
     let scale = row.objective_gradient(&vec![0.0; p]).0.max(1.0);
@@ -592,10 +655,7 @@ pub(super) fn fit_batch(
             });
         if skip_zero && counts.iter().all(|&v| v == 0.0) {
             if regression.is_none() && !options.map_only && !options.log_link {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "compiled refinement has no prefit for an all-zero row when log_link is false",
-                ));
+                return Err(Error::PosteriorMissingPrefit { gene });
             }
             diagnostics.push(PosteriorMapDiagnostic {
                 convergence: None,

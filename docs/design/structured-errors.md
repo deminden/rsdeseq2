@@ -130,6 +130,23 @@ is evaluated. Beta prior quantile failures include the coefficient
 when called through the matrix fit. Trigamma keeps the original input
 in its message and exposes the failed arithmetic result in `value`.
 
+## Posterior queries
+
+- `PosteriorCancelled` covers both explicit cancellation and an interrupt
+  reported by the calling thread.
+- `PosteriorGridBudgetExceeded` reports estimated evaluations and the budget.
+  `PosteriorGridOverflow` records the requested grid sizes and the
+  calculation whose count overflowed.
+- `InvalidPosteriorControl` carries the rejected control and value.
+  `InvalidGeneValue` carries invalid per-gene parameter uncertainties.
+- `PosteriorShapeMismatch` identifies the array, axis and actual and
+  expected dimensions. `PosteriorSummaryCoefficientMismatch` identifies
+  the requested coefficient and the owner of the probability summaries.
+- Regression errors identify missing parameters, incompatible likelihood
+  matrix operands, unsupported optimizers and genes without a compiled prefit.
+
+These posterior errors retain the previous messages and classification.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

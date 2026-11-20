@@ -1,5 +1,7 @@
 use crate::support as common;
 use common::hex_bits as bits;
+use rsdeseq2::DeseqError;
+use rsdeseq2::errors::{PosteriorArray, PosteriorArrayAxis};
 use std::error::Error;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/heavy_tail.rs"]
@@ -250,11 +252,13 @@ fn posterior_summaries_keep_coefficient_identity_and_reject_inconsistent_state()
         .coefficient_summary(1, CoefficientScale::Natural)
         .unwrap();
     assert_eq!(summary.sign_svalues, fit.sign_svalues);
-    assert!(
+    std::assert_matches!(
         fit.coefficient_summary(0, CoefficientScale::Natural)
-            .unwrap_err()
-            .to_string()
-            .contains("probability summary coefficient")
+            .unwrap_err(),
+        DeseqError::PosteriorSummaryCoefficientMismatch {
+            requested: 0,
+            fitted: Some(1)
+        }
     );
     // The data distinguish the two scientific summaries; a wrong-column test
     // would be ineffective if both coefficients happened to have equal s-values.
@@ -268,7 +272,22 @@ fn posterior_summaries_keep_coefficient_identity_and_reject_inconsistent_state()
     .unwrap();
     assert_eq!(fit.mode, other.mode);
     assert_ne!(fit.sign_svalues, other.sign_svalues);
-    for damage in 0..7 {
+    use PosteriorArrayAxis::{Columns, Rows};
+    let failures = [
+        (PosteriorArray::StandardDeviation, Rows, 1),
+        (PosteriorArray::SignSvalues, Rows, 0),
+        (PosteriorArray::ThresholdSvalues, Rows, 0),
+        (PosteriorArray::FalseSignRate, Rows, 0),
+        (PosteriorArray::FalseSignOrSmallRate, Rows, 0),
+        (PosteriorArray::Diagnostics, Rows, 0),
+        (PosteriorArray::Intervals, Columns, 1),
+        (PosteriorArray::StandardDeviation, Columns, 1),
+        (PosteriorArray::ContrastStandardDeviation, Columns, 1),
+        (PosteriorArray::GridDiagnostics, Rows, 1),
+    ];
+    for (damage, (expected_array, expected_axis, expected_actual)) in
+        failures.into_iter().enumerate()
+    {
         let mut broken = fit.clone();
         match damage {
             0 => {
@@ -280,18 +299,31 @@ fn posterior_summaries_keep_coefficient_identity_and_reject_inconsistent_state()
             3 => broken.false_sign_rate = Some(vec![]),
             4 => broken.false_sign_or_small_rate = Some(vec![]),
             5 => broken.diagnostics.clear(),
-            _ => {
+            6 => {
                 broken.analysis.intervals =
                     Some(RowMajorMatrix::from_row_major(2, 1, vec![1.; 2]).unwrap())
             }
+            7 => broken.standard_deviation = Some(RowMajorMatrix::from_elem(2, 1, 1.).unwrap()),
+            8 => {
+                broken.analysis.contrast_mode = Some(RowMajorMatrix::from_elem(2, 2, 1.).unwrap());
+                broken.analysis.contrast_standard_deviation =
+                    Some(RowMajorMatrix::from_elem(2, 1, 1.).unwrap());
+            }
+            _ => broken.analysis.grid_diagnostics = vec![None],
         }
-        assert!(
-            broken
-                .coefficient_summary(1, CoefficientScale::Natural)
-                .unwrap_err()
-                .to_string()
-                .contains("inconsistent shapes"),
-            "damage {damage}"
+        let error = broken
+            .coefficient_summary(1, CoefficientScale::Natural)
+            .unwrap_err();
+        if damage == 8 {
+            assert_eq!(
+                error.to_string(),
+                "invalid options: heavy-tailed shrinkage: posterior contrast arrays have inconsistent shapes",
+            );
+        }
+        std::assert_matches!(
+            error,
+            DeseqError::PosteriorShapeMismatch { array, axis, expected: 2, actual, .. }
+                if (array, axis, actual) == (expected_array, expected_axis, expected_actual)
         );
     }
 }

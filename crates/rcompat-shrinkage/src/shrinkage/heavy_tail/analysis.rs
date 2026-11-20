@@ -1,6 +1,9 @@
 //! Optional posterior queries share row covariance; no G-by-p-by-p retention.
 use super::{grid, prior::ERROR_SCOPE, regression::RegressionLikelihood};
-use crate::errors::scoped_invalid_options;
+use crate::errors::{
+    ErrorKind, PosteriorArray, PosteriorArrayAxis, PosteriorControl, missing_prerequisite,
+    scoped_invalid_options,
+};
 use crate::{Error, matrix::RowMajorMatrix, probability::normal_upper_quantile};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 /// How credible intervals are computed.
@@ -100,26 +103,24 @@ impl PosteriorAnalysisOptions {
                 "posterior coefficient is outside the model",
             ));
         }
+        let overflow =
+            |operation, reason| self.grid_overflow(o, genes, coefficients, operation, reason);
+        let count_overflow =
+            |operation| overflow(operation, "posterior grid evaluation count overflows");
         let power = u32::try_from(coefficients - 1)
-            .map_err(|_| scoped_invalid_options(ERROR_SCOPE, "posterior dimensions overflow"))?;
-        o.grid_intervals
+            .map_err(|_| overflow("nuisance exponent", "posterior dimensions overflow"))?;
+        let points = o
+            .grid_intervals
             .checked_add(1)
-            .and_then(|points| {
-                o.nuisance_points
-                    .checked_pow(power)
-                    .and_then(|n| points.checked_mul(n))
-            })
-            .and_then(|n| {
-                n.checked_mul(if self.parameter_standard_errors.is_some() {
-                    o.nuisance_points
-                } else {
-                    1
-                })
-            })
-            .and_then(|n| n.checked_mul(genes))
-            .ok_or_else(|| {
-                scoped_invalid_options(ERROR_SCOPE, "posterior grid evaluation count overflows")
-            })
+            .ok_or_else(|| count_overflow("interval grid points"))?;
+        let nuisance = o
+            .nuisance_points
+            .checked_pow(power)
+            .ok_or_else(|| count_overflow("nuisance grid points"))?;
+        self.row_grid_evaluations(o, points, nuisance)
+            .ok_or_else(|| count_overflow("row evaluations"))?
+            .checked_mul(genes)
+            .ok_or_else(|| count_overflow("batch evaluations"))
     }
 
     pub(super) fn validate(
@@ -133,26 +134,47 @@ impl PosteriorAnalysisOptions {
         if let Some(c) = &self.contrasts
             && c.n_rows() != p
         {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "posterior contrasts must have one row per coefficient",
-            ));
+            return Err(Error::PosteriorShapeMismatch {
+                array: PosteriorArray::Contrasts,
+                axis: PosteriorArrayAxis::Rows,
+                expected: p,
+                actual: c.n_rows(),
+                reason: "posterior contrasts must have one row per coefficient",
+            });
         }
         if let Some(c) = &self.contrasts {
             c.validate_finite("posterior contrasts")?;
         }
         if let Some(s) = &self.parameter_standard_errors {
-            if threshold.is_some() {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "parameter uncertainty and a threshold cannot be combined",
-                ));
+            if let Some(threshold) = threshold {
+                return Err(Error::InvalidPosteriorControl {
+                    control: PosteriorControl::ThresholdWithUncertainty(threshold),
+                });
             }
-            if s.len() != genes || s.iter().any(|v| !v.is_finite() || *v < 0.0) {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "parameter uncertainties must be finite nonnegative and gene aligned",
-                ));
+            const UNCERTAINTIES: &str =
+                "parameter uncertainties must be finite nonnegative and gene aligned";
+            if s.len() != genes {
+                return Err(Error::PosteriorShapeMismatch {
+                    array: PosteriorArray::ParameterStandardErrors,
+                    axis: PosteriorArrayAxis::Rows,
+                    expected: genes,
+                    actual: s.len(),
+                    reason: UNCERTAINTIES,
+                });
+            }
+            if let Some((gene, &value)) = s
+                .iter()
+                .enumerate()
+                .find(|(_, value)| !value.is_finite() || **value < 0.0)
+            {
+                return Err(Error::InvalidGeneValue {
+                    domain: ErrorKind::Options,
+                    operation: "posterior parameter standard error",
+                    gene,
+                    sample: None,
+                    value,
+                    reason: format!("{ERROR_SCOPE}: {UNCERTAINTIES}"),
+                });
             }
             if !map_only
                 && coefficient.is_some()
@@ -161,61 +183,44 @@ impl PosteriorAnalysisOptions {
                     .as_ref()
                     .is_none_or(|o| o.kind == PosteriorIntervalKind::Laplace)
             {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "parameter uncertainty requires a grid interval",
+                return Err(missing_prerequisite(
+                    ErrorKind::Options,
+                    format!("{ERROR_SCOPE}: parameter uncertainty"),
+                    "a grid interval",
                 ));
             }
         }
         if let Some(o) = &self.interval {
             if !o.level.is_finite() || !(0.0..=1.0).contains(&o.level) {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "posterior interval level must lie between zero and one",
-                ));
+                return Err(Error::InvalidPosteriorControl {
+                    control: PosteriorControl::IntervalLevel(o.level),
+                });
             }
             if !map_only && coefficient.is_some() && o.kind != PosteriorIntervalKind::Laplace {
-                if o.level == 0.0
-                    || o.level == 1.0
-                    || o.grid_intervals < 2
-                    || o.grid_intervals % 2 != 0
-                    || !o.grid_standard_deviations.is_finite()
-                    || o.grid_standard_deviations <= 0.0
-                    || o.nuisance_points == 0
-                    || !o.nuisance_standard_deviations.is_finite()
-                    || o.nuisance_standard_deviations < 0.0
-                {
-                    return Err(scoped_invalid_options(
-                        ERROR_SCOPE,
-                        "invalid posterior integration grid controls",
-                    ));
+                if let Some(control) = invalid_grid_control(o) {
+                    return Err(Error::InvalidPosteriorControl { control });
                 }
+                let overflow =
+                    |operation, reason| self.grid_overflow(o, genes, p, operation, reason);
                 let points = o.grid_intervals.checked_add(1).ok_or_else(|| {
-                    scoped_invalid_options(ERROR_SCOPE, "posterior grid dimensions overflow")
+                    overflow("interval grid points", "posterior grid dimensions overflow")
                 })?;
-                let nuisance = o
-                    .nuisance_points
-                    .checked_pow((p - 1).try_into().map_err(|_| {
-                        scoped_invalid_options(ERROR_SCOPE, "posterior dimensions overflow")
-                    })?)
+                let power = p
+                    .checked_sub(1)
+                    .and_then(|n| u32::try_from(n).ok())
                     .ok_or_else(|| {
-                        scoped_invalid_options(
-                            ERROR_SCOPE,
-                            "posterior nuisance grid dimensions overflow",
-                        )
+                        overflow("nuisance exponent", "posterior dimensions overflow")
                     })?;
-                points
-                    .checked_mul(nuisance)
-                    .and_then(|n| {
-                        n.checked_mul(if self.parameter_standard_errors.is_some() {
-                            o.nuisance_points
-                        } else {
-                            1
-                        })
-                    })
+                let nuisance = o.nuisance_points.checked_pow(power).ok_or_else(|| {
+                    overflow(
+                        "nuisance grid points",
+                        "posterior nuisance grid dimensions overflow",
+                    )
+                })?;
+                self.row_grid_evaluations(o, points, nuisance)
                     .ok_or_else(|| {
-                        scoped_invalid_options(
-                            ERROR_SCOPE,
+                        overflow(
+                            "row evaluations",
                             "posterior grid evaluation count overflows",
                         )
                     })?;
@@ -229,6 +234,60 @@ impl PosteriorAnalysisOptions {
                 map_only,
             )?)?;
         Ok(())
+    }
+
+    fn row_grid_evaluations(
+        &self,
+        interval: &PosteriorIntervalOptions,
+        points: usize,
+        nuisance: usize,
+    ) -> Option<usize> {
+        points
+            .checked_mul(nuisance)?
+            .checked_mul(if self.parameter_standard_errors.is_some() {
+                interval.nuisance_points
+            } else {
+                1
+            })
+    }
+
+    fn grid_overflow(
+        &self,
+        interval: &PosteriorIntervalOptions,
+        genes: usize,
+        coefficients: usize,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Error {
+        Error::PosteriorGridOverflow {
+            operation,
+            grid_intervals: interval.grid_intervals,
+            nuisance_points: interval.nuisance_points,
+            coefficients,
+            genes,
+            parameter_uncertainty: self.parameter_standard_errors.is_some(),
+            reason,
+        }
+    }
+}
+
+fn invalid_grid_control(o: &PosteriorIntervalOptions) -> Option<PosteriorControl> {
+    if o.level == 0.0 || o.level == 1.0 {
+        Some(PosteriorControl::GridLevel(o.level))
+    } else if o.grid_intervals < 2 || !o.grid_intervals.is_multiple_of(2) {
+        Some(PosteriorControl::GridIntervals(o.grid_intervals))
+    } else if !o.grid_standard_deviations.is_finite() || o.grid_standard_deviations <= 0.0 {
+        Some(PosteriorControl::GridStandardDeviations(
+            o.grid_standard_deviations,
+        ))
+    } else if o.nuisance_points == 0 {
+        Some(PosteriorControl::NuisancePoints(o.nuisance_points))
+    } else if !o.nuisance_standard_deviations.is_finite() || o.nuisance_standard_deviations < 0.0 {
+        Some(PosteriorControl::NuisanceStandardDeviations(
+            o.nuisance_standard_deviations,
+        ))
+    } else {
+        None
     }
 }
 impl PosteriorAnalysis {

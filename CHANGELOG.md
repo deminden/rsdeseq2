@@ -156,6 +156,11 @@ versions live in [docs/releases](docs/releases/).
   qualifies. Single-gene beta priors now report an overflow instead of
   returning an infinite variance for a retained coefficient.
 
+- Posterior errors distinguish cancellation, grid budget and size failures,
+  invalid controls, and incompatible inputs or summaries. The variants
+  report the relevant limits, dimensions, gene or coefficient and preserve
+  the existing messages and error kinds.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

@@ -1,5 +1,40 @@
 //! Shared original-package posterior, missingness, state and diagnostic gates.
 use super::posterior::*;
+use rsdeseq2::DeseqError;
+use std::error::Error;
+
+fn matches_rejection(error: &(dyn Error + 'static), expected: &str, optimizer: &str) -> bool {
+    let error = error.downcast_ref::<DeseqError>();
+    match expected {
+        "nonconformable likelihood matrix product" => matches!(
+            error,
+            Some(DeseqError::LikelihoodProductShapeMismatch {
+                left_dimensions: Some([8, 2]),
+                left_length: 16,
+                right_dimensions: None,
+                right_length: 1,
+            })
+        ),
+        "parameters must be supplied" => matches!(
+            error,
+            Some(DeseqError::MissingRegressionLikelihoodParameters)
+        ),
+        "unsupported posterior optimizer" => matches!(
+            error,
+            Some(DeseqError::PosteriorOptimizerUnsupported {
+                refinement_method: None
+            })
+        ),
+        "unsupported refinement optimizer" => matches!(
+            error,
+            Some(DeseqError::PosteriorOptimizerUnsupported { refinement_method: Some(method) })
+                if method == optimizer
+        ),
+        "no prefit" => matches!(error, Some(DeseqError::PosteriorMissingPrefit { gene: 0 })),
+        _ => panic!("missing typed rejection for {expected}"),
+    }
+}
+
 pub fn compare_posteriors(reference: serde_json::Value, compare_warning_events: bool) {
     let mut failures = vec![];
     for c in reference["cases"].as_array().unwrap() {
@@ -16,8 +51,8 @@ pub fn compare_posteriors(reference: serde_json::Value, compare_warning_events: 
                     });
             match actual {
                 Ok(_) => failures.push(format!("{} accepted invalid source request", input.name)),
-                Err(e) if !e.to_string().contains(expected) => {
-                    failures.push(format!("{} rejected for wrong reason: {e}", input.name))
+                Err(e) if !matches_rejection(e.as_ref(), expected, &input.optimizer) => {
+                    failures.push(format!("{} expected {expected}, got {e:?}", input.name))
                 }
                 Err(_) => {}
             }

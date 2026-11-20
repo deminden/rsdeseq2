@@ -130,6 +130,108 @@ pub enum Error {
         reason: String,
     },
 
+    /// A posterior operation was interrupted by its caller.
+    #[error("invalid options: heavy-tailed shrinkage: posterior operation cancelled")]
+    PosteriorCancelled,
+
+    /// Estimated posterior grid work exceeds the configured budget.
+    #[error(
+        "invalid options: heavy-tailed shrinkage: posterior grid requires {evaluations} evaluations, exceeding the configured budget"
+    )]
+    PosteriorGridBudgetExceeded {
+        /// Estimated likelihood evaluations required.
+        evaluations: usize,
+        /// Configured limit.
+        limit: usize,
+    },
+
+    /// Posterior grid dimensions or work cannot be represented as `usize`.
+    #[error("invalid options: heavy-tailed shrinkage: {reason}")]
+    PosteriorGridOverflow {
+        /// The calculation that overflowed.
+        operation: &'static str,
+        /// Number of requested grid intervals.
+        grid_intervals: usize,
+        /// Integration points per nuisance dimension.
+        nuisance_points: usize,
+        /// Number of model coefficients.
+        coefficients: usize,
+        /// Number of rows in the query.
+        genes: usize,
+        /// Whether the query also integrates over parameter uncertainty.
+        parameter_uncertainty: bool,
+        /// The original diagnostic text.
+        reason: &'static str,
+    },
+
+    /// A posterior control is invalid for the requested query.
+    #[error("invalid options: heavy-tailed shrinkage: {}", control.message())]
+    InvalidPosteriorControl {
+        /// Control and rejected value.
+        control: PosteriorControl,
+    },
+
+    /// A posterior array disagrees with the expected shape.
+    #[error("invalid options: heavy-tailed shrinkage: {reason}")]
+    PosteriorShapeMismatch {
+        /// The array with the mismatched dimension.
+        array: PosteriorArray,
+        /// Which dimension differs.
+        axis: PosteriorArrayAxis,
+        /// Expected dimension.
+        expected: usize,
+        /// Actual dimension.
+        actual: usize,
+        /// The original diagnostic text.
+        reason: &'static str,
+    },
+
+    /// Probability summaries belong to a different coefficient.
+    #[error(
+        "invalid options: heavy-tailed shrinkage: requested coefficient differs from the fitted probability summary coefficient"
+    )]
+    PosteriorSummaryCoefficientMismatch {
+        /// Requested zero-based coefficient.
+        requested: usize,
+        /// Zero-based coefficient owning the summaries, when recorded.
+        fitted: Option<usize>,
+    },
+
+    /// The optimizer needed by the requested posterior method is unsupported.
+    #[error("invalid options: heavy-tailed shrinkage: {}", posterior_optimizer_message(.refinement_method.as_deref()))]
+    PosteriorOptimizerUnsupported {
+        /// Name of the requested compiled refinement method, when applicable.
+        refinement_method: Option<String>,
+    },
+
+    /// Compiled refinement has no prefit for this all-zero row.
+    #[error(
+        "invalid options: heavy-tailed shrinkage: compiled refinement has no prefit for an all-zero row when log_link is false"
+    )]
+    PosteriorMissingPrefit {
+        /// Zero-based input gene.
+        gene: usize,
+    },
+
+    /// The regression likelihood's parameter matrix is missing.
+    #[error(
+        "invalid options: heavy-tailed shrinkage: regression likelihood parameters must be supplied"
+    )]
+    MissingRegressionLikelihoodParameters,
+
+    /// A matrix product in a likelihood expression has incompatible operands.
+    #[error("invalid options: heavy-tailed shrinkage: nonconformable likelihood matrix product")]
+    LikelihoodProductShapeMismatch {
+        /// Matrix dimensions of the left operand, or None for a vector.
+        left_dimensions: Option<[usize; 2]>,
+        /// Element count of the left operand.
+        left_length: usize,
+        /// Matrix dimensions of the right operand, or None for a vector.
+        right_dimensions: Option<[usize; 2]>,
+        /// Element count of the right operand.
+        right_length: usize,
+    },
+
     /// No rows can contribute to median-ratio size-factor estimation.
     #[error("no usable genes for size-factor estimation")]
     NoUsableGenesForSizeFactors,
@@ -298,6 +400,85 @@ pub enum Error {
         /// The violated condition.
         what: String,
     },
+}
+
+/// Posterior controls rejected during query validation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum PosteriorControl {
+    /// An interval probability outside the closed unit interval.
+    IntervalLevel(f64),
+    /// An endpoint probability in a grid interval.
+    GridLevel(f64),
+    /// An odd grid interval count or a count below two.
+    GridIntervals(usize),
+    /// A nonpositive or nonfinite grid width.
+    GridStandardDeviations(f64),
+    /// An empty nuisance integration grid.
+    NuisancePoints(usize),
+    /// A negative or nonfinite nuisance integration width.
+    NuisanceStandardDeviations(f64),
+    /// Threshold requested together with parameter uncertainty.
+    ThresholdWithUncertainty(f64),
+}
+
+impl PosteriorControl {
+    fn message(self) -> &'static str {
+        match self {
+            Self::IntervalLevel(_) => "posterior interval level must lie between zero and one",
+            Self::ThresholdWithUncertainty(_) => {
+                "parameter uncertainty and a threshold cannot be combined"
+            }
+            _ => "invalid posterior integration grid controls",
+        }
+    }
+}
+
+fn posterior_optimizer_message(refinement_method: Option<&str>) -> String {
+    match refinement_method {
+        Some(method) => format!("unsupported refinement optimizer '{method}'"),
+        None => "unsupported posterior optimizer; use BFGS or L-BFGS-B".into(),
+    }
+}
+
+/// Posterior arrays with independently validated dimensions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum PosteriorArray {
+    /// Input contrasts.
+    Contrasts,
+    /// Scalar parameter uncertainties.
+    ParameterStandardErrors,
+    /// Coefficient standard deviations.
+    StandardDeviation,
+    /// Per-row optimizer diagnostics.
+    Diagnostics,
+    /// Per-row false sign rates.
+    FalseSignRate,
+    /// Per-row sign s-values.
+    SignSvalues,
+    /// Per-row false-sign-or-small rates.
+    FalseSignOrSmallRate,
+    /// Per-row threshold s-values.
+    ThresholdSvalues,
+    /// Credible interval bounds.
+    Intervals,
+    /// Modes of requested contrasts.
+    ContrastMode,
+    /// Standard deviations of requested contrasts.
+    ContrastStandardDeviation,
+    /// Per-row grid diagnostics.
+    GridDiagnostics,
+}
+
+/// Dimension of a posterior array.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum PosteriorArrayAxis {
+    /// Rows of a matrix or elements of a per-row vector.
+    Rows,
+    /// Columns of a matrix.
+    Columns,
 }
 
 /// The position associated with a calculation failure.
@@ -537,7 +718,17 @@ impl Error {
             Self::InvalidDispersion { .. } | Self::NoUsableDispersionTrendRows { .. } => {
                 ErrorKind::Dispersion
             }
-            Self::InvalidOptions { .. } => ErrorKind::Options,
+            Self::InvalidOptions { .. }
+            | Self::PosteriorCancelled
+            | Self::PosteriorGridBudgetExceeded { .. }
+            | Self::PosteriorGridOverflow { .. }
+            | Self::InvalidPosteriorControl { .. }
+            | Self::PosteriorShapeMismatch { .. }
+            | Self::PosteriorSummaryCoefficientMismatch { .. }
+            | Self::PosteriorOptimizerUnsupported { .. }
+            | Self::PosteriorMissingPrefit { .. }
+            | Self::MissingRegressionLikelihoodParameters
+            | Self::LikelihoodProductShapeMismatch { .. } => ErrorKind::Options,
             Self::NonFiniteValue { .. } | Self::CoxReidColumnSumOverflow { .. } => {
                 ErrorKind::Numeric
             }

@@ -175,6 +175,12 @@ fn subset(input: &Value, index: &Value) -> Result<Value, Error> {
 fn product(a: &Value, b: &Value) -> Result<Value, Error> {
     let av = numeric(a)?;
     let bv = numeric(b)?;
+    let incompatible = || Error::LikelihoodProductShapeMismatch {
+        left_dimensions: a.dimensions,
+        left_length: av.len(),
+        right_dimensions: b.dimensions,
+        right_length: bv.len(),
+    };
     let (ar, ac, br, bc) = match (a.dimensions, b.dimensions) {
         (Some([ar, ac]), Some([br, bc])) => (ar, ac, br, bc),
         (Some([ar, ac]), None) if ac == bv.len() => (ar, ac, bv.len(), 1),
@@ -182,18 +188,10 @@ fn product(a: &Value, b: &Value) -> Result<Value, Error> {
         (None, Some([br, bc])) if av.len() == br => (1, av.len(), br, bc),
         (None, Some([1, bc])) => (av.len(), 1, 1, bc),
         (None, None) if av.len() == bv.len() => (1, av.len(), bv.len(), 1),
-        _ => {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "nonconformable likelihood matrix product",
-            ));
-        }
+        _ => return Err(incompatible()),
     };
     if ac != br {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "nonconformable likelihood matrix product",
-        ));
+        return Err(incompatible());
     }
     let len = ar.checked_mul(bc).ok_or_else(|| {
         scoped_invalid_options(ERROR_SCOPE, "likelihood matrix product shape overflows")

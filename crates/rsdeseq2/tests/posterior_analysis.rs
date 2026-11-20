@@ -1,5 +1,8 @@
 //! Optional posterior queries, numerical references and validation behavior.
 use crate::support::posterior as support;
+use rsdeseq2::DeseqError;
+use rsdeseq2::errors::{ErrorKind, PosteriorArray, PosteriorArrayAxis, PosteriorControl};
+use std::assert_matches;
 use support::*;
 
 #[test]
@@ -143,66 +146,111 @@ fn posterior_analysis_controls_fail_early_and_map_only_queries_keep_missing_summ
         .iter()
         .find(|v| v["name"] == "normal_credible")
         .unwrap();
-    let mut variants = vec![];
-    let mut add = |path: &str, value: serde_json::Value, message: &str| {
+    let reject = |path: &str, value: serde_json::Value| {
         let mut c = base.clone();
         *c.pointer_mut(path).unwrap() = value;
-        variants.push((c, message.to_owned()));
+        *regression::run(&serde_json::from_value(c).unwrap())
+            .unwrap_err()
+            .downcast::<DeseqError>()
+            .unwrap()
     };
-    add(
-        "/analysis/grid_intervals",
-        serde_json::json!(51),
-        "integration grid",
+    assert_matches!(
+        reject("/analysis/grid_intervals", serde_json::json!(51)),
+        DeseqError::InvalidPosteriorControl {
+            control: PosteriorControl::GridIntervals(51)
+        }
     );
-    add(
-        "/analysis/level",
-        serde_json::json!("-0.1"),
-        "interval level",
+    assert_matches!(
+        reject("/analysis/level", serde_json::json!("-0.1")),
+        DeseqError::InvalidPosteriorControl {
+            control: PosteriorControl::IntervalLevel(-0.1)
+        }
     );
-    add(
-        "/analysis/contrasts/rows",
-        serde_json::json!(3),
-        "dimensions",
+    assert_matches!(
+        reject("/analysis/contrasts/rows", serde_json::json!(3)),
+        DeseqError::InvalidDimensions { context, expected: 9, actual: 6 }
+            if context == "borrowed matrix values"
     );
-    add(
-        "/analysis/contrasts/values/0",
-        serde_json::json!("NaN"),
-        "posterior contrasts",
+    assert_matches!(
+        reject(
+            "/analysis/contrasts",
+            serde_json::json!({ "rows": 3, "columns": 2, "values": vec!["1"; 6] })
+        ),
+        DeseqError::PosteriorShapeMismatch {
+            array: PosteriorArray::Contrasts,
+            axis: PosteriorArrayAxis::Rows,
+            expected: 2,
+            actual: 3,
+            ..
+        }
     );
-    add(
-        "/analysis/nuisance_points",
-        serde_json::json!(0),
-        "integration grid",
+    assert_matches!(
+        reject("/analysis/contrasts/values/0", serde_json::json!("NaN")),
+        DeseqError::NonFiniteValue { context, index: Some(0), value }
+            if context == "posterior contrasts" && value.is_nan()
     );
-    add(
-        "/analysis/grid_intervals",
-        serde_json::json!(usize::MAX - 1),
-        "overflows",
+    assert_matches!(
+        reject("/analysis/nuisance_points", serde_json::json!(0)),
+        DeseqError::InvalidPosteriorControl {
+            control: PosteriorControl::NuisancePoints(0)
+        }
     );
-    add(
-        "/analysis/parameter_standard_errors",
-        serde_json::json!(["-1", "0", "0"]),
-        "uncertainties",
+    assert_matches!(
+        reject("/analysis/grid_intervals", serde_json::json!(usize::MAX - 1)),
+        DeseqError::PosteriorGridOverflow {
+            operation: "row evaluations", grid_intervals, nuisance_points: 5, coefficients: 2,
+            genes: 3, parameter_uncertainty: false, ..
+        } if grid_intervals == usize::MAX - 1
     );
-    for (c, message) in variants {
-        let input: regression::Case = serde_json::from_value(c).unwrap();
-        let error = regression::run(&input).unwrap_err().to_string();
-        assert!(error.contains(&message), "expected {message}, got {error}");
-    }
+    assert_matches!(
+        reject(
+            "/analysis/parameter_standard_errors",
+            serde_json::json!(["0", "0", "-1"])
+        ),
+        DeseqError::InvalidGeneValue {
+            domain: ErrorKind::Options,
+            operation: "posterior parameter standard error",
+            gene: 2,
+            sample: None,
+            value: -1.0,
+            ..
+        }
+    );
+    assert_matches!(
+        reject(
+            "/analysis/parameter_standard_errors",
+            serde_json::json!(["0", "0"])
+        ),
+        DeseqError::PosteriorShapeMismatch {
+            array: PosteriorArray::ParameterStandardErrors,
+            axis: PosteriorArrayAxis::Rows,
+            expected: 3,
+            actual: 2,
+            ..
+        }
+    );
     let mut c = base.clone();
     c["analysis"]["parameter_standard_errors"] = serde_json::json!(["0.1", "0.1", "0.1"]);
     c["threshold"] = serde_json::json!("0.2");
-    let error = regression::run(&serde_json::from_value(c.clone()).unwrap())
+    let error = *regression::run(&serde_json::from_value(c.clone()).unwrap())
         .unwrap_err()
-        .to_string();
-    assert!(error.contains("threshold"));
+        .downcast::<DeseqError>()
+        .unwrap();
+    assert_matches!(
+        error,
+        DeseqError::InvalidPosteriorControl {
+            control: PosteriorControl::ThresholdWithUncertainty(0.2)
+        }
+    );
     c["threshold"] = serde_json::Value::Null;
     c["analysis"]["kind"] = serde_json::json!("laplace");
-    assert!(
-        regression::run(&serde_json::from_value(c).unwrap())
+    assert_matches!(
+        *regression::run(&serde_json::from_value(c).unwrap())
             .unwrap_err()
-            .to_string()
-            .contains("grid interval")
+            .downcast::<DeseqError>()
+            .unwrap(),
+        DeseqError::MissingPrerequisite { domain: ErrorKind::Options, operation, prerequisite }
+            if operation == "heavy-tailed shrinkage: parameter uncertainty" && prerequisite == "a grid interval"
     );
     let mut c = reference["cases"]
         .as_array()
@@ -315,6 +363,20 @@ fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
             .unwrap(),
         0
     );
+    assert_matches!(
+        analysis
+            .estimated_grid_evaluations(usize::MAX, 2, Some(1), false)
+            .unwrap_err(),
+        DeseqError::PosteriorGridOverflow {
+            operation: "batch evaluations",
+            grid_intervals: 50,
+            nuisance_points: 5,
+            coefficients: 2,
+            genes: usize::MAX,
+            parameter_uncertainty: false,
+            ..
+        }
+    );
     analysis.parameter_standard_errors = Some(vec![0.1; 2]);
     assert_eq!(
         analysis
@@ -345,21 +407,25 @@ fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
         analysis,
         ..Default::default()
     };
-    assert!(
-        fit_negative_binomial_posterior(input, &options)
-            .unwrap_err()
-            .to_string()
-            .contains("255 evaluations")
+    let error = fit_negative_binomial_posterior(input, &options).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid options: heavy-tailed shrinkage: posterior grid requires 255 evaluations, exceeding the configured budget",
     );
-    options.analysis.work.max_grid_evaluations = None;
+    assert_matches!(
+        error,
+        DeseqError::PosteriorGridBudgetExceeded {
+            evaluations: 255,
+            limit: 254
+        }
+    );
+    options.analysis.work.max_grid_evaluations = Some(255);
     let accepted = fit_negative_binomial_posterior(input, &options).unwrap();
     assert!(accepted.diagnostics[0].laplace_valid);
     options.analysis.work.cancellation.cancel();
-    assert!(
-        fit_negative_binomial_posterior(input, &options)
-            .unwrap_err()
-            .to_string()
-            .contains("cancelled")
+    assert_matches!(
+        fit_negative_binomial_posterior(input, &options).unwrap_err(),
+        DeseqError::PosteriorCancelled
     );
     // A frontend callback (such as R's interrupt poll) must remain confined to
     // its originating thread, while explicit cancellation reaches workers.
@@ -382,13 +448,9 @@ fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
     std::thread::scope(|scope| {
         scope.spawn(|| shared.cancel()).join().unwrap();
         let worker = scope.spawn(|| fit_negative_binomial_posterior(input, &options));
-        assert!(
-            worker
-                .join()
-                .unwrap()
-                .unwrap_err()
-                .to_string()
-                .contains("cancelled")
+        assert_matches!(
+            worker.join().unwrap().unwrap_err(),
+            DeseqError::PosteriorCancelled
         );
     });
     assert_eq!(
@@ -403,10 +465,8 @@ fn posterior_work_preflight_is_batch_wide_and_cancellation_is_cooperative() {
     }
     options.analysis.work =
         rsdeseq2::shrinkage::PosteriorWorkControl::default().with_interrupt_check(interrupt);
-    assert!(
-        fit_negative_binomial_posterior(input, &options)
-            .unwrap_err()
-            .to_string()
-            .contains("cancelled")
+    assert_matches!(
+        fit_negative_binomial_posterior(input, &options).unwrap_err(),
+        DeseqError::PosteriorCancelled
     );
 }

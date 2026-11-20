@@ -1,7 +1,5 @@
 //! Resource policy independent of the likelihood and frontend.
-use super::prior::ERROR_SCOPE;
 use crate::Error;
-use crate::errors::scoped_invalid_options;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -49,35 +47,23 @@ impl PosteriorWorkControl {
     #[doc(hidden)]
     pub fn check(&self) -> Result<(), Error> {
         if self.cancellation.is_cancelled() {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "posterior operation cancelled",
-            ));
+            return Err(Error::PosteriorCancelled);
         }
         if let Some((thread, check)) = self.interrupt
             && thread == std::thread::current().id()
             && check()
         {
             self.cancellation.cancel();
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                "posterior operation cancelled",
-            ));
+            return Err(Error::PosteriorCancelled);
         }
         Ok(())
     }
     pub(super) fn validate_estimate(&self, evaluations: usize) -> Result<(), Error> {
         self.check()?;
-        if self
-            .max_grid_evaluations
-            .is_some_and(|limit| evaluations > limit)
+        if let Some(limit) = self.max_grid_evaluations
+            && evaluations > limit
         {
-            return Err(scoped_invalid_options(
-                ERROR_SCOPE,
-                format!(
-                    "posterior grid requires {evaluations} evaluations, exceeding the configured budget"
-                ),
-            ));
+            return Err(Error::PosteriorGridBudgetExceeded { evaluations, limit });
         }
         Ok(())
     }

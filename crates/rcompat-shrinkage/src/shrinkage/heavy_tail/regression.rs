@@ -173,10 +173,7 @@ fn fit_regression_impl(
         ));
     }
     if input.parameters.is_none() {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "regression likelihood parameters must be supplied",
-        ));
+        return Err(Error::MissingRegressionLikelihoodParameters);
     }
     if options.prior_df.is_nan()
         || options.prior_df <= 0.0
@@ -487,10 +484,9 @@ impl GeneralRow<'_> {
                 .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))?
             }
             RegressionOptimizer::Unsupported => {
-                return Err(scoped_invalid_options(
-                    ERROR_SCOPE,
-                    "unsupported posterior optimizer; use BFGS or L-BFGS-B",
-                ));
+                return Err(Error::PosteriorOptimizerUnsupported {
+                    refinement_method: None,
+                });
             }
         };
         if let Some(e) = self.error.borrow_mut().take() {
@@ -525,9 +521,8 @@ pub(super) fn optimize_nb_r(
             )
             .map_err(|e| scoped_invalid_options(ERROR_SCOPE, e.to_string()))
         }
-        RegressionOptimizer::Unsupported => Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            "unsupported posterior optimizer; use BFGS or L-BFGS-B",
-        )),
+        RegressionOptimizer::Unsupported => Err(Error::PosteriorOptimizerUnsupported {
+            refinement_method: None,
+        }),
     }
 }

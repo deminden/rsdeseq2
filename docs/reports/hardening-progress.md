@@ -803,6 +803,18 @@ to use the configured wide variance for an intercept.
 The targeted dispersion reference, trend, VST and beta prior batches
 passed 137 integration tests and 12 unit tests.
 
+Posterior work errors now distinguish cancellation, the requested
+evaluation count exceeding its budget, and arithmetic overflow in grid
+sizing. Invalid controls retain their values. Summary shape errors name
+the array and axis, and coefficient mismatches identify both coefficients.
+Regression fixture checks match variants for invalid likelihood shapes,
+missing parameters, unsupported optimizers and missing compiled prefits.
+The messages and coarse error kinds are preserved.
+
+All 15 targeted posterior and regression tests passed, including the
+exact grid budget boundary and cancellation during active work. Workspace
+Clippy passed for all targets.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

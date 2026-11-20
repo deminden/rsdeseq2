@@ -48,10 +48,9 @@ pub(super) fn optimize(
     };
     let optimizer = RegressionOptimizer::from_r_method(name);
     if optimizer == RegressionOptimizer::Unsupported {
-        return Err(scoped_invalid_options(
-            ERROR_SCOPE,
-            format!("unsupported refinement optimizer '{name}'"),
-        ));
+        return Err(Error::PosteriorOptimizerUnsupported {
+            refinement_method: Some(name.into()),
+        });
     }
     let bounds = if name == "L-BFGS-B" {
         RegressionOptimizer::r_bounds(

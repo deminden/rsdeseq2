@@ -3,7 +3,8 @@
 
 pub use rcompat_numeric::errors::Error as DeseqError;
 pub use rcompat_numeric::errors::{
-    CalculationLocation, ErrorKind, FactorLevelRole, NameScope, NegativeBinomialStage, Requirement,
+    CalculationLocation, ErrorKind, FactorLevelRole, NameScope, NegativeBinomialStage,
+    PosteriorArray, PosteriorArrayAxis, PosteriorControl, Requirement,
 };
 #[doc(hidden)]
 pub use rcompat_numeric::errors::{
