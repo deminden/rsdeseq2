@@ -14,12 +14,18 @@ RELEASE_TESTS = (
     # Small independent panels exercise target-sensitive posterior arithmetic,
     # sparse optimizer state, uncertainty propagation and formula column order.
     'bounded_posterior', 'sqp_controls', 'heavy_tail', 'posterior_analysis',
-    'formula_fitting',
+    'posterior_rng', 'regression_method_policy', 'regression_posterior',
+    'formula_fitting', 'tsv_readers',
 )
 LINUX_ARM64_FORMULA_TESTS = (
     'formula_expression', 'model_matrix', 'native_factor', 'native_formula',
     'numeric_transform',
 )
+HOST_GOLDEN_TARGETS = {
+    'aarch64-apple-darwin',
+    'aarch64-unknown-linux-gnu',
+    'x86_64-unknown-linux-gnu',
+}
 
 
 def main():
@@ -45,7 +51,7 @@ def main():
         ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
         cwd=ROOT, check=True, env=portable_env,
     )
-    if linux_arm64:
+    if args.target in HOST_GOLDEN_TARGETS:
         subprocess.run(
             ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
             cwd=ROOT, check=True, env=host_env,

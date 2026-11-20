@@ -998,6 +998,27 @@ golden manifests. The vendored source archive installed with Rust 1.96.0 on
 R 4.5.3 and passed 189 native bridge and fit-object expectations with zero
 failures or skips.
 
+### Platform runtime checkpoint
+
+The release panel now includes the posterior RNG, regression and TSV tests.
+It runs the host R golden check on every target with a committed host
+manifest, as well as the portable golden check on every release target.
+
+The `6eeb479` source passed the release-profile checks below.
+
+| Target | Host R tests | Portable bounded-posterior tests | Golden fields in each profile |
+| --- | ---: | ---: | ---: |
+| macOS arm64 | 126 | 3 | 8,032 |
+| Ubuntu 24.04 arm64 | 142 | 3 | 8,032 |
+| Ubuntu 24.04 x86_64 under QEMU 10.0.13 | 115 in the initial panel, 11 in the added group | 3 | 8,032 |
+
+The added group also passed under the portable profile on Linux x86_64.
+Both separate 56,200-gene replays passed under each numeric profile on
+both Linux targets. The fixture hashes were checked before running those
+replays. Intel macOS test executables linked, and Windows MSVC libraries
+and binaries type-checked. Native runtime results for those two targets
+and the hosted release run remain open.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
