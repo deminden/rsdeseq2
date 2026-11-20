@@ -10,7 +10,7 @@ individual analysis stages. An optional R package wraps the same numerical core.
 
 ## Install
 
-Requires **Rust 1.97.1 or newer**.
+Requires **Rust 1.96.0 or newer**.
 
 ```sh
 # Embed the library.

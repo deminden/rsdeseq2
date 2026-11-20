@@ -107,6 +107,9 @@ versions live in [docs/releases](docs/releases/).
 
 ### Changed
 
+- The minimum supported Rust version is 1.96.0 for the workspace and R
+  source package.
+
 - Gene-wise dispersion iterations borrow the selected rows of counts, offsets
   and weights. The same compact ordering is used for results and diagnostics.
 

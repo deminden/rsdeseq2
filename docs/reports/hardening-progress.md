@@ -985,6 +985,19 @@ flattened cell index of a nonfinite design value after a quoted label.
 The 55 I/O unit tests, 47 TSV and CLI integration tests, and workspace
 Clippy passed.
 
+### Minimum supported Rust version
+
+The workspace and R source package now require Rust 1.96.0. This is the first
+release with the stable `core::range::Range` type used by the public matrix
+index accessors. The workspace, R backend, CI jobs and installation docs
+declare the same version.
+
+On macOS arm64, Rust 1.96.0 passed the locked offline all-targets check and
+221 workspace library tests. Both numeric profiles matched their 8,032-field
+golden manifests. The vendored source archive installed with Rust 1.96.0 on
+R 4.5.3 and passed 189 native bridge and fit-object expectations with zero
+failures or skips.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

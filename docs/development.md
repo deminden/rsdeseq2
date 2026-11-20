@@ -1,6 +1,6 @@
 # Development
 
-Use Rust 1.97.1 or newer (Rust 2024 edition), Python 3.10 or newer, and
+Use Rust 1.96.0 or newer (Rust 2024 edition), Python 3.10 or newer, and
 `deseq2-r462-native` for independent R comparisons. See
 [reproducibility](reproducibility.md) for pinned package restoration.
 

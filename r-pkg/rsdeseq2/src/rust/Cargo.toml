@@ -2,7 +2,7 @@
 name = "rsdeseq2-r"
 version = "0.6.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.96.0"
 publish = false
 exclude = [".DS_Store", "**/.DS_Store"]
 

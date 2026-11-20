@@ -11,7 +11,7 @@ resolver = "3"
 edition = "2024"
 license = "MIT AND BSD-3-Clause AND BSD-2-Clause-Views"
 repository = "https://github.com/deminden/rsdeseq2"
-rust-version = "1.97.1"
+rust-version = "1.96.0"
 
 # Whole-program optimisation for the CLI and benchmarks. Floating-point
 # semantics are unchanged (no fast-math); the golden harness checks outputs.

@@ -15,7 +15,7 @@ scripts/release/sync_r_vendor.sh --check
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
-cargo +1.97.1 check --locked --workspace --all-targets
+cargo +1.96.0 check --locked --workspace --all-targets
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 cargo package --locked --workspace --no-verify

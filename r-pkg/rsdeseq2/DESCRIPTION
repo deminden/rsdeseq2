@@ -10,7 +10,7 @@ Description: R access layer for a Rust implementation of DESeq2-compatible
     differential expression workflow stages and result-table semantics.
 License: MIT + file LICENSE
 Encoding: UTF-8
-SystemRequirements: Cargo and rustc (Rust >= 1.97.1, the crate rust-version)
+SystemRequirements: Cargo and rustc (Rust >= 1.96.0, the crate rust-version)
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.0
 Imports:

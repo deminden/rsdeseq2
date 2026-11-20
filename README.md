@@ -112,7 +112,7 @@ git clone --branch main https://github.com/deminden/rsdeseq2.git
 cd rsdeseq2
 ```
 
-Source installation requires **Rust 1.97.1 or newer, with Cargo**. Installing
+Source installation requires **Rust 1.96.0 or newer, with Cargo**. Installing
 the R package also compiles Rust and requires R and its native build tools.
 R 4.6.2 is the pinned comparison environment; see the
 [R guide](docs/r-wrapper.md) for supported interfaces and optional dependencies.
