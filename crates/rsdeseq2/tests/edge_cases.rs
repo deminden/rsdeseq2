@@ -213,8 +213,10 @@ fn oversized_matrices_fail_with_an_error_instead_of_aborting() {
     // on every host. (16 TiB, used before, is reserved lazily on macOS, and
     // `from_elem` then filled it until the machine ran out of memory.)
     let error = RowMajorMatrix::from_elem(1usize << 48, 1usize << 10, 0.0f64).unwrap_err();
+    let bytes = (1usize << 58) * std::mem::size_of::<f64>();
+    let expected_context = format!("row-major matrix allocation failed ({bytes} bytes requested)");
     assert!(
-        matches!(&error, DeseqError::InvalidDimensions { context, .. } if context == "row-major matrix allocation failed"),
+        matches!(&error, DeseqError::InvalidDimensions { context, .. } if context == &expected_context),
         "{error:?}"
     );
     let error = RowMajorMatrix::from_elem(usize::MAX, 2, 0.0f64).unwrap_err();

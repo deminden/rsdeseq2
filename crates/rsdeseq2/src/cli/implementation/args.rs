@@ -345,6 +345,8 @@ pub(super) struct WaldTestArgs {
 
 /// Arguments for the Wald command.
 #[derive(Debug, clap::Args)]
+#[command(mut_arg("contrast", |arg| arg.help("Numeric Wald contrast vector, comma-delimited in design-column order")))]
+#[command(mut_arg("contrast_name", |arg| arg.help("Design coefficient name to report as a Wald contrast")))]
 pub(super) struct WaldArgs {
     /// Tab-delimited count matrix with gene IDs in the first column.
     #[arg(long)]
@@ -370,6 +372,12 @@ pub(super) struct WaldArgs {
 
 /// Arguments for the LRT command.
 #[derive(Debug, clap::Args)]
+#[command(mut_arg("coefficient", |arg| arg.help("Zero-based full-design coefficient index to report. Defaults to the last column")))]
+#[command(mut_arg("coefficient_name", |arg| arg.help("Full-design coefficient name to report")))]
+#[command(mut_arg("contrast", |arg| arg.help("Numeric full-model contrast vector to report, comma-delimited in design-column order")))]
+#[command(mut_arg("contrast_name", |arg| arg.help("Full-design coefficient name to report as an LRT effect-size contrast")))]
+#[command(mut_arg("contrast_positive", |arg| arg.help("Comma-delimited positive full-design coefficient names for a list contrast")))]
+#[command(mut_arg("contrast_negative", |arg| arg.help("Comma-delimited negative full-design coefficient names for a list contrast")))]
 pub(super) struct LrtArgs {
     /// Tab-delimited count matrix with gene IDs in the first column.
     #[arg(long)]
