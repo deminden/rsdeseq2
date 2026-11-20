@@ -9,7 +9,7 @@ pub(super) fn initial_beta(
     nf: &[f64],
 ) -> Result<DVector<f64>, DeseqError> {
     let mut beta = DVector::zeros(x.ncols());
-    InitialBeta::least_squares(x).initialize(y, nf, &mut Vec::new(), &mut beta)?;
+    InitialBeta::least_squares(x)?.initialize(y, nf, &mut Vec::new(), &mut beta)?;
     Ok(beta)
 }
 
@@ -31,7 +31,7 @@ pub(super) enum InitialBeta {
 impl InitialBeta {
     pub(super) fn for_design(design: &DesignMatrix, x: &DMatrix<f64>) -> Result<Self, DeseqError> {
         if design.rank()? == design.n_coefficients() {
-            return Ok(Self::least_squares(x));
+            return Self::least_squares(x);
         }
         let intercept = design.coefficient_names().and_then(|names| {
             names
@@ -41,10 +41,19 @@ impl InitialBeta {
         Ok(intercept.map_or(Self::Ones, Self::LogBaseMeanIntercept))
     }
 
-    fn least_squares(x: &DMatrix<f64>) -> Self {
-        let transpose = x.transpose();
-        let lu = (&transpose * x).lu();
-        Self::LeastSquares { transpose, lu }
+    fn least_squares(x: &DMatrix<f64>) -> Result<Self, DeseqError> {
+        let coefficients = x.ncols();
+        let mut transpose =
+            try_zero_dmatrix(coefficients, x.nrows(), "IRLS starting design transpose")?;
+        x.transpose_to(&mut transpose);
+        let mut crossproduct = try_zero_dmatrix(
+            coefficients,
+            coefficients,
+            "IRLS starting design crossproduct",
+        )?;
+        transpose.mul_to(x, &mut crossproduct);
+        let lu = crossproduct.lu();
+        Ok(Self::LeastSquares { transpose, lu })
     }
 
     pub(super) fn initialize(

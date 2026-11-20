@@ -873,6 +873,20 @@ GTEx replays. Workspace Clippy passed. The optimized golden harness matched
 8,032 fields in each of the host R and portable profiles at one and four
 workers.
 
+### Linear dispersion projection and IRLS setup
+
+Linear dispersion fits reuse the normalized projection for rough dispersion
+estimates and move that buffer into the count-scale means. The projection
+borrows the design transpose and reserves its matrix products through the
+shared allocation helper. Initial IRLS design and crossproduct buffers use
+the same helper. Matrix products keep their previous grouping and column-major
+storage.
+
+The 166 focused tests and workspace Clippy passed. A seven-coefficient
+regression checks every fitted mean bit against the original multiplication
+on nalgebra's wide matrix path. Both the macOS host R and portable golden
+manifests matched all 8,032 fields at one and four workers.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

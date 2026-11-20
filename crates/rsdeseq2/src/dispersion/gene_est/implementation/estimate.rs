@@ -1,15 +1,15 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
-use crate::matrix::try_alloc_matrix;
+use crate::matrix::{try_alloc_matrix, try_dmatrix_from_row_major, try_zero_dmatrix};
 use crate::numeric::math::ProfileMath;
+use nalgebra::DMatrixView;
 /// Estimate gene-wise dispersions using DESeq2's linear-mu branch shape.
 ///
 /// This implements a clean Rust subset of `estimateDispersionsGeneEst`:
 /// base normalized counts are projected through the supplied design matrix,
 /// raw means are reconstructed from size factors or gene/sample normalization
 /// factors, rough/moments starts are bounded, and each gene's dispersion is
-/// optimized on a two-pass log-alpha grid with optional Cox-Reid correction and
-/// without priors. General iterative GLM mean refitting remains future work.
+/// optimized with the configured search and optional Cox-Reid correction.
 pub fn estimate_gene_wise_dispersions_linear_mu(
     input: GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
@@ -17,7 +17,9 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
     validate_gene_est_inputs(&input, options)?;
     let max_disp = max_dispersion(options, input.counts.n_samples());
     let normalized_mu = linear_model_mu(input.normalized_counts, input.design)?;
-    let rough_disp = rough_dispersion_estimates(input.normalized_counts, input.design)?;
+    let residual_df = rough_dispersion_residual_df(input.design)?;
+    let rough_disp =
+        rough_dispersion_from_means(input.normalized_counts, &normalized_mu, residual_df)?;
     let moments_disp = match input.normalization_factors {
         Some(normalization_factors) => moments_dispersion_estimates_with_normalization_factors(
             input.base_mean,
@@ -30,36 +32,26 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
     let initial_disp =
         initial_dispersion_estimates(&rough_disp, &moments_disp, options.min_disp, max_disp)?;
 
-    let mut mu_values = {
-        let mut values = try_alloc_matrix(
-            input.counts.n_genes(),
-            input.counts.n_samples(),
-            "gene-wise dispersion means",
-        )?;
-        values.resize(input.counts.n_genes() * input.counts.n_samples(), f64::NAN);
-        values
-    };
+    let mut mu_values = normalized_mu.into_values();
     let mut disp_gene_est = vec![f64::NAN; input.counts.n_genes()];
     let mut disp_iter = vec![0; input.counts.n_genes()];
     let mut converged = vec![false; input.counts.n_genes()];
 
-    for gene in 0..input.counts.n_genes() {
+    for (gene, row_mu) in mu_values
+        .chunks_exact_mut(input.counts.n_samples())
+        .enumerate()
+    {
         if input.all_zero[gene] {
+            row_mu.fill(f64::NAN);
             continue;
         }
-        let mu_start = gene * input.counts.n_samples();
-        let normalization_factor_row = input
-            .normalization_factors
-            .map(|normalization_factors| normalization_factors.row(gene))
-            .transpose()?;
-        for sample in 0..input.counts.n_samples() {
-            let factor = normalization_factor_row
-                .map(|row| row[sample])
-                .unwrap_or(input.size_factors[sample]);
-            let value = normalized_mu.row(gene)?[sample] * factor;
-            mu_values[mu_start + sample] = value.max(options.min_mu);
+        let factors = match input.normalization_factors {
+            Some(factors) => factors.row(gene)?,
+            None => input.size_factors,
+        };
+        for (value, factor) in row_mu.iter_mut().zip(factors) {
+            *value = (*value * factor).max(options.min_mu);
         }
-        let row_mu = &mu_values[mu_start..mu_start + input.counts.n_samples()];
         let (estimate, iterations, is_converged) = fit_dispersion_for_gene(
             input.counts.row(gene)?,
             row_mu,
@@ -145,28 +137,30 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
     linear_mu: bool,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
     validate_gene_est_inputs(&input, options)?;
-    let linear_means = if linear_mu {
+    let (rough_disp, linear_means) = if linear_mu {
         let means = linear_model_mu(input.normalized_counts, input.design)?;
-        let mut values = means.as_slice().to_vec();
-        for gene in 0..input.counts.n_genes() {
-            for sample in 0..input.counts.n_samples() {
-                let factor = match input.normalization_factors {
-                    Some(factors) => factors.row(gene)?[sample],
-                    None => input.size_factors[sample],
-                };
-                values[gene * input.counts.n_samples() + sample] *= factor;
+        let residual_df = rough_dispersion_residual_df(input.design)?;
+        let rough_disp = rough_dispersion_from_means(input.normalized_counts, &means, residual_df)?;
+        let mut values = means.into_values();
+        let samples = input.counts.n_samples();
+        for (gene, row) in values.chunks_exact_mut(samples).enumerate() {
+            let factors = match input.normalization_factors {
+                Some(factors) => factors.row(gene)?,
+                None => input.size_factors,
+            };
+            for (value, factor) in row.iter_mut().zip(factors) {
+                *value *= factor;
             }
         }
-        Some(RowMajorMatrix::from_row_major(
-            input.counts.n_genes(),
-            input.counts.n_samples(),
-            values,
-        )?)
+        let means = RowMajorMatrix::from_row_major(input.counts.n_genes(), samples, values)?;
+        (rough_disp, Some(means))
     } else {
-        None
+        (
+            rough_dispersion_estimates(input.normalized_counts, input.design)?,
+            None,
+        )
     };
     let max_disp = max_dispersion(options, input.counts.n_samples());
-    let rough_disp = rough_dispersion_estimates(input.normalized_counts, input.design)?;
     let moments_disp = match input.normalization_factors {
         Some(normalization_factors) => moments_dispersion_estimates_with_normalization_factors(
             input.base_mean,
@@ -388,26 +382,29 @@ pub fn linear_model_mu(
             normalized_counts.n_cols(),
         ));
     }
-    let y = DMatrix::from_row_slice(
-        normalized_counts.n_rows(),
-        normalized_counts.n_cols(),
-        normalized_counts.as_slice(),
-    );
-    let x = DMatrix::from_row_slice(
-        design.n_samples(),
-        design.n_coefficients(),
-        design.matrix().as_slice(),
-    );
-    let xtx = x.transpose() * &x;
-    let Some(xtx_inverse) = xtx.try_inverse() else {
+    let samples = design.n_samples();
+    let coefficients = design.n_coefficients();
+    let x = try_dmatrix_from_row_major(design.matrix(), "linear mean design")?;
+    // The row-major design slice has the column-major layout of its transpose.
+    let xt = DMatrixView::from_slice(design.matrix().as_slice(), coefficients, samples);
+    let mut xtx = try_zero_dmatrix(coefficients, coefficients, "linear mean crossproduct")?;
+    xt.mul_to(&x, &mut xtx);
+    if !xtx.try_inverse_mut() {
         return Err(DeseqError::InvalidDimensions {
             context: "linear mu design rank".to_string(),
-            expected: design.n_coefficients(),
+            expected: coefficients,
             actual: 0,
         });
-    };
-    let hat = &x * xtx_inverse * x.transpose();
-    let fitted = y * hat;
+    }
+    let mut left = try_zero_dmatrix(samples, coefficients, "linear mean projection left factor")?;
+    x.mul_to(&xtx, &mut left);
+    let mut hat = try_zero_dmatrix(samples, samples, "linear mean projection")?;
+    left.mul_to(&xt, &mut hat);
+    let y = try_dmatrix_from_row_major(normalized_counts, "linear mean normalized counts")?;
+    let mut fitted = try_zero_dmatrix(normalized_counts.n_rows(), samples, "linear fitted means")?;
+    y.mul_to(&hat, &mut fitted);
+    drop(y);
+    drop(hat);
     let mut values = try_alloc_matrix(
         normalized_counts.n_rows(),
         normalized_counts.n_cols(),
@@ -430,6 +427,12 @@ pub fn rough_dispersion_estimates(
     normalized_counts: &RowMajorMatrix<f64>,
     design: &DesignMatrix,
 ) -> Result<Vec<f64>, DeseqError> {
+    let residual_df = rough_dispersion_residual_df(design)?;
+    let mu = linear_model_mu(normalized_counts, design)?;
+    rough_dispersion_from_means(normalized_counts, &mu, residual_df)
+}
+
+fn rough_dispersion_residual_df(design: &DesignMatrix) -> Result<f64, DeseqError> {
     if design.n_samples() <= design.n_coefficients() {
         return Err(DeseqError::InvalidDimensions {
             context: "dispersion residual degrees of freedom".to_string(),
@@ -437,8 +440,14 @@ pub fn rough_dispersion_estimates(
             actual: design.n_samples(),
         });
     }
-    let mu = linear_model_mu(normalized_counts, design)?;
-    let residual_df = (design.n_samples() - design.n_coefficients()) as f64;
+    Ok((design.n_samples() - design.n_coefficients()) as f64)
+}
+
+fn rough_dispersion_from_means(
+    normalized_counts: &RowMajorMatrix<f64>,
+    mu: &RowMajorMatrix<f64>,
+    residual_df: f64,
+) -> Result<Vec<f64>, DeseqError> {
     let mut estimates = Vec::with_capacity(normalized_counts.n_rows());
     for gene in 0..normalized_counts.n_rows() {
         let y = normalized_counts.row(gene)?;

@@ -27,6 +27,45 @@ fn linear_model_mu_projects_rows_onto_design_cells() {
 }
 
 #[test]
+fn linear_model_mu_preserves_multiplication_order_for_wide_designs() {
+    use nalgebra::DMatrix;
+
+    // All three dimensions exercise nalgebra's wide matrix multiplication.
+    let (genes, samples, coefficients) = (11, 12, 7);
+    let values = (0..samples * coefficients)
+        .map(|i| {
+            let diagonal = if i / coefficients == i % coefficients {
+                5.0
+            } else {
+                0.0
+            };
+            diagonal + (i * 17 % 53) as f64 / 53.0 - 0.5
+        })
+        .collect();
+    let design = DesignMatrix::from_row_major(samples, coefficients, values, None).unwrap();
+    let counts = (0..genes * samples)
+        .map(|i| (i * 41 % 113) as f64 / 7.0)
+        .collect();
+    let normalized = RowMajorMatrix::from_row_major(genes, samples, counts).unwrap();
+
+    let x = DMatrix::from_row_slice(samples, coefficients, design.matrix().as_slice());
+    let y = DMatrix::from_row_slice(genes, samples, normalized.as_slice());
+    let inverse = (x.transpose() * &x).try_inverse().unwrap();
+    let expected = y * (&x * inverse * x.transpose());
+    let actual = linear_model_mu(&normalized, &design).unwrap();
+
+    for gene in 0..genes {
+        for sample in 0..samples {
+            assert_eq!(
+                actual.row(gene).unwrap()[sample].to_bits(),
+                expected[(gene, sample)].to_bits(),
+                "gene {gene}, sample {sample}",
+            );
+        }
+    }
+}
+
+#[test]
 fn rough_dispersion_matches_deseq2_formula() {
     let normalized = RowMajorMatrix::from_row_major(1, 4, vec![10.0, 30.0, 10.0, 30.0]).unwrap();
     let rough =

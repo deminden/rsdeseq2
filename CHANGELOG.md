@@ -110,6 +110,10 @@ versions live in [docs/releases](docs/releases/).
 - Gene-wise dispersion iterations borrow the selected rows of counts, offsets
   and weights. The same compact ordering is used for results and diagnostics.
 
+- Linear dispersion fitting reuses the projection that supplies starting
+  dispersions and scales the fitted means in the same buffer. Linear
+  projection and IRLS starting matrices use checked allocation.
+
 - Size-factor estimation filters unusable geometric means once, reuses one
   log-ratio buffer across samples and selects the median in place.
 

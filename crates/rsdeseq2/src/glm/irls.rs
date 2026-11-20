@@ -20,7 +20,7 @@ use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
-use crate::matrix::try_alloc_matrix;
+use crate::matrix::{try_alloc_matrix, try_dmatrix_from_row_major, try_zero_dmatrix};
 use crate::normalization::Offsets;
 
 /// Internal retention policy for the same fitted model and fallback rules.
@@ -464,11 +464,7 @@ fn fit_irls_rows<const SELECTED: bool>(
     let samples = rows.input.counts.n_samples();
     let genes = rows.len();
 
-    let x = DMatrix::from_row_slice(
-        design.n_samples(),
-        design.n_coefficients(),
-        design.matrix().as_slice(),
-    );
+    let x = try_dmatrix_from_row_major(design.matrix(), "IRLS design")?;
     let max_design = finite_abs_max(x.as_slice());
     let initial_beta = InitialBeta::for_design(design, &x)?;
     let shared_log_offsets = match rows.input.offsets {
