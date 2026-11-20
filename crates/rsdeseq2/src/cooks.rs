@@ -650,20 +650,10 @@ fn replacement_count_from_scaled_mean(value: f64) -> Result<u32, DeseqError> {
     Ok(value.trunc() as u32)
 }
 
-fn count_matrix_like(counts: &CountMatrix, values: Vec<u32>) -> Result<CountMatrix, DeseqError> {
-    CountMatrix::from_row_major_u32_with_names(
-        counts.n_genes(),
-        counts.n_samples(),
-        values,
-        counts.gene_names().map(<[String]>::to_vec),
-        counts.sample_names().map(<[String]>::to_vec),
-    )
-}
-
 fn no_replacement_output(counts: &CountMatrix) -> Result<CooksReplacementOutput, DeseqError> {
     Ok(CooksReplacementOutput {
-        replaced_counts: count_matrix_like(counts, counts.as_slice().to_vec())?,
-        candidate_replacement_counts: count_matrix_like(counts, counts.as_slice().to_vec())?,
+        replaced_counts: counts.clone(),
+        candidate_replacement_counts: counts.clone(),
         outlier_cells: RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), {
             let mut values =
                 try_alloc_matrix(counts.n_genes(), counts.n_samples(), "Cook's outlier mask")?;

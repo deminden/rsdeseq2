@@ -38,21 +38,24 @@ pub fn replace_outlier_counts(
 
     let genes = counts.n_genes();
     let samples = counts.n_samples();
-    let mut candidate_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
-    let mut outlier_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
-    let mut replaced_values = try_alloc_matrix(genes, samples, "Cook's replacement")?;
-    candidate_values.resize(counts.as_slice().len(), 0);
-    outlier_values.resize(counts.as_slice().len(), false);
-    replaced_values.extend_from_slice(counts.as_slice());
+    let mut changed_rows = try_filled_vec(genes, false, "Cook's changed count rows")?;
+    let mut replace = try_filled_vec(genes, None, "Cook's replacement flags")?;
+    let mut candidates = try_alloc_matrix(genes, samples, "Cook's replacement candidates")?;
+    let mut outliers = try_alloc_matrix(genes, samples, "Cook's outlier mask")?;
+    candidates.resize(counts.as_slice().len(), 0);
+    outliers.resize(counts.as_slice().len(), false);
 
-    let replace = candidate_values
+    let first_error = candidates
         .par_chunks_mut(samples)
-        .zip(outlier_values.par_chunks_mut(samples))
-        .zip(replaced_values.par_chunks_mut(samples))
+        .zip(outliers.par_chunks_mut(samples))
+        .zip(replace.par_iter_mut())
+        .zip(changed_rows.par_iter_mut())
         .enumerate()
         .map_init(
             || None,
-            |scratch, (gene, ((candidate, outlier), replaced))| {
+            |scratch,
+             (gene, (((candidate, outlier), replace), changed))|
+             -> Result<(), DeseqError> {
                 let values = cooks_row_buffer(scratch, samples)?;
                 values.clear();
                 values.extend_from_slice(normalized_counts.row(gene)?);
@@ -61,6 +64,7 @@ pub fn replace_outlier_counts(
                     Some(factors) => factors.row(gene)?,
                     None => size_factors,
                 };
+                let counts_row = counts.row_values(gene);
                 let cooks_row = cooks.row(gene)?;
                 let mut has_outlier = false;
                 let mut has_missing = false;
@@ -74,33 +78,56 @@ pub fn replace_outlier_counts(
                     outlier[sample] = finite && cook > options.cooks_cutoff;
                     has_outlier |= outlier[sample];
                     has_missing |= !finite;
-                    if outlier[sample] && replaceable_samples[sample] {
-                        replaced[sample] = candidate[sample];
+                    if outlier[sample]
+                        && replaceable_samples[sample]
+                        && counts_row[sample] != candidate[sample]
+                    {
+                        *changed = true;
                     }
                 }
-                Ok(if has_outlier {
+                *replace = if has_outlier {
                     Some(true)
                 } else if has_missing {
                     None
                 } else {
                     Some(false)
-                })
+                };
+                Ok(())
             },
         )
-        .collect::<Vec<_>>();
-    // Collect in row order so concurrent failures report the same first gene
-    // and sample as the serial implementation.
-    let replace = replace
-        .into_iter()
-        .collect::<Result<Vec<_>, DeseqError>>()?;
+        .find_map_first(Result::err);
+    if let Some(error) = first_error {
+        return Err(error);
+    }
+
+    let replaced_counts = if changed_rows.iter().any(|&changed| changed) {
+        let mut replaced = try_alloc_matrix(genes, samples, "Cook's replaced counts")?;
+        replaced.extend_from_slice(counts.as_slice());
+        replaced
+            .par_chunks_mut(samples)
+            .zip(candidates.par_chunks(samples))
+            .zip(outliers.par_chunks(samples))
+            .zip(changed_rows.par_iter())
+            .filter(|&(_, &changed)| changed)
+            .for_each(|(((replaced, candidates), outliers), _)| {
+                for (sample, &replaceable) in replaceable_samples.iter().enumerate() {
+                    if replaceable && outliers[sample] {
+                        replaced[sample] = candidates[sample];
+                    }
+                }
+            });
+        counts.with_counts(replaced)?
+    } else {
+        counts.clone()
+    };
 
     Ok(CooksReplacementOutput {
-        replaced_counts: count_matrix_like(counts, replaced_values)?,
-        candidate_replacement_counts: count_matrix_like(counts, candidate_values)?,
+        replaced_counts,
+        candidate_replacement_counts: counts.with_counts(candidates)?,
         outlier_cells: RowMajorMatrix::from_row_major(
             counts.n_genes(),
             counts.n_samples(),
-            outlier_values,
+            outliers,
         )?,
         replace,
         replaceable_samples,

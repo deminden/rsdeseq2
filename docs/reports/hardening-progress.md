@@ -1545,6 +1545,35 @@ gene, masked and unmasked NaNs, all-sample masking and signed zero
 in model-matrix cells. Integration Clippy, formatting, documentation
 and the module dependency check passed.
 
+### Shared counts in Cook's replacement
+
+Count matrices share immutable count buffers and axis labels when
+cloned. Cook's replacement builds the requested candidate counts and
+outlier flags, then copies original counts only if an eligible
+replacement changes a value. When a copy is needed, workers apply the
+changed rows in parallel. Saturated designs and replacement decisions
+that preserve all counts reuse the input buffer.
+
+The portable profile's 60,000-gene, 800-sample no-change replacement
+probe used four workers. Across five pairs against `091f786`, median
+peak RSS fell from 1,337.02 to 1,147.05 MiB and median time fell from
+152.2 to 140.8 ms. A separate 20,000-gene, 100-sample stress probe
+marked every cell as an outlier. Median time there was 6.41 ms versus
+6.08 ms and peak RSS was 57.78 versus 60.16 MiB. Replacement counts,
+candidate counts and refit-flag checksums matched on all pairs.
+
+The 60,000 × 800 robust-dispersion probe used four replicated design
+cells. Median times with 1, 2, 4 and 8 workers were 0.968, 0.467, 0.383
+and 0.198 s. All worker counts and paired runs matched the original
+`67370a4` dispersions. At eight workers, that source took 1.289 s.
+Current median peak RSS at eight workers was 552.62 MiB.
+
+Both profiles passed 183 focused tests and matched all 8,032 golden
+fields. The regression checks shared backing storage when flagged
+outliers preserve the counts and a separate count buffer when an
+eligible replacement changes a value. Integration Clippy, formatting,
+the module dependency check and documentation checks passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

@@ -366,14 +366,75 @@ fn replace_outlier_counts_skips_when_samples_do_not_exceed_coefficients() {
     )
     .unwrap();
 
-    assert_eq!(output.replaced_counts.as_slice(), counts.as_slice());
     assert_eq!(
-        output.candidate_replacement_counts.as_slice(),
-        counts.as_slice()
+        output.replaced_counts.as_slice().as_ptr(),
+        counts.as_slice().as_ptr()
+    );
+    assert_eq!(
+        output.candidate_replacement_counts.as_slice().as_ptr(),
+        counts.as_slice().as_ptr(),
     );
     assert_eq!(output.outlier_cells.as_slice(), &[false, false]);
     assert_eq!(output.replace, vec![Some(false)]);
     assert_eq!(output.replaceable_samples, vec![false, false]);
+}
+
+#[test]
+fn replacement_shares_counts_when_marked_outliers_leave_them_unchanged() {
+    let counts = CountMatrix::from_row_major_u32_with_names(
+        2,
+        4,
+        vec![12, 12, 12, 12, 10, 10, 10, 40],
+        Some(vec!["constant".into(), "protected".into()]),
+        Some(vec!["a".into(), "b".into(), "c".into(), "d".into()]),
+    )
+    .unwrap();
+    let factors = [1.0; 4];
+    let normalized = normalized_counts(&counts, &factors).unwrap();
+    let cooks = RowMajorMatrix::from_row_major(2, 4, vec![9., 0., 0., 0., 0., 0., 0., 9.]).unwrap();
+    let design = DesignMatrix::from_row_major(4, 1, vec![1.; 4], None).unwrap();
+    let mut options = CooksReplacementOptions::new(1.0);
+    options.which_samples = Some(vec![true, true, true, false]);
+    let replace = |options: &CooksReplacementOptions| {
+        replace_outlier_counts(
+            &counts,
+            &normalized,
+            &factors,
+            None,
+            &cooks,
+            &design,
+            options,
+        )
+        .unwrap()
+    };
+
+    let unchanged = replace(&options);
+    assert_eq!(unchanged.replace, [Some(true); 2]);
+    assert_eq!(
+        unchanged.replaced_counts.as_slice().as_ptr(),
+        counts.as_slice().as_ptr()
+    );
+    assert_eq!(
+        unchanged.candidate_replacement_counts.row(1).unwrap(),
+        &[17; 4]
+    );
+    assert_eq!(
+        unchanged
+            .candidate_replacement_counts
+            .gene_names()
+            .unwrap()
+            .as_ptr(),
+        counts.gene_names().unwrap().as_ptr()
+    );
+
+    options.which_samples = Some(vec![true; 4]);
+    let changed = replace(&options);
+    assert_eq!(changed.replaced_counts.row(1).unwrap(), &[10, 10, 10, 17]);
+    assert_eq!(counts.row(1).unwrap(), &[10, 10, 10, 40]);
+    assert_eq!(
+        changed.replaced_counts.sample_names().unwrap().as_ptr(),
+        counts.sample_names().unwrap().as_ptr()
+    );
 }
 
 #[test]

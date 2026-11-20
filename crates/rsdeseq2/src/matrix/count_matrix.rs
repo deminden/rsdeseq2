@@ -2,15 +2,18 @@
 
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::matrix::{normalize_index_range, try_alloc_matrix};
+use std::sync::Arc;
 
-/// Row-major genes x samples count matrix.
+/// Immutable row-major genes x samples count matrix.
+///
+/// Clones share counts and axis labels.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CountMatrix {
     n_genes: usize,
     n_samples: usize,
-    counts: Vec<u32>,
-    gene_names: Option<Vec<String>>,
-    sample_names: Option<Vec<String>>,
+    counts: Arc<Vec<u32>>,
+    gene_names: Option<Arc<Vec<String>>>,
+    sample_names: Option<Arc<Vec<String>>>,
 }
 
 impl CountMatrix {
@@ -90,9 +93,9 @@ impl CountMatrix {
         Ok(Self {
             n_genes,
             n_samples,
-            counts,
-            gene_names,
-            sample_names,
+            counts: Arc::new(counts),
+            gene_names: gene_names.map(Arc::new),
+            sample_names: sample_names.map(Arc::new),
         })
     }
 
@@ -187,12 +190,12 @@ impl CountMatrix {
 
     /// Optional gene names.
     pub fn gene_names(&self) -> Option<&[String]> {
-        self.gene_names.as_deref()
+        self.gene_names.as_deref().map(Vec::as_slice)
     }
 
     /// Optional sample names.
     pub fn sample_names(&self) -> Option<&[String]> {
-        self.sample_names.as_deref()
+        self.sample_names.as_deref().map(Vec::as_slice)
     }
 
     /// Return a basic summary used by fit-state output.
@@ -229,14 +232,31 @@ impl CountMatrix {
                 .map(|gene| names[*gene].clone())
                 .collect::<Vec<_>>()
         });
-        let sample_names = self.sample_names().map(<[String]>::to_vec);
-        CountMatrix::from_row_major_u32_with_names(
-            gene_indices.len(),
-            self.n_samples,
-            values,
-            gene_names,
-            sample_names,
-        )
+        Ok(Self {
+            n_genes: gene_indices.len(),
+            n_samples: self.n_samples,
+            counts: Arc::new(values),
+            gene_names: gene_names.map(Arc::new),
+            sample_names: self.sample_names.clone(),
+        })
+    }
+
+    /// Replace the count buffer while sharing the original axis labels.
+    pub(crate) fn with_counts(&self, counts: Vec<u32>) -> Result<Self, DeseqError> {
+        if counts.len() != self.counts.len() {
+            return Err(invalid_dimensions(
+                "count matrix values",
+                self.counts.len(),
+                counts.len(),
+            ));
+        }
+        Ok(Self {
+            n_genes: self.n_genes,
+            n_samples: self.n_samples,
+            counts: Arc::new(counts),
+            gene_names: self.gene_names.clone(),
+            sample_names: self.sample_names.clone(),
+        })
     }
 }
 
