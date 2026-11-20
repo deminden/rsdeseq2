@@ -203,3 +203,18 @@ R 4.5.3 and R 4.6.2 with zero skips. Both package checks recorded two
 vendoring notes. R 4.6.2 also recorded the compiled-symbol warning.
 The Python validation suite passed all 71 tests with the installed R package
 and full GTEx tables available.
+
+
+### Linux arm64 profile verification
+
+The `dc2e0f9` source passed 1,221 workspace tests on macOS arm64 as well as
+Linux arm64. Linux x86_64 passed its 114 release-panel tests under QEMU
+10.0.13. All 8,032 portable hashes matched on those three targets, and each
+host profile matched all 8,032 fields in its own manifest.
+
+On macOS arm64, the rebuilt binary passed all 121 per-contrast and nine
+global GTEx precision gates under `r-host`. The rebuilt R source archive
+installed on R 4.5.3 with DESeq2 1.50.2 and on R 4.6.2 with DESeq2 1.52.0.
+Each installation passed 2,874 expectations with zero skips. All four Rust
+archives built offline from their packaged contents. The Python suite
+passed 71 tests with the rebuilt R package and full GTEx tables available.
