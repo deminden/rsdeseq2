@@ -223,6 +223,110 @@ pub(super) fn beta_log2_r_objective(
     Ok(-(ll + lp))
 }
 
+pub(super) fn beta_log2_r_centered_gradient(
+    input: &BetaOptimInput<'_>,
+    beta: &[f64],
+    lower: f64,
+    upper: f64,
+    ndeps: &[f64],
+) -> Result<Vec<f64>, DeseqError> {
+    let ln2 = std::f64::consts::LN_2;
+    let size = input.dispersion.recip();
+    let mut candidate = beta.to_vec();
+    let mut gradient = vec![0.0; beta.len()];
+    for (col, value) in gradient.iter_mut().enumerate() {
+        let forward_step = ndeps[col].min(upper - beta[col]);
+        let backward_step = ndeps[col].min(beta[col] - lower);
+        let denominator = forward_step + backward_step;
+        if lower == upper {
+            continue;
+        }
+        let backward = beta[col] - backward_step;
+        let forward = beta[col] + forward_step;
+        if denominator <= 0.0 || (forward == beta[col] && backward == beta[col]) {
+            return Err(DeseqError::UnsupportedFeature {
+                feature: format!("optim fallback stencil cannot perturb coordinate {col}"),
+            });
+        }
+        candidate[col] = backward;
+        let coordinate_change = (forward - backward) * ln2;
+        let precision = input.ridge_lambda[col] * ln2.powi(2);
+        let ridge_change = (0.5 * precision) * (forward - backward) * (forward + backward);
+        let centered = (0..input.x.nrows())
+            .try_fold(0.0, |difference, sample| {
+                let term = beta_log2_sample_loss_change(
+                    input,
+                    &candidate,
+                    col,
+                    sample,
+                    size,
+                    coordinate_change,
+                )?;
+                let weight = input.weights.map_or(1.0, |weights| weights[sample]);
+                Some(difference + weight * term)
+            })
+            .map(|difference| difference + ridge_change)
+            .filter(|difference| difference.is_finite());
+        let difference = match centered {
+            Some(difference) => difference,
+            None => {
+                // Keep the R objective's behaviour when a stencil leaves the
+                // ordinary floating-point range.
+                let before = beta_log2_r_objective(input, &candidate)?;
+                candidate[col] = forward;
+                beta_log2_r_objective(input, &candidate)? - before
+            }
+        };
+        candidate[col] = beta[col];
+        *value = difference / denominator;
+    }
+    Ok(gradient)
+}
+
+fn beta_log2_sample_loss_change(
+    input: &BetaOptimInput<'_>,
+    backward: &[f64],
+    col: usize,
+    sample: usize,
+    size: f64,
+    coordinate_change: f64,
+) -> Option<f64> {
+    let eta = backward
+        .iter()
+        .copied()
+        .enumerate()
+        .fold(0.0, |eta, (j, coefficient)| {
+            input.x[(sample, j)].mul_add(coefficient, eta)
+        });
+    let delta = input.x[(sample, col)] * coordinate_change;
+    // Leave room for exp2 and the offset product at the other end of the
+    // stencil. The direct R objective handles wider steps and extreme means.
+    if eta.abs() > 1020.0 || delta.abs() > 1.0 {
+        return None;
+    }
+    let mu = input.nf[sample] * 2.0_f64.powf_p(eta);
+    let total = mu + size;
+    if mu < 3.0 * f64::MIN_POSITIVE || mu > f64::MAX / 3.0 || !total.is_finite() {
+        return None;
+    }
+    let share = mu.min(size) / total;
+    if !share.is_normal() {
+        return None;
+    }
+    let count = f64::from(input.counts[sample]);
+    // The means satisfy mu_forward = mu * exp(delta). Evaluate the change in
+    // log(size + mu) after factoring out the larger contribution. Terms that
+    // depend only on the count or dispersion cancel exactly.
+    let term = if mu <= size {
+        let shifted = share * delta.exp_m1_p();
+        (count + size).mul_add(shifted.ln_1p_p(), -count * delta)
+    } else {
+        let shifted = share * (-delta).exp_m1_p();
+        (count + size).mul_add(shifted.ln_1p_p(), size * delta)
+    };
+    Some(term)
+}
+
 #[cfg(test)]
 pub(super) fn beta_log2_numeric_gradient(
     input: &BetaOptimInput<'_>,

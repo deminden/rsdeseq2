@@ -325,6 +325,27 @@ fn beta_numeric_gradient_uses_r_optim_bounded_difference() {
 }
 
 #[test]
+fn centered_beta_gradient_matches_high_precision_bounded_difference() {
+    let x = DMatrix::from_row_slice(3, 2, &[1.0, -0.5, 1.0, 1.25, 1.0, 0.0]);
+    let input = BetaOptimInput {
+        x: &x,
+        counts: &[5, 900, 4_000_000_000],
+        nf: &[0.04, 1.5, 4.0],
+        dispersion: 0.3,
+        weights: Some(&[0.25, 0.8, 1.0]),
+        ridge_lambda: &[0.25, 0.125],
+    };
+    let gradient =
+        beta_log2_r_centered_gradient(&input, &[4.0, -0.75], -4.0, 4.0, &[1e-3; 2]).unwrap();
+
+    // Independently evaluate both endpoint objectives with 80-digit decimal
+    // arithmetic. The first stencil is one-sided. The high-count row has the
+    // same loss at both endpoints of the second stencil.
+    assert_relative_eq!(gradient[0], -137_302_192.856_035_1, max_relative = 3e-15);
+    assert_relative_eq!(gradient[1], -129.004_900_349_682_5, max_relative = 3e-15);
+}
+
+#[test]
 fn optim_fallback_replays_portable_objective_only_r_optim_gtex_cases() {
     let fixture: HardROptimFixture =
         serde_json::from_str(include_str!("fixtures/gtex_optim_reference.json")).unwrap();

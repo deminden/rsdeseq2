@@ -201,12 +201,36 @@ pub(super) fn minimize_beta_log2_lbfgsb(
         })?;
     let control = optim_fallback_control(parameters.len(), maxit, gradient_tol);
     let solution = if r_optim_compat {
-        let numeric = match optim_lbfgsb(
-            parameters.clone(),
-            bounds.clone(),
-            &mut objective,
-            control.clone(),
-        ) {
+        let numeric_fit = if crate::numeric_profile() == crate::NumericProfile::Portable {
+            let mut gradient = |beta: &[f64]| match beta_log2_r_centered_gradient(
+                &input,
+                beta,
+                lower,
+                upper,
+                &control.ndeps,
+            ) {
+                Ok(gradient) => gradient,
+                Err(error) => {
+                    deferred_error.borrow_mut().get_or_insert(error);
+                    vec![0.0; beta.len()]
+                }
+            };
+            optim_lbfgsb_with_gradient(
+                parameters.clone(),
+                bounds.clone(),
+                &mut objective,
+                &mut gradient,
+                control.clone(),
+            )
+        } else {
+            optim_lbfgsb(
+                parameters.clone(),
+                bounds.clone(),
+                &mut objective,
+                control.clone(),
+            )
+        };
+        let numeric = match numeric_fit {
             Ok(solution) => solution,
             Err(error) => {
                 return Err(DeseqError::UnsupportedFeature {
