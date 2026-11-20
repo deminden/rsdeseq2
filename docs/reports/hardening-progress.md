@@ -690,6 +690,36 @@ The `just generators` entry point lists reference generators, output
 paths and replay checks. The inventory test checks that each top-level
 reference generator is registered.
 
+### Portable Student-t uniform posteriors
+
+In `8133dcf`, portable Student-t calculations use `libm` Gamma values
+and the unit-shape beta identity. Interval probabilities use the outer
+tail, and narrow intervals use local integration on the original
+scale. Same-tail moments subtract small tail integrals to avoid losing
+the component variance after rounding. The host R profiles retain the
+original calculation and its reference.
+
+The portable test checks 630 observations across 30 prior and
+degrees-of-freedom combinations. Its independent reference evaluates
+likelihoods, weights, conditional moments and CDFs with 100 working
+decimal digits at the existing test tolerances. For the symmetric
+10-degree case at estimate −15 and standard error 0.1, the posterior
+SD is 1.56674834635824 against 1.56674834635824 from the independent
+reference. The original ashr fixture records 1.59286532675430.
+
+The focused Student-t integration test passed on macOS arm64, Linux
+arm64 and emulated Linux x86_64. The macOS and Linux arm64 host R
+bounded-posterior panels passed. Both macOS golden manifests matched
+all 8,032 fields. Release targets now run the portable Student-t replay
+alongside the existing portable golden and host R checks.
+
+The portable Gaussian panel still reports the same 19 mismatches as
+`a85ca59`, all in one ultra-narrow uniform fixture. For its estimate
+−40 and standard error 8, the 90-digit midpoint log density is
+−15.49838007488450867. The averaging error at the fixture width is
+below `1e-24`. The portable replay and the original ashr fixture both
+differ from that value by more than `1e-3`.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
