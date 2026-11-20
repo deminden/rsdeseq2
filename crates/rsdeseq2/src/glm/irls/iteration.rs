@@ -4,6 +4,7 @@ use crate::numeric::math::ProfileMath;
 
 pub(super) struct IrlsScratch {
     counts: Vec<f64>,
+    scaled_factors: Vec<f64>,
     log_offsets: Vec<f64>,
     fitted_means: Vec<f64>,
     weights: Vec<f64>,
@@ -18,9 +19,15 @@ impl IrlsScratch {
         samples: usize,
         coefficients: usize,
         per_cell_offsets: bool,
+        scale_offsets: bool,
     ) -> Result<Self, DeseqError> {
         Ok(Self {
             counts: try_alloc_matrix(samples, 1, "IRLS count scratch")?,
+            scaled_factors: try_alloc_matrix(
+                if scale_offsets { samples } else { 0 },
+                1,
+                "IRLS scaled offset scratch",
+            )?,
             log_offsets: try_alloc_matrix(
                 if per_cell_offsets { samples } else { 0 },
                 1,
@@ -53,10 +60,12 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
             count_row.len(),
             input.x.ncols(),
             input.shared_log_offsets.is_none(),
+            input.rows.offset_scales.is_some(),
         )?),
     };
     let IrlsScratch {
         counts: y,
+        scaled_factors,
         log_offsets,
         fitted_means: mu,
         weights: w,
@@ -67,7 +76,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     } = scratch;
     y.clear();
     y.extend(count_row.iter().copied().map(f64::from));
-    let nf = input.rows.input.offsets.row(source_gene)?;
+    let nf = input.rows.factors(gene, scaled_factors)?;
     let log_nf = match input.shared_log_offsets {
         Some(shared) => shared,
         None => {

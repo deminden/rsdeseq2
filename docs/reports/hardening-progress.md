@@ -1367,3 +1367,24 @@ optimizer-diagnostic checksums matched for both pairs.
 The 104 focused tests passed under each profile, including the
 GTEx optimizer reference and a scratch reuse check across genes.
 Both 8,032-field golden manifests matched. Clippy and formatting passed.
+
+### Borrowed rows and frozen offsets in rlog
+
+Estimated and frozen rlog pass active gene indices into IRLS and borrow
+the original counts and factors. Prior estimation reuses its normalized
+counts buffer for log-fold changes. Frozen rlog validates the scaled
+factors in row order and composes them in a reusable sample-sized worker
+buffer during fitting.
+
+A paired portable-profile probe on macOS arm64 used 8,192 genes, 16
+samples, per-cell factors, two workers, and an all-zero row every five
+genes. Across three runs, median peak RSS fell from 13.98 to 11.09 MiB
+for estimated rlog and from 10.64 to 8.03 MiB for frozen rlog against
+`4c4aa82`. Transformed values, intercepts and prior checksums matched on
+all pairs.
+
+Each profile passed 140 focused GLM, normalization and transform tests.
+Both 8,032-field golden manifests matched. Clippy, formatting and the
+module dependency check passed. The separate exact-R formula-transform
+panel passed in the host R profile. Its degree-10 polynomial bit
+comparison also fails under the portable profile at the baseline commit.

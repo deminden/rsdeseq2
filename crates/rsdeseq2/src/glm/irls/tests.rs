@@ -334,6 +334,45 @@ fn selected_glm_fits_match_compacted_rows_with_offsets_and_weights() {
             fit_selected_irls_means(selected_input, &design, options.clone(), genes).unwrap();
         assert_eq!(means, compact.mu);
 
+        let scales = [2.0, 0.5];
+        let scaled_factors = RowMajorMatrix::from_row_major(
+            genes.len(),
+            counts.n_samples(),
+            scales
+                .iter()
+                .enumerate()
+                .flat_map(|(gene, &scale)| {
+                    compact_offsets
+                        .row(gene)
+                        .unwrap()
+                        .iter()
+                        .map(move |factor| factor * scale)
+                })
+                .collect(),
+        )
+        .unwrap();
+        let dense = fit_fixed_dispersion_glm(
+            GlmInput {
+                offsets: Offsets::PerCell(&scaled_factors),
+                ..compact_input
+            },
+            &design,
+            options.clone(),
+        )
+        .unwrap();
+        let scaled = fit_irls_with_offset_scales(
+            selected_input,
+            &design,
+            options.clone(),
+            Some(genes),
+            &scales,
+            OutputRequirements::Transform,
+        )
+        .unwrap()
+        .into_matrix()
+        .unwrap();
+        assert_eq!(scaled, dense.beta);
+
         let selected_intercept =
             crate::glm::beta::fit_intercept_only_glm_rows(selected_input, Some(genes)).unwrap();
         let compact_intercept = fit_intercept_only_glm(compact_input).unwrap();

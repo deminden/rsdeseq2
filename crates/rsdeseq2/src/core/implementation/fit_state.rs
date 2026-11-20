@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::transform::rlog::{rlog_frozen_for_rows, rlog_with_estimated_prior_for_rows};
 use std::sync::Arc;
 /// Inspectable fit state for all implemented and future DESeq2 stages.
 #[derive(Clone, Debug, PartialEq)]
@@ -279,26 +280,12 @@ impl DeseqFit {
                     offset_mode,
                 });
             }
-            let compact_counts = compact_counts(counts, &nonzero_rows)?;
-            let compact_base_mean = compact_f64_values(&self.base_mean, &nonzero_rows)?;
-            let compact_disp_fit = compact_f64_values(disp_fit, &nonzero_rows)?;
-            let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
-            let compact_factors = self
-                .normalization_factors
-                .as_ref()
-                .map(|factors| compact_matrix_rows(factors, &nonzero_rows))
-                .transpose()?;
-            let offsets = match &compact_factors {
-                Some(factors) => Offsets::PerCell(factors),
-                None => Offsets::PerSample(&self.size_factors),
-            };
-            let compact_output = rlog_with_estimated_prior(
-                &compact_counts,
-                offsets,
-                &compact_base_mean,
-                &compact_disp_fit,
-                &compact_dispersions,
+            let compact_output = rlog_with_estimated_prior_for_rows(
+                GlmInput::new(counts, self.offsets(), dispersions),
+                &self.base_mean,
+                disp_fit,
                 options,
+                Some(&nonzero_rows),
             )?;
             return expand_rlog_output_with_all_zero_rows(
                 compact_output,
@@ -387,25 +374,12 @@ impl DeseqFit {
                     offset_mode,
                 });
             }
-            let compact_counts = compact_counts(counts, &nonzero_rows)?;
-            let compact_dispersions = compact_f64_values(dispersions, &nonzero_rows)?;
-            let compact_intercept = compact_f64_values(frozen_intercept, &nonzero_rows)?;
-            let compact_factors = self
-                .normalization_factors
-                .as_ref()
-                .map(|factors| compact_matrix_rows(factors, &nonzero_rows))
-                .transpose()?;
-            let offsets = match &compact_factors {
-                Some(factors) => Offsets::PerCell(factors),
-                None => Offsets::PerSample(&self.size_factors),
-            };
-            let compact_output = rlog_frozen(
-                &compact_counts,
-                offsets,
-                &compact_dispersions,
+            let compact_output = rlog_frozen_for_rows(
+                GlmInput::new(counts, self.offsets(), dispersions),
                 sample_prior_variance,
-                &compact_intercept,
+                frozen_intercept,
                 options,
+                Some(&nonzero_rows),
             )?;
             return expand_frozen_rlog_output_with_all_zero_rows(
                 compact_output,

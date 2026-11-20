@@ -401,6 +401,7 @@ pub(crate) fn fit_offsets_irls_for_output(
         IrlsRows::<false> {
             input,
             selection: &[],
+            offset_scales: None,
         },
         design,
         options,
@@ -428,7 +429,7 @@ pub(crate) fn fit_selected_irls(
         .and_then(IrlsOutput::into_inference)
 }
 
-fn fit_selected_irls_output(
+pub(crate) fn fit_selected_irls_output(
     input: GlmInput<'_>,
     design: &DesignMatrix,
     options: IrlsOptions,
@@ -442,6 +443,7 @@ fn fit_selected_irls_output(
         IrlsRows::<true> {
             input,
             selection: genes,
+            offset_scales: None,
         },
         design,
         options,
@@ -449,11 +451,51 @@ fn fit_selected_irls_output(
     )
 }
 
+/// Fit rows whose normalization factors include one prescaled intercept per row.
+/// The caller validates each product before fitting so errors retain row order.
+pub(crate) fn fit_irls_with_offset_scales(
+    input: GlmInput<'_>,
+    design: &DesignMatrix,
+    options: IrlsOptions,
+    genes: Option<&[usize]>,
+    scales: &[f64],
+    requirements: OutputRequirements,
+) -> Result<IrlsOutput, DeseqError> {
+    let rows = genes.map_or(input.counts.n_genes(), <[usize]>::len);
+    if scales.len() != rows {
+        return Err(invalid_dimensions("IRLS offset scales", rows, scales.len()));
+    }
+    match genes {
+        Some(genes) => fit_irls_rows(
+            IrlsRows::<true> {
+                input,
+                selection: genes,
+                offset_scales: Some(scales),
+            },
+            design,
+            options,
+            requirements,
+        ),
+        None => fit_irls_rows(
+            IrlsRows::<false> {
+                input,
+                selection: &[],
+                offset_scales: Some(scales),
+            },
+            design,
+            options,
+            requirements,
+        ),
+    }
+}
+
 #[derive(Clone, Copy)]
 struct IrlsRows<'a, const SELECTED: bool> {
     input: GlmInput<'a>,
     /// Source gene indices in fit order. Output and error positions are compact.
     selection: &'a [usize],
+    /// Already validated positive multipliers in fit order.
+    offset_scales: Option<&'a [f64]>,
 }
 
 impl<'a, const SELECTED: bool> IrlsRows<'a, SELECTED> {
@@ -467,6 +509,24 @@ impl<'a, const SELECTED: bool> IrlsRows<'a, SELECTED> {
 
     fn source(self, gene: usize) -> usize {
         if SELECTED { self.selection[gene] } else { gene }
+    }
+
+    fn factors<'scratch>(
+        self,
+        gene: usize,
+        buffer: &'scratch mut Vec<f64>,
+    ) -> Result<&'scratch [f64], DeseqError>
+    where
+        'a: 'scratch,
+    {
+        let factors = self.input.offsets.row(self.source(gene))?;
+        if let Some(scales) = self.offset_scales {
+            buffer.clear();
+            buffer.extend(factors.iter().map(|&factor| factor * scales[gene]));
+            Ok(buffer)
+        } else {
+            Ok(factors)
+        }
     }
 
     fn weights(self, source_gene: usize) -> Result<Option<&'a [f64]>, DeseqError> {
@@ -491,12 +551,12 @@ fn fit_irls_rows<const SELECTED: bool>(
     let max_design = finite_abs_max(x.as_slice());
     let initial_beta = InitialBeta::for_design(design, &x)?;
     let shared_log_offsets = match rows.input.offsets {
-        Offsets::PerSample(factors) => {
+        Offsets::PerSample(factors) if rows.offset_scales.is_none() => {
             let mut values = try_alloc_matrix(samples, 1, "IRLS shared log offsets")?;
             values.extend(factors.iter().copied().map(f64::ln_p));
             Some(values)
         }
-        Offsets::PerCell(_) => None,
+        _ => None,
     };
     let p = design.n_coefficients();
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;

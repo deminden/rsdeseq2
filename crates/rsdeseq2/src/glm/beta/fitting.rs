@@ -461,44 +461,46 @@ pub fn fit_glms_with_estimated_beta_prior_variance_and_normalization_factors_and
     )
 }
 
-pub(crate) fn fit_prior_sf_for_output(
-    counts: &CountMatrix,
+pub(crate) fn fit_prior_for_output(
+    input: GlmInput<'_>,
     design: &DesignMatrix,
-    size_factors: &[f64],
-    dispersions: &[f64],
     beta_prior_variance: &[f64],
     options: IrlsOptions,
+    genes: Option<&[usize]>,
+    offset_scales: Option<&[f64]>,
     requirements: crate::glm::irls::OutputRequirements,
 ) -> Result<crate::glm::irls::IrlsOutput, DeseqError> {
+    use crate::glm::irls::{
+        fit_irls_with_offset_scales, fit_nf_irls_for_output, fit_selected_irls_output,
+        fit_sf_irls_for_output,
+    };
     let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-    crate::glm::irls::fit_sf_irls_for_output(
-        counts,
-        design,
-        size_factors,
-        dispersions,
-        None,
-        options,
-        requirements,
-    )
-}
-
-pub(crate) fn fit_prior_nf_for_output(
-    counts: &CountMatrix,
-    design: &DesignMatrix,
-    factors: &RowMajorMatrix<f64>,
-    dispersions: &[f64],
-    beta_prior_variance: &[f64],
-    options: IrlsOptions,
-    requirements: crate::glm::irls::OutputRequirements,
-) -> Result<crate::glm::irls::IrlsOutput, DeseqError> {
-    let options = options_with_beta_prior_variance(design, beta_prior_variance, options)?;
-    crate::glm::irls::fit_nf_irls_for_output(
-        counts,
-        design,
-        factors,
-        dispersions,
-        None,
-        options,
-        requirements,
-    )
+    match (genes, offset_scales) {
+        (_, Some(scales)) => {
+            fit_irls_with_offset_scales(input, design, options, genes, scales, requirements)
+        }
+        (Some(genes), None) => {
+            fit_selected_irls_output(input, design, options, genes, requirements)
+        }
+        (None, None) => match input.offsets {
+            Offsets::PerSample(factors) => fit_sf_irls_for_output(
+                input.counts,
+                design,
+                factors,
+                input.dispersions,
+                input.weights,
+                options,
+                requirements,
+            ),
+            Offsets::PerCell(factors) => fit_nf_irls_for_output(
+                input.counts,
+                design,
+                factors,
+                input.dispersions,
+                input.weights,
+                options,
+                requirements,
+            ),
+        },
+    }
 }

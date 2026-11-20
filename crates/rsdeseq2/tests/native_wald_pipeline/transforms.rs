@@ -243,41 +243,56 @@ fn fitted_rlog_expands_all_zero_rows_as_zero_transform_rows() {
     let compact_counts = counts.select_rows(&[1, 2, 3, 4, 5, 6, 7]).unwrap();
     let design = two_group_design();
     let builder = glm_mu_native_wald_builder().fit_type(FitType::Mean);
-    let fit = builder
+    let mut fit = builder
         .fit_map_dispersions_glm_mu(&counts, &design)
         .unwrap();
-    let compact_fit = builder
+    let mut compact_fit = builder
         .fit_map_dispersions_glm_mu(&compact_counts, &design)
         .unwrap();
 
-    let output = fit.rlog(&counts).unwrap();
-    let compact_output = compact_fit.rlog(&compact_counts).unwrap();
+    for use_cell_factors in [false, true] {
+        if use_cell_factors {
+            let samples = counts.n_samples();
+            let active_factors = (0..compact_counts.n_genes() * samples)
+                .map(|index| 0.85 + 0.04 * (index % 7) as f64)
+                .collect::<Vec<_>>();
+            let factors = [vec![f64::NAN; samples], active_factors.clone()].concat();
+            fit.normalization_factors =
+                Some(RowMajorMatrix::from_row_major(counts.n_genes(), samples, factors).unwrap());
+            compact_fit.normalization_factors = Some(
+                RowMajorMatrix::from_row_major(compact_counts.n_genes(), samples, active_factors)
+                    .unwrap(),
+            );
+        }
+        let output = fit.rlog(&counts).unwrap();
+        let compact_output = compact_fit.rlog(&compact_counts).unwrap();
 
-    assert_eq!(output.transformed.n_rows(), counts.n_genes());
-    assert_eq!(output.transformed.n_cols(), counts.n_samples());
-    assert_eq!(output.intercept.len(), counts.n_genes());
-    assert_eq!(output.intercept[0], 0.0);
-    assert!(
-        output
-            .transformed
-            .row(0)
-            .unwrap()
-            .iter()
-            .all(|value| *value == 0.0)
-    );
-    assert_eq!(
-        output.sample_prior_variance,
-        compact_output.sample_prior_variance
-    );
-    for compact_gene in 0..compact_counts.n_genes() {
-        assert_eq!(
-            output.transformed.row(compact_gene + 1).unwrap(),
-            compact_output.transformed.row(compact_gene).unwrap()
+        assert_eq!(output.transformed.n_rows(), counts.n_genes());
+        assert_eq!(output.transformed.n_cols(), counts.n_samples());
+        assert_eq!(output.intercept.len(), counts.n_genes());
+        assert_eq!(output.intercept[0], 0.0);
+        assert!(
+            output
+                .transformed
+                .row(0)
+                .unwrap()
+                .iter()
+                .all(|value| *value == 0.0)
         );
         assert_eq!(
-            output.intercept[compact_gene + 1],
-            compact_output.intercept[compact_gene]
+            output.sample_prior_variance,
+            compact_output.sample_prior_variance
         );
+        for compact_gene in 0..compact_counts.n_genes() {
+            assert_eq!(
+                output.transformed.row(compact_gene + 1).unwrap(),
+                compact_output.transformed.row(compact_gene).unwrap()
+            );
+            assert_eq!(
+                output.intercept[compact_gene + 1],
+                compact_output.intercept[compact_gene]
+            );
+        }
     }
 }
 

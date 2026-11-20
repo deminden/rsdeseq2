@@ -130,22 +130,7 @@ pub fn normalized_counts(
     counts: &CountMatrix,
     size_factors: &[f64],
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    validate_size_factors(size_factors, counts.n_samples())?;
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "normalized counts")?;
-    for gene in 0..counts.n_genes() {
-        for (sample, count) in counts.row_values(gene).iter().copied().enumerate() {
-            values.push(
-                checked::try_div(f64::from(count), size_factors[sample]).map_err(|error| {
-                    normalized_count_error(
-                        "normalized count",
-                        gene * counts.n_samples() + sample,
-                        error.value,
-                    )
-                })?,
-            );
-        }
-    }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
+    normalized_counts_for_rows(counts, Offsets::PerSample(size_factors), None)
 }
 
 /// Expand sample-specific size factors into a genes x samples normalization matrix.
@@ -172,27 +157,52 @@ pub fn normalized_counts_with_factors(
     counts: &CountMatrix,
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    validate_normalization_factors(counts, normalization_factors)?;
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "normalized counts")?;
-    for gene in 0..counts.n_genes() {
-        let count_row = counts.row_values(gene);
-        let factor_row = normalization_factors.row(gene)?;
-        for (sample, (count, factor)) in count_row
-            .iter()
-            .copied()
-            .zip(factor_row.iter().copied())
-            .enumerate()
-        {
+    normalized_counts_for_rows(counts, Offsets::PerCell(normalization_factors), None)
+}
+
+pub(crate) fn normalized_counts_for_rows(
+    counts: &CountMatrix,
+    offsets: Offsets<'_>,
+    selected: Option<&[usize]>,
+) -> Result<RowMajorMatrix<f64>, DeseqError> {
+    let genes = selected.map_or(counts.n_genes(), <[usize]>::len);
+    let samples = counts.n_samples();
+    let context = match offsets {
+        Offsets::PerSample(factors) => {
+            validate_size_factors(factors, samples)?;
+            "normalized count"
+        }
+        Offsets::PerCell(factors) => {
+            if let Some(selected) = selected {
+                if factors.n_cols() != samples {
+                    return Err(invalid_dimensions(
+                        "normalization factors",
+                        genes * samples,
+                        genes.saturating_mul(factors.n_cols()),
+                    ));
+                }
+                for (gene, &source) in selected.iter().enumerate() {
+                    for (sample, &factor) in factors.row(source)?.iter().enumerate() {
+                        validate_normalization_factor_value(factor, gene * samples + sample)?;
+                    }
+                }
+            } else {
+                validate_normalization_factors(counts, factors)?;
+            }
+            "normalization-factor normalized count"
+        }
+    };
+    let mut values = try_alloc_matrix(genes, samples, "normalized counts")?;
+    for gene in 0..genes {
+        let source = selected.map_or(gene, |selected| selected[gene]);
+        let factors = offsets.row(source)?;
+        for (sample, (&count, &factor)) in counts.row(source)?.iter().zip(factors).enumerate() {
             values.push(checked::try_div(f64::from(count), factor).map_err(|error| {
-                normalized_count_error(
-                    "normalization-factor normalized count",
-                    gene * counts.n_samples() + sample,
-                    error.value,
-                )
+                normalized_count_error(context, gene * samples + sample, error.value)
             })?);
         }
     }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values)
+    RowMajorMatrix::from_row_major(genes, samples, values)
 }
 
 /// Visit normalized counts in column-major order for foreign output buffers.

@@ -453,42 +453,6 @@ pub(super) fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.filtered = None;
 }
 
-pub(super) fn compact_counts(
-    counts: &CountMatrix,
-    gene_indices: &[usize],
-) -> Result<CountMatrix, DeseqError> {
-    counts.select_rows(gene_indices)
-}
-
-pub(super) fn compact_matrix_rows(
-    matrix: &RowMajorMatrix<f64>,
-    row_indices: &[usize],
-) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    let mut values = try_alloc_matrix(row_indices.len(), matrix.n_cols(), "selected matrix rows")?;
-    for row in row_indices {
-        values.extend_from_slice(matrix.row(*row)?);
-    }
-    RowMajorMatrix::from_row_major(row_indices.len(), matrix.n_cols(), values)
-}
-
-pub(super) fn compact_f64_values(
-    values: &[f64],
-    row_indices: &[usize],
-) -> Result<Vec<f64>, DeseqError> {
-    let mut compact = Vec::with_capacity(row_indices.len());
-    for row in row_indices {
-        let Some(value) = values.get(*row) else {
-            return Err(invalid_dimensions(
-                "compact vector rows",
-                row + 1,
-                values.len(),
-            ));
-        };
-        compact.push(*value);
-    }
-    Ok(compact)
-}
-
 pub(super) fn expand_rlog_output_with_all_zero_rows(
     compact_output: RlogOutput,
     all_zero: &[bool],

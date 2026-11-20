@@ -27,11 +27,20 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
     let mut stencil = try_filled_vec(p, 0.0, "IRLS refit stencil coefficients")?;
     let mut inference_mu = try_filled_vec(n, 0.0, "IRLS refit inference means")?;
     let mut working_weights = try_alloc_matrix(n, 1, "IRLS refit working weights")?;
+    let mut scaled_factors = try_alloc_matrix(
+        if input.rows.offset_scales.is_some() {
+            n
+        } else {
+            0
+        },
+        1,
+        "IRLS refit scaled offsets",
+    )?;
     let mut covariance_scratch = CovarianceScratch::default();
     for gene in rows.iter().copied() {
         let source_gene = input.rows.source(gene);
         let counts_row = input.rows.input.counts.row(source_gene)?;
-        let nf = input.rows.input.offsets.row(source_gene)?;
+        let nf = input.rows.factors(gene, &mut scaled_factors)?;
         let weight_row = input.rows.weights(source_gene)?;
         let dispersion = input.rows.input.dispersions[source_gene];
         let beta_start = optim_start_beta_log2(
