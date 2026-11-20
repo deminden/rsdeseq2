@@ -99,38 +99,40 @@ fn check_bounded_fixtures(fixtures: &[(FixtureKind, &str)]) {
         threshold: String,
         cdf: String,
     }
-    let calibration = fixtures
-        .iter()
-        .any(|(kind, _)| *kind == FixtureKind::Uniform)
-        .then(|| std::env::var_os("RSDESEQ2_UNIFORM_CDF_REFERENCE"))
-        .flatten()
-        .map(|path| {
-            csv::ReaderBuilder::new()
-                .delimiter(b'\t')
-                .from_path(path)
-                .unwrap()
-                .deserialize::<CdfReference>()
-                .map(|r| {
-                    let row = r.unwrap();
-                    ((row.case.clone(), row.row, row.cutoff), row)
-                })
-                .collect::<BTreeMap<_, _>>()
-        });
-    let mathematical = (numeric_profile() == NumericProfile::Portable
+    let portable = numeric_profile() == NumericProfile::Portable;
+    let calibration = (!portable
         && fixtures
             .iter()
-            .any(|(kind, _)| *kind == FixtureKind::StudentT))
-    .then(|| {
-        serde_json::from_str::<MathematicalReference>(include_str!(
-            "data/student_uniform_mathematical.json"
-        ))
-        .unwrap()
+            .any(|(kind, _)| *kind == FixtureKind::Uniform))
+    .then(|| std::env::var_os("RSDESEQ2_UNIFORM_CDF_REFERENCE"))
+    .flatten()
+    .map(|path| {
+        csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_path(path)
+            .unwrap()
+            .deserialize::<CdfReference>()
+            .map(|r| {
+                let row = r.unwrap();
+                ((row.case.clone(), row.row, row.cutoff), row)
+            })
+            .collect::<BTreeMap<_, _>>()
     });
     let mut calibrated = 0usize;
-    let mut mathematical_cases = 0usize;
     for &(kind, fixture) in fixtures {
+        let mathematical = match (portable, kind) {
+            (true, FixtureKind::Uniform) => {
+                Some(include_str!("data/gaussian_uniform_mathematical.json"))
+            }
+            (true, FixtureKind::StudentT) => {
+                Some(include_str!("data/student_uniform_mathematical.json"))
+            }
+            _ => None,
+        }
+        .map(|source| serde_json::from_str::<MathematicalReference>(source).unwrap());
+        let mut mathematical_cases = 0usize;
         let r: References = serde_json::from_str(fixture).unwrap();
-        if let Some(probe) = r.source.dnorm_probe {
+        if !portable && let Some(probe) = r.source.dnorm_probe {
             assert_eq!(probe.len(), 1);
             let point = UniformMixture::new(vec![1.0], vec![0.0], vec![0.0]).unwrap();
             let density = point.log_likelihoods(37.0 / 0.15, 1.0).unwrap()[0];
@@ -262,6 +264,9 @@ fn check_bounded_fixtures(fixtures: &[(FixtureKind, &str)]) {
                 }
             }
         }
+        if let Some(reference) = mathematical {
+            assert_eq!(mathematical_cases, reference.cases.len());
+        }
     }
     if let Some(rows) = calibration {
         assert_eq!(
@@ -269,9 +274,6 @@ fn check_bounded_fixtures(fixtures: &[(FixtureKind, &str)]) {
             rows.len(),
             "every independently generated CDF must be checked"
         );
-    }
-    if let Some(reference) = mathematical {
-        assert_eq!(mathematical_cases, reference.cases.len());
     }
     assert!(
         failures.is_empty(),
@@ -327,6 +329,16 @@ fn uniform_point_masses_boundaries_and_invalid_inputs_remain_explicit() {
     assert!(p.cdf(f64::NAN).is_nan());
     let prior = UniformMixture::new(vec![1.], vec![-1.], vec![1.]).unwrap();
     let p = prior.posterior(40., 0.01).unwrap();
+    if numeric_profile() == NumericProfile::Portable {
+        assert!((p.mean() - 0.999_997_435_897_773).abs() < 1e-12);
+        assert!((p.standard_deviation() - 2.564_102_058_362_641e-6).abs() < 1e-12);
+        assert_eq!(p.cdf(0.), 0.);
+    } else {
+        assert!(p.mean().is_nan());
+        assert!(p.standard_deviation().is_nan());
+        assert!(p.cdf(0.).is_nan());
+    }
+    let p = prior.posterior(f64::MAX, 0.01).unwrap();
     assert!(p.mean().is_nan());
     assert!(p.standard_deviation().is_nan());
     assert!(p.cdf(0.).is_nan());

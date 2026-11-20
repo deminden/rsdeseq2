@@ -1,14 +1,16 @@
 use crate::errors::scoped_invalid_options;
 use crate::numeric::{NumericProfile, math::ProfileMath, numeric_profile};
 const ERROR_SCOPE: &str = "uniform-mixture posterior";
-use super::{LocationLikelihood, student_t};
+use super::{LocationLikelihood, student_t, truncated_standard, uniform_interval::NarrowInterval};
 use crate::math::elementary::language_exp;
 use crate::{Error, errors::invalid_dimensions};
 
 /// Fixed finite uniform-mixture prior, including zero-width point masses.
 ///
-/// The finite-arithmetic likelihood and moment rules preserve original ashr
-/// compatibility. Numerically undefined observations retain NaN summaries.
+/// Host R profiles follow the original ashr likelihood and moment rules.
+/// The portable profile evaluates Gaussian and Student-t interval
+/// probabilities in the outer tail and integrates narrow intervals locally.
+/// Numerically undefined observations retain NaN summaries.
 #[derive(Clone, Debug)]
 pub struct UniformMixture {
     log_weights: Vec<f64>,
@@ -39,12 +41,66 @@ fn observation(x: f64, s: f64) -> Result<(), Error> {
     Ok(())
 }
 
-fn portable_student_df(likelihood: &LocationLikelihood) -> Option<f64> {
-    match likelihood {
-        LocationLikelihood::StudentT(df) if numeric_profile() == NumericProfile::Portable => {
-            Some(*df)
+#[derive(Clone, Copy)]
+enum PortableLocation {
+    Normal,
+    StudentT(f64),
+}
+
+impl PortableLocation {
+    fn for_likelihood(likelihood: &LocationLikelihood) -> Option<Self> {
+        if numeric_profile() != NumericProfile::Portable {
+            return None;
         }
-        _ => None,
+        match likelihood {
+            LocationLikelihood::Normal => Some(Self::Normal),
+            LocationLikelihood::StudentT(df) => Some(Self::StudentT(*df)),
+            _ => None,
+        }
+    }
+
+    fn narrow_interval(self, a: f64, b: f64, estimate: f64, se: f64) -> Option<NarrowInterval> {
+        match self {
+            Self::Normal => truncated_standard::narrow_interval(a, b, estimate, se),
+            Self::StudentT(df) => student_t::narrow_interval(a, b, estimate, se, df),
+        }
+    }
+
+    fn log_average_density(self, a: f64, b: f64, estimate: f64, se: f64) -> f64 {
+        if let Some(interval) = self.narrow_interval(a, b, estimate, se) {
+            return interval.log_density(se);
+        }
+        let alpha = (a - estimate) / se;
+        let beta = (b - estimate) / se;
+        let mass = match self {
+            Self::Normal => truncated_standard::log_interval_mass(alpha, beta),
+            Self::StudentT(df) => student_t::log_interval_mass(alpha, beta, df),
+        };
+        mass - (b - a).ln_p()
+    }
+
+    fn interval_cdf(self, a: f64, t: f64, b: f64, estimate: f64, se: f64) -> f64 {
+        if t == a {
+            return 0.0;
+        }
+        let partial = self.log_average_density(a, t, estimate, se);
+        let full = self.log_average_density(a, b, estimate, se);
+        (partial - full + ((t - a).ln_p() - (b - a).ln_p()))
+            .exp_p()
+            .clamp(0.0, 1.0)
+    }
+
+    fn narrow_moments(self, a: f64, b: f64, estimate: f64, se: f64) -> Option<(f64, f64)> {
+        if matches!(self, Self::StudentT(df) if df <= 1.0) {
+            return None;
+        }
+        let (mean, second) = self.narrow_interval(a, b, estimate, se)?.moments(a, b);
+        let second = if matches!(self, Self::StudentT(df) if df <= 2.0) {
+            f64::NAN
+        } else {
+            second
+        };
+        Some((mean, second))
     }
 }
 
@@ -153,7 +209,7 @@ impl UniformMixture {
         likelihood: &LocationLikelihood,
     ) -> Result<Vec<f64>, Error> {
         observation(estimate, standard_error)?;
-        let portable_df = portable_student_df(likelihood);
+        let portable = PortableLocation::for_likelihood(likelihood);
         let reverse = if matches!(likelihood,LocationLikelihood::Builtin(b) if b.is_count()) {
             match self.cdf_reversed {
                 Some(reverse) => reverse,
@@ -190,8 +246,8 @@ impl UniformMixture {
                     let density = likelihood.log_density(q);
                     return density - standard_error.ln_p();
                 }
-                if let Some(df) = portable_df {
-                    return student_t::log_average_density(a, b, estimate, standard_error, df);
+                if let Some(portable) = portable {
+                    return portable.log_average_density(a, b, estimate, standard_error);
                 }
                 let left = likelihood.log_cdf((estimate - a) / standard_error);
                 let right = likelihood.log_cdf((estimate - b) / standard_error);
@@ -304,22 +360,49 @@ impl UniformMixture {
                 standard_deviation: f64::NAN,
             });
         }
+        let (mean, variance) = if matches!(
+            PortableLocation::for_likelihood(likelihood),
+            Some(PortableLocation::Normal)
+        ) {
+            self.portable_gaussian_moments(&weights, estimate, standard_error)
+        } else {
+            let (mean, second) = self.raw_moments(&weights, estimate, standard_error, likelihood);
+            let second = if second < 0.0 { 0.0 } else { second };
+            (mean, second - mean * mean)
+        };
+        Ok(UniformMixturePosterior {
+            weights,
+            lower: self.lower.clone(),
+            upper: self.upper.clone(),
+            estimate,
+            standard_error,
+            likelihood: likelihood.clone(),
+            mean,
+            standard_deviation: if variance < 0.0 { 0.0 } else { variance.sqrt() },
+        })
+    }
+
+    fn raw_moments(
+        &self,
+        weights: &[f64],
+        estimate: f64,
+        standard_error: f64,
+        likelihood: &LocationLikelihood,
+    ) -> (f64, f64) {
         let mut mean = 0.0;
         let mut second = 0.0;
-        let portable_df = portable_student_df(likelihood).filter(|df| *df > 1.0);
-        for ((&a, &b), &weight) in self.lower.iter().zip(&self.upper).zip(&weights) {
+        let portable = PortableLocation::for_likelihood(likelihood);
+        for ((&a, &b), &weight) in self.lower.iter().zip(&self.upper).zip(weights) {
             let (component_mean, component_second) = if a == b
                 && matches!(
                     likelihood,
                     LocationLikelihood::Normal | LocationLikelihood::StudentT(_)
                 ) {
                 (a, a * a)
-            } else if let Some((df, interval)) = portable_df.and_then(|df| {
-                student_t::NarrowInterval::new(a, b, estimate, standard_error, df)
-                    .map(|interval| (df, interval))
-            }) {
-                let (mean, second) = interval.moments(a, b);
-                (mean, if df > 2.0 { second } else { f64::NAN })
+            } else if let Some(moments) = portable
+                .and_then(|location| location.narrow_moments(a, b, estimate, standard_error))
+            {
+                moments
             } else {
                 let alpha = (a - estimate) / standard_error;
                 let beta = (b - estimate) / standard_error;
@@ -345,20 +428,48 @@ impl UniformMixture {
             mean += weight * component_mean;
             second += weight * component_second;
         }
-        Ok(UniformMixturePosterior {
-            weights,
-            lower: self.lower.clone(),
-            upper: self.upper.clone(),
-            estimate,
-            standard_error,
-            likelihood: likelihood.clone(),
-            mean,
-            standard_deviation: {
-                let second = if second < 0.0 { 0.0 } else { second };
-                let variance = second - mean * mean;
-                (if variance < 0.0 { 0.0 } else { variance }).sqrt()
-            },
-        })
+        (mean, second)
+    }
+
+    fn portable_gaussian_moments(
+        &self,
+        weights: &[f64],
+        estimate: f64,
+        standard_error: f64,
+    ) -> (f64, f64) {
+        let mut total = 0.0;
+        let mut mean = 0.0;
+        let mut variance_sum = 0.0;
+        for ((&a, &b), &weight) in self.lower.iter().zip(&self.upper).zip(weights) {
+            if weight == 0.0 {
+                continue;
+            }
+            let (component_mean, variance) =
+                truncated_standard::portable_mean_variance(a, b, estimate, standard_error);
+            variance_sum += weight * variance;
+            if total == 0.0 {
+                mean = component_mean;
+                total = weight;
+                continue;
+            }
+            // Combine within-component variance with the between-component
+            // separation around the current mean.
+            let next_total = total + weight;
+            let fraction = weight / next_total;
+            let spread_scale = (total * fraction).sqrt();
+            let difference = component_mean - mean;
+            let spread = if difference.is_finite() {
+                mean += fraction * difference;
+                spread_scale * difference
+            } else {
+                let separation = spread_scale * component_mean - spread_scale * mean;
+                mean = (total / next_total) * mean + fraction * component_mean;
+                separation
+            };
+            variance_sum += spread * spread;
+            total = next_total;
+        }
+        (mean, variance_sum / total)
     }
 }
 impl UniformMixturePosterior {
@@ -403,7 +514,7 @@ impl CdfView<'_> {
         if threshold.is_nan() || self.weights.iter().any(|v| v.is_nan()) {
             return f64::NAN;
         }
-        let portable_df = portable_student_df(self.likelihood);
+        let portable = PortableLocation::for_likelihood(self.likelihood);
         self.lower
             .iter()
             .zip(self.upper)
@@ -413,8 +524,8 @@ impl CdfView<'_> {
                     0.0
                 } else if threshold >= b {
                     1.0
-                } else if let Some(df) = portable_df {
-                    student_t::interval_cdf(a, threshold, b, self.estimate, self.standard_error, df)
+                } else if let Some(portable) = portable {
+                    portable.interval_cdf(a, threshold, b, self.estimate, self.standard_error)
                 } else {
                     let left = self.log_cdf((self.estimate - a) / self.standard_error);
                     let middle = self.log_cdf((self.estimate - threshold) / self.standard_error);

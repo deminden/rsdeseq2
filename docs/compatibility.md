@@ -65,11 +65,12 @@ selects the host R profile. Worker-count invariance is tested.
 See [numerical parity](linux_numerical_parity.md) for platform-specific
 reference arithmetic.
 
-Portable Student-t uniform mixtures evaluate interval probabilities in the
-outer tail and use local density integration for narrow intervals. Their
-likelihoods, posterior probabilities and available moments are checked against
-independent high-precision integration. The host R profiles follow the
-original ashr calculation.
+Portable Gaussian and Student-t uniform mixtures evaluate interval
+probabilities in the outer tail and use local density integration for
+narrow intervals. Gaussian moments in the far tail are computed relative
+to the nearer endpoint. Independent high-precision integration checks
+likelihoods, posterior probabilities and available moments. The host R
+profiles follow the original ashr calculation.
 
 Optimizer trajectories, dispersion line-search boundaries and local smoothing
 can amplify small floating-point differences. Exact optimizer replay alone does

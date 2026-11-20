@@ -2,6 +2,7 @@
 use super::beta_normalization::{beta_positive as beta, regularized_beta};
 #[cfg(test)]
 use super::gamma_normalization::gamma_positive;
+use super::uniform_interval::{NarrowInterval, symmetric_log_mass};
 use crate::numeric::{NumericProfile, math::ProfileMath, numeric_profile};
 use crate::probability::student_t_upper_tail;
 
@@ -72,81 +73,29 @@ pub(super) fn log_density(q: f64, df: f64) -> f64 {
         - ((df + 1.0) / 2.0) * log_ratio
 }
 
-pub(super) fn log_interval_mass(mut a: f64, mut b: f64, df: f64) -> f64 {
-    if a >= 0.0 {
-        (a, b) = (-b, -a);
-    }
-    let upper = log_cdf(b, df);
-    let lower = log_cdf(a, df);
-    upper + (-(lower - upper).exp_m1_p()).ln_p()
+pub(super) fn log_interval_mass(a: f64, b: f64, df: f64) -> f64 {
+    symmetric_log_mass(a, b, |q| log_cdf(q, df))
 }
 
-pub(super) struct NarrowInterval {
-    log_density: f64,
-    left_weight: f64,
-    right_weight: f64,
-    total: f64,
-}
-
-impl NarrowInterval {
-    pub(super) fn new(a: f64, b: f64, estimate: f64, se: f64, df: f64) -> Option<Self> {
-        let width = (b - a) / se;
-        let root_df = df.sqrt();
-        // Bound variation on the standardized interval before using Simpson's
-        // rule. The bounds cover the maximum log-density slope and the
-        // scale on which that slope changes.
-        if width * (root_df + 1.0 / root_df) > 2e-3 || width > 1e-3 * root_df {
-            return None;
-        }
-        let lower = log_density((a - estimate) / se, df);
-        let center = log_density((a.midpoint(b) - estimate) / se, df);
-        let upper = log_density((b - estimate) / se, df);
-        if !center.is_finite() {
-            return None;
-        }
-        let left_weight = (lower - center).exp_p();
-        let right_weight = (upper - center).exp_p();
-        let total = left_weight + 4.0 + right_weight;
-        Some(Self {
-            log_density: center + (total / 6.0).ln_p(),
-            left_weight,
-            right_weight,
-            total,
-        })
+pub(super) fn narrow_interval(
+    a: f64,
+    b: f64,
+    estimate: f64,
+    se: f64,
+    df: f64,
+) -> Option<NarrowInterval> {
+    let width = (b - a) / se;
+    let root_df = df.sqrt();
+    // Bound variation on the standardized interval before using Simpson's
+    // rule. The bounds cover the maximum log-density slope and the
+    // scale on which that slope changes.
+    if width * (root_df + 1.0 / root_df) > 2e-3 || width > 1e-3 * root_df {
+        return None;
     }
-
-    pub(super) fn log_density(&self, se: f64) -> f64 {
-        self.log_density - se.ln_p()
-    }
-
-    pub(super) fn moments(&self, a: f64, b: f64) -> (f64, f64) {
-        let half = (b - a) / 2.0;
-        let center = a.midpoint(b);
-        let centered_mean = half * ((self.right_weight - self.left_weight) / self.total);
-        let centered_second = half * (half * ((self.right_weight + self.left_weight) / self.total));
-        (
-            center + centered_mean,
-            center * (center + 2.0 * centered_mean) + centered_second,
-        )
-    }
-}
-
-pub(super) fn log_average_density(a: f64, b: f64, estimate: f64, se: f64, df: f64) -> f64 {
-    if let Some(interval) = NarrowInterval::new(a, b, estimate, se, df) {
-        return interval.log_density(se);
-    }
-    log_interval_mass((a - estimate) / se, (b - estimate) / se, df) - (b - a).ln_p()
-}
-
-pub(super) fn interval_cdf(a: f64, t: f64, b: f64, estimate: f64, se: f64, df: f64) -> f64 {
-    if t == a {
-        return 0.0;
-    }
-    let partial = log_average_density(a, t, estimate, se, df);
-    let full = log_average_density(a, b, estimate, se, df);
-    (partial - full + ((t - a).ln_p() - (b - a).ln_p()))
-        .exp_p()
-        .clamp(0.0, 1.0)
+    let lower = log_density((a - estimate) / se, df);
+    let center = log_density((a.midpoint(b) - estimate) / se, df);
+    let upper = log_density((b - estimate) / se, df);
+    NarrowInterval::from_log_ratios(center, lower - center, upper - center)
 }
 
 fn integral(q: f64, df: f64, order: i32) -> f64 {

@@ -38,7 +38,7 @@ def main():
     )
     subprocess.run(
         ['cargo', 'test', *build, '--test', 'integration', '--',
-         'bounded_posterior::student_uniform_'],
+         'bounded_posterior::'],
         cwd=ROOT, check=True, env=portable_env,
     )
     subprocess.run(

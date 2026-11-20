@@ -74,6 +74,27 @@ fn panel(f: &impl Fn(f64) -> f64, a: f64, b: f64) -> Option<Panel> {
     error = error.max(50.0 * f64::EPSILON * absolute);
     Some(Panel { a, b, value, error })
 }
+
+/// Integrate the density and its first two raw moments on a finite panel.
+pub(super) fn weight_moments(density: impl Fn(f64) -> f64, a: f64, b: f64) -> [f64; 3] {
+    let middle = a.midpoint(b);
+    let half = (b - a) / 2.0;
+    let mut moments = [0.0; 3];
+    let mut add = |x: f64, weight: f64| {
+        let weighted_density = weight * density(x);
+        moments[0] += weighted_density;
+        moments[1] += weighted_density * x;
+        moments[2] += weighted_density * x * x;
+    };
+    add(middle, KRONROD[7]);
+    for (&node, &weight) in NODES[..7].iter().zip(&KRONROD) {
+        let offset = half * node;
+        add(middle - offset, weight);
+        add(middle + offset, weight);
+    }
+    moments.map(|moment| half * moment)
+}
+
 pub(super) fn integrate_infinite(f: impl Fn(f64) -> f64, a: f64, b: f64) -> Option<f64> {
     let transformed = |t: f64| {
         let x = (1.0 - t) / t;

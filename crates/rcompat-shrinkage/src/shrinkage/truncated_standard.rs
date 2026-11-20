@@ -1,4 +1,8 @@
 //! Standard truncated-normal moments with finite-arithmetic boundary bounds.
+use super::{
+    log_f_quadrature::weight_moments,
+    uniform_interval::{NarrowInterval, symmetric_log_mass},
+};
 use crate::numeric::math::ProfileMath;
 use crate::{math::elementary::language_exp, math::normal_log_cdf};
 
@@ -11,6 +15,77 @@ pub(super) fn log_phi(x: f64) -> f64 {
         -(0.5 * x).mul_add(x, 0.918_938_533_204_672_8)
     }
 }
+
+pub(super) fn log_interval_mass(a: f64, b: f64) -> f64 {
+    symmetric_log_mass(a, b, normal_log_cdf)
+}
+
+pub(super) fn narrow_interval(a: f64, b: f64, estimate: f64, se: f64) -> Option<NarrowInterval> {
+    let half = ((b - a) / se) / 2.0;
+    let center = (a.midpoint(b) - estimate) / se;
+    let slope = center * half;
+    let quadratic = 0.5 * half * half;
+    // Bound the log-density variation across the interval. Form the
+    // endpoint differences algebraically to preserve tiny widths.
+    if slope.abs() + quadratic > 1e-3 {
+        return None;
+    }
+    NarrowInterval::from_log_ratios(log_phi(center), slope - quadratic, -slope - quadratic)
+}
+
+fn far_tail_mean_variance(a: f64, b: f64, estimate: f64, se: f64) -> Option<(f64, f64)> {
+    let (anchor, direction, distance) = if estimate < a {
+        (a, 1.0, (a - estimate) / se)
+    } else {
+        (b, -1.0, (estimate - b) / se)
+    };
+    if !distance.is_finite() || distance < 32.0 {
+        return None;
+    }
+    // In units of se/distance from the nearer endpoint the conditional
+    // density is proportional to exp(-x - x²/(2*distance²)). The moments
+    // beyond 48 contribute less than 4e-18 in these units.
+    let end = (distance * ((b - a) / se)).min(48.0);
+    let density = |x: f64| (-x - 0.5 * (x / distance).powi(2)).exp_p();
+    let mut moments = [0.0; 3];
+    let mut left: f64 = 0.0;
+    while left < end {
+        let right = (left + 4.0).min(end);
+        for (moment, value) in moments.iter_mut().zip(weight_moments(density, left, right)) {
+            *moment += value;
+        }
+        left = right;
+    }
+    let [mass, first, second] = moments;
+    if mass <= 0.0 {
+        return None;
+    }
+    let mean = first / mass;
+    let variance = second / mass - mean * mean;
+    let scale = se / distance;
+    Some((
+        anchor + direction * scale * mean,
+        scale * (scale * variance),
+    ))
+}
+
+pub(super) fn portable_mean_variance(a: f64, b: f64, estimate: f64, se: f64) -> (f64, f64) {
+    if a == b {
+        return (a, 0.0);
+    }
+    if let Some(interval) = narrow_interval(a, b, estimate, se) {
+        return interval.mean_variance(a, b);
+    }
+    if let Some(moments) = far_tail_mean_variance(a, b, estimate, se) {
+        return moments;
+    }
+    let alpha = (a - estimate) / se;
+    let beta = (b - estimate) / se;
+    let mean = truncated_mean(alpha, beta);
+    let variance = truncated_second(alpha, beta) - mean * mean;
+    (estimate + se * mean, se * (se * variance))
+}
+
 // Finite-arithmetic log difference, including coincident/zero endpoints.
 fn log_difference(larger: f64, smaller: f64) -> f64 {
     if larger.is_nan() || smaller.is_nan() {

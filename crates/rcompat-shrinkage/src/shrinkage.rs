@@ -33,6 +33,7 @@ mod student_t;
 mod svalue;
 mod truncated_normal_mixture;
 mod truncated_standard;
+mod uniform_interval;
 mod uniform_mixture;
 
 pub use mixture_controls::ashr_mixture_fit_options;

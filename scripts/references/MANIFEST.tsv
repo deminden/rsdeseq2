@@ -68,6 +68,7 @@ crates/rsdeseq2/tests/data/row_preparation_r462*.json	scripts/references/generat
 crates/rsdeseq2/tests/data/sparse_sqp_r462*.json	scripts/references/generate_sparse_sqp_reference.R	cargo test --locked -p rsdeseq2 --test integration sqp_controls::	-
 crates/rcompat-shrinkage/tests/data/student_component_leaves_r462*.json	scripts/references/generate_student_component_leaves.R	cargo test --locked -p rcompat-shrinkage --lib	-
 crates/rsdeseq2/tests/data/truncated_posterior_r462*.json	scripts/references/generate_truncated_posterior_reference.R	cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	-
+crates/rsdeseq2/tests/data/gaussian_uniform_mathematical.json	scripts/references/generate_gaussian_uniform_mathematical_reference.py	RSDESEQ2_NUMERIC_PROFILE=portable cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	Gaussian likelihoods, weights, moments and CDFs from independent normal integration.
 crates/rsdeseq2/tests/data/uniform_posterior_r462*.json	scripts/references/generate_uniform_posterior_reference.R	cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	-
 crates/rsdeseq2/tests/data/weighted_refit_metadata_r462*.json	scripts/references/generate_weighted_refit_metadata_reference.R	cargo test --locked -p rsdeseq2 --test integration weighted_refit_metadata::	-
 crates/rsdeseq2/tests/data/weighted_replacement_state_r462*.json	scripts/references/generate_weighted_replacement_state_reference.R	cargo test --locked -p rsdeseq2 --test integration weighted_refit_metadata::	-

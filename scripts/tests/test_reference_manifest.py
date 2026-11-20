@@ -64,13 +64,18 @@ class ReferenceManifestTest(unittest.TestCase):
             with self.subTest(fixture=name):
                 self.assertEqual((UNIT_DATA / name).read_text(), contents)
 
-    def test_student_posterior_reference_uses_the_current_inputs(self):
-        source = DATA / "student_uniform_posterior_r462.json"
-        fixture = json.loads((DATA / "student_uniform_mathematical.json").read_text())
-        self.assertEqual(fixture["source"]["inputs"], source.name)
-        self.assertEqual(
-            fixture["source"]["input_sha256"], hashlib.sha256(source.read_bytes()).hexdigest(),
-        )
+    def test_mathematical_posterior_references_use_the_current_inputs(self):
+        for filename, source_name in [
+            ("student_uniform_mathematical.json", "student_uniform_posterior_r462.json"),
+            ("gaussian_uniform_mathematical.json", "uniform_posterior_r462.json"),
+        ]:
+            with self.subTest(fixture=filename):
+                fixture = json.loads((DATA / filename).read_text())
+                self.assertEqual(fixture["source"]["inputs"], source_name)
+                self.assertEqual(
+                    fixture["source"]["input_sha256"],
+                    hashlib.sha256((DATA / source_name).read_bytes()).hexdigest(),
+                )
 
 
 if __name__ == "__main__":
