@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the same target/profile numerical panel before and during a release."""
 import argparse
+import os
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -21,10 +22,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--target', required=True)
     args = parser.parse_args()
-    command = ['cargo', 'test', '--release', '--locked', '-p', 'rsdeseq2',
-               '--target', args.target, '--test', 'integration', '--']
-    command.extend(f'{name}::' for name in RELEASE_TESTS)
-    subprocess.run(command, cwd=ROOT, check=True)
+    build = ['--release', '--locked', '-p', 'rsdeseq2', '--target', args.target]
+    subprocess.run(
+        ['cargo', 'test', *build, '--test', 'integration', '--',
+         *(f'{name}::' for name in RELEASE_TESTS)],
+        cwd=ROOT, check=True, env={**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'r-host'},
+    )
+    subprocess.run(
+        ['cargo', 'run', *build, '--example', 'golden', '--', '--check'],
+        cwd=ROOT, check=True, env={**os.environ, 'RSDESEQ2_NUMERIC_PROFILE': 'portable'},
+    )
 
 
 if __name__ == '__main__':

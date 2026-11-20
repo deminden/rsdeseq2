@@ -92,13 +92,13 @@ with untimed fits before recording result-only timing. See [benchmark scope](ben
 
 ## Compact and full-gene replay
 
-All-gene counts, sample metadata, fixed dispersions and original DESeq2 outputs
-are checked in under
+The sample metadata, fixed dispersions and compact 512-gene panel live under
 [`tests/data/gtex_v8_real_wald/`](../crates/rsdeseq2/tests/data/gtex_v8_real_wald/README.md).
-Routine tests use a 512-gene selection plus full normalization; the opt-in replay
-fits all genes. Replaying requires no R installation or data download.
+To replay all 56,200 genes, restore the count and result tables by SHA-256
+from the pinned Git revision. Once restored, the replay runs without R.
 
 ```sh
+python3 scripts/references/stage_gtex_full_fixture.py --fetch
 cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::
 cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_wald \
   -- --ignored --nocapture

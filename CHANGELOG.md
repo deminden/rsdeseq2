@@ -54,17 +54,18 @@ versions live in [docs/releases](docs/releases/).
   its p-value by 3.7e-6; no significance call changes.
 
 - `NumericProfile`, `numeric_profile()` and `set_numeric_profile()`, with
-  three profiles chosen at run time:
+  four profiles chosen at run time:
   - `portable` (the library default): pure-Rust elementary and special
     functions and fixed-order reductions, so the same input gives the same
     bits on every OS and architecture. One golden manifest covers all targets.
   - `r-linux-x86_64`: R on Linux x86_64 (x87 extended reductions, the OpenBLAS
     Haswell dot schedule, glibc libm); available on any x86_64 host.
-  - `r-macos`: R on macOS (host libm); available on macOS only.
-  `RSDESEQ2_NUMERIC_PROFILE` selects one by name, and `r-host` picks the R
-  profile for the current host. The R package selects `r-host` unless the
-  variable is set, so its output is unchanged. Library users who relied on the
-  old host-dependent default should set `RSDESEQ2_NUMERIC_PROFILE=r-host`;
+  - `r-macos` uses the macOS system math library.
+  - `r-binary64` uses binary64 reductions and the host math library.
+    It is the R profile on Linux arm64 and Windows.
+  `RSDESEQ2_NUMERIC_PROFILE` selects a profile by name. The R package defaults
+  to `r-host`, which selects the applicable R profile for the current host.
+  Library users can select that same behavior with `RSDESEQ2_NUMERIC_PROFILE=r-host`.
   On full GTEx (56,200 genes, two contrasts, parametric and local trends)
   `portable` differs from `r-linux-x86_64` by at most 1.9e-4 relative in
   p-values and 1.2e-4 in dispersions, with no significance call changing at
@@ -103,6 +104,9 @@ versions live in [docs/releases](docs/releases/).
   `parityMode` to the R functions is now an unused-argument error.
 
 ### Changed
+
+- Gene-wise dispersion iterations borrow the selected rows of counts, offsets
+  and weights. The same compact ordering is used for results and diagnostics.
 
 - Size-factor estimation reuses one log-ratio buffer across samples and
   selects the median in place.

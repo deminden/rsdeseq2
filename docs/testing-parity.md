@@ -1,12 +1,12 @@
 # Testing and numerical parity
 
-Version 0.5.0 is checked against independent original-R references and actual
-standalone/wrapped execution. Accuracy and interface equality are separate gates:
-matching the same Rust engine twice does not prove agreement with DESeq2.
+Independent original R references check accuracy, and separate standalone and
+wrapped runs check interface equality. The [0.6.0 development report](reports/hardening-progress.md)
+records the completed local checks.
 
 ## CI status
 
-All nine executed jobs passed on source commit
+The last recorded hosted matrix is for 0.5.0. All nine executed jobs passed on source commit
 [`2d86916`](https://github.com/deminden/rsdeseq2/commit/2d86916c089f55bcddb33aee1af9b079f2b9384e)
 on 2026-11-12 UTC. Final release preparation updates documentation and package
 discovery metadata; numerical code, tests and retained reference values are
@@ -53,7 +53,9 @@ it does not replace numerical comparisons.
 Refactoring that must not change results is checked with the
 [golden harness](../crates/rsdeseq2/tools/validation/README.md#golden-output-harness):
 one SHA-256 per output field over raw `f64` bits, for four inputs and the main
-workflows at 1 and 4 threads. Rust CI runs it with `--check` on Linux x86_64.
+workflows at 1 and 4 threads. Rust CI runs both the host R and portable profiles on Linux x86_64.
+Each release target runs the portable hash check alongside the host R
+numerical and CLI panels.
 
 ```sh
 cargo run --release --locked -p rsdeseq2 --example golden -- --check
@@ -98,7 +100,7 @@ repo_root="$PWD"
 mkdir -p results/checks/r
 scripts/release/build_r_source.sh results/checks/r
 (cd results/checks/r && \
-  R CMD check --no-manual --no-build-vignettes rsdeseq2_0.5.0.tar.gz)
+  R CMD check --no-manual --no-build-vignettes rsdeseq2_0.6.0.tar.gz)
 cargo build --release --locked -p rsdeseq2 --example evaluate_r_interface
 Rscript --vanilla scripts/validation/check_rust_r_identity.R \
   target/release/examples/evaluate_r_interface results/checks/r/rsdeseq2.Rcheck \

@@ -448,6 +448,11 @@ enum Input {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // The R bridge uses this profile by default. Cargo's repository setting
+    // is absent when this executable is launched directly by an R check.
+    if std::env::var_os("RSDESEQ2_NUMERIC_PROFILE").is_none() {
+        rsdeseq2::set_numeric_profile(rsdeseq2::NumericProfile::r_host())?;
+    }
     let path = std::env::args()
         .nth(1)
         .ok_or("expected an input JSON path")?;

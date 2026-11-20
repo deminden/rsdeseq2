@@ -2,8 +2,11 @@
 
 The standalone engine and R wrapper use the same Rust arithmetic. Independent
 references reflect the original R environment on each affected platform; R is
-never a production numerical backend. [Current CI](testing-parity.md#ci-status)
-passes Linux, both macOS architectures and Windows at unchanged numerical bounds.
+never a production numerical backend. `r-host` selects the R arithmetic for
+the executing host. Linux x86_64 and macOS have specialized profiles. Linux
+arm64 and Windows use `r-binary64` with the system math library.
+The portable profile uses the same Rust math library on every target.
+See the [validation record](testing-parity.md#ci-status) for checked revisions.
 
 ## Linux formulas
 
@@ -38,7 +41,7 @@ required platform-specific snapshots do not silently fall back when absent.
 Original Linux x86_64 R rounds the far-tail normal-density square and addition
 separately; the macOS reference uses a fused operation. A one-ulp log-density
 difference can grow when posterior variance subtracts close moments. The shared
-Rust helper uses the target's original arithmetic schedule. Tests check the
+Rust helper uses the schedule selected by the active R profile. Tests check the
 independent density probe's exact bits and existing posterior bounds; no broader
 CDF or SD tolerance substitutes for the correct expression.
 

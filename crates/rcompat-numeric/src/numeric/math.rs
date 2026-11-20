@@ -1,6 +1,6 @@
 //! Elementary functions that follow the numeric profile.
 //!
-//! Under the R profiles (`RLinuxX86`, `RMacos`) each method calls the host C
+//! Under the R profiles each method calls the host C
 //! library exactly as `f64::ln` and friends do, so results match R built on
 //! that host. Under `Portable` they call the pure-Rust `libm` crate, whose
 //! results do not depend on the operating system or architecture.

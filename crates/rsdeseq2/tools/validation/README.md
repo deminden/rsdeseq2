@@ -9,9 +9,10 @@ Cargo target names are explicit in the crate manifest and remain stable:
 cargo build --release -p rsdeseq2 --example evaluate_r_interface
 ```
 
-The existing Cargo example target type keeps these programs out of the installed
-CLI set. Its executable remains at `target/release/examples/evaluate_r_interface`.
-Shared protocol modules are used by integration tests through explicit paths.
+Run the standalone probe at `target/release/examples/evaluate_r_interface`.
+It selects the same host R arithmetic as the wrapper by default. Set
+`RSDESEQ2_NUMERIC_PROFILE` for both processes to compare a different profile.
+Integration tests also use the shared protocol modules.
 
 ## Golden output harness
 
@@ -33,8 +34,8 @@ hashed from raw `f64` bit patterns, so signed zeros and NaN payloads (R's
 `NA_real_`) count. Fields hashed from `Debug` text carry a `~debug` suffix; this
 is exact for all non-NaN values. A workflow that fails records its error text.
 
-Manifests live in `golden/<profile>.<arch>-<os>.tsv`. The numeric profile is
-`r-linux-x86_64` on Linux x86_64 and `portable` elsewhere, matching the current
-compile-time platform arithmetic. Only an explicitly NUMERIC change may rewrite a
-manifest (`--write`), and its pull request must show the per-field differences.
-A missing manifest fails `--check`; generate it on that target first.
+The portable profile uses `golden/portable.tsv` on every target. Use
+`RSDESEQ2_NUMERIC_PROFILE=portable` to select it explicitly. Host R profiles
+use `golden/<profile>.<arch>-<os>.tsv`. A missing manifest fails `--check`.
+Only an explicitly numerical change can rewrite an existing manifest
+(`--write`). Record the per-field differences and their causes.

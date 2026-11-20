@@ -1,6 +1,6 @@
 //! Runtime selection of the numeric profile.
 //!
-//! Results that depend on floating-point details can follow one of three
+//! Results that depend on floating-point details can follow one of the following
 //! profiles:
 //!
 //! - `Portable` (the default): binary64 reductions and pure-Rust maths (the
@@ -12,11 +12,14 @@
 //!   in R. Available on x86_64 hosts.
 //! - `RMacos`: R on macOS. Binary64 reductions with the host C library
 //!   (Apple's libm), as in R there. Available on macOS.
+//! - `RBinary64`: R-compatible binary64 reductions and host elementary
+//!   functions on hosts without a specialized R profile.
 //!
 //! The profile is a process-wide setting. When `RSDESEQ2_NUMERIC_PROFILE` is
-//! set when it is first read (`portable`, `r-linux-x86_64`, `r-macos`, or
-//! `r-host` for the R profile of this host), that profile is used; otherwise
-//! `Portable`. The R package selects the R profile of its host.
+//! set when it is first read (`portable`, `r-linux-x86_64`, `r-macos`,
+//! `r-binary64`, or `r-host` for the R profile of this host), that profile
+//! is used. The standalone default is `Portable`. The R package selects the
+//! R profile of its host.
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -34,6 +37,8 @@ pub enum NumericProfile {
     /// R on macOS: binary64 reductions and the host C maths library.
     /// Available only on macOS.
     RMacos,
+    /// Binary64 reductions and the host C maths library.
+    RBinary64,
 }
 
 impl NumericProfile {
@@ -43,6 +48,7 @@ impl NumericProfile {
             Self::Portable => "portable",
             Self::RLinuxX86 => "r-linux-x86_64",
             Self::RMacos => "r-macos",
+            Self::RBinary64 => "r-binary64",
         }
     }
 
@@ -53,20 +59,21 @@ impl NumericProfile {
             "portable" => Some(Self::Portable),
             "r-linux-x86_64" => Some(Self::RLinuxX86),
             "r-macos" => Some(Self::RMacos),
+            "r-binary64" => Some(Self::RBinary64),
             "r-host" => Some(Self::r_host()),
             _ => None,
         }
     }
 
     /// The profile matching R on this host: `RLinuxX86` on Linux x86_64,
-    /// `RMacos` on macOS and `Portable` elsewhere.
+    /// `RMacos` on macOS and `RBinary64` elsewhere.
     pub fn r_host() -> Self {
         if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
             Self::RLinuxX86
         } else if cfg!(target_os = "macos") {
             Self::RMacos
         } else {
-            Self::Portable
+            Self::RBinary64
         }
     }
 
@@ -78,7 +85,7 @@ impl NumericProfile {
     /// Whether this host can run the profile.
     pub fn is_available(self) -> bool {
         match self {
-            Self::Portable => true,
+            Self::Portable | Self::RBinary64 => true,
             Self::RLinuxX86 => cfg!(target_arch = "x86_64"),
             Self::RMacos => cfg!(target_os = "macos"),
         }
@@ -100,6 +107,7 @@ fn encode(profile: NumericProfile) -> u8 {
         NumericProfile::Portable => 0,
         NumericProfile::RLinuxX86 => 1,
         NumericProfile::RMacos => 2,
+        NumericProfile::RBinary64 => 3,
     }
 }
 
@@ -112,6 +120,7 @@ pub fn numeric_profile() -> NumericProfile {
         0 => NumericProfile::Portable,
         1 => NumericProfile::RLinuxX86,
         2 => NumericProfile::RMacos,
+        3 => NumericProfile::RBinary64,
         _ => initialize_profile(),
     }
 }
@@ -167,6 +176,7 @@ mod tests {
             NumericProfile::Portable,
             NumericProfile::RLinuxX86,
             NumericProfile::RMacos,
+            NumericProfile::RBinary64,
         ] {
             assert_eq!(NumericProfile::from_name(profile.name()), Some(profile));
         }
