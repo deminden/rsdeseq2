@@ -252,6 +252,7 @@ pub(super) fn beta_log2_r_centered_gradient(
         let coordinate_change = (forward - backward) * ln2;
         let precision = input.ridge_lambda[col] * ln2.powi(2);
         let ridge_change = (0.5 * precision) * (forward - backward) * (forward + backward);
+        let mut roundoff = 0.0;
         let centered = (0..input.x.nrows())
             .try_fold(0.0, |difference, sample| {
                 let term = beta_log2_sample_loss_change(
@@ -263,7 +264,11 @@ pub(super) fn beta_log2_r_centered_gradient(
                     coordinate_change,
                 )?;
                 let weight = input.weights.map_or(1.0, |weights| weights[sample]);
-                Some(difference + weight * term)
+                // The signed sample changes can nearly cancel at an optimum.
+                let increment = weight * term - roundoff;
+                let next = difference + increment;
+                roundoff = (next - difference) - increment;
+                Some(next)
             })
             .map(|difference| difference + ridge_change)
             .filter(|difference| difference.is_finite());
