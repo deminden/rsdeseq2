@@ -1,7 +1,7 @@
 //! One base-factor/offset composition for native formula and foreign interfaces.
 use super::{validate_normalization_factor_value, validate_size_factors};
 use crate::errors::missing_prerequisite;
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{DeseqError, invalid_dimensions, validate_matrix_shape};
 use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 use crate::matrix::{MatrixView, RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::math::ProfileMath;
@@ -100,7 +100,7 @@ fn prepare_offsets<'a>(
     offsets: &[f64],
 ) -> Result<(BaseFactors<'a>, Vec<f64>), DeseqError> {
     validate_offset_count(offsets, samples)?;
-    let length = genes
+    genes
         .checked_mul(samples)
         .ok_or_else(|| DeseqError::InvalidOptions {
             reason: "normalization offset shape overflow".into(),
@@ -109,13 +109,11 @@ fn prepare_offsets<'a>(
         validate_size_factors(sf, samples)?;
     }
     let base = if let Some(nf) = factors {
-        if nf.n_rows() != genes || nf.n_cols() != samples {
-            return Err(invalid_dimensions(
-                "normalization factors",
-                length,
-                nf.as_slice().len(),
-            ));
-        }
+        validate_matrix_shape(
+            "normalization factors",
+            (genes, samples),
+            (nf.n_rows(), nf.n_cols()),
+        )?;
         for (index, &value) in nf.as_slice().iter().enumerate() {
             validate_normalization_factor_value(value, index)?;
         }

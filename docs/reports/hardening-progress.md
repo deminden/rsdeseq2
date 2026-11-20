@@ -1640,6 +1640,21 @@ nine portable checks on Linux x86_64 under QEMU 10.0.13. Both targets
 used Rust 1.100.0 and matched all 8,032 golden fields in each profile.
 The separate parity workflow runs the full fixed-dispersion GTEx tests.
 
+### Structured matrix shape errors
+
+Normalization, dispersion, GLM, result assembly and VST now preserve both
+expected and supplied dimensions in `MatrixShapeMismatch`. The normalization
+and main analysis regressions exercise transposed factors and weights whose
+total element counts match. The coarse shape error kind and legacy message
+text are retained.
+
+The focused integration panel passed 302 checks in each arithmetic profile.
+Both profiles matched all 8,032 golden fields. The unmodified Linux arm64
+baseline reproduced the portable mismatch against the R-specific polynomial
+fixture. Both formula-transform tests passed under the R-host profile.
+The three numeric error unit tests passed, along with library Clippy
+and the module dependency check.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

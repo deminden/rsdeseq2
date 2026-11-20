@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter, validate_matrix_shape};
 pub(super) fn numeric_column<F>(rows: &[DeseqResultRow], selector: F) -> DeseqResultColumnValues
 where
     F: Fn(&DeseqResultRow) -> Option<f64>,
@@ -51,13 +51,11 @@ pub(super) fn validate_result_view(
             });
         }
     }
-    if fit.beta_se.n_rows() != n_genes || fit.beta_se.n_cols() != fit.beta.n_cols() {
-        return Err(invalid_dimensions(
-            "result betaSE matrix values",
-            fit.beta.len(),
-            fit.beta_se.len(),
-        ));
-    }
+    validate_matrix_shape(
+        "result betaSE matrix values",
+        (n_genes, fit.beta.n_cols()),
+        (fit.beta_se.n_rows(), fit.beta_se.n_cols()),
+    )?;
     if fit.beta_converged.len() != n_genes {
         return Err(invalid_dimensions(
             "result beta convergence flags",

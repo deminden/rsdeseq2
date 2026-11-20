@@ -20,6 +20,21 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A matrix has the wrong number of rows or columns.
+    #[error(
+        "invalid dimensions for {context}: expected {}, got {}",
+        expected.0.saturating_mul(expected.1),
+        actual.0.saturating_mul(actual.1)
+    )]
+    MatrixShapeMismatch {
+        /// What was being checked.
+        context: String,
+        /// Required row and column counts, in that order.
+        expected: (usize, usize),
+        /// Supplied row and column counts, in that order.
+        actual: (usize, usize),
+    },
+
     /// Count data failed validation.
     #[error("invalid counts: {reason}")]
     InvalidCounts {
@@ -1020,7 +1035,7 @@ impl Error {
     /// Coarse classification of this error.
     pub fn kind(&self) -> ErrorKind {
         match self {
-            Self::InvalidDimensions { .. } => ErrorKind::Shape,
+            Self::InvalidDimensions { .. } | Self::MatrixShapeMismatch { .. } => ErrorKind::Shape,
             Self::InvalidCounts { .. } | Self::AllZeroGene { .. } => ErrorKind::Counts,
             Self::InvalidSizeFactors { .. } | Self::NoUsableGenesForSizeFactors => {
                 ErrorKind::Normalization

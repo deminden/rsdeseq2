@@ -1,6 +1,6 @@
 //! DESeq2-parameterized negative-binomial likelihoods.
 
-use crate::errors::{DeseqError, NegativeBinomialStage, invalid_dimensions};
+use crate::errors::{DeseqError, NegativeBinomialStage, invalid_dimensions, validate_matrix_shape};
 use crate::matrix::{CountMatrix, RowMajorMatrix, try_alloc_matrix};
 use crate::numeric::checked;
 use crate::numeric::math::ProfileMath;
@@ -202,13 +202,11 @@ pub fn nbinom_log_likelihood_matrix(
     dispersions: &[f64],
     weights: Option<&RowMajorMatrix<f64>>,
 ) -> Result<Vec<f64>, DeseqError> {
-    if mu.n_rows() != counts.n_genes() || mu.n_cols() != counts.n_samples() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "NB likelihood mu matrix".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: mu.len(),
-        });
-    }
+    validate_matrix_shape(
+        "NB likelihood mu matrix",
+        (counts.n_genes(), counts.n_samples()),
+        (mu.n_rows(), mu.n_cols()),
+    )?;
     if dispersions.len() != counts.n_genes() {
         return Err(invalid_dimensions(
             "NB likelihood dispersions",
@@ -216,14 +214,12 @@ pub fn nbinom_log_likelihood_matrix(
             dispersions.len(),
         ));
     }
-    if let Some(weights) = weights
-        && (weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples())
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "NB likelihood weights matrix".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: weights.len(),
-        });
+    if let Some(weights) = weights {
+        validate_matrix_shape(
+            "NB likelihood weights matrix",
+            (counts.n_genes(), counts.n_samples()),
+            (weights.n_rows(), weights.n_cols()),
+        )?;
     }
 
     let mut out = try_alloc_matrix(counts.n_genes(), 1, "NB log likelihoods")?;

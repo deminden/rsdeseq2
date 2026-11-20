@@ -195,6 +195,12 @@ when an output transaction detects a missing staged write.
 and each formula's offset there, when available. These variants preserve
 the previous messages and error kinds.
 
+`MatrixShapeMismatch` reports the expected and actual `(rows, columns)`
+for matrices such as normalization factors, observation weights and
+fitted means. Callers can distinguish a transposed input from the expected
+shape when both have the same number of elements. The diagnostic text and
+`ErrorKind::Shape` are preserved.
+
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.
 - The free-text variants stay; nothing is deprecated.

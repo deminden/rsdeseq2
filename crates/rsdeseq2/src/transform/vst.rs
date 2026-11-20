@@ -1,6 +1,6 @@
 use crate::dispersion::{DispersionTrendFit, LocalDispersionTrend, ParametricDispersionTrend};
 use crate::errors::DeseqError;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter, validate_matrix_shape};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
 use crate::normalization::Offsets;
@@ -305,15 +305,14 @@ fn vst_with_dispersion_trend_and_normalization_factors_impl(
     trend_fit: &DispersionTrendFit,
     normalization_factors: &RowMajorMatrix<f64>,
 ) -> Result<RowMajorMatrix<f64>, DeseqError> {
-    if normalization_factors.n_rows() != normalized_counts.n_rows()
-        || normalization_factors.n_cols() != normalized_counts.n_cols()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "VST normalization factors".to_string(),
-            expected: normalized_counts.len(),
-            actual: normalization_factors.len(),
-        });
-    }
+    validate_matrix_shape(
+        "VST normalization factors",
+        (normalized_counts.n_rows(), normalized_counts.n_cols()),
+        (
+            normalization_factors.n_rows(),
+            normalization_factors.n_cols(),
+        ),
+    )?;
     let inverse_size_factor_mean =
         local_vst_inverse_size_factor_mean_from_normalization_factors_impl(normalization_factors)?;
     vst_with_dispersion_trend(normalized_counts, trend_fit, inverse_size_factor_mean)

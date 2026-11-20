@@ -132,15 +132,22 @@ fn borrowed_base_metadata_keeps_error_priority_across_genes() {
 #[test]
 fn normalization_factors_validate_dimensions_and_positive_values() {
     let counts = CountMatrix::from_row_major_u32(1, 3, vec![10, 20, 30]).unwrap();
-    let bad_dims = RowMajorMatrix::from_row_major(1, 2, vec![1.0, 2.0]).unwrap();
+    let bad_dims = RowMajorMatrix::from_row_major(3, 1, vec![1.0; 3]).unwrap();
     let zero_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 0.0, 2.0]).unwrap();
     let negative_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, -1.0, 2.0]).unwrap();
     let nan_factor = RowMajorMatrix::from_row_major(1, 3, vec![1.0, f64::NAN, 2.0]).unwrap();
 
-    assert!(matches!(
-        normalized_counts_with_factors(&counts, &bad_dims).unwrap_err(),
-        DeseqError::InvalidDimensions { .. }
-    ));
+    let error = normalized_counts_with_factors(&counts, &bad_dims).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Shape);
+    assert_eq!(
+        error.to_string(),
+        "invalid dimensions for normalization factors: expected 3, got 3"
+    );
+    std::assert_matches!(
+        error,
+        DeseqError::MatrixShapeMismatch { context, expected: (1, 3), actual: (3, 1) }
+            if context == "normalization factors"
+    );
     assert!(matches!(
         normalized_counts_with_factors(&counts, &zero_factor).unwrap_err(),
         DeseqError::InvalidSizeFactors { .. }
@@ -364,7 +371,7 @@ fn weighted_base_metadata_validates_inputs() {
     for stage in [base_mean_with_weights, base_variance_with_weights] {
         std::assert_matches!(
             stage(&normalized, &bad_dims).unwrap_err(),
-            DeseqError::InvalidDimensions { context, expected: 6, actual: 2 }
+            DeseqError::MatrixShapeMismatch { context, expected: (2, 3), actual: (1, 2) }
                 if context == "base metadata weights"
         );
         let error = stage(&normalized, &bad_weight).unwrap_err();

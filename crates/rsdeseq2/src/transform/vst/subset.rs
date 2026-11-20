@@ -201,14 +201,11 @@ fn validate_fast_vst_matrix_shape(
     counts: &CountMatrix,
     context: &str,
 ) -> Result<(), DeseqError> {
-    if matrix.n_rows() != counts.n_genes() || matrix.n_cols() != counts.n_samples() {
-        return Err(DeseqError::InvalidDimensions {
-            context: context.to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: matrix.len(),
-        });
-    }
-    Ok(())
+    validate_matrix_shape(
+        context,
+        (counts.n_genes(), counts.n_samples()),
+        (matrix.n_rows(), matrix.n_cols()),
+    )
 }
 
 fn select_matrix_rows(

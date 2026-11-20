@@ -3,7 +3,7 @@ use crate::numeric::checked;
 use crate::numeric::special::standard_normal_pdf;
 use crate::probability::{normal_two_sided_tail, normal_upper_tail, student_t_upper_tail};
 
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{DeseqError, validate_matrix_shape};
 use crate::glm::inference::GlmInferenceView;
 use crate::glm::{NbinomGlmFit, WaldOutput};
 
@@ -195,13 +195,11 @@ pub fn wald_test_coefficient_with_options(
             actual: coefficient,
         });
     }
-    if fit.beta.n_rows() != fit.beta_se.n_rows() || fit.beta.n_cols() != fit.beta_se.n_cols() {
-        return Err(invalid_dimensions(
-            "Wald beta/betaSE matrix values",
-            fit.beta.len(),
-            fit.beta_se.len(),
-        ));
-    }
+    validate_matrix_shape(
+        "Wald beta/betaSE matrix values",
+        (fit.beta.n_rows(), fit.beta.n_cols()),
+        (fit.beta_se.n_rows(), fit.beta_se.n_cols()),
+    )?;
     let p = fit.beta.n_cols();
     let beta = fit.beta.as_slice();
     let se = fit.beta_se.as_slice();

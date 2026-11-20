@@ -158,6 +158,11 @@ versions live in [docs/releases](docs/releases/).
   invariants (`ErrorKind::Internal`). Design note:
   `docs/design/structured-errors.md`.
 
+- Matrix shape errors in normalization, dispersion, GLM, results and VST
+  now expose both axes through `DeseqError::MatrixShapeMismatch`.
+  Callers matching `InvalidDimensions` can match the new variant or
+  use `ErrorKind::Shape`. The displayed messages are preserved.
+
 - Rank-deficient and non-nested LRT designs now report their computed ranks
   in structured errors. Ambiguous coefficient requests retain their
   candidates and matches. All-zero GLM rows report fit and source indices,

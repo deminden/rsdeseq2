@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{ErrorKind, Requirement, invalid_parameter, validate_matrix_shape};
 use crate::numeric::math::ProfileMath;
 pub(super) fn best_log_alpha(
     objective: DispersionObjectiveInput<'_>,
@@ -64,15 +64,14 @@ pub(super) fn validate_gene_est_inputs(
             input.design.n_samples(),
         ));
     }
-    if input.normalized_counts.n_rows() != input.counts.n_genes()
-        || input.normalized_counts.n_cols() != input.counts.n_samples()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "dispersion normalized counts".to_string(),
-            expected: input.counts.n_genes() * input.counts.n_samples(),
-            actual: input.normalized_counts.len(),
-        });
-    }
+    validate_matrix_shape(
+        "dispersion normalized counts",
+        (input.counts.n_genes(), input.counts.n_samples()),
+        (
+            input.normalized_counts.n_rows(),
+            input.normalized_counts.n_cols(),
+        ),
+    )?;
     if input.base_mean.len() != input.counts.n_genes() {
         return Err(invalid_dimensions(
             "dispersion baseMean",
@@ -111,15 +110,11 @@ pub(super) fn validate_gene_est_inputs(
         )?;
     }
     if let Some(observation_weights) = input.observation_weights {
-        if observation_weights.n_rows() != input.counts.n_genes()
-            || observation_weights.n_cols() != input.counts.n_samples()
-        {
-            return Err(DeseqError::InvalidDimensions {
-                context: "dispersion observation weights".to_string(),
-                expected: input.counts.n_genes() * input.counts.n_samples(),
-                actual: observation_weights.len(),
-            });
-        }
+        validate_matrix_shape(
+            "dispersion observation weights",
+            (input.counts.n_genes(), input.counts.n_samples()),
+            (observation_weights.n_rows(), observation_weights.n_cols()),
+        )?;
         for (idx, weight) in observation_weights.as_slice().iter().copied().enumerate() {
             if !weight.is_finite() || weight < 0.0 {
                 return Err(DeseqError::NonFiniteValue {

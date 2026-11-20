@@ -148,6 +148,18 @@ fn observation_weights_validate_inputs() {
             if context == "observation weight columns"
     );
 
+    let counts = CountMatrix::from_row_major_u32(2, 4, vec![10; 8]).unwrap();
+    let transposed = RowMajorMatrix::from_row_major(4, 2, vec![1.0; 8]).unwrap();
+    let error = DeseqBuilder::new()
+        .observation_weights(transposed)
+        .run(&Analysis::new(&counts, &design))
+        .unwrap_err();
+    std::assert_matches!(
+        error,
+        DeseqError::MatrixShapeMismatch { context, expected: (2, 4), actual: (4, 2) }
+            if context == "observation weights"
+    );
+
     let bad_weight = RowMajorMatrix::from_row_major(
         3,
         4,

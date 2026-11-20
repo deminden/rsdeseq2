@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::errors::{ErrorKind, missing_prerequisite, validate_matrix_shape};
 use crate::glm::beta::fit_intercept_only_glm_rows;
 use crate::glm::irls::fit_selected_irls;
 use crate::matrix::try_alloc_matrix;
@@ -61,14 +61,11 @@ pub(super) fn validate_observation_weights_for_counts(
     counts: &CountMatrix,
     weights: &RowMajorMatrix<f64>,
 ) -> Result<(), DeseqError> {
-    if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "observation weights".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: weights.len(),
-        });
-    }
-    Ok(())
+    validate_matrix_shape(
+        "observation weights",
+        (counts.n_genes(), counts.n_samples()),
+        (weights.n_rows(), weights.n_cols()),
+    )
 }
 
 pub(super) fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Result<(), DeseqError> {
@@ -114,15 +111,11 @@ pub(super) fn validate_lrt_pipeline_input(input: &LrtPipelineInput<'_>) -> Resul
             input.base_mean.len(),
         ));
     }
-    if input.normalized.n_rows() != input.counts.n_genes()
-        || input.normalized.n_cols() != input.counts.n_samples()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "LRT normalized counts".to_string(),
-            expected: input.counts.n_genes() * input.counts.n_samples(),
-            actual: input.normalized.len(),
-        });
-    }
+    validate_matrix_shape(
+        "LRT normalized counts",
+        (input.counts.n_genes(), input.counts.n_samples()),
+        (input.normalized.n_rows(), input.normalized.n_cols()),
+    )?;
     validate_lrt_designs(input.full_design, input.reduced_design)?;
     Ok(())
 }

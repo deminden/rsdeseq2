@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::validate_matrix_shape;
 use crate::matrix::try_alloc_matrix;
 // Expanded-fit options, validation and covariance handling.
 
@@ -112,15 +113,11 @@ pub(super) fn validate_expanded_fit_collapse_inputs(
         expanded_fit.beta.n_rows(),
         expanded_fit.beta_iter.len(),
     )?;
-    if expanded_fit.beta_se.n_rows() != expanded_fit.beta.n_rows()
-        || expanded_fit.beta_se.n_cols() != expanded_fit.beta.n_cols()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "expanded fit beta SE matrix".to_string(),
-            expected: expanded_fit.beta.len(),
-            actual: expanded_fit.beta_se.len(),
-        });
-    }
+    validate_matrix_shape(
+        "expanded fit beta SE matrix",
+        (expanded_fit.beta.n_rows(), expanded_fit.beta.n_cols()),
+        (expanded_fit.beta_se.n_rows(), expanded_fit.beta_se.n_cols()),
+    )?;
     if expanded_fit.mu.n_rows() != expanded_fit.beta.n_rows() {
         return Err(invalid_dimensions(
             "expanded fit fitted mean rows",
@@ -128,16 +125,14 @@ pub(super) fn validate_expanded_fit_collapse_inputs(
             expanded_fit.mu.n_rows(),
         ));
     }
-    if expanded_fit.hat_diagonal.n_rows() != expanded_fit.beta.n_rows()
-        || expanded_fit.hat_diagonal.n_cols() != expanded_fit.mu.n_cols()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "expanded fit hat diagonal matrix".to_string(),
-            expected: expanded_fit.mu.len(),
-            actual: expanded_fit.hat_diagonal.len(),
-        });
-    }
-    Ok(())
+    validate_matrix_shape(
+        "expanded fit hat diagonal matrix",
+        (expanded_fit.mu.n_rows(), expanded_fit.mu.n_cols()),
+        (
+            expanded_fit.hat_diagonal.n_rows(),
+            expanded_fit.hat_diagonal.n_cols(),
+        ),
+    )
 }
 
 pub(super) fn validate_expanded_fit_row_vector(

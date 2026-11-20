@@ -1,5 +1,7 @@
 use super::*;
-use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
+use crate::errors::{
+    ErrorKind, Requirement, invalid_formula, invalid_parameter, validate_matrix_shape,
+};
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::math::ProfileMath;
 pub(super) fn formula_size_factor_offsets(
@@ -45,15 +47,14 @@ pub(super) fn formula_normalization_factor_offsets(
     if !formula_offsets_are_active(offsets) {
         return Ok(None);
     }
-    if normalization_factors.n_rows() != counts.n_genes()
-        || normalization_factors.n_cols() != counts.n_samples()
-    {
-        return Err(invalid_dimensions(
-            "formula offset normalization factors",
-            counts.n_genes() * counts.n_samples(),
-            normalization_factors.len(),
-        ));
-    }
+    validate_matrix_shape(
+        "formula offset normalization factors",
+        (counts.n_genes(), counts.n_samples()),
+        (
+            normalization_factors.n_rows(),
+            normalization_factors.n_cols(),
+        ),
+    )?;
     let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
     let mut values = try_alloc_matrix(
         counts.n_genes(),

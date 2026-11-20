@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::validate_matrix_shape;
 // Input validation, normalization factors and output scaling.
 
 /// Validate the sample factors for a shared IRLS offset.
@@ -39,22 +40,16 @@ pub(super) fn validate_nf_irls_inputs<const SELECTED: bool>(
             design.n_samples(),
         ));
     }
-    let (rows, cols, len) = match offsets {
+    let shape = match offsets {
         // Size factors stand for the genes x samples matrix they used to fill.
-        Offsets::PerSample(factors) => (
-            counts.n_genes(),
-            factors.len(),
-            counts.n_genes() * factors.len(),
-        ),
-        Offsets::PerCell(matrix) => (matrix.n_rows(), matrix.n_cols(), matrix.len()),
+        Offsets::PerSample(factors) => (counts.n_genes(), factors.len()),
+        Offsets::PerCell(matrix) => (matrix.n_rows(), matrix.n_cols()),
     };
-    if rows != counts.n_genes() || cols != counts.n_samples() {
-        return Err(DeseqError::InvalidDimensions {
-            context: "normalization factors".to_string(),
-            expected: counts.n_genes() * counts.n_samples(),
-            actual: len,
-        });
-    }
+    validate_matrix_shape(
+        "normalization factors",
+        (counts.n_genes(), counts.n_samples()),
+        shape,
+    )?;
     if dispersions.len() != counts.n_genes() {
         return Err(invalid_dimensions(
             "dispersions",
@@ -79,13 +74,11 @@ pub(super) fn validate_nf_irls_inputs<const SELECTED: bool>(
         }
     }
     if let Some(weights) = weights {
-        if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
-            return Err(DeseqError::InvalidDimensions {
-                context: "weights".to_string(),
-                expected: counts.n_genes() * counts.n_samples(),
-                actual: weights.len(),
-            });
-        }
+        validate_matrix_shape(
+            "weights",
+            (counts.n_genes(), counts.n_samples()),
+            (weights.n_rows(), weights.n_cols()),
+        )?;
         if SELECTED {
             for (gene, &source_gene) in fit_rows.selection.iter().enumerate() {
                 let row = weights.row(source_gene)?;

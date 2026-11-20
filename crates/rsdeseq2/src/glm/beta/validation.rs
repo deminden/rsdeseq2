@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::validate_matrix_shape;
 // Fit and normalization-factor validation.
 
 pub(super) fn validate_intercept_fit_inputs(
@@ -16,13 +17,11 @@ pub(super) fn validate_intercept_fit_inputs(
             validate_size_factor_offsets(counts, factors)?;
         }
         Offsets::PerCell(factors) => {
-            if factors.n_rows() != counts.n_genes() || factors.n_cols() != counts.n_samples() {
-                return Err(DeseqError::InvalidDimensions {
-                    context: "normalization factors".to_string(),
-                    expected: counts.n_genes() * counts.n_samples(),
-                    actual: factors.len(),
-                });
-            }
+            validate_matrix_shape(
+                "normalization factors",
+                (counts.n_genes(), counts.n_samples()),
+                (factors.n_rows(), factors.n_cols()),
+            )?;
         }
     }
     if dispersions.len() != counts.n_genes() {
@@ -45,13 +44,11 @@ pub(super) fn validate_intercept_fit_inputs(
         validate_positive_finite(dispersion, "dispersion", gene)?;
     }
     if let Some(weights) = weights {
-        if weights.n_rows() != counts.n_genes() || weights.n_cols() != counts.n_samples() {
-            return Err(DeseqError::InvalidDimensions {
-                context: "weights".to_string(),
-                expected: counts.n_genes() * counts.n_samples(),
-                actual: weights.len(),
-            });
-        }
+        validate_matrix_shape(
+            "weights",
+            (counts.n_genes(), counts.n_samples()),
+            (weights.n_rows(), weights.n_cols()),
+        )?;
         validate_intercept_finite_rows(weights, "weights", genes)?;
     }
     if let Offsets::PerCell(factors) = offsets {

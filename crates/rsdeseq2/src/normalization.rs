@@ -8,7 +8,7 @@ pub(crate) use offsets::sample_factors_with_offsets;
 #[doc(hidden)]
 pub use offsets::visit_offset_factors_column_major;
 
-use crate::errors::{DeseqError, invalid_dimensions, nonfinite_gene_cell};
+use crate::errors::{DeseqError, invalid_dimensions, nonfinite_gene_cell, validate_matrix_shape};
 use crate::math::median::median_in_place;
 use crate::matrix::{CountMatrix, CountView, MatrixOrder, MatrixView, RowMajorMatrix};
 use crate::options::SizeFactorMethod;
@@ -355,13 +355,14 @@ fn validate_normalization_factor_view(
     n_samples: usize,
     context: &str,
 ) -> Result<(), DeseqError> {
-    if normalization_factors.n_rows() != n_genes || normalization_factors.n_cols() != n_samples {
-        return Err(DeseqError::InvalidDimensions {
-            context: context.to_string(),
-            expected: n_genes * n_samples,
-            actual: normalization_factors.as_slice().len(),
-        });
-    }
+    validate_matrix_shape(
+        context,
+        (n_genes, n_samples),
+        (
+            normalization_factors.n_rows(),
+            normalization_factors.n_cols(),
+        ),
+    )?;
     if let Some((index, value)) = first_invalid_cell(normalization_factors, |value| {
         !value.is_finite() || value <= 0.0
     }) {
@@ -683,13 +684,11 @@ fn validate_base_weights(
     genes: usize,
     samples: usize,
 ) -> Result<(), DeseqError> {
-    if weights.n_rows() != genes || weights.n_cols() != samples {
-        return Err(DeseqError::InvalidDimensions {
-            context: "base metadata weights".to_string(),
-            expected: genes * samples,
-            actual: weights.as_slice().len(),
-        });
-    }
+    validate_matrix_shape(
+        "base metadata weights",
+        (genes, samples),
+        (weights.n_rows(), weights.n_cols()),
+    )?;
     if let Some((index, value)) =
         first_invalid_cell(weights, |value| !value.is_finite() || value < 0.0)
     {

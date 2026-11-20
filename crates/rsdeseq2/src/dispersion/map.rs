@@ -3,7 +3,7 @@ use crate::dispersion::gene_est::{
     DispersionFitInput, DispersionPrior, GeneWiseDispersionFitMethod, GeneWiseDispersionOptions,
     grid_search_dispersion, line_search_dispersion,
 };
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{DeseqError, invalid_dimensions, validate_matrix_shape};
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::matrix::CountMatrix;
 use crate::matrix::RowMajorMatrix;
@@ -300,14 +300,11 @@ fn validate_map_inputs(
             input.design.n_samples(),
         ));
     }
-    if input.mu.n_rows() != input.counts.n_genes() || input.mu.n_cols() != input.counts.n_samples()
-    {
-        return Err(DeseqError::InvalidDimensions {
-            context: "MAP dispersion fitted means".to_string(),
-            expected: input.counts.n_genes() * input.counts.n_samples(),
-            actual: input.mu.len(),
-        });
-    }
+    validate_matrix_shape(
+        "MAP dispersion fitted means",
+        (input.counts.n_genes(), input.counts.n_samples()),
+        (input.mu.n_rows(), input.mu.n_cols()),
+    )?;
     if input.disp_gene_est.len() != input.counts.n_genes() {
         return Err(invalid_dimensions(
             "MAP gene-wise dispersions",
@@ -330,15 +327,11 @@ fn validate_map_inputs(
         ));
     }
     if let Some(weights) = input.observation_weights {
-        if weights.n_rows() != input.counts.n_genes()
-            || weights.n_cols() != input.counts.n_samples()
-        {
-            return Err(DeseqError::InvalidDimensions {
-                context: "MAP observation weights".to_string(),
-                expected: input.counts.n_genes() * input.counts.n_samples(),
-                actual: weights.len(),
-            });
-        }
+        validate_matrix_shape(
+            "MAP observation weights",
+            (input.counts.n_genes(), input.counts.n_samples()),
+            (weights.n_rows(), weights.n_cols()),
+        )?;
         for (idx, value) in weights.as_slice().iter().copied().enumerate() {
             if !value.is_finite() || value < 0.0 {
                 return Err(DeseqError::NonFiniteValue {

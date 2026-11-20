@@ -14,3 +14,19 @@ pub use rcompat_numeric::errors::{
 };
 
 pub(crate) use rcompat_numeric::errors::nonfinite_gene_cell;
+
+pub(crate) fn validate_matrix_shape(
+    context: &str,
+    expected: (usize, usize),
+    actual: (usize, usize),
+) -> Result<(), DeseqError> {
+    if expected == actual {
+        Ok(())
+    } else {
+        Err(DeseqError::MatrixShapeMismatch {
+            context: context.into(),
+            expected,
+            actual,
+        })
+    }
+}
