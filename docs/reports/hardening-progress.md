@@ -713,12 +713,45 @@ bounded-posterior panels passed. Both macOS golden manifests matched
 all 8,032 fields. Release targets now run the portable Student-t replay
 alongside the existing portable golden and host R checks.
 
-The portable Gaussian panel still reports the same 19 mismatches as
-`a85ca59`, all in one ultra-narrow uniform fixture. For its estimate
+At `8133dcf`, the portable Gaussian panel reported the same 19 mismatches
+as `a85ca59`, all in one ultra-narrow uniform fixture. For its estimate
 −40 and standard error 8, the 90-digit midpoint log density is
 −15.49838007488450867. The averaging error at the fixture width is
 below `1e-24`. The portable replay and the original ashr fixture both
 differ from that value by more than `1e-3`.
+
+### Portable Gaussian uniform posteriors and release checks
+
+In `96d2361`, Gaussian likelihoods and CDFs use differences in the outer
+tail and share narrow-interval integration with Student-t. The portable
+profile computes far-tail variances around the nearer endpoint and
+combines mixture variances around component means. For the uniform
+interval [−1, 1] at estimate 40 and standard error 0.01, the portable
+posterior mean is 0.999997435897773 and its SD is 2.56410205836264e-6
+within 1e-12 of the independent reference. The host R profile retains
+its original ashr result.
+
+The mathematical Gaussian reference checks 650 observations across ten
+priors with unchanged tolerances, including the ultra-narrow case and
+four far-tail standard deviations exposed by the independent comparison.
+All bounded-posterior tests passed in both profiles on macOS arm64,
+Linux arm64 and emulated Linux x86_64. Each release target now runs the
+full bounded-posterior panel in both profiles.
+
+The macOS checkpoint passed 1,233 Rust unit and integration tests and one
+doctest, plus both separate 56,200-gene replays. The native release-profile
+check passed 115 host R tests and all three portable bounded-posterior
+tests. Both golden manifests matched their 8,032 fields. Clippy and the
+Rust 1.97.1 checks passed. Intel macOS test executables linked, and Windows
+MSVC libraries and binaries type-checked.
+
+The release executable passed 130 GTEx precision gates in each numeric
+profile. All 44 result and diagnostic TSVs matched the preceding checked
+release. The four staged Rust archives reproduced byte for byte and
+passed 217 library tests offline. The R source archive passed 2,874
+expectations with zero skips on both R 4.5.3 and R 4.6.2. Both checks
+retained the two vendoring notes, and R 4.6.2 also retained the
+compiled-symbol warning.
 
 ### Mutation workflow verification
 
