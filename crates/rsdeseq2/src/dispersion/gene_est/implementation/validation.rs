@@ -322,7 +322,11 @@ pub(super) fn mu_alpha_terms_impl<const NEED_LOG: bool>(
         )?;
         MuAlphaTerms {
             log1p: if NEED_LOG {
-                (1.0 + mu_alpha).ln_p()
+                if crate::numeric_profile() == crate::NumericProfile::Portable {
+                    mu_alpha.ln_1p_p()
+                } else {
+                    (1.0 + mu_alpha).ln_p()
+                }
             } else {
                 0.0
             },

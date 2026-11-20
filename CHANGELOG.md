@@ -208,6 +208,10 @@ versions live in [docs/releases](docs/releases/).
 
 ### Fixed
 
+- Portable dispersion fitting computes the small-dispersion negative-binomial
+  likelihood using a centered log-gamma difference and `log1p`. This reduces
+  cancellation in the likelihood and its log-dispersion derivatives.
+
 - R 4.5 can import likelihood closures with already evaluated captures.
   Reading their cached values preserves the guard against evaluating active
   bindings or delayed expressions.

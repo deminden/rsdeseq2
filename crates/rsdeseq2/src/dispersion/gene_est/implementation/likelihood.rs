@@ -1,6 +1,7 @@
 use super::*;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::math::ProfileMath;
+use crate::{NumericProfile, numeric_profile};
 /// DESeq2's alpha-dependent NB log-likelihood kernel.
 ///
 /// Terms independent of alpha are omitted, matching the objective used inside
@@ -48,7 +49,13 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         ));
     }
     let inv_alpha = alpha.recip();
-    let log_gamma_inv_alpha = dispersion_lgamma(inv_alpha);
+    let portable = numeric_profile() == NumericProfile::Portable;
+    let center_gamma = portable && inv_alpha > 10.0;
+    let shape_term = if center_gamma {
+        stirling_log_gamma_correction(inv_alpha)
+    } else {
+        dispersion_lgamma(inv_alpha)
+    };
     let mut total = 0.0;
     for (sample, (count, mu)) in counts.iter().copied().zip(mu.iter().copied()).enumerate() {
         validate_positive_mu(mu, sample)?;
@@ -57,15 +64,21 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
         let mu_alpha = mu * alpha;
         let mu_plus_inv_alpha = checked::try_add(mu, inv_alpha)
             .nonfinite_at("dispersion objective mean plus inverse alpha", Some(sample))?;
-        let log_gamma_y = if count == 0 {
-            log_gamma_inv_alpha
+        let log_mean_factor = if portable {
+            mu_alpha.ln_1p_p()
         } else {
-            dispersion_lgamma(y + inv_alpha)
+            (1.0 + mu_alpha).ln_p()
         };
-        let term = log_gamma_y
-            - log_gamma_inv_alpha
-            - y * mu_plus_inv_alpha.ln_p()
-            - inv_alpha * (1.0 + mu_alpha).ln_p();
+        let term = if center_gamma {
+            centered_dispersion_term(y, inv_alpha, shape_term, log_mean_factor)
+        } else {
+            let log_gamma_y = if count == 0 {
+                shape_term
+            } else {
+                dispersion_lgamma(y + inv_alpha)
+            };
+            log_gamma_y - shape_term - y * mu_plus_inv_alpha.ln_p() - inv_alpha * log_mean_factor
+        };
         if !term.is_finite() {
             return Err(DeseqError::NonFiniteValue {
                 context: "dispersion objective likelihood term".to_string(),
@@ -81,6 +94,37 @@ pub fn dispersion_nb_log_likelihood_kernel_weighted(
             .nonfinite_at("dispersion objective likelihood sum", Some(sample))?;
     }
     Ok(total)
+}
+
+// For shape r and count y, subtract y*log(r) from the log-gamma
+// difference before rounding. In the Stirling expansion, combine the
+// linear term -y with r*log1p(y/r) using log1p(y/r) - y/r.
+fn centered_dispersion_term(y: f64, shape: f64, correction: f64, log_mean_factor: f64) -> f64 {
+    let relative_y = y / shape;
+    (y - 0.5) * relative_y.ln_1p_p()
+        + shape * log1p_minus_x(relative_y)
+        + stirling_log_gamma_correction(y + shape)
+        - correction
+        - (y + shape) * log_mean_factor
+}
+
+// For small x, the alternating log1p series starts at -x²/2.
+// At x <= 1/8 the first omitted term is at most x^25/25.
+fn log1p_minus_x(x: f64) -> f64 {
+    if x > 0.125 {
+        return x.ln_1p_p() - x;
+    }
+    let mut power = -x * x;
+    let mut sum = power / 2.0;
+    for degree in 3..=24 {
+        power *= -x;
+        let next = sum + power / f64::from(degree);
+        if next == sum {
+            break;
+        }
+        sum = next;
+    }
+    sum
 }
 
 pub(super) fn dispersion_lgamma(x: f64) -> f64 {
@@ -399,4 +443,34 @@ pub fn dispersion_nb_log_likelihood_kernel_second_derivative_weighted(
         first_log_alpha,
         "dispersion objective log-alpha second derivative",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn centered_likelihood_avoids_small_dispersion_cancellation() {
+        // 80-digit reference from sum(log(r + i), i = 0..y-1) and the
+        // remaining likelihood terms, using the exact binary64 input means.
+        for (y, mu, log_alpha, expected) in [
+            (1.0_f64, 0.01_f64, -25.0_f64, -0.010000000000138185_f64),
+            (0.0, 43.0, -25.0, -42.9999999871606),
+            (7.0, 43.0, -18.0, -42.99999018428271),
+            (240.0, 240.0, -3.0, -241.28433345508736),
+        ] {
+            let alpha = log_alpha.exp_p();
+            let shape = alpha.recip();
+            let value = centered_dispersion_term(
+                y,
+                shape,
+                stirling_log_gamma_correction(shape),
+                (mu * alpha).ln_1p_p(),
+            );
+            assert!(
+                value.to_bits().abs_diff(expected.to_bits()) <= 16,
+                "count {y}, mean {mu}, log dispersion {log_alpha}: {value} vs {expected}"
+            );
+        }
+    }
 }

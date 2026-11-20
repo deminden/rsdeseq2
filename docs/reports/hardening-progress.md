@@ -241,3 +241,40 @@ recorded both vendoring notes.
 
 The rebuilt macOS CLI passed all 130 GTEx precision gates under `r-host`.
 The portable run passed 107 per-contrast and all nine global gates.
+
+
+### Portable dispersion precision
+
+The portable likelihood now evaluates a centered log-gamma difference.
+The likelihood and its derivatives use `log1p` for the mean-dispersion
+term. An 80-digit decimal replay covered 200 individual likelihood values. The
+median error decreased from 12.5 to 1 binary64 ulp. For count 1, mean
+0.01 and log dispersion −25, the result moved from
+`-0.009992687141410671` to the rounded reference
+`-0.010000000000138185`.
+
+On the eleven frozen GTEx contrasts, the portable profile passed 116 of
+121 per-contrast gates and all nine global gates. The five remaining
+comparisons cover the blocked condition p-value and fitted dispersion,
+the first blocked random split's fitted dispersion, and the third and
+fourth blocked random splits' log2 fold changes. The significance check
+found zero flips and full top-set overlap. The host R profile passed all
+130 gates, with the result and diagnostic TSVs matching the previous
+archived run byte for byte. The new portable manifest records 2,094
+changed field hashes. All 8,032 fields matched across macOS arm64, Linux
+arm64 and emulated Linux x86_64.
+
+For the blocked condition's remaining p-value maximum
+(`ENSG00000168056.15`), the 80-digit posterior replay found a positive
+MAP objective gain of about `1.24e-10` at iteration eight. Both binary64
+paths measured a decrease of about `2.33e-10` at that step. The underlying
+objective magnitudes were about `6.45e5`.
+
+### Mutation workflow verification
+
+The scheduled job verifies a nonempty mutation selection and propagates
+baseline and infrastructure failures. Local discovery found mutants in
+all six matrix entries. The real MAP sample caught a mutation of the
+upper dispersion bound and identified an equivalent mutation that
+discarded an unused grid-start override. The override was removed, and
+both pre-change golden manifests matched after that cleanup.
