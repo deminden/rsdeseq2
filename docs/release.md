@@ -18,7 +18,8 @@ cargo test --locked --workspace
 cargo +1.97.1 check --locked --workspace --all-targets
 python3 scripts/validation/check_docs.py
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-cargo package --locked --workspace
+cargo package --locked --workspace --no-verify
+python3 scripts/release/verify_release_crates.py
 ```
 
 Run the R package check, exact interface checks and full GTEx replay from
@@ -52,8 +53,10 @@ check results as artifacts. Each binary target
 also runs its release-profile numerical/CLI panel.
 
 CI uploads the R source tarball it checked and the verified crate archives with
-a manifest binding their hashes to the revision. Publishing verifies that
-manifest and tag/version agreement. Crate publication stages version-pinned
+a manifest binding their hashes to the revision. The archive check builds the
+unpacked crates against locked vendored dependencies, including the sibling
+release archives. Publishing verifies the manifest and tag/version agreement.
+Crate publication stages version-pinned
 README links and requires repackaging to reproduce the checked archive bytes.
 Binary provenance records compiler, commit and executable/archive hashes.
 

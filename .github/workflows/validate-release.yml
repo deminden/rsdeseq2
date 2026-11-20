@@ -38,7 +38,8 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 scripts/release/stage_release_crate.py
-          cargo package -p rcompat-numeric -p rcompat-formula -p rcompat-shrinkage -p rsdeseq2 --locked --allow-dirty
+          cargo package --workspace --locked --allow-dirty --no-verify
+          python3 scripts/release/verify_release_crates.py
           cp target/package/{rcompat-numeric,rcompat-formula,rcompat-shrinkage,rsdeseq2}-*.crate validated/
           python3 scripts/release/release_artifact_manifest.py write validated
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
