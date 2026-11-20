@@ -156,8 +156,10 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 }
             }
         }
-        let augmented_columns = n_standard_coefficients + contrast_pairs.len();
-        let mut augmented_values = Vec::with_capacity(n_genes * augmented_columns);
+        let augmented_columns = augmented_groups.len();
+        let mut augmented_values =
+            try_alloc_matrix(n_genes, augmented_columns, "augmented contrast coefficients")
+                .map_err(|error| error.to_string())?;
         for gene in 0..n_genes {
             let beta_row = standard_beta.row(gene).map_err(|error| error.to_string())?;
             augmented_values.extend_from_slice(beta_row);

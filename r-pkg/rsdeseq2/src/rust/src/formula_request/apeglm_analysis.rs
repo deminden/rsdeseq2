@@ -2,6 +2,7 @@
 use super::ashr::{choice, field, number};
 use super::posterior::numbers;
 use super::{Data, Value, get, named, text};
+use rcompat_numeric::matrix::try_alloc_matrix;
 use rsdeseq2::{
     matrix::RowMajorMatrix,
     shrinkage::{
@@ -68,8 +69,12 @@ pub(super) fn options(args: &Value) -> Result<PosteriorAnalysisOptions, String> 
     let contrasts = present(field(args, "contrasts"))
         .map(|v| {
             let [rows, columns] = v.dimensions.ok_or("contrasts requires a matrix")?;
-            RowMajorMatrix::from_row_major(rows, columns, numbers(v)?.to_vec())
-                .map_err(|e| e.to_string())
+            let values = numbers(v)?;
+            // The wire decoder has checked that this data matches the dimensions.
+            let mut copied = try_alloc_matrix(rows, columns, "apeglm contrasts")
+                .map_err(|error| error.to_string())?;
+            copied.extend_from_slice(values);
+            RowMajorMatrix::from_row_major(rows, columns, copied).map_err(|e| e.to_string())
         })
         .transpose()?;
     let parameter_standard_errors = present(field(args, "param.sd"))

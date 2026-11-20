@@ -2,9 +2,11 @@
 
 use std::cell::RefCell;
 use std::ffi::{CString, c_char};
+use std::mem::size_of;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
+use rcompat_numeric::matrix::try_alloc_matrix;
 use rsdeseq2::prelude::{
     Analysis, DeseqFit, GlmInput, MeanModel, Offsets, RunOutput, Stage,
     fit_glms_with_beta_prior, fit_glms_with_estimated_beta_prior,
@@ -77,38 +79,54 @@ fn run_backend(operation: impl FnOnce() -> Result<(), String>) -> i32 {
     }
 }
 
-// SAFETY: the C entry point must validate the allocated buffer's element count,
-// type and lifetime before passing a pointer. Null checks cannot prove length.
+fn check_buffer<T>(pointer: *const T, length: usize, name: &str, kind: &str) -> Result<(), String> {
+    if pointer.is_null() {
+        return Err(format!("{name} {kind} is null"));
+    }
+    if !pointer.is_aligned() {
+        return Err(format!("{name} {kind} is misaligned"));
+    }
+    if length
+        .checked_mul(size_of::<T>())
+        .is_none_or(|bytes| bytes > isize::MAX as usize)
+    {
+        return Err(format!("{name} {kind} span exceeds isize::MAX bytes"));
+    }
+    Ok(())
+}
+
+/// # Safety
+/// For nonempty buffers that pass the pointer and span checks, the caller
+/// guarantees `length` readable, initialized elements in one allocation
+/// that remains valid and immutable for `'a`.
 unsafe fn input_slice<'a, T>(
     pointer: *const T,
     length: usize,
     name: &str,
 ) -> Result<&'a [T], String> {
-    if length > 0 && pointer.is_null() {
-        return Err(format!("{name} pointer is null"));
+    if length == 0 {
+        return Ok(&[]);
     }
-    Ok(if length == 0 {
-        &[]
-    } else {
-        // SAFETY: the pointer is non-null (checked above) and the caller's contract guarantees `length` valid, aligned elements for 'a.
-        unsafe { std::slice::from_raw_parts(pointer, length) }
-    })
+    check_buffer(pointer, length, name, "pointer")?;
+    // SAFETY: the address and span were checked above, and the caller guarantees the storage and lifetime.
+    Ok(unsafe { std::slice::from_raw_parts(pointer, length) })
 }
 
+/// # Safety
+/// For nonempty buffers that pass the pointer and span checks, the caller
+/// guarantees `length` initialized elements in one writable allocation,
+/// exclusively borrowed for `'a`.
 unsafe fn output_slice<'a, T>(
     pointer: *mut T,
     length: usize,
     name: &str,
 ) -> Result<&'a mut [T], String> {
-    if length > 0 && pointer.is_null() {
-        return Err(format!("{name} output pointer is null"));
+    if length == 0 {
+        return Ok(&mut []);
     }
-    Ok(if length == 0 {
-        &mut []
-    } else {
-        // SAFETY: the pointer is non-null (checked above) and the caller's contract guarantees `length` valid, aligned elements for 'a.
-        unsafe { std::slice::from_raw_parts_mut(pointer, length) }
-    })
+    check_buffer(pointer, length, name, "output pointer")?;
+    // SAFETY: the address and span were checked above, and the caller guarantees exclusive storage and lifetime.
+    Ok(unsafe { std::slice::from_raw_parts_mut(pointer, length) })
 }
 
 unsafe fn counts_from_r(
@@ -136,7 +154,8 @@ unsafe fn counts_from_r(
         .map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    let mut row_major = Vec::with_capacity(column_major.len());
+    let mut row_major =
+        try_alloc_matrix(n_genes, n_samples, "R counts").map_err(|error| error.to_string())?;
     for gene in 0..n_genes {
         for sample in 0..n_samples {
             row_major.push(column_major[gene + sample * n_genes] as u32);
@@ -161,7 +180,8 @@ unsafe fn row_major_from_column_major(
             "matrix",
         )?
     };
-    let mut row_major = Vec::with_capacity(column_major.len());
+    let mut row_major =
+        try_alloc_matrix(n_rows, n_cols, "R matrix").map_err(|error| error.to_string())?;
     for row in 0..n_rows {
         for col in 0..n_cols {
             row_major.push(column_major[row + col * n_rows]);
@@ -267,7 +287,31 @@ mod replacement_counts;
 
 #[cfg(test)]
 mod entry_point_tests {
+    use super::check_buffer;
+    use std::mem::size_of;
     use std::path::Path;
+    use std::ptr;
+
+    #[test]
+    fn buffer_checks_reject_invalid_addresses_and_byte_spans() {
+        let value = 0.0_f64;
+        let pointer = &raw const value;
+        assert!(check_buffer(pointer, 1, "input", "pointer").is_ok());
+        assert_eq!(
+            check_buffer(ptr::null::<f64>(), 1, "input", "pointer").unwrap_err(),
+            "input pointer is null"
+        );
+        assert_eq!(
+            check_buffer(pointer.wrapping_byte_add(1), 1, "input", "pointer").unwrap_err(),
+            "input pointer is misaligned"
+        );
+        for length in [isize::MAX as usize / size_of::<f64>() + 1, usize::MAX] {
+            assert_eq!(
+                check_buffer(pointer, length, "result", "output pointer").unwrap_err(),
+                "result output pointer span exceeds isize::MAX bytes"
+            );
+        }
+    }
 
     /// Every exported `rsdeseq2_r_*` function must catch panics at the FFI
     /// boundary through `run_backend` or `guard_value`.

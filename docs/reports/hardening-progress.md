@@ -1047,6 +1047,19 @@ case, elapsed time fell from 11.00 to 7.88 s and peak RSS rose from 975 to
 1,010 MiB. The ashr, apeglm and rlog cases differed by less than 2% in
 elapsed time and less than 1 MiB in peak RSS.
 
+### R bridge buffer validation
+
+Shared Rust slice helpers now check alignment and the maximum byte span
+before borrowing nonempty C buffers. Count conversion, dense matrix
+conversion, expanded contrast coefficients and apeglm contrast matrices
+use the same fallible allocator as the core.
+
+The locked offline R build used Rust 1.96.0. Both focused Rust boundary
+tests and all 361 selected expectations on R 4.6.2 passed without
+failures or skips. All 40 posterior analysis batches matched standalone
+Rust output exactly. A SIGINT cancelled the posterior calculation, and
+the same R process completed a second fit.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
