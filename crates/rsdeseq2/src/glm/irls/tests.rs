@@ -124,10 +124,18 @@ fn unretained_hat_keeps_the_overflow_check() {
     let design = DMatrix::from_row_slice(1, 1, &[1e155]);
     let inverse = DMatrix::from_row_slice(1, 1, &[1e-160]);
     let mut active = Vec::new();
-    assert!(
-        validate_unretained_hat(&design, &[1e160], &inverse, Some(1e155), &mut active).is_none()
-    );
-    assert!(validate_unretained_hat(&design, &[1.0], &inverse, Some(1e155), &mut active).is_some());
+    let mut validate = |weights: &[f64]| {
+        validate_unretained_hat(
+            &design,
+            weights,
+            &inverse,
+            Some(1e155),
+            Some(1e-160),
+            &mut active,
+        )
+    };
+    assert!(validate(&[1e160]).is_none());
+    assert!(validate(&[1.0]).is_some());
 }
 
 #[test]
@@ -140,6 +148,31 @@ fn unretained_covariance_keeps_off_diagonal_overflow_check() {
             Err(DeseqError::NonFiniteValue {index:Some(11), context, ..}) if context == "covariance test"
         ));
     }
+}
+
+#[test]
+fn unretained_covariance_checks_positive_diagonals_without_building_the_matrix() {
+    let design = DMatrix::identity(8, 8);
+    let mut scratch = CovarianceScratch::default();
+    let fitted = covariance_and_hat_diagonal(
+        &mut scratch,
+        &design,
+        &[1.0; 8],
+        &[0.1; 8],
+        None,
+        Some(1.0),
+        false,
+    );
+    assert!(matches!(fitted, Some(FitCovariance::PositiveDiagonal)));
+
+    let mut product = DMatrix::identity(2, 2);
+    let mut inverse = DMatrix::identity(2, 2);
+    product[(0, 1)] = -1.0;
+    inverse[(1, 0)] = 1.0;
+    assert!(!covariance_diagonal_is_positive(&product, &inverse, 1.0));
+
+    product[(0, 1)] = f64::MAX;
+    assert!(!covariance_diagonal_is_positive(&product, &inverse, 1.0));
 }
 
 #[test]

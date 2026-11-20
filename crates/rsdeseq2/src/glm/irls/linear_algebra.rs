@@ -202,6 +202,11 @@ pub(super) struct CovarianceScratch {
     active: Vec<(usize, f64)>,
 }
 
+pub(super) enum FitCovariance<'a> {
+    Full(&'a DMatrix<f64>),
+    PositiveDiagonal,
+}
+
 pub(super) fn covariance_and_hat_diagonal<'a>(
     scratch: &'a mut CovarianceScratch,
     x: &DMatrix<f64>,
@@ -209,13 +214,13 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
     ridge_lambda: &[f64],
     hat: Option<&mut [f64]>,
     max_design: Option<f64>,
-) -> Option<&'a DMatrix<f64>> {
+    retain_covariance: bool,
+) -> Option<FitCovariance<'a>> {
     let p = x.ncols();
     if scratch.crossproduct.shape() != (p, p) {
         scratch.crossproduct = DMatrix::zeros(p, p);
         scratch.inverse = DMatrix::zeros(p, p);
         scratch.product = DMatrix::zeros(p, p);
-        scratch.covariance = DMatrix::zeros(p, p);
         scratch.active = Vec::with_capacity(p);
     } else {
         scratch.crossproduct.fill(0.0);
@@ -236,17 +241,58 @@ pub(super) fn covariance_and_hat_diagonal<'a>(
     if !inverse.try_inverse_mut() {
         return None;
     }
+    let max_inverse = if !retain_covariance || hat.is_none() {
+        finite_abs_max(inverse.as_slice())
+    } else {
+        None
+    };
     product.gemm(1.0, inverse, crossproduct, 0.0);
-    covariance.gemm(1.0, product, inverse, 0.0);
-    if !covariance.iter().all(|value| value.is_finite()) {
-        return None;
-    }
+    let fitted = if !retain_covariance
+        && max_inverse.is_some_and(|max| covariance_diagonal_is_positive(product, inverse, max))
+    {
+        FitCovariance::PositiveDiagonal
+    } else {
+        if covariance.shape() != (p, p) {
+            *covariance = DMatrix::zeros(p, p);
+        }
+        covariance.gemm(1.0, product, inverse, 0.0);
+        if !covariance.iter().all(|value| value.is_finite()) {
+            return None;
+        }
+        FitCovariance::Full(covariance)
+    };
     if let Some(hat) = hat {
         visit_hat_diagonal(x, w, inverse, active, |sample, value| hat[sample] = value)?;
     } else {
-        validate_unretained_hat(x, w, inverse, max_design, active)?;
+        validate_unretained_hat(x, w, inverse, max_design, max_inverse, active)?;
     }
-    Some(covariance)
+    Some(fitted)
+}
+
+pub(super) fn covariance_diagonal_is_positive(
+    product: &DMatrix<f64>,
+    inverse: &DMatrix<f64>,
+    max_inverse: f64,
+) -> bool {
+    let p = product.ncols() as f64;
+    let Some(max_product) = finite_abs_max(product.as_slice()) else {
+        return false;
+    };
+    let term = max_product * max_inverse;
+    let magnitude = term * p;
+    if !term.is_normal() || magnitude > f64::MAX / 16.0 {
+        return false;
+    }
+    // The magnitude bound leaves room for rounding and log2 scaling in all
+    // entries. A dot product uses at most p products and p additions. Allow
+    // for both reduction orders, block accumulation, and subnormal terms.
+    let error_bound = magnitude * (32.0 * p * f64::EPSILON) + p * f64::MIN_POSITIVE;
+    (0..product.nrows()).all(|row| {
+        let diagonal: f64 = (0..product.ncols())
+            .map(|col| product[(row, col)] * inverse[(col, row)])
+            .sum();
+        diagonal > error_bound
+    })
 }
 
 pub(super) fn finite_abs_max(values: &[f64]) -> Option<f64> {
@@ -260,12 +306,13 @@ pub(super) fn validate_unretained_hat(
     w: &[f64],
     inverse: &DMatrix<f64>,
     max_design: Option<f64>,
+    max_inverse: Option<f64>,
     active: &mut Vec<(usize, f64)>,
 ) -> Option<()> {
     let bounds = || {
         let max_design = max_design?;
         let left = checked::mul(max_design, finite_abs_max(w)?)?;
-        let right = checked::mul(max_design, finite_abs_max(inverse.as_slice())?)?;
+        let right = checked::mul(max_design, max_inverse?)?;
         let term = checked::mul(left, right)?;
         checked::mul(term, (x.ncols() as f64).powi(2))
     };

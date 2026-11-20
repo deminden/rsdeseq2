@@ -23,19 +23,13 @@ use crate::matrix::RowMajorMatrix;
 use crate::matrix::try_alloc_matrix;
 use crate::normalization::Offsets;
 
-/// Internal retention policy; fitting and fallback arithmetic are identical.
+/// Internal retention policy for the same fitted model and fallback rules.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum OutputRequirements {
     Inference,
     Means,
     Transform,
 }
-impl OutputRequirements {
-    fn covariance(self) -> bool {
-        matches!(self, Self::Inference)
-    }
-}
-
 // Return the inference value inline so full fits need no additional heap allocation.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum IrlsOutput {
@@ -486,9 +480,11 @@ fn fit_irls_rows<const SELECTED: bool>(
     };
     let p = design.n_coefficients();
     let ridge_lambda = options.ridge_lambdas_for_coefficients(p)?;
+    let inference = requirements == OutputRequirements::Inference;
     let n_beta = checked_output_elements(genes, p)?;
+    let n_inference_beta = if inference { n_beta } else { 0 };
     let covariance_columns = checked_output_elements(p, p)?;
-    let n_covariance = if requirements.covariance() {
+    let n_covariance = if inference {
         checked_output_elements(genes, covariance_columns)?
     } else {
         0
@@ -498,15 +494,15 @@ fn fit_irls_rows<const SELECTED: bool>(
     // error instead of aborting.
     let mut beta_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
     beta_values.resize(n_beta, 0.0);
-    let mut beta_var_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
-    beta_var_values.resize(n_beta, f64::NAN);
-    let mut beta_optim_start_values = try_alloc_matrix(n_beta, 1, "IRLS output")?;
-    beta_optim_start_values.resize(n_beta, f64::NAN);
+    let mut beta_var_values = try_alloc_matrix(n_inference_beta, 1, "IRLS output")?;
+    beta_var_values.resize(n_inference_beta, f64::NAN);
+    let mut beta_optim_start_values = try_alloc_matrix(n_inference_beta, 1, "IRLS output")?;
+    beta_optim_start_values.resize(n_inference_beta, f64::NAN);
     let mut beta_covariance_values = try_alloc_matrix(n_covariance, 1, "IRLS output")?;
     beta_covariance_values.resize(n_covariance, f64::NAN);
     let mut mu_values = try_alloc_matrix(n_means, 1, "IRLS output")?;
     mu_values.resize(n_means, 0.0);
-    let mut hat_values = if requirements == OutputRequirements::Inference {
+    let mut hat_values = if inference {
         let mut values = try_alloc_matrix(n_means, 1, "IRLS hat diagonal")?;
         values.resize(n_means, f64::NAN);
         values
@@ -520,7 +516,7 @@ fn fit_irls_rows<const SELECTED: bool>(
     let mut beta_optim_objective = vec![f64::NAN; genes];
     let mut beta_optim_gradient_norm = vec![f64::NAN; genes];
 
-    let covariance_rows = if requirements.covariance() {
+    let covariance_rows = if inference {
         rayon::iter::Either::Left(
             beta_covariance_values
                 .par_chunks_mut(covariance_columns)
@@ -529,14 +525,19 @@ fn fit_irls_rows<const SELECTED: bool>(
     } else {
         rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
     };
-    let hat_rows = if requirements == OutputRequirements::Inference {
+    let beta_se_rows = if inference {
+        rayon::iter::Either::Left(beta_var_values.par_chunks_mut(p).map(Some))
+    } else {
+        rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
+    };
+    let hat_rows = if inference {
         rayon::iter::Either::Left(hat_values.par_chunks_mut(samples).map(Some))
     } else {
         rayon::iter::Either::Right((0..genes).into_par_iter().map(|_| None))
     };
     let row_statuses = (
         beta_values.par_chunks_mut(p),
-        beta_var_values.par_chunks_mut(p),
+        beta_se_rows,
         covariance_rows,
         mu_values.par_chunks_mut(samples),
         hat_rows,
@@ -606,17 +607,6 @@ fn fit_irls_rows<const SELECTED: bool>(
         )?;
     }
     let beta = RowMajorMatrix::from_row_major(genes, p, beta_values)?;
-    let beta_se = RowMajorMatrix::from_row_major(genes, p, beta_var_values)?;
-    let beta_optim_start = RowMajorMatrix::from_row_major(genes, p, beta_optim_start_values)?;
-    let beta_covariance = if requirements.covariance() {
-        Some(RowMajorMatrix::from_row_major(
-            genes,
-            p * p,
-            beta_covariance_values,
-        )?)
-    } else {
-        None
-    };
     let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
     let mut log_like = if SELECTED {
         let mut result = Vec::with_capacity(genes);
@@ -648,6 +638,13 @@ fn fit_irls_rows<const SELECTED: bool>(
         OutputRequirements::Transform => return Ok(IrlsOutput::Matrix(beta)),
         OutputRequirements::Inference => {}
     }
+    let beta_se = RowMajorMatrix::from_row_major(genes, p, beta_var_values)?;
+    let beta_optim_start = RowMajorMatrix::from_row_major(genes, p, beta_optim_start_values)?;
+    let beta_covariance = Some(RowMajorMatrix::from_row_major(
+        genes,
+        covariance_columns,
+        beta_covariance_values,
+    )?);
     let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
     Ok(IrlsOutput::Inference(NbinomGlmFit {
         log_like,
@@ -701,7 +698,7 @@ struct IrlsRowInput<'a, const SELECTED: bool> {
 
 struct IrlsRowOutput<'a> {
     beta: &'a mut [f64],
-    beta_se: &'a mut [f64],
+    beta_se: Option<&'a mut [f64]>,
     covariance: Option<&'a mut [f64]>,
     mu: &'a mut [f64],
     hat: Option<&'a mut [f64]>,

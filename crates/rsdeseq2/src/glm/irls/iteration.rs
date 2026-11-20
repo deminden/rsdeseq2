@@ -116,34 +116,41 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         input.ridge_lambda,
         output.hat.as_deref_mut(),
         input.max_design,
+        output.covariance.is_some(),
     );
 
     for (col, (out, value)) in output.beta.iter_mut().zip(beta.iter().copied()).enumerate() {
         *out = checked_log2_scale(value, col, "IRLS beta log2 scale")?;
     }
-    let variance_positive;
-    if let Some(covariance) = covariance {
-        for (diagonal, out) in output.beta_se.iter_mut().enumerate() {
-            let value = covariance[(diagonal, diagonal)];
-            *out = checked_log2_standard_error(value, diagonal, "IRLS beta standard error")?;
+    let variance_positive = match covariance {
+        Some(FitCovariance::PositiveDiagonal) => true,
+        Some(FitCovariance::Full(covariance)) => {
+            if let Some(beta_se) = output.beta_se {
+                for (diagonal, out) in beta_se.iter_mut().enumerate() {
+                    let value = covariance[(diagonal, diagonal)];
+                    *out =
+                        checked_log2_standard_error(value, diagonal, "IRLS beta standard error")?;
+                }
+            }
+            retain_covariance_on_log2_scale(
+                covariance,
+                output.covariance.as_deref_mut(),
+                0,
+                "IRLS beta covariance log2 scale",
+            )?
         }
-        variance_positive = retain_covariance_on_log2_scale(
-            covariance,
-            output.covariance.as_deref_mut(),
-            0,
-            "IRLS beta covariance log2 scale",
-        )?;
-    } else {
-        variance_positive = false;
-        iter = input.options.maxit;
-        if let Some(covariance) = output.covariance {
-            covariance.fill(f64::NAN);
+        None => {
+            iter = input.options.maxit;
+            if let Some(covariance) = output.covariance {
+                covariance.fill(f64::NAN);
+            }
+            // Computing the hat diagonal can fail partway through a row.
+            if let Some(hat) = output.hat {
+                hat.fill(f64::NAN);
+            }
+            false
         }
-        // Computing the hat diagonal can fail partway through a row.
-        if let Some(hat) = output.hat {
-            hat.fill(f64::NAN);
-        }
-    }
+    };
     fitted_mu_into(input.x, &beta, nf, None, Some(log_nf), mu)?;
     output.mu.copy_from_slice(mu);
     let converged = converged && iter < input.options.maxit;
