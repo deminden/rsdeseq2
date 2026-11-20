@@ -1031,6 +1031,22 @@ The stripped build passed all 2,874 R expectations with zero failures
 or skips. A SIGINT interrupted a posterior grid, and the same R process
 then completed a second native fit.
 
+### R backend release profile
+
+The R backend builds in a separate Cargo workspace. Its release profile now
+uses thin LTO, one codegen unit and panic unwinding. In a paired macOS arm64
+build with R 4.6.2 and Rust 1.96.0, the stripped library fell from 5,934,904
+to 5,091,368 bytes. The registration export and the Rust runtime `abort`
+diagnostic were present in both builds.
+
+The new build passed 2,874 expectations with zero failures or skips, and
+a SIGINT cancelled a posterior calculation before the same R process
+completed a second fit. A single paired workflow pass matched all four
+payloads exactly. For the synthetic 56,200-gene × 16-sample batch-results
+case, elapsed time fell from 11.00 to 7.88 s and peak RSS rose from 975 to
+1,010 MiB. The ashr, apeglm and rlog cases differed by less than 2% in
+elapsed time and less than 1 MiB in peak RSS.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
