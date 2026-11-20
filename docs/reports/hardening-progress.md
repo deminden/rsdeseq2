@@ -570,8 +570,10 @@ In `1f1e817`, Wald and LRT use typed argument groups and share contrast
 resolution, path staging and sidecar writing. The supplied beta-prior
 routes also consume the grouped normalization and reporting inputs.
 All 52 focused CLI tests passed. Both subcommands retained their flag
-order and conflict diagnostics. A portable-profile replay matched the
-result table and five sidecars byte for byte for each subcommand.
+order and conflict diagnostics. `28fe321` preserves the command-specific
+descriptions pinned by the help snapshots. A portable-profile replay
+matched the result table and five sidecars byte for byte for each
+subcommand.
 
 `34b7908` adds checked reservations to generated and expanded matrices.
 The shared allocator reports bytes requested when a reservation fails.
@@ -589,6 +591,41 @@ The workspace follows the later crate-boundary decision in `e7ad144`.
 The three reusable `rcompat` crates are separate. The CLI remains in the
 `rsdeseq2` package so its installed binary and Rust entry point ship
 together.
+
+### Portable QR and MAP convergence
+
+In `b921f0a`, the portable profile uses direct Householder projection for
+all design widths. For short MAP proposals, an integrated score checks
+either rounded Armijo decision when the gain is close to the bound.
+The portable optimizer also continues when the rounded positive gain
+falls within the roundoff band of the existing convergence tolerance.
+An R 4.6.1 replay confirmed that the reference continued past iteration
+eight for `ENSG00000175899.14`, with a gain of `1.0063e-6`.
+
+The release build passed all 121 per-contrast and nine global gates
+in both profiles. Portable fitted-dispersion maxima fell from
+`4.98e-7` to `3.02e-7` for the blocked condition and from `7.83e-7` to
+`6.76e-7` for blocked split 01. The significance check found zero flips
+at adjusted p-value cutoffs of 0.05 and 0.1. Every top-set check matched.
+The host profile retains its narrow-design projection order after that
+profile's direct-projection trial failed nine comparisons. All 22 host
+result and diagnostic files matched the previous milestone byte for byte.
+
+The portable manifest updates 2,228 of 8,032 fields. It matches across
+macOS arm64, Linux arm64 and emulated Linux x86_64. The macOS and Linux
+arm64 host manifests also matched their existing hashes.
+
+Two paired four-worker runs of the eleven GTEx contrasts measured
+16.856 s versus 17.265 s in summed median time. Throughput rose 2.43%
+and peak RSS fell from 259.44 to 259.19 MiB. The timed outputs matched
+the candidate precision run byte for byte.
+
+The batched macOS checks passed 1,231 workspace tests, both separate
+56,200-gene GTEx tests and 80 portable-profile integration tests. Clippy
+and Rust 1.97.1 checks passed. Intel macOS test executables linked and
+Windows MSVC libraries and binaries type-checked. The macOS R 4.6.2
+package passed 2,874 expectations with zero skips and recorded the
+existing compiled-symbol warning and two vendoring notes.
 
 ### Mutation workflow verification
 
