@@ -941,6 +941,27 @@ Each profile passed 22 focused tests and workspace Clippy passed. The BFGS
 unit test compares the in-place rank-two update against the previous matrix
 expression bit for bit.
 
+### Batched allocation checkpoint
+
+The macOS arm64 workspace at `6206eee` passed 1,242 unit and integration
+tests and one doctest. Both separate 56,200-gene GTEx replays passed.
+Both profiles matched the 8,032-field golden manifests at one and four
+workers. The locked Rust 1.97.1 all-targets check passed. Intel macOS test
+executables cross-linked, and Windows MSVC libraries and binaries
+type-checked. Those platforms still need native runtime verification.
+
+The optimized CLI passed all 130 precision gates in each numeric profile
+over eleven GTEx contrasts. All 44 result and diagnostic TSVs matched
+the outputs from `96d2361` byte for byte.
+
+The self-contained R source archive passed 2,874 expectations with zero
+failures and zero skips on both R 4.5.3 with DESeq2 1.50.2 and R 4.6.2 with
+DESeq2 1.52.0. Both checks retained the hidden-file and portable-filename
+notes from vendoring. R 4.6.2 also retained the compiled-symbol warning.
+
+All four staged Cargo archives reproduced byte for byte. They built
+offline from the packaged sources and passed 221 library tests in total.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
