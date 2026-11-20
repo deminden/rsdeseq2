@@ -974,6 +974,17 @@ The 23 focused posterior tests passed in each profile, all 11 shrinkage
 unit tests passed under the host R profile, and workspace Clippy passed.
 Both golden manifests matched all 8,032 fields.
 
+### Labelled TSV parsing
+
+Count, design, normalization-factor and observation-weight readers share a
+typed matrix parser. Matrix and two-column readers reuse one CSV record per
+input. The reader policies preserve the existing label checks and error
+locations. A regression checks the line of a ragged count record and the
+flattened cell index of a nonfinite design value after a quoted label.
+
+The 55 I/O unit tests, 47 TSV and CLI integration tests, and workspace
+Clippy passed.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

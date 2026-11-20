@@ -3,7 +3,7 @@
 
 use std::fmt::Debug;
 
-use rsdeseq2::io::*;
+use rsdeseq2::{errors::DeseqError, io::*};
 
 fn temp_file(name: &str, bytes: &[u8]) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!("rsdeseq2-{}-{name}.tsv", std::process::id()));
@@ -85,5 +85,26 @@ fn reader_forms_match_path_forms() {
         levels,
         |p| read_sample_levels_tsv(p),
         |b| read_sample_levels_tsv_from_reader(b),
+    );
+}
+
+#[test]
+fn reused_matrix_records_keep_error_coordinates() {
+    let counts = b"gene\ts1\ts2\ng1\t1\t2\ng2\t3\n";
+    let error = read_count_matrix_tsv_from_reader(&counts[..]).unwrap_err();
+    std::assert_matches!(
+        error,
+        DeseqError::Csv(error)
+            if matches!(error.kind(), csv::ErrorKind::UnequalLengths {
+                pos: Some(position), expected_len: 3, len: 2
+            } if position.line() == 3)
+    );
+
+    let design = b"sample\tintercept\tcondition\n\"s\t1\"\t1\t0\ns2\t1\tNaN\n";
+    let error = read_labeled_design_matrix_tsv_from_reader(&design[..]).unwrap_err();
+    std::assert_matches!(
+        error,
+        DeseqError::NonFiniteValue { context, index: Some(3), value }
+            if context == "design matrix" && value.is_nan()
     );
 }

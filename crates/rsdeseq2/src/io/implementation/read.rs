@@ -77,39 +77,16 @@ pub fn read_count_matrix_tsv_from_reader(reader: impl Read) -> Result<CountMatri
 }
 
 fn read_count_matrix_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
 ) -> Result<CountMatrix, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() < 2 {
-        return Err(DeseqError::InvalidCounts {
-            reason: "count table must have a gene column and at least one sample column"
-                .to_string(),
-        });
-    }
-    let sample_names = headers
-        .iter()
-        .skip(1)
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    let mut gene_names = Vec::new();
-    let mut values = Vec::new();
-    for record in reader.records() {
-        let record = record?;
-        if record.len() != headers.len() {
-            return Err(DeseqError::InvalidCounts {
-                reason: format!(
-                    "record has {} columns but header has {} columns",
-                    record.len(),
-                    headers.len()
-                ),
-            });
-        }
-        gene_names.push(record.get(0).unwrap_or_default().to_string());
-        for field in record.iter().skip(1) {
-            values.push(parse_count_field(field, path_ref)?);
-        }
-    }
+    let TsvMatrix {
+        rows: gene_names,
+        columns: sample_names,
+        values,
+    } = read_labelled_matrix(reader, MatrixTsvSchema::Counts, |_, field| {
+        parse_count_field(field, path_ref)
+    })?;
     CountMatrix::from_row_major_u32_with_names(
         gene_names.len(),
         sample_names.len(),
@@ -145,61 +122,29 @@ pub fn read_labeled_design_matrix_tsv_from_reader(
 }
 
 fn read_labeled_design_matrix_tsv_records<R: Read>(
-    mut reader: csv::Reader<R>,
+    reader: csv::Reader<R>,
     path_ref: &Path,
 ) -> Result<LabeledDesignMatrix, DeseqError> {
-    let headers = reader.headers()?.clone();
-    if headers.len() < 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "design matrix columns".to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let coefficient_names = headers
-        .iter()
-        .skip(1)
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    let n_coefficients = coefficient_names.len();
-    let mut sample_names = Vec::new();
-    let mut values = Vec::new();
-    let mut n_samples = 0_usize;
-    for record in reader.records() {
-        let record = record?;
-        if record.len() != headers.len() {
-            return Err(DeseqError::InvalidDimensions {
-                context: "design matrix record columns".to_string(),
-                expected: headers.len(),
-                actual: record.len(),
-            });
-        }
-        let sample = record.get(0).unwrap_or_default();
-        if sample.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: "design sample names must not be empty".to_string(),
-            });
-        }
-        sample_names.push(sample.to_string());
-        for (column, field) in record.iter().skip(1).enumerate() {
-            values.push(parse_finite_float_field(
-                field,
-                path_ref,
-                n_samples * n_coefficients + column,
-                "design matrix",
-            )?);
-        }
-        n_samples += 1;
-    }
-    if n_samples == 0 {
-        return Err(DeseqError::InvalidDimensions {
-            context: "design matrix rows".to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    let design =
-        DesignMatrix::from_row_major(n_samples, n_coefficients, values, Some(coefficient_names))?;
+    let TsvMatrix {
+        rows: sample_names,
+        columns: coefficient_names,
+        values,
+    } = read_labelled_matrix(
+        reader,
+        MatrixTsvSchema::Numeric {
+            columns: "design matrix columns",
+            record: "design matrix record columns",
+            rows: "design matrix rows",
+            label: "design sample names",
+        },
+        |index, field| parse_finite_float_field(field, path_ref, index, "design matrix"),
+    )?;
+    let design = DesignMatrix::from_row_major(
+        sample_names.len(),
+        coefficient_names.len(),
+        values,
+        Some(coefficient_names),
+    )?;
     Ok(LabeledDesignMatrix {
         design,
         sample_names,
@@ -264,7 +209,7 @@ pub fn read_labeled_observation_weights_tsv(
     Ok(weights)
 }
 
-pub(super) fn read_labeled_assay_matrix_tsv(
+fn read_labeled_assay_matrix_tsv(
     path_ref: &Path,
     column_context: &str,
     record_context: &str,
@@ -272,65 +217,99 @@ pub(super) fn read_labeled_assay_matrix_tsv(
     value_context: &str,
     gene_context: &str,
 ) -> Result<LabeledAssayMatrix, DeseqError> {
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .from_path(path_ref)?;
-    let headers = reader.headers()?.clone();
-    if headers.len() < 2 {
-        return Err(DeseqError::InvalidDimensions {
-            context: column_context.to_string(),
-            expected: 2,
-            actual: headers.len(),
-        });
-    }
-    let sample_names = headers
-        .iter()
-        .skip(1)
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    let n_samples = headers.len() - 1;
-    let mut gene_names = Vec::new();
-    let mut values = Vec::new();
-    let mut n_genes = 0_usize;
-    for record in reader.records() {
-        let record = record?;
-        if record.len() != headers.len() {
-            return Err(DeseqError::InvalidDimensions {
-                context: record_context.to_string(),
-                expected: headers.len(),
-                actual: record.len(),
-            });
-        }
-        let gene = record.get(0).unwrap_or_default();
-        if gene.is_empty() {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!("{gene_context} must not be empty"),
-            });
-        }
-        gene_names.push(gene.to_string());
-        for (sample, field) in record.iter().skip(1).enumerate() {
-            values.push(parse_finite_float_field(
-                field,
-                path_ref,
-                n_genes * n_samples + sample,
-                value_context,
-            )?);
-        }
-        n_genes += 1;
-    }
-    if n_genes == 0 {
-        return Err(DeseqError::InvalidDimensions {
-            context: row_context.to_string(),
-            expected: 1,
-            actual: 0,
-        });
-    }
-    let matrix = RowMajorMatrix::from_row_major(n_genes, n_samples, values)?;
+    let TsvMatrix {
+        rows: gene_names,
+        columns: sample_names,
+        values,
+    } = read_labelled_matrix(
+        tsv_from_path(path_ref)?,
+        MatrixTsvSchema::Numeric {
+            columns: column_context,
+            record: record_context,
+            rows: row_context,
+            label: gene_context,
+        },
+        |index, field| parse_finite_float_field(field, path_ref, index, value_context),
+    )?;
+    let matrix = RowMajorMatrix::from_row_major(gene_names.len(), sample_names.len(), values)?;
     Ok(LabeledAssayMatrix {
         matrix,
         gene_names,
         sample_names,
+    })
+}
+
+enum MatrixTsvSchema<'a> {
+    Counts,
+    Numeric {
+        columns: &'a str,
+        record: &'a str,
+        rows: &'a str,
+        label: &'a str,
+    },
+}
+
+struct TsvMatrix<T> {
+    rows: Vec<String>,
+    columns: Vec<String>,
+    values: Vec<T>,
+}
+
+fn read_labelled_matrix<R: Read, T>(
+    mut reader: csv::Reader<R>,
+    schema: MatrixTsvSchema<'_>,
+    mut cell: impl FnMut(usize, &str) -> Result<T, DeseqError>,
+) -> Result<TsvMatrix<T>, DeseqError> {
+    let headers = reader.headers()?;
+    let width = headers.len();
+    if width < 2 {
+        return Err(match schema {
+            MatrixTsvSchema::Counts => DeseqError::InvalidCounts {
+                reason: "count table must have a gene column and at least one sample column".into(),
+            },
+            MatrixTsvSchema::Numeric { columns, .. } => invalid_dimensions(columns, 2, width),
+        });
+    }
+    let columns = headers.iter().skip(1).map(ToOwned::to_owned).collect();
+    let mut rows = Vec::new();
+    let mut values = Vec::new();
+    let mut record = csv::StringRecord::new();
+    while reader.read_record(&mut record)? {
+        if record.len() != width {
+            return Err(match schema {
+                MatrixTsvSchema::Counts => DeseqError::InvalidCounts {
+                    reason: format!(
+                        "record has {} columns but header has {width} columns",
+                        record.len()
+                    ),
+                },
+                MatrixTsvSchema::Numeric {
+                    record: context, ..
+                } => invalid_dimensions(context, width, record.len()),
+            });
+        }
+        let label = record.get(0).unwrap_or_default();
+        if label.is_empty()
+            && let MatrixTsvSchema::Numeric { label: context, .. } = schema
+        {
+            return Err(DeseqError::InvalidOptions {
+                reason: format!("{context} must not be empty"),
+            });
+        }
+        rows.push(label.to_owned());
+        for field in record.iter().skip(1) {
+            values.push(cell(values.len(), field)?);
+        }
+    }
+    if rows.is_empty()
+        && let MatrixTsvSchema::Numeric { rows: context, .. } = schema
+    {
+        return Err(invalid_dimensions(context, 1, 0));
+    }
+    Ok(TsvMatrix {
+        rows,
+        columns,
+        values,
     })
 }
 
@@ -620,8 +599,9 @@ fn read_labelled<R: Read, T>(
         });
     }
     let mut values = Vec::new();
-    for (idx, record) in reader.records().enumerate() {
-        let record = record?;
+    let mut record = csv::StringRecord::new();
+    while reader.read_record(&mut record)? {
+        let idx = values.len();
         if record.len() != 2 {
             return Err(DeseqError::InvalidDimensions {
                 context: format!("{what} record columns"),
