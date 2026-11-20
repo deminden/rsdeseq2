@@ -1,4 +1,5 @@
 //! Independently frozen R arithmetic plus shared raw/fitted exclusion policy.
+use crate::support::json_fixture;
 use rsdeseq2::matrix::{CountRows, CountView, MatrixOrder, MatrixView};
 use rsdeseq2::prelude::*;
 use serde::Deserialize;
@@ -29,9 +30,6 @@ struct Rows {
     excluded: Option<Vec<bool>>,
     expected: Option<Vec<usize>>,
 }
-fn reference() -> Reference {
-    serde_json::from_str(include_str!("data/row_preparation_r462.json")).unwrap()
-}
 fn numbers(v: &[String]) -> Vec<f64> {
     v.iter()
         .map(|v| f64::from_bits(u64::from_str_radix(v, 16).unwrap()))
@@ -47,7 +45,7 @@ fn columns<T: Copy>(v: &[T], rows: usize, cols: usize) -> Vec<T> {
 }
 #[test]
 fn base_factor_offset_products_match_independent_r_bits_in_both_layouts() {
-    let r = reference();
+    let r = json_fixture!("row_preparation_r462.json", Reference);
     assert_eq!(r.offsets.len(), 12);
     for case in r.offsets {
         let sf = case.size_factors.as_deref().map(numbers);
@@ -82,7 +80,7 @@ fn base_factor_offset_products_match_independent_r_bits_in_both_layouts() {
 }
 #[test]
 fn shrink_rows_preserve_raw_zero_and_fitted_exclusion_semantics_across_layouts() {
-    let r = reference();
+    let r = json_fixture!("row_preparation_r462.json", Reference);
     assert_eq!(r.rows.len(), 6);
     for case in r.rows {
         let unsigned = CountRows::from_unsigned(

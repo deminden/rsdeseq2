@@ -1,6 +1,4 @@
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
+use crate::support::formula_reference;
 #[path = "../tools/validation/evaluate_r_interface/factor_expansion.rs"]
 mod factor_expansion;
 #[allow(dead_code)]

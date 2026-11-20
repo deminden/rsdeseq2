@@ -1,13 +1,9 @@
 //! Independent original-ashr search traces and analytical location estimates.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::posterior as support;
 use support::*;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/ashr_mode.rs"]
 mod ashr_mode;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;

@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use rsdeseq2::io::{read_count_matrix_tsv, read_labeled_design_matrix_tsv};
 use rsdeseq2::prelude::*;
 
-mod common;
+use crate::support as common;
 
 /// A gene's dispersion "matches" R when the log gap is at most this.
 const DISPERSION_MATCH_LOG_GAP: f64 = 1e-10;

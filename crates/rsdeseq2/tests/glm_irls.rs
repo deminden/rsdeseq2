@@ -1,7 +1,7 @@
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
-mod common;
+use crate::support as common;
 use common::*;
 
 fn no_ridge_options() -> IrlsOptions {

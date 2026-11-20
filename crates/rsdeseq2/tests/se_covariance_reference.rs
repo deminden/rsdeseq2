@@ -1,4 +1,4 @@
-mod common;
+use crate::support as common;
 
 use std::collections::HashMap;
 use std::path::Path;

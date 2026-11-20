@@ -1,14 +1,10 @@
 //! Original-package selection/missingness references and independent contracts.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::posterior as support;
 use support::*;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/ashr_output.rs"]
 mod ashr_output;
 use rsdeseq2::shrinkage::*;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;

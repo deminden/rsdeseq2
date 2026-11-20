@@ -1,17 +1,17 @@
 //! Independent original-apeglm profiles, retaining the public numerical gates.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::json_fixture;
+use crate::support::posterior as support;
 use support::*;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/regression_posterior_r462.json")).unwrap()
-}
 #[test]
 fn regression_density_expressions_preserve_independent_precision() {
     let mut failures = vec![];
     let truth: serde_json::Value =
         serde_json::from_str(include_str!("data/regression_density_truth.json")).unwrap();
     let mut reference_differences = vec![];
-    for c in reference()["leaves"].as_array().unwrap() {
+    for c in json_fixture!("regression_posterior_r462.json")["leaves"]
+        .as_array()
+        .unwrap()
+    {
         let input: regression::Leaf = serde_json::from_value(c.clone()).unwrap();
         let actual = regression::leaf(&input).unwrap();
         let high_precision = truth["leaves"]
@@ -56,7 +56,7 @@ fn regression_density_expressions_preserve_independent_precision() {
 }
 #[test]
 fn general_and_analytic_nb_regression_match_original_apeglm() {
-    compare_posteriors(reference(), true);
+    compare_posteriors(json_fixture!("regression_posterior_r462.json"), true);
 }
 #[test]
 fn beta_binomial_r_and_fast_methods_match_original_apeglm() {
@@ -65,8 +65,7 @@ fn beta_binomial_r_and_fast_methods_match_original_apeglm() {
         true,
     );
 }
-#[path = "common/regression_checks.rs"]
-mod checks;
+use crate::support::regression_checks as checks;
 use checks::compare_posteriors;
 
 #[test]

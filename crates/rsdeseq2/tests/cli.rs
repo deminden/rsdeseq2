@@ -1,4 +1,4 @@
-mod common;
+use crate::support as common;
 use rsdeseq2::prelude::*;
 
 use std::fs;

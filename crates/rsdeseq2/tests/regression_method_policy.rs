@@ -1,8 +1,5 @@
 //! Independent ignored/deferred controls and scalar-bound policies across methods.
-#[path = "common/regression_checks.rs"]
-mod checks;
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::regression_checks as checks;
 
 #[test]
 fn regression_controls_match_original_accepted_outputs_and_rejection_categories() {

@@ -1,20 +1,6 @@
+use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
-
-fn two_group_design() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        4,
-        2,
-        vec![
-            1.0, 0.0, //
-            1.0, 0.0, //
-            1.0, 1.0, //
-            1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "conditionB".into()]),
-    )
-    .unwrap()
-}
 
 fn centered_difference<F>(x: f64, f: F) -> f64
 where
@@ -29,7 +15,7 @@ fn linear_model_mu_projects_rows_onto_design_cells() {
     let normalized =
         RowMajorMatrix::from_row_major(2, 4, vec![10.0, 30.0, 10.0, 30.0, 5.0, 5.0, 9.0, 9.0])
             .unwrap();
-    let mu = linear_model_mu(&normalized, &two_group_design()).unwrap();
+    let mu = linear_model_mu(&normalized, &two_group_design(4, Some("conditionB"))).unwrap();
 
     assert_eq!(mu.n_rows(), 2);
     assert_relative_eq!(mu.row(0).unwrap()[0], 20.0, epsilon = 1e-12);
@@ -43,7 +29,8 @@ fn linear_model_mu_projects_rows_onto_design_cells() {
 #[test]
 fn rough_dispersion_matches_deseq2_formula() {
     let normalized = RowMajorMatrix::from_row_major(1, 4, vec![10.0, 30.0, 10.0, 30.0]).unwrap();
-    let rough = rough_dispersion_estimates(&normalized, &two_group_design()).unwrap();
+    let rough =
+        rough_dispersion_estimates(&normalized, &two_group_design(4, Some("conditionB"))).unwrap();
 
     assert_relative_eq!(rough[0], 0.4, epsilon = 1e-12);
 }
@@ -206,7 +193,7 @@ fn cox_reid_adjustment_matches_intercept_hand_formula() {
 fn cox_reid_log_posterior_adds_log_determinant_penalty() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let log_alpha = 0.25_f64.ln();
 
     let without_cr = dispersion_log_posterior(&counts, &mu, None, log_alpha, false).unwrap();
@@ -394,7 +381,7 @@ fn weighted_cox_reid_rejects_overflowed_column_subset_sum() {
 
 #[test]
 fn cox_reid_derivative_matches_finite_difference() {
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = [20.0, 20.0, 20.0, 20.0];
     let log_alpha = 0.25_f64.ln();
 
@@ -408,7 +395,7 @@ fn cox_reid_derivative_matches_finite_difference() {
 
 #[test]
 fn cox_reid_second_derivative_matches_finite_difference() {
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = [20.0, 20.0, 20.0, 20.0];
     let log_alpha = 0.25_f64.ln();
 
@@ -422,7 +409,7 @@ fn cox_reid_second_derivative_matches_finite_difference() {
 
 #[test]
 fn weighted_cox_reid_second_derivative_matches_finite_difference() {
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = [20.0, 20.0, 20.0, 20.0];
     let weights = [1.0, 0.25, 1.0, 0.5];
     let log_alpha = 0.25_f64.ln();
@@ -441,7 +428,7 @@ fn weighted_cox_reid_second_derivative_matches_finite_difference() {
 fn log_posterior_derivative_matches_finite_difference_with_cox_reid() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let log_alpha = 0.25_f64.ln();
 
     let analytic =
@@ -458,7 +445,7 @@ fn weighted_posterior_derivative_matches_finite_difference() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
     let weights = [1.0, 0.25, 1.0, 0.5];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let prior = DispersionPrior::new(0.2_f64.ln(), 0.5).unwrap();
     let log_alpha = 0.25_f64.ln();
 
@@ -543,7 +530,7 @@ fn prior_log_posterior_adds_expected_penalty() {
 fn prior_derivative_matches_finite_difference_with_cox_reid() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let prior = DispersionPrior::new(0.05_f64.ln(), 0.2).unwrap();
     let log_alpha = 0.25_f64.ln();
 
@@ -569,7 +556,7 @@ fn posterior_second_derivative_matches_finite_difference_with_prior_and_weights(
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
     let weights = [1.0, 0.25, 1.0, 0.5];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let prior = DispersionPrior::new(0.05_f64.ln(), 0.2).unwrap();
     let log_alpha = 0.25_f64.ln();
 
@@ -674,7 +661,7 @@ fn weighted_line_search_and_grid_with_prior_return_finite_estimates() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
     let weights = [1.0, 0.25, 1.0, 0.5];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let prior = DispersionPrior::new(0.2_f64.ln(), 0.5).unwrap();
     let options = GeneWiseDispersionOptions::default();
 
@@ -714,7 +701,7 @@ fn dispersion_grid_with_cox_reid_returns_bounded_estimate() {
     let (dispersion, evaluations) = fit_dispersion_grid(
         &[10, 30, 10, 30],
         &[20.0, 20.0, 20.0, 20.0],
-        &two_group_design(),
+        &two_group_design(4, Some("conditionB")),
         0.1,
         options,
         4,
@@ -730,7 +717,7 @@ fn dispersion_grid_with_cox_reid_returns_bounded_estimate() {
 fn dispersion_line_search_improves_objective() {
     let counts = [10, 30, 10, 30];
     let mu = [20.0, 20.0, 20.0, 20.0];
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let options = GeneWiseDispersionOptions::default();
 
     let output =
@@ -785,7 +772,7 @@ fn linear_mu_gene_wise_dispersion_estimator_expands_all_zero_rows() {
     let output = estimate_gene_wise_dispersions_linear_mu(
         GeneWiseDispersionInput {
             counts: &counts,
-            design: &two_group_design(),
+            design: &two_group_design(4, Some("conditionB")),
             size_factors: &size_factors,
             normalization_factors: None,
             normalized_counts: &normalized,
@@ -825,7 +812,7 @@ fn linear_mu_gene_wise_dispersion_estimator_uses_normalization_factor_offsets() 
             use_cox_reid: false,
             ..GeneWiseDispersionOptions::default()
         })
-        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design())
+        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design(4, Some("conditionB")))
         .unwrap();
 
     assert_eq!(fit.size_factors, vec![1.0, 1.0, 1.0, 1.0]);
@@ -869,7 +856,7 @@ fn glm_mu_gene_wise_dispersion_estimator_refits_means_and_expands_all_zero_rows(
     let output = estimate_gene_wise_dispersions_glm_mu(
         GeneWiseDispersionInput {
             counts: &counts,
-            design: &two_group_design(),
+            design: &two_group_design(4, Some("conditionB")),
             size_factors: &size_factors,
             normalization_factors: None,
             normalized_counts: &normalized,
@@ -915,7 +902,7 @@ fn builder_attaches_linear_mu_gene_wise_dispersion_state() {
             use_cox_reid: false,
             ..GeneWiseDispersionOptions::default()
         })
-        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design())
+        .fit_gene_wise_dispersions_linear_mu(&counts, &two_group_design(4, Some("conditionB")))
         .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
@@ -947,7 +934,7 @@ fn builder_attaches_glm_mu_gene_wise_dispersion_state() {
             niter: 2,
             ..GeneWiseDispersionOptions::default()
         })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design())
+        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
         .unwrap();
 
     let dispersions = fit.disp_gene_est.as_ref().unwrap();
@@ -1005,7 +992,7 @@ fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_fitidx_weight_rows() {
             niter: 2,
             ..GeneWiseDispersionOptions::default()
         })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design())
+        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
         .unwrap();
 
     assert_eq!(
@@ -1057,7 +1044,7 @@ fn weighted_glm_mu_gene_wise_dispersion_matches_deseq2_weighted_cox_reid() {
             niter: 2,
             ..GeneWiseDispersionOptions::default()
         })
-        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design())
+        .fit_gene_wise_dispersions_glm_mu(&counts, &two_group_design(4, Some("conditionB")))
         .unwrap();
 
     assert_eq!(
@@ -1093,7 +1080,7 @@ fn gene_wise_dispersion_options_reject_zero_niter() {
         estimate_gene_wise_dispersions_glm_mu(
             GeneWiseDispersionInput {
                 counts: &counts,
-                design: &two_group_design(),
+                design: &two_group_design(4, Some("conditionB")),
                 size_factors: &size_factors,
                 normalization_factors: None,
                 normalized_counts: &normalized,

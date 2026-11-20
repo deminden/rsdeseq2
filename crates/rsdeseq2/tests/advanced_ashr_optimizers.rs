@@ -1,19 +1,13 @@
 //! Independent cycling references and certified interior-point optima.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::json_fixture;
+use crate::support::posterior as support;
 use support::*;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/ashr_advanced_optimizer_r462.json")).unwrap()
-}
 #[test]
 fn cycling_and_interior_point_queries_match_independent_references() {
-    let r = reference();
+    let r = json_fixture!("ashr_advanced_optimizer_r462.json");
     let mut failures = vec![];
     for c in r["cases"].as_array().unwrap() {
         let input: location_shrinkage::Case = serde_json::from_value(c.clone()).unwrap();
@@ -94,7 +88,7 @@ fn cycling_and_interior_point_queries_match_independent_references() {
 }
 #[test]
 fn primitive_cycling_states_keep_source_budgets_and_variational_counts() {
-    let r = reference();
+    let r = json_fixture!("ashr_advanced_optimizer_r462.json");
     let mut failures = vec![];
     for c in r["em_fit_cases"].as_array().unwrap() {
         let input: em_fit::Case = serde_json::from_value(c.clone()).unwrap();
@@ -143,7 +137,7 @@ fn primitive_cycling_states_keep_source_budgets_and_variational_counts() {
 fn interior_point_has_independent_high_precision_kkt_certificates() {
     let truth: serde_json::Value =
         serde_json::from_str(include_str!("data/interior_mixture_truth.json")).unwrap();
-    let reference = reference();
+    let reference = json_fixture!("ashr_advanced_optimizer_r462.json");
     let mut failures = vec![];
     for t in truth["cases"].as_array().unwrap() {
         let c = reference["em_fit_cases"]

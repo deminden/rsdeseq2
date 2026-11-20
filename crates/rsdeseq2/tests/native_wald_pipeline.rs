@@ -4,27 +4,11 @@ use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
 fn two_group_design() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        8,
-        2,
-        vec![
-            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
-    )
-    .unwrap()
+    crate::support::two_group_design(8, Some("condition_B_vs_A"))
 }
 
 fn two_group_design_with_r_cleaned_coefficient() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        8,
-        2,
-        vec![
-            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "condition.B.1".into()]),
-    )
-    .unwrap()
+    crate::support::two_group_design(8, Some("condition.B.1"))
 }
 
 fn native_wald_counts_with_zero_row() -> CountMatrix {

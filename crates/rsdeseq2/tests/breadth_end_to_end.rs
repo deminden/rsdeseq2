@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use rsdeseq2::io::{read_count_matrix_tsv, read_labeled_design_matrix_tsv};
 use rsdeseq2::prelude::*;
 
-mod common;
+use crate::support as common;
 
 const DISPERSION_MATCH_LOG_GAP: f64 = 1e-10;
 const KNIFE_EDGE_LOG_GAP: f64 = 1e-4;

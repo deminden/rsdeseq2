@@ -1,3 +1,4 @@
+use crate::support::optional_bits as bits;
 use rsdeseq2::prelude::*;
 
 fn matrix(rows: usize, columns: usize, values: &[f64]) -> MatrixView<'_, f64> {
@@ -8,10 +9,6 @@ fn column_major(rows: usize, columns: usize, values: &[f64]) -> Vec<f64> {
     (0..columns)
         .flat_map(|column| (0..rows).map(move |row| values[row * columns + column]))
         .collect()
-}
-
-fn bits(values: &[Option<f64>]) -> Vec<Option<u64>> {
-    values.iter().map(|v| v.map(f64::to_bits)).collect()
 }
 
 #[test]

@@ -1,6 +1,4 @@
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
+use crate::support::formula_reference;
 use rsdeseq2::design::expression::{
     Argument, Data, EvaluationOptions, Expression, Value, evaluate,
 };

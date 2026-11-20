@@ -3,6 +3,7 @@
 //! Inputs are small random count matrices, so each case runs in milliseconds;
 //! the case count is kept low because the fits are deterministic per input.
 
+use crate::support::two_group_design;
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;
 use rsdeseq2::prelude::*;
@@ -31,13 +32,6 @@ fn positive_counts(max_genes: usize) -> impl Strategy<Value = (usize, Vec<u32>)>
 
 fn matrix(genes: usize, values: Vec<u32>) -> CountMatrix {
     CountMatrix::from_row_major_u32(genes, SAMPLES, values).unwrap()
-}
-
-fn two_group_design() -> DesignMatrix {
-    let values = (0..SAMPLES)
-        .flat_map(|sample| [1.0, if sample < SAMPLES / 2 { 0.0 } else { 1.0 }])
-        .collect();
-    DesignMatrix::from_row_major(SAMPLES, 2, values, None).unwrap()
 }
 
 fn close(a: f64, b: f64, relative: f64) -> bool {
@@ -122,7 +116,7 @@ proptest! {
         dispersion in 0.01f64..1.0,
     ) {
         let counts = matrix(genes, values);
-        let design = two_group_design();
+        let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
         let builder = DeseqBuilder::new();
         let (_, forward) = builder
@@ -144,7 +138,7 @@ proptest! {
         dispersion in 0.01f64..1.0,
     ) {
         let counts = matrix(genes, values);
-        let design = two_group_design();
+        let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
         let one = DeseqBuilder::new()
             .threads(1)
@@ -168,7 +162,7 @@ proptest! {
         let zero_gene = zero_gene % genes;
         values[zero_gene * SAMPLES..(zero_gene + 1) * SAMPLES].fill(0);
         let counts = matrix(genes, values);
-        let design = two_group_design();
+        let design = two_group_design(SAMPLES, None);
         let dispersions = vec![dispersion; genes];
         let (_, results) = DeseqBuilder::new()
             .size_factors(vec![1.0; SAMPLES])

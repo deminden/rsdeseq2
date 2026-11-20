@@ -1,3 +1,4 @@
+use crate::support::decimal_numbers as numbers;
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 use rsdeseq2::shrinkage::{MixtureFitOptions, NormalMixture, fit_mixture_proportions};
 use serde::Deserialize;
@@ -21,9 +22,6 @@ struct Case {
     posterior_mean: Vec<String>,
     posterior_sd: Vec<String>,
     converged: bool,
-}
-fn numbers(x: &[String]) -> Vec<f64> {
-    x.iter().map(|s| s.parse().unwrap()).collect()
 }
 #[test]
 fn convex_mixture_fits_match_independent_ashr_likelihoods_and_posteriors() {

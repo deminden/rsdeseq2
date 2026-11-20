@@ -1,4 +1,10 @@
-#![allow(dead_code)]
+//! Shared test inputs, fixture readers and numerical assertions.
+pub(crate) mod builtin_checks;
+mod formula_reference;
+pub(crate) mod posterior;
+pub(crate) mod regression_checks;
+
+pub(crate) use formula_reference::formula_reference;
 
 use csv::ReaderBuilder;
 use rsdeseq2::prelude::*;
@@ -6,6 +12,68 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub type TsvRow = HashMap<String, String>;
+
+macro_rules! json_fixture {
+    ($file:literal) => {
+        json_fixture!($file, serde_json::Value)
+    };
+    ($file:literal, $value:ty) => {
+        serde_json::from_str::<$value>(include_str!(concat!("data/", $file)))
+            .unwrap_or_else(|error| panic!("invalid fixture {}: {error}", $file))
+    };
+}
+pub(crate) use json_fixture;
+
+pub struct TsvTable {
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+}
+
+impl TsvTable {
+    pub fn read(path: &Path) -> Self {
+        let (headers, records) = tsv_records(path);
+        let headers = headers.iter().map(str::to_owned).collect();
+        let rows = records
+            .map(|record| record.iter().map(str::to_owned).collect())
+            .collect();
+        Self { headers, rows }
+    }
+
+    pub fn column(&self, name: &str) -> usize {
+        self.headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap_or_else(|| panic!("missing {name:?} in {:?}", self.headers))
+    }
+}
+
+fn tsv_records(
+    path: &Path,
+) -> (
+    csv::StringRecord,
+    impl Iterator<Item = csv::StringRecord> + '_,
+) {
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .from_path(path)
+        .unwrap_or_else(|error| panic!("failed to open {}: {error}", path.display()));
+    let headers = reader
+        .headers()
+        .unwrap_or_else(|error| panic!("failed to read headers from {}: {error}", path.display()))
+        .clone();
+    assert!(!headers.is_empty(), "empty header: {}", path.display());
+    let unique = headers.iter().collect::<std::collections::HashSet<_>>();
+    assert_eq!(
+        unique.len(),
+        headers.len(),
+        "duplicate reference columns: {}",
+        path.display()
+    );
+    let records = reader.into_records().map(move |record| {
+        record.unwrap_or_else(|error| panic!("failed to read row from {}: {error}", path.display()))
+    });
+    (headers, records)
+}
 
 pub fn reference_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/deseq2_reference")
@@ -28,35 +96,44 @@ pub fn read_reference_tsv(name: &str) -> Vec<TsvRow> {
 }
 
 pub fn read_tsv(path: &Path) -> Vec<TsvRow> {
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b'\t')
-        .from_path(path)
-        .unwrap_or_else(|error| panic!("failed to open {}: {error}", path.display()));
-    let headers = reader
-        .headers()
-        .unwrap_or_else(|error| panic!("failed to read headers from {}: {error}", path.display()))
-        .clone();
-    assert!(!headers.is_empty(), "empty header: {}", path.display());
-    let unique = headers.iter().collect::<std::collections::HashSet<_>>();
-    assert_eq!(
-        unique.len(),
-        headers.len(),
-        "duplicate reference columns: {}",
-        path.display()
-    );
-    reader
-        .records()
+    let (headers, records) = tsv_records(path);
+    records
         .map(|record| {
-            let record = record.unwrap_or_else(|error| {
-                panic!("failed to read row from {}: {error}", path.display())
-            });
             headers
                 .iter()
                 .zip(record.iter())
                 .map(|(key, value)| (key.to_string(), value.to_string()))
-                .collect::<TsvRow>()
+                .collect()
         })
         .collect()
+}
+
+pub fn two_group_design(samples: usize, coefficient: Option<&str>) -> DesignMatrix {
+    let values = (0..samples)
+        .flat_map(|sample| [1.0, if sample < samples / 2 { 0.0 } else { 1.0 }])
+        .collect();
+    let names = coefficient.map(|name| vec!["Intercept".to_string(), name.to_string()]);
+    DesignMatrix::from_row_major(samples, 2, values, names).unwrap()
+}
+
+pub fn decimal_numbers(values: &[String]) -> Vec<f64> {
+    values.iter().map(|value| value.parse().unwrap()).collect()
+}
+
+pub fn json_prefixed_bits(values: &serde_json::Value) -> Vec<f64> {
+    values
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| {
+            let bits = value.as_str().unwrap().strip_prefix("bits:").unwrap();
+            f64::from_bits(u64::from_str_radix(bits, 16).unwrap())
+        })
+        .collect()
+}
+
+pub fn optional_bits(values: &[Option<f64>]) -> Vec<Option<u64>> {
+    values.iter().map(|value| value.map(f64::to_bits)).collect()
 }
 
 pub fn reference_counts() -> CountMatrix {

@@ -8,7 +8,7 @@ use rsdeseq2::design::{FormulaFactorColumn, FormulaModelFrame};
 use rsdeseq2::io::{read_count_matrix_tsv, read_labeled_design_matrix_tsv};
 use rsdeseq2::prelude::*;
 
-mod common;
+use crate::support as common;
 
 fn data(case: &str, name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

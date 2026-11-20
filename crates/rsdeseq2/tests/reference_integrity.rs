@@ -1,5 +1,5 @@
 //! Regression checks for the fail-closed numerical oracle helpers.
-mod common;
+use crate::support as common;
 
 #[test]
 #[should_panic(expected = "required DESeq2 reference missing")]

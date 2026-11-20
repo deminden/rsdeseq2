@@ -1,21 +1,18 @@
 //! Independent original-ashr optimizer states and complete posterior batches.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::json_fixture;
+use crate::support::posterior as support;
 use support::*;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/ashr_optimizer_r462.json")).unwrap()
-}
 #[test]
 fn accelerated_em_and_variational_states_match_original_ashr() {
     let mut failures = vec![];
     let mut stale_source_objectives = vec![];
-    for c in reference()["em_fit_cases"].as_array().unwrap() {
+    for c in json_fixture!("ashr_optimizer_r462.json")["em_fit_cases"]
+        .as_array()
+        .unwrap()
+    {
         let input: em_fit::Case = serde_json::from_value(c.clone()).unwrap();
         let f = match em_fit::run(&input) {
             Ok(f) => f,
@@ -92,7 +89,10 @@ fn accelerated_em_and_variational_states_match_original_ashr() {
 #[test]
 fn alternative_optimizers_keep_complete_posterior_and_warning_coverage() {
     let mut failures = vec![];
-    for c in reference()["cases"].as_array().unwrap() {
+    for c in json_fixture!("ashr_optimizer_r462.json")["cases"]
+        .as_array()
+        .unwrap()
+    {
         let input: location_shrinkage::Case = serde_json::from_value(c.clone()).unwrap();
         let f = match location_shrinkage::run(&input) {
             Ok(f) => f,
@@ -159,7 +159,7 @@ fn alternative_optimizers_keep_complete_posterior_and_warning_coverage() {
 
 #[test]
 fn em_validation_does_not_silently_change_optimizer_or_prior_semantics() {
-    let r = reference();
+    let r = json_fixture!("ashr_optimizer_r462.json");
     let base = &r["em_fit_cases"][0];
     let mut variants = vec![];
     let mut c = base.clone();

@@ -4,15 +4,14 @@
 //! `#[path]`, so its own `mod` declarations resolve as before). Run one file's
 //! tests with `cargo test --test integration <file>::`.
 //!
-//! Shared helpers (`common`, `support`, the R-interface evaluators) are still
-//! declared by each file that uses them, exactly as when every file was its
-//! own crate, so the same source is compiled once per user and a file module
-//! may share its helper's name.
+//! Fixture readers and comparisons are shared through `support`.
 //!
 //! The deprecated `DeseqBuilder::fit*` methods stay covered here until they
 //! are removed in 0.7.0; `run_equivalence` checks each against `run`.
 #![allow(clippy::duplicate_mod, clippy::module_inception)]
 #![allow(deprecated)]
+
+mod support;
 
 #[path = "adaptive_result.rs"]
 mod adaptive_result;

@@ -4,6 +4,9 @@ use std::error::Error;
 #[path = "../../tools/validation/evaluate_r_interface/builtin_likelihood.rs"]
 pub(crate) mod builtin_likelihood;
 #[allow(dead_code)]
+#[path = "../../tools/validation/evaluate_r_interface/em_fit.rs"]
+pub(crate) mod em_fit;
+#[allow(dead_code)]
 #[path = "../../tools/validation/evaluate_r_interface/formula.rs"]
 pub(crate) mod formula;
 #[allow(dead_code)]
@@ -12,6 +15,9 @@ pub(crate) mod heavy_tail;
 #[allow(dead_code)]
 #[path = "../../tools/validation/evaluate_r_interface/likelihood.rs"]
 pub(crate) mod likelihood;
+#[allow(dead_code)]
+#[path = "../../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
+pub(crate) mod location_shrinkage;
 #[allow(dead_code)]
 #[path = "../../tools/validation/evaluate_r_interface/random.rs"]
 pub(crate) mod random;

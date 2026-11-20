@@ -1,8 +1,5 @@
 //! Original compiled-prefit versus refinement control and zero-row contracts.
-#[path = "common/regression_checks.rs"]
-mod checks;
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::regression_checks as checks;
 #[test]
 fn compiled_method_controls_preserve_original_posteriors_errors_and_rng_state() {
     let reference: serde_json::Value =

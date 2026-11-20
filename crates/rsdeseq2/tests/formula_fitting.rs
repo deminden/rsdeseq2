@@ -1,22 +1,9 @@
 //! Independent original-R matrix and offset semantics for complete workflows.
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
+use crate::support::formula_reference;
+use crate::support::json_prefixed_bits as numbers;
 use rsdeseq2::{design::formula_design_for_fitting_from_model_frame, prelude::*};
 use serde_json::Value;
 
-fn numbers(v: &Value) -> Vec<f64> {
-    v.as_array()
-        .unwrap()
-        .iter()
-        .map(|v| {
-            f64::from_bits(
-                u64::from_str_radix(v.as_str().unwrap().strip_prefix("bits:").unwrap(), 16)
-                    .unwrap(),
-            )
-        })
-        .collect()
-}
 fn strings(v: &Value) -> Vec<String> {
     v.as_array()
         .unwrap()

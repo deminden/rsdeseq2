@@ -1,4 +1,4 @@
-mod common;
+use crate::support as common;
 use rsdeseq2::prelude::*;
 
 fn assert_numbers(a: &[f64], b: &[f64], label: &str) {

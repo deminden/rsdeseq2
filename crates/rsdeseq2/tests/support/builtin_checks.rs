@@ -1,5 +1,5 @@
 //! Shared independent numerical gates for continuous and count likelihood fixtures.
-use super::{location_shrinkage, support::*};
+use super::posterior::*;
 pub fn kernels(reference: serde_json::Value) {
     let mut failures = vec![];
     for c in reference["kernel_cases"].as_array().unwrap() {

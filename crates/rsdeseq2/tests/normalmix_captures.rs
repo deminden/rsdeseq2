@@ -1,25 +1,13 @@
 //! Independent canonical capture layout, component order and missing-row policies.
-#[path = "common/posterior.rs"]
-mod support;
-use support::*;
-#[path = "common/builtin_checks.rs"]
-mod checks;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
-mod location_shrinkage;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/normalmix_capture_r462.json")).unwrap()
-}
+use crate::support::builtin_checks as checks;
+use crate::support::json_fixture;
 #[test]
 fn capture_kernels_match_original_matrix_coercion_and_recycling() {
-    checks::kernels(reference());
+    checks::kernels(json_fixture!("normalmix_capture_r462.json"));
 }
 #[test]
 fn capture_fits_match_original_fitted_fixed_and_missing_row_summaries() {
-    checks::complete_fits(reference());
+    checks::complete_fits(json_fixture!("normalmix_capture_r462.json"));
 }
 #[test]
 fn equal_capture_lengths_flatten_columns_without_row_weight_interpretation() {

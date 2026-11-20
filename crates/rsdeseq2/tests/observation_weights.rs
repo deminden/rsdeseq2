@@ -1,27 +1,15 @@
+use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
-
-fn two_group_design() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        4,
-        2,
-        vec![
-            1.0, 0.0, //
-            1.0, 0.0, //
-            1.0, 1.0, //
-            1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
-    )
-    .unwrap()
-}
 
 #[test]
 fn observation_weights_are_normalized_by_gene_row_max() {
     let weights =
         RowMajorMatrix::from_row_major(2, 4, vec![2.0, 1.0, 0.0, 2.0, 0.5, 0.5, 0.0, 0.25])
             .unwrap();
-    let output = preprocess_observation_weights(&weights, &two_group_design()).unwrap();
+    let output =
+        preprocess_observation_weights(&weights, &two_group_design(4, Some("condition_B_vs_A")))
+            .unwrap();
 
     assert_eq!(output.design_rank, 2);
     assert_eq!(output.weights_fail, vec![false, false]);
@@ -44,7 +32,9 @@ fn observation_weights_flag_rows_that_drop_design_rank() {
         ],
     )
     .unwrap();
-    let output = preprocess_observation_weights(&weights, &two_group_design()).unwrap();
+    let output =
+        preprocess_observation_weights(&weights, &two_group_design(4, Some("condition_B_vs_A")))
+            .unwrap();
 
     assert_eq!(output.weights_fail, vec![false, true, true]);
     assert_eq!(output.weights.row(2).unwrap(), &[0.0, 0.0, 0.0, 0.0]);
@@ -55,7 +45,7 @@ fn observation_weights_use_thresholded_subset_for_cox_reid_check() {
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 1.0, 0.001, 0.001]).unwrap();
     let output = preprocess_observation_weights_with_options(
         &weights,
-        &two_group_design(),
+        &two_group_design(4, Some("condition_B_vs_A")),
         ObservationWeightOptions {
             weight_threshold: 1e-2,
             ..ObservationWeightOptions::default()
@@ -125,7 +115,7 @@ fn observation_weights_for_non_full_rank_design_use_zero_column_check() {
 
 #[test]
 fn observation_weights_validate_inputs() {
-    let design = two_group_design();
+    let design = two_group_design(4, Some("condition_B_vs_A"));
     let bad_dims = RowMajorMatrix::from_row_major(1, 3, vec![1.0, 1.0, 1.0]).unwrap();
     assert!(preprocess_observation_weights(&bad_dims, &design).is_err());
 

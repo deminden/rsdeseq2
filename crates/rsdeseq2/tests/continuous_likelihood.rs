@@ -1,29 +1,17 @@
 //! Original built-in likelihood kernels, complete workflows and analytical checks.
-#[path = "common/posterior.rs"]
-mod support;
-use support::*;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
-mod location_shrinkage;
+use crate::support::builtin_checks as checks;
+use crate::support::json_fixture;
 use rsdeseq2::{
     matrix::{MatrixOrder, MatrixView},
     shrinkage::BuiltinLocationLikelihood,
 };
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/continuous_likelihood_r462.json")).unwrap()
-}
-#[path = "common/builtin_checks.rs"]
-mod checks;
 #[test]
 fn continuous_kernels_match_original_scalar_and_row_parameters() {
-    checks::kernels(reference());
+    checks::kernels(json_fixture!("continuous_likelihood_r462.json"));
 }
 #[test]
 fn complete_continuous_fits_preserve_original_summaries_and_missingness() {
-    checks::complete_fits(reference());
+    checks::complete_fits(json_fixture!("continuous_likelihood_r462.json"));
 }
 #[test]
 fn logistic_identity_and_observation_geometry_have_independent_solutions() {

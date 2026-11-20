@@ -1,6 +1,5 @@
 //! Optional posterior queries, numerical references and validation behavior.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::posterior as support;
 use support::*;
 
 #[test]

@@ -1,26 +1,15 @@
 //! Original-package tails/moments plus independent high-precision density truths.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::builtin_checks as checks;
+use crate::support::json_fixture;
+use crate::support::posterior as support;
 use support::*;
-#[allow(dead_code)]
-#[path = "common/builtin_checks.rs"]
-mod checks;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
-mod location_shrinkage;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/large_shape_likelihood_r462.json")).unwrap()
-}
 #[test]
 fn large_shape_tails_and_moments_match_original_without_iteration_exhaustion() {
-    checks::kernels(reference());
+    checks::kernels(json_fixture!("large_shape_likelihood_r462.json"));
 }
 #[test]
 fn large_shape_density_normalization_matches_independent_hundred_digit_truths() {
-    let reference = reference();
+    let reference = json_fixture!("large_shape_likelihood_r462.json");
     let truths: serde_json::Value =
         serde_json::from_str(include_str!("data/large_shape_density_truth.json")).unwrap();
     let mut failures = vec![];

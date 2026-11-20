@@ -1,3 +1,4 @@
+use crate::support::decimal_numbers as numbers;
 use rsdeseq2::prelude::*;
 use rsdeseq2::transform::{FrozenLocalDispersion, SavedLocalDispersionFit, vst_frozen_local};
 use serde::Deserialize;
@@ -30,9 +31,6 @@ struct Case {
     dispersions: Vec<String>,
     transformed: Vec<String>,
     serialization_identical: bool,
-}
-fn numbers(x: &[String]) -> Vec<f64> {
-    x.iter().map(|x| x.parse().unwrap()).collect()
 }
 fn close(actual: &[f64], expected: &[String], tolerance: f64, context: &str) {
     assert_eq!(actual.len(), expected.len());

@@ -1,3 +1,4 @@
+use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
 
@@ -933,19 +934,12 @@ fn varied_counts(genes: usize, samples: usize) -> CountMatrix {
     CountMatrix::from_row_major_u32(genes, samples, values).unwrap()
 }
 
-fn two_group_design(samples: usize) -> DesignMatrix {
-    let values = (0..samples)
-        .flat_map(|sample| [1.0, if sample < samples / 2 { 0.0 } else { 1.0 }])
-        .collect();
-    DesignMatrix::from_row_major(samples, 2, values, None).unwrap()
-}
-
 /// DESeq2 1.52 `estimateDispersionsFit` wraps `parametricDispersionFit` in
 /// `try()` and substitutes `fitType="local"` when it fails.
 #[test]
 fn failed_parametric_trend_falls_back_to_the_local_fit() {
     let counts = varied_counts(200, 6);
-    let design = two_group_design(6);
+    let design = two_group_design(6, None);
     let fit_with = |fit_type| {
         DeseqBuilder::new()
             .fit_type(fit_type)

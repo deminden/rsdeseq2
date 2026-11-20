@@ -1,20 +1,6 @@
+use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
-
-fn two_group_design() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        4,
-        2,
-        vec![
-            1.0, 0.0, //
-            1.0, 0.0, //
-            1.0, 1.0, //
-            1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "condition_B_vs_A".into()]),
-    )
-    .unwrap()
-}
 
 #[test]
 fn normalized_counts_and_base_mean() {
@@ -345,7 +331,10 @@ fn builder_preprocesses_observation_weights_when_design_is_supplied() {
     let fit = DeseqBuilder::new()
         .size_factors(vec![1.0, 1.0, 1.0, 1.0])
         .observation_weights(weights)
-        .fit_size_factors_and_base_means_with_design(&counts, &two_group_design())
+        .fit_size_factors_and_base_means_with_design(
+            &counts,
+            &two_group_design(4, Some("condition_B_vs_A")),
+        )
         .unwrap();
 
     assert_eq!(fit.weights_design_rank, Some(2));
@@ -389,7 +378,12 @@ fn fixed_dispersion_wald_pipeline_marks_weight_failed_rows_as_skipped() {
         .size_factors(vec![1.0, 1.0, 1.0, 1.0])
         .observation_weights(weights)
         .disable_cooks_cutoff()
-        .fit_fixed_dispersion_wald(&counts, &two_group_design(), &[0.1, 0.1], 1)
+        .fit_fixed_dispersion_wald(
+            &counts,
+            &two_group_design(4, Some("condition_B_vs_A")),
+            &[0.1, 0.1],
+            1,
+        )
         .unwrap();
 
     assert_eq!(fit.weights_fail, Some(vec![false, true]));

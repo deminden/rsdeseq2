@@ -1,20 +1,8 @@
 //! Execution policy from original DESeq2, shared across fitting/selection routes.
+use crate::support::json_prefixed_bits as numbers;
 use rsdeseq2::prelude::*;
 use serde_json::Value;
 
-fn numbers(value: &Value) -> Vec<f64> {
-    value
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| {
-            f64::from_bits(
-                u64::from_str_radix(v.as_str().unwrap().strip_prefix("bits:").unwrap(), 16)
-                    .unwrap(),
-            )
-        })
-        .collect()
-}
 fn matrix_bits(m: &Option<RowMajorMatrix<f64>>) -> Option<Vec<u64>> {
     m.as_ref()
         .map(|m| m.as_slice().iter().map(|v| v.to_bits()).collect())

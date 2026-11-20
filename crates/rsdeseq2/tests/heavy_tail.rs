@@ -1,4 +1,4 @@
-mod common;
+use crate::support as common;
 use common::hex_bits as bits;
 use std::error::Error;
 #[allow(dead_code)]

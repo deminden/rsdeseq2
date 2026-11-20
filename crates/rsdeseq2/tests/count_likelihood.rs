@@ -1,10 +1,7 @@
 //! Original built-in likelihood kernels, complete workflows and analytical checks.
-#[path = "common/posterior.rs"]
-mod support;
+use crate::support::json_fixture;
+use crate::support::posterior as support;
 use support::*;
-#[allow(dead_code)]
-#[path = "../tools/validation/evaluate_r_interface/em_fit.rs"]
-mod em_fit;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/location_shrinkage.rs"]
 mod location_shrinkage;
@@ -12,18 +9,14 @@ use rsdeseq2::shrinkage::BuiltinLocationLikelihood;
 #[allow(dead_code)]
 #[path = "../tools/validation/evaluate_r_interface/ashr_mode.rs"]
 mod ashr_mode;
-fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!("data/count_likelihood_r462.json")).unwrap()
-}
-#[path = "common/builtin_checks.rs"]
-mod checks;
+use crate::support::builtin_checks as checks;
 #[test]
 fn count_kernels_match_original_scalar_and_row_parameters() {
-    checks::kernels(reference());
+    checks::kernels(json_fixture!("count_likelihood_r462.json"));
 }
 #[test]
 fn complete_count_fits_preserve_original_summaries_and_missingness() {
-    checks::complete_fits(reference());
+    checks::complete_fits(json_fixture!("count_likelihood_r462.json"));
 }
 #[test]
 fn count_kernels_have_analytic_exponential_and_uniform_beta_solutions() {
@@ -119,7 +112,7 @@ fn count_mode_bounds_searches_and_complete_summaries_match_original() {
 #[test]
 fn count_batch_orientation_is_shared_by_the_direct_posterior_api() {
     let mut failures = vec![];
-    for c in reference()["cases"]
+    for c in json_fixture!("count_likelihood_r462.json")["cases"]
         .as_array()
         .unwrap()
         .iter()

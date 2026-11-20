@@ -1,3 +1,4 @@
+use crate::support::r_numbers as numbers;
 use rsdeseq2::shrinkage::{LocationShrinkageOptions, MixtureComponents, shrink_location_batch};
 use serde::Deserialize;
 #[derive(Deserialize)]
@@ -8,17 +9,6 @@ struct Reference {
     fitted_sds: Vec<String>,
     posterior_mean: Vec<String>,
     posterior_sd: Vec<String>,
-}
-fn numbers(v: &[String]) -> Vec<f64> {
-    v.iter()
-        .map(|s| {
-            if let Some(s) = s.strip_prefix("bits:") {
-                f64::from_bits(u64::from_str_radix(s, 16).unwrap())
-            } else {
-                s.parse().unwrap()
-            }
-        })
-        .collect()
 }
 #[test]
 fn automatic_prior_retains_original_positive_coordinate_convergence() {

@@ -1,6 +1,4 @@
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
+use crate::support::formula_reference;
 // Frozen independent R matrices, including attributes/order and signed zeros.
 #[path = "../tools/validation/evaluate_r_interface/model_matrix.rs"]
 mod input;

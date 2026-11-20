@@ -1,8 +1,6 @@
-mod common;
+use crate::support as common;
+use crate::support::formula_reference;
 use common::{r_number as number, r_numbers as numbers};
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
 use rsdeseq2::shrinkage::{FixedMixture, TruncatedNormalMixture, UniformMixture};
 use serde::Deserialize;
 #[derive(Deserialize)]

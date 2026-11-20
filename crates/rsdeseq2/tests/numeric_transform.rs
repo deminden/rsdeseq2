@@ -1,6 +1,4 @@
-#[macro_use]
-#[path = "support/formula_reference.rs"]
-mod reference;
+use crate::support::formula_reference;
 use rsdeseq2::design::numeric_transform::{
     PolynomialCoefficients, ScalePolicy, integer_covariate, polynomial_basis, scale_covariates,
 };

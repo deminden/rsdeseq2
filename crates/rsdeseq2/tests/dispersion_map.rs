@@ -1,20 +1,6 @@
+use crate::support::two_group_design;
 use approx::assert_relative_eq;
 use rsdeseq2::prelude::*;
-
-fn two_group_design() -> DesignMatrix {
-    DesignMatrix::from_row_major(
-        4,
-        2,
-        vec![
-            1.0, 0.0, //
-            1.0, 0.0, //
-            1.0, 1.0, //
-            1.0, 1.0,
-        ],
-        Some(vec!["Intercept".into(), "conditionB".into()]),
-    )
-    .unwrap()
-}
 
 fn one_gene_counts() -> CountMatrix {
     CountMatrix::from_row_major_u32(1, 4, vec![10, 30, 10, 30]).unwrap()
@@ -64,7 +50,7 @@ fn map_dispersion_outlier_rejects_non_positive_threshold_multiplier() {
 #[test]
 fn estimate_map_dispersions_runs_prior_aware_line_search() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
 
     let output = estimate_map_dispersions(
@@ -98,7 +84,7 @@ fn estimate_map_dispersions_runs_prior_aware_line_search() {
 #[test]
 fn estimate_map_dispersions_accepts_observation_weights() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0, 0.25, 1.0, 0.5]).unwrap();
 
@@ -130,7 +116,7 @@ fn estimate_map_dispersions_accepts_observation_weights() {
 #[test]
 fn estimate_map_dispersions_unit_weights_match_unweighted() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
     let weights = RowMajorMatrix::from_row_major(1, 4, vec![1.0; 4]).unwrap();
 
@@ -186,7 +172,7 @@ fn estimate_map_dispersions_unit_weights_match_unweighted() {
 #[test]
 fn estimate_map_dispersions_uses_grid_fallback_when_line_search_does_not_converge() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
 
     let output = estimate_map_dispersions(
@@ -218,7 +204,7 @@ fn estimate_map_dispersions_uses_grid_fallback_when_line_search_does_not_converg
 #[test]
 fn estimate_map_dispersions_replaces_outlier_final_dispersion_with_gene_estimate() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
 
     let output = estimate_map_dispersions(
@@ -248,7 +234,7 @@ fn estimate_map_dispersions_replaces_outlier_final_dispersion_with_gene_estimate
 #[test]
 fn estimate_map_dispersions_expands_all_zero_rows_as_missing() {
     let counts = CountMatrix::from_row_major_u32(2, 4, vec![0, 0, 0, 0, 10, 30, 10, 30]).unwrap();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = RowMajorMatrix::from_row_major(
         2,
         4,
@@ -295,7 +281,7 @@ fn estimate_map_dispersions_expands_all_zero_rows_as_missing() {
 #[test]
 fn estimate_map_dispersions_validates_dimensions() {
     let counts = one_gene_counts();
-    let design = two_group_design();
+    let design = two_group_design(4, Some("conditionB"));
     let mu = one_gene_mu();
 
     let err = estimate_map_dispersions(

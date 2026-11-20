@@ -1,47 +1,7 @@
-mod common;
+use crate::support::{self as common, TsvTable};
 
 use rsdeseq2::prelude::*;
 use std::path::PathBuf;
-
-#[derive(Debug)]
-struct Tsv {
-    headers: Vec<String>,
-    rows: Vec<Vec<String>>,
-}
-
-impl Tsv {
-    fn read(dir: &std::path::Path, name: &str) -> Self {
-        let path = dir.join(name);
-        let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b'\t')
-            .from_path(&path)
-            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        let headers = reader
-            .headers()
-            .unwrap_or_else(|error| panic!("read headers from {}: {error}", path.display()))
-            .iter()
-            .map(str::to_owned)
-            .collect();
-        let rows = reader
-            .records()
-            .map(|record| {
-                record
-                    .unwrap_or_else(|error| panic!("read row from {}: {error}", path.display()))
-                    .iter()
-                    .map(str::to_owned)
-                    .collect()
-            })
-            .collect();
-        Self { headers, rows }
-    }
-
-    fn column(&self, name: &str) -> usize {
-        self.headers
-            .iter()
-            .position(|header| header == name)
-            .unwrap_or_else(|| panic!("missing {name:?} in {:?}", self.headers))
-    }
-}
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/gtex_v8_real_wald")
@@ -113,10 +73,10 @@ fn check_wald(compact: bool) {
     } else {
         fixture_dir()
     };
-    let counts_table = Tsv::read(&dir, "counts.tsv");
-    let design_table = Tsv::read(&fixture_dir(), "design_matrix.tsv");
-    let reference = Tsv::read(&dir, "reference_results.tsv");
-    let reference_size_factors = Tsv::read(&fixture_dir(), "reference_size_factors.tsv");
+    let counts_table = TsvTable::read(&dir.join("counts.tsv"));
+    let design_table = TsvTable::read(&fixture_dir().join("design_matrix.tsv"));
+    let reference = TsvTable::read(&dir.join("reference_results.tsv"));
+    let reference_size_factors = TsvTable::read(&fixture_dir().join("reference_size_factors.tsv"));
     let gene_names = counts_table
         .rows
         .iter()
@@ -308,7 +268,7 @@ fn check_wald(compact: bool) {
 // The original full reference predates the padj column. Compute its BH oracle
 // from the R p-values, independently of the candidate's p-values and BH code.
 // The compact oracle is frozen directly by stats::p.adjust in R.
-fn reference_padj(reference: &Tsv) -> Vec<Option<f64>> {
+fn reference_padj(reference: &TsvTable) -> Vec<Option<f64>> {
     if let Some(col) = reference.headers.iter().position(|s| s == "padj") {
         return reference
             .rows
@@ -341,7 +301,7 @@ fn full_gtex_normalization_matches_deseq2_without_fitting_glms() {
     let fit = DeseqBuilder::new()
         .fit_size_factors_and_base_means(&counts)
         .unwrap();
-    let expected = Tsv::read(&fixture_dir(), "reference_size_factors.tsv");
+    let expected = TsvTable::read(&fixture_dir().join("reference_size_factors.tsv"));
     assert_eq!(fit.size_factors.len(), expected.rows.len());
     for (a, r) in fit.size_factors.iter().zip(&expected.rows) {
         let b = r[1].parse::<f64>().unwrap();

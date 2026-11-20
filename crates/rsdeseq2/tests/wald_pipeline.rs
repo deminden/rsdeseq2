@@ -1,6 +1,6 @@
 //! Numerical coverage grouped by responsibility; shared fixtures stay in this test crate.
 
-mod common;
+use crate::support as common;
 use approx::assert_relative_eq;
 use common::{assert_matrix_close_or_nan, assert_slice_close_or_nan};
 use rsdeseq2::prelude::*;

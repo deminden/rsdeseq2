@@ -1,3 +1,4 @@
+use crate::support::{r_number as number, r_numbers as numbers};
 use rsdeseq2::shrinkage::{NormalMixture, svalues};
 use serde::Deserialize;
 
@@ -26,17 +27,6 @@ struct SvalueCase {
     name: String,
     rates: Vec<String>,
     values: Vec<String>,
-}
-fn number(s: &str) -> f64 {
-    match s {
-        "Inf" => f64::INFINITY,
-        "-Inf" => f64::NEG_INFINITY,
-        "NA" | "NaN" => f64::NAN,
-        _ => s.parse().unwrap(),
-    }
-}
-fn numbers(x: &[String]) -> Vec<f64> {
-    x.iter().map(|s| number(s)).collect()
 }
 fn references() -> References {
     serde_json::from_str(include_str!("data/normal_mixture_posterior_r462.json")).unwrap()

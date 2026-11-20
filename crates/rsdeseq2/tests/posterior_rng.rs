@@ -1,5 +1,5 @@
 //! Independent original-R seed, uniform, normal and state-transition references.
-mod common;
+use crate::support as common;
 use common::hex_bits as bits;
 use rsdeseq2::shrinkage::PosteriorRng;
 #[allow(dead_code)]

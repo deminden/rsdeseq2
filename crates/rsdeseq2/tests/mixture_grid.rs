@@ -1,4 +1,4 @@
-mod common;
+use crate::support as common;
 use common::{r_number as number, r_numbers as numbers};
 use rsdeseq2::shrinkage::{
     MixtureComponents, MixtureFamily, MixtureGridOptions, MixturePriorPenalty, prepare_mixture_grid,
