@@ -118,16 +118,14 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal(
             )?
         };
         for gene in 0..n_genes {
-            beta[gene] = *fitted
-                .prior_fit
-                .beta
-                .get(gene, coefficient)
-                .ok_or("missing shrunken coefficient")?;
-            beta_se[gene] = *fitted
-                .prior_fit
-                .beta_se
-                .get(gene, coefficient)
-                .ok_or("missing shrunken coefficient SE")?;
+            beta[gene].write(
+                *fitted.prior_fit.beta.get(gene, coefficient)
+                    .ok_or("missing shrunken coefficient")?,
+            );
+            beta_se[gene].write(
+                *fitted.prior_fit.beta_se.get(gene, coefficient)
+                    .ok_or("missing shrunken coefficient SE")?,
+            );
         }
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
@@ -137,14 +135,14 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal(
                 "beta prior variances",
             )?
         }
-        .copy_from_slice(&fitted.beta_prior_variance);
+        .write_copy_of_slice(&fitted.beta_prior_variance);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let stats = unsafe { output_slice(stat_output, n_genes, "shrunken Wald statistics")? };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let pvalues = unsafe { output_slice(pvalue_output, n_genes, "shrunken Wald p-values")? };
         for gene in 0..n_genes {
-            stats[gene] = wald.stat[gene].unwrap_or(f64::NAN);
-            pvalues[gene] = wald.pvalue[gene].unwrap_or(f64::NAN);
+            stats[gene].write(wald.stat[gene].unwrap_or(f64::NAN));
+            pvalues[gene].write(wald.pvalue[gene].unwrap_or(f64::NAN));
         }
         Ok(())
     })

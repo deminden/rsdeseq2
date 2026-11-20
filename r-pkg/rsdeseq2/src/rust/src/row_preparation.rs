@@ -51,7 +51,7 @@ pub unsafe extern "C" fn rsdeseq2_r_frozen_local_grid(
         let grid = rsdeseq2::transform::frozen_local_vst_grid_from_counts(counts, sf, nf)
             .map_err(|e| e.to_string())?;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        unsafe { output_slice(output, 999, "frozen local grid")? }.copy_from_slice(&grid);
+        unsafe { output_slice(output, 999, "frozen local grid")? }.write_copy_of_slice(&grid);
         Ok(())
     })
 }
@@ -110,11 +110,11 @@ pub unsafe extern "C" fn rsdeseq2_r_normal_shrinkage_rows(
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let out = unsafe { output_slice(indices, genes, "selected rows")? };
         for (slot, &index) in out.iter_mut().zip(selected.indices()) {
-            *slot = i32::try_from(index + 1).map_err(|e| e.to_string())?;
+            slot.write(i32::try_from(index + 1).map_err(|e| e.to_string())?);
         }
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let length = unsafe { output_slice(used, 1, "selected row count")? };
-        length[0] = selected.indices().len();
+        length[0].write(selected.indices().len());
         Ok(())
     })
 }
@@ -153,8 +153,8 @@ pub unsafe extern "C" fn rsdeseq2_r_offset_factors(
         let out = unsafe { output_slice(output, result.len(), "effective factors")? };
         for sample in 0..samples {
             for gene in 0..genes {
-                out[gene + sample * genes] =
-                    *result.get(gene, sample).ok_or("missing effective factor")?;
+                out[gene + sample * genes]
+                    .write(*result.get(gene, sample).ok_or("missing effective factor")?);
             }
         }
         Ok(())

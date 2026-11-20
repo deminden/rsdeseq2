@@ -125,8 +125,8 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
                 // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 let se = unsafe { output_slice(request.lfc_se, genes, "contrast SEs")? };
                 for gene in 0..genes {
-                    effect[gene] = result.projection.log2_fold_change[gene].unwrap_or(missing);
-                    se[gene] = result.projection.lfc_se[gene].unwrap_or(missing);
+                    effect[gene].write(result.projection.log2_fold_change[gene].unwrap_or(missing));
+                    se[gene].write(result.projection.lfc_se[gene].unwrap_or(missing));
                 }
                 if let Some(wald) = result.wald {
                     // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
@@ -135,8 +135,8 @@ pub unsafe extern "C" fn rsdeseq2_r_contrast_batch(
                         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                         unsafe { output_slice(request.pvalue, genes, "contrast p-values")? };
                     for gene in 0..genes {
-                        stat[gene] = wald.stat[gene].unwrap_or(missing);
-                        pvalue[gene] = wald.pvalue[gene].unwrap_or(missing);
+                        stat[gene].write(wald.stat[gene].unwrap_or(missing));
+                        pvalue[gene].write(wald.pvalue[gene].unwrap_or(missing));
                     }
                 }
                 Ok(())

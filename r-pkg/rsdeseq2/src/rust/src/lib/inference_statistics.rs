@@ -74,8 +74,8 @@ pub unsafe extern "C" fn rsdeseq2_r_wald_statistics(
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let pvalue = unsafe { output_slice(pvalue, genes, "Wald p-values")? };
         for gene in 0..genes {
-            stat[gene] = result.stat[gene].unwrap_or(missing);
-            pvalue[gene] = result.pvalue[gene].unwrap_or(missing);
+            stat[gene].write(result.stat[gene].unwrap_or(missing));
+            pvalue[gene].write(result.pvalue[gene].unwrap_or(missing));
         }
         Ok(())
     })
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn rsdeseq2_r_lrt_pvalues(
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe { output_slice(output, genes, "LRT p-values")? };
         for (target, value) in output.iter_mut().zip(result) {
-            *target = value.unwrap_or(missing);
+            target.write(value.unwrap_or(missing));
         }
         Ok(())
     })
@@ -126,8 +126,8 @@ pub unsafe extern "C" fn rsdeseq2_r_default_cooks_cutoff(
         let output = unsafe { output_slice(output, 1, "Cook's cutoff")? };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let present = unsafe { output_slice(present, 1, "Cook's cutoff flag")? };
-        output[0] = cutoff.unwrap_or(0.0);
-        present[0] = u8::from(cutoff.is_some());
+        output[0].write(cutoff.unwrap_or(0.0));
+        present[0].write(u8::from(cutoff.is_some()));
         Ok(())
     })
 }

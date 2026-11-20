@@ -74,8 +74,8 @@ pub unsafe extern "C" fn rsdeseq2_r_cooks_mask(
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let outlier = unsafe { output_slice(output_outlier, n_genes, "Cook's outlier flags")? };
         for gene in 0..n_genes {
-            out_p[gene] = mask.pvalue[gene].unwrap_or(f64::NAN);
-            outlier[gene] = mask.outlier[gene].map_or(u8::MAX, u8::from);
+            out_p[gene].write(mask.pvalue[gene].unwrap_or(f64::NAN));
+            outlier[gene].write(mask.outlier[gene].map_or(u8::MAX, u8::from));
         }
         Ok(())
     })

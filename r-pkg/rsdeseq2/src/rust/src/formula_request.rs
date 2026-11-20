@@ -1,5 +1,5 @@
 //! Primitive request adapter. Numerical implementations remain in the core.
-use super::{guard_value, input_slice, output_slice, run_backend};
+use super::{guard_value, inout_slice, input_slice, output_slice, run_backend};
 use rsdeseq2::design::expression::{
     self, Argument, Data, EvaluationOptions, Expression, Value, frame, wire,
 };
@@ -230,8 +230,9 @@ fn dispatch(request: &Value) -> Result<Value, String> {
     }
 }
 /// # Safety
-/// C validates `input` for `size` bytes and a distinct writable owner slot. No
-/// R address is retained. The returned owner must be consumed by formula_drop.
+/// C validates `input` for `size` bytes and a distinct writable owner slot
+/// initialized to NULL. No R address is retained. The returned owner must be
+/// consumed by formula_drop.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_formula_request(
     input: *const u8,
@@ -239,8 +240,8 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_request(
     output: *mut *mut FormulaOutput,
 ) -> i32 {
     run_backend(|| {
-        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        let slot = unsafe { output_slice(output, 1, "formula owner")? };
+        // SAFETY: C passes a distinct, initialized owner slot.
+        let slot = unsafe { inout_slice(output, 1, "formula owner")? };
         if !slot[0].is_null() {
             return Err("formula output owner slot must be empty".into());
         }
@@ -267,8 +268,8 @@ pub unsafe extern "C" fn rsdeseq2_r_formula_bytes(
         let owner = unsafe { owner.as_ref() }.ok_or("formula owner is null")?;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
-            output_slice(bytes, 1, "formula bytes")?[0] = owner.bytes.as_ptr();
-            output_slice(size, 1, "formula size")?[0] = owner.bytes.len();
+            output_slice(bytes, 1, "formula bytes")?[0].write(owner.bytes.as_ptr());
+            output_slice(size, 1, "formula size")?[0].write(owner.bytes.len());
         }
         Ok(())
     })

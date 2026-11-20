@@ -29,8 +29,8 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_shape(
         let genes_out = unsafe { output_slice(genes, 1, "replacement genes")? };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let samples_out = unsafe { output_slice(samples, 1, "replacement samples")? };
-        genes_out[0] = owner.counts.n_genes();
-        samples_out[0] = owner.counts.n_samples();
+        genes_out[0].write(owner.counts.n_genes());
+        samples_out[0].write(owner.counts.n_samples());
         Ok(())
     })
 }
@@ -86,12 +86,15 @@ pub unsafe extern "C" fn rsdeseq2_r_replacement_drop(slot: *mut *mut Replacement
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::MaybeUninit;
+
     #[test]
     fn owned_counts_validate_copy_shape_and_release_the_slot() {
         let counts = CountMatrix::from_row_major_u32(2, 3, vec![1, 2, 3, 4, 5, 6]).unwrap();
         let mut owner = Box::into_raw(Box::new(ReplacementCounts::new(counts)));
         let (mut genes, mut samples) = (0, 0);
-        let mut output = [-1.0; 6];
+        let mut untouched = [-1.0; 6];
+        let mut output = MaybeUninit::<[f64; 6]>::uninit();
         // SAFETY: test-owned buffers and pointers outlive every call in this block.
         unsafe {
             assert_eq!(
@@ -100,16 +103,17 @@ mod tests {
             );
             assert_eq!((genes, samples), (2, 3));
             assert_ne!(
-                rsdeseq2_r_replacement_copy(owner, 3, 2, output.as_mut_ptr()),
+                rsdeseq2_r_replacement_copy(owner, 3, 2, untouched.as_mut_ptr()),
                 0
             );
-            assert_eq!(output, [-1.0; 6]);
+            assert_eq!(untouched, [-1.0; 6]);
             assert_ne!(rsdeseq2_r_replacement_copy(owner, 2, 3, ptr::null_mut()), 0);
             assert_eq!(
-                rsdeseq2_r_replacement_copy(owner, 2, 3, output.as_mut_ptr()),
+                rsdeseq2_r_replacement_copy(owner, 2, 3, output.as_mut_ptr().cast()),
                 0
             );
-            assert_eq!(output, [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
+            // A successful copy writes the complete 2×3 destination.
+            assert_eq!(output.assume_init(), [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
             rsdeseq2_r_replacement_drop(&mut owner);
             assert!(owner.is_null());
             rsdeseq2_r_replacement_drop(&mut owner);

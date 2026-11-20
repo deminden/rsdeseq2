@@ -1060,6 +1060,20 @@ failures or skips. All 40 posterior analysis batches matched standalone
 Rust output exactly. A SIGINT cancelled the posterior calculation, and
 the same R process completed a second fit.
 
+### R bridge output initialization
+
+The Rust bridge borrows fresh R output storage as slices of
+`MaybeUninit<T>` and writes values directly into those slots. This
+avoids a separate initialization pass over large matrices. The formula
+owner slot and the duplicated columns used in result presentation use
+the checked helper for already initialized storage.
+
+On macOS arm64, all five Rust bridge tests passed with Rust 1.96.0, and
+the replacement-count copy into uninitialized storage passed under Miri.
+R 4.6.2 passed all 2,874 package expectations without failures or skips.
+The 40 posterior batches still matched the standalone Rust output
+exactly, and a second native fit succeeded after SIGINT cancellation.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

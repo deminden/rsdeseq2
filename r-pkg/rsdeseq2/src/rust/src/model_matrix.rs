@@ -36,7 +36,7 @@ pub unsafe extern "C" fn rsdeseq2_r_average_contrast(
             &indices(negative, n_negative)?,
         )
         .map_err(|e| e.to_string())?;
-        output_slice(output, columns, "average contrast values")?.copy_from_slice(&values);
+        output_slice(output, columns, "average contrast values")?.write_copy_of_slice(&values);
         Ok(())
     })
 }
@@ -221,10 +221,10 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_shape(
                 let bytes = plan.column_names().iter().try_fold(0usize, |n, s| {
                     n.checked_add(s.len() + 1).ok_or("model names overflow")
                 })?;
-                output_slice(n_columns, 1, "model column count")?[0] = plan.n_cols();
-                output_slice(name_bytes, 1, "model name size")?[0] = bytes;
-                output_slice(response_dropped, 1, "response warning flag")?[0] =
-                    i32::from(plan.response_term_dropped());
+                output_slice(n_columns, 1, "model column count")?[0].write(plan.n_cols());
+                output_slice(name_bytes, 1, "model name size")?[0].write(bytes);
+                output_slice(response_dropped, 1, "response warning flag")?[0]
+                    .write(i32::from(plan.response_term_dropped()));
                 Ok(())
             },
         )
@@ -271,12 +271,12 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_fill(
                 let values = plan.values();
                 for column in 0..n_columns {
                     for sample in 0..samples {
-                        out[sample + column * samples] = values[sample * n_columns + column];
+                        out[sample + column * samples].write(values[sample * n_columns + column]);
                     }
                 }
                 let out = output_slice(assignments, n_columns, "model assignments")?;
                 for (out, &value) in out.iter_mut().zip(plan.assignments()) {
-                    *out = i32::try_from(value).map_err(|e| e.to_string())?;
+                    out.write(i32::try_from(value).map_err(|e| e.to_string())?);
                 }
                 let out = output_slice(names, name_capacity, "model names")?;
                 let mut used = 0usize;
@@ -287,8 +287,8 @@ pub unsafe extern "C" fn rsdeseq2_r_model_matrix_fill(
                     if end > out.len() {
                         return Err("model name buffer too small".into());
                     }
-                    out[used..end - 1].copy_from_slice(name.as_bytes());
-                    out[end - 1] = 0;
+                    out[used..end - 1].write_copy_of_slice(name.as_bytes());
+                    out[end - 1].write(0);
                     used = end;
                 }
                 Ok(())

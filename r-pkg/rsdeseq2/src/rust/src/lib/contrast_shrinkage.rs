@@ -254,12 +254,16 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
         unsafe { output_slice(beta_output, n_genes, "shrunken contrast estimates")? }
             .iter_mut()
             .zip(wald.log2_fold_change.iter())
-            .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+            .for_each(|(out, value)| {
+                out.write(value.unwrap_or(f64::NAN));
+            });
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(beta_se_output, n_genes, "shrunken contrast standard errors")? }
             .iter_mut()
             .zip(wald.lfc_se.iter())
-            .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+            .for_each(|(out, value)| {
+                out.write(value.unwrap_or(f64::NAN));
+            });
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe {
             output_slice(
@@ -268,17 +272,21 @@ pub unsafe extern "C" fn rsdeseq2_r_lfc_shrink_normal_contrast(
                 "beta prior variances",
             )?
         }
-        .copy_from_slice(&prior_variance);
+        .write_copy_of_slice(&prior_variance);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(stat_output, n_genes, "shrunken Wald statistics")? }
             .iter_mut()
             .zip(wald.wald.stat.iter())
-            .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+            .for_each(|(out, value)| {
+                out.write(value.unwrap_or(f64::NAN));
+            });
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(pvalue_output, n_genes, "shrunken Wald p-values")? }
             .iter_mut()
             .zip(wald.wald.pvalue.iter())
-            .for_each(|(out, value)| *out = value.unwrap_or(f64::NAN));
+            .for_each(|(out, value)| {
+                out.write(value.unwrap_or(f64::NAN));
+            });
         Ok(())
     })
 }

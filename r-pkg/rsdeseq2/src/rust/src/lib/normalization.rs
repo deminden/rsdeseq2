@@ -42,7 +42,7 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
         let factors = estimate_size_factors_with_options(&counts, method, geo, controls)
             .map_err(|e| e.to_string())?;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        unsafe { output_slice(output, n_samples, "size factors")? }.copy_from_slice(&factors);
+        unsafe { output_slice(output, n_samples, "size factors")? }.write_copy_of_slice(&factors);
         Ok(())
     })
 }
@@ -125,13 +125,15 @@ pub unsafe extern "C" fn rsdeseq2_r_base_metadata(
             )
         };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        unsafe { output_slice(base_means, n_genes, "base means")? }.copy_from_slice(&means);
+        unsafe { output_slice(base_means, n_genes, "base means")? }.write_copy_of_slice(&means);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        unsafe { output_slice(base_vars, n_genes, "base variances")? }.copy_from_slice(&vars);
+        unsafe { output_slice(base_vars, n_genes, "base variances")? }.write_copy_of_slice(&vars);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let zero = unsafe { output_slice(all_zero, n_genes, "all-zero flags")? };
         for (gene, flag) in zero.iter_mut().enumerate() {
-            *flag = u8::from(counts.is_all_zero_gene(gene).map_err(|e| e.to_string())?);
+            flag.write(u8::from(
+                counts.is_all_zero_gene(gene).map_err(|e| e.to_string())?,
+            ));
         }
         Ok(())
     })

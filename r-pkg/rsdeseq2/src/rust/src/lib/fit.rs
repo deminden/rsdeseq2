@@ -48,9 +48,9 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
 ) -> i32 {
     let mut pending = None;
     let status = run_backend(|| {
-        if replacement_output.is_null() { return Err("replacement owner output pointer is null".into()); }
-        // SAFETY: `replacement_output` is a non-null, writable owner slot (checked on entry; a null slot returns an error first).
-        unsafe { *replacement_output = ptr::null_mut(); }
+        // SAFETY: C provides a distinct writable owner slot.
+        let replacement_slot = unsafe { output_slice(replacement_output, 1, "replacement owner")? };
+        replacement_slot[0].write(ptr::null_mut());
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let lrt_df = unsafe { output_slice(lrt_df_output, 1, "LRT degrees of freedom")? };
         let fit_type_used =
@@ -138,10 +138,17 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             }
             _ => return Err("the fit run returned no results".into()),
         };
-        fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
-        lrt_df[0] = fit.lrt.as_ref().map(|lrt| i32::try_from(lrt.degrees_of_freedom)
-            .map_err(|_| "LRT degrees of freedom exceed the R integer range"))
-            .transpose()?.unwrap_or(0);
+        fit_type_used[0].write(fit_type_code(fit.dispersion_trend.as_ref(), fit_type));
+        lrt_df[0].write(
+            fit.lrt
+                .as_ref()
+                .map(|lrt| {
+                    i32::try_from(lrt.degrees_of_freedom)
+                        .map_err(|_| "LRT degrees of freedom exceed the R integer range")
+                })
+                .transpose()?
+                .unwrap_or(0),
+        );
         const COLUMNS: usize = 13;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe {
@@ -192,7 +199,7 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
                 raw_stat.unwrap_or(f64::NAN),
             ];
             for (column, value) in values.into_iter().enumerate() {
-                output[gene + column * n_genes] = value;
+                output[gene + column * n_genes].write(value);
             }
         }
         let beta = fit
@@ -247,13 +254,13 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             let beta_se_row = beta_se.row(gene).map_err(|error| error.to_string())?;
             let covariance_row = covariance.row(gene).map_err(|error| error.to_string())?;
             for coefficient in 0..n_coefficients {
-                beta_out[gene + coefficient * n_genes] = beta_row[coefficient];
-                beta_se_out[gene + coefficient * n_genes] = beta_se_row[coefficient];
+                beta_out[gene + coefficient * n_genes].write(beta_row[coefficient]);
+                beta_se_out[gene + coefficient * n_genes].write(beta_se_row[coefficient]);
                 for other in 0..n_coefficients {
                     let r_offset = coefficient * n_coefficients + other;
                     let out_offset =
                         gene + coefficient * n_genes + other * n_genes * n_coefficients;
-                    covariance_out[out_offset] = covariance_row[r_offset];
+                    covariance_out[out_offset].write(covariance_row[r_offset]);
                 }
             }
         }
@@ -273,69 +280,68 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
             unsafe { output_slice(new_all_zero_rows_output, n_genes, "new all-zero rows")? };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let n_refit = unsafe { output_slice(n_refit_output, 1, "replacement refit count")? };
-        if let Some(output) = &replacement {
-            let plan = output;
+        let n_refit_count = if let Some(plan) = &replacement {
             let has_replaceable_samples = plan.has_replaceable_samples();
-            n_refit[0] = if has_replaceable_samples {
-                plan.n_refit
-            } else {
-                0
-            };
             for (gene, flag) in replace.iter_mut().enumerate() {
-                *flag = if has_replaceable_samples {
+                flag.write(if has_replaceable_samples {
                     match plan.replacement.replace[gene] {
                         Some(value) => u8::from(value),
                         None => 2,
                     }
                 } else {
                     2
-                };
+                });
             }
             for (sample, flag) in replaceable_samples.iter_mut().enumerate() {
-                *flag = u8::from(plan.replacement.replaceable_samples[sample]);
+                flag.write(u8::from(plan.replacement.replaceable_samples[sample]));
             }
-            refit_rows.fill(0);
-            new_all_zero_rows.fill(0);
+            refit_rows.fill(MaybeUninit::new(0));
+            new_all_zero_rows.fill(MaybeUninit::new(0));
             if has_replaceable_samples {
                 for &row in &plan.refit_rows {
-                    refit_rows[row] = 1;
+                    refit_rows[row].write(1);
                 }
                 for &row in &plan.new_all_zero_rows {
-                    new_all_zero_rows[row] = 1;
+                    new_all_zero_rows[row].write(1);
                 }
+                plan.n_refit
+            } else {
+                0
             }
         } else {
-            n_refit[0] = 0;
-            replace.fill(2);
-            replaceable_samples.fill(0);
-            refit_rows.fill(0);
-            new_all_zero_rows.fill(0);
-
-        }
+            replace.fill(MaybeUninit::new(2));
+            replaceable_samples.fill(MaybeUninit::new(0));
+            refit_rows.fill(MaybeUninit::new(0));
+            new_all_zero_rows.fill(MaybeUninit::new(0));
+            0
+        };
+        n_refit[0].write(n_refit_count);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(size_factors_output, n_samples, "size factors")? }
-            .copy_from_slice(&fit.size_factors);
+            .write_copy_of_slice(&fit.size_factors);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let dispersions = unsafe { output_slice(dispersion_output, n_genes, "dispersions")? };
-        match &fit.dispersion {
-            Some(values) => dispersions.copy_from_slice(values),
-            None => dispersions.fill(f64::NAN),
+        if let Some(values) = &fit.dispersion {
+            dispersions.write_copy_of_slice(values);
+        } else {
+            dispersions.fill(MaybeUninit::new(f64::NAN));
         }
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let disp_fit = unsafe { output_slice(disp_fit_output, n_genes, "dispersion fit")? };
-        match &fit.disp_fit {
-            Some(values) => disp_fit.copy_from_slice(values),
-            None => disp_fit.fill(f64::NAN),
+        if let Some(values) = &fit.disp_fit {
+            disp_fit.write_copy_of_slice(values);
+        } else {
+            disp_fit.fill(MaybeUninit::new(f64::NAN));
         }
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(base_var_output, n_genes, "base variances")? }
-            .copy_from_slice(&fit.base_var);
+            .write_copy_of_slice(&fit.base_var);
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let all_zero = unsafe { output_slice(all_zero_output, n_genes, "all-zero flags")? };
         for (target, source) in all_zero.iter_mut().zip(&fit.all_zero) {
-            *target = i32::from(*source);
+            target.write(i32::from(*source));
         }
-        if n_refit[0] > 0 {
+        if n_refit_count > 0 {
             let plan = replacement.ok_or("replacement refit count has no plan")?;
             pending = Some(Box::new(replacement_counts::ReplacementCounts::new(plan.replacement.replaced_counts)));
         }
@@ -343,8 +349,8 @@ pub unsafe extern "C" fn rsdeseq2_r_fit(
     });
     // Publish only after borrowed R buffers and the fit frame have been released.
     if status == 0 {
-        // SAFETY: `replacement_output` is a non-null, writable owner slot (checked on entry; a null slot returns an error first).
-        unsafe { *replacement_output = pending.map_or(ptr::null_mut(), Box::into_raw); }
+        // SAFETY: the owner slot was checked on entry and remains exclusively writable.
+        unsafe { replacement_output.write(pending.map_or(ptr::null_mut(), Box::into_raw)) };
     }
     status
 }

@@ -1,9 +1,10 @@
 //! Synchronous borrowed fitted-result policy. No R APIs or retained pointers.
-use super::{borrowed_cooks_heuristic, input_slice, output_slice, run_backend};
+use super::{borrowed_cooks_heuristic, inout_slice, input_slice, output_slice, run_backend};
 use rsdeseq2::design::DesignOrigin;
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
 use rsdeseq2::results::{CooksPolicy, ReplacementRows, RowFlags, low_count_eligible};
 use std::ffi::{CStr, c_char};
+use std::mem::MaybeUninit;
 
 #[repr(C)]
 pub(super) struct FactorCodes {
@@ -94,7 +95,7 @@ pub unsafe extern "C" fn rsdeseq2_r_result_replacement_storage(
         let rows = unsafe { replacement_rows(genes, refitted, new_zero)? };
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         let output = unsafe { output_slice(storage, 1, "replacement storage flag")? };
-        output[0] = u8::from(rows.has_new_zero());
+        output[0].write(u8::from(rows.has_new_zero()));
         Ok(())
     })
 }
@@ -104,7 +105,8 @@ pub unsafe extern "C" fn rsdeseq2_r_result_replacement_storage(
 /// G×N count/Cook's matrices, F factor descriptors and N code buffers. When
 /// replacement zero rows exist, all four G output columns are distinct initialized
 /// copies disjoint from inputs. Otherwise effect/SE/stat may be null; p-values
-/// may be null only when filtering is disabled. G output flags are writable.
+/// is an initialized copy when filtering is enabled and may be null otherwise.
+/// G output flags are writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rsdeseq2_r_present_results(
     genes: usize,
@@ -131,21 +133,21 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
         // C only copies columns that Rust may modify. Untouched columns remain
         // shared R inputs and are never borrowed mutably here.
         let effect =
-            // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-            unsafe { output_slice(effect, if needs_zero { genes } else { 0 }, "result effects")? };
-        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
-        let se = unsafe { output_slice(se, if needs_zero { genes } else { 0 }, "result SEs")? };
-        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
+            // SAFETY: any nonempty borrow is a distinct, initialized copy from C.
+            unsafe { inout_slice(effect, if needs_zero { genes } else { 0 }, "result effects")? };
+        // SAFETY: any nonempty borrow is a distinct, initialized copy from C.
+        let se = unsafe { inout_slice(se, if needs_zero { genes } else { 0 }, "result SEs")? };
+        // SAFETY: any nonempty borrow is a distinct, initialized copy from C.
         let stat = unsafe {
-            output_slice(
+            inout_slice(
                 stat,
                 if needs_zero { genes } else { 0 },
                 "result statistics",
             )?
         };
-        // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
+        // SAFETY: any nonempty borrow is a distinct, initialized copy from C.
         let pvalue = unsafe {
-            output_slice(
+            inout_slice(
                 pvalue,
                 if needs_zero || active == 1 { genes } else { 0 },
                 "result p-values",
@@ -159,7 +161,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
                 rows.apply_columns(effect, se, stat, pvalue)
                     .map_err(|e| e.to_string())?;
             }
-            outlier.fill(u8::MAX);
+            outlier.fill(MaybeUninit::new(u8::MAX));
             return Ok(());
         }
         let factors =
@@ -249,7 +251,7 @@ pub unsafe extern "C" fn rsdeseq2_r_present_results(
         for gene in 0..genes {
             // Retain the legacy active-mask missing-value encoding.
             pvalue[gene] = mask.pvalue[gene].unwrap_or(f64::NAN);
-            outlier[gene] = mask.outlier[gene].map_or(u8::MAX, u8::from);
+            outlier[gene].write(mask.outlier[gene].map_or(u8::MAX, u8::from));
         }
         Ok(())
     })

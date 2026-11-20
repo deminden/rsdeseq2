@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 use std::ffi::{CString, c_char};
-use std::mem::size_of;
+use std::mem::{MaybeUninit, size_of};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
@@ -114,19 +114,33 @@ unsafe fn input_slice<'a, T>(
 
 /// # Safety
 /// For nonempty buffers that pass the pointer and span checks, the caller
-/// guarantees `length` initialized elements in one writable allocation,
-/// exclusively borrowed for `'a`.
+/// guarantees storage for `length` elements in one writable allocation,
+/// exclusively borrowed for `'a`. The storage may be uninitialized.
 unsafe fn output_slice<'a, T>(
     pointer: *mut T,
     length: usize,
     name: &str,
-) -> Result<&'a mut [T], String> {
+) -> Result<&'a mut [MaybeUninit<T>], String> {
     if length == 0 {
         return Ok(&mut []);
     }
     check_buffer(pointer, length, name, "output pointer")?;
     // SAFETY: the address and span were checked above, and the caller guarantees exclusive storage and lifetime.
-    Ok(unsafe { std::slice::from_raw_parts_mut(pointer, length) })
+    Ok(unsafe { std::slice::from_raw_parts_mut(pointer.cast(), length) })
+}
+
+/// # Safety
+/// The caller meets the output buffer contract and every element is already
+/// initialized as a valid `T`.
+unsafe fn inout_slice<'a, T>(
+    pointer: *mut T,
+    length: usize,
+    name: &str,
+) -> Result<&'a mut [T], String> {
+    // SAFETY: the caller guarantees exclusive storage and lifetime.
+    let storage = unsafe { output_slice(pointer, length, name)? };
+    // SAFETY: the caller guarantees every element is initialized.
+    Ok(unsafe { storage.assume_init_mut() })
 }
 
 unsafe fn counts_from_r(
@@ -205,20 +219,21 @@ unsafe fn copy_matrix_to_r(matrix: &RowMajorMatrix<f64>, output: *mut f64) -> Re
     };
     for row in 0..n_rows {
         for col in 0..n_cols {
-            out[row + col * n_rows] = *matrix.get(row, col).ok_or("matrix index out of bounds")?;
+            out[row + col * n_rows]
+                .write(*matrix.get(row, col).ok_or("matrix index out of bounds")?);
         }
     }
     Ok(())
 }
 
-unsafe fn copy_counts_to_r(counts: &CountMatrix, output: &mut [f64]) -> Result<(), String> {
+fn copy_counts_to_r(counts: &CountMatrix, output: &mut [MaybeUninit<f64>]) -> Result<(), String> {
     if output.len() != counts.n_genes().saturating_mul(counts.n_samples()) {
         return Err("replacement count output has an invalid length".into());
     }
     for gene in 0..counts.n_genes() {
         for sample in 0..counts.n_samples() {
-            output[gene + sample * counts.n_genes()] =
-                f64::from(counts.as_slice()[gene * counts.n_samples() + sample]);
+            output[gene + sample * counts.n_genes()]
+                .write(f64::from(counts.as_slice()[gene * counts.n_samples() + sample]));
         }
     }
     Ok(())

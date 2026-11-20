@@ -38,7 +38,7 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
         let fit_type_used =
             // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
             unsafe { output_slice(fit_type_used_output, 1, "fitted dispersion trend type")? };
-        fit_type_used[0] = fit_type;
+        fit_type_used[0].write(fit_type);
         // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
         let counts = unsafe { counts_from_r(n_genes, n_samples, counts_values)? };
         let design_values =
@@ -95,14 +95,17 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                 let output = builder
                     .fast_vst_glm_mu(&counts, &design, nsub)
                     .map_err(|error| error.to_string())?;
-                fit_type_used[0] =
-                    fit_type_code(output.subset_fit.dispersion_trend.as_ref(), fit_type);
+                fit_type_used[0].write(fit_type_code(
+                    output.subset_fit.dispersion_trend.as_ref(),
+                    fit_type,
+                ));
                 // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 unsafe {
                     output_slice(size_factors_output, n_samples, "size factors")?
-                        .copy_from_slice(&output.subset_fit.size_factors);
-                    output_slice(intercept_output, n_genes, "rlog intercepts")?.fill(f64::NAN);
-                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0] = f64::NAN;
+                        .write_copy_of_slice(&output.subset_fit.size_factors);
+                    output_slice(intercept_output, n_genes, "rlog intercepts")?
+                        .fill(MaybeUninit::new(f64::NAN));
+                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0].write(f64::NAN);
                 }
                 output.transformed
             }
@@ -144,15 +147,15 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                         .map_err(|error| error.to_string())?;
                     (fit, rlog)
                 };
-                fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
+                fit_type_used[0].write(fit_type_code(fit.dispersion_trend.as_ref(), fit_type));
                 // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 unsafe {
                     output_slice(size_factors_output, n_samples, "size factors")?
-                        .copy_from_slice(&fit.size_factors);
+                        .write_copy_of_slice(&fit.size_factors);
                     output_slice(intercept_output, n_genes, "rlog intercepts")?
-                        .copy_from_slice(&rlog.intercept);
-                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0] =
-                        rlog.sample_prior_variance;
+                        .write_copy_of_slice(&rlog.intercept);
+                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0]
+                        .write(rlog.sample_prior_variance);
                 }
                 rlog.transformed
             }
@@ -258,15 +261,16 @@ pub unsafe extern "C" fn rsdeseq2_r_transform(
                 } else {
                     let fit = trend_stage_fit(&builder, &counts, &design)?;
                     let transformed = fit.vst(&counts).map_err(|error| error.to_string())?;
-                    fit_type_used[0] = fit_type_code(fit.dispersion_trend.as_ref(), fit_type);
+                    fit_type_used[0].write(fit_type_code(fit.dispersion_trend.as_ref(), fit_type));
                     (transformed, fit.size_factors)
                 };
                 // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
                 unsafe {
                     output_slice(size_factors_output, n_samples, "size factors")?
-                        .copy_from_slice(&output_size_factors);
-                    output_slice(intercept_output, n_genes, "rlog intercepts")?.fill(f64::NAN);
-                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0] = f64::NAN;
+                        .write_copy_of_slice(&output_size_factors);
+                    output_slice(intercept_output, n_genes, "rlog intercepts")?
+                        .fill(MaybeUninit::new(f64::NAN));
+                    output_slice(prior_variance_output, 1, "rlog prior variance")?[0].write(f64::NAN);
                 }
                 transformed
             }

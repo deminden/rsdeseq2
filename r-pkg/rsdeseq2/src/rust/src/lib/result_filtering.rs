@@ -24,7 +24,7 @@ pub unsafe extern "C" fn rsdeseq2_r_bh_adjust(
         let output = unsafe { output_slice(output, genes, "BH output")? };
         let adjusted = rsdeseq2::multiple_testing::bh_adjust(&filtering_pvalues(values));
         for ((target, adjusted), &original) in output.iter_mut().zip(adjusted).zip(values) {
-            *target = adjusted.unwrap_or(if original.is_nan() { original } else { missing });
+            target.write(adjusted.unwrap_or(if original.is_nan() { original } else { missing }));
         }
         Ok(())
     })
@@ -99,25 +99,26 @@ pub unsafe extern "C" fn rsdeseq2_r_independent_filtering(
         for gene in 0..genes {
             // Preserve NA/NaN payloads only as R transport formatting. Population
             // selection and adjustment have already been decided by the core.
-            padj[gene] = rsdeseq2::independent_filtering::format_adjusted_pvalue(
+            padj[gene].write(rsdeseq2::independent_filtering::format_adjusted_pvalue(
                 result.padj[gene], values[gene], filter[gene],
                 result.metadata.filter_threshold, missing,
-            );
-            filtered[gene] = result.filtered[gene].map_or(u8::MAX, u8::from);
+            ));
+            filtered[gene].write(result.filtered[gene].map_or(u8::MAX, u8::from));
         }
-        theta_output.copy_from_slice(&result.metadata.theta);
+        theta_output.write_copy_of_slice(&result.metadata.theta);
         for (target, &count) in rejections.iter_mut().zip(&result.metadata.num_rejections) {
-            *target =
-                i32::try_from(count).map_err(|_| "filter rejection count exceeds integer range")?;
+            target.write(
+                i32::try_from(count).map_err(|_| "filter rejection count exceeds integer range")?,
+            );
         }
         if let Some(curve) = result.metadata.lowess_fit {
-            smooth.copy_from_slice(&curve);
+            smooth.write_copy_of_slice(&curve);
         }
-        selected[0] = result.metadata.selected_index.map_or(Ok(-1), |index| {
+        selected[0].write(result.metadata.selected_index.map_or(Ok(-1), |index| {
             i32::try_from(index + 1).map_err(|_| "filter index exceeds integer range")
-        })?;
-        scalars[0] = result.metadata.filter_theta.unwrap_or(missing);
-        scalars[1] = result.metadata.filter_threshold.unwrap_or(missing);
+        })?);
+        scalars[0].write(result.metadata.filter_theta.unwrap_or(missing));
+        scalars[1].write(result.metadata.filter_threshold.unwrap_or(missing));
         Ok(())
     })
 }
