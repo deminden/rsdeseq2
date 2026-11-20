@@ -627,6 +627,29 @@ Windows MSVC libraries and binaries type-checked. The macOS R 4.6.2
 package passed 2,874 expectations with zero skips and recorded the
 existing compiled-symbol warning and two vendoring notes.
 
+### Reduced-output covariance and coefficient buffers
+
+In `42a0b8e`, dispersion mean fitting and transform-only rlog omit
+the second covariance matrix product when the diagonal is provably
+positive and all entries can be scaled safely. Uncertain cases use
+the full calculation and keep the existing overflow and optimizer
+fallback behavior. Both fits also omit the standard-error and
+optimizer-start matrices. Public inference fits keep their diagnostics.
+
+Each numerical profile passed 59 focused IRLS, covariance and rlog
+tests, matched all 8,032 golden fields, and passed all 121 per-contrast
+and nine global GTEx precision gates. All 44 GTEx result and diagnostic
+TSVs matched the preceding checkpoint byte for byte. Clippy passed for
+the library.
+
+Two paired four-worker runs across eleven GTEx contrasts measured
+15.452 s versus 16.274 s in summed median time. Throughput increased
+5.32%, and peak RSS was 259.31 versus 257.97 MiB. Seven paired rlog
+runs per fixture produced byte-identical outputs. Median throughput
+was 0.6% lower for 4,096 genes and 16 samples and 3.2% higher for
+2,048 genes and 32 samples. Median RSS changed by −0.03 MiB and
++0.08 MiB, respectively.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates
