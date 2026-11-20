@@ -82,9 +82,8 @@ were in the BH helpers used by independent filtering:
 `rejections_for_filter` returning a constant, `<` → `<=` at the alpha
 boundary, and `||` → `&&` in `bh_adjust_f64` validation. Unit tests now kill
 all three. The weekly `coverage and mutation` workflow covers `numeric/`,
-`multiple_testing`, `normalization` and `independent_filtering`; line
-coverage needs llvm-tools, which this environment cannot install, so it is
-measured in CI only.
+`multiple_testing`, `normalization` and `independent_filtering`. At that
+checkpoint, line coverage was measured in CI.
 
 ## Development after the bundled checkpoint
 
@@ -157,7 +156,7 @@ manifest.
 | macOS arm64 | 114 release-panel tests passed. The workspace suite, both 8,032-field golden checks and the separate 56,200-gene GTEx replay passed. |
 | Linux arm64 | 1,221 workspace tests, 129 release-panel tests, both 8,032-field golden checks and both full GTEx replay tests passed in Ubuntu 24.04. |
 | Linux x86_64 | 114 release-panel tests, both golden manifests and both full GTEx replay tests passed in Ubuntu 24.04 under QEMU 10.0.13. |
-| macOS x86_64 | The locked workspace and all targets cross-compiled on macOS arm64. The runtime panel is pending. |
+| macOS x86_64 | The locked workspace cross-compiled, and the unit and integration test executables linked on macOS arm64. The runtime panel is pending. |
 | Windows x86_64 | The locked workspace libraries and binaries cross-checked on macOS arm64. The test build requires a Windows SDK and the runtime panel is pending. |
 
 Original Linux arm64 R 4.6.2 with ICU 74.2 and OpenBLAS 0.3.26 independently
@@ -218,3 +217,9 @@ installed on R 4.5.3 with DESeq2 1.50.2 and on R 4.6.2 with DESeq2 1.52.0.
 Each installation passed 2,874 expectations with zero skips. All four Rust
 archives built offline from their packaged contents. The Python suite
 passed 71 tests with the rebuilt R package and full GTEx tables available.
+
+
+The local instrumented suite measured 86.66% line coverage for the rsdeseq2
+crate with nightly Rust and cargo-llvm-cov 0.9.1. All nine matrix and checked
+arithmetic tests selected by CI also passed under Miri with the portable
+profile.
