@@ -1,11 +1,11 @@
 //! Parametric trend model and Gamma identity-link fitting.
 
 use super::numerics::{
-    checked_add_assign, checked_product_difference, checked_product3, validate_positive_dispersion,
-    validate_positive_mean,
+    checked_add_assign, checked_product_difference, checked_product3, validate_fitted_dispersion,
+    validate_positive_dispersion, validate_positive_mean,
 };
 use super::selection::{parametric_trend_use_for_fit, validate_trend_fit_rows};
-use crate::errors::{DeseqError, invalid_dimensions};
+use crate::errors::{CalculationLocation, DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
@@ -71,7 +71,7 @@ impl ParametricDispersionTrend {
     pub fn evaluate(&self, mean: f64) -> Result<f64, DeseqError> {
         validate_positive_mean(mean, None)?;
         self.validate_fit()?;
-        self.evaluate_validated(mean)
+        self.evaluate_validated(mean, None)
     }
 
     /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
@@ -80,9 +80,10 @@ impl ParametricDispersionTrend {
         means
             .iter()
             .copied()
-            .map(|mean| {
+            .enumerate()
+            .map(|(gene, mean)| {
                 if mean.is_finite() && mean > 0.0 {
-                    self.evaluate_validated(mean)
+                    self.evaluate_validated(mean, Some(gene))
                 } else {
                     Ok(f64::NAN)
                 }
@@ -90,16 +91,9 @@ impl ParametricDispersionTrend {
             .collect()
     }
 
-    fn evaluate_validated(&self, mean: f64) -> Result<f64, DeseqError> {
+    fn evaluate_validated(&self, mean: f64, gene: Option<usize>) -> Result<f64, DeseqError> {
         let fitted = self.asympt_disp + self.extra_pois / mean;
-        if !fitted.is_finite() || fitted <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason:
-                    "parametric dispersion trend produced a non-finite or non-positive fitted value"
-                        .to_string(),
-            });
-        }
-        Ok(fitted)
+        validate_fitted_dispersion("parametric dispersion trend", gene, fitted)
     }
 
     fn validate_fit(&self) -> Result<(), DeseqError> {
@@ -162,8 +156,9 @@ pub fn fit_parametric_dispersion_trend(
     let use_for_fit = parametric_trend_use_for_fit(base_mean, disp_gene_est, options.min_disp)?;
     let genes_used = use_for_fit.iter().filter(|value| **value).count();
     if genes_used == 0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "all gene-wise dispersion estimates are within 2 orders of magnitude from the minimum value".to_string(),
+        return Err(DeseqError::NoUsableDispersionTrendRows {
+            min_disp: options.min_disp,
+            genes_checked: base_mean.len(),
         });
     }
 
@@ -183,10 +178,25 @@ pub fn fit_parametric_dispersion_trend(
         asympt_disp: options.initial_asympt_disp,
         extra_pois: options.initial_extra_pois,
     };
+    let restore_gene_index = |mut error| {
+        if let DeseqError::InvalidCalculation { location, .. } = &mut error
+            && let Some(CalculationLocation::Gene(row)) = *location
+        {
+            *location = use_for_fit
+                .iter()
+                .enumerate()
+                .filter_map(|(gene, used)| used.then_some(gene))
+                .nth(row)
+                .map(CalculationLocation::Gene);
+        }
+        error
+    };
 
     for outer in 0..=options.max_outer_iter {
-        let good = robust_parametric_trend_rows(&means, &disps, trend, options)?;
-        let fit = gamma_identity_irls(&means, &disps, &good, trend, options)?;
+        let good = robust_parametric_trend_rows(&means, &disps, trend, options)
+            .map_err(restore_gene_index)?;
+        let fit = gamma_identity_irls(&means, &disps, &good, trend, options)
+            .map_err(restore_gene_index)?;
         let old = trend;
         trend = fit.trend;
         if trend.asympt_disp <= 0.0 || trend.extra_pois <= 0.0 {
@@ -225,7 +235,7 @@ pub(super) fn robust_parametric_trend_rows(
     for (idx, (mean, disp)) in means.iter().copied().zip(disps.iter().copied()).enumerate() {
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate_validated(mean)?;
+        let fitted = trend.evaluate_validated(mean, Some(idx))?;
         let residual = checked::try_div(disp, fitted)
             .invalid_dispersion("parametric dispersion residual filter")?;
         good.push(
@@ -305,7 +315,7 @@ pub(super) fn weighted_gamma_identity_least_squares(
         }
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate_validated(mean)?;
+        let fitted = trend.evaluate_validated(mean, Some(idx))?;
         let inv_fitted =
             checked::try_div(1.0, fitted).invalid_dispersion(PARAMETRIC_WLS_SUM_CONTEXT)?;
         let weight = checked::try_mul(inv_fitted, inv_fitted)
@@ -444,7 +454,7 @@ pub(super) fn gamma_deviance(
         }
         validate_positive_mean(mean, Some(idx))?;
         validate_positive_dispersion(disp, Some(idx))?;
-        let fitted = trend.evaluate_validated(mean)?;
+        let fitted = trend.evaluate_validated(mean, Some(idx))?;
         let ratio = disp / fitted;
         let relative_delta = ratio - 1.0;
         checked_add_assign(

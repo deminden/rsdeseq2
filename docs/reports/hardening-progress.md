@@ -792,6 +792,17 @@ The focused design, contrast and LRT run passed 210 tests. The final
 assertion updates passed a 16-test Wald and formula run. Workspace Clippy
 passed for all targets after the implementation changes.
 
+Dispersion trends and variance priors now retain rejected arithmetic
+values and the associated gene or coefficient when known. Failed
+parametric predictions inside the fit loop map filtered rows back to
+their original input indices. The no-eligible-genes error records
+`min_disp` and the number of rows considered. A single-gene beta prior
+now rejects variance overflow for a retained coefficient and continues
+to use the configured wide variance for an intercept.
+
+The targeted dispersion reference, trend, VST and beta prior batches
+passed 137 integration tests and 12 unit tests.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

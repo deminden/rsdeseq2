@@ -1,4 +1,4 @@
-use crate::errors::Error;
+use crate::errors::{Error, ErrorKind};
 
 /// Trigamma function for positive finite inputs.
 ///
@@ -18,14 +18,11 @@ pub fn trigamma(mut x: f64) -> Result<f64, Error> {
     while x < 8.0 {
         let inv = x.recip();
         let term = inv * inv;
-        if !term.is_finite() || !result.is_finite() || !(result + term).is_finite() {
-            return Err(Error::NonFiniteValue {
-                context: "trigamma recurrence".to_string(),
-                index: None,
-                value: x,
-            });
+        let next = result + term;
+        if !next.is_finite() {
+            return Err(trigamma_overflow("trigamma recurrence", x, next));
         }
-        result += term;
+        result = next;
         x += 1.0;
     }
 
@@ -41,13 +38,19 @@ pub fn trigamma(mut x: f64) -> Result<f64, Error> {
     let expansion = inv + 0.5 * inv2 + inv3 / 6.0 - inv5 / 30.0 + inv7 / 42.0 - inv9 / 30.0
         + 5.0 * inv11 / 66.0
         - 691.0 * inv13 / 2730.0;
-    if !expansion.is_finite() || !(result + expansion).is_finite() {
-        return Err(Error::NonFiniteValue {
-            context: "trigamma asymptotic expansion".to_string(),
-            index: None,
-            value: x,
-        });
+    let value = result + expansion;
+    if !value.is_finite() {
+        return Err(trigamma_overflow("trigamma asymptotic expansion", x, value));
     }
-    result += expansion;
-    Ok(result)
+    Ok(value)
+}
+
+fn trigamma_overflow(operation: &'static str, input: f64, value: f64) -> Error {
+    Error::InvalidCalculation {
+        domain: ErrorKind::Numeric,
+        operation,
+        location: None,
+        value,
+        message: format!("out-of-range value in {operation} at index None: {input}"),
+    }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use rsdeseq2::errors::CalculationLocation;
 
 #[test]
 fn beta_prior_quantile_matches_type7_upper_abs_quantile() {
@@ -16,9 +17,34 @@ fn beta_prior_quantile_matches_type7_upper_abs_quantile() {
 fn beta_prior_quantile_rejects_overflowed_variance() {
     let err = match_upper_quantile_for_variance(&[f64::MAX], 0.5).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("beta prior variance quantile produced non-finite variance")
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "beta prior variance",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
+    );
+
+    let betas = RowMajorMatrix::from_row_major(2, 2, vec![1.0, 1e155, 1.0, 1e155]).unwrap();
+    let options = BetaPriorVarianceOptions {
+        method: BetaPriorVarianceMethod::Quantile,
+        finite_beta_cutoff: f64::MAX,
+        ..BetaPriorVarianceOptions::default()
+    };
+    let err =
+        estimate_beta_prior_variance(&betas, &[1.0; 2], &[0.1; 2], None, options).unwrap_err();
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "beta prior variance",
+            location: Some(CalculationLocation::Coefficient(1)),
+            value: f64::INFINITY,
+            ..
+        }
     );
 }
 
@@ -40,9 +66,15 @@ fn beta_prior_weighted_quantile_uses_row_weights() {
 fn beta_prior_weighted_quantile_rejects_overflowed_variance() {
     let err = match_weighted_upper_quantile_for_variance(&[f64::MAX], &[1.0], 0.5).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("weighted beta prior variance quantile produced non-finite variance")
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "weighted beta prior variance",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
     );
 }
 
@@ -55,8 +87,66 @@ fn beta_prior_weighted_quantile_rejects_overflowed_weight_sum() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Options);
-    assert!(err.to_string().contains("finite total weight"));
+    assert_eq!(
+        err.to_string(),
+        "invalid options: weighted beta prior variance quantile needs finite total weight",
+    );
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "weighted beta prior total weight",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
+    );
+}
+
+#[test]
+fn beta_prior_weighted_quantile_reports_failed_weight_normalization() {
+    let tiny = f64::from_bits(1);
+    for (weights, operation, rejected) in [
+        (
+            [tiny, tiny],
+            "weighted beta prior normalization scale",
+            f64::INFINITY,
+        ),
+        ([tiny, 1e300], "weighted beta prior normalized weight", 0.0),
+    ] {
+        let err =
+            match_weighted_upper_quantile_for_variance(&[1.0, 2.0], &weights, 0.5).unwrap_err();
+        std::assert_matches!(
+            err,
+            DeseqError::InvalidCalculation {
+                domain: ErrorKind::Options, operation: actual, location: None, value, ..
+            } if actual == operation && value == rejected
+        );
+    }
+}
+
+#[test]
+fn single_gene_beta_prior_reports_overflow_for_retained_coefficients() {
+    let names = ["(Intercept)".into(), "conditionB".into()];
+    let options = BetaPriorVarianceOptions::default();
+    let betas = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, 2.0]).unwrap();
+    let variances =
+        estimate_beta_prior_variance(&betas, &[1.0], &[0.1], Some(&names), options).unwrap();
+    assert_eq!(variances, [options.wide_prior_variance, 4.0]);
+
+    let betas = RowMajorMatrix::from_row_major(1, 2, vec![f64::MAX, f64::MAX]).unwrap();
+    let err =
+        estimate_beta_prior_variance(&betas, &[1.0], &[0.1], Some(&names), options).unwrap_err();
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Options,
+            operation: "single-gene beta prior variance",
+            location: Some(CalculationLocation::Coefficient(1)),
+            value: f64::INFINITY,
+            ..
+        }
+    );
 }
 
 #[test]

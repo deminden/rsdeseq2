@@ -1,6 +1,6 @@
 use super::intercept::intercept_value_error;
 use super::*;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{ErrorKind, Requirement, invalid_calculation, invalid_parameter};
 // Prior input checks, stable arithmetic and quantiles.
 
 pub(super) fn validate_beta_prior_inputs(
@@ -81,11 +81,6 @@ pub(super) fn checked_mean_dispersion_working_weight(
     checked::try_div(1.0, denominator).nonfinite_at(context, Some(index))
 }
 
-pub(super) fn checked_square(value: f64) -> Option<f64> {
-    let square = value * value;
-    (value.is_finite() && square.is_finite()).then_some(square)
-}
-
 pub(super) fn checked_intercept_beta_se(sigma: f64, gene: usize) -> Result<f64, DeseqError> {
     checked::try_mul(std::f64::consts::LOG2_E, sigma.sqrt()).map_err(|failure| {
         intercept_value_error(
@@ -141,9 +136,9 @@ pub(super) fn finite_abs_values(values: &[f64]) -> Result<Vec<f64>, DeseqError> 
 }
 
 /// R `quantile(type = 7)` on an unsorted copy. Equal neighbours return the
-/// neighbour unchanged (`stable_interpolate`); a non-finite interpolation is
-/// `InvalidOptions`. Distinct from the VST and filtering versions, which
-/// report `NonFiniteValue` and always evaluate `lo + f * (hi - lo)`.
+/// neighbour unchanged (`stable_interpolate`). A failed interpolation retains
+/// the rejected value. The VST and filtering versions always evaluate
+/// `lo + f * (hi - lo)`.
 pub(super) fn quantile_type7_stable(
     mut values: Vec<f64>,
     probability: f64,
@@ -165,14 +160,15 @@ pub(super) fn quantile_type7_stable(
     } else if lower >= values.len() {
         Ok(values[values.len() - 1])
     } else {
-        let quantile = stable_interpolate(values[lower - 1], values[lower], fraction);
-        if quantile.is_finite() {
-            Ok(quantile)
-        } else {
-            Err(DeseqError::InvalidOptions {
-                reason: "beta prior variance quantile produced non-finite quantile".to_string(),
-            })
-        }
+        stable_interpolate(values[lower - 1], values[lower], fraction).map_err(|failure| {
+            invalid_calculation(
+                ErrorKind::Options,
+                "beta prior quantile",
+                None,
+                failure.value,
+                "beta prior variance quantile produced non-finite quantile",
+            )
+        })
     }
 }
 
@@ -211,11 +207,16 @@ pub(super) fn weighted_abs_quantile(
     }
     pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    let Some(weight_sum) = checked::sum(pairs.iter().map(|(_, weight)| *weight)) else {
-        return Err(DeseqError::InvalidOptions {
-            reason: "weighted beta prior variance quantile needs finite total weight".to_string(),
-        });
-    };
+    let weight_sum =
+        checked::try_sum(pairs.iter().map(|(_, weight)| *weight)).map_err(|failure| {
+            invalid_calculation(
+                ErrorKind::Options,
+                "weighted beta prior total weight",
+                None,
+                failure.value,
+                "weighted beta prior variance quantile needs finite total weight",
+            )
+        })?;
     if weight_sum <= 0.0 {
         return Err(DeseqError::InvalidOptions {
             reason: "weighted beta prior variance quantile needs positive finite total weight"
@@ -223,26 +224,34 @@ pub(super) fn weighted_abs_quantile(
         });
     }
 
-    let Some(norm_scale) = checked::div(pairs.len() as f64, weight_sum) else {
-        return Err(DeseqError::InvalidOptions {
-            reason: "weighted beta prior variance quantile produced non-finite normalization scale"
-                .to_string(),
-        });
-    };
+    let norm_scale = checked::try_div(pairs.len() as f64, weight_sum).map_err(|failure| {
+        invalid_calculation(
+            ErrorKind::Options,
+            "weighted beta prior normalization scale",
+            None,
+            failure.value,
+            "weighted beta prior variance quantile produced non-finite normalization scale",
+        )
+    })?;
     let mut unique = Vec::<(f64, f64)>::with_capacity(pairs.len());
     for (value, weight) in pairs {
-        let Some(normalized_weight) = checked::mul(weight, norm_scale) else {
-            return Err(DeseqError::InvalidOptions {
-                reason:
-                    "weighted beta prior variance quantile produced non-finite normalized weight"
-                        .to_string(),
-            });
-        };
+        let normalized_weight = checked::try_mul(weight, norm_scale).map_err(|failure| {
+            invalid_calculation(
+                ErrorKind::Options,
+                "weighted beta prior normalized weight",
+                None,
+                failure.value,
+                "weighted beta prior variance quantile produced non-finite normalized weight",
+            )
+        })?;
         if normalized_weight <= 0.0 {
-            return Err(DeseqError::InvalidOptions {
-                reason: "weighted beta prior variance quantile needs positive normalized weight"
-                    .to_string(),
-            });
+            return Err(invalid_calculation(
+                ErrorKind::Options,
+                "weighted beta prior normalized weight",
+                None,
+                normalized_weight,
+                "weighted beta prior variance quantile needs positive normalized weight",
+            ));
         }
         if let Some((last_value, last_weight)) = unique.last_mut()
             && *last_value == value
@@ -297,27 +306,28 @@ pub(super) fn weighted_abs_quantile(
 
     let low_quantile = weighted_order_statistic(&unique, &cumulative_weights, low);
     let high_quantile = weighted_order_statistic(&unique, &cumulative_weights, high);
-    let quantile = stable_interpolate(low_quantile, high_quantile, fraction);
-    if !quantile.is_finite() {
-        return Err(DeseqError::InvalidOptions {
-            reason: "weighted beta prior variance quantile produced non-finite quantile"
-                .to_string(),
-        });
-    }
-    Ok(quantile)
+    stable_interpolate(low_quantile, high_quantile, fraction).map_err(|failure| {
+        invalid_calculation(
+            ErrorKind::Options,
+            "weighted beta prior quantile",
+            None,
+            failure.value,
+            "weighted beta prior variance quantile produced non-finite quantile",
+        )
+    })
 }
 
-pub(super) fn stable_interpolate(left: f64, right: f64, fraction: f64) -> f64 {
+pub(super) fn stable_interpolate(left: f64, right: f64, fraction: f64) -> checked::Checked {
     if left == right {
-        return left;
+        return if left.is_finite() {
+            Ok(left)
+        } else {
+            checked::reject(left)
+        };
     }
-    let Some(delta) = checked::add(right, -left) else {
-        return f64::NAN;
-    };
-    let Some(offset) = checked::mul(fraction, delta) else {
-        return f64::NAN;
-    };
-    checked::add(left, offset).unwrap_or(f64::NAN)
+    let delta = checked::try_add(right, -left)?;
+    let offset = checked::try_mul(fraction, delta)?;
+    checked::try_add(left, offset)
 }
 
 pub(super) fn weighted_order_statistic(

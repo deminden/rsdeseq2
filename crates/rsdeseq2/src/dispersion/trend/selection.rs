@@ -153,8 +153,9 @@ pub fn estimate_dispersion_trend(
 ) -> Result<DispersionTrendFit, DeseqError> {
     let use_for_fit = parametric_trend_use_for_fit(base_mean, disp_gene_est, min_disp)?;
     if !use_for_fit.iter().any(|used| *used) {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "all gene-wise dispersion estimates are within 2 orders of magnitude from the minimum value".to_string(),
+        return Err(DeseqError::NoUsableDispersionTrendRows {
+            min_disp,
+            genes_checked: base_mean.len(),
         });
     }
     match fit_type {

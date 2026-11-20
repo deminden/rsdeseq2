@@ -22,8 +22,23 @@ fn trigamma_keeps_large_finite_recurrence_and_rejects_overflow() {
     assert!(finite > 1.0e307);
 
     let err = trigamma(1.0e-200).unwrap_err();
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Numeric);
-    assert!(err.to_string().contains("trigamma recurrence"));
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "out-of-range value in trigamma recurrence at index None: {}",
+            1.0e-200
+        ),
+    );
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Numeric,
+            operation: "trigamma recurrence",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
+    );
 }
 
 #[test]
@@ -39,10 +54,36 @@ fn mad_squared_rejects_overflowed_variance() {
     let residuals = [-1.0e308, 0.0, 1.0e308];
     let err = mad_squared(&residuals).unwrap_err();
 
-    assert!(
-        err.to_string()
-            .contains("MAD squared produced non-finite dispersion prior variance")
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "MAD squared",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
     );
+}
+
+#[test]
+fn dispersion_prior_reports_invalid_gene_wise_and_fitted_dispersions() {
+    for (gene_est, fit, operation, rejected) in [
+        (0.0, 0.5, "gene-wise dispersion", 0.0),
+        (0.5, f64::INFINITY, "fitted dispersion", f64::INFINITY),
+    ] {
+        let error =
+            log_dispersion_residuals_above_min(&[0.5, gene_est], &[0.5, fit], 1e-8).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid dispersion: dispersion prior variance row 1 must contain positive finite dispersions",
+        );
+        std::assert_matches!(
+            error,
+            DeseqError::InvalidGeneValue { domain: ErrorKind::Dispersion, operation: actual,
+                gene: 1, sample: None, value, .. } if actual == operation && value == rejected
+        );
+    }
 }
 
 #[test]

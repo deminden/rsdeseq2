@@ -150,6 +150,12 @@ versions live in [docs/releases](docs/releases/).
   factor-level errors identify the role and sample index when applicable.
   Existing messages and error kinds are preserved.
 
+- Dispersion-trend and prior-variance errors retain the rejected value
+  and the available gene or coefficient index. Trend selection reports
+  the configured dispersion minimum and number of rows when no gene
+  qualifies. Single-gene beta priors now report an overflow instead of
+  returning an infinite variance for a retained coefficient.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

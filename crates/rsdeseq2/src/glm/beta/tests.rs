@@ -8,27 +8,32 @@ use crate::numeric::checked;
 
 #[test]
 fn stable_interpolate_preserves_equal_extreme_endpoints() {
-    let interpolated = stable_interpolate(f64::MAX, f64::MAX, 0.5);
+    let interpolated = stable_interpolate(f64::MAX, f64::MAX, 0.5).unwrap();
 
     assert_eq!(interpolated, f64::MAX);
 }
 
 #[test]
 fn stable_interpolate_rejects_overflowed_delta() {
-    let interpolated = stable_interpolate(-f64::MAX, f64::MAX, 0.5);
+    let failure = stable_interpolate(-f64::MAX, f64::MAX, 0.5).unwrap_err();
 
-    assert!(interpolated.is_nan());
+    assert_eq!(failure.value, f64::INFINITY);
 }
 
 #[test]
 fn quantile_type7_rejects_overflowed_interpolation() {
     let err = super::quantile_type7_stable(vec![-f64::MAX, f64::MAX], 0.5).unwrap_err();
 
-    assert!(matches!(
+    std::assert_matches!(
         err,
-        crate::errors::DeseqError::InvalidOptions { reason }
-            if reason == "beta prior variance quantile produced non-finite quantile"
-    ));
+        DeseqError::InvalidCalculation {
+            domain: crate::errors::ErrorKind::Options,
+            operation: "beta prior quantile",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
+    );
 }
 
 #[test]

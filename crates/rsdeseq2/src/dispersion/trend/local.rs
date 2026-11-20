@@ -1,6 +1,6 @@
 //! Local regression trend model, fitting, and validation.
 
-use super::numerics::validate_positive_mean;
+use super::numerics::{validate_fitted_dispersion, validate_positive_mean};
 use super::selection::{local_trend_use_for_fit, validate_trend_fit_rows};
 use crate::errors::{DeseqError, invalid_dimensions};
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
@@ -68,14 +68,7 @@ impl LocalDispersionTrend {
             .rcompat_fit()?
             .predict_one(mean.ln_p())
             .map_err(rcompat_local_dispersion_error)?;
-        let dispersion = predicted.exp_p();
-        if !dispersion.is_finite() || dispersion <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "local dispersion trend produced a non-finite or non-positive fitted value"
-                    .to_string(),
-            });
-        }
-        Ok(dispersion)
+        validate_fitted_dispersion("local dispersion trend", None, predicted.exp_p())
     }
 
     /// Evaluate the trend for all finite positive means, returning `NaN` for missing rows.
@@ -112,19 +105,17 @@ impl LocalDispersionTrend {
         means
             .iter()
             .copied()
-            .map(|mean| {
+            .enumerate()
+            .map(|(gene, mean)| {
                 if mean.is_finite() && mean > 0.0 {
                     let predicted = trend
                         .predict_one(mean.ln_p())
                         .map_err(rcompat_local_dispersion_error)?;
-                    let dispersion = predicted.exp_p();
-                    if !dispersion.is_finite() || dispersion <= 0.0 {
-                        return Err(DeseqError::InvalidDispersion {
-                            reason: "local dispersion trend produced a non-finite or non-positive fitted value"
-                                .to_string(),
-                        });
-                    }
-                    Ok(dispersion)
+                    validate_fitted_dispersion(
+                        "local dispersion trend",
+                        Some(gene),
+                        predicted.exp_p(),
+                    )
                 } else {
                     Ok(f64::NAN)
                 }
@@ -133,14 +124,7 @@ impl LocalDispersionTrend {
     }
 
     fn single_row_dispersion(&self) -> Result<f64, DeseqError> {
-        let dispersion = self.log_disps[0].exp_p();
-        if !dispersion.is_finite() || dispersion <= 0.0 {
-            return Err(DeseqError::InvalidDispersion {
-                reason: "local dispersion trend produced a non-finite or non-positive fitted value"
-                    .to_string(),
-            });
-        }
-        Ok(dispersion)
+        validate_fitted_dispersion("local dispersion trend", None, self.log_disps[0].exp_p())
     }
 
     fn validate_fit(&self) -> Result<(), DeseqError> {

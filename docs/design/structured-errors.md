@@ -103,6 +103,8 @@ exact phrase. `domain` is an `ErrorKind` limited to `Options`, `Dispersion`,
 | `NameNotFound` | Name scope and requested name | Original `Formula` or `Options` |
 | `AllZeroGene` | Zero-based fit row and original count-matrix row | `Counts` |
 | `InvalidGeneValue` | Operation, zero-based gene and optional sample, rejected value | Original domain |
+| `InvalidCalculation` | Operation, rejected value and available gene or coefficient position | Original domain |
+| `NoUsableDispersionTrendRows` | Minimum dispersion and number of rows checked | `Dispersion` |
 | `InvalidNegativeBinomialValue` | Likelihood stage, optional zero-based gene and sample, rejected value | `Numeric` for means and weights, `Dispersion` for the other stages |
 | `CoxReidColumnSumOverflow` | Zero-based gene, sample and design column, finite term and overflowing partial sum | `Numeric` |
 
@@ -121,6 +123,12 @@ entries in input order. Declaration checks stop at the first collision and
 report the two entries involved. For factor levels, the scope carries the
 factor name when known and distinguishes contrast operands, reference levels,
 declared levels and the zero-based index of an observed sample.
+
+Fitted dispersion checks report the failing input row for batched
+predictions. A failed constant fit can be diagnosed before any row
+is evaluated. Beta prior quantile failures include the coefficient
+when called through the matrix fit. Trigamma keeps the original input
+in its message and exposes the failed arithmetic result in `value`.
 
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.

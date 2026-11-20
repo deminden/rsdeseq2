@@ -1,6 +1,6 @@
 //! Checked arithmetic and shared trend input validation.
 
-use crate::errors::DeseqError;
+use crate::errors::{CalculationLocation, DeseqError, ErrorKind, invalid_calculation};
 use crate::numeric::checked::{self, CheckedExt};
 
 pub(super) fn checked_add_assign(
@@ -62,6 +62,23 @@ pub(super) fn validate_positive_mean(mean: f64, index: Option<usize>) -> Result<
         });
     }
     Ok(())
+}
+
+pub(super) fn validate_fitted_dispersion(
+    trend: &'static str,
+    gene: Option<usize>,
+    value: f64,
+) -> Result<f64, DeseqError> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(invalid_calculation(
+            ErrorKind::Dispersion,
+            trend,
+            gene.map(CalculationLocation::Gene),
+            value,
+            format_args!("{trend} produced a non-finite or non-positive fitted value"),
+        ));
+    }
+    Ok(value)
 }
 
 pub(super) fn validate_positive_dispersion(

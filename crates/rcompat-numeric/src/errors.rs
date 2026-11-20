@@ -53,6 +53,32 @@ pub enum Error {
         reason: String,
     },
 
+    /// A calculation produced a value outside its domain.
+    #[error("{message}")]
+    InvalidCalculation {
+        /// Classification of the failing calculation.
+        domain: ErrorKind,
+        /// The calculation that failed.
+        operation: &'static str,
+        /// The input position associated with the failure, when known.
+        location: Option<CalculationLocation>,
+        /// The value rejected by the calculation.
+        value: f64,
+        /// The original diagnostic, including its domain prefix.
+        message: String,
+    },
+
+    /// No gene passed the dispersion trend's eligibility rule.
+    #[error(
+        "invalid dispersion: all gene-wise dispersion estimates are within 2 orders of magnitude from the minimum value"
+    )]
+    NoUsableDispersionTrendRows {
+        /// The configured minimum dispersion.
+        min_disp: f64,
+        /// Number of input rows examined.
+        genes_checked: usize,
+    },
+
     /// A negative-binomial likelihood input or intermediate failed validation.
     #[error("{}", stage.error_message(*sample, *value))]
     InvalidNegativeBinomialValue {
@@ -272,6 +298,16 @@ pub enum Error {
         /// The violated condition.
         what: String,
     },
+}
+
+/// The position associated with a calculation failure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum CalculationLocation {
+    /// Zero-based row in an input of genes.
+    Gene(usize),
+    /// Zero-based column in an input of coefficients.
+    Coefficient(usize),
 }
 
 /// Input and arithmetic stages of a negative-binomial likelihood.
@@ -498,7 +534,9 @@ impl Error {
             Self::InvalidSizeFactors { .. } | Self::NoUsableGenesForSizeFactors => {
                 ErrorKind::Normalization
             }
-            Self::InvalidDispersion { .. } => ErrorKind::Dispersion,
+            Self::InvalidDispersion { .. } | Self::NoUsableDispersionTrendRows { .. } => {
+                ErrorKind::Dispersion
+            }
             Self::InvalidOptions { .. } => ErrorKind::Options,
             Self::NonFiniteValue { .. } | Self::CoxReidColumnSumOverflow { .. } => {
                 ErrorKind::Numeric
@@ -512,6 +550,7 @@ impl Error {
             Self::InvalidParameter { domain, .. }
             | Self::MissingPrerequisite { domain, .. }
             | Self::InvalidGeneValue { domain, .. }
+            | Self::InvalidCalculation { domain, .. }
             | Self::AmbiguousName { domain, .. }
             | Self::NameNotFound { domain, .. } => *domain,
             Self::InvalidFormula { .. } => ErrorKind::Formula,
@@ -538,6 +577,23 @@ pub fn ambiguous_name(
         name: name.into(),
         matches: matches.into_iter().map(Into::into).collect(),
         reason,
+    }
+}
+
+#[doc(hidden)]
+pub fn invalid_calculation(
+    domain: ErrorKind,
+    operation: &'static str,
+    location: Option<CalculationLocation>,
+    value: f64,
+    reason: impl std::fmt::Display,
+) -> Error {
+    Error::InvalidCalculation {
+        domain,
+        operation,
+        location,
+        value,
+        message: format!("{}: {reason}", domain_prefix(domain)),
     }
 }
 

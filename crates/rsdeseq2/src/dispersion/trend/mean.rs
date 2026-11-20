@@ -102,8 +102,9 @@ pub fn fit_mean_dispersion_trend(
     let use_for_fit = mean_trend_use_for_fit(base_mean, disp_gene_est, options.min_disp)?;
     let genes_used = use_for_fit.iter().filter(|value| **value).count();
     if genes_used == 0 {
-        return Err(DeseqError::InvalidDispersion {
-            reason: "all gene-wise dispersion estimates are within 2 orders of magnitude from the minimum value".to_string(),
+        return Err(DeseqError::NoUsableDispersionTrendRows {
+            min_disp: options.min_disp,
+            genes_checked: base_mean.len(),
         });
     }
 

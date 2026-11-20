@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::{CalculationLocation, ErrorKind, invalid_calculation};
 // Prior-variance estimation and upper-quantile matching.
 
 /// Estimate DESeq2-style beta prior variances from unshrunken MLE betas.
@@ -30,8 +31,19 @@ pub fn estimate_beta_prior_variance(
     for coefficient in 0..beta_matrix.n_cols() {
         let value = if beta_matrix.n_rows() == 1 {
             let beta = beta_matrix.row(0)?[coefficient];
-            if beta.is_finite() {
-                beta * beta
+            let is_intercept = coefficient_names.is_some_and(|names| {
+                matches!(names[coefficient].as_str(), "Intercept" | "(Intercept)")
+            });
+            if beta.is_finite() && !is_intercept {
+                checked::try_mul(beta, beta).map_err(|failure| {
+                    invalid_calculation(
+                        ErrorKind::Options,
+                        "single-gene beta prior variance",
+                        Some(CalculationLocation::Coefficient(coefficient)),
+                        failure.value,
+                        "single-gene beta prior produced non-finite variance",
+                    )
+                })?
             } else {
                 options.wide_prior_variance
             }
@@ -50,18 +62,24 @@ pub fn estimate_beta_prior_variance(
             if betas.is_empty() {
                 options.wide_prior_variance
             } else {
-                match options.method {
+                let variance = match options.method {
                     BetaPriorVarianceMethod::Quantile => {
-                        match_upper_quantile_for_variance(&betas, options.upper_quantile)?
+                        match_upper_quantile_for_variance(&betas, options.upper_quantile)
                     }
                     BetaPriorVarianceMethod::Weighted => {
                         match_weighted_upper_quantile_for_variance(
                             &betas,
                             &selected_weights,
                             options.upper_quantile,
-                        )?
+                        )
                     }
-                }
+                };
+                variance.map_err(|mut error| {
+                    if let DeseqError::InvalidCalculation { location, .. } = &mut error {
+                        *location = Some(CalculationLocation::Coefficient(coefficient));
+                    }
+                    error
+                })?
             }
         };
         prior_variance.push(value);
@@ -85,11 +103,7 @@ pub fn match_upper_quantile_for_variance(
     validate_upper_quantile(upper_quantile)?;
     let abs_betas = finite_abs_values(betas)?;
     let quantile = quantile_type7_stable(abs_betas, 1.0 - upper_quantile)?;
-    let normal_quantile = standard_normal_inverse_cdf(1.0 - upper_quantile / 2.0);
-    let scale = quantile / normal_quantile;
-    checked_square(scale).ok_or_else(|| DeseqError::InvalidOptions {
-        reason: "beta prior variance quantile produced non-finite variance".to_string(),
-    })
+    variance_from_quantile(quantile, upper_quantile, "beta prior variance")
 }
 
 /// Weighted version of [`match_upper_quantile_for_variance`].
@@ -107,9 +121,27 @@ pub fn match_weighted_upper_quantile_for_variance(
         ));
     }
     let weighted_quantile = weighted_abs_quantile(betas, weights, 1.0 - upper_quantile)?;
+    variance_from_quantile(
+        weighted_quantile,
+        upper_quantile,
+        "weighted beta prior variance",
+    )
+}
+
+fn variance_from_quantile(
+    quantile: f64,
+    upper_quantile: f64,
+    operation: &'static str,
+) -> Result<f64, DeseqError> {
     let normal_quantile = standard_normal_inverse_cdf(1.0 - upper_quantile / 2.0);
-    let scale = weighted_quantile / normal_quantile;
-    checked_square(scale).ok_or_else(|| DeseqError::InvalidOptions {
-        reason: "weighted beta prior variance quantile produced non-finite variance".to_string(),
+    let scale = quantile / normal_quantile;
+    checked::try_mul(scale, scale).map_err(|failure| {
+        invalid_calculation(
+            ErrorKind::Options,
+            operation,
+            None,
+            failure.value,
+            format_args!("{operation} quantile produced non-finite variance"),
+        )
     })
 }

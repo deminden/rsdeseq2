@@ -1,5 +1,6 @@
 use crate::support::two_group_design;
 use approx::assert_relative_eq;
+use rsdeseq2::errors::CalculationLocation;
 use rsdeseq2::prelude::*;
 
 fn trend_data() -> (Vec<f64>, Vec<f64>) {
@@ -30,14 +31,42 @@ fn parametric_trend_rejects_overflowed_tiny_mean_fit() {
     };
 
     let err = trend.evaluate(f64::MIN_POSITIVE).unwrap_err();
-    assert!(
-        err.to_string()
-            .contains("parametric dispersion trend produced")
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "parametric dispersion trend",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
     );
-    assert!(
+    std::assert_matches!(
         trend
             .evaluate_many_allow_missing(&[0.0, f64::MIN_POSITIVE])
-            .is_err()
+            .unwrap_err(),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "parametric dispersion trend",
+            location: Some(CalculationLocation::Gene(1)),
+            value: f64::INFINITY,
+            ..
+        }
+    );
+
+    let options = ParametricDispersionTrendOptions {
+        initial_extra_pois: f64::MAX,
+        ..ParametricDispersionTrendOptions::default()
+    };
+    std::assert_matches!(
+        fit_parametric_dispersion_trend(&[0.0, f64::MIN_POSITIVE], &[0.1; 2], options).unwrap_err(),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "parametric dispersion trend",
+            location: Some(CalculationLocation::Gene(1)),
+            value: f64::INFINITY,
+            ..
+        }
     );
 }
 
@@ -564,9 +593,30 @@ fn local_dispersion_trend_rejects_overflowed_fitted_value() {
     };
 
     let err = trend.evaluate(10.0).unwrap_err();
-    assert_eq!(err.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
-    assert!(err.to_string().contains("local dispersion trend produced"));
-    assert!(trend.evaluate_many_allow_missing(&[0.0, 10.0]).is_err());
+    assert_eq!(
+        err.to_string(),
+        "invalid dispersion: local dispersion trend produced a non-finite or non-positive fitted value",
+    );
+    std::assert_matches!(
+        err,
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "local dispersion trend",
+            location: None,
+            value: f64::INFINITY,
+            ..
+        }
+    );
+    std::assert_matches!(
+        trend.evaluate_many_allow_missing(&[0.0, 10.0]).unwrap_err(),
+        DeseqError::InvalidCalculation {
+            domain: ErrorKind::Dispersion,
+            operation: "local dispersion trend",
+            location: Some(CalculationLocation::Gene(1)),
+            value: f64::INFINITY,
+            ..
+        }
+    );
 }
 
 #[test]
@@ -1012,7 +1062,11 @@ fn trend_rows_follow_deseq2_use_for_fit_for_every_fit_type() {
     for fit_type in [FitType::Parametric, FitType::Local, FitType::Mean] {
         let error = estimate_dispersion_trend(&means, &floor, fit_type, min_disp).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Dispersion);
-        assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Dispersion);
-        assert!(error.to_string().contains("within 2 orders of magnitude"));
+        std::assert_matches!(
+            error,
+            DeseqError::NoUsableDispersionTrendRows {
+                min_disp: minimum, genes_checked,
+            } if minimum == min_disp && genes_checked == means.len()
+        );
     }
 }

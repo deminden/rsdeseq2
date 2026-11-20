@@ -1,5 +1,5 @@
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{ErrorKind, Requirement, invalid_calculation, invalid_parameter};
 use crate::math::{median_finite, trigamma};
 use crate::numeric::checked::{self, CheckedExt};
 use crate::numeric::math::ProfileMath;
@@ -99,9 +99,13 @@ pub fn mad_squared(values: &[f64]) -> Result<f64, DeseqError> {
     if variance.is_finite() {
         Ok(variance)
     } else {
-        Err(DeseqError::InvalidDispersion {
-            reason: "MAD squared produced non-finite dispersion prior variance".to_string(),
-        })
+        Err(invalid_calculation(
+            ErrorKind::Dispersion,
+            "MAD squared",
+            None,
+            variance,
+            "MAD squared produced non-finite dispersion prior variance",
+        ))
     }
 }
 
@@ -143,7 +147,17 @@ pub fn log_dispersion_residuals_above_min(
         } else if gene_est.is_nan() || fit.is_nan() {
             above_min_disp.push(false);
         } else {
-            return Err(DeseqError::InvalidDispersion {
+            let (operation, value) = if !gene_est.is_finite() || gene_est <= 0.0 {
+                ("gene-wise dispersion", gene_est)
+            } else {
+                ("fitted dispersion", fit)
+            };
+            return Err(DeseqError::InvalidGeneValue {
+                domain: ErrorKind::Dispersion,
+                operation,
+                gene,
+                sample: None,
+                value,
                 reason: format!(
                     "dispersion prior variance row {gene} must contain positive finite dispersions"
                 ),
