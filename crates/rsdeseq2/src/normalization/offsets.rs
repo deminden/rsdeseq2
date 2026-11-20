@@ -99,13 +99,7 @@ fn prepare_offsets<'a>(
     factors: Option<MatrixView<'a, f64>>,
     offsets: &[f64],
 ) -> Result<(BaseFactors<'a>, Vec<f64>), DeseqError> {
-    if offsets.len() != samples {
-        return Err(invalid_dimensions(
-            "formula offsets",
-            samples,
-            offsets.len(),
-        ));
-    }
+    validate_offset_count(offsets, samples)?;
     let length = genes
         .checked_mul(samples)
         .ok_or_else(|| DeseqError::InvalidOptions {
@@ -135,7 +129,39 @@ fn prepare_offsets<'a>(
             "base size or normalization factors",
         ));
     };
-    let mut multipliers = try_alloc_matrix(samples, 1, "formula offset multipliers")?;
+    let multipliers = offset_multipliers(offsets)?;
+    if genes == 0 {
+        return Err(invalid_dimensions("row-major matrix rows", 1, 0));
+    }
+    if samples == 0 {
+        return Err(invalid_dimensions("row-major matrix columns", 1, 0));
+    }
+    Ok((base, multipliers))
+}
+
+pub(crate) fn sample_factors_with_offsets(
+    size_factors: &[f64],
+    offsets: &[f64],
+    samples: usize,
+) -> Result<Vec<f64>, DeseqError> {
+    validate_offset_count(offsets, samples)?;
+    validate_size_factors(size_factors, samples)?;
+    sample_products(size_factors, offset_multipliers(offsets)?)
+}
+
+fn validate_offset_count(offsets: &[f64], samples: usize) -> Result<(), DeseqError> {
+    if offsets.len() != samples {
+        return Err(invalid_dimensions(
+            "formula offsets",
+            samples,
+            offsets.len(),
+        ));
+    }
+    Ok(())
+}
+
+fn offset_multipliers(offsets: &[f64]) -> Result<Vec<f64>, DeseqError> {
+    let mut multipliers = try_alloc_matrix(offsets.len(), 1, "formula offset multipliers")?;
     for (sample, &offset) in offsets.iter().enumerate() {
         let multiplier = offset.exp_p();
         if !offset.is_finite() || !valid_factor(multiplier) {
@@ -145,13 +171,7 @@ fn prepare_offsets<'a>(
         }
         multipliers.push(multiplier);
     }
-    if genes == 0 {
-        return Err(invalid_dimensions("row-major matrix rows", 1, 0));
-    }
-    if samples == 0 {
-        return Err(invalid_dimensions("row-major matrix columns", 1, 0));
-    }
-    Ok((base, multipliers))
+    Ok(multipliers)
 }
 
 fn sample_products(

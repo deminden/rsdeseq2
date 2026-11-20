@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{ErrorKind, missing_prerequisite};
+use std::sync::Arc;
 /// Inspectable fit state for all implemented and future DESeq2 stages.
 #[derive(Clone, Debug, PartialEq)]
 #[must_use]
@@ -134,8 +135,10 @@ pub struct DeseqBuilder {
     pub(super) fit_type: FitType,
     pub(super) test: TestType,
     pub(super) size_factor_options: SizeFactorOptions,
-    pub(super) normalization_factors: Option<RowMajorMatrix<f64>>,
-    pub(super) observation_weights: Option<RowMajorMatrix<f64>>,
+    pub(super) normalization_factors: Option<Arc<RowMajorMatrix<f64>>>,
+    // Formula sample offsets use normalization-factor column means for dispersion starts.
+    pub(super) formula_sample_factors: bool,
+    pub(super) observation_weights: Option<Arc<RowMajorMatrix<f64>>>,
     pub(super) observation_weight_options: ObservationWeightOptions,
     pub(super) threads: Option<usize>,
     pub(super) execution_context: ExecutionContext,

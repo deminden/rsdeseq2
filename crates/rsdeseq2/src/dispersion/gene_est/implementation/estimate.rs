@@ -14,21 +14,21 @@ pub fn estimate_gene_wise_dispersions_linear_mu(
     input: GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
+    estimate_gene_wise_dispersions_linear_mu_with_moments(input, options, false)
+}
+
+pub(crate) fn estimate_gene_wise_dispersions_linear_mu_with_moments(
+    input: GeneWiseDispersionInput<'_>,
+    options: GeneWiseDispersionOptions,
+    sample_factor_column_means: bool,
+) -> Result<GeneWiseDispersionOutput, DeseqError> {
     validate_gene_est_inputs(&input, options)?;
     let max_disp = max_dispersion(options, input.counts.n_samples());
     let normalized_mu = linear_model_mu(input.normalized_counts, input.design)?;
     let residual_df = rough_dispersion_residual_df(input.design)?;
     let rough_disp =
         rough_dispersion_from_means(input.normalized_counts, &normalized_mu, residual_df)?;
-    let moments_disp = match input.normalization_factors {
-        Some(normalization_factors) => moments_dispersion_estimates_with_normalization_factors(
-            input.base_mean,
-            input.base_var,
-            normalization_factors,
-            Some(input.all_zero),
-        )?,
-        None => moments_dispersion_estimates(input.base_mean, input.base_var, input.size_factors)?,
-    };
+    let moments_disp = gene_wise_moments(&input, sample_factor_column_means)?;
     let initial_disp =
         initial_dispersion_estimates(&rough_disp, &moments_disp, options.min_disp, max_disp)?;
 
@@ -95,7 +95,7 @@ pub fn estimate_gene_wise_dispersions_glm_mu(
     options: GeneWiseDispersionOptions,
     irls_options: IrlsOptions,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
-    estimate_gene_wise_dispersions_with_mean_fit(input, options, irls_options, false)
+    estimate_gene_wise_dispersions_for_workflow(input, options, irls_options, false, false)
 }
 
 /// Estimate dispersions with DESeq2's automatic fitted-mean selection.
@@ -109,9 +109,26 @@ pub fn estimate_gene_wise_dispersions_auto(
     options: GeneWiseDispersionOptions,
     irls_options: IrlsOptions,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
-    let linear_mu =
-        input.observation_weights.is_none() && design_uses_linear_dispersion_means(input.design)?;
-    estimate_gene_wise_dispersions_with_mean_fit(input, options, irls_options, linear_mu)
+    estimate_gene_wise_dispersions_for_workflow(input, options, irls_options, true, false)
+}
+
+pub(crate) fn estimate_gene_wise_dispersions_for_workflow(
+    input: GeneWiseDispersionInput<'_>,
+    options: GeneWiseDispersionOptions,
+    irls_options: IrlsOptions,
+    automatic_means: bool,
+    sample_factor_column_means: bool,
+) -> Result<GeneWiseDispersionOutput, DeseqError> {
+    let linear_mu = automatic_means
+        && input.observation_weights.is_none()
+        && design_uses_linear_dispersion_means(input.design)?;
+    estimate_gene_wise_dispersions_with_mean_fit(
+        input,
+        options,
+        irls_options,
+        linear_mu,
+        sample_factor_column_means,
+    )
 }
 
 /// Whether the design is saturated across its distinct sample groups.
@@ -130,11 +147,12 @@ pub fn design_uses_linear_dispersion_means(design: &DesignMatrix) -> Result<bool
     Ok(groups.len() == design.n_coefficients())
 }
 
-pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
+fn estimate_gene_wise_dispersions_with_mean_fit(
     input: GeneWiseDispersionInput<'_>,
     options: GeneWiseDispersionOptions,
     irls_options: IrlsOptions,
     linear_mu: bool,
+    sample_factor_column_means: bool,
 ) -> Result<GeneWiseDispersionOutput, DeseqError> {
     validate_gene_est_inputs(&input, options)?;
     let (rough_disp, linear_means) = if linear_mu {
@@ -161,15 +179,7 @@ pub(super) fn estimate_gene_wise_dispersions_with_mean_fit(
         )
     };
     let max_disp = max_dispersion(options, input.counts.n_samples());
-    let moments_disp = match input.normalization_factors {
-        Some(normalization_factors) => moments_dispersion_estimates_with_normalization_factors(
-            input.base_mean,
-            input.base_var,
-            normalization_factors,
-            Some(input.all_zero),
-        )?,
-        None => moments_dispersion_estimates(input.base_mean, input.base_var, input.size_factors)?,
-    };
+    let moments_disp = gene_wise_moments(&input, sample_factor_column_means)?;
     let initial_disp =
         initial_dispersion_estimates(&rough_disp, &moments_disp, options.min_disp, max_disp)?;
 
@@ -531,7 +541,12 @@ pub fn moments_dispersion_estimates_with_normalization_factors(
             all_zero.len(),
         ));
     }
-    let xim = normalization_factor_moments_xim(normalization_factors, all_zero)?;
+    let xim = normalization_factor_moments_xim(
+        Offsets::PerCell(normalization_factors),
+        normalization_factors.n_rows(),
+        normalization_factors.n_cols(),
+        all_zero,
+    )?;
     moments_dispersion_estimates_with_xim(base_mean, base_var, xim)
 }
 
@@ -586,17 +601,43 @@ pub(super) fn moments_dispersion_estimates_with_xim(
     Ok(estimates)
 }
 
-pub(super) fn normalization_factor_moments_xim(
-    normalization_factors: &RowMajorMatrix<f64>,
+fn gene_wise_moments(
+    input: &GeneWiseDispersionInput<'_>,
+    sample_factor_column_means: bool,
+) -> Result<Vec<f64>, DeseqError> {
+    match input.normalization_factors {
+        Some(factors) => moments_dispersion_estimates_with_normalization_factors(
+            input.base_mean,
+            input.base_var,
+            factors,
+            Some(input.all_zero),
+        ),
+        None if sample_factor_column_means => {
+            let xim = normalization_factor_moments_xim(
+                Offsets::PerSample(input.size_factors),
+                input.counts.n_genes(),
+                input.counts.n_samples(),
+                Some(input.all_zero),
+            )?;
+            moments_dispersion_estimates_with_xim(input.base_mean, input.base_var, xim)
+        }
+        None => moments_dispersion_estimates(input.base_mean, input.base_var, input.size_factors),
+    }
+}
+
+fn normalization_factor_moments_xim(
+    factors: Offsets<'_>,
+    genes: usize,
+    samples: usize,
     all_zero: Option<&[bool]>,
 ) -> Result<f64, DeseqError> {
-    let mut col_sums = vec![0.0; normalization_factors.n_cols()];
+    let mut col_sums = vec![0.0; samples];
     let mut n_rows_used = 0_usize;
-    for row in 0..normalization_factors.n_rows() {
+    for row in 0..genes {
         if all_zero.is_some_and(|flags| flags[row]) {
             continue;
         }
-        for (sample, value) in normalization_factors.row(row)?.iter().copied().enumerate() {
+        for (sample, value) in factors.row(row)?.iter().copied().enumerate() {
             validate_normalization_factor_value(value, sample)?;
             checked_matrix_add_assign(
                 &mut col_sums[sample],
@@ -633,7 +674,7 @@ pub(super) fn normalization_factor_moments_xim(
             "moments dispersion inverse normalization-factor mean sum",
         )?;
     }
-    checked::try_div(inverse_col_mean_sum, normalization_factors.n_cols() as f64).nonfinite_at(
+    checked::try_div(inverse_col_mean_sum, samples as f64).nonfinite_at(
         "moments dispersion inverse normalization-factor mean",
         Some(0),
     )

@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use rsdeseq2::design::{FormulaFactorColumn, FormulaModelFrame};
+use rsdeseq2::design::{FormulaFactorColumn, FormulaModelFrame, FormulaNumericColumn};
 use rsdeseq2::errors::RunConflict;
 use rsdeseq2::io::{read_count_matrix_tsv, read_labeled_design_matrix_tsv};
 use rsdeseq2::prelude::*;
@@ -144,6 +144,81 @@ fn three_vs_three_matches_deseq_beta_prior() {
 #[test]
 fn batch_and_condition_match_deseq_beta_prior() {
     check("many_samples", "~ batch + condition");
+}
+
+#[test]
+fn formula_sample_offsets_match_cell_factors_at_early_stage_and_beta_prior() {
+    use rsdeseq2::normalization::normalization_factors_with_offsets;
+
+    let case = "three_vs_three";
+    let counts = read_count_matrix_tsv(data(case, "counts.tsv")).unwrap();
+    let mut frame = model_frame(case);
+    let offsets = vec![0.0, 0.1, -0.1, 0.2, -0.2, 0.0];
+    frame.numeric_covariates.push(FormulaNumericColumn {
+        name: "exposure".into(),
+        values: offsets.clone(),
+    });
+    let base = vec![0.85, 1.0, 1.1, 0.9, 1.0, 1.2];
+    let effective = normalization_factors_with_offsets(
+        counts.n_genes(),
+        counts.n_samples(),
+        Some(&base),
+        None,
+        &offsets,
+    )
+    .unwrap();
+    let by_sample = DeseqBuilder::new()
+        .model_frame(frame.clone())
+        .size_factors(base);
+    let by_cell = DeseqBuilder::new()
+        .model_frame(frame)
+        .normalization_factors(effective.clone());
+    let formula_offsets = Analysis::formula(&counts, "~ condition + offset(exposure)");
+    let formula_cells = Analysis::formula(&counts, "~ condition");
+
+    for (sample_request, cell_request) in [
+        (
+            formula_offsets.stop_after(Stage::SizeFactors),
+            formula_cells.stop_after(Stage::SizeFactors),
+        ),
+        (
+            formula_offsets
+                .stop_after(Stage::GeneWise)
+                .means(MeanModel::LinearMu),
+            formula_cells
+                .stop_after(Stage::GeneWise)
+                .means(MeanModel::LinearMu),
+        ),
+        (
+            formula_offsets.beta_prior(true),
+            formula_cells.beta_prior(true),
+        ),
+    ] {
+        let sample = by_sample.run(&sample_request).unwrap();
+        let cell = by_cell.run(&cell_request).unwrap();
+        let fit = sample.fit();
+        assert_eq!(fit.size_factors, vec![1.0; counts.n_samples()]);
+        assert_eq!(fit.normalization_factors.as_ref(), Some(&effective));
+        assert_eq!(fit.base_mean, cell.fit().base_mean);
+        assert_eq!(fit.base_var, cell.fit().base_var);
+        let as_bits = |values: Option<&[f64]>| {
+            values.map(|row| row.iter().map(|value| value.to_bits()).collect::<Vec<_>>())
+        };
+        assert_eq!(
+            as_bits(fit.disp_gene_est.as_deref()),
+            as_bits(cell.fit().disp_gene_est.as_deref()),
+        );
+        if let (Some(sample), Some(cell)) = (sample.results(), cell.results()) {
+            assert_eq!(sample.rows.len(), cell.rows.len());
+            for (sample, cell) in sample.rows.iter().zip(&cell.rows) {
+                assert_eq!(sample, cell);
+            }
+            assert_eq!(sample.metadata, cell.metadata);
+            assert_eq!(sample.independent_filtering, cell.independent_filtering);
+        } else {
+            assert!(sample.results().is_none() && cell.results().is_none());
+        }
+    }
 }
 
 #[test]

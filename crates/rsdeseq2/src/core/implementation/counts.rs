@@ -22,8 +22,7 @@ pub(super) use crate::design::{
 pub(super) use crate::dispersion::{
     DispersionTrendFit, GeneWiseDispersionInput, GeneWiseDispersionOptions, MapDispersionInput,
     MapDispersionOptions, estimate_dispersion_prior_variance, estimate_dispersion_trend,
-    estimate_gene_wise_dispersions_auto, estimate_gene_wise_dispersions_glm_mu,
-    estimate_gene_wise_dispersions_linear_mu, estimate_map_dispersions,
+    estimate_map_dispersions,
 };
 pub(super) use crate::errors::{DeseqError, invalid_dimensions};
 pub(super) use crate::glm::{

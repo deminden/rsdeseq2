@@ -1,5 +1,9 @@
 //! Builder gene wise stages.
 use super::*;
+use crate::dispersion::gene_est::{
+    estimate_gene_wise_dispersions_for_workflow,
+    estimate_gene_wise_dispersions_linear_mu_with_moments,
+};
 
 impl DeseqBuilder {
     /// Leaf workflow behind [`DeseqBuilder::fit_gene_wise_dispersions_linear_mu`] and [`DeseqBuilder::run`].
@@ -12,7 +16,7 @@ impl DeseqBuilder {
             self.ensure_no_observation_weights("native linear-mu dispersion estimation")?;
             design.validate_full_rank("linear-mu dispersion")?;
             let stages = self.normalization_stages(counts)?;
-            let dispersion = estimate_gene_wise_dispersions_linear_mu(
+            let dispersion = estimate_gene_wise_dispersions_linear_mu_with_moments(
                 GeneWiseDispersionInput {
                     counts,
                     design,
@@ -25,6 +29,7 @@ impl DeseqBuilder {
                     observation_weights: None,
                 },
                 self.gene_wise_dispersion_options,
+                self.formula_sample_factors,
             )?;
             let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
             fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());
@@ -44,12 +49,7 @@ impl DeseqBuilder {
         self.in_pool(|| {
             design.validate_full_rank("GLM-mu dispersion")?;
             let stages = self.normalization_stages_for_design(counts, design)?;
-            let estimator = if self.automatic_dispersion_means {
-                estimate_gene_wise_dispersions_auto
-            } else {
-                estimate_gene_wise_dispersions_glm_mu
-            };
-            let dispersion = estimator(
+            let dispersion = estimate_gene_wise_dispersions_for_workflow(
                 GeneWiseDispersionInput {
                     counts,
                     design,
@@ -63,6 +63,8 @@ impl DeseqBuilder {
                 },
                 self.gene_wise_dispersion_options,
                 self.irls_options.clone(),
+                self.automatic_dispersion_means,
+                self.formula_sample_factors,
             )?;
             let mut fit = self.base_fit(counts, Some(design.clone()), stages.into_base_fit_input());
             fit.disp_gene_est = Some(dispersion.disp_gene_est.clone());

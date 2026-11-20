@@ -2,6 +2,7 @@
 use super::*;
 use crate::errors::missing_prerequisite;
 use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use std::sync::Arc;
 
 impl DeseqBuilder {
     /// Fit the selected GLM-mu dispersion trend on a fast-VST subset.
@@ -41,8 +42,9 @@ impl DeseqBuilder {
             )?;
             let mut subset_builder = self.clone();
             subset_builder.size_factor_options.supplied_size_factors = Some(stages.size_factors);
-            subset_builder.normalization_factors = subset.normalization_factors.clone();
-            subset_builder.observation_weights = subset.observation_weights.clone();
+            subset_builder.normalization_factors =
+                subset.normalization_factors.clone().map(Arc::new);
+            subset_builder.observation_weights = subset.observation_weights.clone().map(Arc::new);
             let fit = subset_builder.leaf_dispersion_trend_glm_mu(&subset.counts, design)?;
             Ok((fit, subset))
         })
@@ -90,7 +92,7 @@ impl DeseqBuilder {
                 Some(design.clone()),
                 BaseFitInput {
                     size_factors: subset_fit.size_factors.clone(),
-                    normalization_factors: self.normalization_factors.clone(),
+                    normalization_factors: self.normalization_factors.as_deref().cloned(),
                     observation_weights: None,
                     weights_fail: None,
                     weights_design_rank: None,

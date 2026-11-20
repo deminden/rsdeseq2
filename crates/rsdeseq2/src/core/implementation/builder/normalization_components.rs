@@ -38,7 +38,8 @@ impl DeseqBuilder {
         // DESeq2 gives assay-shaped normalization factors precedence over
         // size-factor estimation; supplied size factors are kept only for APIs
         // that still need sample-scale metadata.
-        let (size_factors, normalization_factors, normalized) = match &self.normalization_factors {
+        let factor_matrix = self.normalization_factors.as_deref();
+        let (size_factors, normalization_factors, normalized) = match factor_matrix {
             Some(factors) => {
                 validate_normalization_factors(counts, factors)?;
                 let size_factors = match &self.size_factor_options.supplied_size_factors {
@@ -105,7 +106,7 @@ impl DeseqBuilder {
         design: Option<&DesignMatrix>,
         normalized: &RowMajorMatrix<f64>,
     ) -> Result<WeightedBaseMetadata, DeseqError> {
-        let Some(weights) = &self.observation_weights else {
+        let Some(weights) = self.observation_weights.as_deref() else {
             return Ok(WeightedBaseMetadata {
                 base_mean: base_mean(normalized)?,
                 base_var: base_variance(normalized)?,

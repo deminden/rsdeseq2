@@ -1302,3 +1302,22 @@ On macOS, 77 focused tests passed in each profile, along with Clippy
 and the locked Rust 1.96.0 library check.
 The revised portable manifest and all three beta-prior tests also passed
 on Linux arm64 and Linux x86_64 under QEMU 10.0.13.
+
+### Sample-only offsets in formula workflows
+
+Formula runs with sample-specific offsets compose the effective factors
+once and fit with a shared sample vector. The returned fit and any Cook's
+refit materialize the normalization-factor matrix for public metadata.
+Dispersion starts retain the column-mean summation order of the equivalent
+dense normalization matrix. Cloned builders share supplied cell factors
+and observation weights.
+
+A paired macOS arm64 fixed-dispersion Wald probe used 20,000 genes, 100
+samples, and two workers. Across three runs per version, median peak RSS
+fell from 114.39 MiB at `09b8923` to 83.86 MiB, a 26.7% reduction. The
+normalization-factor and coefficient checksums matched on all three pairs.
+
+The 174 focused tests passed under both numeric profiles. The formula
+comparison checks early size factors, linear gene-wise dispersions, and
+expanded beta-prior results against explicit cell factors. Both 8,032-field
+golden checks matched. Clippy, format, and the module-cycle check passed.

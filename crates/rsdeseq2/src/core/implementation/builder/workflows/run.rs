@@ -33,6 +33,32 @@ fn unsupported(feature: &str) -> DeseqError {
     }
 }
 
+fn retain_formula_normalization_factors(
+    output: &mut RunOutput,
+    counts: &CountMatrix,
+) -> Result<(), DeseqError> {
+    let (fit, refit) = match output {
+        RunOutput::Fit(fit) | RunOutput::Results { fit, .. } => (fit, None),
+        RunOutput::BetaPrior(output) => (&mut output.fit, None),
+        RunOutput::Replacement(CooksReplacementTestOutput::Wald(output)) => {
+            (&mut output.original_fit, output.refit_fit.as_mut())
+        }
+        RunOutput::Replacement(CooksReplacementTestOutput::Lrt(output)) => {
+            (&mut output.original_fit, output.refit_fit.as_mut())
+        }
+    };
+    for fit in std::iter::once(fit).chain(refit) {
+        fit.normalization_factors = Some(
+            crate::normalization::normalization_factors_from_size_factors(
+                counts,
+                &fit.size_factors,
+            )?,
+        );
+        fit.size_factors.fill(1.0);
+    }
+    Ok(())
+}
+
 impl DeseqBuilder {
     /// Run one analysis.
     ///
@@ -111,11 +137,16 @@ impl DeseqBuilder {
                         return Err(invalid_run(RunConflict::ReducedDesignRequired));
                     }
                 };
-                self.with_formula_offsets(counts, &full)?.run_matrix(
+                let builder = self.with_formula_offsets(counts, &full)?;
+                let mut output = builder.run_matrix(
                     analysis,
                     &full.design.standard_design,
                     reduced.as_deref(),
-                )
+                )?;
+                if builder.formula_sample_factors {
+                    retain_formula_normalization_factors(&mut output, counts)?;
+                }
+                Ok(output)
             }
         }
     }
@@ -166,9 +197,16 @@ impl DeseqBuilder {
             ..*analysis
         };
         let fit = builder.run_matrix(&map, design, None)?.into_fit_only()?;
-        builder
-            .wald_beta_prior(analysis.counts, &full, fit, &contrast)
-            .map(RunOutput::BetaPrior)
+        let mut output = RunOutput::BetaPrior(builder.wald_beta_prior(
+            analysis.counts,
+            &full,
+            fit,
+            &contrast,
+        )?);
+        if builder.formula_sample_factors {
+            retain_formula_normalization_factors(&mut output, analysis.counts)?;
+        }
+        Ok(output)
     }
 
     fn run_matrix(

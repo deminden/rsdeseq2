@@ -1,6 +1,7 @@
 use super::*;
 use crate::contrasts::resolve_factor_level_alias;
 use crate::errors::{FactorLevelRole, invalid_formula};
+use std::sync::Arc;
 impl Default for DeseqBuilder {
     fn default() -> Self {
         Self::new()
@@ -15,6 +16,7 @@ impl DeseqBuilder {
             test: TestType::default(),
             size_factor_options: SizeFactorOptions::default(),
             normalization_factors: None,
+            formula_sample_factors: false,
             observation_weights: None,
             observation_weight_options: ObservationWeightOptions::default(),
             threads: None,
@@ -91,7 +93,7 @@ impl DeseqBuilder {
     /// As in DESeq2, these count-scale factors preempt size factors for
     /// normalized counts and fixed-dispersion GLM offsets.
     pub fn normalization_factors(mut self, normalization_factors: RowMajorMatrix<f64>) -> Self {
-        self.normalization_factors = Some(normalization_factors);
+        self.normalization_factors = Some(Arc::new(normalization_factors));
         self
     }
 
@@ -101,7 +103,7 @@ impl DeseqBuilder {
     /// weighted base metadata. Design-aware stages first row-normalize and
     /// check them with `getAndCheckWeights`-style preprocessing.
     pub fn observation_weights(mut self, observation_weights: RowMajorMatrix<f64>) -> Self {
-        self.observation_weights = Some(observation_weights);
+        self.observation_weights = Some(Arc::new(observation_weights));
         self
     }
 
@@ -365,12 +367,12 @@ impl DeseqBuilder {
 
     /// Current caller-supplied normalization factors, if any.
     pub fn current_normalization_factors(&self) -> Option<&RowMajorMatrix<f64>> {
-        self.normalization_factors.as_ref()
+        self.normalization_factors.as_deref()
     }
 
     /// Current caller-supplied observation weights, if any.
     pub fn current_observation_weights(&self) -> Option<&RowMajorMatrix<f64>> {
-        self.observation_weights.as_ref()
+        self.observation_weights.as_deref()
     }
 
     /// Current observation-weight preprocessing options.
@@ -420,6 +422,7 @@ impl DeseqBuilder {
         Ok(reduced.design.standard_design)
     }
 
+    /// Prepare the model frame and effective normalization factors for a formula.
     pub(super) fn with_formula_offsets(
         &self,
         counts: &CountMatrix,
@@ -440,34 +443,42 @@ impl DeseqBuilder {
             ));
         }
         let mut builder = self.clone().model_frame(formula_design.model_frame.clone());
-        if self.normalization_factors.is_none() {
-            let control_gene_indices = self
-                .size_factor_options
-                .control_genes
-                .as_ref()
-                .map(|control| control.to_indices(counts.n_genes()))
-                .transpose()?;
-            let size_factors = match &self.size_factor_options.supplied_size_factors {
-                Some(values) => values.clone(),
-                None => estimate_size_factors_for_dataset(
-                    counts,
-                    self.size_factor_options.method,
-                    self.size_factor_options.geo_means.as_deref(),
-                    control_gene_indices.as_deref(),
-                )?,
-            };
-            builder.size_factor_options.supplied_size_factors = Some(size_factors);
-        }
-        builder.normalization_factors =
-            Some(crate::normalization::normalization_factors_with_offsets(
+        if let Some(factors) = self.normalization_factors.as_deref() {
+            let effective = crate::normalization::normalization_factors_with_offsets(
                 counts.n_genes(),
                 counts.n_samples(),
-                builder.size_factor_options.supplied_size_factors.as_deref(),
-                self.normalization_factors.as_ref().map(Into::into),
+                self.size_factor_options.supplied_size_factors.as_deref(),
+                Some(factors.into()),
                 &formula_design.offsets,
+            )?;
+            builder = builder.normalization_factors(effective);
+            builder.size_factor_options.supplied_size_factors = None;
+            return Ok(builder);
+        }
+
+        let control_gene_indices = self
+            .size_factor_options
+            .control_genes
+            .as_ref()
+            .map(|control| control.to_indices(counts.n_genes()))
+            .transpose()?;
+        let base_factors = match &self.size_factor_options.supplied_size_factors {
+            Some(values) => std::borrow::Cow::Borrowed(values.as_slice()),
+            None => std::borrow::Cow::Owned(estimate_size_factors_for_dataset(
+                counts,
+                self.size_factor_options.method,
+                self.size_factor_options.geo_means.as_deref(),
+                control_gene_indices.as_deref(),
+            )?),
+        };
+        builder.size_factor_options.supplied_size_factors =
+            Some(crate::normalization::sample_factors_with_offsets(
+                &base_factors,
+                &formula_design.offsets,
+                counts.n_samples(),
             )?);
-        // Offsets are now in the matrix factors; sample-only scales are unused.
-        builder.size_factor_options.supplied_size_factors = None;
+        builder.size_factor_options.control_genes = None;
+        builder.formula_sample_factors = true;
         Ok(builder)
     }
 }
