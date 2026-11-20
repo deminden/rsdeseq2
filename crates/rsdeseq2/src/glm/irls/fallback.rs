@@ -10,12 +10,7 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
     beta_optim_start_values: &mut [f64],
     beta_covariance_values: &mut [f64],
     mu_values: &mut [f64],
-    beta_converged: &mut [bool],
-    optim_log_like: &mut [Option<f64>],
-    beta_optim_iter: &mut [f64],
-    beta_optim_start_objective: &mut [f64],
-    beta_optim_objective: &mut [f64],
-    beta_optim_gradient_norm: &mut [f64],
+    mut diagnostics: Option<&mut FitDiagnostics>,
     input: OptimFallbackInput<'_, SELECTED>,
 ) -> Result<(), DeseqError> {
     let p = input.x.ncols();
@@ -128,17 +123,16 @@ pub(super) fn refit_optim_fallback_rows<const SELECTED: bool>(
         // DESeq2 updates beta, SE, mu, and log-likelihood after L-BFGS-B
         // fallback, but preserves the original IRLS hat diagonals returned by
         // fitBetaWrapper. Cook's replacement relies on that pre-optim leverage.
-        beta_converged[gene] = output.converged;
-        beta_optim_iter[gene] = output.iterations as f64;
-        beta_optim_start_objective[gene] = start_objective;
-        beta_optim_objective[gene] = output.value;
-        beta_optim_gradient_norm[gene] = final_gradient_norm;
-        optim_log_like[gene] = Some(nbinom_log_likelihood_weighted(
-            counts_row,
-            &inference_mu,
-            dispersion,
-            weight_row,
-        )?);
+        let likelihood =
+            nbinom_log_likelihood_weighted(counts_row, &inference_mu, dispersion, weight_row)?;
+        if let Some(diagnostics) = &mut diagnostics {
+            diagnostics.beta_converged[gene] = output.converged;
+            diagnostics.beta_optim_iter[gene] = output.iterations as f64;
+            diagnostics.beta_optim_start_objective[gene] = start_objective;
+            diagnostics.beta_optim_objective[gene] = output.value;
+            diagnostics.beta_optim_gradient_norm[gene] = final_gradient_norm;
+            diagnostics.refit_log_like.push(likelihood);
+        }
     }
     Ok(())
 }

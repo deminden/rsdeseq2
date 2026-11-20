@@ -43,33 +43,35 @@ pub(crate) struct FixedDispersionLikelihood<'a> {
     dispersion: f64,
     gene: usize,
     size: f64,
-    gamma_terms: Vec<f64>,
+    gamma_terms: &'a [f64],
 }
 
 impl<'a> FixedDispersionLikelihood<'a> {
-    pub(crate) fn new(counts: &'a [u32], dispersion: f64, gene: usize) -> Self {
+    pub(crate) fn new(
+        counts: &'a [u32],
+        dispersion: f64,
+        gene: usize,
+        gamma_terms: &'a mut Vec<f64>,
+    ) -> Self {
         let size = dispersion.recip();
         let gamma_size = ln_gamma(size);
         let gamma_one = ln_gamma(1.0);
-        let gamma_terms = counts
-            .iter()
-            .copied()
-            .map(|count| {
-                let y = f64::from(count);
-                // Preserve both subtractions before the mean-dependent terms.
-                let gamma_y_size = if count == 0 {
-                    gamma_size
-                } else {
-                    ln_gamma(y + size)
-                };
-                let gamma_y_one = if count == 0 {
-                    gamma_one
-                } else {
-                    ln_gamma(y + 1.0)
-                };
-                gamma_y_size - gamma_size - gamma_y_one
-            })
-            .collect();
+        gamma_terms.clear();
+        gamma_terms.extend(counts.iter().copied().map(|count| {
+            let y = f64::from(count);
+            // Preserve both subtractions before the mean-dependent terms.
+            let gamma_y_size = if count == 0 {
+                gamma_size
+            } else {
+                ln_gamma(y + size)
+            };
+            let gamma_y_one = if count == 0 {
+                gamma_one
+            } else {
+                ln_gamma(y + 1.0)
+            };
+            gamma_y_size - gamma_size - gamma_y_one
+        }));
         Self {
             counts,
             dispersion,
@@ -90,7 +92,7 @@ impl<'a> FixedDispersionLikelihood<'a> {
             self.dispersion,
             weights,
             Some(self.gene),
-            Some((&self.gamma_terms, self.size)),
+            Some((self.gamma_terms, self.size)),
         )
     }
 }
@@ -224,20 +226,15 @@ pub fn nbinom_log_likelihood_matrix(
         });
     }
 
-    let mut out = Vec::with_capacity(counts.n_genes());
-    for (gene, dispersion) in dispersions.iter().copied().enumerate() {
-        let count_row = counts.row(gene)?;
-        let mu_row = mu.row(gene)?;
-        let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
-        out.push(nbinom_log_likelihood_with_cached_gamma(
-            count_row,
-            mu_row,
-            dispersion,
-            weight_row,
-            Some(gene),
-            None,
-        )?);
-    }
+    let mut out = try_alloc_matrix(counts.n_genes(), 1, "NB log likelihoods")?;
+    visit_nbinom_log_likelihood_rows(
+        counts,
+        mu,
+        dispersions,
+        weights,
+        0..counts.n_genes(),
+        |value| out.push(value),
+    )?;
     Ok(out)
 }
 
@@ -250,10 +247,30 @@ pub(crate) fn nbinom_log_likelihood_selected_rows(
     genes: &[usize],
 ) -> Result<Vec<f64>, DeseqError> {
     let mut result = try_alloc_matrix(genes.len(), 1, "selected NB log likelihoods")?;
-    for (gene, &source_gene) in genes.iter().enumerate() {
+    visit_nbinom_log_likelihood_rows(
+        counts,
+        mu,
+        dispersions,
+        weights,
+        genes.iter().copied(),
+        |value| result.push(value),
+    )?;
+    Ok(result)
+}
+
+/// Evaluate likelihoods on already aligned inputs in fit order.
+pub(crate) fn visit_nbinom_log_likelihood_rows(
+    counts: &CountMatrix,
+    mu: &RowMajorMatrix<f64>,
+    dispersions: &[f64],
+    weights: Option<&RowMajorMatrix<f64>>,
+    source_genes: impl Iterator<Item = usize>,
+    mut write: impl FnMut(f64),
+) -> Result<(), DeseqError> {
+    for (gene, source_gene) in source_genes.enumerate() {
         let count_row = counts.row(source_gene)?;
         let weight_row = weights.map(|matrix| matrix.row(source_gene)).transpose()?;
-        result.push(nbinom_log_likelihood_with_cached_gamma(
+        write(nbinom_log_likelihood_with_cached_gamma(
             count_row,
             mu.row(gene)?,
             dispersions[source_gene],
@@ -262,7 +279,7 @@ pub(crate) fn nbinom_log_likelihood_selected_rows(
             None,
         )?);
     }
-    Ok(result)
+    Ok(())
 }
 
 fn nbinom_log_pmf_unchecked(count: u32, mu: f64, dispersion: f64) -> f64 {

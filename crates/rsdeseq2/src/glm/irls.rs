@@ -15,6 +15,7 @@ use crate::glm::beta::{GlmInput, fit_intercept_only_glm};
 use crate::glm::fallback::requires_optim_fallback;
 use crate::glm::nb::{
     FixedDispersionLikelihood, nbinom_log_likelihood_matrix, nbinom_log_likelihood_selected_rows,
+    visit_nbinom_log_likelihood_rows,
 };
 use crate::glm::r_arithmetic::{nbinom_log, normal_log};
 use crate::math::optim::BoundedOptimizationOutput;
@@ -589,14 +590,7 @@ fn fit_irls_rows<const SELECTED: bool>(
     } else {
         Vec::new()
     };
-    let mut beta_iter = try_alloc_matrix(genes, 1, "IRLS iteration counts")?;
-    let mut beta_converged = try_alloc_matrix(genes, 1, "IRLS convergence flags")?;
-    let mut beta_optim_iter = try_filled_vec(genes, f64::NAN, "IRLS refit iteration counts")?;
-    let mut beta_optim_start_objective =
-        try_filled_vec(genes, f64::NAN, "IRLS refit starting objectives")?;
-    let mut beta_optim_objective = try_filled_vec(genes, f64::NAN, "IRLS refit objectives")?;
-    let mut beta_optim_gradient_norm =
-        try_filled_vec(genes, f64::NAN, "IRLS refit gradient norms")?;
+    let mut diagnostics = inference.then(|| FitDiagnostics::new(genes)).transpose()?;
 
     let covariance_rows = if inference {
         rayon::iter::Either::Left(
@@ -657,15 +651,20 @@ fn fit_irls_rows<const SELECTED: bool>(
     let mut fallback_rows = Vec::new();
     for (gene, status) in row_statuses.into_iter().enumerate() {
         let status = status?;
-        beta_iter.push(status.iter);
-        beta_converged.push(status.converged);
+        if let Some(diagnostics) = &mut diagnostics {
+            diagnostics.beta_iter.push(status.iter);
+            diagnostics.beta_converged.push(status.converged);
+        }
         if status.refit {
             fallback_rows.push(gene);
         }
     }
 
-    let mut optim_log_like = try_filled_vec(genes, None, "IRLS refit log likelihoods")?;
     if !fallback_rows.is_empty() {
+        if let Some(diagnostics) = &mut diagnostics {
+            diagnostics.refit_log_like =
+                try_alloc_matrix(fallback_rows.len(), 1, "IRLS refit log likelihoods")?;
+        }
         refit_optim_fallback_rows(
             &fallback_rows,
             &mut beta_values,
@@ -673,12 +672,7 @@ fn fit_irls_rows<const SELECTED: bool>(
             &mut beta_optim_start_values,
             &mut beta_covariance_values,
             &mut mu_values,
-            &mut beta_converged,
-            &mut optim_log_like,
-            &mut beta_optim_iter,
-            &mut beta_optim_start_objective,
-            &mut beta_optim_objective,
-            &mut beta_optim_gradient_norm,
+            diagnostics.as_mut(),
             OptimFallbackInput {
                 rows,
                 x: &x,
@@ -690,6 +684,22 @@ fn fit_irls_rows<const SELECTED: bool>(
     }
     let beta = RowMajorMatrix::from_row_major(genes, p, beta_values)?;
     let mu = RowMajorMatrix::from_row_major(genes, samples, mu_values)?;
+    let Some(diagnostics) = diagnostics else {
+        // Evaluate likelihoods in the same order, including after an optimizer refit.
+        visit_nbinom_log_likelihood_rows(
+            rows.input.counts,
+            &mu,
+            rows.input.dispersions,
+            rows.input.weights,
+            (0..genes).map(|gene| rows.source(gene)),
+            |_| {},
+        )?;
+        return match requirements {
+            OutputRequirements::Means => Ok(IrlsOutput::Matrix(mu)),
+            OutputRequirements::Transform => Ok(IrlsOutput::Matrix(beta)),
+            OutputRequirements::Inference => Err(crate::errors::invariant("IRLS fit diagnostics")),
+        };
+    };
     let mut log_like = if SELECTED {
         nbinom_log_likelihood_selected_rows(
             rows.input.counts,
@@ -706,16 +716,8 @@ fn fit_irls_rows<const SELECTED: bool>(
             rows.input.weights,
         )?
     };
-    for (likelihood, optimized) in log_like.iter_mut().zip(optim_log_like) {
-        if let Some(value) = optimized {
-            *likelihood = value;
-        }
-    }
-
-    match requirements {
-        OutputRequirements::Means => return Ok(IrlsOutput::Matrix(mu)),
-        OutputRequirements::Transform => return Ok(IrlsOutput::Matrix(beta)),
-        OutputRequirements::Inference => {}
+    for (gene, likelihood) in fallback_rows.into_iter().zip(diagnostics.refit_log_like) {
+        log_like[gene] = likelihood;
     }
     let beta_se = RowMajorMatrix::from_row_major(genes, p, beta_var_values)?;
     let beta_optim_start = RowMajorMatrix::from_row_major(genes, p, beta_optim_start_values)?;
@@ -727,21 +729,49 @@ fn fit_irls_rows<const SELECTED: bool>(
     let hat_diagonal = RowMajorMatrix::from_row_major(genes, samples, hat_values)?;
     Ok(IrlsOutput::Inference(NbinomGlmFit {
         log_like,
-        beta_converged,
+        beta_converged: diagnostics.beta_converged,
         beta,
         beta_se,
         beta_optim_start,
         beta_covariance,
         mu,
-        beta_iter,
-        beta_optim_iter,
-        beta_optim_start_objective,
-        beta_optim_objective,
-        beta_optim_gradient_norm,
+        beta_iter: diagnostics.beta_iter,
+        beta_optim_iter: diagnostics.beta_optim_iter,
+        beta_optim_start_objective: diagnostics.beta_optim_start_objective,
+        beta_optim_objective: diagnostics.beta_optim_objective,
+        beta_optim_gradient_norm: diagnostics.beta_optim_gradient_norm,
         model_matrix: design.clone(),
         n_terms: p,
         hat_diagonal,
     }))
+}
+
+struct FitDiagnostics {
+    beta_iter: Vec<usize>,
+    beta_converged: Vec<bool>,
+    beta_optim_iter: Vec<f64>,
+    beta_optim_start_objective: Vec<f64>,
+    beta_optim_objective: Vec<f64>,
+    beta_optim_gradient_norm: Vec<f64>,
+    refit_log_like: Vec<f64>,
+}
+
+impl FitDiagnostics {
+    fn new(genes: usize) -> Result<Self, DeseqError> {
+        Ok(Self {
+            beta_iter: try_alloc_matrix(genes, 1, "IRLS iteration counts")?,
+            beta_converged: try_alloc_matrix(genes, 1, "IRLS convergence flags")?,
+            beta_optim_iter: try_filled_vec(genes, f64::NAN, "IRLS refit iteration counts")?,
+            beta_optim_start_objective: try_filled_vec(
+                genes,
+                f64::NAN,
+                "IRLS refit starting objectives",
+            )?,
+            beta_optim_objective: try_filled_vec(genes, f64::NAN, "IRLS refit objectives")?,
+            beta_optim_gradient_norm: try_filled_vec(genes, f64::NAN, "IRLS refit gradient norms")?,
+            refit_log_like: Vec::new(),
+        })
+    }
 }
 
 fn checked_output_elements(rows: usize, columns: usize) -> Result<usize, DeseqError> {

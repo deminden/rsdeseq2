@@ -9,6 +9,7 @@ pub(super) struct IrlsScratch {
     fitted_means: Vec<f64>,
     weights: Vec<f64>,
     response: Vec<f64>,
+    gamma_terms: Vec<f64>,
     coefficients: DVector<f64>,
     least_squares: LeastSquaresScratch,
     covariance: CovarianceScratch,
@@ -36,6 +37,7 @@ impl IrlsScratch {
             fitted_means: try_alloc_matrix(samples, 1, "IRLS fitted mean scratch")?,
             weights: try_alloc_matrix(samples, 1, "IRLS weight scratch")?,
             response: try_alloc_matrix(samples, 1, "IRLS response scratch")?,
+            gamma_terms: try_alloc_matrix(samples, 1, "IRLS gamma term scratch")?,
             coefficients: try_zero_dvector(coefficients, "IRLS coefficient scratch")?,
             least_squares: LeastSquaresScratch::default(),
             covariance: CovarianceScratch::default(),
@@ -70,6 +72,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         fitted_means: mu,
         weights: w,
         response: z,
+        gamma_terms,
         coefficients: beta,
         least_squares,
         covariance: covariance_scratch,
@@ -96,7 +99,8 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         Some(log_nf),
         mu,
     )?;
-    let likelihood = FixedDispersionLikelihood::new(count_row, dispersion, source_gene);
+    let likelihood =
+        FixedDispersionLikelihood::new(count_row, dispersion, source_gene, gamma_terms);
     let mut dev_old = 0.0;
     let mut iter = 0_usize;
     let mut converged = false;

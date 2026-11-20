@@ -1464,6 +1464,26 @@ golden check. The final rank and weight regression run passed nine
 tests in each profile. The numeric rank unit check, Clippy, formatting
 and the module dependency check also passed.
 
+### IRLS likelihood scratch and diagnostic retention
+
+IRLS now reuses the negative-binomial gamma-term buffer across rows
+in the same Rayon task. Means-only and transform fits skip the
+inference diagnostic vectors and evaluate the final likelihoods in
+fit order without collecting them. Full inference stores replacement
+likelihoods only for rows the optimizer refits and writes those
+values back to their original fit positions.
+
+A paired macOS arm64 probe used 8,192 genes, eight samples, two workers
+and the portable profile. Across three runs, median allocation and
+reallocation calls fell from 16,582 to 8,393 for the rlog transform
+and from 24,789 to 16,605 for the rlog inference fit against `b624785`.
+Transform, likelihood and standard-error checksums matched on all
+pairs. Median runtime was within approximately 5% on both workloads.
+
+Each numeric profile passed 180 focused IRLS, likelihood, dispersion
+and transform tests and matched all 8,032 golden fields. Integration
+Clippy, formatting, documentation and module dependency checks passed.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
@@ -1479,7 +1499,7 @@ and the module dependency check also passed.
 | 9. Rank and initial coefficients | `aaea914` implemented R's rank rule and `1977237` aligned rank-deficient starts. The independently generated rank reference includes scaled near-collinear designs. |
 | 10. Modules and dependency cycles | Core and R bridge use modules. The module checker reports zero mutual top-level dependency pairs. It runs in Rust CI. |
 | 11. Cargo features and workspace | The four Cargo packages separate numerical, formula, shrinkage and DESeq workflow code. Formula, shrinkage and CLI features are checked independently. The CLI ships from the workflow crate and the R native backend has its own package manifest. |
-| 12. Release build and IRLS buffers | Release uses thin LTO, one codegen unit and unwinding. IRLS reuses worker buffers, writes outputs directly and skips unrequested covariance and hat work. The [QR work](#direct-householder-projection-for-wider-designs) records the measured range used by the direct solver. |
+| 12. Release build and IRLS buffers | Release uses thin LTO, one codegen unit and unwinding. IRLS reuses worker buffers, writes outputs directly and skips unrequested covariance, hat and [diagnostic retention](#irls-likelihood-scratch-and-diagnostic-retention). The [QR work](#direct-householder-projection-for-wider-designs) records the measured range used by the direct solver. |
 | 13. Test layout, fuzzing and fixtures | One integration binary shares a support module. The suite has property tests and seven fuzz targets, including parsing and transactional publication. The large GTEx tables are restored by hash. Reference breadth covers small, sparse and 500-plus-sample designs, and a previous Bioconductor release. |
 | 14. CI and toolchain | Pinned workflows cover locked builds, caching, Rust 1.96.0, dependency audit, semver, coverage, mutation tests, Miri and R sanitizers. The [local release checkpoint](#batched-local-060-release-validation) records offline builds with the minimum toolchain. |
 | 15. R bridge | Native entries are guarded and CI denies undocumented Rust unsafe blocks. The offline package passed both R reference environments and SIGINT recovery. R 4.6.2 reported one compiled-code warning for the Rust runtime's `abort` import. |
