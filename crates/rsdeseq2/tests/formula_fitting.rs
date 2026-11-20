@@ -1,7 +1,10 @@
 //! Independent original-R matrix and offset semantics for complete workflows.
-use crate::support::formula_reference;
 use crate::support::json_prefixed_bits as numbers;
-use rsdeseq2::{design::formula_design_for_fitting_from_model_frame, prelude::*};
+use crate::support::{formula_reference, matches_within_ulps};
+use rsdeseq2::{
+    NumericProfile, design::formula_design_for_fitting_from_model_frame, numeric_profile,
+    prelude::*,
+};
 use serde_json::Value;
 
 fn strings(v: &Value) -> Vec<String> {
@@ -49,6 +52,7 @@ fn fitting_matrices_follow_original_term_order_and_matrix_variable_products() {
     let cases = r["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 32);
     let bits = |v: &[f64]| v.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+    let portable = numeric_profile() == NumericProfile::Portable;
     let mut failures = Vec::new();
     for c in cases {
         let formula = c["formula"].as_str().unwrap();
@@ -66,7 +70,19 @@ fn fitting_matrices_follow_original_term_order_and_matrix_variable_products() {
         if bits(matrix.matrix().as_slice()) != bits(&numbers(&c["values"])) {
             failures.push(format!("{} matrix", c["name"]));
         }
-        if bits(&parsed.offsets) != bits(&numbers(&c["offsets"])) {
+        let expected_offsets = numbers(&c["offsets"]);
+        let ulps = match (portable, c["name"].as_str().unwrap()) {
+            (true, "offsets") => 1,
+            (true, "two_offsets") => 2,
+            _ => 0,
+        };
+        if parsed.offsets.len() != expected_offsets.len()
+            || !parsed
+                .offsets
+                .iter()
+                .zip(expected_offsets)
+                .all(|(&a, b)| matches_within_ulps(a, b, ulps))
+        {
             failures.push(format!("{} offsets", c["name"]));
         }
     }

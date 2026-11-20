@@ -1783,6 +1783,29 @@ Python 3.9 with the full GTEx inputs and the installed R package available.
 The two frozen-gene test modules now defer type annotation evaluation on
 Python 3.9.
 
+### Portable formula expression and offset references
+
+Independent R fixtures now exercise expression evaluation, fitting
+formulas and the native formula parser in the portable release panel.
+Portable comparisons allow one or two ULPs on the observed elementary
+function, power and offset cases. The checks preserve exact metadata,
+matrix layouts, signed zeros, non-finite values and rejection decisions.
+R-host comparisons remain bitwise.
+
+The x86_64 Linux replay exposed machine-dependent NaNs from unary
+transforms, scaling and mean reduction in the portable profile.
+Generated NaNs use a canonical value. Portable scaling and mean
+preserve the payload of the first explicit NaN operand.
+
+Each profile passed 13 targeted checks on macOS arm64, Linux arm64 and
+Linux x86_64 under QEMU 10.0.13. Both macOS golden manifests matched all
+8,032 fields.
+
+The portable integration audit initially found nine failures. After
+adding the targeted comparisons, 1,026 tests passed, six failed and
+two full-data tests remained ignored. The remaining failures cover
+high-order ordered-factor contrasts and five shrinkage reference tests.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

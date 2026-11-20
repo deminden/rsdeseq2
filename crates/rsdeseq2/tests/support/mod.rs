@@ -175,6 +175,17 @@ pub fn json_prefixed_bits(values: &serde_json::Value) -> Vec<f64> {
         .collect()
 }
 
+pub fn matches_within_ulps(actual: f64, expected: f64, ulps: u64) -> bool {
+    let actual_bits = actual.to_bits();
+    let expected_bits = expected.to_bits();
+    actual_bits == expected_bits
+        || (actual.is_finite()
+            && expected.is_finite()
+            && actual != 0.0
+            && expected != 0.0
+            && actual_bits.abs_diff(expected_bits) <= ulps)
+}
+
 pub fn optional_bits(values: &[Option<f64>]) -> Vec<Option<u64>> {
     values.iter().map(|value| value.map(f64::to_bits)).collect()
 }

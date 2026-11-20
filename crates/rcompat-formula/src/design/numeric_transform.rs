@@ -6,7 +6,7 @@ use crate::errors::Error;
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::errors::{invalid_dimensions, invalid_options};
 use crate::matrix::{MatrixView, RowMajorMatrix, try_alloc_matrix};
-use crate::numeric::profile::{r_linux_arm64, r_linux_x86};
+use crate::numeric::profile::{NumericProfile, numeric_profile, r_linux_arm64, r_linux_x86};
 
 pub(in crate::design) mod binary128;
 
@@ -127,6 +127,7 @@ pub(super) fn scale_expression(
     let mut divisors = (!matches!(scale, ScalePolicy::Disabled))
         .then(|| try_alloc_matrix(columns, 1, "scale divisors"))
         .transpose()?;
+    let portable = numeric_profile() == NumericProfile::Portable;
     for column in 0..columns {
         // R's column mean is a single reduction; poly's scalar mean has a
         // correction pass. They are different operations, not frontend modes.
@@ -153,11 +154,23 @@ pub(super) fn scale_expression(
             ScalePolicy::Disabled => 0.0,
             ScalePolicy::Supplied(v) => v[column],
         };
-        for row in 0..rows {
-            values[row * columns + column] = if matches!(center, ScalePolicy::Disabled) {
-                *input.at(row, column)
+        let center_value =
+            if portable && matches!(center, ScalePolicy::Automatic) && center_value.is_nan() {
+                f64::NAN
             } else {
-                *input.at(row, column) - center_value
+                center_value
+            };
+        for row in 0..rows {
+            let original = *input.at(row, column);
+            values[row * columns + column] = if matches!(center, ScalePolicy::Disabled) {
+                original
+            } else {
+                let value = original - center_value;
+                if portable && value.is_nan() {
+                    first_nan([original, center_value])
+                } else {
+                    value
+                }
             };
         }
         let divisor = match scale {
@@ -180,7 +193,13 @@ pub(super) fn scale_expression(
         };
         if !matches!(scale, ScalePolicy::Disabled) {
             for row in 0..rows {
-                values[row * columns + column] /= divisor;
+                let entry = &mut values[row * columns + column];
+                let value = *entry / divisor;
+                *entry = if portable && value.is_nan() {
+                    first_nan([*entry, divisor])
+                } else {
+                    value
+                };
             }
         }
         if let Some(v) = &mut centers {
@@ -219,8 +238,22 @@ pub fn scalar_mean(values: &[f64]) -> f64 {
     } else if r_linux_x86() {
         extended::mean(values)
     } else {
-        scalar_mean_binary64(values)
+        let mean = scalar_mean_binary64(values);
+        if mean.is_nan() && numeric_profile() == NumericProfile::Portable {
+            first_nan(values.iter().copied())
+        } else {
+            mean
+        }
     }
+}
+
+fn first_nan(values: impl IntoIterator<Item = f64>) -> f64 {
+    values
+        .into_iter()
+        .find(|value| value.is_nan())
+        .map_or(f64::NAN, |value| {
+            f64::from_bits(value.to_bits() | (1 << 51))
+        })
 }
 
 fn scalar_mean_binary64(values: &[f64]) -> f64 {

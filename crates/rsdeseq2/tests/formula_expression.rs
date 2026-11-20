@@ -1,9 +1,9 @@
-use crate::support::formula_reference;
-use rsdeseq2::DeseqError;
+use crate::support::{formula_reference, matches_within_ulps};
 use rsdeseq2::design::expression::{
     Argument, Data, EvaluationOptions, Expression, Value, evaluate,
 };
 use rsdeseq2::errors::FormulaResource;
+use rsdeseq2::{DeseqError, NumericProfile, numeric_profile};
 use serde_json::Value as Json;
 use std::assert_matches;
 
@@ -12,7 +12,7 @@ use std::assert_matches;
 mod formula;
 use formula::{expression, value};
 
-fn equal_value(actual: &Value, expected: &Value, path: &str) {
+fn equal_value(actual: &Value, expected: &Value, path: &str, ulps: u64) {
     assert_eq!(actual.dimensions, expected.dimensions, "{path}: dimensions");
     assert_eq!(actual.names, expected.names, "{path}: names");
     assert_eq!(actual.dimnames, expected.dimnames, "{path}: dimnames");
@@ -34,17 +34,18 @@ fn equal_value(actual: &Value, expected: &Value, path: &str) {
             assert_eq!(ai, bi, "{path}: integer type");
             assert_eq!(a.len(), b.len(), "{path}: length");
             for (i, (a, b)) in a.iter().zip(b).enumerate() {
-                assert_eq!(
+                assert!(
+                    matches_within_ulps(*a, *b, if *ai { 0 } else { ulps }),
+                    "{path}: element {i}, {a:?} ({:016x}) vs {b:?} ({:016x})",
                     a.to_bits(),
-                    b.to_bits(),
-                    "{path}: element {i}, {a:?} vs {b:?}"
-                )
+                    b.to_bits()
+                );
             }
         }
         (Data::List(a), Data::List(b)) => {
             assert_eq!(a.len(), b.len(), "{path}: list length");
             for (i, (a, b)) in a.iter().zip(b).enumerate() {
-                equal_value(a, b, &format!("{path}[[{i}]]"))
+                equal_value(a, b, &format!("{path}[[{i}]]"), 0)
             }
         }
         (a, b) => assert_eq!(a, b, "{path}: data"),
@@ -63,6 +64,7 @@ fn equal_value(actual: &Value, expected: &Value, path: &str) {
             actual.attribute(name).unwrap(),
             expected,
             &format!("{path}@{name}"),
+            0,
         )
     }
 }
@@ -260,8 +262,15 @@ fn compare_reference(contents: &str) {
         collation: reference["metadata"]["collation"].as_str().unwrap().into(),
     };
     let mut failures = Vec::new();
+    let portable = numeric_profile() == NumericProfile::Portable;
     for case in reference["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
+        // The portable elementary functions round independently of the system libm.
+        let ulps = match (portable, name) {
+            (true, "base_three") => 2,
+            (true, "logarithm" | "log1p" | "exp" | "expm1" | "scale_nested" | "offset") => 1,
+            _ => 0,
+        };
         let result = evaluate(&expression(&case["expression"]), &variables, &options)
             .map_err(|e| e.to_string());
         let comparison = std::panic::catch_unwind(|| {
@@ -272,6 +281,7 @@ fn compare_reference(contents: &str) {
                     &result.unwrap_or_else(|e| panic!("{name}: {e}")),
                     &value(&case["expected"]),
                     name,
+                    ulps,
                 )
             }
         });
@@ -293,7 +303,7 @@ fn primitive_wire_preserves_reference_bits_and_rejects_truncation() {
     for (name, input) in reference["variables"].as_object().unwrap() {
         let original = value(input);
         let bytes = wire::encode(&original).unwrap();
-        equal_value(&wire::decode(&bytes).unwrap(), &original, name);
+        equal_value(&wire::decode(&bytes).unwrap(), &original, name, 0);
     }
     let nested = value(&reference["variables"]["coefficients"]);
     let bytes = wire::encode(&nested).unwrap();

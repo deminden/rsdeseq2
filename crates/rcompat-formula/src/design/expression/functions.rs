@@ -3,6 +3,7 @@ use crate::errors::Error;
 use crate::errors::invalid_formula;
 use crate::errors::{ErrorKind, missing_prerequisite};
 use crate::numeric::math::ProfileMath;
+use crate::numeric::profile::{NumericProfile, numeric_profile};
 
 pub(super) fn supported(name: &str) -> bool {
     matches!(
@@ -249,40 +250,48 @@ impl Evaluator<'_> {
         } else {
             std::f64::consts::E
         };
+        let portable = numeric_profile() == NumericProfile::Portable;
         let out = values
             .iter()
-            .map(|&v| match name {
-                "log" => {
-                    if base == 2.0 {
-                        v.log2_p()
-                    } else if base == 10.0 {
-                        v.log10_p()
-                    } else if base == std::f64::consts::E {
-                        v.ln_p()
-                    } else {
-                        v.ln_p() / base.ln_p()
+            .map(|&v| {
+                let result = match name {
+                    "log" => {
+                        if base == 2.0 {
+                            v.log2_p()
+                        } else if base == 10.0 {
+                            v.log10_p()
+                        } else if base == std::f64::consts::E {
+                            v.ln_p()
+                        } else {
+                            v.ln_p() / base.ln_p()
+                        }
                     }
-                }
-                "log2" => v.log2_p(),
-                "log10" => v.log10_p(),
-                "log1p" => crate::math::elementary::language_log1p(v),
-                "exp" => crate::math::elementary::language_exp(v),
-                "expm1" => crate::math::elementary::language_expm1(v),
-                "sqrt" => v.sqrt(),
-                "abs" => v.abs(),
-                "sign" => {
-                    if v.is_nan() {
-                        v
-                    } else if v == 0.0 {
-                        0.0
-                    } else {
-                        v.signum()
+                    "log2" => v.log2_p(),
+                    "log10" => v.log10_p(),
+                    "log1p" => crate::math::elementary::language_log1p(v),
+                    "exp" => crate::math::elementary::language_exp(v),
+                    "expm1" => crate::math::elementary::language_expm1(v),
+                    "sqrt" => v.sqrt(),
+                    "abs" => v.abs(),
+                    "sign" => {
+                        if v.is_nan() {
+                            v
+                        } else if v == 0.0 {
+                            0.0
+                        } else {
+                            v.signum()
+                        }
                     }
+                    "floor" => v.floor(),
+                    "ceiling" => v.ceil(),
+                    "trunc" => v.trunc(),
+                    _ => f64::NAN,
+                };
+                if portable && result.is_nan() && !v.is_nan() && !base.is_nan() {
+                    f64::NAN
+                } else {
+                    result
                 }
-                "floor" => v.floor(),
-                "ceiling" => v.ceil(),
-                "trunc" => v.trunc(),
-                _ => f64::NAN,
             })
             .collect();
         Ok(input.with_numbers(out, false))
