@@ -57,17 +57,30 @@ jobs:
         with:
           tool: cargo-mutants
       - name: Mutants in ${{ matrix.files }}
-        run: >-
-          cargo mutants -d crates/${{ matrix.crate }} -o . -f '${{ matrix.files }}' --timeout 600
-          ${{ matrix.tests }}
-          || true
+        shell: bash
+        env:
+          MUTATION_CRATE: ${{ matrix.crate }}
+          MUTATION_FILES: ${{ matrix.files }}
+        run: |
+          selection=(-p "$MUTATION_CRATE" -f "$MUTATION_FILES" --cargo-arg=--locked)
+          cargo mutants "${selection[@]}" --list --json | jq -e 'length > 0' > /dev/null
+
+          mutation_exit=0
+          cargo mutants "${selection[@]}" -o . --timeout 600 ${{ matrix.tests }} || mutation_exit=$?
+          # Missed mutants and mutant timeouts remain diagnostic results.
+          case "$mutation_exit" in
+            0|2|3) ;;
+            *) exit "$mutation_exit" ;;
+          esac
       - name: Summary
+        if: always() && hashFiles('mutants.out/outcomes.json') != ''
         run: |
           for kind in caught missed timeout unviable; do
             echo "$kind: $(wc -l < mutants.out/$kind.txt)" >> "$GITHUB_STEP_SUMMARY"
           done
           sed 's/^/- /' mutants.out/missed.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && hashFiles('mutants.out/**') != ''
         with:
           name: mutants-${{ strategy.job-index }}-${{ github.sha }}
           path: mutants.out
