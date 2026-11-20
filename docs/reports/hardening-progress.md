@@ -268,7 +268,22 @@ For the blocked condition's remaining p-value maximum
 (`ENSG00000168056.15`), the 80-digit posterior replay found a positive
 MAP objective gain of about `1.24e-10` at iteration eight. Both binary64
 paths measured a decrease of about `2.33e-10` at that step. The underlying
-objective magnitudes were about `6.45e5`.
+objective magnitudes were about `6.45e5`. Original DESeq2 refits using
+the saved portable gene-wise estimates reproduced both remaining Rust
+trend outputs within `7e-12`. In the fourth blocked split, a fixed-input
+refit of `ENSG00000217228.1` still differed by `2.11e-6` between Rust
+profiles with the same offsets and dispersion, after both fits reached
+the L-BFGS-B fallback.
+
+One paired four-worker run of the eleven portable contrasts took 34.84 s
+with the new likelihood and 35.64 s with the prior build from `c6caa1b`.
+Peak RSS was 264.27 MiB and 263.06 MiB, respectively.
+
+The `adc4027` archives built offline and all four Cargo archives
+reproduced byte for byte. The R archive passed all 2,874 expectations
+with zero skips on Linux arm64 R 4.6.2 and on macOS R 4.6.2 and R 4.5.3.
+Both R 4.6.2 checks recorded the existing compiled-symbol warning and
+vendoring notes. The R 4.5.3 check recorded the vendoring notes.
 
 ### Mutation workflow verification
 
