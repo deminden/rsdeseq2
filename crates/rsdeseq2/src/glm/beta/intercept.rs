@@ -55,6 +55,7 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
     } = input;
 
     let mut normalized_row = Vec::with_capacity(counts.n_samples());
+    let mut weighted_values = Vec::new();
     let mut beta_values = Vec::with_capacity(counts.n_genes());
     let mut mu_values =
         try_alloc_matrix(counts.n_genes(), counts.n_samples(), "intercept-only fit")?;
@@ -75,7 +76,7 @@ pub fn fit_intercept_only_glm(input: GlmInput<'_>) -> Result<NbinomGlmFit, Deseq
         );
         let weight_row = weights.map(|matrix| matrix.row(gene)).transpose()?;
         let mean_normalized = match weight_row {
-            Some(weights) => weighted_mean(&normalized_row, weights, gene)?,
+            Some(weights) => weighted_mean(&normalized_row, weights, gene, &mut weighted_values)?,
             None => {
                 if counts.is_all_zero_gene(gene)? {
                     return Err(DeseqError::InvalidCounts {
@@ -202,8 +203,9 @@ pub(super) fn weighted_mean(
     values: &[f64],
     weights: &[f64],
     gene: usize,
+    weighted_values: &mut Vec<f64>,
 ) -> Result<f64, DeseqError> {
-    let mut weighted_values = Vec::with_capacity(values.len());
+    weighted_values.clear();
     for (sample, (value, weight)) in values
         .iter()
         .copied()
@@ -218,7 +220,7 @@ pub(super) fn weighted_mean(
         };
         weighted_values.push(value_term);
     }
-    let Some(numerator_mean) = checked::mean(&weighted_values) else {
+    let Some(numerator_mean) = checked::mean(weighted_values) else {
         return Err(DeseqError::InvalidCounts {
             reason: format!("gene {gene} has non-finite weighted normalized mean"),
         });

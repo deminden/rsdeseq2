@@ -251,10 +251,13 @@ pub fn base_mean_with_weights(
 ) -> Result<Vec<f64>, DeseqError> {
     validate_weighted_base_inputs(normalized_counts, weights)?;
     let mut means = Vec::with_capacity(normalized_counts.n_rows());
+    let mut weighted_values = Vec::with_capacity(normalized_counts.n_cols());
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
         let weight_row = weights.row(gene)?;
-        let mean = checked_weighted_mean(row, weight_row, "weighted baseMean", gene)?;
+        let context = "weighted baseMean";
+        checked_weighted_values(row, weight_row, context, gene, &mut weighted_values)?;
+        let mean = checked::try_mean(&weighted_values).nonfinite_at(context, Some(gene))?;
         means.push(mean);
     }
     Ok(means)
@@ -299,6 +302,7 @@ pub fn base_variance_with_weights(
     validate_weighted_base_inputs(normalized_counts, weights)?;
     let n_samples = normalized_counts.n_cols();
     let mut variances = Vec::with_capacity(normalized_counts.n_rows());
+    let mut weighted_values = Vec::with_capacity(n_samples);
     for gene in 0..normalized_counts.n_rows() {
         let row = normalized_counts.row(gene)?;
         let weight_row = weights.row(gene)?;
@@ -306,7 +310,13 @@ pub fn base_variance_with_weights(
             variances.push(f64::NAN);
             continue;
         }
-        let weighted_values = checked_weighted_values(row, weight_row, "weighted baseVar", gene)?;
+        checked_weighted_values(
+            row,
+            weight_row,
+            "weighted baseVar",
+            gene,
+            &mut weighted_values,
+        )?;
         let mean = checked::try_mean(&weighted_values)
             .nonfinite_at("weighted baseVar mean", Some(gene))?;
         variances.push(
@@ -322,28 +332,19 @@ pub fn base_variance_with_weights(
     Ok(variances)
 }
 
-fn checked_weighted_mean(
-    values: &[f64],
-    weights: &[f64],
-    context: &str,
-    gene: usize,
-) -> Result<f64, DeseqError> {
-    let weighted_values = checked_weighted_values(values, weights, context, gene)?;
-    checked::try_mean(&weighted_values).nonfinite_at(context, Some(gene))
-}
-
 fn checked_weighted_values(
     values: &[f64],
     weights: &[f64],
     context: &str,
     gene: usize,
-) -> Result<Vec<f64>, DeseqError> {
-    let mut out = Vec::with_capacity(values.len());
+    out: &mut Vec<f64>,
+) -> Result<(), DeseqError> {
+    out.clear();
     for (value, weight) in values.iter().copied().zip(weights.iter().copied()) {
         let weighted = checked::try_mul(value, weight).nonfinite_at(context, Some(gene))?;
         out.push(weighted);
     }
-    Ok(out)
+    Ok(())
 }
 
 fn checked_sample_variance(values: &[f64], mean: f64) -> checked::Checked {

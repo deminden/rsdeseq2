@@ -5,6 +5,7 @@ use crate::errors::{ErrorKind, missing_prerequisite};
 pub(super) use crate::math::rank::{R_QR_TOLERANCE, matrix_rank, matrix_rank_r_qr};
 pub(super) use crate::matrix::RowMajorMatrix;
 use rcompat_numeric::matrix::try_alloc_matrix;
+use std::sync::Arc;
 
 /// A design matrix generated outside the Rust core or by the Rust design helpers.
 ///
@@ -15,11 +16,15 @@ use rcompat_numeric::matrix::try_alloc_matrix;
 /// formula-dependent result policy is relevant.
 #[derive(Clone)]
 pub struct DesignMatrix {
-    matrix: RowMajorMatrix<f64>,
-    coefficient_names: Option<Vec<String>>,
+    values: Arc<DesignValues>,
     origin: DesignOrigin,
     // Immutable design products shared across row optimizers and clones.
     cox_products: std::sync::OnceLock<Option<std::sync::Arc<SharedDesignProducts>>>,
+}
+
+struct DesignValues {
+    matrix: RowMajorMatrix<f64>,
+    coefficient_names: Option<Vec<String>>,
 }
 
 #[doc(hidden)]
@@ -32,15 +37,16 @@ pub struct SharedDesignProducts {
 
 impl PartialEq for DesignMatrix {
     fn eq(&self, other: &Self) -> bool {
-        self.matrix == other.matrix && self.coefficient_names == other.coefficient_names
+        self.values.matrix == other.values.matrix
+            && self.values.coefficient_names == other.values.coefficient_names
     }
 }
 
 impl std::fmt::Debug for DesignMatrix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DesignMatrix")
-            .field("matrix", &self.matrix)
-            .field("coefficient_names", &self.coefficient_names)
+            .field("matrix", &self.values.matrix)
+            .field("coefficient_names", &self.values.coefficient_names)
             .finish()
     }
 }
@@ -395,8 +401,10 @@ impl DesignMatrix {
         let matrix = RowMajorMatrix::from_row_major(n_samples, n_coefficients, values)?;
         matrix.validate_finite("design matrix")?;
         Ok(Self {
-            matrix,
-            coefficient_names,
+            values: Arc::new(DesignValues {
+                matrix,
+                coefficient_names,
+            }),
             origin: DesignOrigin::matrix(),
             cox_products: std::sync::OnceLock::new(),
         })
@@ -416,22 +424,22 @@ impl DesignMatrix {
 
     /// Number of samples.
     pub fn n_samples(&self) -> usize {
-        self.matrix.n_rows()
+        self.values.matrix.n_rows()
     }
 
     /// Number of coefficients.
     pub fn n_coefficients(&self) -> usize {
-        self.matrix.n_cols()
+        self.values.matrix.n_cols()
     }
 
     /// Reusable sample-index span.
     pub fn sample_indices(&self) -> core::range::Range<usize> {
-        self.matrix.row_indices()
+        self.values.matrix.row_indices()
     }
 
     /// Reusable coefficient-index span.
     pub fn coefficient_indices(&self) -> core::range::Range<usize> {
-        self.matrix.col_indices()
+        self.values.matrix.col_indices()
     }
 
     /// Return a contiguous sample-row block in row-major order.
@@ -442,17 +450,17 @@ impl DesignMatrix {
         &self,
         samples: R,
     ) -> Result<&[f64], Error> {
-        self.matrix.rows(samples)
+        self.values.matrix.rows(samples)
     }
 
     /// Matrix values.
     pub fn matrix(&self) -> &RowMajorMatrix<f64> {
-        &self.matrix
+        &self.values.matrix
     }
 
     /// Optional coefficient names.
     pub fn coefficient_names(&self) -> Option<&[String]> {
-        self.coefficient_names.as_deref()
+        self.values.coefficient_names.as_deref()
     }
 
     /// Resolve a coefficient name to its zero-based column index.
@@ -477,7 +485,7 @@ impl DesignMatrix {
     /// `dqrdc2`, tolerance 1e-7), the rank DESeq2's `checkFullRank` uses.
     pub fn rank(&self) -> Result<usize, Error> {
         matrix_rank_r_qr(
-            self.matrix.as_slice(),
+            self.values.matrix.as_slice(),
             self.n_samples(),
             self.n_coefficients(),
             R_QR_TOLERANCE,
@@ -487,7 +495,7 @@ impl DesignMatrix {
     /// Numerical rank using a caller-supplied absolute tolerance.
     pub fn rank_with_tolerance(&self, tolerance: f64) -> Result<usize, Error> {
         matrix_rank(
-            self.matrix.as_slice(),
+            self.values.matrix.as_slice(),
             self.n_samples(),
             self.n_coefficients(),
             tolerance,
@@ -546,8 +554,15 @@ impl DesignMatrix {
     fn zero_columns(&self, tolerance: f64) -> Vec<String> {
         let mut columns = Vec::new();
         for col in 0..self.n_coefficients() {
-            let is_zero = (0..self.n_samples())
-                .all(|row| self.matrix.get(row, col).copied().unwrap_or(0.0).abs() <= tolerance);
+            let is_zero = (0..self.n_samples()).all(|row| {
+                self.values
+                    .matrix
+                    .get(row, col)
+                    .copied()
+                    .unwrap_or(0.0)
+                    .abs()
+                    <= tolerance
+            });
             if is_zero {
                 columns.push(
                     self.coefficient_names()

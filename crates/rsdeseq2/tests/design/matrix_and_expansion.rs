@@ -15,6 +15,18 @@ fn intercept_only_design_has_named_all_ones_column() {
 }
 
 #[test]
+fn cloned_design_shares_matrix_and_coefficient_names() {
+    let design = DesignMatrix::intercept_only(3).unwrap();
+    let cloned = design.clone();
+
+    assert!(std::ptr::eq(design.matrix(), cloned.matrix()));
+    assert!(std::ptr::eq(
+        design.coefficient_names().unwrap(),
+        cloned.coefficient_names().unwrap(),
+    ));
+}
+
+#[test]
 fn design_matrix_reports_full_rank() {
     let design = DesignMatrix::from_row_major(
         4,

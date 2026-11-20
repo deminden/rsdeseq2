@@ -24,10 +24,12 @@ pub fn average_expanded_model_coefficients(
         coefficient_groups.len(),
         "collapsed beta coefficients",
     )?;
+    let mut grouped = Vec::new();
     for gene in 0..expanded_beta.n_rows() {
         let row = expanded_beta.row(gene)?;
         for group in coefficient_groups {
-            let grouped = group.iter().map(|&column| row[column]).collect::<Vec<_>>();
+            grouped.clear();
+            grouped.extend(group.iter().map(|&column| row[column]));
             values.push(
                 checked::try_mean(&grouped)
                     .nonfinite_at("expanded beta coefficient average", Some(gene))?,

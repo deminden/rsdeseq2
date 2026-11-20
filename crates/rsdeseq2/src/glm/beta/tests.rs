@@ -73,7 +73,7 @@ fn intercept_working_weights_reject_nonfinite_weight_scaling() {
 
 #[test]
 fn weighted_mean_rejects_nonfinite_products() {
-    let err = weighted_mean(&[f64::MAX], &[2.0], 0).unwrap_err();
+    let err = weighted_mean(&[f64::MAX], &[2.0], 0, &mut Vec::new()).unwrap_err();
 
     assert!(
         err.to_string()
