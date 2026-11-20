@@ -4,6 +4,7 @@ use rsdeseq2::design::numeric_transform::{
 };
 use rsdeseq2::design::{ExpandedNumericSpec, expanded_formula_design};
 use rsdeseq2::matrix::{MatrixOrder, MatrixView};
+use rsdeseq2::{NumericProfile, numeric_profile};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -42,13 +43,30 @@ fn floats(hex: &[String]) -> Vec<f64> {
         .map(|v| f64::from_bits(u64::from_str_radix(v, 16).unwrap()))
         .collect()
 }
-fn bits(values: &[f64], expected: &[String], name: &str) {
+#[derive(Clone, Copy)]
+enum Comparison {
+    Ulps(u64),
+    Absolute(f64),
+    Relative(f64),
+}
+
+const EXACT: Comparison = Comparison::Ulps(0);
+
+fn compare(values: &[f64], expected: &[String], name: &str, comparison: Comparison) {
     assert_eq!(values.len(), expected.len(), "{name}: shape");
-    for (i, (v, e)) in values.iter().zip(expected).enumerate() {
-        assert_eq!(
-            format!("{:016x}", v.to_bits()),
-            *e,
-            "{name}: element {i}: {v:?}"
+    for (i, (&actual, expected)) in values.iter().zip(expected).enumerate() {
+        let reference_bits = u64::from_str_radix(expected, 16).unwrap();
+        let reference = f64::from_bits(reference_bits);
+        let error = (actual - reference).abs();
+        let matches = match comparison {
+            Comparison::Ulps(limit) => actual.to_bits().abs_diff(reference_bits) <= limit,
+            Comparison::Absolute(limit) => error <= limit,
+            Comparison::Relative(limit) => error <= limit * reference.abs(),
+        };
+        assert!(
+            actual.is_finite() && reference.is_finite() && matches,
+            "{name}: element {i}: {actual:?} ({:016x}) vs {reference:?} ({expected})",
+            actual.to_bits(),
         );
     }
 }
@@ -76,7 +94,7 @@ fn policy(control: &(u8, Vec<f64>)) -> ScalePolicy<'_> {
 }
 
 // Exercise the production parser as well as the reusable numerical leaf.
-fn check_formula(case: &Case, input: &[f64]) {
+fn check_formula(case: &Case, input: &[f64], comparison: Comparison) {
     let control = |p: &Policy| match p.mode.as_str() {
         "automatic" => "TRUE".to_string(),
         "disabled" => "FALSE".to_string(),
@@ -113,19 +131,38 @@ fn check_formula(case: &Case, input: &[f64]) {
             .chunks_exact(matrix.n_cols())
             .flat_map(|r| r[1..].iter().copied())
             .collect::<Vec<_>>();
-        bits(&values, expected, &format!("{} parser", case.name));
+        compare(
+            &values,
+            expected,
+            &format!("{} parser", case.name),
+            comparison,
+        );
     } else {
         assert!(result.is_err(), "{} parser should reject", case.name);
     }
 }
 
 #[test]
-fn formula_transforms_match_independent_r_bits_and_invalid_output_decisions() {
+fn formula_transforms_match_independent_r_predictions_and_validation() {
     let reference: Reference =
         serde_json::from_str(formula_reference!("numeric_transform_r462")).unwrap();
+    let portable = numeric_profile() == NumericProfile::Portable;
     for case in reference.cases {
+        // Portable powers use libm. The centered Vandermonde QR can magnify
+        // a one-ulp power difference in the fitted columns and their norms.
+        let portable_fit = portable
+            && case.operation == "poly"
+            && case.raw == Some(false)
+            && case.supplied_coefficients.is_none();
+        let comparison = if portable_fit {
+            Comparison::Absolute(5e-10)
+        } else if portable && case.raw == Some(true) {
+            Comparison::Ulps(1)
+        } else {
+            EXACT
+        };
         let input = floats(&case.input);
-        check_formula(&case, &input);
+        check_formula(&case, &input, comparison);
         match case.operation.as_str() {
             "poly" => {
                 let supplied =
@@ -143,11 +180,21 @@ fn formula_transforms_match_independent_r_bits_and_invalid_output_decisions() {
                 );
                 if let Some(expected) = case.expected {
                     let observed = result.unwrap_or_else(|e| panic!("{}: {e}", case.name));
-                    bits(observed.values.as_slice(), &expected, &case.name);
+                    compare(
+                        observed.values.as_slice(),
+                        &expected,
+                        &case.name,
+                        comparison,
+                    );
                     match (observed.coefficients, case.coefficients) {
                         (Some(o), Some(e)) => {
-                            bits(&o.alpha, &e.alpha, &format!("{} alpha", case.name));
-                            bits(&o.norm2, &e.norm2, &format!("{} norm2", case.name));
+                            let (alpha, norm2) = if portable_fit {
+                                (Comparison::Absolute(1e-9), Comparison::Relative(2e-9))
+                            } else {
+                                (EXACT, EXACT)
+                            };
+                            compare(&o.alpha, &e.alpha, &format!("{} alpha", case.name), alpha);
+                            compare(&o.norm2, &e.norm2, &format!("{} norm2", case.name), norm2);
                         }
                         (None, None) => {}
                         _ => panic!("{} coefficient presence", case.name),
@@ -174,13 +221,13 @@ fn formula_transforms_match_independent_r_bits_and_invalid_output_decisions() {
                     );
                     if let Some(expected) = &case.expected {
                         let observed = result.unwrap_or_else(|e| panic!("{}: {e}", case.name));
-                        bits(observed.values.as_slice(), expected, &case.name);
+                        compare(observed.values.as_slice(), expected, &case.name, EXACT);
                         for (actual, expected) in [
                             (observed.center, &case.center),
                             (observed.scale, &case.scale),
                         ] {
                             match (actual, expected) {
-                                (Some(a), Some(e)) => bits(&a, e, &case.name),
+                                (Some(a), Some(e)) => compare(&a, e, &case.name, EXACT),
                                 (None, None) => {}
                                 _ => panic!("{} scale metadata", case.name),
                             }
@@ -191,10 +238,11 @@ fn formula_transforms_match_independent_r_bits_and_invalid_output_decisions() {
                 }
             }
             "integer" => match &case.expected {
-                Some(expected) => bits(
+                Some(expected) => compare(
                     &[integer_covariate(input[0]).unwrap()],
                     expected,
                     &case.name,
+                    EXACT,
                 ),
                 None => assert!(integer_covariate(input[0]).is_err(), "{}", case.name),
             },

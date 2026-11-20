@@ -1655,6 +1655,22 @@ fixture. Both formula-transform tests passed under the R-host profile.
 The three numeric error unit tests passed, along with library Clippy
 and the module dependency check.
 
+### Portable formula transforms
+
+The formula-transform panel now checks all 85 independent R cases under
+the portable profile. Exact-bit assertions still cover R-host results,
+portable scaling and integer coercion, and portable prediction from
+supplied polynomial coefficients. Portable raw powers allow one ulp.
+The fitted-polynomial comparisons use absolute bounds of `5e-10` for
+basis values and `1e-9` for recurrence centers, and a relative bound
+of `2e-9` for squared norms. The largest observed differences on the
+macOS arm64 panel were `3.53e-10`, `8.83e-10` and `1.51e-9` respectively.
+The panel checks the same rejection cases in both profiles.
+
+Both profiles passed on macOS arm64, on Linux arm64 and on Linux x86_64
+under QEMU 10.0.13. Portable formula transforms are now part of the
+release panel on every target.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |
