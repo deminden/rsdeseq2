@@ -206,7 +206,12 @@ and matching `--beta-prior-additive-sample-levels` TSV paths. The CLI builds
 the multi-factor expanded and reported designs internally, verifies the
 reported design matches `--design`, and uses the same coefficient, contrast,
 normalization-factor, and replacement-sidecar behavior.
-The CLI accepts explicit design matrices and does not parse formulas.
+These expanded beta-prior commands estimate prior variances from the
+expanded-model MLE and average grouped coefficients for the reported effects.
+For eligible Rust formula analyses, `Analysis::beta_prior(true)` implements
+the standard-model MLE and expanded contrasts used by
+`DESeq(betaPrior = TRUE)`. The CLI accepts explicit design matrices.
+
 It also accepts thresholded p-values through
 `--lfc-threshold` and `--alternative`, with alternatives `greater-abs`,
 `greater-abs-upshot`, `greater-abs2014`, `less-abs`, `greater`, and `less`.

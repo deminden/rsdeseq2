@@ -27,6 +27,10 @@ Complete formula fits preserve R term order, factor coding, polynomial groups
 and supported offsets. Use `formula_design_for_fitting_from_model_frame()` for
 standalone designs matching that layout. The `expanded_formula_design*`
 compatibility helpers expose their own explicit expanded layout.
+`Analysis::beta_prior(true)` uses the standard-design MLE and expanded
+contrasts for eligible formula-based Wald fits. The legacy expanded-design
+Rust and CLI APIs use an expanded-design MLE and averaged coefficients.
+See the [beta-prior design record](design/beta-prior-results-request.md#finding-the-expanded-primitives-do-not-reproduce-deseqbetaprior--true).
 
 Formula functions are restricted to declared built-ins. Custom functions are
 rejected without execution. Restricted likelihood and frozen-dispersion
