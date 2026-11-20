@@ -2,10 +2,50 @@
 set -eu
 
 package_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "rsdeseq2 requires Cargo to build its Rust backend" >&2
+cd "$package_root/src/rust"
+rust_required=$(sed -n 's/^rust-version[[:space:]]*=[[:space:]]*"\([0-9.]*\)"[[:space:]]*$/\1/p' Cargo.toml)
+if [ -z "$rust_required" ]; then
+  echo "rsdeseq2 configure: missing rust-version in src/rust/Cargo.toml" >&2
   exit 1
 fi
+rustc_command=${RUSTC:-${CARGO_BUILD_RUSTC:-rustc}}
+
+version_at_least() {
+  awk -v actual="$1" -v required="$rust_required" 'BEGIN {
+    split(actual, fields, " ")
+    split(fields[2], release, "-")
+    if (release[1] !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 1
+    split(release[1], found, "[.]")
+    split(required, minimum, "[.]")
+    for (i = 1; i <= 3; i++) {
+      if (found[i] + 0 < minimum[i] + 0) exit 1
+      if (found[i] + 0 > minimum[i] + 0) exit 0
+    }
+  }'
+}
+
+check_rust_tools() {
+  cargo_version=$(cargo --version 2>/dev/null || :)
+  rustc_version=$("$rustc_command" --version 2>/dev/null || :)
+  version_at_least "$cargo_version" && version_at_least "$rustc_version"
+}
+
+cargo_build_env=""
+if ! check_rust_tools; then
+  personal_bin=${CARGO_HOME:-${HOME:-}/.cargo}/bin
+  if [ -d "$personal_bin" ]; then
+    PATH="$personal_bin:$PATH"
+    export PATH
+    # Expand the same environment variables in the recipe shell at build time.
+    cargo_build_env='PATH="$${CARGO_HOME:-$$HOME/.cargo}/bin:$$PATH" '
+  fi
+  if ! check_rust_tools; then
+    echo "rsdeseq2 configure: install cargo and rustc $rust_required or newer and add them to PATH" >&2
+    echo "rsdeseq2 configure: found ${cargo_version:-no cargo} and ${rustc_version:-no rustc}" >&2
+    exit 1
+  fi
+fi
+printf 'rsdeseq2 configure: %s\nrsdeseq2 configure: %s\n' "$cargo_version" "$rustc_version"
 # The Rust core is not committed under src/rust/vendor. In a git checkout
 # configure copies it from crates/ on every build, so it is never stale; the
 # R source package (scripts/release/build_r_source.sh) ships the copy
@@ -22,12 +62,14 @@ elif [ ! -f "$package_root/src/rust/vendor/rsdeseq2/Cargo.toml" ]; then
   exit 1
 fi
 if [ -f "$package_root/src/rust/cargo/config.toml" ]; then
-  cargo_offline="--offline --config cargo/config.toml"
+  # Cargo gives an inherited jobserver precedence over an explicit job count.
+  cargo_build_env="${cargo_build_env}CARGO_MAKEFLAGS= MAKEFLAGS= MFLAGS= "
+  cargo_source_flags="--jobs 2 --offline --config cargo/config.toml"
 else
-  cargo_offline=""
+  cargo_source_flags=""
 fi
 if [ -f "$package_root/src/rust/vendor-crates.tar.xz" ]; then
-  if [ -z "$cargo_offline" ]; then
+  if [ -z "$cargo_source_flags" ]; then
     echo "rsdeseq2 configure: offline Cargo config is missing from the source archive" >&2
     exit 1
   fi
@@ -44,11 +86,12 @@ if [ "${1:-}" = "--windows" ]; then
     echo "rsdeseq2 configure: use the UCRT build of LLVM-MinGW" >&2
     exit 1
   fi
-  if ! rust_libdir=$(rustc --print target-libdir --target "$rust_target") || [ ! -d "$rust_libdir" ]; then
+  if ! rust_libdir=$("$rustc_command" --print target-libdir --target "$rust_target") || [ ! -d "$rust_libdir" ]; then
     echo "rsdeseq2 configure: install the Rust standard library for $rust_target" >&2
     exit 1
   fi
-  sed -e "s|@CARGO_OFFLINE@|$cargo_offline|g" -e "s|@RUST_TARGET@|$rust_target|g" \
+  sed -e "s|@CARGO_SOURCE_FLAGS@|$cargo_source_flags|g" -e "s|@CARGO_BUILD_ENV@|$cargo_build_env|g" \
+    -e "s|@RUST_TARGET@|$rust_target|g" \
     "$package_root/src/Makevars.win.in" > "$package_root/src/Makevars.win"
   echo "rsdeseq2 configure: enabled the Rust core static library."
   exit 0
@@ -69,9 +112,9 @@ case "$(uname -s)" in
     rust_linker_flags=""
     ;;
 esac
-sed "s|@RUST_LINK_LIBS@|$rust_link_libraries|g" \
-  "$package_root/src/Makevars.in" |
-  sed "s|@RUST_LINK_FLAGS@|$rust_linker_flags|g" |
-  sed "s|@CARGO_OFFLINE@|$cargo_offline|g" \
-  > "$package_root/src/Makevars"
+sed -e "s|@RUST_LINK_LIBS@|$rust_link_libraries|g" \
+  -e "s|@RUST_LINK_FLAGS@|$rust_linker_flags|g" \
+  -e "s|@CARGO_SOURCE_FLAGS@|$cargo_source_flags|g" \
+  -e "s|@CARGO_BUILD_ENV@|$cargo_build_env|g" \
+  "$package_root/src/Makevars.in" > "$package_root/src/Makevars"
 echo "rsdeseq2 configure: enabled the Rust core static library."

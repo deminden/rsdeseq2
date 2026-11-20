@@ -1236,3 +1236,20 @@ All 53 focused results tests passed under both macOS numeric profiles.
 The formula cases compare coefficient and contrast fits against explicit
 cell factors, including nonuniform observation weights and an actual
 Cook's replacement refit.
+
+### R installation toolchain and build jobs
+
+The R installer checks Cargo and rustc against the backend manifest and
+reports both versions before compilation. It can select a toolchain in the
+personal Cargo directory when the tools on PATH are missing or too old.
+Vendor generation checks the Rust minimum in the workspace, the backend
+manifest and the R package metadata. Archived installs use two Cargo jobs
+and begin compiling C after the Rust build finishes. The archived Cargo
+recipe clears the external jobserver settings so Cargo honors its job limit.
+[CRAN guidance for Rust packages](https://cran.r-project.org/web/packages/using_rust.html)
+
+On macOS arm64, the source archive installed with an empty Cargo home,
+R 4.6.2, Rust 1.96.0 and parallel Make. The install log showed the requested
+job limit and build order, and the native install smoke test passed. Local
+shell checks exercised both generated recipes, the personal toolchain
+fallback, missing and outdated tools, and metadata version mismatches.

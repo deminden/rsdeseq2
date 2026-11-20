@@ -131,6 +131,13 @@ def main():
     backend_version = re.search(r'^version\s*=\s*"([^"]+)"', backend_manifest, re.M).group(1)
     if r_version != version or backend_version != version:
         raise ValueError('Rust crate, R package and R backend versions must agree')
+    minimum_rust = package['rust_version']
+    backend_minimum = re.search(r'^rust-version\s*=\s*"([^"]+)"', backend_manifest, re.M)
+    system_requirements = next((line for line in description if line.startswith('SystemRequirements:')), '')
+    r_minimum = re.search(r'\bRust >= ([\d.]+)\b', system_requirements)
+    if (backend_minimum is None or backend_minimum.group(1) != minimum_rust
+            or r_minimum is None or r_minimum.group(1) != minimum_rust):
+        raise ValueError(f'R backend and DESCRIPTION must declare the Rust workspace minimum {minimum_rust}')
     crates = vendored_crates(workspace)
     # The rsdeseq2 crates share one version; the rcompat crates have their own.
     if any(workspace[name]['version'] != version for name in crates if name.startswith('rsdeseq2')):
