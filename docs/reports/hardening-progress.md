@@ -655,6 +655,41 @@ for the fit, and reuses the response and initial coefficients across
 rows. The 32 focused IRLS tests and both rank-deficient tests passed,
 as did Clippy and both 8,032-field golden checks.
 
+### Batched local validation and reference tooling
+
+The `915ae25` release build passed both sets of 130 GTEx precision
+gates. All 44 result and diagnostic TSVs matched the preceding precision
+checkpoint byte for byte. Two paired runs against `42a0b8e` measured
+15.724 versus 15.687 s in summed median time and 259.52 versus 259.55
+MiB in peak RSS. The initial workspace reuse produced no separate
+throughput gain on GTEx. The seven paired rlog runs per fixture matched
+byte for byte. The 16-sample case was 3.7% slower and the 32-sample
+case varied by 0.1%.
+
+In `ae83ba9`, the integration suite uses one support module for
+reference readers, conversions and shared design fixtures. The macOS
+workspace batch passed 1,232 unit and integration tests and one doctest.
+Both 56,200-gene replay tests passed separately. Clippy and the locked
+Rust 1.97.1 check passed. Python tooling tests passed, including the
+separately enabled full GTEx fixture check.
+
+The R source archive from `915ae25` passed 2,874 expectations with zero
+skips on R 4.5.3 and 4.6.2. The checks retained the two vendoring notes.
+R 4.6.2 also retained the compiled-symbol warning.
+
+In `1de7cd5`, the standalone shrinkage crate carries its own four
+unit-test fixtures. Two keep their original bytes and two reproduce
+only the independent analytic and grid leaves used by the unit tests.
+All four unpacked Rust archives built offline and passed 217 library
+tests with the workspace's host R profile. An exploratory portable
+run differed from the R student-component normalization reference
+at the existing 16-ulp bounds. The archive check selects the same
+host R profile as ordinary fixture tests.
+
+The `just generators` entry point lists reference generators, output
+paths and replay checks. The inventory test checks that each top-level
+reference generator is registered.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

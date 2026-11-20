@@ -1,0 +1,23 @@
+# Supporting generators and outputs outside the tracked Rust test-data directories.
+# Commands use uppercase placeholders for paths that the maintainer supplies.
+pattern	generator	check	note
+R dependency source lock TSV	scripts/references/freeze_r_reference_sources.py	python3 scripts/environment/install_r_reference.py --manifest OUTPUT --check-installed	Use the pinned R installation and dependency library.
+docs/data/wald_frozen_worst100_r461.tsv	scripts/references/generate_frozen_worst_genes.py	python3 -m unittest scripts.tests.test_generate_frozen_worst_genes	Field comparison uses scripts/validation/score_frozen_worst_genes.py.
+crates/rsdeseq2/tests/data/gtex_v8_real_wald/compact/reference_results.tsv	scripts/references/generate_gtex_compact_reference.R	cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::	Called by generate_gtex_compact_fixture.py.
+CONTRAST_DIR/reference_{results,fit_diagnostics,size_factors}.tsv and sessionInfo.txt	scripts/references/generate_gtex_mode_contrast_references.R	python3 scripts/validation/check_gtex_dispersion_improvement.py --fixture-root CONTRAST_ROOT --binary BINARY	Called by generate_gtex_mode_contrasts.py.
+results/benchmarks/gtex_mode_contrasts/	scripts/references/generate_gtex_mode_contrasts.py	python3 -m unittest scripts.tests.test_gtex_parity_tools.ContrastGenerationTests	Full precision replay uses check_gtex_dispersion_improvement.py.
+crates/rsdeseq2/src/glm/irls/fixtures/gtex_optim_reference.json	scripts/references/generate_gtex_optim_reference.R	cargo test --locked -p rsdeseq2 --lib optim_fallback_replays_portable_objective_only_r_optim_gtex_cases	-
+FIXTURE_DIR/reference_{results,size_factors}.tsv	scripts/references/generate_gtex_real_wald_reference.R	cargo test --locked -p rsdeseq2 --test integration gtex_real_wald_parity::full_gtex_ -- --ignored	Called by generate_gtex_real_wald_fixture.py.
+results/fixtures/lbfgsb_hard_real_2026-06-01/	scripts/references/generate_lbfgsb_hard_fixtures.R	python3 scripts/validation/analyze_parity_mismatch_sources.py --lbfgsb-root OUTPUT	Research replay with saved GTEx diagnostics.
+results/fixtures/lbfgsb_synthetic_stress_r461_2026-07-22/	scripts/references/generate_lbfgsb_synthetic_stress_fixtures.R	Manual optimizer replay against manifest.tsv and coefficients.tsv	Uses the recorded R 4.6.1 environment. See docs/reproducibility.md.
+results/fixtures/locfit_hard_real_2026-06-01/	scripts/references/generate_locfit_hard_fixtures.R	Manual locfit replay against the prediction grids	Research fixtures include per-contrast manifests.
+crates/rsdeseq2/tests/data/pasilla_holdout/reference_*.tsv	scripts/references/generate_pasilla_reference.R	python3 scripts/validation/check_pasilla_holdout.py --binary CANDIDATE --baseline-binary BASELINE --output-dir OUTPUT	Called by generate_pasilla_validation.py.
+OUTPUT_STUDY_ROOT/02_deseq2_outputs/	scripts/references/generate_real_data_references.R	python3 scripts/validation/real_data_parity.py --study-root STUDY --binary BINARY --output REPORT	Test a reviewed tissue and contrast subset with --tissue and --contrast.
+results/fixtures/real_optimizer_locfit_2026-05-31/	scripts/references/generate_real_port_fixtures.R	Manual optimizer and locfit replay against the saved study diagnostics	Research fixtures extracted from compiled original R routines.
+Requested uniform CDF reference TSV	scripts/references/generate_uniform_cdf_reference.R	RSDESEQ2_UNIFORM_CDF_REFERENCE=OUTPUT cargo test --locked -p rsdeseq2 --test integration bounded_posterior::	Windows and Intel macOS release runners generate this reference.
+crates/rsdeseq2/tests/data/gtex_v8_real_wald/{counts,reference_results}.tsv	scripts/references/stage_gtex_full_fixture.py	RSDESEQ2_FULL_GTEX=1 python3 -m unittest scripts.tests.test_gtex_parity_tools.CompactFixtureTests	Restores by pinned Git revision and SHA-256.
+crates/rsdeseq2/tests/run_equivalence.rs	crates/rsdeseq2/tools/validation/gen_run_equivalence.py	cargo test --locked -p rsdeseq2 --test integration run_equivalence::	-
+crates/rsdeseq2/tools/validation/golden/*.tsv	crates/rsdeseq2/tools/validation/golden.rs	cargo golden --check	Run with the host R and portable profiles.
+rsdeseq2_VERSION.tar.gz	scripts/release/build_r_source.sh	R CMD check --no-manual --no-build-vignettes ARCHIVE	See the no-skip gate in docs/testing-parity.md.
+r-pkg/rsdeseq2/src/rust/vendor/	scripts/release/sync_r_vendor.py	scripts/release/sync_r_vendor.sh --check	Generates the workspace portions of the R vendoring tree.
+Binary README and release notes	scripts/release/prepare_release_docs.py	python3 -m unittest scripts.tests.test_docs	Verified for each release target and tag.
