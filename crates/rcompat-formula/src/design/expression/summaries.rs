@@ -27,6 +27,7 @@ impl Evaluator<'_> {
             let mut integer = true;
             let mut total = 0.0_f64;
             let mut missing = false;
+            let mut integer_missing = false;
             for (arg, value) in args {
                 if arg.as_deref() == Some("na.rm") {
                     continue;
@@ -38,11 +39,18 @@ impl Evaluator<'_> {
                         "numeric or logical values",
                     ));
                 }
-                integer &= matches!(
+                let integer_argument = matches!(
                     value.data,
                     Data::Number { integer: true, .. } | Data::Logical(_) | Data::Null
                 );
+                integer &= integer_argument;
                 let input = value.flattened().numeric()?;
+                // R validates every argument type. A missing integer or
+                // logical then ends the sum before any later accumulation.
+                integer_missing |= !remove && integer_argument && input.iter().copied().any(is_na);
+                if integer_missing {
+                    continue;
+                }
                 let input = if linux_arm64 {
                     // R rounds each variadic argument's binary128 subtotal
                     // before adding it to the final binary64 result.
@@ -86,15 +94,16 @@ impl Evaluator<'_> {
                         }
                     }
                 }
+                // R promotes the result after each argument subtotal crosses
+                // the integer range, even if a later subtotal cancels it.
+                integer &= total > i32::MIN as f64 && total <= i32::MAX as f64;
             }
-            if integer && total.is_nan() {
+            if integer_missing {
                 total = NA_REAL;
             } else if missing && !(linux_x86 || linux_arm64) {
                 // Apple's R gives NA precedence over an earlier NaN. The Linux
                 // R profiles preserve the accumulator's first NaN.
                 total = f64::from_bits(0x7ff8_0000_0000_07a2);
-            } else if total <= i32::MIN as f64 || total > i32::MAX as f64 {
-                integer = false;
             }
             return Ok(Value::new(Data::Number {
                 values: vec![total],

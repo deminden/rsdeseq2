@@ -140,6 +140,50 @@ fn sum_preserves_r_missing_precedence_across_nan_orders() {
 }
 
 #[test]
+fn sum_preserves_r_integer_promotion_and_missing_type() {
+    let na = f64::from_bits(0x7ff0_0000_0000_07a2);
+    let max = f64::from(i32::MAX);
+    let integer = |values| {
+        Expression::Literal(Value::new(Data::Number {
+            values,
+            integer: true,
+        }))
+    };
+    let number = |x| Expression::Literal(Value::scalar(x));
+    let logical_na = Expression::Literal(Value::new(Data::Logical(vec![None])));
+    let options = EvaluationOptions::default();
+
+    // Type and payload observed in original R 4.6.2 on macOS and Linux arm64.
+    for (arguments, expected, integer_type) in [
+        (vec![number(f64::NAN), logical_na], na, false),
+        (vec![integer(vec![na]), number(f64::NAN)], na, false),
+        (
+            vec![integer(vec![max]), integer(vec![1.0]), integer(vec![-1.0])],
+            max,
+            false,
+        ),
+        (vec![integer(vec![max, 1.0, -1.0])], max, true),
+        (
+            vec![integer(vec![max]), integer(vec![1.0]), integer(vec![na])],
+            na,
+            false,
+        ),
+        (
+            vec![integer(vec![na]), integer(vec![max]), integer(vec![1.0])],
+            na,
+            true,
+        ),
+    ] {
+        let result = evaluate(&call("sum", arguments), &[], &options).unwrap();
+        let Data::Number { values, integer } = result.data else {
+            panic!("sum must return a number");
+        };
+        assert_eq!(values[0].to_bits(), expected.to_bits());
+        assert_eq!(integer, integer_type);
+    }
+}
+
+#[test]
 fn mean_preserves_r_missing_and_nan_order() {
     let na = f64::from_bits(0x7ff0_0000_0000_07a2);
     let options = EvaluationOptions::default();
