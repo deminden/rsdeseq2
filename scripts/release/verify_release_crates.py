@@ -3,7 +3,8 @@
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -13,6 +14,37 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def extract_crate(archive, vendor):
+    stem = archive.stem
+    source = vendor / stem
+    source.mkdir()
+    with tarfile.open(archive) as package:
+        for member in package:
+            parts = PurePosixPath(member.name).parts
+            if (
+                not parts
+                or parts[0] != stem
+                or any(part.endswith((" ", ".")) for part in parts)
+                or "\\" in member.name
+                or ":" in member.name
+            ):
+                raise ValueError(f"Invalid path in {archive.name}: {member.name!r}")
+            target = source.joinpath(*parts[1:])
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+            elif member.isfile() and len(parts) > 1:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                data = package.extractfile(member)
+                if data is None:
+                    raise ValueError(f"Missing file data in {archive.name}: {member.name!r}")
+                with data, target.open("xb") as output:
+                    shutil.copyfileobj(data, output)
+                target.chmod(0o755 if member.mode & 0o100 else 0o644)
+            else:
+                raise ValueError(f"Unsupported entry in {archive.name}: {member.name!r}")
+    return source
 
 
 def main():
@@ -31,9 +63,7 @@ def main():
         ))
 
         for archive in packages:
-            with tarfile.open(archive) as package:
-                package.extractall(vendor, filter="data")
-            source = vendor / archive.stem
+            source = extract_crate(archive, vendor)
             # Dependents' packaged lockfiles pin the sibling archive checksum.
             files = {p.relative_to(source).as_posix(): sha256(p)
                      for p in source.rglob("*") if p.is_file()}
