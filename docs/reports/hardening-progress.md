@@ -851,6 +851,28 @@ fields, and the CLI stderr tests continue to check the user-facing text.
 Six targeted numeric tests, 25 application unit tests, 91 integration
 tests and workspace Clippy passed.
 
+### Size-factor estimation
+
+The median pass filters nonfinite log geometric means once and reserves one
+reusable sample buffer. This preserves control-gene ordering and multiplicity.
+On macOS arm64, five alternating runs per executable compared the change
+with `37f8c8f`. Size-factor output hashes matched in both numeric profiles
+for all synthetic cases at 20,000 × 6, 20,000 × 100 and 60,000 × 800.
+
+In the sparse ratio trials, 80% of the genes had a zero in one sample.
+Median runtime at 60,000 × 800 fell from 142.7 to 98.0 ms in the portable
+profile and from 128.3 to 86.5 ms in the host R profile. Dense ratio and
+poscounts timings were within 4% at the two larger sizes. Row-wise
+experiments with blocks of eight and 32 samples took 6–24% longer on
+the largest matrix and required more ratio scratch space. The median
+pass keeps one sample buffer and uses linear-time selection.
+
+The batched macOS verification after the error migration and normalization
+change passed 1,238 Rust tests and one doctest, plus both separate 56,200-gene
+GTEx replays. Workspace Clippy passed. The optimized golden harness matched
+8,032 fields in each of the host R and portable profiles at one and four
+workers.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

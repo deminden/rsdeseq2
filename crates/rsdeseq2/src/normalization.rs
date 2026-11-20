@@ -498,15 +498,16 @@ fn estimate_from_log_geo_means(
     if log_geo_means.iter().all(|value| value.is_infinite()) {
         return Err(DeseqError::NoUsableGenesForSizeFactors);
     }
-    let genes = usable_gene_indices(counts, control_genes)?;
+    let mut genes = usable_gene_indices(counts, control_genes)?;
+    genes.retain(|&gene| log_geo_means[gene].is_finite());
     let mut size_factors = Vec::with_capacity(counts.n_samples());
-    let mut log_ratios = Vec::new();
+    let mut log_ratios = try_alloc_matrix(genes.len(), 1, "size-factor log ratios")?;
     for sample in 0..counts.n_samples() {
         log_ratios.clear();
         for gene in &genes {
             let log_geo_mean = log_geo_means[*gene];
             let count = counts.row_values(*gene)[sample];
-            if log_geo_mean.is_finite() && count > 0 {
+            if count > 0 {
                 log_ratios.push(
                     checked::try_sub(f64::from(count).ln_p(), log_geo_mean).map_err(|error| {
                         DeseqError::NonFiniteValue {

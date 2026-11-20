@@ -110,8 +110,8 @@ versions live in [docs/releases](docs/releases/).
 - Gene-wise dispersion iterations borrow the selected rows of counts, offsets
   and weights. The same compact ordering is used for results and diagnostics.
 
-- Size-factor estimation reuses one log-ratio buffer across samples and
-  selects the median in place.
+- Size-factor estimation filters unusable geometric means once, reuses one
+  log-ratio buffer across samples and selects the median in place.
 
 - The R package's copy of the Rust core is no longer committed. Its
   configure step regenerates it from `crates/` in a git checkout, and
