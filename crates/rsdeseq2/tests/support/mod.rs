@@ -7,11 +7,43 @@ pub(crate) mod regression_checks;
 pub(crate) use formula_reference::formula_reference;
 
 use csv::ReaderBuilder;
+use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub type TsvRow = HashMap<String, String>;
+
+#[track_caller]
+pub(crate) fn assert_ambiguous_name(
+    error: DeseqError,
+    expected_domain: ErrorKind,
+    expected_scope: NameScope,
+    expected_name: &str,
+    expected_matches: &[&str],
+) {
+    assert_eq!(error.kind(), expected_domain);
+    std::assert_matches!(
+        error,
+        DeseqError::AmbiguousName { scope, name, matches, .. }
+            if scope == expected_scope && name == expected_name && matches == expected_matches
+    );
+}
+
+#[track_caller]
+pub(crate) fn assert_name_not_found(
+    error: DeseqError,
+    expected_domain: ErrorKind,
+    expected_scope: NameScope,
+    expected_name: &str,
+) {
+    assert_eq!(error.kind(), expected_domain);
+    std::assert_matches!(
+        error,
+        DeseqError::NameNotFound { scope, name, .. }
+            if scope == expected_scope && name == expected_name
+    );
+}
 
 #[track_caller]
 pub(crate) fn assert_ordered_factor_contrast_error(error: DeseqError, factor: &str) {

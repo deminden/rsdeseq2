@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn formula_model_frame_resolves_r_cleaned_factor_reference_aliases() {
@@ -99,10 +101,14 @@ fn formula_model_frame_factor_reference_aliases_prefer_exact_and_reject_ambiguou
         ],
         numeric_covariates: Vec::new(),
     };
-    assert!(
+    assert_ambiguous_name(
         ambiguous
             .resolved_factor_reference_by_alias("cell.type")
-            .is_err()
+            .unwrap_err(),
+        ErrorKind::Options,
+        NameScope::Factor,
+        "cell.type",
+        &["cell type", "cell-type"],
     );
 }
 
@@ -165,10 +171,14 @@ fn formula_model_frame_numeric_aliases_prefer_exact_and_reject_ambiguous() {
             },
         ],
     };
-    assert!(
+    assert_ambiguous_name(
         ambiguous
             .resolved_numeric_covariate_by_alias("dose.value")
-            .is_err()
+            .unwrap_err(),
+        ErrorKind::Options,
+        NameScope::NumericCovariate,
+        "dose.value",
+        &["dose value", "dose-value"],
     );
 }
 
@@ -262,12 +272,20 @@ fn formula_model_frame_reference_rejects_ambiguous_cleaned_level_aliases() {
         numeric_covariates: Vec::new(),
     };
 
-    assert!(
-        model_frame
-            .validate()
-            .unwrap_err()
-            .to_string()
-            .contains("reference level 'A.cell' resolves ambiguously")
+    let error = model_frame.validate().unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid options: formula factor 'condition' reference level 'A.cell' resolves ambiguously after R-style cleanup",
+    );
+    assert_ambiguous_name(
+        error,
+        ErrorKind::Formula,
+        NameScope::FactorLevel {
+            factor: Some("condition".into()),
+            role: FactorLevelRole::Reference,
+        },
+        "A.cell",
+        &["A cell", "A-cell"],
     );
 
     let declared_collision = FormulaModelFrame {
@@ -287,12 +305,15 @@ fn formula_model_frame_reference_rejects_ambiguous_cleaned_level_aliases() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(
-        declared_collision
-            .validate()
-            .unwrap_err()
-            .to_string()
-            .contains("declared level 'A-cell' resolves ambiguously after R-style cleanup")
+    assert_ambiguous_name(
+        declared_collision.validate().unwrap_err(),
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("condition".into()),
+            role: FactorLevelRole::Declared,
+        },
+        "A-cell",
+        &["A cell", "A-cell"],
     );
 }
 

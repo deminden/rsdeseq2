@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, NameScope, ambiguous_name, invalid_formula};
 pub(super) fn expand_formula_factor_transform_terms(
     rhs: &str,
     factors: &[ExpandedFactorSpec<'_>],
@@ -434,9 +434,13 @@ pub(super) fn find_formula_factor<'a>(
         [factor] => return Ok(*factor),
         [] => {}
         _ => {
-            return Err(invalid_formula(format!(
-                "formula factor '{factor_name}' appears more than once"
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::Factor,
+                factor_name,
+                exact.iter().map(|factor| factor.factor),
+                format!("formula factor '{factor_name}' appears more than once"),
+            ));
         }
     }
 
@@ -450,11 +454,20 @@ pub(super) fn find_formula_factor<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [factor] => Ok(*factor),
-        [] => Err(invalid_formula(format!(
-            "formula factor '{factor_name}' is not present in supplied design metadata"
-        ))),
-        _ => Err(invalid_formula(format!(
-            "formula factor '{factor_name}' resolves ambiguously after R-style cleanup"
-        ))),
+        [] => Err(Error::NameNotFound {
+            domain: ErrorKind::Formula,
+            scope: NameScope::Factor,
+            name: factor_name.into(),
+            reason: format!(
+                "formula factor '{factor_name}' is not present in supplied design metadata"
+            ),
+        }),
+        _ => Err(ambiguous_name(
+            ErrorKind::Formula,
+            NameScope::Factor,
+            factor_name,
+            aliases.iter().map(|factor| factor.factor),
+            format!("formula factor '{factor_name}' resolves ambiguously after R-style cleanup"),
+        )),
     }
 }

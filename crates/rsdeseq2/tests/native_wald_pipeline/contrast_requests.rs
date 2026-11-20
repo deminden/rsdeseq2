@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn top_level_results_contrast_request_routes_character_list_and_numeric_forms() {
@@ -348,11 +350,15 @@ fn top_level_results_contrast_request_canonicalizes_cleaned_sample_level_aliases
         &ResultsContrast::character("cell.type", "B.cell", "A.cell"),
         Some(&ambiguous_levels),
     );
-    assert!(
-        ambiguous
-            .unwrap_err()
-            .to_string()
-            .contains("denominator level 'A.cell' resolves ambiguously")
+    assert_ambiguous_name(
+        ambiguous.unwrap_err(),
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("cell.type".into()),
+            role: FactorLevelRole::Denominator,
+        },
+        "A.cell",
+        &["A cell", "A-cell"],
     );
 }
 

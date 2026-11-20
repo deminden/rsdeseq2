@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, NameScope, ambiguous_name, invalid_formula};
 pub(super) fn remove_formula_term<'a>(
     term: &str,
     factors: &'a [ExpandedFactorSpec<'a>],
@@ -892,32 +892,19 @@ pub(super) fn resolve_formula_variable<'a>(
         .iter()
         .filter(|candidate| candidate.factor == variable)
         .collect::<Vec<_>>();
-    match exact_factors.as_slice() {
-        [_] => {}
-        [] => {}
-        _ => {
-            return Err(invalid_formula(format!(
-                "formula variable '{variable}' appears more than once"
-            )));
-        }
-    }
     let exact_numeric = numeric_covariates
         .iter()
         .filter(|candidate| candidate.name == variable)
         .collect::<Vec<_>>();
-    match exact_numeric.as_slice() {
-        [_] => {}
-        [] => {}
-        _ => {
-            return Err(invalid_formula(format!(
-                "formula variable '{variable}' appears more than once"
-            )));
-        }
-    }
-    if exact_factors.len() + exact_numeric.len() > 1 {
-        return Err(invalid_formula(format!(
-            "formula variable '{variable}' appears more than once"
-        )));
+    let exact_count = exact_factors.len() + exact_numeric.len();
+    if exact_count > 1 {
+        return Err(ambiguous_name(
+            ErrorKind::Formula,
+            NameScope::FormulaVariable,
+            variable,
+            std::iter::repeat_n(variable, exact_count),
+            format!("formula variable '{variable}' appears more than once"),
+        ));
     }
     if let [factor] = exact_factors.as_slice() {
         return Ok(FormulaVariableRef::Factor(factor.factor));
@@ -943,9 +930,16 @@ pub(super) fn resolve_formula_variable<'a>(
         })
         .collect::<Vec<_>>();
     if factor_aliases.len() + numeric_aliases.len() > 1 {
-        return Err(invalid_formula(format!(
-            "formula variable '{variable}' resolves ambiguously after R-style cleanup"
-        )));
+        return Err(ambiguous_name(
+            ErrorKind::Formula,
+            NameScope::FormulaVariable,
+            variable,
+            factor_aliases
+                .iter()
+                .map(|factor| factor.factor)
+                .chain(numeric_aliases.iter().map(|covariate| covariate.name)),
+            format!("formula variable '{variable}' resolves ambiguously after R-style cleanup"),
+        ));
     }
     if let [factor] = factor_aliases.as_slice() {
         return Ok(FormulaVariableRef::Factor(factor.factor));
@@ -953,9 +947,12 @@ pub(super) fn resolve_formula_variable<'a>(
     if let [covariate] = numeric_aliases.as_slice() {
         return Ok(FormulaVariableRef::Numeric(covariate.name));
     }
-    Err(invalid_formula(format!(
-        "formula variable '{variable}' is not present in supplied design metadata"
-    )))
+    Err(Error::NameNotFound {
+        domain: ErrorKind::Formula,
+        scope: NameScope::FormulaVariable,
+        name: variable.into(),
+        reason: format!("formula variable '{variable}' is not present in supplied design metadata"),
+    })
 }
 
 pub(super) fn resolved_formula_variable_name<'a>(

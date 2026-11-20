@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn fixed_dispersion_wald_results_contrast_canonicalizes_cleaned_sample_level_aliases() {
@@ -83,9 +85,17 @@ fn fixed_dispersion_wald_results_contrast_canonicalizes_cleaned_sample_level_ali
             &ResultsContrast::character_with_reference("cell.type", "B.cell", "A.cell", "A.cell"),
             Some(&ambiguous_levels),
         )
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("denominator level 'A.cell' resolves ambiguously"));
+        .unwrap_err();
+    assert_ambiguous_name(
+        err,
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("cell.type".into()),
+            role: FactorLevelRole::Denominator,
+        },
+        "A.cell",
+        &["A cell", "A-cell"],
+    );
 }
 
 #[test]

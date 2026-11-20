@@ -15,6 +15,7 @@ pub use types::{
 };
 
 pub use model_frame::factor_level_contrast_from_model_frame;
+pub(crate) use model_frame::resolve_factor_level_alias;
 
 pub use resolution::{resolve_coefficient_index, resolve_contrast, resolve_results_contrast};
 

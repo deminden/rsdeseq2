@@ -99,6 +99,8 @@ exact phrase. `domain` is an `ErrorKind` limited to `Options`, `Dispersion`,
 | `DesignRankDeficient` | Validation context, rank, column count and zero-column labels | `Options` |
 | `LrtDesignNotNested` | Full design rank and combined rank | `Options` |
 | `AmbiguousCoefficient` | Requested names or levels and matching columns in model-matrix order | `Options` |
+| `AmbiguousName` | Name scope, requested or conflicting declared name, matching entries | Original `Formula` or `Options` |
+| `NameNotFound` | Name scope and requested name | Original `Formula` or `Options` |
 | `AllZeroGene` | Zero-based fit row and original count-matrix row | `Counts` |
 | `InvalidGeneValue` | Operation, zero-based gene and optional sample, rejected value | Original domain |
 | `InvalidNegativeBinomialValue` | Likelihood stage, optional zero-based gene and sample, rejected value | `Numeric` for means and weights, `Dispersion` for the other stages |
@@ -113,6 +115,12 @@ the original count-matrix row. Row likelihoods have no gene index. For a
 weighted term or partial sum, the sample identifies the operation that
 overflowed. The Cox–Reid overflow's message still displays the finite term
 from the original diagnostic. Its `value` field contains the actual sum.
+
+Name lookup preserves exact-name priority. Ambiguous lookups list matching
+entries in input order. Declaration checks stop at the first collision and
+report the two entries involved. For factor levels, the scope carries the
+factor name when known and distinguishes contrast operands, reference levels,
+declared levels and the zero-based index of an observed sample.
 
 ## Not in this step
 - `scoped_invalid_options` sites keep their `"{scope}: {reason}"` text.

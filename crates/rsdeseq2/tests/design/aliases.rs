@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::{assert_ambiguous_name, assert_name_not_found};
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn expanded_formula_design_supports_dot_main_effects() {
@@ -183,14 +185,20 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
         },
     ];
 
-    let error = expanded_formula_design("~ cell.type", &factors, &[])
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("resolves ambiguously"));
-    let transform_error = expanded_formula_design("~ factor(cell.type)", &factors, &[])
-        .unwrap_err()
-        .to_string();
-    assert!(transform_error.contains("resolves ambiguously"));
+    assert_ambiguous_name(
+        expanded_formula_design("~ cell.type", &factors, &[]).unwrap_err(),
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
+    assert_ambiguous_name(
+        expanded_formula_design("~ factor(cell.type)", &factors, &[]).unwrap_err(),
+        ErrorKind::Formula,
+        NameScope::Factor,
+        "cell.type",
+        &["cell type", "cell-type"],
+    );
 
     let transform_alias_levels = vec![
         "A".to_string(),
@@ -214,9 +222,14 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
     ];
     let derived_factor_alias_error =
         expanded_formula_design("~ factor(`cell type`)", &transform_alias_collision, &[])
-            .unwrap_err()
-            .to_string();
-    assert!(derived_factor_alias_error.contains("resolves ambiguously"));
+            .unwrap_err();
+    assert_ambiguous_name(
+        derived_factor_alias_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "factor(cell type)",
+        &["factor.cell.type.", "factor(cell type)"],
+    );
 
     let dose = [0.0, 1.0];
     let exact_cross_type_error = expanded_formula_design(
@@ -232,9 +245,18 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
             values: &dose,
         }],
     )
-    .unwrap_err()
-    .to_string();
-    assert!(exact_cross_type_error.contains("formula variable 'condition' appears more than once"));
+    .unwrap_err();
+    assert_eq!(
+        exact_cross_type_error.to_string(),
+        "invalid options: formula variable 'condition' appears more than once",
+    );
+    assert_ambiguous_name(
+        exact_cross_type_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "condition",
+        &["condition", "condition"],
+    );
 
     let alias_cross_type_error = expanded_formula_design(
         "~ cell.type",
@@ -249,9 +271,14 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
             values: &dose,
         }],
     )
-    .unwrap_err()
-    .to_string();
-    assert!(alias_cross_type_error.contains("resolves ambiguously"));
+    .unwrap_err();
+    assert_ambiguous_name(
+        alias_cross_type_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
 
     let numeric = [
         ExpandedNumericSpec {
@@ -263,14 +290,15 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
             values: &dose,
         },
     ];
-    let numeric_error = expanded_formula_design("~ log2(dose.value)", &[], &numeric)
-        .unwrap_err()
-        .to_string();
-    assert!(numeric_error.contains("resolves ambiguously"));
-    let numeric_identity_error = expanded_formula_design("~ I(dose.value + 1)", &[], &numeric)
-        .unwrap_err()
-        .to_string();
-    assert!(numeric_identity_error.contains("resolves ambiguously"));
+    for formula in ["~ log2(dose.value)", "~ I(dose.value + 1)"] {
+        assert_ambiguous_name(
+            expanded_formula_design(formula, &[], &numeric).unwrap_err(),
+            ErrorKind::Formula,
+            NameScope::NumericCovariate,
+            "dose.value",
+            &["dose value", "dose-value"],
+        );
+    }
 
     let numeric_transform_alias_collision = [
         ExpandedNumericSpec {
@@ -287,9 +315,14 @@ fn expanded_formula_design_rejects_ambiguous_r_cleaned_variable_aliases() {
         &[],
         &numeric_transform_alias_collision,
     )
-    .unwrap_err()
-    .to_string();
-    assert!(derived_numeric_alias_error.contains("resolves ambiguously"));
+    .unwrap_err();
+    assert_ambiguous_name(
+        derived_numeric_alias_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "dose value_as.numeric",
+        &["dose.value_as.numeric", "dose value_as.numeric"],
+    );
 }
 
 #[test]
@@ -419,11 +452,15 @@ fn expanded_formula_design_from_model_frame_validates_declared_factor_levels() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(
-        expanded_formula_design_from_model_frame("~ condition", &duplicate_level)
-            .unwrap_err()
-            .to_string()
-            .contains("duplicate declared level")
+    assert_ambiguous_name(
+        expanded_formula_design_from_model_frame("~ condition", &duplicate_level).unwrap_err(),
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("condition".into()),
+            role: FactorLevelRole::Declared,
+        },
+        "A",
+        &["A", "A"],
     );
 
     let missing_sample_level = FormulaModelFrame {
@@ -435,11 +472,14 @@ fn expanded_formula_design_from_model_frame_validates_declared_factor_levels() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(
-        expanded_formula_design_from_model_frame("~ condition", &missing_sample_level)
-            .unwrap_err()
-            .to_string()
-            .contains("declared levels")
+    assert_name_not_found(
+        expanded_formula_design_from_model_frame("~ condition", &missing_sample_level).unwrap_err(),
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("condition".into()),
+            role: FactorLevelRole::Sample { index: 2 },
+        },
+        "C",
     );
 
     let missing_reference = FormulaModelFrame {
@@ -451,11 +491,14 @@ fn expanded_formula_design_from_model_frame_validates_declared_factor_levels() {
         }],
         numeric_covariates: Vec::new(),
     };
-    assert!(
-        expanded_formula_design_from_model_frame("~ condition", &missing_reference)
-            .unwrap_err()
-            .to_string()
-            .contains("reference level")
+    assert_name_not_found(
+        expanded_formula_design_from_model_frame("~ condition", &missing_reference).unwrap_err(),
+        ErrorKind::Formula,
+        NameScope::FactorLevel {
+            factor: Some("condition".into()),
+            role: FactorLevelRole::Reference,
+        },
+        "C",
     );
 }
 
@@ -541,10 +584,19 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
             values: vec![0.0, 1.0],
         }],
     };
-    let duplicate_error = expanded_formula_design_from_model_frame("~ condition", &duplicate)
-        .unwrap_err()
-        .to_string();
-    assert!(duplicate_error.contains("cannot be both a factor and numeric covariate"));
+    let duplicate_error =
+        expanded_formula_design_from_model_frame("~ condition", &duplicate).unwrap_err();
+    assert_eq!(
+        duplicate_error.to_string(),
+        "invalid options: formula column 'condition' cannot be both a factor and numeric covariate",
+    );
+    assert_ambiguous_name(
+        duplicate_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "condition",
+        &["condition", "condition"],
+    );
 
     let ambiguous_cross_type = FormulaModelFrame {
         factors: vec![FormulaFactorColumn {
@@ -559,12 +611,13 @@ fn expanded_formula_design_from_model_frame_handles_offsets_and_validation() {
         }],
     };
     let ambiguous_error =
-        expanded_formula_design_from_model_frame("~ cell.type", &ambiguous_cross_type)
-            .unwrap_err()
-            .to_string();
-    assert!(
-        ambiguous_error
-            .contains("formula column 'cell-type' resolves ambiguously after R-style cleanup")
+        expanded_formula_design_from_model_frame("~ cell.type", &ambiguous_cross_type).unwrap_err();
+    assert_ambiguous_name(
+        ambiguous_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
     );
 
     let bad_reference = FormulaModelFrame {

@@ -145,6 +145,11 @@ versions live in [docs/releases](docs/releases/).
   exposes the gene, sample, column and overflowing sum. These errors retain
   their existing messages and error kinds.
 
+- Formula and contrast name resolution reports ambiguous or missing names
+  with structured errors. Ambiguities identify the matching names, and
+  factor-level errors identify the role and sample index when applicable.
+  Existing messages and error kinds are preserved.
+
 - Missing-prerequisite errors ("Wald fitting requires MAP dispersions") are
   `DeseqError::MissingPrerequisite { domain, operation, prerequisite }`
   (119 sites). 57 of these messages were reworded into the one form

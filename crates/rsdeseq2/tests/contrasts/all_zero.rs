@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn contrast_all_zero_numeric_matches_deseq2_expanded_shape() {
@@ -136,10 +138,16 @@ fn contrast_all_zero_factor_levels_rejects_ambiguous_cleaned_level_aliases() {
     let counts = CountMatrix::from_row_major_u32(1, 4, vec![0, 0, 0, 0]).unwrap();
     let levels = vec!["A cell", "A-cell", "B", "B"];
 
-    let err = contrast_all_zero_factor_levels(&counts, &levels, "A.cell", "B")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("resolves ambiguously"));
+    assert_ambiguous_name(
+        contrast_all_zero_factor_levels(&counts, &levels, "A.cell", "B").unwrap_err(),
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: None,
+            role: FactorLevelRole::Numerator,
+        },
+        "A.cell",
+        &["A cell", "A-cell"],
+    );
 }
 
 #[test]

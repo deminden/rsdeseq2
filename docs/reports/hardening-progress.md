@@ -780,6 +780,18 @@ Wald and LRT entry points.
 
 The targeted batches passed 88 integration tests and one unit test.
 
+Formula and model-frame lookups now report unresolved names and
+collisions by scope. The error includes the matching labels for a
+collision and the factor-level role or observed sample index when
+available. Model-frame and builder character contrasts share level
+resolution. The tests verify exact-name priority, alias collision order
+and retained diagnostics across Wald and LRT routes. Existing error
+messages and coarse kinds are preserved.
+
+The focused design, contrast and LRT run passed 210 tests. The final
+assertion updates passed a 16-test Wald and formula run. Workspace Clippy
+passed for all targets after the implementation changes.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

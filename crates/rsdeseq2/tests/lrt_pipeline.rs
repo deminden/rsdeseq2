@@ -1,4 +1,6 @@
+use crate::support::assert_ambiguous_name;
 use approx::assert_relative_eq;
+use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
 
 fn assert_lrt_likelihood_state(fit: &DeseqFit, counts: &CountMatrix) {
@@ -1518,10 +1520,15 @@ fn lrt_replacement_numeric_contrast_validates_stored_model_frame_metadata() {
             None::<&[String]>,
             &options,
         )
-        .unwrap_err()
-        .to_string();
+        .unwrap_err();
 
-    assert!(error.contains("resolves ambiguously after R-style cleanup"));
+    assert_ambiguous_name(
+        error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
 }
 
 #[test]

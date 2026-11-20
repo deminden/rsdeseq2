@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::{FactorLevelRole, NameScope};
 
 #[test]
 fn expanded_formula_design_with_offsets_extracts_formula_offsets() {
@@ -511,9 +513,17 @@ fn expanded_formula_design_validates_unsupported_terms() {
         &ambiguous_factor,
         &[],
     )
-    .unwrap_err()
-    .to_string();
-    assert!(ambiguous_relevel.contains("resolves ambiguously"));
+    .unwrap_err();
+    assert_ambiguous_name(
+        ambiguous_relevel,
+        ErrorKind::Options,
+        NameScope::FactorLevel {
+            factor: Some("cell type".into()),
+            role: FactorLevelRole::Declared,
+        },
+        "B-cell",
+        &["B cell", "B-cell"],
+    );
     assert!(
         expanded_formula_design_with_offsets("~ condition - offset(dose)", &factors, &numeric)
             .is_err()

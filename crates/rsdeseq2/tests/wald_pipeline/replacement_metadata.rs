@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::NameScope;
 
 #[test]
 fn fixed_dispersion_wald_list_contrast_replacement_accepts_cleaned_positive_and_negative_aliases() {
@@ -128,10 +130,15 @@ fn wald_replacement_numeric_contrast_validates_stored_model_frame_metadata() {
             None::<&[String]>,
             &options,
         )
-        .unwrap_err()
-        .to_string();
+        .unwrap_err();
 
-    assert!(error.contains("resolves ambiguously after R-style cleanup"));
+    assert_ambiguous_name(
+        error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
 }
 
 #[test]

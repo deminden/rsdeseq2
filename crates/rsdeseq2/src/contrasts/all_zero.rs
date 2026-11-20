@@ -4,7 +4,7 @@ use super::counts_view::ContrastCounts;
 use super::resolution::{validate_factor_level_contrast, validate_numeric_contrast};
 use crate::design::{DesignMatrix, r_like_name_candidates as candidate_names};
 use crate::errors::{DeseqError, invalid_dimensions};
-use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::errors::{ErrorKind, FactorLevelRole, NameScope, ambiguous_name, missing_prerequisite};
 use crate::matrix::CountMatrix;
 use crate::matrix::MatrixView;
 use crate::numeric::checked;
@@ -111,8 +111,10 @@ pub(super) fn factor_level_samples<S: AsRef<str>>(
         ));
     }
     let observed_levels = unique_sample_levels(sample_levels);
-    let numerator = resolve_sample_level_alias(&observed_levels, numerator, "numerator")?;
-    let denominator = resolve_sample_level_alias(&observed_levels, denominator, "denominator")?;
+    let numerator =
+        resolve_sample_level_alias(&observed_levels, numerator, FactorLevelRole::Numerator)?;
+    let denominator =
+        resolve_sample_level_alias(&observed_levels, denominator, FactorLevelRole::Denominator)?;
     if numerator == denominator {
         return Err(DeseqError::InvalidOptions {
             reason: format!(
@@ -163,8 +165,9 @@ fn unique_sample_levels<S: AsRef<str>>(sample_levels: &[S]) -> Vec<&str> {
 fn resolve_sample_level_alias<'a>(
     observed_levels: &[&'a str],
     requested: &str,
-    role: &str,
+    role: FactorLevelRole,
 ) -> Result<&'a str, DeseqError> {
+    let scope = || NameScope::FactorLevel { factor: None, role };
     let exact = observed_levels
         .iter()
         .copied()
@@ -174,11 +177,13 @@ fn resolve_sample_level_alias<'a>(
         [level] => return Ok(*level),
         [] => {}
         _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "contrastAllZero {role} level '{requested}' appears more than once"
-                ),
-            });
+            return Err(ambiguous_name(
+                ErrorKind::Options,
+                scope(),
+                requested,
+                exact,
+                format!("contrastAllZero {role} level '{requested}' appears more than once"),
+            ));
         }
     }
 
@@ -193,15 +198,22 @@ fn resolve_sample_level_alias<'a>(
         .collect::<Vec<_>>();
     match matches.as_slice() {
         [level] => Ok(*level),
-        [] => Err(DeseqError::InvalidOptions {
+        [] => Err(DeseqError::NameNotFound {
+            domain: ErrorKind::Options,
+            scope: scope(),
+            name: requested.into(),
             reason: format!(
                 "contrastAllZero sample levels do not contain {role} level '{requested}'"
             ),
         }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
+        _ => Err(ambiguous_name(
+            ErrorKind::Options,
+            scope(),
+            requested,
+            matches,
+            format!(
                 "contrastAllZero {role} level '{requested}' resolves ambiguously after R-style cleanup"
             ),
-        }),
+        )),
     }
 }

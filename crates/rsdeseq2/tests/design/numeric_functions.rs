@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::NameScope;
 
 #[test]
 fn expanded_formula_design_supports_numeric_function_transforms() {
@@ -256,11 +258,13 @@ fn expanded_formula_design_supports_numeric_function_transforms() {
     ];
     let duplicate_name_error =
         expanded_formula_design("~ as.numeric(dose)", &factors, &duplicate_name_numeric)
-            .unwrap_err()
-            .to_string();
-    assert!(
-        duplicate_name_error.contains("formula variable 'dose_as.numeric' appears more than once"),
-        "{duplicate_name_error}"
+            .unwrap_err();
+    assert_ambiguous_name(
+        duplicate_name_error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "dose_as.numeric",
+        &["dose_as.numeric", "dose_as.numeric"],
     );
 
     let scaled_interaction =

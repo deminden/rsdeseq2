@@ -1,7 +1,7 @@
 pub(super) use super::super::DesignOrigin;
 use super::*;
 pub(super) use crate::errors::{Error, invalid_dimensions};
-use crate::errors::{ErrorKind, missing_prerequisite};
+use crate::errors::{ErrorKind, NameScope, ambiguous_name, missing_prerequisite};
 pub(super) use crate::math::rank::{R_QR_TOLERANCE, matrix_rank, matrix_rank_r_qr};
 pub(super) use crate::matrix::RowMajorMatrix;
 use rcompat_numeric::matrix::try_alloc_matrix;
@@ -268,11 +268,13 @@ impl FormulaModelFrame {
         match matches.as_slice() {
             [factor] => Ok(Some(formula_model_frame_factor_reference(factor)?)),
             [] => Ok(None),
-            _ => Err(Error::InvalidOptions {
-                reason: format!(
-                    "factor '{factor_name}' resolves ambiguously after R-style cleanup"
-                ),
-            }),
+            _ => Err(ambiguous_name(
+                ErrorKind::Options,
+                NameScope::Factor,
+                factor_name,
+                matches.iter().map(|factor| factor.name.as_str()),
+                format!("factor '{factor_name}' resolves ambiguously after R-style cleanup"),
+            )),
         }
     }
 
@@ -340,11 +342,15 @@ impl FormulaModelFrame {
                 values: covariate.values.as_slice(),
             })),
             [] => Ok(None),
-            _ => Err(Error::InvalidOptions {
-                reason: format!(
+            _ => Err(ambiguous_name(
+                ErrorKind::Options,
+                NameScope::NumericCovariate,
+                numeric_name,
+                matches.iter().map(|covariate| covariate.name.as_str()),
+                format!(
                     "numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
                 ),
-            }),
+            )),
         }
     }
 

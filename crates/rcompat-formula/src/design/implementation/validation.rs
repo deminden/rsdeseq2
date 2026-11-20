@@ -1,6 +1,8 @@
 use super::*;
 use crate::errors::missing_prerequisite;
-use crate::errors::{ErrorKind, Requirement, invalid_parameter};
+use crate::errors::{
+    ErrorKind, FactorLevelRole, NameScope, Requirement, ambiguous_name, invalid_parameter,
+};
 pub(super) fn validate_additive_factor_specs(
     factors: &[ExpandedFactorSpec<'_>],
 ) -> Result<(), Error> {
@@ -336,26 +338,46 @@ pub(super) fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
             ));
         }
         if levels[..idx].iter().any(|previous| previous == level) {
-            return Err(Error::InvalidOptions {
-                reason: format!("factor '{factor}' has duplicate declared level '{level}'"),
-            });
+            return Err(ambiguous_name(
+                ErrorKind::Options,
+                NameScope::FactorLevel {
+                    factor: Some(factor.into()),
+                    role: FactorLevelRole::Declared,
+                },
+                level,
+                [level.as_str(); 2],
+                format!("factor '{factor}' has duplicate declared level '{level}'"),
+            ));
         }
         let cleaned_level = r_like_make_name(level);
-        if levels[..idx].iter().any(|previous| {
+        if let Some(previous) = levels[..idx].iter().find(|previous| {
             r_like_make_name(previous) == cleaned_level
                 && previous.as_str() != cleaned_level
                 && level.as_str() != cleaned_level
         }) {
-            return Err(Error::InvalidOptions {
-                reason: format!(
+            return Err(ambiguous_name(
+                ErrorKind::Options,
+                NameScope::FactorLevel {
+                    factor: Some(factor.into()),
+                    role: FactorLevelRole::Declared,
+                },
+                level,
+                [previous.as_str(), level.as_str()],
+                format!(
                     "factor '{factor}' declared level '{level}' resolves ambiguously after R-style cleanup"
                 ),
-            });
+            ));
         }
         has_reference |= level == reference;
     }
     if !has_reference {
-        return Err(Error::InvalidOptions {
+        return Err(Error::NameNotFound {
+            domain: ErrorKind::Options,
+            scope: NameScope::FactorLevel {
+                factor: Some(factor.into()),
+                role: FactorLevelRole::Reference,
+            },
+            name: reference.into(),
             reason: format!(
                 "reference level '{reference}' is not present in factor '{factor}' declared levels"
             ),
@@ -364,7 +386,13 @@ pub(super) fn validate_factor_design_inputs_with_levels<S: AsRef<str>>(
     for (idx, level) in sample_levels.iter().enumerate() {
         let level = level.as_ref();
         if !levels.iter().any(|candidate| candidate == level) {
-            return Err(Error::InvalidOptions {
+            return Err(Error::NameNotFound {
+                domain: ErrorKind::Options,
+                scope: NameScope::FactorLevel {
+                    factor: Some(factor.into()),
+                    role: FactorLevelRole::Sample { index: idx },
+                },
+                name: level.into(),
                 reason: format!(
                     "sample level {idx} value '{level}' is not present in factor '{factor}' declared levels"
                 ),

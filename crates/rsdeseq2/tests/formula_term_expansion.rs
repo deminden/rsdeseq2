@@ -1,5 +1,7 @@
 //! Formula term expansion edge cases.
 
+use crate::support::assert_name_not_found;
+use rsdeseq2::errors::NameScope;
 use rsdeseq2::prelude::*;
 
 fn frame() -> FormulaModelFrame {
@@ -25,20 +27,21 @@ fn unknown_calls_are_errors_not_stack_overflows() {
     std::thread::Builder::new()
         .stack_size(1 << 20)
         .spawn(|| {
-            for formula in [
-                "~ q(age)",
-                "~q()",
-                "~ f() + condition",
-                "~ q(age):condition",
+            for (formula, missing) in [
+                ("~ q(age)", "q(age)"),
+                ("~q()", "q()"),
+                ("~ f() + condition", "f()"),
+                ("~ q(age):condition", "q(age)"),
             ] {
                 let error =
                     expanded_formula_design_with_offsets_from_model_frame(formula, &frame())
                         .err()
                         .unwrap_or_else(|| panic!("{formula} should be rejected"));
-                assert_eq!(error.kind(), rsdeseq2::errors::ErrorKind::Formula);
-                assert!(
-                    error.to_string().contains("is not present"),
-                    "{formula}: {error}"
+                assert_name_not_found(
+                    error,
+                    ErrorKind::Formula,
+                    NameScope::FormulaVariable,
+                    missing,
                 );
             }
             assert!(

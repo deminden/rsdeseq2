@@ -1,4 +1,6 @@
 use super::*;
+use crate::support::assert_ambiguous_name;
+use rsdeseq2::errors::NameScope;
 
 #[test]
 fn builder_try_model_frame_validates_wrapper_metadata() {
@@ -35,11 +37,13 @@ fn builder_try_model_frame_validates_wrapper_metadata() {
             .current_model_frame(),
         Some(&ambiguous)
     );
-    let error = DeseqBuilder::new()
-        .try_model_frame(ambiguous)
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("resolves ambiguously after R-style cleanup"));
+    assert_ambiguous_name(
+        DeseqBuilder::new().try_model_frame(ambiguous).unwrap_err(),
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
 }
 
 #[test]
@@ -79,10 +83,15 @@ fn model_frame_contrast_routes_validate_metadata_for_numeric_requests() {
             &ResultsContrast::numeric(vec![0.0, 1.0]),
             &ambiguous,
         )
-        .unwrap_err()
-        .to_string();
+        .unwrap_err();
 
-    assert!(error.contains("resolves ambiguously after R-style cleanup"));
+    assert_ambiguous_name(
+        error,
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        "cell-type",
+        &["cell type", "cell-type"],
+    );
 }
 
 #[test]

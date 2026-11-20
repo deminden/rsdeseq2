@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, NameScope, ambiguous_name, invalid_formula};
 // Numeric transform discovery, parsing and covariate resolution.
 
 pub(super) fn expand_formula_numeric_transform_terms(
@@ -484,9 +484,13 @@ pub(super) fn find_formula_numeric_covariate<'a>(
         [covariate] => return Ok(*covariate),
         [] => {}
         _ => {
-            return Err(invalid_formula(format!(
-                "formula numeric covariate '{numeric_name}' appears more than once"
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::NumericCovariate,
+                numeric_name,
+                exact.iter().map(|covariate| covariate.name),
+                format!("formula numeric covariate '{numeric_name}' appears more than once"),
+            ));
         }
     }
 
@@ -500,12 +504,23 @@ pub(super) fn find_formula_numeric_covariate<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [covariate] => Ok(*covariate),
-        [] => Err(invalid_formula(format!(
-            "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
-        ))),
-        _ => Err(invalid_formula(format!(
-            "formula numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
-        ))),
+        [] => Err(Error::NameNotFound {
+            domain: ErrorKind::Formula,
+            scope: NameScope::NumericCovariate,
+            name: numeric_name.into(),
+            reason: format!(
+                "formula numeric covariate '{numeric_name}' is not present in supplied design metadata"
+            ),
+        }),
+        _ => Err(ambiguous_name(
+            ErrorKind::Formula,
+            NameScope::NumericCovariate,
+            numeric_name,
+            aliases.iter().map(|covariate| covariate.name),
+            format!(
+                "formula numeric covariate '{numeric_name}' resolves ambiguously after R-style cleanup"
+            ),
+        )),
     }
 }
 

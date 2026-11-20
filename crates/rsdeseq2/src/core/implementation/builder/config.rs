@@ -1,5 +1,6 @@
 use super::*;
-use crate::errors::invalid_formula;
+use crate::contrasts::resolve_factor_level_alias;
+use crate::errors::{FactorLevelRole, invalid_formula};
 impl Default for DeseqBuilder {
     fn default() -> Self {
         Self::new()
@@ -477,12 +478,16 @@ pub(super) fn factor_level_contrast_from_sample_levels<'a>(
             observed_levels.push(level);
         }
     }
-    let numerator =
-        resolve_sample_level_alias_for_builder(factor, numerator, "numerator", &observed_levels)?;
-    let denominator = resolve_sample_level_alias_for_builder(
+    let numerator = resolve_factor_level_alias(
+        factor,
+        numerator,
+        FactorLevelRole::Numerator,
+        &observed_levels,
+    )?;
+    let denominator = resolve_factor_level_alias(
         factor,
         denominator,
-        "denominator",
+        FactorLevelRole::Denominator,
         &observed_levels,
     )?;
     if numerator == denominator {
@@ -494,7 +499,12 @@ pub(super) fn factor_level_contrast_from_sample_levels<'a>(
     }
     let reference = reference
         .map(|reference| {
-            resolve_sample_level_alias_for_builder(factor, reference, "reference", &observed_levels)
+            resolve_factor_level_alias(
+                factor,
+                reference,
+                FactorLevelRole::Reference,
+                &observed_levels,
+            )
         })
         .transpose()?;
     Ok(FactorLevelContrast {
@@ -504,51 +514,6 @@ pub(super) fn factor_level_contrast_from_sample_levels<'a>(
         reference,
         sample_levels,
     })
-}
-
-pub(super) fn resolve_sample_level_alias_for_builder<'a>(
-    factor: &str,
-    requested: &str,
-    role: &str,
-    observed_levels: &[&'a str],
-) -> Result<&'a str, DeseqError> {
-    let exact = observed_levels
-        .iter()
-        .copied()
-        .filter(|level| *level == requested)
-        .collect::<Vec<_>>();
-    match exact.as_slice() {
-        [level] => return Ok(*level),
-        [] => {}
-        _ => {
-            return Err(DeseqError::InvalidOptions {
-                reason: format!(
-                    "factor '{factor}' {role} level '{requested}' appears more than once"
-                ),
-            });
-        }
-    }
-
-    let matches = observed_levels
-        .iter()
-        .copied()
-        .filter(|level| {
-            design_name_candidates(level)
-                .into_iter()
-                .any(|candidate| candidate == requested)
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [level] => Ok(*level),
-        [] => Err(DeseqError::InvalidOptions {
-            reason: format!("factor '{factor}' does not contain {role} level '{requested}'"),
-        }),
-        _ => Err(DeseqError::InvalidOptions {
-            reason: format!(
-                "factor '{factor}' {role} level '{requested}' resolves ambiguously after R-style cleanup"
-            ),
-        }),
-    }
 }
 
 /// Per-sample levels as owned strings for a `results()` contrast request.

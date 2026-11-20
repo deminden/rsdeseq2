@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::invalid_formula;
+use crate::errors::{ErrorKind, FactorLevelRole, NameScope, ambiguous_name, invalid_formula};
 // Model-frame construction, validation and alias resolution.
 
 pub(super) fn validate_formula_factor_name_collisions(
@@ -7,23 +7,7 @@ pub(super) fn validate_formula_factor_name_collisions(
 ) -> Result<(), Error> {
     for (idx, factor) in factors.iter().enumerate() {
         for previous in &factors[..idx] {
-            if previous.factor == factor.factor {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' appears more than once",
-                    factor.factor
-                )));
-            }
-            let previous_aliases = r_like_name_candidates(previous.factor);
-            let current_aliases = r_like_name_candidates(factor.factor);
-            if previous_aliases
-                .iter()
-                .any(|previous_alias| current_aliases.contains(previous_alias))
-            {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' resolves ambiguously after R-style cleanup",
-                    factor.factor
-                )));
-            }
+            validate_formula_variable_name_pair(previous.factor, factor.factor)?;
         }
     }
     Ok(())
@@ -34,23 +18,7 @@ pub(super) fn validate_formula_numeric_covariate_name_collisions(
 ) -> Result<(), Error> {
     for (idx, covariate) in numeric_covariates.iter().enumerate() {
         for previous in &numeric_covariates[..idx] {
-            if previous.name == covariate.name {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' appears more than once",
-                    covariate.name
-                )));
-            }
-            let previous_aliases = r_like_name_candidates(previous.name);
-            let current_aliases = r_like_name_candidates(covariate.name);
-            if previous_aliases
-                .iter()
-                .any(|previous_alias| current_aliases.contains(previous_alias))
-            {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' resolves ambiguously after R-style cleanup",
-                    covariate.name
-                )));
-            }
+            validate_formula_variable_name_pair(previous.name, covariate.name)?;
         }
     }
     Ok(())
@@ -62,26 +30,34 @@ pub(super) fn validate_formula_factor_numeric_name_collisions(
 ) -> Result<(), Error> {
     for factor in factors {
         for covariate in numeric_covariates {
-            if factor.factor == covariate.name {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' appears more than once",
-                    factor.factor
-                )));
-            }
-            let factor_aliases = r_like_name_candidates(factor.factor);
-            let covariate_aliases = r_like_name_candidates(covariate.name);
-            if factor_aliases
-                .iter()
-                .any(|factor_alias| covariate_aliases.contains(factor_alias))
-            {
-                return Err(invalid_formula(format!(
-                    "formula variable '{}' resolves ambiguously after R-style cleanup",
-                    covariate.name
-                )));
-            }
+            validate_formula_variable_name_pair(factor.factor, covariate.name)?;
         }
     }
     Ok(())
+}
+
+fn validate_formula_variable_name_pair(previous: &str, name: &str) -> Result<(), Error> {
+    let reason = if previous == name {
+        format!("formula variable '{name}' appears more than once")
+    } else if name_aliases_overlap(previous, name) {
+        format!("formula variable '{name}' resolves ambiguously after R-style cleanup")
+    } else {
+        return Ok(());
+    };
+    Err(ambiguous_name(
+        ErrorKind::Formula,
+        NameScope::FormulaVariable,
+        name,
+        [previous, name],
+        reason,
+    ))
+}
+
+fn name_aliases_overlap(left: &str, right: &str) -> bool {
+    let right_aliases = r_like_name_candidates(right);
+    r_like_name_candidates(left)
+        .iter()
+        .any(|alias| right_aliases.contains(alias))
 }
 
 pub(super) fn formula_model_frame_from_specs(
@@ -193,10 +169,13 @@ pub(super) fn validate_formula_model_frame(model_frame: &FormulaModelFrame) -> R
             .iter()
             .any(|previous| previous.name == factor.name)
         {
-            return Err(invalid_formula(format!(
-                "formula factor '{}' appears more than once",
-                factor.name
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::Factor,
+                &factor.name,
+                [factor.name.as_str(); 2],
+                format!("formula factor '{}' appears more than once", factor.name),
+            ));
         }
         if factor.sample_levels.len() != n_samples {
             return Err(invalid_dimensions(
@@ -219,32 +198,48 @@ pub(super) fn validate_formula_model_frame(model_frame: &FormulaModelFrame) -> R
             .iter()
             .any(|previous| previous.name == covariate.name)
         {
-            return Err(invalid_formula(format!(
-                "formula numeric covariate '{}' appears more than once",
-                covariate.name
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::NumericCovariate,
+                &covariate.name,
+                [covariate.name.as_str(); 2],
+                format!(
+                    "formula numeric covariate '{}' appears more than once",
+                    covariate.name
+                ),
+            ));
         }
         if model_frame
             .factors
             .iter()
             .any(|factor| factor.name == covariate.name)
         {
-            return Err(invalid_formula(format!(
-                "formula column '{}' cannot be both a factor and numeric covariate",
-                covariate.name
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::FormulaVariable,
+                &covariate.name,
+                [covariate.name.as_str(); 2],
+                format!(
+                    "formula column '{}' cannot be both a factor and numeric covariate",
+                    covariate.name
+                ),
+            ));
         }
-        if model_frame.factors.iter().any(|factor| {
-            let factor_aliases = r_like_name_candidates(&factor.name);
-            let covariate_aliases = r_like_name_candidates(&covariate.name);
-            factor_aliases
-                .iter()
-                .any(|factor_alias| covariate_aliases.contains(factor_alias))
-        }) {
-            return Err(invalid_formula(format!(
-                "formula column '{}' resolves ambiguously after R-style cleanup",
-                covariate.name
-            )));
+        if let Some(factor) = model_frame
+            .factors
+            .iter()
+            .find(|factor| name_aliases_overlap(&factor.name, &covariate.name))
+        {
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                NameScope::FormulaVariable,
+                &covariate.name,
+                [factor.name.as_str(), covariate.name.as_str()],
+                format!(
+                    "formula column '{}' resolves ambiguously after R-style cleanup",
+                    covariate.name
+                ),
+            ));
         }
         if covariate.values.len() != n_samples {
             return Err(invalid_dimensions(
@@ -314,6 +309,10 @@ pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
     levels: &[&'a str],
     requested: &str,
 ) -> Result<&'a str, Error> {
+    let scope = || NameScope::FactorLevel {
+        factor: Some(factor_name.into()),
+        role: FactorLevelRole::Reference,
+    };
     let exact = levels
         .iter()
         .copied()
@@ -323,9 +322,15 @@ pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
         [level] => return Ok(*level),
         [] => {}
         _ => {
-            return Err(invalid_formula(format!(
-                "formula factor '{factor_name}' reference level '{requested}' appears more than once"
-            )));
+            return Err(ambiguous_name(
+                ErrorKind::Formula,
+                scope(),
+                requested,
+                exact,
+                format!(
+                    "formula factor '{factor_name}' reference level '{requested}' appears more than once"
+                ),
+            ));
         }
     }
 
@@ -340,12 +345,23 @@ pub(super) fn resolve_formula_reference_alias_from_levels<'a>(
         .collect::<Vec<_>>();
     match aliases.as_slice() {
         [level] => Ok(*level),
-        [] => Err(invalid_formula(format!(
-            "formula factor '{factor_name}' does not contain reference level '{requested}'"
-        ))),
-        _ => Err(invalid_formula(format!(
-            "formula factor '{factor_name}' reference level '{requested}' resolves ambiguously after R-style cleanup"
-        ))),
+        [] => Err(Error::NameNotFound {
+            domain: ErrorKind::Formula,
+            scope: scope(),
+            name: requested.into(),
+            reason: format!(
+                "formula factor '{factor_name}' does not contain reference level '{requested}'"
+            ),
+        }),
+        _ => Err(ambiguous_name(
+            ErrorKind::Formula,
+            scope(),
+            requested,
+            aliases,
+            format!(
+                "formula factor '{factor_name}' reference level '{requested}' resolves ambiguously after R-style cleanup"
+            ),
+        )),
     }
 }
 

@@ -212,6 +212,34 @@ pub enum Error {
         matches: Vec<String>,
     },
 
+    /// A name lookup or declaration has more than one matching entry.
+    #[error("invalid options: {reason}")]
+    AmbiguousName {
+        /// Classification of the lookup or validation stage.
+        domain: ErrorKind,
+        /// The collection and role of the name.
+        scope: NameScope,
+        /// The requested or conflicting declared name.
+        name: String,
+        /// Names of matching entries in input order.
+        matches: Vec<String>,
+        /// The original diagnostic text.
+        reason: String,
+    },
+
+    /// A requested name is absent from the matching collection.
+    #[error("invalid options: {reason}")]
+    NameNotFound {
+        /// Classification of the lookup stage.
+        domain: ErrorKind,
+        /// The collection and role of the name.
+        scope: NameScope,
+        /// The requested name.
+        name: String,
+        /// The original diagnostic text.
+        reason: String,
+    },
+
     /// The model matrix has dependent or zero columns.
     #[error(
         "invalid options: {context} model matrix is not full rank: rank {rank}, columns {columns}{}",
@@ -264,6 +292,56 @@ pub enum NegativeBinomialStage {
     RowSum,
     /// Negative twice the row log likelihood.
     Deviance,
+}
+
+/// Names searched or checked during formula design and contrast resolution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum NameScope {
+    /// Variables in the combined factor and numeric model frame.
+    FormulaVariable,
+    /// Factor columns.
+    Factor,
+    /// Numeric covariate columns.
+    NumericCovariate,
+    /// Levels of a single factor.
+    FactorLevel {
+        /// The factor name when known.
+        factor: Option<String>,
+        /// How the requested level is used.
+        role: FactorLevelRole,
+    },
+}
+
+/// The use of a level in a design or contrast request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum FactorLevelRole {
+    /// The contrast numerator.
+    Numerator,
+    /// The contrast denominator.
+    Denominator,
+    /// The treatment reference.
+    Reference,
+    /// An explicitly declared factor level.
+    Declared,
+    /// An observed sample's level.
+    Sample {
+        /// The zero-based sample index.
+        index: usize,
+    },
+}
+
+impl std::fmt::Display for FactorLevelRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Numerator => "numerator",
+            Self::Denominator => "denominator",
+            Self::Reference => "reference",
+            Self::Declared => "declared",
+            Self::Sample { .. } => "sample",
+        })
+    }
 }
 
 impl NegativeBinomialStage {
@@ -433,7 +511,9 @@ impl Error {
             Self::ParseInt { .. } | Self::ParseFloat { .. } => ErrorKind::Parse,
             Self::InvalidParameter { domain, .. }
             | Self::MissingPrerequisite { domain, .. }
-            | Self::InvalidGeneValue { domain, .. } => *domain,
+            | Self::InvalidGeneValue { domain, .. }
+            | Self::AmbiguousName { domain, .. }
+            | Self::NameNotFound { domain, .. } => *domain,
             Self::InvalidFormula { .. } => ErrorKind::Formula,
             Self::CoefficientNotFound { .. }
             | Self::AmbiguousCoefficient { .. }
@@ -441,6 +521,23 @@ impl Error {
             | Self::LrtDesignNotNested { .. } => ErrorKind::Options,
             Self::Internal { .. } => ErrorKind::Internal,
         }
+    }
+}
+
+#[doc(hidden)]
+pub fn ambiguous_name(
+    domain: ErrorKind,
+    scope: NameScope,
+    name: &str,
+    matches: impl IntoIterator<Item = impl Into<String>>,
+    reason: String,
+) -> Error {
+    Error::AmbiguousName {
+        domain,
+        scope,
+        name: name.into(),
+        matches: matches.into_iter().map(Into::into).collect(),
+        reason,
     }
 }
 
