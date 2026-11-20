@@ -3,41 +3,38 @@ use crate::errors::{ErrorKind, Requirement, invalid_formula, invalid_parameter};
 use crate::matrix::try_alloc_matrix;
 use crate::numeric::math::ProfileMath;
 pub(super) fn formula_size_factor_offsets(
-    counts: &CountMatrix,
     size_factors: &[f64],
     offsets: &[f64],
-) -> Result<Option<RowMajorMatrix<f64>>, DeseqError> {
+    n_samples: usize,
+) -> Result<Option<Vec<f64>>, DeseqError> {
     if !formula_offsets_are_active(offsets) {
         return Ok(None);
     }
-    if size_factors.len() != counts.n_samples() {
+    if size_factors.len() != n_samples {
         return Err(invalid_dimensions(
             "formula offset size factors",
-            counts.n_samples(),
+            n_samples,
             size_factors.len(),
         ));
     }
-    let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
-    let mut values = try_alloc_matrix(counts.n_genes(), counts.n_samples(), "replacement counts")?;
-    for _ in 0..counts.n_genes() {
-        for (sample, size_factor) in size_factors.iter().copied().enumerate() {
-            if !size_factor.is_finite() || size_factor <= 0.0 {
-                return Err(invalid_parameter(
-                    ErrorKind::Options,
-                    format!("size factor at sample {sample}"),
-                    Requirement::FiniteAndPositive,
-                ));
-            }
-            let factor = size_factor * offset_scales[sample];
-            if !factor.is_finite() || factor <= 0.0 {
-                return Err(invalid_formula(format!(
-                    "formula offset normalization factor at sample {sample} must be finite and positive"
-                )));
-            }
-            values.push(factor);
+    let mut factors = formula_offset_scales(offsets, n_samples)?;
+    for (sample, (factor, &size_factor)) in factors.iter_mut().zip(size_factors).enumerate() {
+        if !size_factor.is_finite() || size_factor <= 0.0 {
+            return Err(invalid_parameter(
+                ErrorKind::Options,
+                format!("size factor at sample {sample}"),
+                Requirement::FiniteAndPositive,
+            ));
         }
+        let product = size_factor * *factor;
+        if !product.is_finite() || product <= 0.0 {
+            return Err(invalid_formula(format!(
+                "formula offset normalization factor at sample {sample} must be finite and positive"
+            )));
+        }
+        *factor = product;
     }
-    RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
+    Ok(Some(factors))
 }
 
 pub(super) fn formula_normalization_factor_offsets(
@@ -58,7 +55,11 @@ pub(super) fn formula_normalization_factor_offsets(
         ));
     }
     let offset_scales = formula_offset_scales(offsets, counts.n_samples())?;
-    let mut values = Vec::with_capacity(normalization_factors.len());
+    let mut values = try_alloc_matrix(
+        counts.n_genes(),
+        counts.n_samples(),
+        "formula offset normalization factors",
+    )?;
     for gene in 0..normalization_factors.n_rows() {
         for (sample, value) in normalization_factors.row(gene)?.iter().copied().enumerate() {
             if !value.is_finite() || value <= 0.0 {
@@ -80,38 +81,8 @@ pub(super) fn formula_normalization_factor_offsets(
     RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), values).map(Some)
 }
 
-pub(super) fn formula_offsets_are_active(offsets: &[f64]) -> bool {
+fn formula_offsets_are_active(offsets: &[f64]) -> bool {
     offsets.iter().any(|value| *value != 0.0)
-}
-
-pub(super) fn beta_prior_cooks_output(
-    counts: &CountMatrix,
-    size_factors: &[f64],
-    fit: &ExpandedModelBetaPriorGlmFit,
-) -> Result<CooksOutput, DeseqError> {
-    let normalized = normalized_counts(counts, size_factors)?;
-    calculate_cooks_distance(
-        counts,
-        &normalized,
-        &fit.prior_fit.mu,
-        &fit.prior_fit.hat_diagonal,
-        &fit.prior_fit.model_matrix,
-    )
-}
-
-pub(super) fn beta_prior_normalized_cooks_output(
-    counts: &CountMatrix,
-    normalization_factors: &RowMajorMatrix<f64>,
-    fit: &ExpandedModelBetaPriorGlmFit,
-) -> Result<CooksOutput, DeseqError> {
-    let normalized = normalized_counts_with_factors(counts, normalization_factors)?;
-    calculate_cooks_distance(
-        counts,
-        &normalized,
-        &fit.prior_fit.mu,
-        &fit.prior_fit.hat_diagonal,
-        &fit.prior_fit.model_matrix,
-    )
 }
 
 pub(super) fn attach_cooks_to_results(
@@ -220,10 +191,7 @@ pub(super) fn clear_replacement_all_zero_result(row: &mut DeseqResultRow) {
     row.filtered = None;
 }
 
-pub(super) fn formula_offset_scales(
-    offsets: &[f64],
-    n_samples: usize,
-) -> Result<Vec<f64>, DeseqError> {
+fn formula_offset_scales(offsets: &[f64], n_samples: usize) -> Result<Vec<f64>, DeseqError> {
     if offsets.len() != n_samples {
         return Err(invalid_dimensions(
             "formula offsets",
@@ -231,18 +199,15 @@ pub(super) fn formula_offset_scales(
             offsets.len(),
         ));
     }
-    offsets
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(sample, offset)| {
-            let scale = offset.exp_p();
-            if !scale.is_finite() || scale <= 0.0 {
-                return Err(invalid_formula(format!(
-                    "formula offset scale at sample {sample} must be finite and positive"
-                )));
-            }
-            Ok(scale)
-        })
-        .collect()
+    let mut scales = try_alloc_matrix(n_samples, 1, "formula offset scales")?;
+    for (sample, &offset) in offsets.iter().enumerate() {
+        let scale = offset.exp_p();
+        if !scale.is_finite() || scale <= 0.0 {
+            return Err(invalid_formula(format!(
+                "formula offset scale at sample {sample} must be finite and positive"
+            )));
+        }
+        scales.push(scale);
+    }
+    Ok(scales)
 }

@@ -1221,3 +1221,18 @@ all six matrix entries. The real MAP sample caught a mutation of the
 upper dispersion bound and identified an equivalent mutation that
 discarded an unused grid-start override. The override was removed, and
 both pre-change golden manifests matched after that cleanup.
+
+### Expanded beta-prior formula offsets
+
+The standalone expanded beta-prior result helpers compute effective sample
+factors once and pass them as shared GLM offsets. This reduces offset
+storage from genes × samples to samples for these formula fits. Supplied
+cell factors still use a matrix, with checked allocation for the composed
+factors. Coefficient and contrast results share the fit and replacement
+implementation. The Cook's step reuses the normalized counts for both
+distance calculation and replacement planning.
+
+All 53 focused results tests passed under both macOS numeric profiles.
+The formula cases compare coefficient and contrast fits against explicit
+cell factors, including nonuniform observation weights and an actual
+Cook's replacement refit.

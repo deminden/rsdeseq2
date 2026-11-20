@@ -434,6 +434,8 @@ fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
         },
     ];
     let size_factors = [1.0, 1.1, 0.9, 1.2];
+    let weights =
+        RowMajorMatrix::from_row_major(2, 4, vec![1.0, 0.8, 1.0, 0.9, 0.9, 1.0, 0.7, 1.0]).unwrap();
     let dispersions = [0.05, 0.08];
     let base_mean = [41.5, 40.5];
     let disp_fit = [0.05, 0.08];
@@ -459,7 +461,7 @@ fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
             factors: &factors,
             numeric_covariates: &numeric_covariates,
             size_factors: &size_factors,
-            weights: None,
+            weights: Some(&weights),
             dispersions: &dispersions,
             base_mean: &base_mean,
             disp_fit: &disp_fit,
@@ -481,23 +483,24 @@ fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
     let normalization_factors =
         RowMajorMatrix::from_row_major(counts.n_genes(), counts.n_samples(), normalization_values)
             .unwrap();
+    let direct_input = ExpandedBetaPriorWaldNormalizedResultsInput {
+        counts: &counts,
+        design: ExpandedModelBetaPriorDesignInput {
+            expanded_design: &design.expanded_design,
+            standard_design: &design.standard_design,
+            coefficient_groups: &design.coefficient_groups,
+        },
+        normalization_factors: &normalization_factors,
+        weights: Some(&weights),
+        dispersions: &dispersions,
+        base_mean: &base_mean,
+        disp_fit: &disp_fit,
+        gene_names: None,
+        options: options.clone(),
+    };
     let direct =
         fit_expanded_beta_prior_wald_results_with_normalization_factors_and_weights_and_cooks_replacement(
-            ExpandedBetaPriorWaldNormalizedResultsInput {
-                counts: &counts,
-                design: ExpandedModelBetaPriorDesignInput {
-                    expanded_design: &design.expanded_design,
-                    standard_design: &design.standard_design,
-                    coefficient_groups: &design.coefficient_groups,
-                },
-                normalization_factors: &normalization_factors,
-                weights: None,
-                dispersions: &dispersions,
-                base_mean: &base_mean,
-                disp_fit: &disp_fit,
-                gene_names: None,
-                options: options.clone(),
-            },
+            direct_input.clone(),
             1,
             &replacement_options,
         )
@@ -514,7 +517,7 @@ fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
                 factors: &factors,
                 numeric_covariates: &numeric_covariates,
                 size_factors: &size_factors,
-                weights: None,
+                weights: Some(&weights),
                 dispersions: &dispersions,
                 base_mean: &base_mean,
                 disp_fit: &disp_fit,
@@ -525,14 +528,13 @@ fn fit_expanded_formula_beta_prior_wald_replacement_applies_formula_offsets() {
             &replacement_options,
         )
         .unwrap();
+    let direct_contrast =
+        fit_expanded_beta_prior_wald_contrast_results_with_normalization_factors_and_weights_and_cooks_replacement(
+            direct_input,
+            &[0.0, 1.0],
+            &replacement_options,
+        )
+        .unwrap();
     assert!(formula_contrast.replacement.refit.is_some());
-    assert_eq!(
-        formula_contrast
-            .replacement
-            .results
-            .metadata
-            .result_name
-            .as_deref(),
-        Some("contrast")
-    );
+    assert_eq!(formula_contrast.replacement, direct_contrast);
 }
