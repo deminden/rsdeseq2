@@ -1734,6 +1734,21 @@ The focused run passed 87 R-host integration checks and four portable
 checks. Both profiles matched all 8,032 golden fields. The zero-row
 scaling unit regression, formula library Clippy and module validation passed.
 
+### Non-finite covariance fit summaries
+
+Native Wald and LRT commands expose the `DeseqFit` covariance count in
+`--fit-diagnostics-summary-output`. It reports the original fit and any
+replacement refit separately, excludes skipped genes, and writes `NA`
+when covariance was unavailable. The TSV participates in the CLI output
+transaction and is covered by the completion record.
+
+Each numerical profile passed 52 focused CLI and diagnostics integration
+tests. Three CLI writer unit tests passed, including a non-finite original
+covariance and an unavailable refit covariance. The 3,745-gene GTEx
+pipeline with Cook's cutoff 1 reported 451 replacement candidates and
+zero non-finite covariance rows in both fits. Both profiles verified all
+three files through the completion record.
+
 ## Review plan verification for 0.6.0
 
 | Priority | Implementation and evidence |

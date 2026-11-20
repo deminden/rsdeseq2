@@ -153,6 +153,7 @@ impl DiagnosticOutputArgs {
             self.independent_filter_lowess_output.as_mut(),
             self.fit_diagnostics_output.as_mut(),
             self.refit_diagnostics_output.as_mut(),
+            self.fit_diagnostics_summary_output.as_mut(),
             self.fit_beta_output.as_mut(),
             self.fit_beta_se_output.as_mut(),
             self.fit_beta_optim_start_output.as_mut(),

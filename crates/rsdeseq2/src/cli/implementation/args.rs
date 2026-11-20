@@ -156,6 +156,9 @@ pub(super) struct DiagnosticOutputArgs {
     /// Optional DESeq2-shaped fit diagnostics TSV for the replacement refit.
     #[arg(long)]
     pub(super) refit_diagnostics_output: Option<PathBuf>,
+    /// Optional TSV of non-finite covariance row counts for the fit and any refit.
+    #[arg(long)]
+    pub(super) fit_diagnostics_summary_output: Option<PathBuf>,
     /// Optional GLM beta matrix TSV for the original fit.
     #[arg(long)]
     pub(super) fit_beta_output: Option<PathBuf>,

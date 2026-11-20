@@ -24,6 +24,13 @@ Separate file renames are not an atomic transaction. Consumers requiring a coher
 generation must verify the record, and concurrent writers must use different output
 paths. Existing readers that ignore the record retain ordinary file-read semantics.
 
+Native Wald and LRT runs can write `--fit-diagnostics-summary-output` with
+the number of fitted genes whose coefficient covariance contains a
+non-finite value. The TSV has an `original` row and, when a replacement
+refit ran, a `refit` row. It excludes genes skipped for all-zero counts
+or failed observation weights. `NA` indicates unavailable covariance.
+Rust callers can retrieve the count with `DeseqFit::nonfinite_covariance_rows`.
+
 ```bash
 rsdeseq2 size-factors \
   --counts counts.tsv \

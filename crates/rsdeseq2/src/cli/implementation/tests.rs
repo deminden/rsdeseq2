@@ -41,6 +41,29 @@ fn write_cli_result_sidecars_exports_fit_diagnostics() {
 }
 
 #[test]
+fn write_cli_fit_summary_distinguishes_nonfinite_and_unavailable_covariance() {
+    let path = temp_tsv_path("fit_summary");
+    let mut fit = one_gene_fit(0.2);
+    fit.beta_covariance = Some(RowMajorMatrix::from_elem(1, 1, f64::NAN).unwrap());
+    let analysis = CliAnalysisOutput {
+        results: DeseqResults::default(),
+        fit: Some(fit),
+        refit: Some(one_gene_fit(0.2)),
+        cooks: None,
+        refit_plan: None,
+    };
+
+    write_cli_fit_diagnostics_summary(&path, &analysis).unwrap();
+
+    let got = fs::read_to_string(&path).unwrap();
+    fs::remove_file(&path).unwrap();
+    assert_eq!(
+        got,
+        "fit\tnonfinite_covariance_rows\noriginal\t1\nrefit\tNA\n"
+    );
+}
+
+#[test]
 fn write_cli_result_sidecars_rejects_missing_refit_diagnostics() {
     let path = temp_tsv_path("missing_refit_diagnostics");
     let paths = CliResultSidecarPaths {

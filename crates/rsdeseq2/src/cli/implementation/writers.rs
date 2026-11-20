@@ -14,6 +14,7 @@ pub(super) fn write_cli_analysis_outputs(
         independent_filter_lowess_output,
         fit_diagnostics_output,
         refit_diagnostics_output,
+        fit_diagnostics_summary_output,
         fit_beta_output,
         fit_beta_se_output,
         fit_beta_optim_start_output,
@@ -58,7 +59,29 @@ pub(super) fn write_cli_analysis_outputs(
         analysis,
     )?;
     write_cli_result_sidecars(&result_sidecars, counts.gene_names(), analysis)?;
+    if let Some(path) = fit_diagnostics_summary_output {
+        write_cli_fit_diagnostics_summary(&path, analysis)?;
+    }
     write_deseq_results_tsv(output, &analysis.results)
+}
+
+pub(super) fn write_cli_fit_diagnostics_summary(
+    path: &std::path::Path,
+    analysis: &CliAnalysisOutput,
+) -> Result<(), DeseqError> {
+    let fit = require_cli_fit(analysis, "fit diagnostics summary output")?;
+    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(["fit", "nonfinite_covariance_rows"])?;
+    for (name, fit) in [("original", Some(fit)), ("refit", analysis.refit.as_ref())] {
+        if let Some(fit) = fit {
+            let count = fit
+                .nonfinite_covariance_rows()
+                .map_or_else(|| "NA".to_string(), |count| count.to_string());
+            writer.write_record([name, &count])?;
+        }
+    }
+    writer.flush()?;
+    Ok(())
 }
 
 pub(super) fn write_cli_cooks_outputs(

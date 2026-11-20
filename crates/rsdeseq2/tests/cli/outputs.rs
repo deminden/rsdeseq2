@@ -10,6 +10,7 @@ fn cli_wald_writes_result_and_cooks_sidecars() {
     let filter_metadata = dir.join("filter_metadata.tsv");
     let filter_num_rej = dir.join("filter_num_rej.tsv");
     let filter_lowess = dir.join("filter_lowess.tsv");
+    let fit_summary = dir.join("fit_summary.tsv");
 
     run_cli(&[
         "wald",
@@ -33,6 +34,8 @@ fn cli_wald_writes_result_and_cooks_sidecars() {
         filter_num_rej.to_str().unwrap(),
         "--independent-filter-lowess-output",
         filter_lowess.to_str().unwrap(),
+        "--fit-diagnostics-summary-output",
+        fit_summary.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
@@ -48,10 +51,14 @@ fn cli_wald_writes_result_and_cooks_sidecars() {
     assert_tsv_contains(&filter_metadata, "alpha\t");
     assert_tsv_starts_with(&filter_num_rej, "theta\tnumRej\n");
     assert_tsv_starts_with(&filter_lowess, "x\ty\n");
+    assert_eq!(
+        fs::read_to_string(fit_summary).unwrap(),
+        "fit\tnonfinite_covariance_rows\noriginal\t0\n"
+    );
     let marker: serde_json::Value =
         serde_json::from_slice(&fs::read(dir.join("wald.tsv.complete.json")).unwrap()).unwrap();
     let files = marker["files"].as_array().unwrap();
-    assert_eq!(files.len(), 7);
+    assert_eq!(files.len(), 8);
     for file in files {
         use sha2::{Digest, Sha256};
         let bytes = fs::read(file["path"].as_str().unwrap()).unwrap();
@@ -199,6 +206,7 @@ fn cli_lrt_writes_result_and_cooks_sidecars() {
     let cooks = dir.join("cooks.tsv");
     let column_metadata = dir.join("result_columns.tsv");
     let table_metadata = dir.join("result_table_metadata.tsv");
+    let fit_summary = dir.join("fit_summary.tsv");
 
     run_cli(&[
         "lrt",
@@ -218,6 +226,8 @@ fn cli_lrt_writes_result_and_cooks_sidecars() {
         column_metadata.to_str().unwrap(),
         "--result-table-metadata-output",
         table_metadata.to_str().unwrap(),
+        "--fit-diagnostics-summary-output",
+        fit_summary.to_str().unwrap(),
         "--output",
         output.to_str().unwrap(),
     ]);
@@ -229,4 +239,8 @@ fn cli_lrt_writes_result_and_cooks_sidecars() {
     assert_tsv_contains(&column_metadata, "stat\tresults\t");
     assert_tsv_starts_with(&table_metadata, "name\tvalue\n");
     assert_tsv_contains(&table_metadata, "testType\tLRT\n");
+    assert_eq!(
+        fs::read_to_string(fit_summary).unwrap(),
+        "fit\tnonfinite_covariance_rows\noriginal\t0\n"
+    );
 }
