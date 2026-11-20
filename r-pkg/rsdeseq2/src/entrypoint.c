@@ -87,10 +87,9 @@ SEXP rsdeseq2_estimate_size_factors(SEXP counts, SEXP geo_means, SEXP control_ge
     SEXP dims = Rf_getAttrib(counts, R_DimSymbol);
     if (Rf_length(dims) != 2) Rf_error("counts must be a matrix");
     const size_t n_genes = (size_t)INTEGER(dims)[0], n_samples = (size_t)INTEGER(dims)[1];
-    const size_t n_control = control_genes == R_NilValue ? n_genes : (size_t)Rf_xlength(control_genes);
-    size_t *controls = (size_t *)R_alloc(n_control, sizeof(size_t));
-    if (control_genes == R_NilValue) for (size_t i = 0; i < n_control; ++i) controls[i] = i;
-    else for (size_t i = 0; i < n_control; ++i) controls[i] = (size_t)(INTEGER(control_genes)[i] - 1);
+    const size_t n_control = control_genes == R_NilValue ? 0 : (size_t)Rf_xlength(control_genes);
+    size_t *controls = n_control ? (size_t *)R_alloc(n_control, sizeof(size_t)) : NULL;
+    for (size_t i = 0; i < n_control; ++i) controls[i] = (size_t)(INTEGER(control_genes)[i] - 1);
     SEXP out = PROTECT(Rf_allocVector(REALSXP, n_samples));
     check_rust_backend(rsdeseq2_r_estimate_size_factors(n_genes, n_samples, REAL(counts), Rf_asInteger(method),
         geo_means == R_NilValue ? NULL : REAL(geo_means), controls, n_control, REAL(out)));

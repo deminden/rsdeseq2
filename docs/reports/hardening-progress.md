@@ -1115,6 +1115,21 @@ Peak RSS fell from 212.2 to 182.0 MiB with sample factors and from
 comparison matched single-sample variance, raw-zero flags and all
 four error messages exactly.
 
+### Borrowed size-factor estimation in R
+
+The estimator reads validated counts directly from R's column-major
+matrix. The default call skips building a control-index array in C.
+Explicit controls retain their order and multiplicity. The standalone
+Rust path retains its direct row-slice access.
+
+All 14 selected Rust tests and 260 R 4.6.2 expectations passed. Dense
+ratio, sparse ratio and poscounts runs at 60,000 genes by 128 samples
+produced byte-identical R output, with about 30 MiB less peak RSS per
+run. Standalone Rust checksums matched in both numeric profiles. The
+60,000-gene × 800-sample timings differed by at most 3.4%. An initial
+5.3% difference for the medium portable ratio case was 0.1% over 12
+additional alternating runs.
+
 ### Mutation workflow verification
 
 The scheduled job verifies a nonempty mutation selection and propagates

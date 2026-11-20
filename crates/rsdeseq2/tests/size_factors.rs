@@ -21,6 +21,51 @@ fn poscounts_size_factors_with_zeros() {
 }
 
 #[test]
+fn borrowed_column_major_size_factors_match_owned_counts_bitwise() {
+    use rsdeseq2::normalization::estimate_size_factors_from_view;
+
+    let counts =
+        CountMatrix::from_row_major_u32(4, 3, vec![1, 4, 16, 2, 9, 13, u32::MAX, 0, 8, 0, 0, 0])
+            .unwrap();
+    let column_major = [
+        1.0,
+        2.0,
+        f64::from(u32::MAX),
+        0.0,
+        4.0,
+        9.0,
+        0.0,
+        0.0,
+        16.0,
+        13.0,
+        8.0,
+        0.0,
+    ];
+    let view = CountView::from_doubles(
+        MatrixView::new(4, 3, &column_major, MatrixOrder::ColumnMajor).unwrap(),
+    )
+    .unwrap();
+    let supplied_geo_means = [4.0, 6.0, 8.0, 0.0];
+    let control_genes = [2, 1, 2, 0, 3];
+    for method in [SizeFactorMethod::Ratio, SizeFactorMethod::PosCounts] {
+        for geo in [None, Some(&supplied_geo_means[..])] {
+            for controls in [None, Some(&control_genes[..])] {
+                let expected =
+                    estimate_size_factors_with_options(&counts, method, geo, controls).unwrap();
+                let borrowed =
+                    estimate_size_factors_from_view(view, method, geo, controls).unwrap();
+                assert!(
+                    expected
+                        .iter()
+                        .zip(borrowed)
+                        .all(|(x, y)| x.to_bits() == y.to_bits())
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn ratio_size_factors_use_deseq2_log_scale_location() {
     let counts = CountMatrix::from_row_major_u32(2, 2, vec![1, 4, 4, 4]).unwrap();
     let size_factors = estimate_size_factors_ratio(&counts).unwrap();

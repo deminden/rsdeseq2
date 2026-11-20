@@ -1,7 +1,9 @@
 // Size factors, normalized counts and base metadata exports.
 // Optional geometric means use natural-scale units, as in the standalone API.
 use super::*;
-use rsdeseq2::normalization::{visit_base_metadata, visit_normalized_counts_column_major};
+use rsdeseq2::normalization::{
+    estimate_size_factors_from_view, visit_base_metadata, visit_normalized_counts_column_major,
+};
 
 /// # Safety
 /// The selected input pointer is valid for its complete buffer and lifetime.
@@ -43,7 +45,8 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
 ) -> i32 {
     run_backend(|| {
         // SAFETY: the C caller passes a readable buffer of these dimensions that stays valid for this call (see the export's safety contract).
-        let counts = unsafe { counts_from_r(n_genes, n_samples, counts)? };
+        let values = unsafe { column_major_view(n_genes, n_samples, counts, "counts")? };
+        let counts = CountView::from_doubles(values).map_err(|error| error.to_string())?;
         let geo = if geo_means.is_null() {
             None
         } else {
@@ -61,7 +64,7 @@ pub unsafe extern "C" fn rsdeseq2_r_estimate_size_factors(
             1 => SizeFactorMethod::PosCounts,
             _ => return Err("unknown size-factor method".into()),
         };
-        let factors = estimate_size_factors_with_options(&counts, method, geo, controls)
+        let factors = estimate_size_factors_from_view(counts, method, geo, controls)
             .map_err(|e| e.to_string())?;
         // SAFETY: the C caller passes a writable buffer of this length, uniquely borrowed for this call (see the export's safety contract).
         unsafe { output_slice(output, n_samples, "size factors")? }.write_copy_of_slice(&factors);

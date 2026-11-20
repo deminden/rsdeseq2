@@ -25,14 +25,32 @@ pub fn estimate_size_factors_with_options(
     geo_means: Option<&[f64]>,
     control_genes: Option<&[usize]>,
 ) -> Result<Vec<f64>, DeseqError> {
-    match method {
-        SizeFactorMethod::Ratio => {
-            estimate_size_factors_ratio_with_options(counts, geo_means, control_genes)
-        }
-        SizeFactorMethod::PosCounts => {
-            estimate_size_factors_poscounts_with_options(counts, geo_means, control_genes)
-        }
-    }
+    estimate_size_factors_for_counts(counts, method, geo_means, control_genes)
+}
+
+/// Estimate median-ratio size factors from validated counts in either layout.
+#[doc(hidden)]
+pub fn estimate_size_factors_from_view(
+    counts: CountView<'_>,
+    method: SizeFactorMethod,
+    geo_means: Option<&[f64]>,
+    control_genes: Option<&[usize]>,
+) -> Result<Vec<f64>, DeseqError> {
+    estimate_size_factors_for_counts(counts, method, geo_means, control_genes)
+}
+
+fn estimate_size_factors_for_counts(
+    counts: impl SizeFactorCounts,
+    method: SizeFactorMethod,
+    geo_means: Option<&[f64]>,
+    control_genes: Option<&[usize]>,
+) -> Result<Vec<f64>, DeseqError> {
+    let log_geo_means = match (geo_means, method) {
+        (Some(values), _) => supplied_log_geo_means(counts.n_genes(), values)?,
+        (None, SizeFactorMethod::Ratio) => ratio_log_geo_means(counts)?,
+        (None, SizeFactorMethod::PosCounts) => poscounts_log_geo_means(counts)?,
+    };
+    estimate_from_log_geo_means(counts, &log_geo_means, control_genes, geo_means.is_some())
 }
 
 /// Estimate DESeq2 median-ratio size factors.
@@ -49,12 +67,7 @@ pub fn estimate_size_factors_ratio_with_options(
     geo_means: Option<&[f64]>,
     control_genes: Option<&[usize]>,
 ) -> Result<Vec<f64>, DeseqError> {
-    let incoming_geo_means = geo_means.is_some();
-    let log_geo_means = match geo_means {
-        Some(values) => supplied_log_geo_means(counts, values)?,
-        None => ratio_log_geo_means(counts)?,
-    };
-    estimate_from_log_geo_means(counts, &log_geo_means, control_genes, incoming_geo_means)
+    estimate_size_factors_with_options(counts, SizeFactorMethod::Ratio, geo_means, control_genes)
 }
 
 /// Estimate DESeq2 `poscounts` size factors.
@@ -72,12 +85,12 @@ pub fn estimate_size_factors_poscounts_with_options(
     geo_means: Option<&[f64]>,
     control_genes: Option<&[usize]>,
 ) -> Result<Vec<f64>, DeseqError> {
-    let incoming_geo_means = geo_means.is_some();
-    let log_geo_means = match geo_means {
-        Some(values) => supplied_log_geo_means(counts, values)?,
-        None => poscounts_log_geo_means(counts)?,
-    };
-    estimate_from_log_geo_means(counts, &log_geo_means, control_genes, incoming_geo_means)
+    estimate_size_factors_with_options(
+        counts,
+        SizeFactorMethod::PosCounts,
+        geo_means,
+        control_genes,
+    )
 }
 
 /// Estimate size factors the way `estimateSizeFactors(dds, type = ...)` and
@@ -102,7 +115,7 @@ pub fn estimate_size_factors_for_dataset(
                 .into_iter()
                 .map(f64::exp_p)
                 .collect::<Vec<_>>();
-            let log_geo_means = supplied_log_geo_means(counts, &geo_means)?;
+            let log_geo_means = supplied_log_geo_means(counts.n_genes(), &geo_means)?;
             estimate_from_log_geo_means(counts, &log_geo_means, control_genes, true)
         }
         _ => estimate_size_factors_with_options(counts, method, geo_means, control_genes),
@@ -619,61 +632,105 @@ fn validate_base_weights(
     Ok(())
 }
 
-fn ratio_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
+// Keep native row slices available to the owned-count path while sharing
+// geometric means and the median pass with strided foreign input.
+trait SizeFactorCounts: Copy {
+    fn n_genes(self) -> usize;
+    fn n_samples(self) -> usize;
+    fn row(self, gene: usize) -> impl Iterator<Item = u32>;
+    fn at(self, gene: usize, sample: usize) -> u32;
+
+    fn row_contains_zero(self, gene: usize) -> bool {
+        self.row(gene).any(|count| count == 0)
+    }
+}
+
+impl SizeFactorCounts for &CountMatrix {
+    fn n_genes(self) -> usize {
+        CountMatrix::n_genes(self)
+    }
+    fn n_samples(self) -> usize {
+        CountMatrix::n_samples(self)
+    }
+    fn row(self, gene: usize) -> impl Iterator<Item = u32> {
+        self.row_values(gene).iter().copied()
+    }
+    fn at(self, gene: usize, sample: usize) -> u32 {
+        self.row_values(gene)[sample]
+    }
+    fn row_contains_zero(self, gene: usize) -> bool {
+        self.row_values(gene).contains(&0)
+    }
+}
+
+impl SizeFactorCounts for CountView<'_> {
+    fn n_genes(self) -> usize {
+        CountView::n_genes(&self)
+    }
+    fn n_samples(self) -> usize {
+        CountView::n_samples(&self)
+    }
+    fn row(self, gene: usize) -> impl Iterator<Item = u32> {
+        (0..self.n_samples()).map(move |sample| self.at(gene, sample))
+    }
+    fn at(self, gene: usize, sample: usize) -> u32 {
+        CountView::at(&self, gene, sample)
+    }
+}
+
+fn ratio_log_geo_means(counts: impl SizeFactorCounts) -> Result<Vec<f64>, DeseqError> {
+    let samples = counts.n_samples();
     (0..counts.n_genes())
         .map(|gene| {
-            let row = counts.row_values(gene);
-            if row.contains(&0) {
+            if counts.row_contains_zero(gene) {
                 Ok(f64::NEG_INFINITY)
             } else {
                 // R's rowMeans() accumulates with extended precision. A
                 // compensated sum preserves the same low-order information in
                 // portable f64 arithmetic and prevents near-boundary genes
                 // from changing optimizer routes through size-factor drift.
-                let sum = checked_compensated_sum(row.iter().map(|count| f64::from(*count).ln_p()))
-                    .nonfinite_at("ratio geometric mean log sum", Some(gene))?;
-                checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
-                    DeseqError::NonFiniteValue {
-                        context: "ratio geometric mean log mean".to_string(),
-                        index: Some(gene),
-                        value: error.value,
-                    }
+                let sum =
+                    checked_compensated_sum(counts.row(gene).map(|count| f64::from(count).ln_p()))
+                        .nonfinite_at("ratio geometric mean log sum", Some(gene))?;
+                checked::try_div(sum, samples as f64).map_err(|error| DeseqError::NonFiniteValue {
+                    context: "ratio geometric mean log mean".to_string(),
+                    index: Some(gene),
+                    value: error.value,
                 })
             }
         })
         .collect()
 }
 
-fn poscounts_log_geo_means(counts: &CountMatrix) -> Result<Vec<f64>, DeseqError> {
+fn poscounts_log_geo_means(counts: impl SizeFactorCounts) -> Result<Vec<f64>, DeseqError> {
+    let samples = counts.n_samples();
     (0..counts.n_genes())
         .map(|gene| {
-            let row = counts.row_values(gene);
-            if row.iter().all(|count| *count == 0) {
+            if counts.row(gene).all(|count| count == 0) {
                 Ok(f64::NEG_INFINITY)
             } else {
                 let sum = checked_compensated_sum(
-                    row.iter()
-                        .filter(|count| **count > 0)
-                        .map(|count| f64::from(*count).ln_p()),
+                    counts
+                        .row(gene)
+                        .filter(|&count| count > 0)
+                        .map(|count| f64::from(count).ln_p()),
                 )
                 .nonfinite_at("poscounts geometric mean log sum", Some(gene))?;
-                checked::try_div(sum, counts.n_samples() as f64).map_err(|error| {
-                    DeseqError::NonFiniteValue {
-                        context: "poscounts geometric mean log mean".to_string(),
-                        index: Some(gene),
-                        value: error.value,
-                    }
+                checked::try_div(sum, samples as f64).map_err(|error| DeseqError::NonFiniteValue {
+                    context: "poscounts geometric mean log mean".to_string(),
+                    index: Some(gene),
+                    value: error.value,
                 })
             }
         })
         .collect()
 }
 
-fn supplied_log_geo_means(counts: &CountMatrix, geo_means: &[f64]) -> Result<Vec<f64>, DeseqError> {
-    if geo_means.len() != counts.n_genes() {
+fn supplied_log_geo_means(genes: usize, geo_means: &[f64]) -> Result<Vec<f64>, DeseqError> {
+    if geo_means.len() != genes {
         return Err(invalid_dimensions(
             "geometric means",
-            counts.n_genes(),
+            genes,
             geo_means.len(),
         ));
     }
@@ -696,7 +753,7 @@ fn supplied_log_geo_means(counts: &CountMatrix, geo_means: &[f64]) -> Result<Vec
 }
 
 fn estimate_from_log_geo_means(
-    counts: &CountMatrix,
+    counts: impl SizeFactorCounts,
     log_geo_means: &[f64],
     control_genes: Option<&[usize]>,
     stabilize_to_geometric_mean_one: bool,
@@ -704,7 +761,7 @@ fn estimate_from_log_geo_means(
     if log_geo_means.iter().all(|value| value.is_infinite()) {
         return Err(DeseqError::NoUsableGenesForSizeFactors);
     }
-    let mut genes = usable_gene_indices(counts, control_genes)?;
+    let mut genes = usable_gene_indices(counts.n_genes(), control_genes)?;
     genes.retain(|&gene| log_geo_means[gene].is_finite());
     let mut size_factors = Vec::with_capacity(counts.n_samples());
     let mut log_ratios = try_alloc_matrix(genes.len(), 1, "size-factor log ratios")?;
@@ -712,7 +769,7 @@ fn estimate_from_log_geo_means(
         log_ratios.clear();
         for gene in &genes {
             let log_geo_mean = log_geo_means[*gene];
-            let count = counts.row_values(*gene)[sample];
+            let count = counts.at(*gene, sample);
             if count > 0 {
                 log_ratios.push(
                     checked::try_sub(f64::from(count).ln_p(), log_geo_mean).map_err(|error| {
@@ -740,7 +797,7 @@ fn estimate_from_log_geo_means(
 }
 
 fn usable_gene_indices(
-    counts: &CountMatrix,
+    genes: usize,
     control_genes: Option<&[usize]>,
 ) -> Result<Vec<usize>, DeseqError> {
     match control_genes {
@@ -749,17 +806,17 @@ fn usable_gene_indices(
                 return Err(DeseqError::NoUsableGenesForSizeFactors);
             }
             for index in indices {
-                if *index >= counts.n_genes() {
+                if *index >= genes {
                     return Err(DeseqError::InvalidDimensions {
                         context: "control gene index".to_string(),
-                        expected: counts.n_genes().saturating_sub(1),
+                        expected: genes.saturating_sub(1),
                         actual: *index,
                     });
                 }
             }
             Ok(indices.to_vec())
         }
-        None => Ok((0..counts.n_genes()).collect()),
+        None => Ok((0..genes).collect()),
     }
 }
 
