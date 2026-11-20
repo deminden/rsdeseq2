@@ -202,6 +202,10 @@ versions live in [docs/releases](docs/releases/).
 
 ### Fixed
 
+- R 4.5 can import likelihood closures with already evaluated captures.
+  Reading their cached values preserves the guard against evaluating active
+  bindings or delayed expressions.
+
 - `poscounts` size factors in the pipeline (`DeseqBuilder`, `DeseqBuilder::run`,
   the CLI beta-prior paths) now match `DESeq(dds, sfType = "poscounts")`: the
   `DESeqDataSet` method passes its own non-zero geometric means and so

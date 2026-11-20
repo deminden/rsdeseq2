@@ -42,7 +42,6 @@ testthat::test_that("custom likelihood import rejects executable bindings and un
   testthat::expect_false(touched)
 })
 testthat::test_that("already forced closure parameters are read without repeating their expressions", {
-  testthat::skip_if(getRversion() < "4.6.0")
   state <- new.env(parent = emptyenv())
   state$touched <- FALSE
   make_function <- function(constant) {
@@ -62,7 +61,6 @@ testthat::test_that("canonical likelihood descriptors retain parameter captures 
   testthat::skip_if_not_installed("ashr")
   translate <- rsdeseq2:::.rsdeseq2_native_ash_likelihood
   testthat::expect_identical(translate(ashr::lik_normal()), list(type = "normal"))
-  testthat::skip_if(getRversion() < "4.6.0")
   testthat::expect_identical(translate(ashr::lik_t(5)), list(type = "t", df = 5))
   normal <- ashr::lik_normal()
   normal$etruncFUN <- function(a, b) stop("must not execute")
