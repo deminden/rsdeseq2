@@ -1,5 +1,6 @@
 use super::*;
 use crate::numeric::math::ProfileMath;
+use nalgebra::{DVectorView, Dyn, linalg::LU};
 // Starting coefficients and stable fitted means.
 
 pub(super) fn initial_beta(
@@ -7,15 +8,19 @@ pub(super) fn initial_beta(
     y: &[f64],
     nf: &[f64],
 ) -> Result<DVector<f64>, DeseqError> {
-    initial_beta_impl(x, y, nf, None)
+    let mut beta = DVector::zeros(x.ncols());
+    InitialBeta::least_squares(x).initialize(y, nf, &mut Vec::new(), &mut beta)?;
+    Ok(beta)
 }
 
 /// How `fitNbinomGLMs` (DESeq2 1.52, R/fitNbinomGLMs.R) starts IRLS.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::glm) enum InitialBeta {
+pub(super) enum InitialBeta {
     /// Full-rank design (`qr(x)$rank == ncol(x)`): least squares on
     /// `log(normalized count + 0.1)`.
-    LeastSquares,
+    LeastSquares {
+        transpose: DMatrix<f64>,
+        lu: LU<f64, Dyn, Dyn>,
+    },
     /// Rank-deficient design with an `Intercept` column: that coefficient
     /// starts at `log(rowMeans(normalized counts))`, the others at 0.
     LogBaseMeanIntercept(usize),
@@ -24,9 +29,9 @@ pub(in crate::glm) enum InitialBeta {
 }
 
 impl InitialBeta {
-    pub(in crate::glm) fn for_design(design: &DesignMatrix) -> Result<Self, DeseqError> {
+    pub(super) fn for_design(design: &DesignMatrix, x: &DMatrix<f64>) -> Result<Self, DeseqError> {
         if design.rank()? == design.n_coefficients() {
-            return Ok(Self::LeastSquares);
+            return Ok(Self::least_squares(x));
         }
         let intercept = design.coefficient_names().and_then(|names| {
             names
@@ -35,56 +40,44 @@ impl InitialBeta {
         });
         Ok(intercept.map_or(Self::Ones, Self::LogBaseMeanIntercept))
     }
-}
 
-/// Starting coefficients by DESeq2's rule for this design.
-pub(super) fn initial_beta_for_rule(
-    x: &DMatrix<f64>,
-    y: &[f64],
-    nf: &[f64],
-    initial_lu: Option<&LU<f64, Dyn, Dyn>>,
-    rule: InitialBeta,
-) -> Result<DVector<f64>, DeseqError> {
-    match rule {
-        InitialBeta::LeastSquares => initial_beta_impl(x, y, nf, initial_lu),
-        InitialBeta::Ones => Ok(DVector::from_element(x.ncols(), 1.0)),
-        InitialBeta::LogBaseMeanIntercept(intercept) => {
-            let mut total = 0.0;
-            for (count, factor) in y.iter().copied().zip(nf.iter().copied()) {
-                validate_positive_finite(factor, "normalization factor", 0)?;
-                total += count / factor;
-            }
-            let mut beta = DVector::from_element(x.ncols(), 0.0);
-            beta[intercept] = (total / y.len() as f64).ln_p();
-            Ok(beta)
-        }
+    fn least_squares(x: &DMatrix<f64>) -> Self {
+        let transpose = x.transpose();
+        let lu = (&transpose * x).lu();
+        Self::LeastSquares { transpose, lu }
     }
-}
 
-pub(super) fn initial_beta_impl(
-    x: &DMatrix<f64>,
-    y: &[f64],
-    nf: &[f64],
-    initial_lu: Option<&LU<f64, Dyn, Dyn>>,
-) -> Result<DVector<f64>, DeseqError> {
-    let response = y
-        .iter()
-        .copied()
-        .zip(nf.iter().copied())
-        .map(|(count, factor)| {
-            validate_positive_finite(factor, "normalization factor", 0)?;
-            Ok((count / factor + 0.1).ln_p())
-        })
-        .collect::<Result<Vec<_>, DeseqError>>()?;
-    let xty = x.transpose() * DVector::from_vec(response);
-    let beta = match initial_lu {
-        Some(lu) => lu.solve(&xty),
-        None => (x.transpose() * x).lu().solve(&xty),
-    };
-    if let Some(beta) = beta {
-        Ok(beta)
-    } else {
-        Ok(DVector::from_element(x.ncols(), 0.0))
+    pub(super) fn initialize(
+        &self,
+        y: &[f64],
+        nf: &[f64],
+        response: &mut Vec<f64>,
+        beta: &mut DVector<f64>,
+    ) -> Result<(), DeseqError> {
+        match self {
+            Self::LeastSquares { transpose, lu } => {
+                response.clear();
+                for (count, factor) in y.iter().copied().zip(nf.iter().copied()) {
+                    validate_positive_finite(factor, "normalization factor", 0)?;
+                    response.push((count / factor + 0.1).ln_p());
+                }
+                transpose.mul_to(&DVectorView::from_slice(response, response.len()), beta);
+                if !lu.solve_mut(beta) {
+                    beta.fill(0.0);
+                }
+            }
+            Self::Ones => beta.fill(1.0),
+            Self::LogBaseMeanIntercept(intercept) => {
+                let mut total = 0.0;
+                for (count, factor) in y.iter().copied().zip(nf.iter().copied()) {
+                    validate_positive_finite(factor, "normalization factor", 0)?;
+                    total += count / factor;
+                }
+                beta.fill(0.0);
+                beta[*intercept] = (total / y.len() as f64).ln_p();
+            }
+        }
+        Ok(())
     }
 }
 

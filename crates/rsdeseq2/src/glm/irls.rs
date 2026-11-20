@@ -3,7 +3,7 @@ use crate::numeric::math::ProfileMath;
 use crate::numeric::validate::{
     nonnegative_finite as validate_nonnegative_finite, positive_finite as validate_positive_finite,
 };
-use nalgebra::{DMatrix, DVector, Dyn, linalg::LU};
+use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
 use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 use std::cell::RefCell;
@@ -470,8 +470,7 @@ fn fit_irls_rows<const SELECTED: bool>(
         design.matrix().as_slice(),
     );
     let max_design = finite_abs_max(x.as_slice());
-    let initial_lu = (x.transpose() * &x).lu();
-    let initial_beta = InitialBeta::for_design(design)?;
+    let initial_beta = InitialBeta::for_design(design, &x)?;
     let shared_log_offsets = match rows.input.offsets {
         Offsets::PerSample(factors) => {
             Some(factors.iter().copied().map(f64::ln_p).collect::<Vec<_>>())
@@ -555,8 +554,7 @@ fn fit_irls_rows<const SELECTED: bool>(
                         rows,
                         x: &x,
                         max_design,
-                        initial_lu: &initial_lu,
-                        initial_beta,
+                        initial_beta: &initial_beta,
                         ridge_lambda: &ridge_lambda,
                         options: &options,
                     },
@@ -690,8 +688,7 @@ struct IrlsRowInput<'a, const SELECTED: bool> {
     rows: IrlsRows<'a, SELECTED>,
     x: &'a DMatrix<f64>,
     max_design: Option<f64>,
-    initial_lu: &'a LU<f64, Dyn, Dyn>,
-    initial_beta: InitialBeta,
+    initial_beta: &'a InitialBeta,
     ridge_lambda: &'a [f64],
     options: &'a IrlsOptions,
 }

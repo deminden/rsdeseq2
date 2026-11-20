@@ -9,6 +9,7 @@ pub(super) struct IrlsScratch {
     fitted_means: Vec<f64>,
     weights: Vec<f64>,
     response: Vec<f64>,
+    coefficients: DVector<f64>,
     least_squares: LeastSquaresScratch,
     covariance: CovarianceScratch,
 }
@@ -32,6 +33,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         fitted_means: mu,
         weights: w,
         response: z,
+        coefficients: beta,
         least_squares,
         covariance: covariance_scratch,
     } = scratch;
@@ -48,11 +50,13 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
     };
     let weight_row = input.rows.weights(source_gene)?;
     let dispersion = input.rows.input.dispersions[source_gene];
-    let mut beta =
-        initial_beta_for_rule(input.x, y, nf, Some(input.initial_lu), input.initial_beta)?;
+    if beta.len() != input.x.ncols() {
+        *beta = DVector::zeros(input.x.ncols());
+    }
+    input.initial_beta.initialize(y, nf, z, beta)?;
     fitted_mu_into(
         input.x,
-        &beta,
+        beta,
         nf,
         Some(input.options.min_mu),
         Some(log_nf),
@@ -74,7 +78,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
             z,
             input.ridge_lambda,
             input.options.solver,
-            &mut beta,
+            beta,
         )
         .is_none()
         {
@@ -90,7 +94,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
         }
         fitted_mu_into(
             input.x,
-            &beta,
+            beta,
             nf,
             Some(input.options.min_mu),
             Some(log_nf),
@@ -151,7 +155,7 @@ pub(super) fn fit_fixed_dispersion_irls_row<const SELECTED: bool>(
             false
         }
     };
-    fitted_mu_into(input.x, &beta, nf, None, Some(log_nf), mu)?;
+    fitted_mu_into(input.x, beta, nf, None, Some(log_nf), mu)?;
     output.mu.copy_from_slice(mu);
     let converged = converged && iter < input.options.maxit;
     Ok(IrlsRowStatus {

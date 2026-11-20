@@ -5,6 +5,35 @@ use approx::assert_relative_eq;
 use serde::Deserialize;
 
 #[test]
+fn rank_deficient_start_overwrites_reused_coefficients() {
+    let counts = [2.0, 8.0];
+    let factors = [2.0, 1.0];
+    let x = DMatrix::from_element(2, 2, 1.0);
+    let with_intercept = DesignMatrix::from_row_major(
+        2,
+        2,
+        vec![1.0; 4],
+        Some(vec!["duplicate".to_string(), "Intercept".to_string()]),
+    )
+    .unwrap();
+    let unnamed = DesignMatrix::from_row_major(2, 2, vec![1.0; 4], None).unwrap();
+    let mut beta = DVector::from_vec(vec![f64::NAN, f64::INFINITY]);
+    let mut response = vec![f64::NAN; 2];
+
+    InitialBeta::for_design(&with_intercept, &x)
+        .unwrap()
+        .initialize(&counts, &factors, &mut response, &mut beta)
+        .unwrap();
+    assert_eq!(beta.as_slice(), &[0.0, 4.5_f64.ln_p()]);
+
+    InitialBeta::for_design(&unnamed, &x)
+        .unwrap()
+        .initialize(&counts, &factors, &mut response, &mut beta)
+        .unwrap();
+    assert_eq!(beta.as_slice(), &[1.0, 1.0]);
+}
+
+#[test]
 fn qr_triangle_keeps_lu_signed_zeros_and_subnormal_pivots() {
     let mut triangular = DMatrix::zeros(4, 4);
     for first_pivot in [2.0, f64::from_bits(1)] {
