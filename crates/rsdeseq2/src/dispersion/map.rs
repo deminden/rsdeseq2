@@ -173,20 +173,17 @@ pub fn estimate_map_dispersions(
             fit_input
         })?;
         let line_converged = line_search.iter < options.maxit;
-        let mut map_value = line_search.dispersion;
-        if !line_converged {
-            map_value = grid_search_dispersion(DispersionFitInput {
-                initial_dispersion: map_value,
-                ..fit_input.design(input.design)
-            })?
-            .0;
-        }
+        let map_value = if line_converged {
+            line_search.dispersion
+        } else {
+            grid_search_dispersion(fit_input.design(input.design))?.0
+        };
         if !map_value.is_finite() || map_value <= 0.0 {
             return Err(DeseqError::InvalidDispersion {
                 reason: "MAP dispersion optimizer produced a non-finite estimate".to_string(),
             });
         }
-        map_value = map_value.clamp(options.min_disp, max_disp);
+        let map_value = map_value.clamp(options.min_disp, max_disp);
         let outlier = map_dispersion_outlier(
             gene_est,
             fit,

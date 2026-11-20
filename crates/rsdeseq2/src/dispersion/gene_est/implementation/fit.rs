@@ -81,18 +81,19 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
     n_samples: usize,
     weights: Option<&[f64]>,
 ) -> Result<GeneDispersionFitDiagnostics, DeseqError> {
+    let input = DispersionFitInput {
+        counts,
+        mu,
+        design: Some(design),
+        initial_dispersion,
+        options,
+        n_samples,
+        prior: None,
+        weights,
+    };
     match options.fit_method {
         GeneWiseDispersionFitMethod::Grid => {
-            let (dispersion, evaluations) = grid_search_dispersion(DispersionFitInput {
-                counts,
-                mu,
-                design: Some(design),
-                initial_dispersion,
-                options,
-                n_samples,
-                prior: None,
-                weights,
-            })?;
+            let (dispersion, evaluations) = grid_search_dispersion(input)?;
             let last_lp = dispersion_log_posterior_objective(
                 DispersionObjectiveInput {
                     counts,
@@ -115,29 +116,10 @@ pub(super) fn fit_dispersion_for_gene_detailed_with_weights(
             })
         }
         GeneWiseDispersionFitMethod::LineSearch => {
-            let line_search = line_search_dispersion(DispersionFitInput {
-                counts,
-                mu,
-                design: Some(design),
-                initial_dispersion,
-                options,
-                n_samples,
-                prior: None,
-                weights,
-            })?;
+            let line_search = line_search_dispersion(input)?;
             let mut dispersion = line_search.dispersion;
             if !line_search.converged && dispersion > options.min_disp * 10.0 {
-                dispersion = grid_search_dispersion(DispersionFitInput {
-                    counts,
-                    mu,
-                    design: Some(design),
-                    initial_dispersion: dispersion,
-                    options,
-                    n_samples,
-                    prior: None,
-                    weights,
-                })?
-                .0;
+                dispersion = grid_search_dispersion(input)?.0;
             }
             Ok(GeneDispersionFitDiagnostics {
                 estimate: dispersion,
@@ -311,7 +293,7 @@ pub struct DispersionFitInput<'a> {
     pub mu: &'a [f64],
     /// Design for the Cox-Reid adjustment.
     pub design: Option<&'a DesignMatrix>,
-    /// Starting dispersion.
+    /// Starting dispersion for line search. Grid search starts from the bounds.
     pub initial_dispersion: f64,
     /// Optimizer options.
     pub options: GeneWiseDispersionOptions,
